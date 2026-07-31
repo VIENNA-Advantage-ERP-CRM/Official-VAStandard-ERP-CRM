@@ -140,7 +140,8 @@
     overflow-y: auto;
     /* Same glass-card surface as the search bar: 2px white border, 14px radius,
        soft navy shadow (slightly lifted as it floats over the dashboard). */
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.80));
+    /* background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.80));*/
+    background: #fff;
     backdrop-filter: blur(8px);
     border: 2px solid #FFFFFF;
     border-radius: 14px;
@@ -280,6 +281,103 @@
     width: 0.95em;
     height: 0.95em;
     flex-shrink: 0;
+}
+
+/* ---------- Accent-bar result row (VAS_069) ----------------------------
+   A status-coloured bar down the left edge states the document's condition,
+   which lets the status badge itself stay quiet. Everything that describes
+   the record - kind, date, name, cash book - shares one meta line under the
+   document number instead of being spread over the row. */
+.vas-dssrch-row-accent {
+    position: relative;
+    align-items: center;
+    margin-bottom: 0.3rem;
+    padding: 0.5rem 0.6rem 0.5rem 0.85rem;
+    background: #FFFFFF;
+    /*border: 1px solid rgba(16, 47, 74, 0.06);
+    box-shadow: 0 1px 2px rgba(16, 47, 74, 0.04);*/
+}
+
+.vas-dssrch-row-accent:last-child {
+    margin-bottom: 0;
+}
+
+.vas-dssrch-accent {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: 9px 0 0 9px;
+    background: #9AB0C0;
+}
+
+.vas-dssrch-tone-ok    .vas-dssrch-accent { background: #20A464; }
+.vas-dssrch-tone-info  .vas-dssrch-accent { background: #0083DA; }
+.vas-dssrch-tone-warn  .vas-dssrch-accent { background: #D78B10; }
+.vas-dssrch-tone-err   .vas-dssrch-accent { background: #D14545; }
+.vas-dssrch-tone-muted .vas-dssrch-accent { background: #9AB0C0; }
+
+/* The accent already carries the state, so the badge drops the uppercase
+   shout and reads as a plain word. */
+.vas-dssrch-row-accent .vas-dssrch-status {
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.vas-dssrch-metaline {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    margin-top: 0.2rem;
+    color: #748494;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.vas-dssrch-kind {
+    flex-shrink: 0;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(0, 131, 218, 0.10);
+    color: #0072C6;
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+/* Facts shrink from the right: the cash book gives way before the date. */
+.vas-dssrch-mtext {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-dssrch-sep {
+    flex-shrink: 0;
+    color: #B8C6D2;
+}
+
+.vas-dssrch-micon {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.vas-dssrch-micon svg {
+    width: 0.95em;
+    height: 0.95em;
+    flex-shrink: 0;
+}
+
+/* A linked-invoice hit keeps the violet it has elsewhere in the family. */
+.vas-dssrch-minv {
+    color: #6B4BE0;
+    font-weight: 600;
 }
 
 .vas-dssrch-title {

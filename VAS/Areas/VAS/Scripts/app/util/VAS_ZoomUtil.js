@@ -7,6 +7,8 @@
  *     - AD_Window_ID <= 0  -> resolve the id from the window names first
  *                             (VAS/VAS_ZoomWindow/GetWindowId -> PoReceiptTabPanelModel.GetWindowId:
  *                              new name -> old name -> VAS_ZoomScreenConfig), then zoom.
+ *     - Record_ID 0        -> the window is opened without positioning on a record
+ *                             (what a "new record" quick action needs).
  *     - no id and no names -> nothing happens; the caller's link simply does not navigate.
  *   Returns a promise resolved with the AD_Window_ID actually used (0 when no zoom
  *   happened), so a caller can keep the id and skip the lookup next time.
@@ -39,22 +41,30 @@
         return value == null ? '' : String(value).trim();
     }
 
-    /* Opens the window on the single record. Returns the id used, or 0 when the
-       framework pieces or the arguments are not usable - zoom is best-effort. */
+    /* Opens the window on the single record. Record_ID 0 opens the window without
+       positioning on anything (a "new record" style action). Returns the id used,
+       or 0 when the framework pieces or the arguments are not usable - zoom is
+       best-effort. */
     function startWindow(primaryColumnName, recordId, windowId) {
-        if (windowId <= 0 || recordId <= 0 || !primaryColumnName) {
+        if (windowId <= 0 || recordId < 0 || !primaryColumnName) {
             return 0;
         }
 
-        if (!window.VIS || typeof VIS.Query !== 'function' ||
-            !VIS.viewManager || typeof VIS.viewManager.startWindow !== 'function') {
+        if (!window.VIS || !VIS.viewManager || typeof VIS.viewManager.startWindow !== 'function') {
+            return 0;
+        }
+
+        if (recordId > 0 && typeof VIS.Query !== 'function') {
             return 0;
         }
 
         try {
-            var zoomQuery = new VIS.Query();
-            zoomQuery.addRestriction(primaryColumnName, VIS.Query.prototype.EQUAL, recordId);
-            zoomQuery.setRecordCount(1);
+            var zoomQuery = null;
+            if (recordId > 0) {
+                zoomQuery = new VIS.Query();
+                zoomQuery.addRestriction(primaryColumnName, VIS.Query.prototype.EQUAL, recordId);
+                zoomQuery.setRecordCount(1);
+            }
             VIS.viewManager.startWindow(windowId, zoomQuery);
             return windowId;
         }
