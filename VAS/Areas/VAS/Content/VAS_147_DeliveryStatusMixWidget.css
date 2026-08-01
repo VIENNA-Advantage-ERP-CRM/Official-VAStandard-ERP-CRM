@@ -60,14 +60,32 @@
 .vas-dsm-filters { display: flex; align-items: center; gap: .375em; flex-shrink: 0; }
 .vas-dsm-sel { position: relative; display: inline-flex; }
 .vas-dsm-sel select {
-    appearance: none; -webkit-appearance: none; font-family: inherit; font-weight: 500;
-    font-size: .75em; color: #102C3F; background: rgba(255, 255, 255, .9);
-    border: 1px solid #E4EDF4; border-radius: 8px; padding: .375em 1.625em .375em .625em;
-    cursor: pointer; line-height: 1.2;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+    font-size: 0.75em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    color: #102C3F;
+    background-color: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    padding: 0.35em 0.75em;
+    min-width: 4.5em;
+    text-align: center;
+    text-align-last: center;
+    outline: none;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-.vas-dsm-sel select:hover { background: #EAF4FD; }
-.vas-dsm-sel select:focus { outline: 2px solid #9ED1FF; outline-offset: 1px; }
-.vas-dsm-chev { position: absolute; right: .4375em; top: 50%; transform: translateY(-50%); pointer-events: none; width: .875em; height: .875em; }
+.vas-dsm-sel select:hover,
+.vas-dsm-sel select:focus {
+    background-color: #EEF8FF;
+    border-color: #0083DA;
+}
+.vas-dsm-chev { display: none !important; }
 
 /* ---- body: status-mix bars ---- */
 .vas-dsm-body { flex: 1; min-height: 0; overflow: hidden; margin-top: .25em; display: flex; flex-direction: column; justify-content: space-evenly; }
@@ -107,7 +125,7 @@
 .vas-dsm-overlay {
     /* Viewport-anchored (the modal lives on <body>, outside the widget), same
        basis as the widget card so it scales at any resolution; internals are em. */
-    font-size: clamp(0.9rem, 1.6vw, 2.2rem);
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0117), 24px);
     position: fixed; inset: 0; background: rgba(16, 44, 63, .35);
     display: flex; align-items: center; justify-content: center; z-index: 50; padding: 2em;
     font-family: Roboto, Arial, sans-serif;

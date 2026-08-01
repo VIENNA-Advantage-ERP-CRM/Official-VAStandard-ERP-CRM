@@ -180,6 +180,15 @@
         }
 
         function openDeliveryWindow() {
+            var windowParam = {
+                "IsTabInNewMode": "true",
+                "TabIndex": "0"
+            };
+            if ($self.listener && typeof $self.listener.widgetFirevalueChanged === "function") {
+                $self.widgetFirevalueChanged(windowParam);
+                return;
+            }
+
             if (deliveryWindowId > 0) {
                 startWindowById(deliveryWindowId);
                 return;

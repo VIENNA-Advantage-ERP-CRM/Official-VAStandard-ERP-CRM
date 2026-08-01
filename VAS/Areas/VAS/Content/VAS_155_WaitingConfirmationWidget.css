@@ -113,11 +113,7 @@
 .MPC-wc-ghead,
 .MPC-wc-row {
     display: grid;
-    /* Status column is a FIXED width, not auto: each row is its own grid, so an
-       auto status column sized to its own pill ("Drafted" vs "In Progress") and
-       shifted the fr columns differently per row - misaligning them from the
-       header. A fixed width makes every row split the fr columns identically. */
-    grid-template-columns: 1.2fr 1.6fr 0.7fr 5.75em;
+    grid-template-columns: 2.2fr 0.7fr 5.75em;
     column-gap: 0.75em;
     align-items: center;
 }
@@ -142,11 +138,6 @@
     margin-top: 0.5em;
     padding: 0 0.5em 0.375em;
     border-bottom: 1px solid #EDF2F6;
-    /* NOTE: no font-size here. The em-based grid track (5.75em) and column-gap
-       (0.75em) resolve against the grid's own font-size, so a smaller font on the
-       header made those columns narrower than in the 1em data rows - shifting every
-       column. The 0.75em label size lives on the header cells below instead, so the
-       header and rows share the same element font and the columns line up. */
     color: #748494;
     text-transform: capitalize;
     flex-shrink: 0;
@@ -172,13 +163,14 @@
 .MPC-wc-rows .MPC-wc-state { grid-row: 1 / -1; }
 
 .MPC-wc-datarow {
-    width: 100%;
-    text-align: left;
     background: transparent;
     border: none;
-    border-bottom: 1px solid #EDF2F6;
+    border-bottom: 1px solid #F0F4F8;
+    border-radius: 8px;
+    width: 100%;
+    text-align: left;
     font-family: inherit;
-    padding: 0.5em;
+    padding: 0.375em 0.5em;
     cursor: pointer;
     transition: background 0.15s ease;
 }
@@ -192,9 +184,26 @@
 }
 
 .MPC-wc-c-primary {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.MPC-wc-c-title {
     font-size: 0.75em;
     font-weight: 700;
     color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-wc-c-customer-sub {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #748494;
+    line-height: 1.25;
+    margin-top: 1px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -359,7 +368,7 @@
        width-driven anchor could outgrow the height budget on wide screens and
        the body scrolled - defeating the pagination that exists precisely so a
        page always fits without scrolling. */
-    font-size: min(clamp(0.9rem, 1.6vw, 2.2rem), 2.7vh);
+    font-size: min(clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0117), 24px), 2.7vh);
 }
 
 .MPC-wc-m-head {
