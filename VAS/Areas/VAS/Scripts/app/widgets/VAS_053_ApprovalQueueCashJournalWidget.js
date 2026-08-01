@@ -68,6 +68,13 @@
         var pageSize = 3;
         var totalPages = 0;
 
+        /* Zoom target for a document-no click when the widget is NOT hosted inside a
+           window (windowNo < 0): VAS.ZoomUtil resolves the AD_Window_ID from these
+           names once and the id is kept for the next click. */
+        var zoomWindowId = 0;
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_CashJournal';
+        var ZOOM_WINDOW_NAME_OLD = 'Cash Journal';
+
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
             return text && text !== key && text !== '[' + key + ']' ? text : fallback;
@@ -152,26 +159,6 @@
                 '</svg>';
         }
 
-        /* The framework navigates IN-PLACE (no new window) only when the payload's
-           ActionName equals the name of the window currently HOSTING this widget;
-           otherwise it opens a new window. Resolve the host window name from the
-           listener chain and pass it as ActionName. */
-        function hostWindowName() {
-            try {
-                var listener = $self.listener;
-                for (var index = 0; index < 6 && listener; index++) {
-                    if (listener.apanel && listener.apanel.gridWindow && listener.apanel.gridWindow.getName) {
-                        return listener.apanel.gridWindow.getName();
-                    }
-                    if (listener.gridWindow && listener.gridWindow.getName) {
-                        return listener.gridWindow.getName();
-                    }
-                    listener = listener.listener;
-                }
-            } catch (e) { }
-            return '';
-        }
-
         /* Zoom to the cash journal record (C_Cash) behind the queue row — same
            contract as the Cash Journal search widget (VAS_069). */
         function zoomToCashJournal(recordId) {
@@ -182,13 +169,23 @@
             }
 
             try {
-                $self.widgetFirevalueChanged({
-                    'TabWhereClause': 'C_Cash.C_Cash_ID=' + recordId,
-                    'TabLayout': 'Y',   /* 'N' Grid, 'Y' Single, 'C' Card */
-                    'TabIndex': '0',
-                    'ActionName': hostWindowName() || 'VAS_CashJournal',
-                    'ActionType': 'W'
-                });
+                if ($self.windowNo >= 0) {
+                    /* Hosted in a window - navigate that window's grid to the record. */
+                    $self.widgetFirevalueChanged({
+                        'TabWhereClause': 'C_Cash.C_Cash_ID=' + recordId,
+                        'TabLayout': 'Y',   /* 'N' Grid, 'Y' Single, 'C' Card */
+                        'TabIndex': '0'
+                    });
+                }
+                else {
+                    /* Standalone dashboard - open the Cash Journal window on the record. */
+                    VAS.ZoomUtil.zoomToRecord('C_Cash_ID', recordId, zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (windowId) {
+                            if (windowId > 0) {
+                                zoomWindowId = windowId;
+                            }
+                        });
+                }
             }
             catch (e) { /* zoom is best-effort */ }
         }
