@@ -202,3 +202,11 @@
 @import "../VAS_164_StockSearchWidget.css";
 @import "../VAS_165_LocationWiseInventoryCountWidget.css";
 @import "../VAS_166_NewCycleCountWidget.css";
+@import "../VAS_167_NewTransferQuickActionWidget.css";
+@import "../VAS_168_OpenTransfersWidget.css";
+@import "../VAS_169_UnderConfirmationWidget.css";
+@import "../VAS_170_CompletedTodayWidget.css";
+@import "../VAS_171_InitiatedMTDWidget.css";
+@import "../VAS_172_PendingTransferConfirmationWidget.css";
+@import "../VAS_173_TransfersByWarehouseWidget.css";
+@import "../VAS_174_TransferQueueWidget.css";
