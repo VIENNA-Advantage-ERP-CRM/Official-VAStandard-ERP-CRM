@@ -317,26 +317,6 @@
                 dsEsc(paid ? msg('VAS_067_Paid', 'Paid') : msg('VAS_067_Unpaid', 'Unpaid')) + '</span>';
         }
 
-        // The framework navigates IN-PLACE (no new window) only when the payload's
-        // ActionName equals the name of the window currently HOSTING this widget;
-        // otherwise it opens a new window. Resolve the host window name from the
-        // listener chain and pass it as ActionName.
-        function hostWindowName() {
-            try {
-                var l = $self.listener;
-                for (var i = 0; i < 6 && l; i++) {
-                    if (l.apanel && l.apanel.gridWindow && l.apanel.gridWindow.getName) {
-                        return l.apanel.gridWindow.getName();
-                    }
-                    if (l.gridWindow && l.gridWindow.getName) {
-                        return l.gridWindow.getName();
-                    }
-                    l = l.listener;
-                }
-            } catch (e) { }
-            return '';
-        }
-
         function zoomTo(recordId) {
             if (!recordId) { return; }
             closePanel();
@@ -346,15 +326,10 @@
                     $self.widgetFirevalueChanged({
                         "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + recordId,
                         "TabLayout": "Y",
-                        "TabIndex": "0",
-                        "ActionName": hostWindowName() || ZOOM_WINDOW_NAME_NEW,
-                        "ActionType": "W"
+                        "TabIndex": "0"
                     });
                 }
                 else {
-                    // Standalone dashboard - open the AP Invoice window on the record.
-                    // windowId already comes back with the search payload, so the util
-                    // normally has nothing left to resolve.
                     VAS.ZoomUtil.zoomToRecord(ZOOM_TABLE + "_ID", recordId, windowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
                         .done(function (id) {
                             if (id > 0) { windowId = id; }

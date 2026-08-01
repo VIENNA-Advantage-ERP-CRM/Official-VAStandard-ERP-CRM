@@ -90,6 +90,9 @@
 
         $self._kpiData = null;
 
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_APInvoice';
+        var windowId = 0;
+
         /* ---- Initialise ---- */
         this.initalize = function () {
             widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) !== 0
@@ -512,11 +515,19 @@
             if (!invoiceId) { return; }
             // Close the drill-down dialog first so it isn't left over the opened window.
             if ($catDialog) { try { $catDialog.dialog('close'); } catch (e) { } }
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": "C_Invoice.C_Invoice_ID=" + invoiceId,
-                "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
-                "TabIndex": "0"
-            });
+            if ($self.windowNo >= 0) {
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "C_Invoice.C_Invoice_ID=" + invoiceId,
+                    "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                    "TabIndex": "0"
+                });
+            }
+            else {
+                VAS.ZoomUtil.zoomToRecord("C_Invoice_ID", invoiceId, windowId, ZOOM_WINDOW_NAME_NEW, "")
+                    .done(function (id) {
+                        if (id > 0) { windowId = id; }
+                    });
+            }
         }
 
         /* ---- Canonical Widget Footer Pager (design.md): "Showing a–b of N" left,
