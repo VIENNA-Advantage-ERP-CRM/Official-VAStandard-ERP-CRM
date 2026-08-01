@@ -107,6 +107,9 @@
 
         var loadRequest = null;
 
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_GLJournal';
+        var windowId = 0;
+
         var baseUrl =
             VIS.Application.contextUrl;
 
@@ -1503,11 +1506,19 @@
             }
 
             try {
-                $self.widgetFirevalueChanged({
-                    "TabWhereClause": "GL_Journal.GL_Journal_ID=" + recordId,
-                    "TabLayout": "Y", /* 'N' Grid, 'Y' Single, 'C' Card */
-                    "TabIndex": "0",
-                });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "GL_Journal.GL_Journal_ID=" + recordId,
+                        "TabLayout": "Y", /* 'N' Grid, 'Y' Single, 'C' Card */
+                        "TabIndex": "0"
+                    });
+                }
+                else {
+                    VAS.ZoomUtil.zoomToRecord("GL_Journal_ID", recordId, windowId, ZOOM_WINDOW_NAME_NEW, "")
+                        .done(function (id) {
+                            if (id > 0) { windowId = id; }
+                        });
+                }
             }
             catch (e) { /* zoom is best-effort */ }
         }

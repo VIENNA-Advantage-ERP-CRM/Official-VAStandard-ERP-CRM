@@ -58,6 +58,8 @@
         var $root;
         var $btn;
         var widgetID = 0;
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_GLJournal';
+        var windowId = 0;
 
         /* ------------------------------------------------------------ */
         /* Lifecycle                                                    */
@@ -114,15 +116,19 @@
             e.preventDefault();
             e.stopPropagation();
             try {
-                /* Standard new-mode descriptor used across VAS quick-action
-                   widgets. The host frame registers via addChangeListener
-                   and opens the GL Journal window in new-record mode. A GL
-                   Journal carries no IsSoTrx flag. */
-                var windowParam = {
-                    "IsTabInNewMode": "true",
-                    "TabIndex": "0"
-                };
-                $self.widgetFirevalueChanged(windowParam);
+                if ($self.windowNo >= 0) {
+                    var windowParam = {
+                        "IsTabInNewMode": "true",
+                        "TabIndex": "0"
+                    };
+                    $self.widgetFirevalueChanged(windowParam);
+                }
+                else {
+                    VAS.ZoomUtil.zoomToRecord("GL_Journal_ID", 0, windowId, ZOOM_WINDOW_NAME_NEW, "")
+                        .done(function (id) {
+                            if (id > 0) { windowId = id; }
+                        });
+                }
             }
             catch (err) {
                 if (window.console) {
