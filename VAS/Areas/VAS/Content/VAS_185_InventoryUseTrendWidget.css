@@ -1,0 +1,313 @@
+/* VAS_185_InventoryUseTrendWidget Stylesheet (4x2 Chart Widget) */
+
+.vas-iut-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas-iut-root,
+    .vas-iut-root * {
+        box-sizing: border-box;
+    }
+
+.vas-iut-card {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
+    font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: left;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    backdrop-filter: blur(10px);
+    padding: .875em;
+    overflow: hidden;
+}
+
+/* Header & Switcher */
+.vas-iut-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    flex: 0 0 auto;
+}
+
+.vas-iut-head-left {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    min-width: 0;
+}
+
+.vas-iut-ico {
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+    .vas-iut-ico svg {
+        width: 1.15em;
+        height: 1.15em;
+    }
+
+.vas-iut-title {
+    font-size: .85em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-iut-sub {
+    font-size: .6875em;
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.2;
+}
+
+.vas-iut-switcher {
+    display: flex;
+    align-items: center;
+    gap: .25em;
+    flex: 0 0 auto;
+}
+
+.vas-iut-pill {
+    font-family: inherit;
+    font-size: .6875em;
+    font-weight: 500;
+    padding: .25em .625em;
+    border-radius: 999px;
+    border: 1px solid #D9E2EB;
+    background: #fff;
+    color: #5F7283;
+    cursor: pointer;
+    outline: none;
+}
+
+    .vas-iut-pill.active {
+        background: #EAF8FF;
+        border-color: #0083DA;
+        color: #0083DA;
+        font-weight: 700;
+    }
+
+/* Legend Row */
+.vas-iut-legend {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    font-size: .6875em;
+    color: #41576A;
+    margin-top: .4em;
+    margin-bottom: .2em;
+    flex: 0 0 auto;
+}
+
+.vas-iut-leg-item {
+    display: flex;
+    align-items: center;
+    gap: .35em;
+}
+
+.vas-iut-swatch-bar {
+    width: 8px;
+    height: 8px;
+    background: #0083DA;
+    border-radius: 2px;
+}
+
+.vas-iut-swatch-line {
+    width: 12px;
+    height: 2px;
+    background: #D78B10;
+}
+
+.vas-iut-leg-hint {
+    margin-left: auto;
+    color: #748494;
+}
+
+/* SVG Chart Region */
+.vas-iut-chart-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    position: relative;
+}
+
+.vas-iut-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+}
+
+/* Click Popover Card
+   Rendered directly under <body> and positioned with viewport coordinates: the widget card sets
+   both overflow:hidden and backdrop-filter, and the latter creates a stacking context that would
+   otherwise trap this popover inside the card (appearing clipped/behind the widget). */
+.vas-iut-popover {
+    position: fixed;
+    font-family: Roboto, Arial, sans-serif;
+    /* Fallback only. showPopover() copies the card's computed font-size onto this element so the
+       em-based inner sizing keeps the same scale it had while nested inside the card. */
+    font-size: 15px;
+    background: #fff;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.14);
+    padding: .5em .625em;
+    min-width: 9em;
+    z-index: 10000;
+    pointer-events: none;
+}
+
+.vas-iut-pop-title {
+    font-size: .6875em;
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: .3em;
+}
+
+.vas-iut-pop-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: .6875em;
+    color: #41576A;
+    margin-top: .15em;
+}
+
+    .vas-iut-pop-row span:last-child {
+        font-weight: 700;
+        color: #102C3F;
+    }
+
+.vas-iut-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .62);
+    border-radius: 14px;
+    z-index: 5;
+}
+
+.vas-iut-hidden {
+    display: none !important;
+}
+
+
+/* Standard Modal / Popup Rules */
+.vas-modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0, 0, 0, 0.45) !important;
+    backdrop-filter: blur(4px) !important;
+    z-index: 10000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 16px !important;
+}
+
+.vas-modal-card {
+    background: #ffffff !important;
+    border-radius: 12px !important;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2) !important;
+    width: 90% !important;
+    max-width: 680px !important;
+    max-height: 85vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    font-family: Roboto, Arial, sans-serif !important;
+    font-size: 13px !important;
+    color: #102C3F !important;
+}
+
+.vas-modal-head {
+    padding: 14px 18px !important;
+    border-bottom: 1px solid #E2EAF1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #F8FAFC !important;
+}
+
+.vas-modal-title {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: #102C3F !important;
+    margin: 0 !important;
+}
+
+.vas-modal-close {
+    background: none !important;
+    border: none !important;
+    font-size: 22px !important;
+    line-height: 1 !important;
+    color: #5F7283 !important;
+    cursor: pointer !important;
+}
+
+.vas-modal-close:hover {
+    color: #102C3F !important;
+}
+
+.vas-modal-body {
+    padding: 16px 18px !important;
+    overflow-y: auto !important;
+    flex: 1 1 auto !important;
+}
+
+.vas-modal-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 0 !important;
+}
+
+.vas-modal-table th {
+    padding: 10px 12px !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    color: #41576A !important;
+    text-transform: uppercase !important;
+    border-bottom: 1px solid #C5D2DD !important;
+    background: #FFFFFF !important;
+    text-align: left !important;
+}
+
+.vas-modal-table td {
+    padding: 10px 12px !important;
+    font-size: 12px !important;
+    color: #102C3F !important;
+    border-bottom: 1px solid #E2EAF1 !important;
+}
+
+.vas-modal-foot {
+    padding: 12px 18px !important;
+    border-top: 1px solid #D9E2EB !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    background: #F8FAFC !important;
+    font-size: 12px !important;
+    color: #5F7283 !important;
+}

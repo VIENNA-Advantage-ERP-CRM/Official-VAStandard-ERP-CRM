@@ -1,0 +1,700 @@
+/* VAS_188_TopUsedProductsWidget Stylesheet (4x2 Ranked List Widget) */
+
+.vas-tup-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas-tup-root,
+    .vas-tup-root * {
+        box-sizing: border-box;
+    }
+
+.vas-tup-card {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
+    font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: left;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    backdrop-filter: blur(10px);
+    padding: .875em;
+    overflow: hidden;
+}
+
+/* Header & Controls */
+.vas-tup-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    flex: 0 0 auto;
+    margin-bottom: .4em;
+}
+
+.vas-tup-head-left {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    min-width: 0;
+}
+
+.vas-tup-ico {
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+    .vas-tup-ico svg {
+        width: 1.15em;
+        height: 1.15em;
+    }
+
+.vas-tup-title {
+    font-size: .85em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-tup-sub {
+    font-size: .6875em;
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.2;
+}
+
+.vas-tup-controls {
+    display: flex;
+    align-items: center;
+    gap: .375em;
+    flex: 0 0 auto;
+}
+
+/* Select Filter Dropdowns, per Global VA Design Standards. The native arrow reserves space on the
+   right of the control, and without a min-width the box is sized to content -- together those
+   clipped the last digit of a 4-digit year ("2026" losing its 6). Arrow removed, value centred,
+   min-width guarantees room for four digits. */
+.vas-tup-select {
+    font-family: inherit;
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    background: #fff;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+    text-align: center;
+    text-align-last: center;
+    padding: 0.35em 0.75em;
+    min-width: 4.5em;
+    outline: none;
+    cursor: pointer;
+}
+
+    /* Centre each option row too, so the open list matches the closed control. */
+    .vas-tup-select option {
+        text-align: center;
+    }
+
+.vas-tup-divider {
+    width: 1px;
+    height: 1.25em;
+    background: #C5D2DD;
+    margin: 0 .25em;
+}
+
+.vas-tup-toggle-grp {
+    display: flex;
+    align-items: center;
+    gap: .2em;
+}
+
+.vas-tup-pill {
+    font-family: inherit;
+    font-size: .6875em;
+    font-weight: 500;
+    padding: .25em .625em;
+    border-radius: 999px;
+    border: 1px solid #D9E2EB;
+    background: #fff;
+    color: #5F7283;
+    cursor: pointer;
+    outline: none;
+}
+
+    .vas-tup-pill.active {
+        background: #EAF8FF;
+        border-color: #0083DA;
+        color: #0083DA;
+        font-weight: 700;
+    }
+
+/* Product Row List */
+.vas-tup-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+}
+
+.vas-tup-row {
+    display: flex;
+    align-items: center;
+    gap: .625em;
+    padding: .4em 0;
+    border-bottom: 1px solid #E2EAF1;
+    border-top: 0;
+    border-left: 0;
+    border-right: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: background 150ms ease;
+}
+
+    .vas-tup-row:last-child {
+        border-bottom: 0;
+    }
+
+    .vas-tup-row:hover {
+        background: rgba(234, 248, 255, 0.6);
+    }
+
+.vas-tup-rank-badge {
+    width: 1.6em;
+    height: 1.6em;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .6875em;
+    font-weight: 700;
+    flex: 0 0 auto;
+}
+
+    .vas-tup-rank-badge.r1 {
+        background: #FFF8E1;
+        color: #B78103;
+    }
+
+    .vas-tup-rank-badge.r2 {
+        background: #F1F4F8;
+        color: #41576A;
+    }
+
+    .vas-tup-rank-badge.r3 {
+        background: #FFF3E0;
+        color: #A0522D;
+    }
+
+    .vas-tup-rank-badge.r-other {
+        background: #F8FAFC;
+        color: #748494;
+    }
+
+.vas-tup-row-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-tup-p-name {
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-tup-p-meta {
+    font-size: .6875em;
+    color: #5F7283;
+    margin-top: .125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-tup-row-right {
+    text-align: right;
+    flex: 0 0 auto;
+}
+
+.vas-tup-qty-uom {
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-tup-val {
+    font-size: .6875em;
+    color: #748494;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Footer Pager */
+.vas-tup-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #EDF2F6;
+    padding-top: .4em;
+    margin-top: .25em;
+    flex: 0 0 auto;
+}
+
+.vas-tup-foot-helper {
+    font-size: .75em;
+    color: #748494;
+}
+
+.vas-tup-pager {
+    display: flex;
+    align-items: center;
+    gap: .4em;
+    font-size: .8125em;
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas-tup-pager-btn {
+    width: 24px;
+    height: 24px;
+    border: 1px solid #D9E2EB;
+    border-radius: 6px;
+    background: #fff;
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+    .vas-tup-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-tup-empty {
+    padding: 2em 1em;
+    text-align: center;
+    color: #5F7283;
+    font-size: .75em;
+}
+
+.vas-tup-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .62);
+    border-radius: 14px;
+    z-index: 5;
+}
+
+.vas-tup-hidden {
+    display: none !important;
+}
+
+/* Product Detail Modal */
+.vas-tup-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.45);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1em;
+}
+
+/* Built to the Global VA Design & Dynamic System Standards:
+   - the card is the single fluid root anchor (clamp), every descendant sizes in em from it
+   - no hardcoded px dimensions or fixed font sizes on any child
+   - height follows content: the table always renders a full page of rows (short pages padded),
+     so the popup is exactly one page tall and never resizes while paging
+   - row hover uses an inset ring so it is not clipped by overflow:hidden */
+.vas-tup-modal-card {
+    /* Root anchor for the whole popup. */
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(14px, 1.2vw, 22px);
+    width: clamp(340px, 85vw, 1400px);
+    height: auto;
+    max-height: clamp(420px, 85vh, 900px);
+    background: #fff;
+    border-radius: .75em;
+    border: 1px solid #D9E2EB;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 .9em 2.2em rgba(15, 61, 97, 0.18);
+    overflow: hidden;
+}
+
+.vas-tup-modal-head {
+    flex: 0 0 auto;
+    min-height: 2.75em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    padding: .5em 1em;
+    border-bottom: 1px solid #1F83FF;
+}
+
+.vas-tup-modal-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    min-width: 0;
+}
+
+.vas-tup-modal-title {
+    font-size: .82em;
+    font-weight: 700;
+    color: #102C3F;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-tup-cat-badge {
+    background: #DFF1FF;
+    color: #106AB0;
+    font-size: .6em;
+    font-weight: 500;
+    padding: .2em .7em;
+    border-radius: 999px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.vas-tup-modal-close {
+    flex: 0 0 auto;
+    width: 1.45em;
+    height: 1.45em;
+    border: 0;
+    background: transparent;
+    border-radius: .35em;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #141414;
+}
+
+    .vas-tup-modal-close svg {
+        width: .82em;
+        height: .82em;
+    }
+
+    .vas-tup-modal-close:hover {
+        background: #EEF6FF;
+        color: #0083DA;
+        box-shadow: inset 0 0 0 1px #0083DA;
+        outline: none;
+    }
+
+.vas-tup-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 1em;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: .5em;
+}
+
+.vas-tup-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: .75em;
+    flex: 0 0 auto;
+}
+
+.vas-tup-summary-field {
+    padding: .35em 0 .25em;
+    border-bottom: 1px solid #D7D7D7;
+    min-width: 0;
+}
+
+.vas-tup-field-lbl {
+    font-size: .6em;
+    color: #748494;
+    margin-bottom: .25em;
+}
+
+.vas-tup-field-val {
+    font-size: .7em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-tup-lines-table {
+    width: 100%;
+    /* separate + zero spacing keeps the td borders while letting the hover ring paint on <tr> */
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    flex: 0 0 auto;
+}
+
+    .vas-tup-lines-table th {
+        font-size: .58em;
+        font-weight: 500;
+        color: #41576A;
+        padding: .5em .6em;
+        text-align: left;
+        border-bottom: 1px solid #C5D2DD;
+        white-space: nowrap;
+    }
+
+        .vas-tup-lines-table th:nth-child(4),
+        .vas-tup-lines-table th:nth-child(5) {
+            text-align: right;
+        }
+
+    .vas-tup-lines-table td {
+        font-size: .64em;
+        color: #5F7283;
+        padding: .5em .55em;
+        border-bottom: 1px solid #E2EAF1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        /* Uniform row height so filler rows are indistinguishable in size from real ones. */
+        height: 2.2em;
+        vertical-align: middle;
+    }
+
+        .vas-tup-lines-table td:nth-child(4),
+        .vas-tup-lines-table td:nth-child(5) {
+            text-align: right;
+            font-weight: 700;
+            color: #102C3F;
+        }
+
+    .vas-tup-lines-table tbody tr {
+        border-radius: 8px;
+        outline: none;
+    }
+
+        .vas-tup-lines-table tbody tr:hover {
+            box-shadow: inset 0 0 0 1px #0083DA;
+        }
+
+            .vas-tup-lines-table tbody tr:hover td {
+                background: #F5FBFF;
+            }
+
+    /* Spacer rows that keep a short page the same height as a full one. Not interactive. */
+    .vas-tup-lines-table tbody tr.vas-tup-m-filler:hover {
+        box-shadow: none;
+    }
+
+        .vas-tup-lines-table tbody tr.vas-tup-m-filler:hover td {
+            background: transparent;
+        }
+
+    .vas-tup-lines-table tbody tr.vas-tup-m-filler td {
+        border-bottom-color: #F1F5F9;
+    }
+
+/* Loading / empty state cell */
+.vas-tup-m-msgcell {
+    text-align: center;
+    color: #748494;
+    white-space: normal;
+}
+
+/* Modal footer + pager. Previously reused the High Value Usage widget's .vas-hvu-* classes,
+   which made this popup depend on another widget's stylesheet. */
+.vas-tup-modal-foot {
+    flex: 0 0 auto;
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    border-top: 1px solid #EDF2F6;
+    padding-top: .4em;
+}
+
+.vas-tup-m-helper {
+    font-size: .62em;
+    color: #748494;
+}
+
+.vas-tup-modal-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: .4em;
+    font-size: .68em;
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas-tup-m-pager-txt {
+    min-width: 6.5em;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.vas-tup-modal-pager-btn {
+    width: 1.6em;
+    height: 1.6em;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    background: #fff;
+    border-radius: .4em;
+    color: #0083DA;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1em;
+    line-height: 1;
+}
+
+    .vas-tup-modal-pager-btn:hover:not(:disabled) {
+        background: #EEF6FF;
+        color: #0083DA;
+        box-shadow: inset 0 0 0 1px #0083DA;
+        outline: none;
+    }
+
+    .vas-tup-modal-pager-btn:disabled {
+        opacity: .45;
+        cursor: default;
+    }
+
+
+/* Standard Modal / Popup Rules */
+.vas-modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0, 0, 0, 0.45) !important;
+    backdrop-filter: blur(4px) !important;
+    z-index: 10000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 16px !important;
+}
+
+.vas-modal-card {
+    background: #ffffff !important;
+    border-radius: 12px !important;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2) !important;
+    width: 90% !important;
+    max-width: 680px !important;
+    max-height: 85vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    font-family: Roboto, Arial, sans-serif !important;
+    font-size: 13px !important;
+    color: #102C3F !important;
+}
+
+.vas-modal-head {
+    padding: 14px 18px !important;
+    border-bottom: 1px solid #E2EAF1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #F8FAFC !important;
+}
+
+.vas-modal-title {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: #102C3F !important;
+    margin: 0 !important;
+}
+
+.vas-modal-close {
+    background: none !important;
+    border: none !important;
+    font-size: 22px !important;
+    line-height: 1 !important;
+    color: #5F7283 !important;
+    cursor: pointer !important;
+}
+
+.vas-modal-close:hover {
+    color: #102C3F !important;
+}
+
+.vas-modal-body {
+    padding: 16px 18px !important;
+    overflow-y: auto !important;
+    flex: 1 1 auto !important;
+}
+
+.vas-modal-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 0 !important;
+}
+
+.vas-modal-table th {
+    padding: 10px 12px !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    color: #41576A !important;
+    text-transform: uppercase !important;
+    border-bottom: 1px solid #C5D2DD !important;
+    background: #FFFFFF !important;
+    text-align: left !important;
+}
+
+.vas-modal-table td {
+    padding: 10px 12px !important;
+    font-size: 12px !important;
+    color: #102C3F !important;
+    border-bottom: 1px solid #E2EAF1 !important;
+}
+
+.vas-modal-foot {
+    padding: 12px 18px !important;
+    border-top: 1px solid #D9E2EB !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    background: #F8FAFC !important;
+    font-size: 12px !important;
+    color: #5F7283 !important;
+}
