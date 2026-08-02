@@ -1,4 +1,4 @@
-using Limilabs.Client.IMAP;
+﻿using Limilabs.Client.IMAP;
 using Limilabs.Mail;
 using Newtonsoft.Json.Linq;
 using System;
@@ -598,7 +598,7 @@ namespace VAdvantage.Process
             mailDataIn.table_id = tableID;
             mailDataIn.record_id = recordID;
             mailDataIn.sessionID = ctx.GetAD_Session_ID();
-            // mailDataIn.sessionGUID = ctx.GetContext("#AD_Session_GUID");
+            mailDataIn.sessionGUID = ctx.GetContext("#AD_Session_GUID");
             mailDataIn.userID = userID;
 
             // vis0008 Handled case for the API being called from VServer
