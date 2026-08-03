@@ -231,12 +231,13 @@
             }
 
             /*
-             * AP amounts are outflows and arrive negative, so only a
-             * missing or zero total means there is nothing to show.
+             * A week with nothing due is a real answer, not a failure, so
+             * the card keeps its normal layout and reads the zero amount
+             * (for example ID0.00) instead of swapping in a "No Data"
+             * state. Only a load error still takes over the card.
              */
-            if (isNaN(totalAmount) || totalAmount === 0) {
-                setNoData();
-                return;
+            if (isNaN(totalAmount)) {
+                totalAmount = 0;
             }
 
             showState(false, '');
@@ -890,14 +891,6 @@
             if ($footer) {
                 $footer.toggle(!show);
             }
-        }
-
-        function setNoData() {
-            if ($description) {
-                $description.text('');
-            }
-
-            showState(true, lbl('VAS_029_MessageNoData', 'No Data'));
         }
 
         this.refreshData = function () {

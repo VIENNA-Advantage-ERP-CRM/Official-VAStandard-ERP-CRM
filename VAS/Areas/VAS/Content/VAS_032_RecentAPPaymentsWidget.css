@@ -314,6 +314,9 @@
     --v-c-font-family: "NoirPro-Regular", sans-serif;
 }
 
+    /* nowrap alone let a heading wider than its fixed-width column spill and
+       get cut mid-word by the wrapper. Clipping it here trims it with an
+       ellipsis instead; the full text is on the cell's `title` for hover. */
     .vas-recent-ap-payments-table th {
         position: sticky;
         top: 0;
@@ -329,6 +332,8 @@
         text-align: left;
         text-transform: capitalize;
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .vas-recent-ap-payments-table td {
@@ -364,7 +369,7 @@
 }
 
 .vas-recent-ap-payments-value {
-    width: 14%;
+    width: 13%;
     color: #60748a;
     --v-c-font-family: 'NoirPro-Regular', sans-serif;
     font-family: var(--v-c-font-family);
@@ -390,7 +395,7 @@ td.vas-recent-ap-payments-vendor {
 }
 
 .vas-recent-ap-payments-status-col {
-    width: 10%;
+    width: 11%;
 }
 
 .vas-recent-ap-payments-amount {

@@ -620,11 +620,11 @@
            itself through addChangeListener and reacts to this fired value to switch the tab into
            new-record mode; existing filters and widget state are left untouched. */
         function onNewInvoice() {
-            var windowParam = {
-                "IsTabInNewMode": "true",
-                "TabIndex": "0"
-            };
             if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "IsTabInNewMode": "true",
+                    "TabIndex": "0"
+                };
                 $self.widgetFirevalueChanged(windowParam);
             }
             else {

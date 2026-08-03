@@ -213,8 +213,6 @@ namespace VAS.Controllers
                     new List<object>();
 
                 int totalRecords = 0;
-                DateTime? dateFrom = null;
-                DateTime? dateTo = null;
 
                 while (
                     reader != null &&
@@ -231,34 +229,6 @@ namespace VAS.Controllers
                             reader,
                             "PaymentDate"
                         );
-
-                    if (
-                        !dateFrom.HasValue &&
-                        GetReaderValue(
-                            reader,
-                            "DateFrom"
-                        ) != DBNull.Value
-                    )
-                    {
-                        dateFrom = GetNullableDate(
-                            reader,
-                            "DateFrom"
-                        );
-                    }
-
-                    if (
-                        !dateTo.HasValue &&
-                        GetReaderValue(
-                            reader,
-                            "DateTo"
-                        ) != DBNull.Value
-                    )
-                    {
-                        dateTo = GetNullableDate(
-                            reader,
-                            "DateTo"
-                        );
-                    }
 
                     string vendorName = GetString(
                         reader,
@@ -539,16 +509,6 @@ namespace VAS.Controllers
                         totalPages =
                             totalPages,
 
-                        dateFrom =
-                            FormatNullableDate(
-                                dateFrom
-                            ),
-
-                        dateTo =
-                            FormatNullableDate(
-                                dateTo
-                            ),
-
                         hasData =
                             rows.Count > 0
                     },
@@ -604,52 +564,6 @@ namespace VAS.Controllers
                     hasExecutionStatusColumn
                 );
 
-            string periodRangeSql = @"
-PeriodRange AS
-(
-    SELECT
-        MIN
-        (
-            Period.StartDate
-        ) AS DateFrom,
-
-        MAX
-        (
-            Period.EndDate
-        ) AS DateTo
-
-    FROM AD_ClientInfo ClientInfo
-
-    INNER JOIN C_Year YearData ON
-    (
-        YearData.C_Calendar_ID =
-        ClientInfo.C_Calendar_ID
-    )
-
-    INNER JOIN C_Period Period ON
-    (
-        Period.C_Year_ID =
-        YearData.C_Year_ID
-    )
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND YearData.IsActive = 'Y'
-
-    AND Period.IsActive = 'Y'
-
-    AND ClientInfo.AD_Client_ID =
-        " + clientIdSql + @"
-
-    AND " + GetCurrentDateSql() + @" >=
-        Period.StartDate
-
-    AND " + GetCurrentDateSql() + @" <
-        " + GetDateToExclusiveSql(
-            "Period.EndDate"
-        ) + @"
-)";
-
             string paymentAccessSql = @"
 SELECT
     Payment.C_Payment_ID,
@@ -683,9 +597,18 @@ AND Payment.TenderType = 'K'
                         MRole.SQL_RO
                     );
 
+            /*
+             * Bounced payments are counted across the whole financial year
+             * that today falls in, not just the current period. The range
+             * is anchored on FinancialYearRange with a LEFT JOIN, so
+             * DateFrom/DateTo still come back as the year's edges even when
+             * no payment bounced in it.
+             */
             return @"
 WITH
-" + periodRangeSql + @",
+" + BuildFinancialYearRangeSql(
+    clientIdSql
+) + @",
 
 PaymentFiltered AS
 (
@@ -701,24 +624,24 @@ SELECT
 
     MIN
     (
-        PeriodRange.DateFrom
+        FinancialYearRange.DateFrom
     ) AS DateFrom,
 
     MAX
     (
-        PeriodRange.DateTo
+        FinancialYearRange.DateTo
     ) AS DateTo
 
-FROM PeriodRange PeriodRange
+FROM FinancialYearRange FinancialYearRange
 
 LEFT OUTER JOIN PaymentFiltered Payment ON
 (
     Payment.DateAcct >=
-        PeriodRange.DateFrom
+        FinancialYearRange.DateFrom
 
     AND Payment.DateAcct <
         " + GetDateToExclusiveSql(
-            "PeriodRange.DateTo"
+            "FinancialYearRange.DateTo"
         ) + @"
 )";
         }
@@ -812,52 +735,6 @@ LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
         Payment.VA009_PaymentMethod_ID
 )"
                     : string.Empty;
-
-            string periodRangeSql = @"
-PeriodRange AS
-(
-    SELECT
-        MIN
-        (
-            Period.StartDate
-        ) AS DateFrom,
-
-        MAX
-        (
-            Period.EndDate
-        ) AS DateTo
-
-    FROM AD_ClientInfo ClientInfo
-
-    INNER JOIN C_Year YearData ON
-    (
-        YearData.C_Calendar_ID =
-        ClientInfo.C_Calendar_ID
-    )
-
-    INNER JOIN C_Period Period ON
-    (
-        Period.C_Year_ID =
-        YearData.C_Year_ID
-    )
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND YearData.IsActive = 'Y'
-
-    AND Period.IsActive = 'Y'
-
-    AND ClientInfo.AD_Client_ID =
-        " + clientIdSql + @"
-
-    AND " + GetCurrentDateSql() + @" >=
-        Period.StartDate
-
-    AND " + GetCurrentDateSql() + @" <
-        " + GetDateToExclusiveSql(
-            "Period.EndDate"
-        ) + @"
-)";
 
             /*
              * Execution Status List Reference.
@@ -1055,22 +932,20 @@ RowsData AS
 
         ExecutionStatusList.StatusName,
 
-        ExecutionStatusList.TranslatedStatusName,
-
-        PeriodRange.DateFrom,
-
-        PeriodRange.DateTo
+        ExecutionStatusList.TranslatedStatusName
 
     FROM PaymentFiltered Payment
 
-    INNER JOIN PeriodRange PeriodRange ON
+    /* Same financial-year window as the count on the card, so the list
+       and the figure it drills into always agree. */
+    INNER JOIN FinancialYearRange FinancialYearRange ON
     (
         Payment.PaymentDate >=
-            PeriodRange.DateFrom
+            FinancialYearRange.DateFrom
 
         AND Payment.PaymentDate <
             " + GetDateToExclusiveSql(
-                "PeriodRange.DateTo"
+                "FinancialYearRange.DateTo"
             ) + @"
     )
 
@@ -1119,7 +994,9 @@ RowsData AS
 
             return @"
 WITH
-" + periodRangeSql + @",
+" + BuildFinancialYearRangeSql(
+    clientIdSql
+) + @",
 
 " + executionStatusListSql + @",
 
@@ -1191,10 +1068,6 @@ SELECT
 
     NumberedRows.TranslatedStatusName,
 
-    NumberedRows.DateFrom,
-
-    NumberedRows.DateTo,
-
     NumberedRows.TotalRecords
 
 FROM NumberedRows NumberedRows
@@ -1239,6 +1112,105 @@ AND Payment.VA009_ExecutionStatus IN
 (
     " + bouncedStatus + @",
     " + rejectedStatus + @"
+)";
+        }
+
+        /// <summary>
+        /// Builds the FinancialYearRange CTE: the first and last dates of
+        /// the financial year that today falls in.
+        /// </summary>
+        /// <remarks>
+        /// The year is resolved through period control rather than from the
+        /// calendar year of the current date - the inner subquery finds the
+        /// C_Period holding today and takes its C_Year_ID, then the outer
+        /// query spans every period of that year. A financial year that
+        /// straddles the calendar boundary is therefore handled correctly.
+        ///
+        /// When today falls outside every defined period the subquery yields
+        /// NULL, the CTE returns a single NULL range, and the queries using
+        /// it match no payments - an unconfigured calendar reads as "nothing
+        /// in range" rather than as "everything".
+        /// </remarks>
+        private string BuildFinancialYearRangeSql(
+            string clientIdSql
+        )
+        {
+            return @"
+FinancialYearRange AS
+(
+    SELECT
+        MIN
+        (
+            Period.StartDate
+        ) AS DateFrom,
+
+        MAX
+        (
+            Period.EndDate
+        ) AS DateTo
+
+    FROM AD_ClientInfo ClientInfo
+
+    INNER JOIN C_Year YearData ON
+    (
+        YearData.C_Calendar_ID =
+        ClientInfo.C_Calendar_ID
+    )
+
+    INNER JOIN C_Period Period ON
+    (
+        Period.C_Year_ID =
+        YearData.C_Year_ID
+    )
+
+    WHERE ClientInfo.IsActive = 'Y'
+
+    AND YearData.IsActive = 'Y'
+
+    AND Period.IsActive = 'Y'
+
+    AND ClientInfo.AD_Client_ID =
+        " + clientIdSql + @"
+
+    AND YearData.C_Year_ID =
+    (
+        SELECT
+            MIN
+            (
+                CurrentYear.C_Year_ID
+            )
+
+        FROM AD_ClientInfo CurrentClientInfo
+
+        INNER JOIN C_Year CurrentYear ON
+        (
+            CurrentYear.C_Calendar_ID =
+            CurrentClientInfo.C_Calendar_ID
+        )
+
+        INNER JOIN C_Period CurrentPeriod ON
+        (
+            CurrentPeriod.C_Year_ID =
+            CurrentYear.C_Year_ID
+        )
+
+        WHERE CurrentClientInfo.IsActive = 'Y'
+
+        AND CurrentYear.IsActive = 'Y'
+
+        AND CurrentPeriod.IsActive = 'Y'
+
+        AND CurrentClientInfo.AD_Client_ID =
+            " + clientIdSql + @"
+
+        AND " + GetCurrentDateSql() + @" >=
+            CurrentPeriod.StartDate
+
+        AND " + GetCurrentDateSql() + @" <
+            " + GetDateToExclusiveSql(
+                "CurrentPeriod.EndDate"
+            ) + @"
+    )
 )";
         }
 

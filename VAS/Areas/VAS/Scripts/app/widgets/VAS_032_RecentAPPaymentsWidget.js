@@ -430,14 +430,19 @@
             var $thead = $('<thead>');
             var $headerRow = $('<tr>');
 
+            /* The table is fixed-layout on percentage widths, so a long heading
+               ("Execution Status") cannot widen its column - it used to spill
+               and get cut off mid-word by the wrapper. Each heading now trims
+               with an ellipsis and carries its full text in `title`, the same
+               hover contract the body cells already use. */
             $headerRow
-                .append($('<th class="vas-recent-ap-payments-date">').text(lbl('VAS_032_MessageDate', 'Account Date')))
-                .append($('<th class="vas-recent-ap-payments-value">').text(lbl('VAS_032_MessageValueDocumentNumber', 'Document Number')))
-                .append($('<th class="vas-recent-ap-payments-vendor">').text(lbl('VAS_032_MessageVendor', 'Vendor')))
-                .append($('<th class="vas-recent-ap-payments-method-col">').text(lbl('VAS_032_MessageMethod', 'Method')))
-                .append($('<th class="vas-recent-ap-payments-bank-account">').text(lbl('VAS_032_MessageBankAccountName', 'Bank Account')))
-                .append($('<th class="vas-recent-ap-payments-status-col">').text(lbl('VAS_032_MessageStatus', 'Execution Status')))
-                .append($('<th class="vas-recent-ap-payments-amount">').text(lbl('VAS_032_MessageAmount', 'Amount')));
+                .append(buildHeaderCell('vas-recent-ap-payments-date', lbl('VAS_032_MessageDate', 'Account Date')))
+                .append(buildHeaderCell('vas-recent-ap-payments-value', lbl('VAS_032_MessageValueDocumentNumber', 'Document Number')))
+                .append(buildHeaderCell('vas-recent-ap-payments-vendor', lbl('VAS_032_MessageVendor', 'Vendor')))
+                .append(buildHeaderCell('vas-recent-ap-payments-method-col', lbl('VAS_032_MessageMethod', 'Method')))
+                .append(buildHeaderCell('vas-recent-ap-payments-bank-account', lbl('VAS_032_MessageBankAccountName', 'Bank Account')))
+                .append(buildHeaderCell('vas-recent-ap-payments-status-col', lbl('VAS_032_MessageStatus', 'Execution Status')))
+                .append(buildHeaderCell('vas-recent-ap-payments-amount', lbl('VAS_032_MessageAmount', 'Amount')));
 
             $thead.append($headerRow);
             $table.append($thead);
@@ -488,6 +493,13 @@
             }
         }
 
+        function buildHeaderCell(className, text) {
+            return $('<th>')
+                .addClass(className)
+                .attr('title', text)
+                .text(text);
+        }
+
         function createPaymentRow(payment) {
             var $row = $('<tr class="vas-recent-ap-payments-row" tabindex="0">');
 
@@ -531,6 +543,7 @@
                 .append($('<td class="vas-recent-ap-payments-status-col">')
                     .append($('<span class="vas-recent-ap-payments-status">')
                         .addClass(statusClass)
+                        .attr('title', statusText)
                         .text(statusText)))
 
                 .append($('<td class="vas-recent-ap-payments-amount">')
