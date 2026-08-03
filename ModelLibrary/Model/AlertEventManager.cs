@@ -422,13 +422,18 @@ namespace VAdvantage.Alert
                 }
             }
 
-            int AD_Role_ID_Rec = recipient.GetAD_Role_ID();
+            int AD_Role_ID_Rec = -1;
+            if (recipient.Get_Value("AD_Role_ID") != null)
+            {
+                AD_Role_ID_Rec = recipient.GetAD_Role_ID();
+            }
+            ;
             if (AD_Role_ID_Rec != -1) // not handled as 0 is of system administratior
             {
                 MRole role_R = MRole.Get(document.GetCtx(), AD_Role_ID_Rec);
                 if (!role_R.IsTableAccess(MTable.Get_Table_ID(tableName), false))
                 {
-                    AD_Role_ID_Rec = 0;
+                    AD_Role_ID_Rec = -1;
                 }
             }
 
