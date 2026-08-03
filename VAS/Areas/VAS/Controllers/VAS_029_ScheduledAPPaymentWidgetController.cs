@@ -787,24 +787,28 @@ ScheduledData AS
 SELECT
     MAX
     (
-        ScheduledData.C_Currency_ID
+        SchemaCurrency.C_Currency_ID
     ) AS C_Currency_ID,
 
     MAX
     (
-        ScheduledData.CurrencyISO
+        SchemaCurrency.ISO_Code
     ) AS CurrencyISO,
 
     MAX
     (
-        ScheduledData.CurrencySymbol
+        CASE
+            WHEN SchemaCurrency.CurSymbol IS NOT NULL
+            THEN SchemaCurrency.CurSymbol
+            ELSE SchemaCurrency.ISO_Code
+        END
     ) AS CurrencySymbol,
 
     COALESCE
     (
         MAX
         (
-            ScheduledData.StdPrecision
+            SchemaCurrency.StdPrecision
         ),
         2
     ) AS StdPrecision,
@@ -830,7 +834,7 @@ SELECT
             (
                 MAX
                 (
-                    ScheduledData.StdPrecision
+                    SchemaCurrency.StdPrecision
                 ),
                 2
             )
@@ -840,15 +844,22 @@ SELECT
 
     MIN
     (
-        ScheduledData.DateFrom
+        WeekRange.DateFrom
     ) AS DateFrom,
 
     MAX
     (
-        ScheduledData.DateTo
+        WeekRange.DateTo
     ) AS DateTo
 
-FROM ScheduledData ScheduledData";
+FROM SchemaCurrency SchemaCurrency
+
+CROSS JOIN WeekRange WeekRange
+
+LEFT OUTER JOIN ScheduledData ScheduledData ON
+(
+    1 = 1
+)";
 
             SqlParameter[] parameters =
                 new SqlParameter[]

@@ -230,11 +230,13 @@
             var $wh = buildWithholding();
             if ($wh) $panel.append($wh);
 
-            var $insight = buildMatchInsight();
-            if ($insight) $panel.append($insight);
-
             var $lcDist = buildLandedCostDistribution();
             if ($lcDist) $panel.append($lcDist);
+
+            // The match verdict sits directly on top of the Goods Receipt & Matching
+            // block it summarises - nothing renders between the two.
+            var $insight = buildMatchInsight();
+            if ($insight) $panel.append($insight);
 
             var $twoCol = buildGoodsReceiptAndSchedule();
             if ($twoCol) $panel.append($twoCol);
