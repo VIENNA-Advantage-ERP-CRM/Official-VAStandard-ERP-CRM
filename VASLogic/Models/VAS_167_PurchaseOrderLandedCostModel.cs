@@ -49,6 +49,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Text;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
@@ -70,12 +71,20 @@ namespace VASLogic.Models
         private const string DOCSTATUS_Completed = "CO";
 
         /// <summary>
-        /// The three C_LandedCostDistribution values this panel exposes. The
-        /// reference list carries more (C = Costs, V = Volume, W = Weight); they
-        /// are deliberately not offered here and a create / update carrying one
-        /// is rejected.
+        /// The C_LandedCostDistribution values this panel exposes. The reference
+        /// list carries more (I = Import Value); it is deliberately not offered
+        /// here and a create / update carrying it is rejected. The same set is
+        /// the AD_Ref_List filter used by <see cref="LoadDistributions"/>, so the
+        /// dropdown and the server-side check can never drift apart.
         /// </summary>
-        private static readonly string[] ALLOWED_DISTRIBUTIONS = new string[] { "Q", "I", "L" };
+        private static readonly string[] ALLOWED_DISTRIBUTIONS =
+            new string[] { "C", "L", "Q", "V", "W" };
+
+        /// <summary>
+        /// Cost elements this panel offers: material elements that carry no
+        /// costing method — the ones a landed cost may be booked against.
+        /// </summary>
+        private const string COSTELEMENTTYPE_Material = "M";
 
         #endregion
 
@@ -155,8 +164,12 @@ namespace VASLogic.Models
             // discovering it only when completion fails.
             result.EligibleLineCount = GetEligibleLineCount(C_Order_ID);
 
+            // Reference-list labels for C_LandedCostDistribution, read once and
+            // shared by the entry rows and the dropdown below.
+            Dictionary<string, string> distributionNames = LoadDistributionNames();
+
             // ----- Expected landed cost entries (+ server-side conversion) -----
-            result.ExpectedCosts = LoadExpectedCosts(ctx, result, clientId, orgId);
+            result.ExpectedCosts = LoadExpectedCosts(ctx, result, clientId, orgId, distributionNames);
 
             // ----- Generated distribution lines, attached to their parent entry -----
             LoadGeneratedLines(C_Order_ID, result.ExpectedCosts);
@@ -177,7 +190,7 @@ namespace VASLogic.Models
             result.CostElements    = LoadCostElements(clientId);
             result.Currencies      = LoadCurrencies(clientId);
             result.ConversionTypes = LoadConversionTypes(clientId);
-            result.Distributions   = LoadDistributions(ctx);
+            result.Distributions   = LoadDistributions(distributionNames);
 
             return result;
         }
@@ -216,7 +229,8 @@ namespace VASLogic.Models
         /// computed in SQL or on the client.
         /// </summary>
         private List<ExpectedCostData> LoadExpectedCosts(
-            Ctx ctx, LandedCostPanelData order, int clientId, int orgId)
+            Ctx ctx, LandedCostPanelData order, int clientId, int orgId,
+            Dictionary<string, string> distributionNames)
         {
             List<ExpectedCostData> list = new List<ExpectedCostData>();
             try
@@ -253,7 +267,7 @@ namespace VASLogic.Models
                     c.ExpectedCostId      = Util.GetValueOfInt(r["ExpectedCostId"]);
                     c.PurchaseOrderId     = Util.GetValueOfInt(r["PurchaseOrderId"]);
                     c.DistributionCode    = Util.GetValueOfString(r["DistributionCode"]);
-                    c.DistributionLabel   = GetDistributionLabel(ctx, c.DistributionCode);
+                    c.DistributionLabel   = GetDistributionLabel(distributionNames, c.DistributionCode);
                     c.CostElementId       = Util.GetValueOfInt(r["CostElementId"]);
                     c.CostElementName     = Util.GetValueOfString(r["CostElementName"]);
                     c.Description         = Util.GetValueOfString(r["Description"]);
@@ -428,7 +442,13 @@ namespace VASLogic.Models
 
         #region Lookups
 
-        /// <summary>Active cost elements (M_CostElement) visible to the client.</summary>
+        /// <summary>
+        /// Active cost elements (M_CostElement) visible to the client, restricted
+        /// to material elements with no costing method. An element that carries a
+        /// costing method drives product costing itself and is not a landed cost
+        /// bucket, so it is kept out of the dropdown — and out of a save, see
+        /// <see cref="IsValidCostElement"/>.
+        /// </summary>
         private List<LookupItemData> LoadCostElements(int clientId)
         {
             return LoadLookup(
@@ -436,11 +456,18 @@ namespace VASLogic.Models
                     FROM M_CostElement ce
                    WHERE ce.IsActive = 'Y'
                      AND ce.AD_Client_ID IN (0, @AD_Client_ID)
+                     AND ce.CostElementType = '" + COSTELEMENTTYPE_Material + @"'
+                     AND ce.CostingMethod IS NULL
                    ORDER BY ce.Name",
                 clientId, "LoadCostElements");
         }
 
-        /// <summary>Active currencies (C_Currency), shown by ISO code.</summary>
+        /// <summary>
+        /// Active currencies (C_Currency) the tenant actually transacts in
+        /// (IsMyCurrency = 'Y'), shown by ISO code. The form preselects the order's
+        /// own currency; an order in a currency that is not flagged simply comes up
+        /// with no preselection rather than widening the list.
+        /// </summary>
         private List<LookupItemData> LoadCurrencies(int clientId)
         {
             return LoadLookup(
@@ -448,6 +475,7 @@ namespace VASLogic.Models
                     FROM C_Currency c
                    WHERE c.IsActive = 'Y'
                      AND c.AD_Client_ID IN (0, @AD_Client_ID)
+                     AND c.IsMyCurrency = 'Y'
                    ORDER BY c.ISO_Code",
                 clientId, "LoadCurrencies");
         }
@@ -465,22 +493,76 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// The three cost distributions this panel exposes, in display order.
-        /// Stored codes stay the platform's own reference-list values (Q / I / L);
-        /// only the labels are panel-side, and no new list value is created.
+        /// The cost distributions this panel exposes, read from the platform's own
+        /// reference list (AD_Ref_List) behind C_ExpectedCost.LandedCostDistribution
+        /// and narrowed to <see cref="ALLOWED_DISTRIBUTIONS"/>. Codes and labels are
+        /// both the platform's — nothing is hard-coded here and no list value is
+        /// created. If the reference cannot be resolved the codes are still offered,
+        /// labelled with their raw value, so the form never comes up empty.
         /// </summary>
-        private List<LookupItemData> LoadDistributions(Ctx ctx)
+        private List<LookupItemData> LoadDistributions(Dictionary<string, string> names)
         {
             List<LookupItemData> list = new List<LookupItemData>();
             foreach (string code in ALLOWED_DISTRIBUTIONS)
             {
-                list.Add(new LookupItemData
-                {
-                    Code = code,
-                    Name = GetDistributionLabel(ctx, code)
-                });
+                string name;
+                if (!names.TryGetValue(code, out name) || string.IsNullOrEmpty(name))
+                    name = code;
+                list.Add(new LookupItemData { Code = code, Name = name });
             }
             return list;
+        }
+
+        /// <summary>
+        /// Code -> name for the allowed C_LandedCostDistribution reference-list
+        /// values. The reference is resolved through AD_Column rather than by a
+        /// hard-coded AD_Reference_ID, so a re-seeded dictionary cannot break it.
+        /// Degrades to an empty map, never throws.
+        /// </summary>
+        private Dictionary<string, string> LoadDistributionNames()
+        {
+            Dictionary<string, string> map = new Dictionary<string, string>();
+            try
+            {
+                string sql = @"SELECT rl.Value AS Code, rl.Name AS Name
+                                 FROM AD_Ref_List rl
+                                WHERE rl.IsActive = 'Y'
+                                  AND rl.Value IN (" + AllowedDistributionSqlList() + @")
+                                  AND rl.AD_Reference_ID = (SELECT c.AD_Reference_Value_ID
+                                                              FROM AD_Column c
+                                                             INNER JOIN AD_Table t
+                                                                    ON (t.AD_Table_ID = c.AD_Table_ID)
+                                                             WHERE t.TableName  = 'C_ExpectedCost'
+                                                               AND c.ColumnName = 'LandedCostDistribution')";
+                DataSet ds = DB.ExecuteDataset(sql, null, null);
+                if (ds == null || ds.Tables.Count == 0) return map;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    string code = Util.GetValueOfString(r["Code"]);
+                    if (!string.IsNullOrEmpty(code) && !map.ContainsKey(code))
+                        map[code] = Util.GetValueOfString(r["Name"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadDistributionNames: " + ex.Message);
+            }
+            return map;
+        }
+
+        /// <summary>
+        /// <see cref="ALLOWED_DISTRIBUTIONS"/> as a quoted SQL IN list. The values
+        /// are compile-time constants of this class, never request input.
+        /// </summary>
+        private static string AllowedDistributionSqlList()
+        {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < ALLOWED_DISTRIBUTIONS.Length; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                sb.Append("'").Append(ALLOWED_DISTRIBUTIONS[i]).Append("'");
+            }
+            return sb.ToString();
         }
 
         /// <summary>Runs an id/name lookup query, degrading to an empty list.</summary>
@@ -522,15 +604,17 @@ namespace VASLogic.Models
         ///
         /// Every rule is enforced here, independently of the client: the order
         /// must exist, be a purchase order (IsSOTrx = 'N') and still be drafted;
-        /// the distribution must be Q, I or L; cost element, currency and rate
-        /// type must exist and be active; and the amount must be greater than
-        /// zero. A manipulated browser cannot bypass any of them.
+        /// the distribution must be one of C / L / Q / V / W; the cost element must
+        /// be an active material element with no costing method; the currency must
+        /// be a transacting currency (IsMyCurrency = 'Y'); the rate type must exist
+        /// and be active; and the amount must be greater than zero. A manipulated
+        /// browser cannot bypass any of them.
         /// </summary>
         /// <param name="ctx">User context.</param>
         /// <param name="expectedCostId">0 to create, else the entry to update.</param>
         /// <param name="purchaseOrderId">Owning purchase order (create only).</param>
-        /// <param name="distributionCode">Q | I | L.</param>
-        /// <param name="costElementId">M_CostElement_ID.</param>
+        /// <param name="distributionCode">C | L | Q | V | W.</param>
+        /// <param name="costElementId">M_CostElement_ID (material, no costing method).</param>
         /// <param name="description">Optional description.</param>
         /// <param name="amount">Entered amount, must be &gt; 0.</param>
         /// <param name="currencyId">C_Currency_ID of the entered amount.</param>
@@ -599,13 +683,13 @@ namespace VASLogic.Models
                     return result;
                 }
 
-                if (!IsActiveLookup("M_CostElement", "M_CostElement_ID", costElementId, guard.ClientId))
+                if (!IsValidCostElement(costElementId, guard.ClientId))
                 {
                     result.Message = GetMsg(ctx, "VAS_167_InvalidCostElement",
                         "Select a valid cost element.");
                     return result;
                 }
-                if (!IsActiveLookup("C_Currency", "C_Currency_ID", currencyId, guard.ClientId))
+                if (!IsValidCurrency(currencyId, guard.ClientId))
                 {
                     result.Message = GetMsg(ctx, "VAS_167_InvalidCurrency",
                         "Select a valid currency.");
@@ -787,6 +871,73 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// Cost element check for a save: active, visible to the tenant, and the
+        /// same material / no-costing-method restriction the dropdown applies.
+        /// A browser posting an element that is not on the list is rejected.
+        /// </summary>
+        private bool IsValidCostElement(int costElementId, int clientId)
+        {
+            if (costElementId <= 0) return false;
+            try
+            {
+                string sql = @"SELECT COUNT(*) AS Found
+                                 FROM M_CostElement ce
+                                WHERE ce.M_CostElement_ID = @Id
+                                  AND ce.IsActive = 'Y'
+                                  AND ce.AD_Client_ID IN (0, @AD_Client_ID)
+                                  AND ce.CostElementType = '" + COSTELEMENTTYPE_Material + @"'
+                                  AND ce.CostingMethod IS NULL";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@Id", costElementId),
+                    new SqlParameter("@AD_Client_ID", clientId)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return false;
+                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["Found"]) > 0;
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("IsValidCostElement (M_CostElement_ID=" + costElementId + "): " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Currency check for a save: active, visible to the tenant and flagged as
+        /// a transacting currency (IsMyCurrency = 'Y') — exactly what the dropdown
+        /// offers.
+        /// </summary>
+        private bool IsValidCurrency(int currencyId, int clientId)
+        {
+            if (currencyId <= 0) return false;
+            try
+            {
+                string sql = @"SELECT COUNT(*) AS Found
+                                 FROM C_Currency c
+                                WHERE c.C_Currency_ID = @Id
+                                  AND c.IsActive = 'Y'
+                                  AND c.AD_Client_ID IN (0, @AD_Client_ID)
+                                  AND c.IsMyCurrency = 'Y'";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@Id", currencyId),
+                    new SqlParameter("@AD_Client_ID", clientId)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return false;
+                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["Found"]) > 0;
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("IsValidCurrency (C_Currency_ID=" + currencyId + "): " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Turns the model layer's last error into a short, business-friendly
         /// message. MExpectedCost.BeforeSave raises its own (duplicate entry,
         /// zero amount) — those are worth showing; anything else falls back to a
@@ -834,20 +985,18 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Display label for a stored C_LandedCostDistribution code. Only the
-        /// three codes this panel exposes are mapped; anything else (an entry
-        /// created elsewhere with C / V / W) shows its raw code rather than being
-        /// silently relabelled.
+        /// Display label for a stored C_LandedCostDistribution code, taken from
+        /// the reference list. Only the codes this panel exposes are in the map;
+        /// anything else (an entry created elsewhere with I = Import Value) shows
+        /// its raw code rather than being silently relabelled.
         /// </summary>
-        private string GetDistributionLabel(Ctx ctx, string code)
+        private string GetDistributionLabel(Dictionary<string, string> names, string code)
         {
-            switch (code)
-            {
-                case "Q": return GetMsg(ctx, "VAS_167_ByQuantity", "By Quantity");
-                case "I": return GetMsg(ctx, "VAS_167_ByValue",    "By Value");
-                case "L": return GetMsg(ctx, "VAS_167_Equally",    "Equally");
-                default:  return code;
-            }
+            if (string.IsNullOrEmpty(code)) return code;
+            string name;
+            if (names != null && names.TryGetValue(code, out name) && !string.IsNullOrEmpty(name))
+                return name;
+            return code;
         }
 
         /// <summary>

@@ -34,6 +34,13 @@ namespace VAS.Controllers
 {
     public class VAS_032_RecentAPPaymentsWidgetController : Controller
     {
+        /// <summary>
+        /// Length of the trailing transaction-date window the card covers,
+        /// in days, counting today. Backs the "last 30 days" the widget
+        /// subtitle has always claimed (VAS_032_MessageReceiptsLast30Days).
+        /// </summary>
+        private const int RecentPaymentWindowDays = 30;
+
         public JsonResult GetRecentAPPayments()
         {
             Ctx ctx = GetContext();
@@ -1035,6 +1042,8 @@ SELECT
 
     Payment.C_ConversionType_ID,
 
+    Payment.DateTrx,
+
     Payment.DateAcct,
 
     Payment.DocumentNo,
@@ -1065,7 +1074,20 @@ AND Payment.DocStatus IN
 (
     'CO',
     'CL'
-)";
+)
+
+/* Trailing 30 days on the transaction date - the card is a recent
+   activity feed, not a period report. DateTrx is what is filtered on;
+   the list still displays DateAcct under its 'Account Date' heading. */
+AND Payment.DateTrx >=
+    " + GetTrailingWindowStartSql(
+        RecentPaymentWindowDays
+    ) + @"
+
+AND Payment.DateTrx <
+    " + GetNextDaySql(
+        GetCurrentDateSql()
+    );
 
             paymentAccessSql =
                 MRole.GetDefault(ctx).AddAccessSQL(
@@ -1689,6 +1711,66 @@ AND ColumnData.ColumnName =
             return "CAST("
                 + expression
                 + " AS VARCHAR(4000))";
+        }
+
+        /// <summary>
+        /// Returns the current database date without time.
+        /// </summary>
+        private string GetCurrentDateSql()
+        {
+            return DB.IsOracle()
+                ? "TRUNC(CURRENT_DATE)"
+                : "CURRENT_DATE";
+        }
+
+        /// <summary>
+        /// Turns an inclusive date into the exclusive upper bound that
+        /// follows it, so a same-day timestamp still falls inside.
+        /// </summary>
+        private string GetNextDaySql(
+            string expression)
+        {
+            if (DB.IsOracle())
+            {
+                return "CAST("
+                    + expression
+                    + " AS DATE) + 1";
+            }
+
+            return "CAST("
+                + expression
+                + " AS DATE) + INTERVAL '1 DAY'";
+        }
+
+        /// <summary>
+        /// Returns the inclusive start of the trailing window of
+        /// <paramref name="days"/> days ending today.
+        /// </summary>
+        /// <remarks>
+        /// The date comes from the database rather than the web server, so
+        /// the window does not shift when the two sit in different time
+        /// zones. The count is inclusive of today: a 30-day window starts
+        /// 29 days back.
+        /// </remarks>
+        private string GetTrailingWindowStartSql(
+            int days)
+        {
+            string offset =
+                (days - 1).ToString(
+                    CultureInfo.InvariantCulture
+                );
+
+            if (DB.IsOracle())
+            {
+                return GetCurrentDateSql()
+                    + " - "
+                    + offset;
+            }
+
+            return GetCurrentDateSql()
+                + " - INTERVAL '"
+                + offset
+                + " DAY'";
         }
 
         private string ToSqlString(

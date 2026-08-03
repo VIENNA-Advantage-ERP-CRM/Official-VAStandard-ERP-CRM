@@ -8,21 +8,17 @@
  * ----+---------------------------------------------------+------------------------------
  *  1  | Unreconciled                                      | VAS_027_messageCleared
  *  1b | All-time Payments not yet reconciled              | VAS_027_messageAllTimeNotReconciled
- *  2  | Of last month                                     | VAS_027_messageAPPaymentClearedWhy
- *  3  | No Data                                           | VAS_027_messageNoData
+ *  2  | Not yet matched to statement                      | VAS_027_messageAPPaymentClearedWhy
  *  4  | payments                                          | VAS_027_messagePayments
  *  5  | awaiting bank match                               | VAS_027_messageAwaitingBankMatch
- *  6  | days                                              | VAS_027_messageDays
  *  7  | No unreconciled payments                          | VAS_027_NoUnreconciledPayments
  *  8  | Showing                                           | VAS_Showing
  *  9  | of                                                | VAS_Of
  * 10  | Unreconciled payments                             | VAS_027_UnreconciledPayments
  * 11  | Auto-match process is not configured              | VAS_027_AutoMatchProcessNotConfigured
- * 12  | Payment reconciliation window is not configured    | VAS_027_ReconciliationWindowNotConfigured
+ * 12  | Payment reconciliation window is not configured   | VAS_027_ReconciliationWindowNotConfigured
  * 13  | Could not open action                             | VAS_ErrorLoading
- * 14  | Unreconciled (summary label)                      | VAS_027_messageUnreconciled
- * 15  | Amount (summary label)                            | VAS_027_messageAmount
- * 16  | Oldest (summary label)                            | VAS_027_messageOldest
+ * 15  | Amount                                            | VAS_027_messageAmount
  * 17  | Payment No. (table header)                        | VAS_027_messagePaymentNo
  * 18  | Date (table header)                               | VAS_027_messageDate
  * 19  | Vendor (table header)                             | VAS_027_messageVendor
@@ -63,11 +59,6 @@
         var $dialogTbody = null;
         var $dialogBusy = null;
         var $dialogSubtitle = null;
-
-        var $summaryCount = null;
-        var $summaryAmount = null;
-        var $summaryOldest = null;
-        var $summaryRate = null;
 
         var $pagerHelper = null;
         var $pagerPrev = null;
@@ -180,23 +171,6 @@
             ).toLocaleString(
                 window.navigator.language
             );
-        }
-
-        function formatPercent(
-            value
-        ) {
-            return Number(
-                value || 0
-            ).toLocaleString(
-                window.navigator.language,
-                {
-                    minimumFractionDigits:
-                        2,
-
-                    maximumFractionDigits:
-                        2
-                }
-            ) + '%';
         }
 
         /*
@@ -523,7 +497,7 @@
             ).text(
                 lbl(
                     'VAS_027_messageAPPaymentClearedWhy',
-                    "Of last month's AP payments reconciled"
+                    'Not yet matched to statement'
                 )
             );
 
@@ -647,48 +621,37 @@
         }
 
         function renderData(data) {
-            var percentage =
-                Number(data.value);
-            var totalPayments =
-                Number(data.totalPayments);
-
-            if (isNaN(percentage)) {
-                percentage = Number(
-                    data.clearedPercentage
-                );
-            }
-
-            if (
-                isNaN(percentage) ||
-                isNaN(totalPayments) ||
-                totalPayments <= 0
-            ) {
-                showState(
-                    true,
-                    lbl(
-                        'VAS_027_messageNoData',
-                        'No Data'
-                    )
-                );
-
-                return;
-            }
-
-            percentage = Math.max(
-                0,
-                Math.min(
-                    percentage,
-                    100
-                )
+            /*
+             * The card reports how many AP payments are still unreconciled,
+             * all-time - a plain count, not a share of the period.
+             */
+            var unreconciledCount = Number(
+                data.unreconciledPayments
             );
+
+            if (isNaN(unreconciledCount)) {
+                unreconciledCount = Number(
+                    data.value
+                );
+            }
+
+            /*
+             * Nothing to reconcile is a real answer, not a failure, so the
+             * card keeps its normal layout and reads 0 instead of swapping
+             * in a "No Data" state. Only a load error still takes over the
+             * card.
+             */
+            if (
+                isNaN(unreconciledCount) ||
+                unreconciledCount < 0
+            ) {
+                unreconciledCount = 0;
+            }
 
             showState(false, '');
 
             $value.text(
-                formatPercent(
-                    percentage,
-                    data.precision
-                )
+                formatCount(unreconciledCount)
             );
         }
 
@@ -1019,14 +982,6 @@
                     symbol
                 );
 
-            var oldestDays = Number(
-                data.oldestDays || 0
-            );
-
-            var autoMatchRate = Number(
-                data.autoMatchRate || 0
-            );
-
             $dialogSubtitle.text(
                 formatCount(totalRecords) +
                 ' ' +
@@ -1040,32 +995,6 @@
                 lbl(
                     'VAS_027_messageAwaitingBankMatch',
                     'awaiting bank match'
-                )
-            );
-
-            $summaryCount.text(
-                formatCount(totalRecords)
-            );
-
-            $summaryAmount.text(
-                totalAmountText
-            );
-
-            $summaryOldest.text(
-                oldestDays > 0
-                    ? oldestDays +
-                    ' ' +
-                    lbl(
-                        'VAS_027_messageDays',
-                        'days'
-                    )
-                    : '0'
-            );
-
-            $summaryRate.text(
-                formatPercent(
-                    autoMatchRate,
-                    0
                 )
             );
         }
@@ -1300,6 +1229,15 @@
             $('body').removeClass(
                 'vas-cpa-body-lock'
             );
+
+            /*
+             * Paging state is reset on close so the next open always starts
+             * at page 1 with a fresh fetch, rather than reopening on
+             * whichever page the user happened to leave off on.
+             */
+            pageNo = 1;
+            rowsLoaded = false;
+            adaptiveAdjustCount = 0;
         }
 
         function reconcileIconSvg() {
@@ -1369,32 +1307,6 @@
                 'x2="18" y2="18"></line>' +
                 '</svg>' +
                 '</button>' +
-
-                '</div>' +
-
-                '<div class="vas-cpa-summary">' +
-
-                '<div>' +
-                '<span>' + lbl('VAS_027_messageUnreconciled', 'Unreconciled') + '</span>' +
-                '<strong class="vas-cpa-summary-count">' +
-                '0' +
-                '</strong>' +
-                '</div>' +
-
-                '<div>' +
-                '<span>' + lbl('VAS_027_messageAmount', 'Amount') + '</span>' +
-                '<strong class="vas-cpa-summary-amount">' +
-                '0' +
-                '</strong>' +
-                '</div>' +
-
-                '<div>' +
-                '<span>' + lbl('VAS_027_messageOldest', 'Oldest') + '</span>' +
-                '<strong class="vas-cpa-summary-oldest">' +
-                '0' +
-                '</strong>' +
-                '</div>' +
-
 
                 '</div>' +
 
@@ -1486,22 +1398,6 @@
 
             $dialogSubtitle = $dialog.find(
                 '.vas-cpa-dialog-subtitle'
-            );
-
-            $summaryCount = $dialog.find(
-                '.vas-cpa-summary-count'
-            );
-
-            $summaryAmount = $dialog.find(
-                '.vas-cpa-summary-amount'
-            );
-
-            $summaryOldest = $dialog.find(
-                '.vas-cpa-summary-oldest'
-            );
-
-            $summaryRate = $dialog.find(
-                '.vas-cpa-summary-rate'
             );
 
             $pagerHelper = $dialog.find(

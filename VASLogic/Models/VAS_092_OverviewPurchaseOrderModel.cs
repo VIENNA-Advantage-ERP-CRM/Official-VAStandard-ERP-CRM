@@ -1,4 +1,4 @@
-/// <summary>
+﻿/// <summary>
 /// Module Name : VASLogic
 /// Purpose     : Purchase Order Overview tab panel data (read side).
 ///               Returns header identity, vendor, linked origin documents,
@@ -148,12 +148,52 @@
 ///                          the complete list, newest first, where the activity
 ///                          feed only carries what survives its cap. One query
 ///                          feeds both.
+///   VAI163   2026-07-31  - Line items now carry the received quantity in the
+///                          line's ENTERED UOM (Σ M_InOutLine.QtyEntered over
+///                          completed receipts, QtyReceivedEntered), so Received
+///                          reads on the same scale as the ordered quantity
+///                          (C_OrderLine.QtyEntered) instead of the converted
+///                          stocking figure C_OrderLine.QtyDelivered.
+///                        - Payment Completed now dates from the payment's own
+///                          workflow DocComplete stamp (GetLastPaymentDate),
+///                          falling back to C_Payment.DateTrx, so a back-dated
+///                          booking no longer reads as the completion moment.
+///                        - E-mail bodies (MailAttachment1.TextMsg) are flattened
+///                          to readable text (MailBodyToText): an HTML mail used
+///                          to render its own tags in the activity feed.
+///   VAI163   2026-07-31  - Generated From gained three origins that previously
+///                          fell through to "Manual": the RFQ the PO was raised
+///                          from (C_RfQResponse.C_Order_ID -> C_RfQ), the project
+///                          it was generated for (C_ProjectLine.C_OrderPO_ID ->
+///                          C_Project), and the requisition reached through the
+///                          RFQ (C_RfQ.M_Requisition_ID) when no direct
+///                          M_RequisitionLine.C_OrderLine_ID link exists — so the
+///                          chain Requisition -> RFQ -> PO still names its origin.
+///                        - Blanket Order: the blanket the PO was released
+///                          against (C_Order.C_Order_Blanket, parent
+///                          IsBlanketTrx = 'Y').
+///                        - Activity is now the record's whole lifecycle. The
+///                          single "approval" row derived from C_Order.Updated
+///                          (which could only show the LATEST change, hiding
+///                          re-activations and every completion but the last) is
+///                          replaced by one row per completed workflow node
+///                          (LoadOrderWorkflowActivity: prepare / complete /
+///                          re-activate / void / close / approve / reject), plus
+///                          header edits from AD_ChangeLog collapsed to one row
+///                          per save (LoadOrderChangeActivity). The feed cap rose
+///                          from 12 to 200 so a long lifecycle is not truncated.
+///                        - E-mail rows carry the Cc / Bcc recipients
+///                          (MailAttachment1.MailAddressCc / MailAddressBcc)
+///                          alongside the To address.
 /// </summary>
 
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Net;
+using System.Text;
+using System.Text.RegularExpressions;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
@@ -400,7 +440,11 @@ namespace VASLogic.Models
             result.OrderCompletedDate = GetOrderCompletedDate(C_Order_ID);
             result.LastReceiptDate = Util.GetValueOfDateTime(r["LastReceiptDate"]);
             result.LastInvoiceDate = GetLastInvoiceDate(C_Order_ID);
-            result.LastPaymentDate = lastPaymentDate;
+            // Payment Completed shows when the payment was completed (its workflow
+            // DocComplete stamp), not the date it was booked against. A payment
+            // without a completed workflow node falls back to its transaction date
+            // so the stage is never left blank.
+            result.LastPaymentDate = GetLastPaymentDate(C_Order_ID) ?? lastPaymentDate;
 
             // ----- Line items -----
             result.Lines = LoadLines(C_Order_ID, result.StdPrecision);
@@ -596,7 +640,20 @@ namespace VASLogic.Models
                               uom.UOMSymbol     AS UOMSymbol,
                               uom.StdPrecision  AS UOMPrecision,
                               asi.Description   AS AttributeSetInstance,
-                              NVL(pl.PricePrecision, 2) AS PricePrecision
+                              NVL(pl.PricePrecision, 2) AS PricePrecision,
+                              -- Received quantity in the line's ENTERED UOM, so it
+                              -- reads on the same scale as the ordered quantity
+                              -- (C_OrderLine.QtyEntered). M_InOutLine.QtyEntered is
+                              -- the receipt's own entered figure; QtyDelivered on the
+                              -- order line is the converted stocking quantity and
+                              -- would show a different unit.
+                              (SELECT NVL(SUM(NVL(iol.QtyEntered, iol.MovementQty)), 0)
+                                 FROM M_InOutLine iol
+                                 INNER JOIN M_InOut io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                                WHERE iol.C_OrderLine_ID = ol.C_OrderLine_ID
+                                  AND NVL(iol.IsActive, 'Y') = 'Y'
+                                  AND NVL(io.IsActive, 'Y')  = 'Y'
+                                  AND io.DocStatus IN ('CO', 'CL')) AS QtyReceivedEntered
                            FROM C_OrderLine ol
                            LEFT OUTER JOIN M_Product   p   ON (ol.M_Product_ID = p.M_Product_ID)
                            LEFT OUTER JOIN C_Charge    ch  ON (ol.C_Charge_ID  = ch.C_Charge_ID)
@@ -626,6 +683,7 @@ namespace VASLogic.Models
                 ln.QtyEntered     = Util.GetValueOfDecimal(r["QtyEntered"]);
                 ln.QtyOrdered     = Util.GetValueOfDecimal(r["QtyOrdered"]);
                 ln.QtyDelivered   = Util.GetValueOfDecimal(r["QtyDelivered"]);
+                ln.QtyReceivedEntered = Util.GetValueOfDecimal(r["QtyReceivedEntered"]);
                 ln.QtyInvoiced    = Util.GetValueOfDecimal(r["QtyInvoiced"]);
                 ln.PriceActual    = Util.GetValueOfDecimal(r["PriceActual"]);
                 ln.LineNetAmt     = Util.GetValueOfDecimal(r["LineNetAmt"]);
@@ -667,6 +725,15 @@ namespace VASLogic.Models
         ///   - Contract reference: C_Order.VAS_ContractMaster_ID ->
         ///     VAS_ContractMaster.DocumentNo. That column is module-optional, so
         ///     it is read under its own guard.
+        ///   - RFQ: the request for quotation the PO was raised from, reached
+        ///     through the winning response (C_RfQResponse.C_Order_ID).
+        ///   - Requisition through the RFQ: when the direct requisition link is
+        ///     absent, C_RfQ.M_Requisition_ID walks the rest of the chain
+        ///     (Requisition -> RFQ -> PO) so the original requisition still shows.
+        ///   - Project: the project line the PO was generated for
+        ///     (C_ProjectLine.C_OrderPO_ID).
+        ///   - Blanket Order: the blanket the PO was released against
+        ///     (C_Order.C_Order_Blanket -> a C_Order with IsBlanketTrx = 'Y').
         /// (The sales-order origin, Ref_Order_ID, is read in the main query.)
         /// </summary>
         private void LoadOrigins(int C_Order_ID, PurchaseOrderOverviewData d)
@@ -738,6 +805,142 @@ namespace VASLogic.Models
                 {
                     // Contract number is a nicety; the chip still shows the id.
                     _log.Severe("LoadOrigins/ContractNo (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                }
+            }
+
+            // --- RFQ: the request for quotation this PO was raised from. ---
+            //  RfQCreatePO writes the order back onto the winning response
+            //  (C_RfQResponse.C_Order_ID), so the response is what ties the two
+            //  together. The RFQ also remembers the requisition it was raised
+            //  from (C_RfQ.M_Requisition_ID) — read here so the chain
+            //  Requisition -> RFQ -> PO can be walked below.
+            int rfqRequisitionId = 0;
+            try
+            {
+                // C_RfQ carries Name always; DocumentNo only in schemas that have
+                // it, so the identifier is chosen under a column guard.
+                string rfqNoExpr = ColumnExists("C_RfQ", "DocumentNo")
+                    ? "NVL(rq.DocumentNo, rq.Name)"
+                    : "rq.Name";
+
+                string sql = @"SELECT rq.C_RfQ_ID          AS RfqId,
+                                      " + rfqNoExpr + @"   AS RfqNo,
+                                      rq.M_Requisition_ID  AS RfqRequisitionId
+                                 FROM C_RfQResponse rr
+                                 INNER JOIN C_RfQ rq ON (rq.C_RfQ_ID = rr.C_RfQ_ID)
+                                WHERE rr.C_Order_ID = @C_Order_ID
+                                  AND NVL(rr.IsActive, 'Y') = 'Y'
+                                  AND NVL(rq.IsActive, 'Y') = 'Y'
+                                GROUP BY rq.C_RfQ_ID, " + rfqNoExpr + @", rq.M_Requisition_ID
+                                ORDER BY rq.C_RfQ_ID";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow r0 = ds.Tables[0].Rows[0];
+                    d.RfqId          = Util.GetValueOfInt(r0["RfqId"]);
+                    d.RfqNo          = Util.GetValueOfString(r0["RfqNo"]);
+                    d.RfqCount       = ds.Tables[0].Rows.Count;
+                    rfqRequisitionId = Util.GetValueOfInt(r0["RfqRequisitionId"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadOrigins/RfQ (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+
+            // --- Requisition reached through the RFQ (Requisition -> RFQ -> PO). ---
+            //  Only when the direct path above found nothing: a PO raised from an
+            //  RFQ has no M_RequisitionLine.C_OrderLine_ID link of its own, so the
+            //  original requisition is only reachable through the RFQ.
+            if (d.RequisitionId <= 0 && rfqRequisitionId > 0)
+            {
+                try
+                {
+                    string sql = @"SELECT r.M_Requisition_ID, r.DocumentNo
+                                     FROM M_Requisition r
+                                    WHERE r.M_Requisition_ID = @M_Requisition_ID
+                                      AND NVL(r.IsActive, 'Y') = 'Y'";
+                    SqlParameter[] p = new SqlParameter[]
+                    {
+                        new SqlParameter("@M_Requisition_ID", rfqRequisitionId)
+                    };
+                    DataSet ds = DB.ExecuteDataset(sql, p, null);
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        DataRow r0 = ds.Tables[0].Rows[0];
+                        d.RequisitionId    = Util.GetValueOfInt(r0["M_Requisition_ID"]);
+                        d.RequisitionDocNo = Util.GetValueOfString(r0["DocumentNo"]);
+                        d.RequisitionCount = 1;
+                        d.IsRequisitionViaRfq = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.Severe("LoadOrigins/RequisitionViaRfQ (C_Order_ID="
+                                + C_Order_ID + "): " + ex.Message);
+                }
+            }
+
+            // --- Project: the project line this PO was generated for. ---
+            //  ProjectGenPO stamps the order onto the project line it raised
+            //  (C_ProjectLine.C_OrderPO_ID), so that column is the link.
+            try
+            {
+                string sql = @"SELECT pj.C_Project_ID       AS ProjectId,
+                                      NVL(pj.Value, pj.Name) AS ProjectNo,
+                                      MAX(pj.Name)          AS ProjectName
+                                 FROM C_ProjectLine pl
+                                 INNER JOIN C_Project pj ON (pj.C_Project_ID = pl.C_Project_ID)
+                                WHERE pl.C_OrderPO_ID = @C_Order_ID
+                                  AND NVL(pl.IsActive, 'Y') = 'Y'
+                                  AND NVL(pj.IsActive, 'Y') = 'Y'
+                                GROUP BY pj.C_Project_ID, NVL(pj.Value, pj.Name)
+                                ORDER BY pj.C_Project_ID";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow r0 = ds.Tables[0].Rows[0];
+                    d.ProjectId   = Util.GetValueOfInt(r0["ProjectId"]);
+                    d.ProjectNo   = Util.GetValueOfString(r0["ProjectNo"]);
+                    d.ProjectName = Util.GetValueOfString(r0["ProjectName"]);
+                    d.ProjectCount = ds.Tables[0].Rows.Count;
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadOrigins/Project (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+
+            // --- Blanket Order: the blanket this PO was released against. ---
+            //  A release order points back at its blanket through
+            //  C_Order.C_Order_Blanket; the blanket itself is the order carrying
+            //  IsBlanketTrx = 'Y'. That flag is re-checked on the parent so a
+            //  stale reference to a non-blanket order cannot show up here.
+            //  C_Order_Blanket is guarded — it is a module column and does not
+            //  exist in every schema.
+            if (ColumnExists("C_Order", "C_Order_Blanket"))
+            {
+                try
+                {
+                    string sql = @"SELECT bo.C_Order_ID  AS BlanketId,
+                                          bo.DocumentNo  AS BlanketNo
+                                     FROM C_Order o
+                                     INNER JOIN C_Order bo
+                                            ON (bo.C_Order_ID = o.C_Order_Blanket)
+                                    WHERE o.C_Order_ID = @C_Order_ID
+                                      AND NVL(bo.IsBlanketTrx, 'N') = 'Y'
+                                      AND NVL(bo.IsActive, 'Y')     = 'Y'";
+                    DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        DataRow r0 = ds.Tables[0].Rows[0];
+                        d.BlanketOrderId = Util.GetValueOfInt(r0["BlanketId"]);
+                        d.BlanketOrderNo = Util.GetValueOfString(r0["BlanketNo"]);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.Severe("LoadOrigins/BlanketOrder (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
                 }
             }
         }
@@ -915,7 +1118,11 @@ namespace VASLogic.Models
         /// <returns>Activity rows ordered newest-first (may be empty).</returns>
         private List<ActivityData> LoadActivity(int C_Order_ID, List<EmailData> emails)
         {
-            const int MAX_ENTRIES = 12;
+            // The feed is the record's lifecycle, so it is not trimmed to a
+            // headline few: an order re-activated and re-completed several times
+            // carries a long, legitimate history and every step has to survive.
+            // The cap is only a runaway guard.
+            const int MAX_ENTRIES = 200;
 
             List<ActivityData> activity = new List<ActivityData>();
             LoadNoteActivity(C_Order_ID, activity);
@@ -924,6 +1131,8 @@ namespace VASLogic.Models
             LoadInvoiceActivity(C_Order_ID, activity);
             LoadPaymentActivity(C_Order_ID, activity);
             LoadOrderMilestoneActivity(C_Order_ID, activity);
+            LoadOrderWorkflowActivity(C_Order_ID, activity);
+            LoadOrderChangeActivity(C_Order_ID, activity);
 
             // Newest first; entries with no timestamp sink to the bottom.
             activity.Sort((a, b) =>
@@ -956,6 +1165,8 @@ namespace VASLogic.Models
                 // on this table is a letter / inbound document, not an e-mail.
                 string sql = @"SELECT ma.MailAttachment1_ID,
                                       ma.MailAddress,
+                                      ma.MailAddressCc,
+                                      ma.MailAddressBcc,
                                       ma.MailAddressFrom,
                                       ma.Title,
                                       ma.TextMsg,
@@ -983,8 +1194,12 @@ namespace VASLogic.Models
                     {
                         MailAttachment1_ID = Util.GetValueOfInt(r["MailAttachment1_ID"]),
                         Subject    = Util.GetValueOfString(r["Title"]),
-                        Body       = Util.GetValueOfString(r["TextMsg"]),
+                        // Mails sent as HTML store their markup in TextMsg; the
+                        // panel shows a body as text, so it is flattened here.
+                        Body       = MailBodyToText(Util.GetValueOfString(r["TextMsg"])),
                         MailTo     = Util.GetValueOfString(r["MailAddress"]),
+                        MailCc     = Util.GetValueOfString(r["MailAddressCc"]),
+                        MailBcc    = Util.GetValueOfString(r["MailAddressBcc"]),
                         MailFrom   = Util.GetValueOfString(r["MailAddressFrom"]),
                         IsMailSent = Util.GetValueOfString(r["IsMailSent"]) == "Y",
                         SentBy     = Util.GetValueOfString(r["UserName"]),
@@ -998,6 +1213,75 @@ namespace VASLogic.Models
                 _log.Severe("LoadEmails (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
             }
             return emails;
+        }
+
+        /// <summary>
+        /// Cheap "is this markup" test — a real tag, not a stray '&lt;' in a
+        /// plain-text mail ("qty &lt; 10"), so a plain body is left untouched.
+        /// </summary>
+        private static readonly Regex HTML_BODY = new Regex(
+            @"<\s*/?\s*(html|body|head|br|p|div|table|thead|tbody|tr|td|th|span|a|img|b|i|u"
+            + @"|strong|em|ul|ol|li|h[1-6]|font|style|script)\b",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        /// <summary>
+        /// Renders a mail body (MailAttachment1.TextMsg) as readable plain text.
+        /// A mail sent as HTML stores its markup here, and the panel shows the
+        /// body as text — so without this the reader gets tags instead of a
+        /// message. Block-level markup becomes line breaks, table cells become
+        /// tabs, everything else is dropped and entities are decoded last, so
+        /// the browser still receives text it can safely escape: no markup is
+        /// ever handed to the panel. A body with no markup is returned as it
+        /// was stored.
+        /// </summary>
+        private static string MailBodyToText(string body)
+        {
+            if (string.IsNullOrEmpty(body)) return body;
+            if (!HTML_BODY.IsMatch(body)) return body;      // plain-text mail
+
+            try
+            {
+                string s = body;
+
+                // Head matter, styles and scripts carry no reading content.
+                s = Regex.Replace(s, @"<\s*(script|style|head)\b[^>]*>.*?<\s*/\s*\1\s*>", " ",
+                                  RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+                // Block boundaries become line breaks so paragraphs survive.
+                s = Regex.Replace(s, @"<\s*br\s*/?\s*>", "\n", RegexOptions.IgnoreCase);
+                s = Regex.Replace(s, @"<\s*/\s*(p|div|tr|li|h[1-6]|table|blockquote)\s*>", "\n",
+                                  RegexOptions.IgnoreCase);
+                // Opening tags too, so a <p> with no closing tag still breaks.
+                // 'tr' is deliberately absent — </tr> already ends the row, and
+                // breaking on both would leave a blank line between every row.
+                s = Regex.Replace(s, @"<\s*(p|div|li|h[1-6])\b[^>]*>", "\n",
+                                  RegexOptions.IgnoreCase);
+                // Cells read better separated than run together.
+                s = Regex.Replace(s, @"<\s*/\s*(td|th)\s*>", "\t", RegexOptions.IgnoreCase);
+
+                // Everything left is presentation.
+                s = Regex.Replace(s, @"<[^>]*>", string.Empty);
+
+                // Entities last, so an escaped &lt;b&gt; in the text was never
+                // treated as a tag above.
+                s = WebUtility.HtmlDecode(s);
+                s = s.Replace('\u00A0', ' ');               // nbsp reads as a space
+
+                // Normalise the whitespace the markup left behind.
+                s = s.Replace("\r\n", "\n").Replace('\r', '\n');
+                s = Regex.Replace(s, @"[^\S\n\t]+", " ");   // runs of spaces -> one
+                s = Regex.Replace(s, @"\t{2,}", "\t");
+                s = Regex.Replace(s, @"[ \t]*\n[ \t]*", "\n");   // incl. the last cell's tab
+                s = Regex.Replace(s, @"\n{3,}", "\n\n");    // at most one blank line
+
+                return s.Trim();
+            }
+            catch (Exception ex)
+            {
+                // Never lose the mail over a formatting failure — show it raw.
+                _log.Severe("MailBodyToText: " + ex.Message);
+                return body;
+            }
         }
 
         /// <summary>
@@ -1016,6 +1300,8 @@ namespace VASLogic.Models
                     Text       = m.Subject,
                     Body       = m.Body,
                     MailTo     = m.MailTo,
+                    MailCc     = m.MailCc,
+                    MailBcc    = m.MailBcc,
                     MailFrom   = m.MailFrom,
                     IsMailSent = m.IsMailSent,
                     UserName   = m.SentBy,
@@ -1218,23 +1504,19 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Adds the order's own milestones as activity rows: a "created" entry
-        /// (C_Order.Created / CreatedBy) and, when the order is completed /
-        /// closed, an "approval" entry (approximated by C_Order.Updated /
-        /// UpdatedBy — the latest change that carried it to CO/CL).
+        /// Adds the order's own creation entry (C_Order.Created / CreatedBy).
+        /// Every later lifecycle event comes from the workflow log — see
+        /// <see cref="LoadOrderWorkflowActivity"/> — so this only seeds the row
+        /// that has no workflow node of its own.
         /// </summary>
         private void LoadOrderMilestoneActivity(int C_Order_ID, List<ActivityData> list)
         {
             try
             {
                 string sql = @"SELECT o.Created,
-                                      o.Updated,
-                                      o.DocStatus,
-                                      cu.Name AS CreatedByName,
-                                      uu.Name AS UpdatedByName
+                                      cu.Name AS CreatedByName
                                  FROM C_Order o
                                  LEFT OUTER JOIN AD_User cu ON (o.CreatedBy = cu.AD_User_ID)
-                                 LEFT OUTER JOIN AD_User uu ON (o.UpdatedBy = uu.AD_User_ID)
                                 WHERE o.C_Order_ID = @C_Order_ID";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
@@ -1246,21 +1528,144 @@ namespace VASLogic.Models
                     UserName = Util.GetValueOfString(r["CreatedByName"]),
                     Created  = Util.GetValueOfDateTime(r["Created"])
                 });
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadOrderMilestoneActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
 
-                string docStatus = Util.GetValueOfString(r["DocStatus"]);
-                if (docStatus == "CO" || docStatus == "CL")
+        /// <summary>
+        /// The order's document lifecycle, one activity row per completed
+        /// workflow node (AD_WF_Process -> AD_WF_Activity -> AD_WF_Node, WFState
+        /// 'CC') against this C_Order: prepare, complete, re-activate, void,
+        /// close, approve / reject — each with the node's own name, the user who
+        /// ran it and when.
+        ///
+        /// This replaces the old single "approval" row derived from
+        /// C_Order.Updated, which could only ever show the LATEST change and so
+        /// hid re-activations and every completion but the last.
+        ///
+        /// Standalone query for the same MRole.AddAccessSQL / ORA-00904 reason as
+        /// <see cref="GetOrderCompletedDate"/>.
+        /// </summary>
+        private void LoadOrderWorkflowActivity(int C_Order_ID, List<ActivityData> list)
+        {
+            try
+            {
+                string sql = @"SELECT wfa.Created            AS EventOn,
+                                      NVL(wfn.Name, wfn.Value) AS NodeName,
+                                      UPPER(TRIM(wfn.Value))   AS NodeValue,
+                                      u.Name                 AS UserName
+                                 FROM AD_WF_Process wfp
+                                 INNER JOIN AD_WF_Activity wfa
+                                         ON (wfa.AD_WF_Process_ID = wfp.AD_WF_Process_ID)
+                                 INNER JOIN AD_WF_Node wfn
+                                         ON (wfn.AD_WF_Node_ID = wfa.AD_WF_Node_ID)
+                                 INNER JOIN AD_Table adt
+                                         ON (adt.AD_Table_ID = wfp.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                         ON (u.AD_User_ID = wfa.CreatedBy)
+                                WHERE wfp.Record_ID = @C_Order_ID
+                                  AND adt.TableName = 'C_Order'
+                                  AND wfp.IsActive  = 'Y'
+                                  AND wfa.IsActive  = 'Y'
+                                  AND wfn.IsActive  = 'Y'
+                                  AND wfa.WFState   = 'CC'
+                                ORDER BY wfa.Created";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
                 {
+                    string nodeValue = Util.GetValueOfString(r["NodeValue"]);
+                    string type      = WorkflowActivityType(nodeValue);
+                    if (type == null) continue;      // routing / non-document node
+
                     list.Add(new ActivityData
                     {
-                        Type     = "approval",
-                        UserName = Util.GetValueOfString(r["UpdatedByName"]),
-                        Created  = Util.GetValueOfDateTime(r["Updated"])
+                        Type     = type,
+                        // The node's own name is the headline, so a tenant that
+                        // renamed its workflow nodes reads in its own words.
+                        Text     = Util.GetValueOfString(r["NodeName"]),
+                        UserName = Util.GetValueOfString(r["UserName"]),
+                        Created  = Util.GetValueOfDateTime(r["EventOn"])
                     });
                 }
             }
             catch (Exception ex)
             {
-                _log.Severe("LoadOrderMilestoneActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                _log.Severe("LoadOrderWorkflowActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Maps a workflow node value to an activity type the client can tag, or
+        /// null for nodes that are pure routing (start / end / split) and carry no
+        /// meaning for a reader.
+        /// </summary>
+        private static string WorkflowActivityType(string nodeValue)
+        {
+            if (string.IsNullOrEmpty(nodeValue)) return null;
+            string v = nodeValue.Replace("(", "").Replace(")", "").Replace("_", "").Trim();
+
+            if (v.Contains("REACTIVATE")) return "reactivated";   // before COMPLETE
+            if (v.Contains("COMPLETE"))   return "completed";
+            if (v.Contains("REJECT"))     return "rejected";
+            if (v.Contains("APPROV"))     return "approval";
+            if (v.Contains("VOID"))       return "voided";
+            if (v.Contains("REVERSE"))    return "reversed";
+            if (v.Contains("CLOSE"))      return "closed";
+            if (v.Contains("PREPARE"))    return "prepared";
+            if (v.Contains("INVALID"))    return "invalidated";
+            return null;
+        }
+
+        /// <summary>
+        /// Field-level edits to the order header, read from the platform's change
+        /// log (AD_ChangeLog for C_Order / this record) and collapsed to one row
+        /// per save — a single edit touching five columns is one event to a
+        /// reader, not five. The column count travels in the row's text.
+        ///
+        /// Silently degrades when change logging is off for the table (no rows).
+        /// </summary>
+        private void LoadOrderChangeActivity(int C_Order_ID, List<ActivityData> list)
+        {
+            try
+            {
+                string sql = @"SELECT MAX(cl.Created)   AS EventOn,
+                                      MAX(u.Name)       AS UserName,
+                                      COUNT(*)          AS FieldCount
+                                 FROM AD_ChangeLog cl
+                                 INNER JOIN AD_Table adt
+                                         ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                         ON (u.AD_User_ID = cl.CreatedBy)
+                                WHERE cl.Record_ID = @C_Order_ID
+                                  AND adt.TableName = 'C_Order'
+                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                GROUP BY cl.AD_Session_ID, cl.CreatedBy,
+                                         CAST(cl.Created AS DATE)
+                                ORDER BY MAX(cl.Created)";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    list.Add(new ActivityData
+                    {
+                        Type       = "updated",
+                        Count      = Util.GetValueOfInt(r["FieldCount"]),
+                        UserName   = Util.GetValueOfString(r["UserName"]),
+                        Created    = Util.GetValueOfDateTime(r["EventOn"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Change logging is optional; a schema without it just shows no
+                // update rows.
+                _log.Severe("LoadOrderChangeActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
             }
         }
 
@@ -1367,6 +1772,65 @@ namespace VASLogic.Models
             {
                 // Non-fatal: the Invoice Raised stage falls back to no date.
                 _log.Severe("GetLastInvoiceDate (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Returns the moment the order's payment was completed: the Created stamp
+        /// of the payment's workflow DocComplete activity (C_Payment ->
+        /// AD_WF_Process -> AD_WF_Activity -> AD_WF_Node), taking the latest across
+        /// every completed payment allocated to the order's invoices, or null when
+        /// none has a completed workflow node.
+        ///
+        /// The Payment Completed stage wants the moment the payment was actually
+        /// completed, not the date it was booked against (C_Payment.DateTrx /
+        /// DateAcct) — those can be back-dated to a period end and then read as a
+        /// milestone that happened before the invoice it settles.
+        ///
+        /// Standalone query for the SAME reason as GetLastInvoiceDate: as a
+        /// subselect in the main SELECT this workflow join is walked by
+        /// MRole.AddAccessSQL's SQL_FULLYQUALIFIED rewriter, which appends
+        /// private-access filters referencing aliases that live only inside the
+        /// subselect and dies with ORA-00904.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected purchase order id.</param>
+        private DateTime? GetLastPaymentDate(int C_Order_ID)
+        {
+            try
+            {
+                string sql = @"SELECT MAX(payment_activity.Created) AS LastPaymentDate
+                                 FROM C_Payment payment_header
+                                 INNER JOIN C_AllocationLine payment_alloc
+                                         ON (payment_alloc.C_Payment_ID = payment_header.C_Payment_ID)
+                                 INNER JOIN C_Invoice payment_invoice
+                                         ON (payment_invoice.C_Invoice_ID = payment_alloc.C_Invoice_ID)
+                                 INNER JOIN AD_WF_Process payment_process
+                                         ON (payment_process.Record_ID = payment_header.C_Payment_ID)
+                                 INNER JOIN AD_Table payment_table
+                                         ON (payment_table.AD_Table_ID = payment_process.AD_Table_ID)
+                                 INNER JOIN AD_WF_Activity payment_activity
+                                         ON (payment_activity.AD_WF_Process_ID = payment_process.AD_WF_Process_ID)
+                                 INNER JOIN AD_WF_Node payment_node
+                                         ON (payment_node.AD_WF_Node_ID = payment_activity.AD_WF_Node_ID)
+                                WHERE payment_invoice.C_Order_ID = @C_Order_ID
+                                  AND payment_header.IsActive    = 'Y'
+                                  AND payment_header.DocStatus IN ('CO', 'CL')
+                                  AND payment_table.TableName    = 'C_Payment'
+                                  AND payment_process.IsActive   = 'Y'
+                                  AND payment_activity.IsActive  = 'Y'
+                                  AND payment_node.IsActive      = 'Y'
+                                  AND payment_activity.WFState   = 'CC'
+                                  AND UPPER(TRIM(payment_node.Value)) IN ('DOCCOMPLETE', 'COMPLETE', '(DOCCOMPLETE)')";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return null;
+                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["LastPaymentDate"]);
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: the Payment stage falls back to the transaction date.
+                _log.Severe("GetLastPaymentDate (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
                 return null;
             }
         }
@@ -1927,6 +2391,9 @@ namespace VASLogic.Models
             public decimal  QtyEntered     { get; set; }   // C_OrderLine.QtyEntered (entered UOM) — the displayed qty
             public decimal  QtyOrdered     { get; set; }
             public decimal  QtyDelivered   { get; set; }
+            /// <summary>Σ M_InOutLine.QtyEntered over completed receipts — the
+            /// received quantity on the same (entered) scale as QtyEntered.</summary>
+            public decimal  QtyReceivedEntered { get; set; }
             public decimal  QtyInvoiced    { get; set; }
             public decimal  PriceActual    { get; set; }
             public decimal  LineNetAmt     { get; set; }
@@ -2014,6 +2481,8 @@ namespace VASLogic.Models
             // E-mail (MailAttachment1) — the body is revealed on click.
             public string    Body            { get; set; }
             public string    MailTo          { get; set; }
+            public string    MailCc          { get; set; }
+            public string    MailBcc         { get; set; }
             public string    MailFrom        { get; set; }
             public bool      IsMailSent      { get; set; }
         }
@@ -2025,6 +2494,8 @@ namespace VASLogic.Models
             public string    Subject    { get; set; }   // Title
             public string    Body       { get; set; }   // TextMsg
             public string    MailTo     { get; set; }   // MailAddress
+            public string    MailCc     { get; set; }   // MailAddressCc
+            public string    MailBcc    { get; set; }   // MailAddressBcc
             public string    MailFrom   { get; set; }   // MailAddressFrom
             public bool      IsMailSent { get; set; }
             public string    SentBy     { get; set; }   // CreatedBy
@@ -2091,6 +2562,20 @@ namespace VASLogic.Models
             public int       RequisitionCount     { get; set; }   // distinct requisitions
             public int       ContractMasterId     { get; set; }   // C_Order.VAS_ContractMaster_ID
             public string    ContractMasterNo     { get; set; }
+            /// <summary>True when the requisition was reached through the RFQ
+            /// (Requisition -> RFQ -> PO) rather than raised into the PO directly.</summary>
+            public bool      IsRequisitionViaRfq  { get; set; }
+            public int       RfqId                { get; set; }   // C_RfQResponse.C_RfQ_ID
+            public string    RfqNo                { get; set; }
+            public int       RfqCount             { get; set; }
+            public int       ProjectId            { get; set; }   // via C_ProjectLine.C_OrderPO_ID
+            public string    ProjectNo            { get; set; }   // C_Project.Value (else Name)
+            public string    ProjectName          { get; set; }
+            public int       ProjectCount         { get; set; }
+            /// <summary>Blanket order this PO was released against —
+            /// C_Order.C_Order_Blanket, where the parent has IsBlanketTrx = 'Y'.</summary>
+            public int       BlanketOrderId       { get; set; }
+            public string    BlanketOrderNo       { get; set; }
 
             // 7-stage progress
             public bool      IsCompleted        { get; set; }

@@ -128,10 +128,10 @@ namespace VIS.Controllers
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Payment_Currency_Symbol,
                        Currency.StdPrecision AS Std_Precision
                 FROM C_Payment Payment
-                INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=Payment.C_BPartner_ID)
                 INNER JOIN C_BankAccount BankAccount ON (BankAccount.C_BankAccount_ID=Payment.C_BankAccount_ID)
                 INNER JOIN C_Bank Bank ON (Bank.C_Bank_ID=BankAccount.C_Bank_ID)
                 INNER JOIN C_Currency Currency ON (Currency.C_Currency_ID=Payment.C_Currency_ID)
+                LEFT JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=Payment.C_BPartner_ID)
                 WHERE Payment.IsReceipt = 'Y'
                   AND Payment.IsActive = 'Y'
                   AND Payment.DocStatus IN ('CO', 'CL')

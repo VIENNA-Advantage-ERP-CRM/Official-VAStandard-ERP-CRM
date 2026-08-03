@@ -11,12 +11,20 @@
  *
  * AD_Message keys used (add via System Messages):
  *   VAS_068_Placeholder       => "Search AP payments by no., vendor, cheque/trx no., bank account..."
- *   VAS_068_Kind              => "AP Payment"
  *   VAS_DocSearch_TypeToSearch=> "Type at least 2 characters to search"
  *   VAS_DocSearch_NoResults   => "No matching documents"
  *   VAS_DocSearch_Error       => "Search failed. Please try again."
  *   VAS_DocSearch_Results     => "results"
  *   VAS_DocSearch_Invoice     => "Invoice"
+ *   VAS_Allocated             => "Allocated"
+ *   VAS_Reconciled            => "Reconciled"
+ *
+ * Result row: initials avatar, vendor name as the headline, then one
+ * dot-separated meta line - status dot + doc no, document type, bank
+ * account, currency, matched invoice, status, allocated / reconciled
+ * flags. Amount and date sit in the right-hand column so figures stay
+ * aligned down the list; the amount is in the payment's OWN currency,
+ * its symbol flush against the number.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -30,11 +38,8 @@
         // are the fallback VAS.ZoomUtil resolves from if it ever comes back 0.
         var ZOOM_WINDOW_NAME_NEW = 'VAS_APPayment';
         var ZOOM_WINDOW_NAME_OLD = 'Payment';
-        var CHIP_CLASS    = 'payment';
         var PLACEHOLDER_K = 'VAS_068_Placeholder';
         var PLACEHOLDER_D = 'Search AP payments by no., vendor, cheque/trx no., bank account...';
-        var KIND_K        = 'VAS_068_Kind';
-        var KIND_D        = 'AP Payment';
 
         this.frame;
         this.windowNo;
@@ -233,10 +238,9 @@
                 return;
             }
 
-            var label = msg(KIND_K, KIND_D);
             var html = '<div class="vas-dssrch-count"></div><div class="vas-dssrch-list">';
             for (var i = 0; i < items.length; i++) {
-                html += buildRow(items[i], label);
+                html += buildRow(items[i], i, currentTerm);
             }
             html += '</div><div class="vas-dssrch-more"><span class="vas-dssrch-more-spin"></span></div>';
             $panel.html(html);
@@ -249,10 +253,13 @@
 
         function appendResults(items) {
             if (!items || items.length === 0) { return; }
-            var label = msg(KIND_K, KIND_D);
+            /* loadedCount is still the pre-append total here, so it is the absolute
+               index of the first new row - which keeps the avatar palette cycling
+               continuously instead of restarting at every page. */
+            var startIndex = loadedCount;
             var html = '';
             for (var i = 0; i < items.length; i++) {
-                html += buildRow(items[i], label);
+                html += buildRow(items[i], startIndex + i, currentTerm);
             }
             var $rows = $(html).filter('.vas-dssrch-row');
             $panel.find('.vas-dssrch-list').append($rows);
@@ -275,25 +282,93 @@
             $panel.find('.vas-dssrch-more').toggleClass('vas-dssrch-more-active', !!on);
         }
 
-        function buildRow(item, label) {
+        /* Vendor-first row: initials avatar, the vendor name as the headline, and a
+           single dot-separated meta line carrying everything that describes the
+           payment. Amount and date are deliberately NOT in that line - they keep
+           the right-hand column so figures stay aligned down the list. */
+        function buildRow(item, index, term) {
             var hasZoom = item.RecordId > 0;
+            var color = PALETTE[index % PALETTE.length];
+            var name = item.Title || '—';
+
             return (
                 '<div class="vas-dssrch-row' + (hasZoom ? '' : ' vas-dssrch-nozoom') + '" data-id="' + VIS.Utility.Util.getValueOfInt(item.RecordId) + '">' +
-                    '<span class="vas-dssrch-chip vas-dssrch-chip-' + CHIP_CLASS + '">' + dsEsc(label) + '</span>' +
-                    '<div class="vas-dssrch-main">' +
-                        '<div class="vas-dssrch-docline">' +
-                            '<span class="vas-dssrch-docno">' + dsEsc(item.DocumentNo || '') + '</span>' +
-                            statusPill(item.DocStatus) +
-                        '</div>' +
-                        '<div class="vas-dssrch-title">' + dsEsc(item.Title || '') + '</div>' +
-                        invoiceTag(item.MatchedInvoiceNo) +
+                    '<div class="vas-dssrch-avatar" style="background:' + color + ';">' + dsEsc(initials(item.Title)) + '</div>' +
+                    '<div class="vas-dssrch-info">' +
+                        '<div class="vas-dssrch-name">' + highlight(name, term) + '</div>' +
+                        '<div class="vas-dssrch-rowmeta">' + rowMeta(item, term) + '</div>' +
                     '</div>' +
                     '<div class="vas-dssrch-meta">' +
-                        '<div class="vas-dssrch-amount">' + formatAmount(item.Amount) + '</div>' +
+                        '<div class="vas-dssrch-amount">' + formatAmount(item.Amount, item.CurSymbol, item.StdPrecision) + '</div>' +
                         '<div class="vas-dssrch-date">' + dsEsc(formatDate(item.DocDate)) + '</div>' +
                     '</div>' +
                 '</div>'
             );
+        }
+
+        /* status-dot + docNo · document type · bank ****1234 · currency · invoice ·
+           status · [Allocated] [Reconciled] - data first, tags last. */
+        function rowMeta(item, term) {
+            var pieces = [];
+
+            pieces.push(
+                '<span class="vas-dssrch-dot" style="background:' + statusColor(item.DocStatus) + ';"></span>' +
+                highlight(item.DocumentNo || '', term)
+            );
+
+            if (item.DocTypeName) { pieces.push(highlight(item.DocTypeName, term)); }
+
+            var bank = formatBank(item.BankName, item.BankAccountNo);
+            if (bank) { pieces.push(highlight(bank, term)); }
+
+            if (item.CurrencyIso) { pieces.push(dsEsc(item.CurrencyIso)); }
+
+            if (item.MatchedInvoiceNo) {
+                pieces.push(dsEsc(msg('VAS_DocSearch_Invoice', 'Invoice')) + ": " + highlight(item.MatchedInvoiceNo, term));
+            }
+
+            if (item.DocStatus) { pieces.push(dsEsc(statusMeta(item.DocStatus).label)); }
+
+            if (item.IsAllocated) {
+                pieces.push('<span class="vas-dssrch-flag">' + dsEsc(msg('VAS_Allocated', 'Allocated')) + '</span>');
+            }
+            if (item.IsReconciled) {
+                pieces.push('<span class="vas-dssrch-flag">' + dsEsc(msg('VAS_Reconciled', 'Reconciled')) + '</span>');
+            }
+
+            return pieces.join('<span class="vas-dssrch-detail-sep">&middot;</span>');
+        }
+
+        /* Avatar palette, cycled by row index (matches the sibling search widgets). */
+        var PALETTE = ['#0083DA', '#019D89', '#D78B10', '#5F4AA6', '#A33F3F', '#2084C4'];
+
+        function initials(name) {
+            if (!name) { return '#'; }
+            var parts = $.trim(name).split(/\s+/);
+            if (parts.length >= 2) { return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase(); }
+            return name.substring(0, 2).toUpperCase();
+        }
+
+        /* Wrap the first case-insensitive hit of the search term in <mark>. */
+        function highlight(text, term) {
+            text = text == null ? '' : String(text);
+            if (!term) { return dsEsc(text); }
+            var idx = text.toLowerCase().indexOf(String(term).toLowerCase());
+            if (idx === -1) { return dsEsc(text); }
+            return dsEsc(text.slice(0, idx)) +
+                '<mark>' + dsEsc(text.slice(idx, idx + term.length)) + '</mark>' +
+                dsEsc(text.slice(idx + term.length));
+        }
+
+        /* "Bank ****1234" when both halves are known, degrading to whichever is. */
+        function formatBank(bankName, accountNo) {
+            var bn = $.trim(bankName || '');
+            var an = $.trim(accountNo || '');
+            var last4 = an.length > 4 ? an.slice(-4) : an;
+            if (bn && last4) { return bn + ' ****' + last4; }
+            if (bn) { return bn; }
+            if (last4) { return '****' + last4; }
+            return '';
         }
 
         function zoomTo(recordId) {
@@ -331,12 +406,19 @@
         function setBusy(on) { $bar.toggleClass('vas-dssrch-busy', !!on); }
 
         /* ---- Formatters / helpers ---- */
-        function formatAmount(number) {
+        /* The amount is in the PAYMENT's own currency, so its symbol and precision
+           travel with the row. The schema-currency values the payload still carries
+           are only a fallback for a payment with no currency on it. */
+        /* Symbol sits directly against the number - "Rs289,100.00", no gap - with any
+           minus sign ahead of the symbol ("-Rs289,100.00"). */
+        function formatAmount(number, symbol, precision) {
             var n = (typeof number === 'number') ? number : parseFloat(number);
             if (isNaN(n)) { return ''; }
-            var prec = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
-            var formatted = n.toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
-            return (curSymbol ? curSymbol + ' ' : '') + formatted;
+            var prec = (typeof precision === 'number' && precision >= 0) ? precision : (stdPrecision || 2);
+            var sign = n < 0 ? '-' : '';
+            var formatted = Math.abs(n).toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            var sym = symbol || curSymbol;
+            return sign + (sym ? '<span class="vas-dssrch-cur">' + dsEsc(sym) + '</span>' : '') + formatted;
         }
         function formatDate(iso) {
             if (!iso) { return ''; }
@@ -346,40 +428,28 @@
             if (isNaN(d.getTime())) { return iso; }
             return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
         }
-        // Shown only when this result matched because of a LINKED invoice (not the
-        // payment's own fields) - makes "invoice-driven" hits easy to identify.
-        function invoiceTag(invNo) {
-            if (!invNo) { return ''; }
-            return '<div class="vas-dssrch-invtag">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-                    '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
-                    '<polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>' +
-                '</svg>' +
-                dsEsc(msg('VAS_DocSearch_Invoice', 'Invoice') + ' ' + invNo) +
-            '</div>';
-        }
-
-        function statusPill(code) {
-            if (!code) { return ''; }
-            var m = statusMeta(code);
-            return '<span class="vas-dssrch-status vas-dssrch-status-' + m.tone + '">' + dsEsc(m.label) + '</span>';
-        }
-
         function statusMeta(code) {
             switch (String(code).toUpperCase()) {
-                case 'CO': return { label: 'Completed',       tone: 'ok' };
-                case 'CL': return { label: 'Closed',          tone: 'ok' };
-                case 'AP': return { label: 'Approved',        tone: 'info' };
-                case 'DR': return { label: 'Draft',           tone: 'muted' };
-                case 'IP': return { label: 'In Process',      tone: 'warn' };
-                case 'WC': return { label: 'Waiting Confirm', tone: 'warn' };
-                case 'WP': return { label: 'Waiting Payment', tone: 'warn' };
-                case 'NA': return { label: 'Not Approved',    tone: 'err' };
-                case 'IN': return { label: 'Invalid',         tone: 'err' };
-                case 'VO': return { label: 'Voided',          tone: 'err' };
-                case 'RE': return { label: 'Reversed',        tone: 'err' };
-                default:   return { label: code,              tone: 'muted' };
+                case 'CO': return { label: 'Completed',       tone: 'ok',    color: '#019D89' };
+                case 'CL': return { label: 'Closed',          tone: 'ok',    color: '#019D89' };
+                case 'AP': return { label: 'Approved',        tone: 'info',  color: '#0072C6' };
+                case 'DR': return { label: 'Draft',           tone: 'muted', color: '#748494' };
+                case 'IP': return { label: 'In Process',      tone: 'warn',  color: '#B5740C' };
+                case 'WC': return { label: 'Waiting Confirm', tone: 'warn',  color: '#B5740C' };
+                case 'WP': return { label: 'Waiting Payment', tone: 'warn',  color: '#B5740C' };
+                case 'NA': return { label: 'Not Approved',    tone: 'err',   color: '#C0392B' };
+                case 'IN': return { label: 'Invalid',         tone: 'err',   color: '#C0392B' };
+                case 'VO': return { label: 'Voided',          tone: 'err',   color: '#C0392B' };
+                case 'RE': return { label: 'Reversed',        tone: 'err',   color: '#C0392B' };
+                default:   return { label: code,              tone: 'muted', color: '#748494' };
             }
+        }
+
+        /* Saturated colour for the meta dot - the pill backgrounds are too pale
+           to read at 7px. */
+        function statusColor(code) {
+            if (!code) { return '#748494'; }
+            return statusMeta(code).color;
         }
 
         function msg(key, fallback) {

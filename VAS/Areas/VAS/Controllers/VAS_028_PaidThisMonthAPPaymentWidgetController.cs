@@ -570,23 +570,6 @@ namespace VAS.Controllers
                     ? "CurrentPeriod.DateTo + 1"
                     : "CurrentPeriod.DateTo + INTERVAL '1 DAY'";
 
-            bool hasExecutionStatus =
-                HasPaymentExecutionStatusColumn();
-
-            string executionStatusFilter =
-                hasExecutionStatus
-                    ? @"
-AND COALESCE
-(
-    Payment.VA009_ExecutionStatus,
-    'R'
-) NOT IN
-(
-    'B',
-    'C'
-)"
-                    : string.Empty;
-
             string paymentAccessSql = @"
 SELECT
     Payment.C_Payment_ID,
@@ -613,11 +596,9 @@ AND Payment.DocStatus IN
 AND Payment.AD_Client_ID =
 (
     SELECT
-        QueryParameters.AD_Client_ID
-
+        QueryParameters.AD_Client_ID 
     FROM QueryParameters QueryParameters
-)"
-                + executionStatusFilter;
+)";
 
             paymentAccessSql =
                 MRole.GetDefault(ctx).AddAccessSQL(
@@ -921,20 +902,6 @@ LEFT OUTER JOIN PaidThisMonthData PaidThisMonthData ON
             bool hasExecutionStatus =
                 HasPaymentExecutionStatusColumn();
 
-            string executionStatusFilter =
-                hasExecutionStatus
-                    ? @"
-AND COALESCE
-(
-    Payment.VA009_ExecutionStatus,
-    'R'
-) NOT IN
-(
-    'B',
-    'C'
-)"
-                    : string.Empty;
-
             string executionStatusColumn =
                 hasExecutionStatus
                     ? "Payment.VA009_ExecutionStatus"
@@ -974,8 +941,7 @@ AND Payment.AD_Client_ID =
         QueryParameters.AD_Client_ID
 
     FROM QueryParameters QueryParameters
-)"
-                + executionStatusFilter;
+)";
 
             paymentAccessSql =
                 MRole.GetDefault(ctx).AddAccessSQL(

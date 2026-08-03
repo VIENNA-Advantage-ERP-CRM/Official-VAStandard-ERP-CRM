@@ -534,9 +534,14 @@
                 );
             }
 
-            if (isNaN(count) || count <= 0) {
-                setNoData();
-                return;
+            /*
+             * No bounced cheques is a real answer, not a failure, so the
+             * card keeps its normal layout and reads 0 instead of swapping
+             * in a "No Data" state. Only a load error still takes over the
+             * card.
+             */
+            if (isNaN(count) || count < 0) {
+                count = 0;
             }
 
             showState(false, '');
@@ -608,19 +613,6 @@
             if ($footer) {
                 $footer.toggle(!show);
             }
-        }
-
-        /**
-         * Shows no data state.
-         */
-        function setNoData() {
-            showState(
-                true,
-                lbl(
-                    'VAS_030_MessageNoData',
-                    'No Data'
-                )
-            );
         }
 
         /**

@@ -7,13 +7,12 @@
  *  1  | Paid This Month                                   | VAS_028_MessagePaidThisMonth
  *  1b | Total Vendor Payments                             | VAS_028_MessageTotalVendorPayments
  *  2  | Loading                                           | VAS_028_MessageLoading
- *  3  | No Data                                           | VAS_ErrorLoading
+ *  3  | Could not load data                               | VAS_ErrorLoading
  *  4  | vendor                                            | VAS_028_MessageVendor
  *  5  | vendors                                           | VAS_028_MessageVendors
  *  6  | Paid to                                           | VAS_028_MessagePaidTo
  *  7  | so far this month                                 | VAS_028_MessageSoFarThisMonth
  *  8  | No payments this month.                           | VAS_028_MessageNoPaymentsThisMonth
- *  9  | No Data                                           | VAS_028_MessageNoData
  * 10  | Cash paid                                         | VAS_028_MessageCashPaid
  * 11  | payments                                          | VAS_028_MessagePayments
  * 12  | Not Specified                                     | VAS_028_MessageNotSpecified
@@ -48,7 +47,6 @@
  * 6  | Paid to                                           | VAS_028_MessagePaidTo
  * 7  | so far this month                                 | VAS_028_MessageSoFarThisMonth
  * 8  | No payments this month.                           | VAS_028_MessageNoPaymentsThisMonth
- * 9  | No Data                                           | VAS_028_MessageNoData
  * 10 | Cash paid                                         | VAS_028_MessageCashPaid
  * 11 | payments                                          | VAS_028_MessagePayments
  * 12 | Not Specified                                     | VAS_028_MessageNotSpecified
@@ -315,7 +313,7 @@
                             true,
                             lbl(
                                 'VAS_ErrorLoading',
-                                'No Data'
+                                'Could not load data'
                             )
                         );
 
@@ -331,7 +329,7 @@
                             true,
                             lbl(
                                 'VAS_ErrorLoading',
-                                'No Data'
+                                'Could not load data'
                             )
                         );
                     }
@@ -359,12 +357,13 @@
             }
 
             /*
-             * AP amounts are outflows and arrive negative, so only a
-             * missing or zero total means there is nothing to show.
+             * A month with no payments is a real answer, not a failure, so
+             * the card keeps its normal layout and reads the zero amount
+             * (for example ID0.00) instead of swapping in a "No Data"
+             * state. Only a load error still takes over the card.
              */
-            if (isNaN(amount) || amount === 0) {
-                setNoData();
-                return;
+            if (isNaN(amount)) {
+                amount = 0;
             }
 
             showState(false, '');
@@ -525,26 +524,6 @@
             }
 
             return stdPrecision;
-        }
-
-        function setNoData() {
-            lastData = null;
-
-            if ($metricEl) {
-                $metricEl.text('');
-            }
-
-            if ($whyText) {
-                $whyText.text('');
-            }
-
-            showState(
-                true,
-                lbl(
-                    'VAS_028_MessageNoData',
-                    'No Data'
-                )
-            );
         }
 
         function openDialog() {
