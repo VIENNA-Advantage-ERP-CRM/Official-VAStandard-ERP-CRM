@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name : VAS
  * Purpose     : Styles for the Inventory Count Overview tab panel
  *               (VAS.VAS_101_OverviewInventoryCount). All classes are
@@ -15,6 +15,12 @@
  *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
  *                        columns with a divider between them (stacking to a
  *                        bottom rule when narrow), plus its RTL mirror.
+ *   VAI163   2026-07-31  Header aligned to the VAS_092 Purchase Order Overview
+ *                        standard: details card is 40%/1fr (was 1.4fr/1fr) and
+ *                        its field column (-hdrColR) is a two-across grid
+ *                        instead of a single tall stack, collapsing to one
+ *                        column under 460px. Field values wrap rather than
+ *                        ellipsis-truncate now that the column is narrower.
  ***********************************************************/
 
 .MPC-vasic-root {
@@ -166,9 +172,12 @@
 /* ----------------------------------------------------------- */
 /*  Header — details card (warehouse | document)               */
 /* ----------------------------------------------------------- */
+/* Identity takes 40% of the card; the fields take the rest and run two across,
+   so short fields sit in rows instead of stacking into a tall column that
+   leaves the identity half empty. */
 .MPC-vasic-hdrCard {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: 40% 1fr;
     gap: 0.875em 1.75em;
     border: 1px solid var(--ic-card-bd);
     border-radius: var(--ic-card-radius);
@@ -180,9 +189,10 @@
 
 .MPC-vasic-hdrColR {
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.625em;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75em 1.5em;
+    align-content: start;
 }
 
 .MPC-vasic-hdrField { min-width: 0; }
@@ -202,14 +212,15 @@
     color: var(--ic-text);
     line-height: 1.35;
     margin-top: 0.125em;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
 }
 .MPC-vasic-fVal.is-link { color: var(--ic-link); }
 
 @container (max-width: 460px) {
     .MPC-vasic-hdrCard { grid-template-columns: 1fr; }
     .MPC-vasic-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--ic-row-div); padding-bottom: 0.75em; }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .MPC-vasic-hdrColR { grid-template-columns: 1fr; }
     .MPC-vasic-hdrTop  { flex-direction: column; }
     .MPC-vasic-hdrPills { justify-content: flex-start; }
 }
