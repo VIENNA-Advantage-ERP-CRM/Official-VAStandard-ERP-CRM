@@ -5,21 +5,22 @@
  * Chronological    Development
  * Ruby           : 17 Sep 2025
   ******************************************************/
-using System;
-using System.Collections.Generic;
-using VAdvantage.DataBase;
-using VAdvantage.Model;
-using System.Data;
-using VAdvantage.Logging;
-using System.IO;
-using System.Linq;
-using VAdvantage.Utility;
-using System.Text;
-using VAdvantage.Classes;
-using VAModelAD.AIHelper;
-using static VAModelAD.AIHelper.AIHelperDataContracts;
+using ModelLibrary.Classes;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.IO;
+using System.Linq;
+using System.Text;
+using VAdvantage.Classes;
+using VAdvantage.DataBase;
+using VAdvantage.Logging;
+using VAdvantage.Model;
+using VAdvantage.Utility;
+using VAModelAD.AIHelper;
+using static VAModelAD.AIHelper.AIHelperDataContracts;
 
 namespace VAdvantage.Alert
 {
@@ -57,7 +58,8 @@ namespace VAdvantage.Alert
         {
             bool started = false;
             tableID = pinfo.getAD_Table_ID();
-            if (tableID == 0) {
+            if (tableID == 0)
+            {
                 return false;
             }
             Ctx ctx = document.GetCtx();
@@ -87,7 +89,7 @@ namespace VAdvantage.Alert
         /// <param name="eventtype">eventtype</param>
         /// <returns></returns>
 
-        public bool AlertRuleActivity(MAlert alert,PO document, POInfo pinfo, string eventType)
+        public bool AlertRuleActivity(MAlert alert, PO document, POInfo pinfo, string eventType)
         {
             try
             {
@@ -139,7 +141,8 @@ namespace VAdvantage.Alert
                         }
                     }
                 }
-                else {
+                else
+                {
                     log.Severe("Recipient Not Found");
                 }
             }
@@ -196,7 +199,7 @@ namespace VAdvantage.Alert
         /// <param name="pinfo">PO info</param>
         /// <param name="eventType">Event type</param>
         /// <returns>true/false</returns>
-        public bool EventAlertProcessing(MAlertRecipient recipient, RuleDetail rule, PO document, POInfo pinfo, string eventType)        
+        public bool EventAlertProcessing(MAlertRecipient recipient, RuleDetail rule, PO document, POInfo pinfo, string eventType)
         {
             Dictionary<string, object> refValues = null;
             string windowName = "";
@@ -208,7 +211,7 @@ namespace VAdvantage.Alert
 
             eventType = eventType.ToUpper();
             int tableID = pinfo.GetAD_Table_ID();
-             string tableName =pinfo.GetTableName();
+            string tableName = pinfo.GetTableName();
             // -----------------------------------------
             // 1. WINDOW & TAB NAME FETCH
             // -----------------------------------------
@@ -226,7 +229,7 @@ namespace VAdvantage.Alert
                     windowName = Util.GetValueOfString(dr["Name"]);
                     windowDisplayName = Util.GetValueOfString(dr["DisplayName"]);
                     tabName = Util.GetValueOfString(dr["TabName"]);
-                }                
+                }
             }
             else
             {
@@ -236,36 +239,40 @@ namespace VAdvantage.Alert
 
 
             //Called API for getting Names instead of IDS
-            ExecuteAlertDataIn dataObj = new ExecuteAlertDataIn();
-            AIApiService.InitAIEndPoint(document.GetCtx().GetContext("#AppFullUrl"));
-            RequestPayload.Get().SetDefaultParameters(dataObj);
-            dataObj.userID = document.GetCtx().GetAD_User_ID();
-            dataObj.sessionID = document.GetCtx().GetAD_Session_ID();
-            dataObj.window_name = windowName;
-            dataObj.table_name = tableName;
-            dataObj.record_id = document.Get_ID();
-            dataObj.exclude_null = false;
-            using (AIApiService service = new AIApiService(dataObj.token))
+            //ExecuteAlertDataIn dataObj = new ExecuteAlertDataIn();
+            //AIApiService.InitAIEndPoint(document.GetCtx().GetContext("#AppFullUrl"));
+            //RequestPayload.Get().SetDefaultParameters(dataObj);
+            //dataObj.userID = document.GetCtx().GetAD_User_ID();
+            //dataObj.sessionID = document.GetCtx().GetAD_Session_ID();
+            //dataObj.window_name = windowName;
+            //dataObj.table_name = tableName;
+            //dataObj.record_id = document.Get_ID();
+            //dataObj.exclude_null = false;
+            //using (AIApiService service = new AIApiService(dataObj.token))
+            //{
+            //    var outp = service.ExecuteRequest(dataObj, "GetRefValues");
+            //    if (outp.isError)
+            //    {
+            //        log.SaveError("Error", " " + outp.result);
+            //    }
+            //    else
+            //    {
+            //         refValues = new Dictionary<string, object>();
+
+            //        if (!string.IsNullOrEmpty(outp.result))
+            //        {
+            //            refValues = JsonConvert.DeserializeObject<Dictionary<string, object>>(outp.result);
+            //        }
+
+            //    }
+            //}
+
+            VAS_CommonMethod.RefValuesResult outp = VAS_CommonMethod.GetRefValues(document.GetCtx(), windowName, tableName, document.Get_ID());
+            refValues = outp?.NewJsonData;
+
+            if (refValues == null || refValues.Count == 0)
             {
-                var outp = service.ExecuteRequest(dataObj, "GetRefValues");
-                if (outp.isError)
-                {
-                    log.SaveError("Error", " " + outp.result);
-                }
-                else
-                {
-                     refValues = new Dictionary<string, object>();
-
-                    if (!string.IsNullOrEmpty(outp.result))
-                    {
-                        refValues = JsonConvert.DeserializeObject<Dictionary<string, object>>(outp.result);
-                    }
-
-                }
-            }
-
-            if (refValues==null) {
-                log.SaveError("AlertEventManager","Record detail not found");
+                log.SaveError("AlertEventManager", "Record detail not found");
                 return false;
             }
 
@@ -278,22 +285,14 @@ namespace VAdvantage.Alert
             {
                 subject = Msg.Translate(document.GetCtx(), "VAS_RecordCreateNotification") + " - " + windowDisplayName;
 
-                JObject newData = GetNewJsonData(refValues);
-
-                if (newData != null)
+                foreach (KeyValuePair<string, object> kv in refValues)
                 {
-                    foreach (var prop in newData.Properties())
-                    {
-                        List<object> row = new List<object>();
+                    List<object> row = new List<object>();
 
-                        string fieldName = prop.Name;
-                        string value = prop.Value?.ToString();
+                    row.Add(kv.Key);
+                    row.Add(kv.Value?.ToString());
 
-                        row.Add(fieldName);
-                        row.Add(value);
-
-                        data.Add(row);
-                    }
+                    data.Add(row);
                 }
             }
 
@@ -333,29 +332,21 @@ namespace VAdvantage.Alert
                 if (updatedColumn.Count > 0)
                 {
                     subject = Msg.Translate(document.GetCtx(), "VAS_RecordUpdateNotification") + " - " + windowDisplayName;
-                    JObject newData = GetNewJsonData(refValues);
-                    if (newData != null)
+                    foreach (KeyValuePair<string, string> kv in sortedByFieldName)
                     {
-                        foreach (KeyValuePair<string, string> kv in sortedByFieldName)
+                        string fieldName = kv.Key;
+                        string colName = kv.Value;
+
+                        if (updatedColumn.Contains(colName))
                         {
-                            string fieldName = kv.Key;
-                            string colName = kv.Value;
-
-                            if (updatedColumn.Contains(colName))
+                            if (refValues.ContainsKey(fieldName))
                             {
-                                // List<object> row = new List<object>();
-                                int index = document.Get_ColumnIndex(colName);
+                                List<object> row = new List<object>();
 
-                                if (newData.ContainsKey(fieldName))
-                                {
-                                    List<object> row = new List<object>();
+                                row.Add(fieldName);
+                                row.Add(refValues[fieldName]?.ToString()); // new value
 
-                                    row.Add(fieldName);
-                                    // row.Add(document.Get_ValueOld(colName)); // old value
-                                    row.Add(newData[fieldName]?.ToString()); // new value
-
-                                    data.Add(row);
-                                }
+                                data.Add(row);
                             }
                         }
                     }
@@ -370,18 +361,13 @@ namespace VAdvantage.Alert
             {
                 subject = Msg.Translate(document.GetCtx(), "VAS_RecordDeletedNotification") + " - " + windowDisplayName;
 
-                JObject newData = GetNewJsonData(refValues);
-
-                if (newData != null)
+                foreach (KeyValuePair<string, object> kv in refValues)
                 {
-                    foreach (var prop in newData.Properties())
-                    {
-                        List<object> row = new List<object>();
+                    List<object> row = new List<object>();
 
-                        row.Add(prop.Name);
-                        row.Add(prop.Value?.ToString());
-                        data.Add(row);
-                    }
+                    row.Add(kv.Key);
+                    row.Add(kv.Value?.ToString());
+                    data.Add(row);
                 }
             }
 
@@ -402,7 +388,7 @@ namespace VAdvantage.Alert
             string sql = Util.GetValueOfString(recipient.Get_Value("VAS_NotificationSQL"));
             if (sql.IndexOf("@") != -1)
             {
-                sql=Utility.Env.ParseContext(document.GetCtx(), document.GetAD_Window_ID(), sql, false);
+                sql = Utility.Env.ParseContext(document.GetCtx(), document.GetAD_Window_ID(), sql, false);
             }
             if (ValidateSql(sql))
             {
@@ -417,10 +403,35 @@ namespace VAdvantage.Alert
             }
 
             int AD_User_ID_Rec = recipient.GetAD_User_ID();
-            if (AD_User_ID_Rec >= 0)
-                users.Add(AD_User_ID_Rec);
+
+            if (AD_User_ID_Rec > 0)
+            {
+                string sql_C = "SELECT AD_Role_ID FROM AD_User_Roles WHERE AD_User_ID = " + AD_User_ID_Rec + " AND IsActive = 'Y'";
+                DataSet ds_C = DB.ExecuteDataset(sql_C);
+                if (ds_C != null && ds_C.Tables[0].Rows.Count > 0)
+                {
+                    for (int _C = 0; _C < ds_C.Tables[0].Rows.Count; _C++)
+                    {
+                        MRole role_C = MRole.Get(document.GetCtx(), Convert.ToInt32(ds_C.Tables[0].Rows[_C]["AD_Role_ID"]));
+                        if (role_C.IsTableAccess(MTable.Get_Table_ID(tableName), false))
+                        {
+                            users.Add(AD_User_ID_Rec);
+                            break;
+                        }
+                    }
+                }
+            }
 
             int AD_Role_ID_Rec = recipient.GetAD_Role_ID();
+            if (AD_Role_ID_Rec != -1) // not handled as 0 is of system administratior
+            {
+                MRole role_R = MRole.Get(document.GetCtx(), AD_Role_ID_Rec);
+                if (!role_R.IsTableAccess(MTable.Get_Table_ID(tableName), false))
+                {
+                    AD_Role_ID_Rec = 0;
+                }
+            }
+
             if (AD_Role_ID_Rec >= 0)
             {
                 MUserRoles[] urs = MUserRoles.GetOfRole(document.GetCtx(), AD_Role_ID_Rec);
@@ -452,28 +463,14 @@ namespace VAdvantage.Alert
         }
 
         /// <summary>
-        /// Getting updated names of IDS
+        /// Send Mail
         /// </summary>
-        /// <param name="refValues"></param>
-        /// <returns></returns>
-
-        private JObject GetNewJsonData(Dictionary<string, object> refValues)
-        {
-            if (refValues != null && refValues.ContainsKey("new_json_data"))
-                return refValues["new_json_data"] as JObject;
-
-            return null;
-        }
-
-    /// <summary>
-    /// Send Mail
-    /// </summary>
-    /// <param name="ctx">context</param>
-    /// <param name="recipientUsers">recipientUsers</param>
-    /// <param name="subject">subject</param>
-    /// <param name="htmlBody">htmlBody</param>
-    /// <returns>count</returns>
-    public int SendInfoHTML(Ctx ctx, List<int> recipientUsers, string subject, string htmlBody)
+        /// <param name="ctx">context</param>
+        /// <param name="recipientUsers">recipientUsers</param>
+        /// <param name="subject">subject</param>
+        /// <param name="htmlBody">htmlBody</param>
+        /// <returns>count</returns>
+        public int SendInfoHTML(Ctx ctx, List<int> recipientUsers, string subject, string htmlBody)
         {
             int countMail = 0;
 
@@ -563,7 +560,7 @@ namespace VAdvantage.Alert
 
                     if (eventType.Equals("UPDATE") && row.Count > 2)
                     {
-                       // string oldVal = Util.GetValueOfString(row[1]);
+                        // string oldVal = Util.GetValueOfString(row[1]);
                         string newVal = Util.GetValueOfString(row[2]);
                         detailRows.Append($@"
                 <tr>
@@ -628,7 +625,7 @@ namespace VAdvantage.Alert
     </div>";
 
             // ✅ Dynamic header icon and color setup
-            string iconSymbol, iconBgColor, iconColor,borderColor;
+            string iconSymbol, iconBgColor, iconColor, borderColor;
             if (eventType.Equals("INSERT"))
             {
                 iconSymbol = "✓";
@@ -651,7 +648,7 @@ namespace VAdvantage.Alert
                 borderColor = "rgb(254, 202, 202)";
             }
             string performerImageUrl = GetUserImageUrl(document.GetCtx(), document.GetCtx().GetAD_User_ID());
-            string userEmail= GetUserEmail(document.GetCtx(), document.GetCtx().GetAD_User_ID());
+            string userEmail = GetUserEmail(document.GetCtx(), document.GetCtx().GetAD_User_ID());
             string firstLetter = "U";
             if (!string.IsNullOrEmpty(performerName))
             {
