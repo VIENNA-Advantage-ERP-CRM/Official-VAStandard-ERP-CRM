@@ -77,6 +77,51 @@
  *                          IsSOTrx-resolved orders, so a drop-ship receipt linked
  *                          to the sales order no longer shows the two the wrong
  *                          way round (model side).
+ *   VAI163   2026-08-03  - Material lines page at 25 rows (was 10), so the pager
+ *                          only appears once a receipt runs past 25 lines.
+ *                        - Activity shows the e-mails sent against the receipt
+ *                          (type "email"): the subject headlines the row, the
+ *                          recipient runs underneath it and the timestamp /
+ *                          sender sit where every other entry carries them. The
+ *                          message body opens on click, headed by the full
+ *                          From / To / Cc / Bcc set.
+ *   VAI163   2026-08-03  - Timestamps render on the viewer's clock: the DB stores
+ *                          them in UTC and they arrived without a timezone
+ *                          marker, so the activity trail and the timeline were
+ *                          showing times an offset away from the local one
+ *                          (parseDbDate / formatStampDate). Date-only fields are
+ *                          still shown exactly as stored.
+ *                        - Activity is rendered in the order the model returns it
+ *                          — oldest first, created -> updated -> completed.
+ *                        - Generate Invoice is enabled for any completed receipt,
+ *                          including a manually created one with no purchase
+ *                          order (it is invoiced from its own lines).
+ *                        - A refused action shows the document's own reason and
+ *                          re-reads the record, so the panel never keeps showing
+ *                          a state the action did not reach.
+ *   VAI163   2026-08-03  - Generate Invoice opens the same dialog the main screen
+ *                          does: target Document Type (the receipt's own default
+ *                          preselected) + the vendor's Invoice Reference, both
+ *                          mandatory, plus Generate Charges. A refusal is shown
+ *                          in the form with the values kept; on success the
+ *                          dialog closes and the toast names the invoice that was
+ *                          generated.
+ *                        - Line items show the Attribute Set Instance after the
+ *                          product name instead of on a line of its own.
+ *                        - The timeline's Completed stage captions with the date
+ *                          the receipt was completed (CompletedDate), not the
+ *                          movement date it was entered for.
+ *   VAI163   2026-08-03  - Added the Generated From chip strip (purchase order,
+ *                          reference invoice, originating sales order), each chip
+ *                          opening its source record, with Manual as the fallback
+ *                          — the VAS_092 Purchase Order pattern.
+ *                        - Added the Documents section: the invoices,
+ *                          confirmations and payments raised against the receipt,
+ *                          with date, status and amount, each row opening the
+ *                          document (openRecord / bindEvents).
+ *                        - Priority Low and Minor now badge green.
+ *                        - The timeline's Invoiced stage captions with the date
+ *                          the invoice was raised, not the date typed on it.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -98,7 +143,9 @@
 
         // Material lines are paged client-side (the whole set arrives in one
         // payload). Page index resets whenever a different record is loaded.
-        var LINES_PER_PAGE = 10;
+        // A receipt of 25 lines or fewer shows them all — the pager only appears
+        // once there is a second page to reach.
+        var LINES_PER_PAGE = 25;
         var linesPage = 0;
 
         this.init = function () {
@@ -108,7 +155,44 @@
             $emptyState.text(VIS.Msg.getMsg("VAS_099_NoData"));
             $root.append($body).append($emptyState);
             createBusyIndicator();
+            bindEvents();
         };
+
+        // ----------------------------------------------------------------- //
+        //  Events / record navigation                                        //
+        // ----------------------------------------------------------------- //
+
+        // Delegated once on the root, so it survives every re-render: an origin
+        // chip or a document row opens the record it points at.
+        function bindEvents() {
+            $root.on("click", ".MPC-vasgrn-chip.is-link, .is-link[data-open-table]", function (e) {
+                e.preventDefault();
+                openRecord($(this).attr("data-open-table"), $(this).attr("data-open-id"),
+                    $(this).attr("data-open-sotrx") === "Y");
+            });
+        }
+
+        // Opens the record's window filtered to that row, using the platform's
+        // zoom API (the same pattern as VAS_092_OverviewPurchaseOrder): resolve the
+        // table's default zoom window, then start it with an equal-query on the
+        // table's key column. Degrades to a toast so a click never throws.
+        function openRecord(tableName, recordId, isSOTrx) {
+            if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
+            try {
+                var windowId = 0;
+                if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
+                    // The 4th arg (IsSOTrx) picks the sales vs purchase window for
+                    // dual-purpose tables like C_Order.
+                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, !!isSOTrx) || 0;
+                }
+                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === "function") {
+                    var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
+                    VIS.viewManager.startWindow(windowId, zoomQuery);
+                    return;
+                }
+            } catch (e) { console.log(e); }
+            toast(msg("VAS_099_OpenRecord", "Open") + " " + tableName + " #" + recordId, false);
+        }
 
         function createBusyIndicator() {
             $busy = $('<div class="vis-apanel-busy">' +
@@ -173,11 +257,13 @@
 
             // Body is a flat stack of self-contained sections.
             renderHeader();
+            renderLinked();
             renderReferences();
             renderSnapshot();
             renderTimeline();
             renderLines();
             renderQualityProducts();
+            renderDocuments();
             renderNotes();
             renderActivity();
             renderActions();
@@ -254,12 +340,15 @@
         }
 
         // PriorityRule code -> { key, tone }.
+        // Low and Minor are the "nothing to worry about" end of the scale, so they
+        // carry the green (success) badge rather than a grey one — the tone is
+        // driven by the priority value, like every other step of the scale.
         var PRIORITY_MAP = {
             "1": { key: "VAS_099_Urgent", tone: "risk" },
             "3": { key: "VAS_099_High",   tone: "warning" },
             "5": { key: "VAS_099_Medium", tone: "info" },
-            "7": { key: "VAS_099_Low",    tone: "neutral" },
-            "9": { key: "VAS_099_Minor",  tone: "neutral" }
+            "7": { key: "VAS_099_Low",    tone: "success" },
+            "9": { key: "VAS_099_Minor",  tone: "success" }
         };
 
         function priorityMeta(code) {
@@ -353,6 +442,78 @@
             $card.append($right);
 
             $body.append($card);
+        }
+
+        // ---------- Generated From (chip strip) ---------- //
+
+        // The source documents this receipt was generated from — the purchase
+        // order it was raised against, the AP invoice it was created with
+        // reference to, and the originating sales order on a drop shipment. Only
+        // origins that actually exist are shown, each a clickable chip that opens
+        // the source record; "Manual" is the fallback for a receipt entered
+        // directly, so it only appears when every origin came back empty.
+        function renderLinked() {
+            var $strip = $('<section class="MPC-vasgrn-genfrom"></section>');
+            $strip.append($('<span class="MPC-vasgrn-gfLabel"></span>')
+                .text(msg("VAS_099_GeneratedFrom", "Generated From")));
+
+            var $chips = $('<div class="MPC-vasgrn-gfChips"></div>');
+            var any = false;
+
+            // Purchase Order — opened on the purchase side (isSOTrx false), since
+            // both order kinds live in C_Order.
+            if (data.PONo || data.PurchaseOrderId > 0) {
+                $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_099_AgainstPO"),
+                    data.PONo || ("#" + data.PurchaseOrderId),
+                    null, "info", "C_Order", data.PurchaseOrderId, false));
+                any = true;
+            }
+
+            // Reference Invoice — the AP invoice this receipt was raised with
+            // reference to (or that was raised from it).
+            if (data.ReferenceInvoice || data.ReferenceInvoiceId > 0) {
+                $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_099_ReferenceInvoice"),
+                    data.ReferenceInvoice || ("#" + data.ReferenceInvoiceId),
+                    null, "purple", "C_Invoice", data.ReferenceInvoiceId, false));
+                any = true;
+            }
+
+            // Sales Order — the originating order on a drop shipment. Opened as a
+            // sales transaction so the framework resolves the Sales Order window.
+            if (data.RefOrderDocNo || data.RefOrderId > 0) {
+                $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_099_ReferenceSalesOrder"),
+                    data.RefOrderDocNo || ("#" + data.RefOrderId),
+                    null, "success", "C_Order", data.RefOrderId, true));
+                any = true;
+            }
+
+            if (!any) {
+                $chips.append(originChip("pencil", msg("VAS_099_Manual", "Manual"),
+                    null, null, "info", null, 0));
+            }
+
+            $strip.append($chips);
+            $body.append($strip);
+        }
+
+        // Origin chip: leading icon (tinted by iconTone) + grey label + dark value,
+        // with an optional trailing status pill. When a table + record id is
+        // supplied the chip becomes a link that opens that record.
+        function originChip(icon, label, value, $statusPill, iconTone, tableName, recordId, isSOTrx) {
+            var $chip = $('<span class="MPC-vasgrn-chip"></span>').addClass("ic-" + (iconTone || "muted"));
+            var isLink = tableName && recordId && +recordId > 0;
+            if (isLink) {
+                $chip.addClass("is-link")
+                    .attr("data-open-table", tableName)
+                    .attr("data-open-id", recordId);
+                if (isSOTrx) $chip.attr("data-open-sotrx", "Y");
+            }
+            $chip.append(svgIcon(icon));
+            $chip.append($('<span class="MPC-vasgrn-chipLabel"></span>').text(label));
+            if (value) $chip.append($('<span class="MPC-vasgrn-chipVal"></span>').text(value));
+            if ($statusPill) $chip.append($statusPill);
+            if (isLink) $chip.append(svgIcon("arrowUpRight"));
+            return $chip;
         }
 
         // ---------- References (PO + linked documents) ---------- //
@@ -498,12 +659,22 @@
             var progressed = PROGRESSED_STATUS.indexOf(st) >= 0;
             var completed  = (st === "CO" || st === "CL");
 
+            // `stamp` marks a caption fed by a real timestamp rather than a
+            // date-only field: those are stored in UTC and have to be converted
+            // before the day is read off them.
             return [
-                { key: "VAS_099_Drafted",    fallback: "Drafted",     date: data.Created,             done: true },
-                { key: "VAS_099_InProgress", fallback: "In Progress", date: progressed ? data.Updated : null, done: progressed },
-                { key: "VAS_099_Completed",  fallback: "Completed",   date: completed ? data.MovementDate : null, done: completed },
-                { key: "VAS_099_Posted",     fallback: "Posted",      date: data.Posted ? (data.PostedDate || data.PostingDate) : null, done: !!data.Posted },
-                { key: "VAS_099_Invoiced",   fallback: "Invoiced",    date: data.ReferenceInvoiceDate, done: !!data.ReferenceInvoice }
+                { key: "VAS_099_Drafted",    fallback: "Drafted",     date: data.Created,             done: true,       stamp: true },
+                { key: "VAS_099_InProgress", fallback: "In Progress", date: progressed ? data.Updated : null, done: progressed, stamp: true },
+                // The date the record was completed on — the workflow's own stamp.
+                // NOT the movement date: that is when the goods moved, typed on the
+                // receipt, and a receipt entered for last month but completed today
+                // captioned this stage with last month.
+                { key: "VAS_099_Completed",  fallback: "Completed",   date: completed ? (data.CompletedDate || data.MovementDate) : null, done: completed, stamp: !!data.CompletedDate },
+                { key: "VAS_099_Posted",     fallback: "Posted",      date: data.Posted ? (data.PostedDate || data.PostingDate) : null, done: !!data.Posted, stamp: !!data.PostedDate },
+                // When the invoice was RAISED against this receipt, not the date
+                // typed on it: DateInvoiced says which period the invoice books
+                // to, and can be any date the enterer chose.
+                { key: "VAS_099_Invoiced",   fallback: "Invoiced",    date: data.ReferenceInvoiceCreated || data.ReferenceInvoiceDate, done: !!data.ReferenceInvoice, stamp: !!data.ReferenceInvoiceCreated }
             ];
         }
 
@@ -521,13 +692,15 @@
             for (var i = 0; i < stages.length; i++) {
                 var s = stages[i];
 
+                var stageDate = s.stamp ? formatStampDate(s.date) : formatDate(s.date);
+
                 var stateCls, metaText;
                 if (i === activeIdx) {
                     stateCls = "is-active";
-                    metaText = formatDate(s.date) || VIS.Msg.getMsg("VAS_099_Done");
+                    metaText = stageDate || VIS.Msg.getMsg("VAS_099_Done");
                 } else if (s.done) {
                     stateCls = "is-done";
-                    metaText = formatDate(s.date) || VIS.Msg.getMsg("VAS_099_Done");
+                    metaText = stageDate || VIS.Msg.getMsg("VAS_099_Done");
                 } else {
                     stateCls = "is-pending";
                     metaText = VIS.Msg.getMsg("VAS_099_Pending");
@@ -680,12 +853,24 @@
         function buildLineRow(ln, cur, showQuality) {
             var $tr = $('<div class="MPC-vasgrn-tRow MPC-vasgrn-tBody"></div>');
 
-            // Item (name + product code / locator). The name cell ellipsises, so
-            // the full product name goes on a hover tooltip — same treatment as the
-            // locator below, and it leaves the layout untouched.
+            // Item (name + attribute, then product code / locator). The name cell
+            // ellipsises, so the full text goes on a hover tooltip — same treatment
+            // as the locator below, and it leaves the layout untouched.
             var $item = $('<span class="MPC-vasgrn-itItem"></span>');
-            var $name = $('<div class="MPC-vasgrn-itName"></div>').text(na(ln.ProductName));
-            if (ln.ProductName) $name.attr("title", ln.ProductName);
+            var $name = $('<div class="MPC-vasgrn-itName"></div>');
+            $name.append($('<span></span>').text(na(ln.ProductName)));
+
+            // Attribute Set Instance (size / lot / serial ...) reads as part of
+            // what the product IS, so it follows the name on the same line rather
+            // than sitting on a line of its own. Only a real instance is shown — a
+            // blank / "--" placeholder is not an attribute.
+            var asi = (ln.AttributeSetInstance || "").trim();
+            var hasAsi = (asi && asi !== "--" && asi !== "-");
+            if (hasAsi) {
+                $name.append($('<span class="MPC-vasgrn-itAttr"></span>').text(asi));
+            }
+            var nameTip = (ln.ProductName || "") + (hasAsi ? " — " + asi : "");
+            if (nameTip) $name.attr("title", nameTip);
             $item.append($name);
 
             // Sub-line: product search key (no "SKU" prefix) · locator. The line
@@ -705,13 +890,6 @@
                 $item.append($sku);
             } else if (ln.Description) {
                 $item.append($('<div class="MPC-vasgrn-itSku"></div>').text(ln.Description));
-            }
-            // Attribute Set Instance details (size / lot / serial ...), only when
-            // the line carries a real instance — a blank / "--" placeholder is not
-            // shown.
-            var asi = (ln.AttributeSetInstance || "").trim();
-            if (asi && asi !== "--" && asi !== "-") {
-                $item.append($('<div class="MPC-vasgrn-itAttr"></div>').text(asi).attr("title", asi));
             }
             $tr.append($item);
 
@@ -866,6 +1044,108 @@
             return $tr;
         }
 
+        // ---------- Documents (raised against this receipt) ---------- //
+
+        // The invoices, confirmations and payments that exist against this
+        // receipt. Each row opens the underlying document through the shared
+        // openRecord() zoom path — the same table the PO overview uses.
+        function renderDocuments() {
+            var rows = (data && data.Documents) || [];
+            if (!rows.length) return;
+
+            var $sec = section(msg("VAS_099_Documents", "Documents"), {
+                summary: buildDocumentsSummary(rows)
+            });
+
+            var $tbl = $('<div class="MPC-vasgrn-table MPC-vasgrn-docTable"></div>');
+
+            var $h = $('<div class="MPC-vasgrn-tRow MPC-vasgrn-tHead"></div>');
+            $h.append($('<span></span>').text(msg("VAS_099_Document", "Document")));
+            $h.append($('<span></span>').text(msg("VAS_099_DocDate", "Date")));
+            $h.append($('<span></span>').text(msg("VAS_099_DocStatus", "Status")));
+            $h.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_099_Amount")));
+            $tbl.append($h);
+
+            for (var i = 0; i < rows.length; i++) {
+                $tbl.append(buildDocumentRow(rows[i]));
+            }
+
+            $sec.append($tbl);
+        }
+
+        // "1 invoices · 2 confirmations" — only the kinds actually present count.
+        function buildDocumentsSummary(rows) {
+            var inv = 0, conf = 0, pay = 0;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].Type === "invoice") inv++;
+                else if (rows[i].Type === "confirmation") conf++;
+                else if (rows[i].Type === "payment") pay++;
+            }
+            var bits = [];
+            if (inv)  bits.push(inv + " " + msg("VAS_099_InvoicesCount", "invoices"));
+            if (conf) bits.push(conf + " " + msg("VAS_099_ConfirmationsCount", "confirmations"));
+            if (pay)  bits.push(pay + " " + msg("VAS_099_PaymentsCount", "payments"));
+            return bits.join(" · ");
+        }
+
+        function buildDocumentRow(d) {
+            var $tr = $('<div class="MPC-vasgrn-tRow MPC-vasgrn-tBody"></div>');
+
+            var canOpen = d.TableName && +d.RecordId > 0;
+            if (canOpen) {
+                $tr.addClass("is-link")
+                    .attr("data-open-table", d.TableName)
+                    .attr("data-open-id", d.RecordId);
+            }
+
+            // Identity: doc number + kind, with the open affordance on the right.
+            var $item = $('<span class="MPC-vasgrn-itItem MPC-vasgrn-docItem"></span>');
+            var docIcon = d.Type === "confirmation" ? "clipboardCheck"
+                        : (d.Type === "payment" ? "coins" : "doc");
+            $item.append(svgIcon(docIcon));
+
+            var $txt = $('<span class="MPC-vasgrn-docTxt"></span>');
+            $txt.append($('<div class="MPC-vasgrn-itName"></div>').text(d.DocumentNo || "—"));
+
+            var sub;
+            if (d.Type === "confirmation") {
+                sub = msg("VAS_099_ReceiptConfirmation", "Receipt Confirmation");
+                if (d.LineCount) sub += " · " + d.LineCount + " " + VIS.Msg.getMsg("VAS_099_Lines");
+            } else if (d.Type === "payment") {
+                sub = msg("VAS_099_APPayment", "AP Payment");
+                if (+d.DiscountAmt) {
+                    sub += " · " + msg("VAS_099_DiscountedAmount", "Discount") + ": " +
+                        formatAmount(+d.DiscountAmt || 0, currencyToken(), data.StdPrecision);
+                }
+            } else {
+                sub = msg("VAS_099_VendorInvoice", "Vendor Invoice");
+                if (d.IsPaid) sub += " · " + msg("VAS_099_Paid", "Paid");
+            }
+            $txt.append($('<div class="MPC-vasgrn-itSku"></div>').text(sub));
+            $item.append($txt);
+            if (canOpen) $item.append(svgIcon("arrowUpRight"));
+            $tr.append($item);
+
+            // A confirmation is stamped when it was raised, so its date reads as a
+            // timestamp; an invoice / payment carries a document date.
+            var when = (d.Type === "confirmation")
+                ? formatStampDate(d.DocDate) : formatDate(d.DocDate);
+            $tr.append($('<span></span>').text(when || "—"));
+
+            var st = statusMeta(d.DocStatus);
+            $tr.append($('<span></span>').append(
+                $('<span class="MPC-vasgrn-tag"></span>').addClass("s-" + st.tone).text(st.label)));
+
+            // A confirmation has no amount of its own.
+            var $amt = $('<span class="ta-r"></span>');
+            $amt.text((d.Amount === null || d.Amount === undefined)
+                ? "—"
+                : formatAmount(+d.Amount || 0, currencyToken(), data.StdPrecision));
+            $tr.append($amt);
+
+            return $tr;
+        }
+
         // ---------- Notes (GRN header description) ---------- //
 
         // The description typed on the goods receipt header. Skipped when blank so
@@ -890,12 +1170,13 @@
             posted:       { tone: "purple",  icon: "coins",          tagKey: "VAS_099_TagPosted",       tagText: "Posted",       titleKey: "VAS_099_ActPosted",       titleText: "Posted to accounting" },
             confirmation: { tone: "warning", icon: "clipboardCheck", tagKey: "VAS_099_TagConfirmation", tagText: "Confirmation", titleKey: "VAS_099_ActConfirmation", titleText: "Receipt confirmation raised" },
             invoice:      { tone: "info",    icon: "doc",            tagKey: "VAS_099_TagInvoice",      tagText: "Invoice",      titleKey: "VAS_099_ActInvoice",      titleText: "Vendor invoice raised" },
-            note:         { tone: "neutral", icon: "mail",           tagKey: "VAS_099_TagNote",         tagText: "Note",         titleKey: null,                      titleText: "" }
+            note:         { tone: "neutral", icon: "mail",           tagKey: "VAS_099_TagNote",         tagText: "Note",         titleKey: null,                      titleText: "" },
+            email:        { tone: "purple",  icon: "mail",           tagKey: "VAS_099_TagEmail",        tagText: "Email",        titleKey: null,                      titleText: "" }
         };
 
         // The receipt's audit trail, newest first: who created it, who changed it
         // and when, when it was completed and posted, plus the confirmations,
-        // invoices and notes raised against it.
+        // invoices, e-mails and notes raised against it.
         function renderActivity() {
             var rows = (data && data.Activity) || [];
             if (!rows.length) return;
@@ -907,6 +1188,10 @@
             var $list = $('<div class="MPC-vasgrn-actList"></div>');
             for (var i = 0; i < rows.length; i++) {
                 $list.append(activityRow(rows[i]));
+                // An e-mail's body is heavy — it stays collapsed under its row and
+                // opens only when the reader asks for it.
+                var $mail = activityBody(rows[i]);
+                if ($mail) $list.append($mail);
             }
             $sec.append($list);
         }
@@ -921,14 +1206,29 @@
             $tag.append($('<span></span>').text(msg(meta.tagKey, meta.tagText)));
             $row.append($tag);
 
-            // For a note the title is the note text itself; for everything else it
-            // is the event sentence plus the related document number. A tooltip
-            // keeps a long line readable once the cell ellipsises.
+            // For a note the title is the note text itself, for an e-mail its
+            // subject; for everything else it is the event sentence plus the
+            // related document number. A tooltip keeps a long line readable once
+            // the cell ellipsises.
             var title = activityTitle(a, meta);
-            $row.append($('<span class="MPC-vasgrn-actTitle"></span>')
+            var $title = $('<span class="MPC-vasgrn-actTitle"></span>');
+            $title.append($('<span class="MPC-vasgrn-actLead"></span>')
                 .text(title).attr("title", title));
 
-            // "when · by whom" — the audit trail's whole point.
+            // An e-mail names its recipients under the subject: the To list, plus
+            // a count of the Cc / Bcc addresses so a reader can see at a glance
+            // that others were copied. Every address itself is listed in the body.
+            if (a.Type === "email") {
+                var to = recipientSummary(a);
+                if (to) {
+                    $title.append($('<small class="MPC-vasgrn-actSub"></small>')
+                        .text(to).attr("title", allRecipients(a) || to));
+                }
+            }
+            $row.append($title);
+
+            // "when · by whom" — the audit trail's whole point. For an e-mail that
+            // is when it went out and who sent it.
             var when = formatDateTime(a.Created);
             if (a.UserName) {
                 when = when
@@ -937,14 +1237,91 @@
             }
             $row.append($('<span class="MPC-vasgrn-actWhen"></span>').text(when).attr("title", when));
 
+            // Rows carrying a body are clickable; the caret shows the state.
+            if (hasActivityBody(a)) {
+                $row.addClass("is-openable");
+                $row.attr("title", msg("VAS_099_ShowMailBody", "Click to read the message"));
+                $row.append($('<span class="MPC-vasgrn-actCaret"></span>').append(svgIcon("chevRight")));
+                $row.on("click", function () {
+                    var $panel = $row.next(".MPC-vasgrn-actBody");
+                    if (!$panel.length) return;
+                    var nowOpen = !$row.hasClass("is-open");
+                    $row.toggleClass("is-open", nowOpen)
+                        .attr("title", nowOpen ? msg("VAS_099_HideMailBody", "Click to hide the message")
+                                               : msg("VAS_099_ShowMailBody", "Click to read the message"));
+                    $panel.toggle(nowOpen);
+                });
+            }
+
             return $row;
         }
 
         function activityTitle(a, meta) {
             if (a.Type === "note") return (a.Text || "").trim();
+            if (a.Type === "email") {
+                return (a.Text || "").trim() || msg("VAS_099_NoSubject", "(no subject)");
+            }
             var title = meta.titleKey ? msg(meta.titleKey, meta.titleText) : (meta.titleText || "");
             if (a.DocumentNo) title += " — " + a.DocumentNo;
             return title;
+        }
+
+        // Only an e-mail carries a body worth opening; a mail stored without one
+        // stays a plain, non-clickable row.
+        function hasActivityBody(a) {
+            return a && a.Type === "email" && !!(a.Body && String(a.Body).trim());
+        }
+
+        // The e-mail body, collapsed beneath its activity row. The full recipient
+        // set (From / To / Cc / Bcc) heads it, so every address the mail went to is
+        // on screen once the reader opens the message.
+        function activityBody(a) {
+            if (!hasActivityBody(a)) return null;
+
+            var $panel = $('<div class="MPC-vasgrn-actBody" style="display:none;"></div>');
+            appendMailMeta($panel, "VAS_099_MailFrom", "From:", a.MailFrom);
+            appendMailMeta($panel, "VAS_099_MailTo",   "To:",   a.MailTo);
+            appendMailMeta($panel, "VAS_099_MailCc",   "Cc:",   a.MailCc);
+            appendMailMeta($panel, "VAS_099_MailBcc",  "Bcc:",  a.MailBcc);
+            $panel.append($('<p></p>').text(String(a.Body).trim()));
+            return $panel;
+        }
+
+        function appendMailMeta($panel, key, fallback, value) {
+            if (!value || !String(value).trim()) return;
+            $panel.append($('<div class="MPC-vasgrn-actMeta"></div>')
+                .text(msg(key, fallback) + " " + String(value).trim()));
+        }
+
+        // Row sub-line: the To list, plus "+n more" covering the Cc / Bcc
+        // addresses. Counting by comma / semicolon is enough for a summary — the
+        // body lists the addresses verbatim.
+        function recipientSummary(a) {
+            var to = (a.MailTo || "").trim();
+            var extra = countAddresses(a.MailCc) + countAddresses(a.MailBcc);
+            if (!to && !extra) return "";
+            var s = msg("VAS_099_MailTo", "To:") + " " + (to || VIS.Msg.getMsg("VAS_099_NA"));
+            if (extra > 0) s += " +" + extra + " " + msg("VAS_099_MoreRecipients", "more");
+            return s;
+        }
+
+        // Every address on the mail, for the row's hover tooltip.
+        function allRecipients(a) {
+            var bits = [];
+            if (a.MailTo)  bits.push(msg("VAS_099_MailTo",  "To:")  + " " + a.MailTo);
+            if (a.MailCc)  bits.push(msg("VAS_099_MailCc",  "Cc:")  + " " + a.MailCc);
+            if (a.MailBcc) bits.push(msg("VAS_099_MailBcc", "Bcc:") + " " + a.MailBcc);
+            return bits.join("\n");
+        }
+
+        function countAddresses(value) {
+            if (!value || !String(value).trim()) return 0;
+            var parts = String(value).split(/[;,]/);
+            var n = 0;
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].trim()) n++;
+            }
+            return n;
         }
 
         // ---------- Actions (visual buttons) ---------- //
@@ -975,18 +1352,17 @@
             }
             $bar.append($complete);
 
-            // Generate Invoice — needs a completed receipt with a linked PO. The
-            // invoice covers the order's uninvoiced received quantity.
+            // Generate Invoice — any completed receipt can be invoiced. With a
+            // purchase order the invoice covers the order's uninvoiced received
+            // quantity; a manually created receipt (no order) is invoiced from the
+            // receipt's own lines, so the button no longer depends on a PO.
             var $invoice = actionButton("doc", VIS.Msg.getMsg("VAS_099_GenerateInvoice"), "sec");
-            if (!isCompleted || !hasPO) {
+            if (!isCompleted) {
                 disableBtn($invoice);
             } else {
-                $invoice.on("click", function () {
-                    if (!confirm(msg("VAS_099_ConfirmInvoice",
-                        "Generate and complete the AP invoice for this receipt's purchase order?"))) return;
-                    runAction($invoice, "GenerateInvoice",
-                        msg("VAS_099_InvoiceFailed", "Could not generate the invoice."));
-                });
+                // Same as the main screen: the document type and the vendor's
+                // invoice reference are asked for before anything is generated.
+                $invoice.on("click", function () { openInvoiceDialog($invoice); });
             }
             $bar.append($invoice);
 
@@ -1004,34 +1380,207 @@
 
         // POSTs a document action to the controller, then refreshes the panel on
         // success. Guards against double-clicks while the action is in flight.
-        function runAction($btn, endpoint, failMsg) {
+        // `extra` carries an action's own parameters (the invoice dialog's document
+        // type / reference); the record id is always sent.
+        function runAction($btn, endpoint, failMsg, extra, onDone) {
             if ($btn.hasClass("is-disabled") || $btn.hasClass("is-busy")) return;
             $btn.addClass("is-busy");
             showBusy(true);
+
+            var payload = { M_InOut_ID: $self.record_ID };
+            if (extra) {
+                for (var k in extra) {
+                    if (extra.hasOwnProperty(k)) payload[k] = extra[k];
+                }
+            }
+
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_099_OverviewGRN/" + endpoint,
                 type: "POST",
                 dataType: "json",
-                data: { M_InOut_ID: $self.record_ID },
+                data: payload,
                 success: function (raw) {
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     $btn.removeClass("is-busy");
+                    // A caller that returns true from onDone has shown the refusal
+                    // itself (the invoice dialog puts it in the form), so it is not
+                    // repeated as a toast behind the dialog.
+                    var handled = onDone ? (onDone(res) === true) : false;
                     if (res && res.success) {
                         toast(res.message || msg("VAS_099_Done", "Done."), false);
                         // Re-fetch so the status pill, timeline and buttons reflect
                         // the new document state.
                         $self.fetchData($self.record_ID);
                     } else {
-                        showBusy(false);
-                        toast((res && (res.error || res.message)) || failMsg, true);
+                        // The action was refused (a closed period, a validation the
+                        // document raised). Show its reason and re-read the record:
+                        // a refused completion can still have moved the document
+                        // (to Invalid), and the panel must not keep showing the
+                        // state it had before.
+                        if (!handled) toast((res && (res.error || res.message)) || failMsg, true);
+                        $self.fetchData($self.record_ID);
                     }
                 },
                 error: function () {
                     $btn.removeClass("is-busy");
                     showBusy(false);
+                    if (onDone) onDone(null);
                     toast(failMsg, true);
                 }
             });
+        }
+
+        // ---------- Generate Invoice dialog ---------- //
+
+        // The panel asks for the same two things the main screen's Generate
+        // Invoice dialog asks for — the target document type and the vendor's own
+        // invoice reference — plus the generate-charges flag, and generates
+        // nothing until both mandatory fields are answered. The document types
+        // offered are the ones the receipt qualifies for (fetched with the
+        // receipt's own default already selected).
+        function openInvoiceDialog($btn) {
+            if ($btn.hasClass("is-disabled") || $btn.hasClass("is-busy")) return;
+
+            showBusy(true);
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS_099_OverviewGRN/GetInvoiceDocTypes",
+                type: "GET",
+                dataType: "json",
+                data: { M_InOut_ID: $self.record_ID },
+                success: function (raw) {
+                    showBusy(false);
+                    var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    if (!res || !res.success) {
+                        toast((res && (res.error || res.message)) ||
+                            msg("VAS_099_InvoiceFailed", "Could not generate the invoice."), true);
+                        return;
+                    }
+                    buildInvoiceDialog($btn, res);
+                },
+                error: function () {
+                    showBusy(false);
+                    toast(msg("VAS_099_InvoiceFailed", "Could not generate the invoice."), true);
+                }
+            });
+        }
+
+        function buildInvoiceDialog($btn, res) {
+            var docTypes = res.docTypes || [];
+
+            var $overlay = $('<div class="MPC-vasgrn-modal"></div>');
+            var $card = $('<div class="MPC-vasgrn-modalCard"></div>');
+
+            var $head = $('<div class="MPC-vasgrn-modalHead"></div>');
+            $head.append($('<h3></h3>').text(msg("VAS_099_CreateInvoice", "Create Invoice")));
+            if (res.documentNo) {
+                $head.append($('<span class="MPC-vasgrn-modalSub"></span>')
+                    .text(VIS.Msg.getMsg("VAS_099_GoodsReceiptNote") + " " + res.documentNo));
+            }
+            $card.append($head);
+
+            var $body = $('<div class="MPC-vasgrn-modalBody"></div>');
+
+            // Document type — mandatory, as on the main screen.
+            var $docField = $('<label class="MPC-vasgrn-fld"></label>');
+            $docField.append($('<span class="MPC-vasgrn-fldLbl"></span>')
+                .text(msg("VAS_099_DocumentType", "Document Type") + " *"));
+            var $docSel = $('<select class="MPC-vasgrn-input"></select>');
+            $docSel.append($('<option></option>').attr("value", "")
+                .text(msg("VAS_099_SelectDocType", "Select a document type")));
+            for (var i = 0; i < docTypes.length; i++) {
+                var $opt = $('<option></option>')
+                    .attr("value", docTypes[i].C_DocType_ID).text(docTypes[i].Name);
+                if (+docTypes[i].C_DocType_ID === +res.defaultDocTypeId) $opt.prop("selected", true);
+                $docSel.append($opt);
+            }
+            $docField.append($docSel);
+            $body.append($docField);
+
+            // Invoice reference — mandatory on the purchase side, as on the main
+            // screen: it is the vendor's own invoice number against this receipt.
+            var $refField = $('<label class="MPC-vasgrn-fld"></label>');
+            $refField.append($('<span class="MPC-vasgrn-fldLbl"></span>')
+                .text(msg("VAS_099_InvoiceReference", "Invoice Reference") + " *"));
+            var $ref = $('<input type="text" class="MPC-vasgrn-input" maxlength="60">');
+            $refField.append($ref);
+            $body.append($refField);
+
+            // Generate charges — spreads the receipt's charges over the lines.
+            var $chargeField = $('<label class="MPC-vasgrn-fldChk"></label>');
+            var $charges = $('<input type="checkbox">');
+            $chargeField.append($charges);
+            $chargeField.append($('<span></span>')
+                .text(msg("VAS_099_GenerateCharges", "Generate Charges")));
+            $body.append($chargeField);
+
+            var $error = $('<div class="MPC-vasgrn-modalErr" style="display:none;"></div>');
+            $body.append($error);
+            $card.append($body);
+
+            var $foot = $('<div class="MPC-vasgrn-modalFoot"></div>');
+            var $cancel = $('<span class="MPC-vasgrn-btn btn-sec"></span>')
+                .append($('<span></span>').text(msg("VAS_099_Cancel", "Cancel")));
+            var $create = $('<span class="MPC-vasgrn-btn btn-pri"></span>')
+                .append($('<span></span>').text(msg("VAS_099_CreateInvoice", "Create Invoice")));
+            $foot.append($cancel).append($create);
+            $card.append($foot);
+
+            $overlay.append($card);
+            $root.append($overlay);
+            $ref.trigger("focus");
+
+            function close() { $overlay.remove(); }
+
+            // Clicking the backdrop (never the card) closes without generating.
+            $overlay.on("click", function (e) { if (e.target === $overlay[0]) close(); });
+            $cancel.on("click", close);
+
+            $create.on("click", function () {
+                var docId = +$docSel.val() || 0;
+                var ref = ($ref.val() || "").trim();
+
+                if (!docId && !ref) {
+                    return showError($error, msg("VAS_099_DocTypeAndRefMandatory",
+                        "Select a document type and enter the invoice reference."));
+                }
+                if (!docId) {
+                    return showError($error, msg("VAS_099_DocTypeMandatory",
+                        "Select a document type."));
+                }
+                if (!ref) {
+                    return showError($error, msg("VAS_099_InvoiceRefMandatory",
+                        "Enter the invoice reference."));
+                }
+                $error.hide();
+
+                // The dialog stays up until the server answers, then closes only
+                // when an invoice was actually created — a refusal is shown in
+                // place, with the values still filled in.
+                $create.addClass("is-busy");
+                runAction($btn, "GenerateInvoice",
+                    msg("VAS_099_InvoiceFailed", "Could not generate the invoice."),
+                    {
+                        C_DocType_ID: docId,
+                        InvoiceReference: ref,
+                        GenerateCharges: $charges.is(":checked")
+                    },
+                    function (res) {
+                        $create.removeClass("is-busy");
+                        if (res && res.success) {
+                            // Closed here so the success toast — which names the
+                            // generated invoice — is the thing left on screen.
+                            close();
+                            return false;
+                        }
+                        showError($error, (res && (res.error || res.message)) ||
+                            msg("VAS_099_InvoiceFailed", "Could not generate the invoice."));
+                        return true;      // shown in the form; no toast behind it
+                    });
+            });
+        }
+
+        function showError($error, text) {
+            $error.text(text).show();
         }
 
         // Lightweight self-contained toast.
@@ -1067,7 +1616,8 @@
             chevRight:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
             chevUp:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>',
             doc:      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>',
-            printer:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>'
+            printer:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>',
+            arrowUpRight: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>'
         };
 
         // Returns a span wrapping the named inline SVG (innerHTML so the browser
@@ -1101,10 +1651,37 @@
             return sign + (cur ? cur + " " : "") + formatted;
         }
 
-        function formatDate(value) {
-            if (!value) return "";
-            var d = (value instanceof Date) ? value : new Date(value);
-            if (isNaN(d.getTime())) return "";
+        // Parses a .NET/Newtonsoft DB value into a Date.
+        //
+        // asUtc = true  → for genuine *timestamps* (Created / Updated / completion
+        //   / posting / e-mail stamps). The DB stores these in UTC and Newtonsoft
+        //   emits no timezone designator (e.g. "2026-08-03T06:29:00"), which the
+        //   browser would otherwise read as a local wall-clock reading — the
+        //   activity trail then showed times hours away from the user's clock. We
+        //   tag it "Z" so toLocale* renders it in the viewer's own zone.
+        // asUtc = false → for *date-only* fields (movement / PO / expected /
+        //   invoice / QA dates). These carry no meaningful time of day, so the
+        //   wall-clock value is parsed as-is and never shifted — the calendar day
+        //   shown always matches the day stored.
+        // Strings that already carry a "Z" or ±hh:mm offset are left untouched.
+        function parseDbDate(value, asUtc) {
+            if (!value) return null;
+            if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+            var s = String(value);
+            var hasTz = /(z|[+-]\d{2}:?\d{2})$/i.test(s);
+            var isDateTime = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(s);
+            if (asUtc && isDateTime && !hasTz) {
+                s = s.replace(" ", "T") + "Z";
+            } else if (!asUtc && isDateTime) {
+                // Keep the calendar date: drop any timezone marker and parse the
+                // date/time as local so no zone conversion can roll the day over.
+                s = s.replace(" ", "T").replace(/(z|[+-]\d{2}:?\d{2})$/i, "");
+            }
+            var d = new Date(s);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        function toLocalDate(d) {
             try {
                 return d.toLocaleDateString(window.navigator.language, {
                     year: "numeric", month: "short", day: "2-digit"
@@ -1114,11 +1691,24 @@
             }
         }
 
-        // Date + time — the audit trail needs the time of day, not just the date.
+        // A date-only field: shown exactly as it is stored.
+        function formatDate(value) {
+            var d = parseDbDate(value, false);
+            return d ? toLocalDate(d) : "";
+        }
+
+        // A real timestamp shown as a date — converted to the viewer's zone first,
+        // so a late-evening event is not captioned with the previous day.
+        function formatStampDate(value) {
+            var d = parseDbDate(value, true);
+            return d ? toLocalDate(d) : "";
+        }
+
+        // Date + time — the audit trail needs the time of day, not just the date,
+        // and it needs it on the reader's own clock.
         function formatDateTime(value) {
-            if (!value) return "";
-            var d = (value instanceof Date) ? value : new Date(value);
-            if (isNaN(d.getTime())) return "";
+            var d = parseDbDate(value, true);
+            if (!d) return "";
             try {
                 return d.toLocaleDateString(window.navigator.language, {
                     year: "numeric", month: "short", day: "2-digit"

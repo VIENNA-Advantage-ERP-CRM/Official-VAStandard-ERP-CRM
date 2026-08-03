@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Purchase Order Overview tab panel. Renders a
  *                  review-oriented overview of the selected purchase
@@ -150,6 +150,23 @@
  *                        - The Removed lines table also shows Updated By, as its
  *                          last column so both history views carry it in the same
  *                          position.
+ *   VAI163   2026-07-31  Line items: Expected Delivery and Received are shown
+ *                        only for Item-type product lines (isDeliverableLine) —
+ *                        a charge line or a Service / Resource / Expense product
+ *                        is never goods-received, so both cells now read "—".
+ *                        Received shows Σ M_InOutLine.QtyEntered against
+ *                        C_OrderLine.QtyEntered, both in the entered UOM and
+ *                        labelled with it.
+ *                        Generated From: adds RFQ and Project chips, and marks a
+ *                        requisition reached through the RFQ with a "via RFQ"
+ *                        pill. "Manual" now only shows when no origin exists.
+ *                        Blanket Order chip added (C_Order.C_Order_Blanket).
+ *                        Activity feed shows the full document lifecycle (new
+ *                        prepared / completed / reactivated / voided / closed /
+ *                        rejected / updated types), e-mail rows summarise the
+ *                        To list with a Cc+Bcc count and the opened body lists
+ *                        From / To / Cc / Bcc verbatim, and the history drawer's
+ *                        Updated By is right-aligned under the Received column.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -212,6 +229,10 @@
             VAS_092_SalesOrder: "Sales Order",
             VAS_092_Origin: "Origin",
             VAS_092_Requisition: "Requisition",
+            VAS_092_Rfq: "RFQ",
+            VAS_092_ViaRfq: "via RFQ",
+            VAS_092_Project: "Project",
+            VAS_092_BlanketOrder: "Blanket Order",
             VAS_092_Contract: "Contract",
             VAS_092_More: "more",
             // Snapshot
@@ -337,7 +358,10 @@
             VAS_092_TagNote: "Note",
             VAS_092_TagEmail: "Email",
             VAS_092_MailTo: "To",
+            VAS_092_MailCc: "Cc",
+            VAS_092_MailBcc: "Bcc",
             VAS_092_MailFrom: "From",
+            VAS_092_MoreRecipients: "more",
             VAS_092_ShowMailBody: "Show message",
             VAS_092_HideMailBody: "Hide message",
             VAS_092_TagGRN: "GRN",
@@ -350,6 +374,18 @@
             VAS_092_ActApproval: "Order approved",
             VAS_092_TagCreated: "Created",
             VAS_092_ActCreated: "Order created",
+            // Document lifecycle (workflow nodes + header edits)
+            VAS_092_TagPrepared: "Prepared",
+            VAS_092_TagCompleted: "Completed",
+            VAS_092_TagReactivated: "Re-activated",
+            VAS_092_TagRejected: "Rejected",
+            VAS_092_TagVoided: "Voided",
+            VAS_092_TagReversed: "Reversed",
+            VAS_092_TagClosed: "Closed",
+            VAS_092_TagInvalidated: "Invalid",
+            VAS_092_TagUpdated: "Updated",
+            VAS_092_ActUpdated: "Order updated",
+            VAS_092_FieldsChanged: "fields changed",
             VAS_092_RecentActivity: "Activity",
             VAS_092_Updates: "updates",
             VAS_092_OpenRecord: "Open"
@@ -625,9 +661,12 @@
         // ---------- Generated From (chip strip) ---------- //
 
         // Shows only origins that actually exist — Sales Order (Ref_Order_ID),
-        // Requisition (M_Requisition) and Contract reference (VAS_ContractMaster)
-        // — each a clickable chip that opens the source record. When the PO has
-        // no origin at all it shows a single "Manual" chip.
+        // Requisition (M_Requisition), RFQ (C_RfQResponse.C_Order_ID), Project
+        // (C_ProjectLine.C_OrderPO_ID), Blanket Order (C_Order.C_Order_Blanket)
+        // and Contract reference (VAS_ContractMaster) — each a clickable chip
+        // that opens the source
+        // record. "Manual" is the fallback for a PO with no origin at all, so it
+        // only shows when every one of those came back empty.
         function renderLinked() {
             var $strip = $('<section class="MPC-vaspo-genfrom"></section>');
             $strip.append($('<span class="MPC-vaspo-gfLabel"></span>')
@@ -646,13 +685,48 @@
                 any = true;
             }
 
-            // Requisition — the requisition(s) this PO was generated from.
+            // Requisition — the requisition(s) this PO was generated from, whether
+            // raised into the PO directly or reached through the RFQ. A chain
+            // origin is marked so the reader can tell the two apart.
             if (data.RequisitionDocNo) {
                 var reqVal = data.RequisitionDocNo;
                 if (data.RequisitionCount > 1)
                     reqVal += " +" + (data.RequisitionCount - 1) + " " + getMsg("VAS_092_More");
                 $chips.append(originChip("clipboardCheck", getMsg("VAS_092_Requisition"), reqVal,
-                    null, "success", "M_Requisition", data.RequisitionId));
+                    data.IsRequisitionViaRfq ? pill(getMsg("VAS_092_ViaRfq"), "neutral") : null,
+                    "success", "M_Requisition", data.RequisitionId));
+                any = true;
+            }
+
+            // RFQ — the request for quotation the PO was raised from
+            // (C_RfQResponse.C_Order_ID).
+            if (data.RfqId > 0) {
+                var rfqVal = data.RfqNo || ("#" + data.RfqId);
+                if (data.RfqCount > 1)
+                    rfqVal += " +" + (data.RfqCount - 1) + " " + getMsg("VAS_092_More");
+                $chips.append(originChip("clipboardCheck", getMsg("VAS_092_Rfq"), rfqVal,
+                    null, "warning", "C_RfQ", data.RfqId));
+                any = true;
+            }
+
+            // Project — the project line this PO was generated for
+            // (C_ProjectLine.C_OrderPO_ID).
+            if (data.ProjectId > 0) {
+                var projVal = data.ProjectNo || data.ProjectName || ("#" + data.ProjectId);
+                if (data.ProjectCount > 1)
+                    projVal += " +" + (data.ProjectCount - 1) + " " + getMsg("VAS_092_More");
+                $chips.append(originChip("doc", getMsg("VAS_092_Project"), projVal,
+                    null, "info", "C_Project", data.ProjectId));
+                any = true;
+            }
+
+            // Blanket Order — the blanket this PO was released against
+            // (C_Order.C_Order_Blanket). Opened on the purchase side: the blanket
+            // is itself a C_Order, so isSOTrx stays false.
+            if (data.BlanketOrderId > 0) {
+                $chips.append(originChip("calendar", getMsg("VAS_092_BlanketOrder"),
+                    data.BlanketOrderNo || ("#" + data.BlanketOrderId),
+                    null, "success", "C_Order", data.BlanketOrderId, false));
                 any = true;
             }
 
@@ -1072,24 +1146,42 @@
             if (ln.UOMSymbol) qtyText += " " + ln.UOMSymbol;
             $tr.append($('<span class="ta-c"></span>').text(qtyText));
 
+            // Delivery and receipt only mean something for a stockable item. A
+            // charge line, or a Service / Resource / Expense product, is never
+            // received — both cells stay empty rather than claiming "not received".
+            var deliverable = isDeliverableLine(ln);
+
             var $exp = $('<span class="MPC-vaspo-expDate"></span>');
-            $exp.append(document.createTextNode(formatDate(ln.DatePromised) || "—"));
-            $exp.append($('<small></small>').text(recvLabel(ln.RecvState)));
+            if (deliverable) {
+                $exp.append(document.createTextNode(formatDate(ln.DatePromised) || "—"));
+                $exp.append($('<small></small>').text(recvLabel(ln.RecvState)));
+            } else {
+                $exp.append(document.createTextNode("—"));
+            }
             $tr.append($exp);
 
             $tr.append($('<span class="ta-r"></span>').text(formatAmount(
                 +ln.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
 
-            var ordered = +ln.QtyOrdered || 0;
-            var delivered = +ln.QtyDelivered || 0;
-            var pct = ordered > 0 ? Math.round((delivered / ordered) * 100) : 0;
-            var $recv = $('<span class="MPC-vaspo-recv ta-r"></span>').addClass(ln.RecvState || "none");
-            var $bar = $('<span class="MPC-vaspo-recvBar"><i></i></span>');
-            $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
-            $recv.append($bar);
-            $recv.append(document.createTextNode(
-                formatNumber(delivered, +ln.UOMPrecision || 0) + "/" +
-                formatNumber(ordered, +ln.UOMPrecision || 0)));
+            // Received / ordered, both in the line's ENTERED UOM — received is
+            // Σ M_InOutLine.QtyEntered from the server, ordered is
+            // C_OrderLine.QtyEntered, so the pair reads on one scale.
+            var $recv = $('<span class="MPC-vaspo-recv ta-r"></span>');
+            if (deliverable) {
+                var ordered  = +ln.QtyEntered || 0;
+                var received = +ln.QtyReceivedEntered || 0;
+                var pct = ordered > 0 ? Math.round((received / ordered) * 100) : 0;
+                $recv.addClass(ln.RecvState || "none");
+                var $bar = $('<span class="MPC-vaspo-recvBar"><i></i></span>');
+                $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
+                $recv.append($bar);
+                var recvText = formatNumber(received, +ln.UOMPrecision || 0) + "/" +
+                               formatNumber(ordered, +ln.UOMPrecision || 0);
+                if (ln.UOMSymbol) recvText += " " + ln.UOMSymbol;
+                $recv.append(document.createTextNode(recvText));
+            } else {
+                $recv.append(document.createTextNode("—"));
+            }
             $tr.append($recv);
 
             // Trailing action column, right-hand edge of the row. Only a line that
@@ -1158,8 +1250,8 @@
             $h.append($('<span></span>').text(getMsg("VAS_092_ExpDelivery")));
             $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
             // Who made the change, in the track the line's Received bar occupies —
-            // the drawer still lines up column-for-column with the line above it.
-            $h.append($('<span></span>').text(getMsg("VAS_092_UpdatedBy")));
+            // right-aligned like that column so the two sit directly in line.
+            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_UpdatedBy")));
             $tbl.append($h);
 
             for (var i = 0; i < rows.length; i++) {
@@ -1189,7 +1281,10 @@
             if (h.UOMSymbol) qty += " " + h.UOMSymbol;
             $r.append($('<span class="ta-c"></span>').text(qty));
 
-            $r.append($('<span></span>').text(formatDate(h.DatePromised) || "—"));
+            // Same gate as the line above it: a charge / service line is never
+            // goods-received, so a promised date is meaningless on any version.
+            $r.append($('<span></span>').text(
+                isDeliverableLine(ln) ? (formatDate(h.DatePromised) || "—") : "—"));
 
             $r.append($('<span class="ta-r"></span>').text(formatAmount(
                 +h.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
@@ -1198,7 +1293,7 @@
             // written by a background/platform process can carry no resolvable
             // user, so an unknown author shows a dash rather than an empty cell.
             var by = h.UpdatedByName || "";
-            $r.append($('<span class="MPC-vaspo-lhBy"></span>')
+            $r.append($('<span class="MPC-vaspo-lhBy ta-r"></span>')
                 .text(by || "—").attr("title", by));
 
             return $r;
@@ -1208,6 +1303,15 @@
             if (state === "full") return getMsg("VAS_092_Delivered");
             if (state === "part") return getMsg("VAS_092_Partial");
             return getMsg("VAS_092_Awaiting");
+        }
+
+        // A line is deliverable only when it carries an Item-type product
+        // (M_Product.ProductType = 'I'). A charge line (C_Charge_ID, no product)
+        // and a Service / Resource / Expense product are never goods-received, so
+        // an expected-delivery date or a received quantity would be meaningless.
+        function isDeliverableLine(ln) {
+            if (!ln || !ln.M_Product_ID || ln.C_Charge_ID) return false;
+            return ln.ProductType === "I";
         }
 
         function buildTotalBit(label, value, isGrand) {
@@ -1739,14 +1843,26 @@
 
         // ---------- Recent Activity (typed feed) ---------- //
 
+        // Document-lifecycle types (prepared / completed / reactivated / ... )
+        // headline with the workflow node's own name, so titleKey stays null and
+        // activityTitle falls through to a.Text.
         var ACT_TYPES = {
-            note:     { tone: "info",    icon: "mail",  tagKey: "VAS_092_TagNote",     titleKey: null },
-            email:    { tone: "purple",  icon: "mail",  tagKey: "VAS_092_TagEmail",    titleKey: null },
-            grn:      { tone: "success", icon: "inbox", tagKey: "VAS_092_TagGRN",      titleKey: "VAS_092_ActGRN" },
-            invoice:  { tone: "info",    icon: "doc",   tagKey: "VAS_092_TagInvoice",  titleKey: "VAS_092_ActInvoice" },
-            payment:  { tone: "success", icon: "coins", tagKey: "VAS_092_TagPayment",  titleKey: "VAS_092_ActPayment" },
-            approval: { tone: "purple",  icon: "check", tagKey: "VAS_092_TagApproval", titleKey: "VAS_092_ActApproval" },
-            created:  { tone: "neutral", icon: "doc",   tagKey: "VAS_092_TagCreated",  titleKey: "VAS_092_ActCreated" }
+            note:        { tone: "info",    icon: "mail",   tagKey: "VAS_092_TagNote",        titleKey: null },
+            email:       { tone: "purple",  icon: "mail",   tagKey: "VAS_092_TagEmail",       titleKey: null },
+            grn:         { tone: "success", icon: "inbox",  tagKey: "VAS_092_TagGRN",         titleKey: "VAS_092_ActGRN" },
+            invoice:     { tone: "info",    icon: "doc",    tagKey: "VAS_092_TagInvoice",     titleKey: "VAS_092_ActInvoice" },
+            payment:     { tone: "success", icon: "coins",  tagKey: "VAS_092_TagPayment",     titleKey: "VAS_092_ActPayment" },
+            approval:    { tone: "purple",  icon: "check",  tagKey: "VAS_092_TagApproval",    titleKey: "VAS_092_ActApproval" },
+            created:     { tone: "neutral", icon: "doc",    tagKey: "VAS_092_TagCreated",     titleKey: "VAS_092_ActCreated" },
+            prepared:    { tone: "neutral", icon: "doc",    tagKey: "VAS_092_TagPrepared",    titleKey: null },
+            completed:   { tone: "success", icon: "check",  tagKey: "VAS_092_TagCompleted",   titleKey: null },
+            reactivated: { tone: "warning", icon: "pencil", tagKey: "VAS_092_TagReactivated", titleKey: null },
+            rejected:    { tone: "risk",    icon: "alert",  tagKey: "VAS_092_TagRejected",    titleKey: null },
+            voided:      { tone: "risk",    icon: "alert",  tagKey: "VAS_092_TagVoided",      titleKey: null },
+            reversed:    { tone: "risk",    icon: "alert",  tagKey: "VAS_092_TagReversed",    titleKey: null },
+            closed:      { tone: "neutral", icon: "check",  tagKey: "VAS_092_TagClosed",      titleKey: null },
+            invalidated: { tone: "warning", icon: "alert",  tagKey: "VAS_092_TagInvalidated", titleKey: null },
+            updated:     { tone: "info",    icon: "pencil", tagKey: "VAS_092_TagUpdated",     titleKey: "VAS_092_ActUpdated" }
         };
 
         function renderActivity($parent, activity) {
@@ -1780,11 +1896,15 @@
             $title.append($('<span class="MPC-vaspo-actLead"></span>')
                 .text(title).attr("title", title));
 
-            // An e-mail also names its recipient, under the subject.
-            if (a.Type === "email" && a.MailTo) {
-                var to = getMsg("VAS_092_MailTo") + " " + a.MailTo;
-                $title.append($('<small class="MPC-vaspo-actSub"></small>')
-                    .text(to).attr("title", to));
+            // An e-mail names its recipients under the subject: the To list, plus
+            // a count of the Cc / Bcc addresses so a reader can see at a glance
+            // that others were copied. Every address itself is listed in the body.
+            if (a.Type === "email") {
+                var to = recipientSummary(a);
+                if (to) {
+                    $title.append($('<small class="MPC-vaspo-actSub"></small>')
+                        .text(to).attr("title", allRecipients(a) || to));
+                }
             }
             $row.append($title);
 
@@ -1815,17 +1935,56 @@
             return a && a.Type === "email" && !!(a.Body && String(a.Body).trim());
         }
 
-        // The e-mail body, collapsed beneath its activity row.
+        // The e-mail body, collapsed beneath its activity row. The full recipient
+        // set (From / To / Cc / Bcc) heads it, so every address the mail went to
+        // is on screen once the reader opens the message.
         function activityBody(a) {
             if (!hasActivityBody(a)) return null;
 
             var $panel = $('<div class="MPC-vaspo-actBody" style="display:none;"></div>');
-            if (a.MailFrom) {
-                $panel.append($('<div class="MPC-vaspo-actMeta"></div>')
-                    .text(getMsg("VAS_092_MailFrom") + " " + a.MailFrom));
-            }
+            appendMailMeta($panel, "VAS_092_MailFrom", a.MailFrom);
+            appendMailMeta($panel, "VAS_092_MailTo",   a.MailTo);
+            appendMailMeta($panel, "VAS_092_MailCc",   a.MailCc);
+            appendMailMeta($panel, "VAS_092_MailBcc",  a.MailBcc);
             $panel.append($('<p></p>').text(String(a.Body).trim()));
             return $panel;
+        }
+
+        function appendMailMeta($panel, key, value) {
+            if (!value || !String(value).trim()) return;
+            $panel.append($('<div class="MPC-vaspo-actMeta"></div>')
+                .text(getMsg(key) + " " + String(value).trim()));
+        }
+
+        // Row sub-line: the To list, plus "+n more" covering the Cc / Bcc
+        // addresses. Counting by comma / semicolon is enough for a summary — the
+        // body lists the addresses verbatim.
+        function recipientSummary(a) {
+            var to = (a.MailTo || "").trim();
+            var extra = countAddresses(a.MailCc) + countAddresses(a.MailBcc);
+            if (!to && !extra) return "";
+            var s = getMsg("VAS_092_MailTo") + " " + (to || "—");
+            if (extra > 0) s += " +" + extra + " " + getMsg("VAS_092_MoreRecipients");
+            return s;
+        }
+
+        // Every address on the mail, for the row's hover tooltip.
+        function allRecipients(a) {
+            var bits = [];
+            if (a.MailTo)  bits.push(getMsg("VAS_092_MailTo")  + " " + a.MailTo);
+            if (a.MailCc)  bits.push(getMsg("VAS_092_MailCc")  + " " + a.MailCc);
+            if (a.MailBcc) bits.push(getMsg("VAS_092_MailBcc") + " " + a.MailBcc);
+            return bits.join("\n");
+        }
+
+        function countAddresses(value) {
+            if (!value || !String(value).trim()) return 0;
+            var parts = String(value).split(/[;,]/);
+            var n = 0;
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].trim()) n++;
+            }
+            return n;
         }
 
         function activityTag(meta) {
@@ -1843,6 +2002,11 @@
             var s = getMsg(meta.titleKey);
             if (a.Type === "grn" && a.Count > 0) {
                 s += " · " + a.Count + " " + getMsg("VAS_092_Lines");
+            }
+            // A header edit says how much of it changed, so one save touching
+            // five columns reads as one event rather than an unqualified "Updated".
+            if (a.Type === "updated" && a.Count > 0) {
+                s += " · " + a.Count + " " + getMsg("VAS_092_FieldsChanged");
             }
             if (a.DocumentNo) s += " (" + a.DocumentNo + ")";
             return s;

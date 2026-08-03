@@ -1,12 +1,13 @@
 /************************************************************
  * Module Name    : VAS
  * Purpose        : Expected Landed Cost tab panel for the Purchase Order
- *                  window (C_Order, IsSOTrx = 'N'). A fixed header bar
- *                  (title, PO Number · Order Date · Document Type, state
- *                  badge) above an independently scrolling body holding the
- *                  cost element table, the generated distribution lines of
- *                  each entry and — while the order is drafted — the add /
- *                  edit form.
+ *                  window (C_Order, IsSOTrx = 'N'). A fixed title strip
+ *                  (title, PO Number · Ordered date, state pill) above an
+ *                  independently scrolling body that opens with the order's
+ *                  details card (vendor + buyer | document type, currency,
+ *                  order lines) and then holds the cost element table, the
+ *                  generated distribution lines of each entry and — while the
+ *                  order is drafted — the add / edit form.
  *
  *                  Draft (DocStatus = 'DR') is editable; completed
  *                  (DocStatus = 'CO') is strictly read-only, with each
@@ -25,6 +26,11 @@
  *                  (completion is owned by the window's own document action).
  * Chronological development:
  *   VAI163   2026-07-30  Created
+ *   VAI163   2026-07-31  Header redesigned to the VAS_092 Purchase Order
+ *                        Overview pattern — title strip with state pills over a
+ *                        two-column details card. Vendor, buyer, currency and
+ *                        order-line count are now surfaced; document type moved
+ *                        off the sub-line into the card.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -42,6 +48,7 @@
         var $busy;
         var $header;
         var $headSub;
+        var $headPills;
         var $headBadge;
         var $body;
         var $emptyState;
@@ -73,6 +80,13 @@
             VAS_167_Empty: "No expected landed cost defined yet — add the first cost element below.",
             VAS_167_EmptyLocked: "No expected landed cost was defined on this purchase order.",
             VAS_167_NoRate: "No exchange rate",
+            // Header details card
+            VAS_167_Vendor: "Vendor",
+            VAS_167_Buyer: "Buyer",
+            VAS_167_DocType: "Document Type",
+            VAS_167_Ordered: "Ordered",
+            VAS_167_OrderLines: "Order Lines",
+            VAS_167_NoVendor: "—",
             VAS_167_POTotal: "PO Total",
             VAS_167_ExpectedTotal: "Expected Landed Cost",
             // Row actions
@@ -90,6 +104,8 @@
             VAS_167_BaseQty: "Qty",
             VAS_167_BaseValue: "Value",
             VAS_167_BaseEqual: "Equal",
+            VAS_167_BaseVolume: "Volume",
+            VAS_167_BaseWeight: "Weight",
             VAS_167_Of: "of",
             VAS_167_Distributed: "Distributed",
             VAS_167_NotReconciled: "Does not add up to the entry amount",
@@ -132,14 +148,18 @@
         this.init = function () {
             $root = $('<div class="MPC-vaselc-root"></div>');
 
-            // ---- Fixed header bar (never scrolls) ----
+            // ---- Fixed title strip (never scrolls) ----
+            // Title + sub-line on the left, state pills on the right; the order's
+            // own details live in the card at the top of the body below.
             $header = $('<div class="MPC-vaselc-head"></div>');
             var $htext = $('<div class="MPC-vaselc-headText"></div>');
             $htext.append($('<div class="MPC-vaselc-headTitle"></div>').text(getMsg("VAS_167_Title")));
             $headSub = $('<div class="MPC-vaselc-headSub"></div>');
             $htext.append($headSub);
+            $headPills = $('<div class="MPC-vaselc-headPills"></div>');
             $headBadge = $('<span class="MPC-vaselc-badge"></span>');
-            $header.append($htext).append($headBadge);
+            $headPills.append($headBadge);
+            $header.append($htext).append($headPills);
 
             // ---- Scrolling body ----
             $body = $('<div class="MPC-vaselc-body"></div>');
@@ -225,6 +245,8 @@
 
             var $wrap = $('<div class="MPC-vaselc-stack"></div>');
 
+            $wrap.append(renderHeaderCard());
+
             // Draft-only notice strip. A completed order shows no equivalent
             // strip — the badge and the absent controls already say it is locked.
             if (data.IsDrafted) {
@@ -251,15 +273,18 @@
             validateForm();
         }
 
-        // Header sub-line: PO Number · Order Date · Document Type. Re-rendered on
-        // every selection so the reader always sees which record they are on.
+        // Title strip: PO Number · Ordered date on the sub-line, state pill on
+        // the right. Re-rendered on every selection so the reader always sees
+        // which record they are on. The remaining order facts belong to the
+        // details card, not to this line.
         function renderHeaderMeta() {
             $headSub.empty();
             $headSub.append($('<b></b>').text(data.PurchaseOrderNumber || ""));
-            var bits = [];
-            if (data.OrderDate) bits.push(formatDate(data.OrderDate));
-            if (data.DocumentTypeName) bits.push(data.DocumentTypeName);
-            if (bits.length) $headSub.append(document.createTextNode(" · " + bits.join(" · ")));
+            var ordered = formatDate(data.OrderDate);
+            if (ordered) {
+                $headSub.append(document.createTextNode(
+                    " · " + getMsg("VAS_167_Ordered") + " " + ordered));
+            }
 
             $headBadge.removeClass("is-generated");
             if (data.IsDrafted) {
@@ -267,6 +292,51 @@
             } else {
                 $headBadge.text(getMsg("VAS_167_BadgeGenerated")).addClass("is-generated");
             }
+        }
+
+        // Details card: vendor identity (left, behind a divider) beside the
+        // order's own fields (right, two across) — the Purchase Order Overview
+        // header card, carrying what this panel already knows about the order.
+        function renderHeaderCard() {
+            var $card = $('<section class="MPC-vaselc-hdrCard"></section>');
+
+            var $left = $('<div class="MPC-vaselc-hdrColL"></div>');
+            $left.append($('<div class="MPC-vaselc-fLabel"></div>').text(getMsg("VAS_167_Vendor")));
+            $left.append($('<div class="MPC-vaselc-vendName"></div>')
+                .text(data.VendorName || getMsg("VAS_167_NoVendor")));
+            if (data.BuyerName) {
+                var $contact = $('<div class="MPC-vaselc-vendContact"></div>');
+                var $bit = $('<span class="MPC-vaselc-contactBit"></span>');
+                $bit.append(svgIcon("user"));
+                $bit.append($('<span></span>').text(data.BuyerName));
+                $contact.append($bit);
+                $left.append($contact);
+            }
+            $card.append($left);
+
+            var $right = $('<div class="MPC-vaselc-hdrColR"></div>');
+            if (data.DocumentTypeName) {
+                $right.append(headerField(getMsg("VAS_167_DocType"), data.DocumentTypeName));
+            }
+            var cur = (data.DocumentCurrencyCode || "") +
+                      (data.DocumentCurrencySymbol ? " (" + data.DocumentCurrencySymbol + ")" : "");
+            if ($.trim(cur)) {
+                $right.append(headerField(getMsg("VAS_167_FldCurrency"), cur));
+            }
+            // PO Total is deliberately absent — it lives in the table footer,
+            // beside the expected total it is there to be compared against.
+            $right.append(headerField(getMsg("VAS_167_OrderLines"),
+                String(data.EligibleLineCount || 0)));
+            $card.append($right);
+
+            return $card;
+        }
+
+        function headerField(label, value) {
+            var $f = $('<div class="MPC-vaselc-hdrField"></div>');
+            $f.append($('<div class="MPC-vaselc-fLabel"></div>').text(label));
+            $f.append($('<div class="MPC-vaselc-fVal"></div>').text(value));
+            return $f;
         }
 
         function noticeStrip(icon, tone, text) {
@@ -489,8 +559,16 @@
                 case "Q":
                     return getMsg("VAS_167_BaseQty") + " " + formatNumber(g.AllocationBase, 0) +
                            of + formatNumber(g.TotalAllocationBase, 0);
+                // C = Costs, I = Import Value (legacy rows) — both value bases.
+                case "C":
                 case "I":
                     return getMsg("VAS_167_BaseValue") + " " + formatNumber(g.AllocationBase, 2) +
+                           of + formatNumber(g.TotalAllocationBase, 2);
+                case "V":
+                    return getMsg("VAS_167_BaseVolume") + " " + formatNumber(g.AllocationBase, 2) +
+                           of + formatNumber(g.TotalAllocationBase, 2);
+                case "W":
+                    return getMsg("VAS_167_BaseWeight") + " " + formatNumber(g.AllocationBase, 2) +
                            of + formatNumber(g.TotalAllocationBase, 2);
                 case "L":
                     return getMsg("VAS_167_BaseEqual") + " 1" + of + lineCount;
@@ -834,11 +912,16 @@
             return linesOpen[id] !== false;
         }
 
+        // Chip colour per C_LandedCostDistribution code. I (Import Value) is no
+        // longer offered but still appears on entries created elsewhere.
         function distTone(code) {
             switch (code) {
                 case "Q": return "qty";
+                case "C":
                 case "I": return "value";
                 case "L": return "equal";
+                case "V": return "volume";
+                case "W": return "weight";
                 default:  return "other";
             }
         }
@@ -873,7 +956,8 @@
             chevDown: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
             info: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
             alert: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01"/></svg>',
-            coins: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5"/><path d="M14.5 4.2a5 5 0 0 1 0 15.6"/><path d="M7 18.7a5 5 0 0 0 6 0"/></svg>'
+            coins: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5"/><path d="M14.5 4.2a5 5 0 0 1 0 15.6"/><path d="M7 18.7a5 5 0 0 0 6 0"/></svg>',
+            user: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
         };
 
         function svgIcon(name) {

@@ -5,9 +5,9 @@
  *               MPC-prefixed (MPC-vaselc-*) and scoped under the panel
  *               root to avoid global collisions.
  *
- *               Structure follows the reference design: a fixed header bar
- *               (title, PO Number · Order Date · Document Type, state badge)
- *               above the only scrolling region — the panel body. Every flex
+ *               Structure: a fixed title strip (title, PO Number · Ordered
+ *               date, state pill) above the only scrolling region — the panel
+ *               body, which opens with the order's details card. Every flex
  *               child in that chain carries min-height: 0 / min-width: 0 so a
  *               body full of expanded generated-lines blocks scrolls instead
  *               of stretching the panel.
@@ -19,6 +19,16 @@
  *               no nested card mosaics, no dark mode.
  * Chronological development:
  *   VAI163   2026-07-30  Created
+ *   VAI163   2026-07-31  Header restyled to the VAS_092 Purchase Order Overview
+ *                        pattern: an untinted title strip (.MPC-vaselc-head)
+ *                        carrying the title, sub-line and state pills
+ *                        (.MPC-vaselc-headPills), above a white two-column
+ *                        details card (.MPC-vaselc-hdrCard) — vendor identity
+ *                        left, labelled order fields right. Card surfaces now
+ *                        share that panel's tokens (--vaselc-card-bd /
+ *                        -row-div / -card-radius) and the add / edit form
+ *                        (.MPC-vaselc-form) dropped its tinted fill and dashed
+ *                        outline for the same plain white card.
  ***********************************************************/
 
 .MPC-vaselc-root {
@@ -38,6 +48,12 @@
     --vaselc-divider:     #EDF2F6;
     --vaselc-field-bd:    #D7D7D7;
     --vaselc-info-bg:     #DFF1FF;
+    /* Card surface — same tokens the PO Overview panel uses, so a card here
+       and a card there are the same object. */
+    --vaselc-card-bd:     #D9E2EB;
+    --vaselc-row-div:     #E2EAF1;
+    --vaselc-card-radius: 12px;
+    --vaselc-hdr-sub:     #41576A;
     /* Semantic tones */
     --vaselc-success-bg:  #CCEFDD;  --vaselc-success-tx: #0C5D38;
     --vaselc-neutral-bg:  #E9EDF1;  --vaselc-neutral-tx: #5A6B79;
@@ -47,6 +63,8 @@
     --vaselc-qty-bg:      #D9ECFF;  --vaselc-qty-tx:     #0E5DA8;
     --vaselc-value-bg:    #EDE9FF;  --vaselc-value-tx:   #5F4AA6;
     --vaselc-equal-bg:    #E4F5EC;  --vaselc-equal-tx:   #0C5D38;
+    --vaselc-volume-bg:   #E0F3F4;  --vaselc-volume-tx:  #14646B;
+    --vaselc-weight-bg:   #FBEBDD;  --vaselc-weight-tx:  #8A4B16;
     --vaselc-shadow:      0 10px 24px rgba(15, 61, 97, 0.06);
     --vaselc-radius:      13px;
 
@@ -66,16 +84,19 @@
 
 .MPC-vaselc-root * { box-sizing: border-box; }
 
-/* ---------------- Fixed header bar ---------------- */
+/* ---------------- Header — title strip ---------------- */
 
+/* Untinted title strip in the PO Overview pattern: title + sub-line on the
+   left, tinted state pills on the right. Unlike that panel's strip this one
+   stays fixed above the scrolling body, so it keeps a hairline rule — the
+   body's content scrolls under it and needs an edge to stop against. */
 .MPC-vaselc-head {
     flex: none;
-    min-height: 56px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
-    padding: 10px 18px;
+    gap: 14px;
+    padding: 14px 18px 12px;
     background: var(--vaselc-white);
     border-bottom: 1px solid var(--vaselc-border);
 }
@@ -83,38 +104,46 @@
 .MPC-vaselc-headText { min-width: 0; }
 
 .MPC-vaselc-headTitle {
-    font-size: 16px;
-    font-weight: 500;
-    color: var(--vaselc-text-strong);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--vaselc-text);
     line-height: 1.2;
 }
 
 .MPC-vaselc-headSub {
     font-size: 12px;
-    color: #717182;
-    margin-top: 3px;
+    color: var(--vaselc-hdr-sub);
+    margin-top: 5px;
     line-height: 1.35;
     word-break: break-word;
 }
 
 .MPC-vaselc-headSub b {
     color: var(--vaselc-text);
-    font-weight: 500;
+    font-weight: 700;
 }
 
-/* State badge: neutral "Expected" in draft, green "Lines Generated" once
-   the order is completed. */
+.MPC-vaselc-headPills {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* State pill: neutral "Expected" in draft, green "Lines Generated" once the
+   order is completed. Metrics follow the overview panel's header pill. */
 .MPC-vaselc-badge {
     flex: none;
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 3px 9px;
+    padding: 5px 10px;
     border-radius: 999px;
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
+    line-height: 1;
     white-space: nowrap;
     background: var(--vaselc-neutral-bg);
     color: var(--vaselc-neutral-tx);
@@ -122,10 +151,11 @@
 
 .MPC-vaselc-badge::before {
     content: '';
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background: #9FB1C0;
+    background: currentColor;
+    flex: none;
 }
 
 .MPC-vaselc-badge.is-generated {
@@ -133,7 +163,90 @@
     color: var(--vaselc-success-tx);
 }
 
-.MPC-vaselc-badge.is-generated::before { background: var(--vaselc-success-tx); }
+/* ---------------- Header — details card ---------------- */
+
+/* White two-column card in the PO Overview pattern: vendor identity on the
+   left behind a divider, labelled order fields two-across on the right. */
+.MPC-vaselc-hdrCard {
+    display: grid;
+    grid-template-columns: 40% 1fr;
+    gap: 14px 26px;
+    border: 1px solid var(--vaselc-card-bd);
+    border-radius: var(--vaselc-card-radius);
+    background: var(--vaselc-white);
+    padding: 13px 15px;
+    margin-bottom: 12px;
+}
+
+.MPC-vaselc-hdrColL {
+    min-width: 0;
+    border-right: 1px solid var(--vaselc-row-div);
+    padding-right: 18px;
+}
+
+.MPC-vaselc-hdrColR {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 11px 22px;
+    align-content: start;
+}
+
+.MPC-vaselc-hdrField { min-width: 0; }
+
+.MPC-vaselc-fLabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--vaselc-muted);
+    line-height: 1.3;
+}
+
+.MPC-vaselc-fVal {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--vaselc-text);
+    line-height: 1.35;
+    margin-top: 2px;
+    overflow-wrap: break-word;   /* a long vendor / type wraps instead of spilling */
+}
+
+.MPC-vaselc-vendName {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--vaselc-text);
+    line-height: 1.3;
+    margin-top: 3px;
+    overflow-wrap: break-word;
+}
+
+.MPC-vaselc-vendContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 16px;
+    font-size: 11.5px;
+    color: var(--vaselc-text);
+    margin-top: 6px;
+}
+
+.MPC-vaselc-contactBit { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.MPC-vaselc-contactBit .MPC-vaselc-ic { color: var(--vaselc-primary); }
+
+/* Narrow panels: stack the two columns and drop the pills below the title. */
+@container (max-width: 460px) {
+    .MPC-vaselc-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vaselc-hdrColL {
+        border-right: none;
+        padding-right: 0;
+        border-bottom: 1px solid var(--vaselc-row-div);
+        padding-bottom: 11px;
+    }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .MPC-vaselc-hdrColR { grid-template-columns: 1fr; }
+    .MPC-vaselc-head { flex-direction: column; }
+    .MPC-vaselc-headPills { justify-content: flex-start; }
+}
 
 /* ---------------- Scrolling body ---------------- */
 
@@ -315,6 +428,8 @@
 .MPC-vaselc-distChip.dist-qty   { background: var(--vaselc-qty-bg);     color: var(--vaselc-qty-tx); }
 .MPC-vaselc-distChip.dist-value { background: var(--vaselc-value-bg);   color: var(--vaselc-value-tx); }
 .MPC-vaselc-distChip.dist-equal { background: var(--vaselc-equal-bg);   color: var(--vaselc-equal-tx); }
+.MPC-vaselc-distChip.dist-volume{ background: var(--vaselc-volume-bg);  color: var(--vaselc-volume-tx); }
+.MPC-vaselc-distChip.dist-weight{ background: var(--vaselc-weight-bg);  color: var(--vaselc-weight-tx); }
 .MPC-vaselc-distChip.dist-other { background: var(--vaselc-neutral-bg); color: var(--vaselc-neutral-tx); }
 
 .MPC-vaselc-amt { text-align: right; }
@@ -524,12 +639,14 @@
 
 /* ---------------- Add / edit form ---------------- */
 
+/* Plain white card on the same border / radius tokens as every other surface
+   in the PO Overview pattern — no tint, no dashed outline. */
 .MPC-vaselc-form {
     margin-top: 12px;
     padding: 13px 15px 15px;
-    background: var(--vaselc-faint);
-    border: 1px dashed var(--vaselc-pale-bd);
-    border-radius: var(--vaselc-radius);
+    background: var(--vaselc-white);
+    border: 1px solid var(--vaselc-card-bd);
+    border-radius: var(--vaselc-card-radius);
 }
 
 .MPC-vaselc-formCap {
@@ -725,3 +842,16 @@ input.MPC-vaselc-input { cursor: text; }
 
 .vis-rtl .MPC-vaselc-ffBody.is-select::after,
 [dir="rtl"] .MPC-vaselc-ffBody.is-select::after { right: auto; left: 2px; }
+
+.vis-rtl .MPC-vaselc-hdrColL,
+[dir="rtl"] .MPC-vaselc-hdrColL {
+    border-right: none;
+    border-left: 1px solid var(--vaselc-row-div);
+    padding-right: 0;
+    padding-left: 18px;
+}
+
+@container (max-width: 460px) {
+    .vis-rtl .MPC-vaselc-hdrColL,
+    [dir="rtl"] .MPC-vaselc-hdrColL { border-left: none; padding-left: 0; }
+}
