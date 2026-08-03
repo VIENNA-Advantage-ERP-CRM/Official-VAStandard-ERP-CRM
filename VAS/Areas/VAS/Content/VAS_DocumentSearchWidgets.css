@@ -283,6 +283,98 @@
     flex-shrink: 0;
 }
 
+/* ---------- Vendor-first result row (VAS_068) --------------------------
+   An initials avatar and the vendor name lead the row; everything that
+   describes the payment - doc no, type, bank account, currency, invoice,
+   status, flags - shares ONE meta line beneath it, so the row is a fixed
+   two lines tall however many of those fields exist. Amount and date keep
+   the right-hand column rather than joining that line, which is what lets
+   the figures align down the list. The row keeps the shared .vas-dssrch-row
+   flex box; only its children differ from the chip-led variant. */
+.vas-dssrch-avatar {
+    width: 2.125rem;
+    height: 2.125rem;
+    flex-shrink: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.vas-dssrch-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-dssrch-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Inline text flow (not flex) so the pieces read as one sentence and the
+   whole line trims with a single ellipsis when the panel is narrow. */
+.vas-dssrch-rowmeta {
+    margin-top: 0.12rem;
+    font-size: 0.72rem;
+    color: #748494;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+    .vas-dssrch-name mark,
+    .vas-dssrch-rowmeta mark {
+        background: #FFF3DA;
+        color: #9A6500;
+        padding: 0 0.05rem;
+        border-radius: 2px;
+    }
+
+.vas-dssrch-detail-sep {
+    margin: 0 0.3rem;
+    color: #B8C6D2;
+    user-select: none;
+}
+
+.vas-dssrch-dot {
+    display: inline-block;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: 50%;
+    margin-inline-end: 0.375rem;
+    vertical-align: middle;
+}
+
+/* The flags read as state, not as another field, so they get a tinted pill
+   while the plain data pieces stay unadorned text. */
+.vas-dssrch-flag {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    line-height: 1.35;
+    white-space: nowrap;
+    background: rgba(1, 157, 137, 0.14);
+    color: #019D89;
+}
+
+/* No gap between the currency symbol and its number: "Rs289,100.00". */
+.vas-dssrch-cur {
+    margin-inline-end: 0;
+}
+
 /* ---------- Accent-bar result row (VAS_069) ----------------------------
    A status-coloured bar down the left edge states the document's condition,
    which lets the status badge itself stay quiet. Everything that describes
