@@ -568,24 +568,12 @@ namespace VAS.Controllers
 SELECT
     Payment.C_Payment_ID,
     Payment.DateAcct
-
 FROM C_Payment Payment
-
-WHERE Payment.IsActive = 'Y'
-
-AND Payment.AD_Client_ID =
-    " + clientIdSql + @"
-
-AND Payment.IsReceipt = 'N'
-
-AND Payment.DocStatus IN
-(
-    'CO',
-    'CL'
-)
-
-AND Payment.TenderType = 'K'
-
+WHERE Payment.IsActive='Y'
+AND Payment.AD_Client_ID=" + clientIdSql + @"
+AND Payment.IsReceipt='N'
+AND Payment.DocStatus IN ('CO','CL')
+AND Payment.TenderType='K'
 " + bouncedStatusFilter;
 
             paymentAccessSql =
@@ -600,7 +588,7 @@ AND Payment.TenderType = 'K'
             /*
              * Bounced payments are counted across the whole financial year
              * that today falls in, not just the current period. The range
-             * is anchored on FinancialYearRange with a LEFT JOIN, so
+             * is anchored on FinancialYearRange with a LEFT OUTER JOIN, so
              * DateFrom/DateTo still come back as the year's edges even when
              * no payment bounced in it.
              */
@@ -609,40 +597,21 @@ WITH
 " + BuildFinancialYearRangeSql(
     clientIdSql
 ) + @",
-
 PaymentFiltered AS
 (
 " + paymentAccessSql + @"
 )
-
 SELECT
-    COUNT
-    (
-        DISTINCT
-        Payment.C_Payment_ID
-    ) AS BouncedPaymentCount,
-
-    MIN
-    (
-        FinancialYearRange.DateFrom
-    ) AS DateFrom,
-
-    MAX
-    (
-        FinancialYearRange.DateTo
-    ) AS DateTo
-
+    COUNT(DISTINCT Payment.C_Payment_ID) AS BouncedPaymentCount,
+    MIN(FinancialYearRange.DateFrom) AS DateFrom,
+    MAX(FinancialYearRange.DateTo) AS DateTo
 FROM FinancialYearRange FinancialYearRange
-
 LEFT OUTER JOIN PaymentFiltered Payment ON
 (
-    Payment.DateAcct >=
-        FinancialYearRange.DateFrom
-
-    AND Payment.DateAcct <
-        " + GetDateToExclusiveSql(
-            "FinancialYearRange.DateTo"
-        ) + @"
+    Payment.DateAcct>=FinancialYearRange.DateFrom
+    AND Payment.DateAcct<" + GetDateToExclusiveSql(
+        "FinancialYearRange.DateTo"
+    ) + @"
 )";
         }
 
@@ -731,8 +700,7 @@ LEFT OUTER JOIN PaymentFiltered Payment ON
                     ? @"
 LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
 (
-    PaymentMethod.VA009_PaymentMethod_ID =
-        Payment.VA009_PaymentMethod_ID
+    PaymentMethod.VA009_PaymentMethod_ID=Payment.VA009_PaymentMethod_ID
 )"
                     : string.Empty;
 
@@ -750,36 +718,24 @@ ExecutionStatusList AS
         " + CastText(
             "RefList.Name"
         ) + @" AS StatusName,
-
         " + CastText(
             "RefListTrl.Name"
         ) + @" AS TranslatedStatusName
-
     FROM AD_Reference ReferenceInfo
-
     INNER JOIN AD_Ref_List RefList ON
     (
-        ReferenceInfo.AD_Reference_ID =
-        RefList.AD_Reference_ID
+        ReferenceInfo.AD_Reference_ID=RefList.AD_Reference_ID
     )
-
     LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
     (
-        RefList.AD_Ref_List_ID =
-        RefListTrl.AD_Ref_List_ID
-
-        AND RefListTrl.AD_Language =
-        " + languageSql + @"
+        RefList.AD_Ref_List_ID=RefListTrl.AD_Ref_List_ID
+        AND RefListTrl.AD_Language=" + languageSql + @"
     )
-
-    WHERE ReferenceInfo.Name =
-        " + ToSqlString(
+    WHERE ReferenceInfo.Name=" + ToSqlString(
             ExecutionStatusReferenceName
         ) + @"
-
-    AND ReferenceInfo.IsActive = 'Y'
-
-    AND RefList.IsActive = 'Y'
+    AND ReferenceInfo.IsActive='Y'
+    AND RefList.IsActive='Y'
 )";
 
             /*
@@ -802,79 +758,46 @@ TenderTypeList AS
         " + CastText(
             "RefList.Name"
         ) + @" AS TenderTypeName,
-
         " + CastText(
             "RefListTrl.Name"
         ) + @" AS TranslatedTenderTypeName
-
     FROM AD_Reference ReferenceInfo
-
     INNER JOIN AD_Ref_List RefList ON
     (
-        ReferenceInfo.AD_Reference_ID =
-        RefList.AD_Reference_ID
+        ReferenceInfo.AD_Reference_ID=RefList.AD_Reference_ID
     )
-
     LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
     (
-        RefList.AD_Ref_List_ID =
-        RefListTrl.AD_Ref_List_ID
-
-        AND RefListTrl.AD_Language =
-        " + languageSql + @"
+        RefList.AD_Ref_List_ID=RefListTrl.AD_Ref_List_ID
+        AND RefListTrl.AD_Language=" + languageSql + @"
     )
-
-    WHERE ReferenceInfo.Name =
-        " + ToSqlString(
+    WHERE ReferenceInfo.Name=" + ToSqlString(
             TenderTypeReferenceName
         ) + @"
-
-    AND ReferenceInfo.IsActive = 'Y'
-
-    AND RefList.IsActive = 'Y'
+    AND ReferenceInfo.IsActive='Y'
+    AND RefList.IsActive='Y'
 )";
 
             string paymentAccessSql = @"
 SELECT
     Payment.C_Payment_ID AS PaymentID,
-
     Payment.DocumentNo AS PaymentNo,
-
     Payment.DateAcct AS PaymentDate,
-
     Payment.C_BPartner_ID,
-
     Payment.C_BankAccount_ID,
-
     Payment.C_Currency_ID,
-
     " + paymentMethodIdColumn + @",
-
     Payment.PayAmt AS Amount,
-
     " + CastText(
         "Payment.TenderType"
     ) + @" AS TenderType,
-
     " + executionStatusColumn + @"
-
 FROM C_Payment Payment
-
-WHERE Payment.IsActive = 'Y'
-
-AND Payment.AD_Client_ID =
-    " + clientIdSql + @"
-
-AND Payment.IsReceipt = 'N'
-
-AND Payment.DocStatus IN
-(
-    'CO',
-    'CL'
-)
-
-AND Payment.TenderType = 'K'
-
+WHERE Payment.IsActive='Y'
+AND Payment.AD_Client_ID=" + clientIdSql + @"
+AND Payment.IsReceipt='N'
+AND Payment.DocStatus IN ('CO','CL')
+AND Payment.TenderType='K'
 " + bouncedStatusFilter;
 
             paymentAccessSql =
@@ -891,102 +814,61 @@ RowsData AS
 (
     SELECT
         Payment.PaymentID,
-
         Payment.PaymentNo,
-
         Payment.PaymentDate,
-
         BPartner.Name AS VendorName,
-
         Bank.Name AS BankName,
-
         BankAccount.Name AS BankAccountName,
-
         BankAccount.AccountNo,
-
         Payment.C_Currency_ID,
-
         Currency.ISO_Code AS CurrencyISO,
-
         Currency.CurSymbol AS CurrencySymbol,
-
-        COALESCE
-        (
-            Currency.StdPrecision,
-            2
-        ) AS StdPrecision,
-
+        COALESCE(Currency.StdPrecision,2) AS StdPrecision,
         Payment.Amount,
-
         Payment.TenderType,
-
         TenderTypeList.TenderTypeName,
-
         TenderTypeList.TranslatedTenderTypeName,
-
         Payment.VA009_PaymentMethod_ID,
-
         " + paymentMethodNameColumn + @",
-
         Payment.ExecutionStatus,
-
         ExecutionStatusList.StatusName,
-
         ExecutionStatusList.TranslatedStatusName
-
     FROM PaymentFiltered Payment
-
     /* Same financial-year window as the count on the card, so the list
        and the figure it drills into always agree. */
     INNER JOIN FinancialYearRange FinancialYearRange ON
     (
-        Payment.PaymentDate >=
-            FinancialYearRange.DateFrom
-
-        AND Payment.PaymentDate <
-            " + GetDateToExclusiveSql(
+        Payment.PaymentDate>=FinancialYearRange.DateFrom
+        AND Payment.PaymentDate<" + GetDateToExclusiveSql(
                 "FinancialYearRange.DateTo"
             ) + @"
     )
-
     LEFT OUTER JOIN C_BPartner BPartner ON
     (
-        BPartner.C_BPartner_ID =
-        Payment.C_BPartner_ID
+        BPartner.C_BPartner_ID=Payment.C_BPartner_ID
     )
-
     LEFT OUTER JOIN C_BankAccount BankAccount ON
     (
-        BankAccount.C_BankAccount_ID =
-        Payment.C_BankAccount_ID
+        BankAccount.C_BankAccount_ID=Payment.C_BankAccount_ID
     )
-
     LEFT OUTER JOIN C_Bank Bank ON
     (
-        Bank.C_Bank_ID =
-        BankAccount.C_Bank_ID
+        Bank.C_Bank_ID=BankAccount.C_Bank_ID
     )
-
     LEFT OUTER JOIN C_Currency Currency ON
     (
-        Currency.C_Currency_ID =
-        Payment.C_Currency_ID
+        Currency.C_Currency_ID=Payment.C_Currency_ID
     )
-
     " + paymentMethodJoin + @"
-
     LEFT OUTER JOIN ExecutionStatusList ExecutionStatusList ON
     (
-        ExecutionStatusList.ReferenceValue =
-        " + CastText(
+        ExecutionStatusList.ReferenceValue=" + CastText(
             "Payment.ExecutionStatus"
         ) + @"
     )
-
     LEFT OUTER JOIN TenderTypeList TenderTypeList ON
     (
-        TenderTypeList.ReferenceValue =
-        " + CastText(
+        TenderTypeList.ReferenceValue=" + CastText(
             "Payment.TenderType"
         ) + @"
     )
@@ -997,89 +879,50 @@ WITH
 " + BuildFinancialYearRangeSql(
     clientIdSql
 ) + @",
-
 " + executionStatusListSql + @",
-
 " + tenderTypeListSql + @",
-
 PaymentFiltered AS
 (
 " + paymentAccessSql + @"
 ),
-
 " + rowsDataSql + @",
-
 NumberedRows AS
 (
     SELECT
         RowsData.*,
-
         COUNT(1) OVER () AS TotalRecords,
-
         ROW_NUMBER() OVER
         (
-            ORDER BY
-                RowsData.PaymentDate DESC,
-                RowsData.PaymentNo DESC,
-                RowsData.PaymentID DESC
+            ORDER BY RowsData.PaymentDate DESC,RowsData.PaymentNo DESC,RowsData.PaymentID DESC
         ) AS RowNumber
-
     FROM RowsData RowsData
 )
-
 SELECT
     NumberedRows.PaymentID,
-
     NumberedRows.PaymentNo,
-
     NumberedRows.PaymentDate,
-
     NumberedRows.VendorName,
-
     NumberedRows.BankName,
-
     NumberedRows.BankAccountName,
-
     NumberedRows.AccountNo,
-
     NumberedRows.C_Currency_ID,
-
     NumberedRows.CurrencyISO,
-
     NumberedRows.CurrencySymbol,
-
     NumberedRows.StdPrecision,
-
     NumberedRows.Amount,
-
     NumberedRows.TenderType,
-
     NumberedRows.TenderTypeName,
-
     NumberedRows.TranslatedTenderTypeName,
-
     NumberedRows.VA009_PaymentMethod_ID,
-
     NumberedRows.PaymentMethodName,
-
     NumberedRows.ExecutionStatus,
-
     NumberedRows.StatusName,
-
     NumberedRows.TranslatedStatusName,
-
     NumberedRows.TotalRecords
-
 FROM NumberedRows NumberedRows
-
-WHERE NumberedRows.RowNumber >=
-    " + startRowSql + @"
-
-AND NumberedRows.RowNumber <=
-    " + endRowSql + @"
-
-ORDER BY
-    NumberedRows.RowNumber";
+WHERE NumberedRows.RowNumber>=" + startRowSql + @"
+AND NumberedRows.RowNumber<=" + endRowSql + @"
+ORDER BY NumberedRows.RowNumber";
         }
 
         /// <summary>
@@ -1092,7 +935,7 @@ ORDER BY
             if (!hasExecutionStatusColumn)
             {
                 return @"
-AND 1 = 2";
+AND 1=2";
             }
 
             string bouncedStatus =
@@ -1108,11 +951,7 @@ AND 1 = 2";
                 );
 
             return @"
-AND Payment.VA009_ExecutionStatus IN
-(
-    " + bouncedStatus + @",
-    " + rejectedStatus + @"
-)";
+AND Payment.VA009_ExecutionStatus IN (" + bouncedStatus + @"," + rejectedStatus + @")";
         }
 
         /// <summary>
@@ -1139,78 +978,39 @@ AND Payment.VA009_ExecutionStatus IN
 FinancialYearRange AS
 (
     SELECT
-        MIN
-        (
-            Period.StartDate
-        ) AS DateFrom,
-
-        MAX
-        (
-            Period.EndDate
-        ) AS DateTo
-
+        MIN(Period.StartDate) AS DateFrom,
+        MAX(Period.EndDate) AS DateTo
     FROM AD_ClientInfo ClientInfo
-
     INNER JOIN C_Year YearData ON
     (
-        YearData.C_Calendar_ID =
-        ClientInfo.C_Calendar_ID
+        YearData.C_Calendar_ID=ClientInfo.C_Calendar_ID
     )
-
     INNER JOIN C_Period Period ON
     (
-        Period.C_Year_ID =
-        YearData.C_Year_ID
+        Period.C_Year_ID=YearData.C_Year_ID
     )
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND YearData.IsActive = 'Y'
-
-    AND Period.IsActive = 'Y'
-
-    AND ClientInfo.AD_Client_ID =
-        " + clientIdSql + @"
-
-    AND YearData.C_Year_ID =
-    (
-        SELECT
-            MIN
-            (
-                CurrentYear.C_Year_ID
-            )
-
+    WHERE ClientInfo.IsActive='Y'
+    AND YearData.IsActive='Y'
+    AND Period.IsActive='Y'
+    AND ClientInfo.AD_Client_ID=" + clientIdSql + @"
+    AND YearData.C_Year_ID=(SELECT MIN(CurrentYear.C_Year_ID)
         FROM AD_ClientInfo CurrentClientInfo
-
         INNER JOIN C_Year CurrentYear ON
         (
-            CurrentYear.C_Calendar_ID =
-            CurrentClientInfo.C_Calendar_ID
+            CurrentYear.C_Calendar_ID=CurrentClientInfo.C_Calendar_ID
         )
-
         INNER JOIN C_Period CurrentPeriod ON
         (
-            CurrentPeriod.C_Year_ID =
-            CurrentYear.C_Year_ID
+            CurrentPeriod.C_Year_ID=CurrentYear.C_Year_ID
         )
-
-        WHERE CurrentClientInfo.IsActive = 'Y'
-
-        AND CurrentYear.IsActive = 'Y'
-
-        AND CurrentPeriod.IsActive = 'Y'
-
-        AND CurrentClientInfo.AD_Client_ID =
-            " + clientIdSql + @"
-
-        AND " + GetCurrentDateSql() + @" >=
-            CurrentPeriod.StartDate
-
-        AND " + GetCurrentDateSql() + @" <
-            " + GetDateToExclusiveSql(
-                "CurrentPeriod.EndDate"
-            ) + @"
-    )
+        WHERE CurrentClientInfo.IsActive='Y'
+        AND CurrentYear.IsActive='Y'
+        AND CurrentPeriod.IsActive='Y'
+        AND CurrentClientInfo.AD_Client_ID=" + clientIdSql + @"
+        AND " + GetCurrentDateSql() + @">=CurrentPeriod.StartDate
+        AND " + GetCurrentDateSql() + @"<" + GetDateToExclusiveSql(
+            "CurrentPeriod.EndDate"
+        ) + @")
 )";
         }
 
@@ -1312,22 +1112,15 @@ FinancialYearRange AS
             string sql = @"
 SELECT
     COUNT(1)
-
 FROM AD_Table TableData
-
 INNER JOIN AD_Column ColumnData ON
 (
-    ColumnData.AD_Table_ID =
-    TableData.AD_Table_ID
+    ColumnData.AD_Table_ID=TableData.AD_Table_ID
 )
-
-WHERE TableData.TableName =
-    " + ToSqlString(
+WHERE TableData.TableName=" + ToSqlString(
                 tableName
             ) + @"
-
-AND ColumnData.ColumnName =
-    " + ToSqlString(
+AND ColumnData.ColumnName=" + ToSqlString(
                 columnName
             );
 

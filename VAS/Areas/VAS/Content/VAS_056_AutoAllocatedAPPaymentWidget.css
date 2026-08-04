@@ -217,6 +217,7 @@
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
     color: #9a6500;
+    padding-left: .3125em;
 }
 
 .VAS-056-AutoAllocatedAPPayment-footer {
