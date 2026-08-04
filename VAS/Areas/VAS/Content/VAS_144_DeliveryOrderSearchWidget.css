@@ -99,7 +99,7 @@
    viewport-based anchor (same basis as every other pop-up/modal fixed on this
    dashboard) and every internal size below is em off that anchor. */
 .MPC-dos-dd {
-    font-size: clamp(0.9rem, 1.6vw, 2.2rem);
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0117), 24px);
     position: fixed;
     z-index: 10050;
     display: none;
@@ -241,7 +241,7 @@
        basis as every other pop-up on this dashboard, so it scales at any
        resolution instead of freezing at a fixed px ceiling. Internals below
        are all em off this anchor. */
-    font-size: clamp(0.9rem, 1.6vw, 2.2rem);
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0117), 24px);
     position: fixed;
     inset: 0;
     background: rgba(2, 38, 64, 0.28);

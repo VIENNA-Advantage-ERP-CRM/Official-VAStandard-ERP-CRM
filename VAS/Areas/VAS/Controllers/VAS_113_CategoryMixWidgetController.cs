@@ -113,6 +113,7 @@ namespace VAS.Controllers
             sql = AddAccessSql(ctx, sql, "Category");
             sql += @"
                 GROUP BY Category.M_Product_Category_ID, Category.Name
+                HAVING COUNT(Prod.M_Product_ID) > 0
                 ORDER BY COUNT(Prod.M_Product_ID) DESC, Category.Name";
 
             SqlParameter[] parameters = new SqlParameter[]
@@ -189,7 +190,8 @@ namespace VAS.Controllers
             string productSql = @"
                 SELECT Product.M_Product_ID,
                        Product.Value AS Product_Code,
-                       Product.Name AS Product_Name
+                       Product.Name AS Product_Name,
+                       Product.ProductType AS Product_Type
                 FROM M_Product Product
                 WHERE Product.IsActive='Y'
                   AND (Product.Discontinued IS NULL OR Product.Discontinued='N')
@@ -278,6 +280,7 @@ namespace VAS.Controllers
                 )
                 SELECT Products.Product_Code,
                        Products.Product_Name,
+                       Products.Product_Type,
                        COALESCE(StockAgg.On_Hand,0) AS On_Hand,
                        COALESCE(StockAgg.Stock_Value,0) AS Stock_Value
                 FROM Products
@@ -317,6 +320,7 @@ namespace VAS.Controllers
                     {
                         sku = Util.GetValueOfString(reader["Product_Code"]),
                         name = Util.GetValueOfString(reader["Product_Name"]),
+                        product_type = Util.GetValueOfString(reader["Product_Type"]),
                         on_hand = Util.GetValueOfDecimal(reader["On_Hand"]),
                         stock_value = Util.GetValueOfDecimal(reader["Stock_Value"])
                     });
@@ -431,6 +435,7 @@ namespace VAS.Controllers
         {
             public string sku { get; set; }
             public string name { get; set; }
+            public string product_type { get; set; }
             public decimal on_hand { get; set; }
             public decimal stock_value { get; set; }
         }

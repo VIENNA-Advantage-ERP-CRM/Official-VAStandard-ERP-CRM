@@ -139,7 +139,7 @@
 .vas-exf-dialog {
     /* Viewport-anchored (the dialog lives on <body>, outside the widget), same
        basis as the widget card so it scales at any resolution; internals are em. */
-    font-size: clamp(0.9rem, 1.6vw, 2.2rem);
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0117), 24px);
     position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 2em; font-family: Roboto, Arial, sans-serif;
 }
 .vas-exf-dialog.vas-exf-hidden { display: none; }
@@ -180,8 +180,7 @@
 }
 select.vas-exf-f {
     appearance: none; -webkit-appearance: none; cursor: pointer;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231F83FF' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
-    background-repeat: no-repeat; background-position: right 0.125em center; padding-right: 1.125em;
+    padding-right: 0.3em;
 }
 .vas-exf-f:hover, .vas-exf-f:focus { border-bottom-color: #0083DA; }
 
@@ -215,10 +214,8 @@ select.vas-exf-f {
 
 .vas-exf-loc {
     font-family: inherit; font-size: .78em; color: #102C3F; border: 1px solid #E4EDF4; border-radius: 0.5em;
-    background: #fff; padding: 0.3em 1.375em 0.3em 0.5em; outline: none; max-width: 11em; cursor: pointer;
+    background: #fff; padding: 0.3em 0.5em; outline: none; max-width: 11em; cursor: pointer;
     appearance: none; -webkit-appearance: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231F83FF' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
-    background-repeat: no-repeat; background-position: right 0.375em center;
 }
 .vas-exf-loc:hover, .vas-exf-loc:focus { border-color: #0083DA; }
 .vas-exf-loc:disabled { opacity: .5; cursor: default; }

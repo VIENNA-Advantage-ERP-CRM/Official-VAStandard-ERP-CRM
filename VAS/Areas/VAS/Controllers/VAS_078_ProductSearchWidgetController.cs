@@ -143,8 +143,7 @@ namespace VAS.Controllers
                        ProductCategory.Name AS Category_Name
                 FROM M_Product Product
                 LEFT OUTER JOIN M_Product_Category ProductCategory ON (ProductCategory.M_Product_Category_ID=Product.M_Product_Category_ID AND ProductCategory.IsActive=N'Y')
-                WHERE Product.IsActive=N'Y'
-                  AND Product.AD_Client_ID=@Product_Client_ID
+                WHERE Product.AD_Client_ID=@Product_Client_ID
                   AND Product.AD_Org_ID IN (0,COALESCE(NULLIF(@Product_Org_ID,0),Product.AD_Org_ID))
                   AND (
                       UPPER(COALESCE(Product.Name,N'')) LIKE @Product_Name
@@ -323,7 +322,6 @@ namespace VAS.Controllers
                 LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=Product.C_UOM_ID AND UOM.IsActive=N'Y')
                 LEFT OUTER JOIN AD_Image ProductImage ON (ProductImage.AD_Image_ID=Product.AD_Image_ID AND ProductImage.IsActive=N'Y')
                 WHERE Product.M_Product_ID=@M_Product_ID
-                  AND Product.IsActive=N'Y'
                   AND Product.AD_Client_ID=@AD_Client_ID
                   AND Product.AD_Org_ID IN (0,COALESCE(NULLIF(@AD_Org_ID,0),Product.AD_Org_ID))";
 
@@ -542,7 +540,7 @@ namespace VAS.Controllers
             string storageRowsSql = @"
                 SELECT Storage.M_Product_ID,
                        Warehouse.Name AS Warehouse_Name,
-                       Locator.Value AS Locator_Value,
+                       COALESCE(Locator.LocatorCombination, Locator.Value) AS Locator_Value,
                        COALESCE(Storage.M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID,
                        COALESCE(AttributeInstance.Description,N'') AS Attribute_Description,
                        SUM(COALESCE(Storage.QtyOnHand,0)) AS Qty_On_Hand
@@ -559,7 +557,7 @@ namespace VAS.Controllers
             storageRowsSql += @"
                 GROUP BY Storage.M_Product_ID,
                          Warehouse.Name,
-                         Locator.Value,
+                         COALESCE(Locator.LocatorCombination, Locator.Value),
                          COALESCE(Storage.M_AttributeSetInstance_ID,0),
                          COALESCE(AttributeInstance.Description,N'')";
 
@@ -584,6 +582,7 @@ namespace VAS.Controllers
                 FROM StorageRows
                 LEFT OUTER JOIN AttributeCost ON (AttributeCost.M_Product_ID=StorageRows.M_Product_ID AND AttributeCost.M_AttributeSetInstance_ID=StorageRows.M_AttributeSetInstance_ID)
                 LEFT OUTER JOIN ProductCost ON (ProductCost.M_Product_ID=StorageRows.M_Product_ID)
+                WHERE StorageRows.Qty_On_Hand > 0
                 ORDER BY StorageRows.Warehouse_Name,
                          StorageRows.Locator_Value,
                          StorageRows.Attribute_Description";
@@ -851,7 +850,7 @@ namespace VAS.Controllers
                        Requisition.DateDoc,
                        Requisition.DateRequired,
                        RequisitionLine.Qty,
-                       RequisitionLine.QtyOrdered,
+                       COALESCE(NULLIF(RequisitionLine.QtyOrdered, 0), (SELECT SUM(ol.QtyOrdered) FROM C_OrderLine ol WHERE ol.M_RequisitionLine_ID=RequisitionLine.M_RequisitionLine_ID AND ol.IsActive=N'Y'), 0) AS QtyOrdered,
                        Requisition.DocStatus,
                        COALESCE(AttributeInstance.Description,N'') AS Attribute_Description
                 FROM M_RequisitionLine RequisitionLine

@@ -420,6 +420,7 @@
 
 .MPC-cm-mini-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
 }
 
@@ -429,6 +430,9 @@
         color: #748494;
         padding: 0.375em 0.5em;
         border-bottom: 1px solid #edf2f6;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .MPC-cm-mini-table td {
@@ -436,11 +440,14 @@
         padding: 0.5em;
         border-bottom: 1px solid #edf2f6;
         color: #5f7283;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
 .MPC-cm-th-r,
 .MPC-cm-td-r {
-    text-align: right;
+    text-align: left;
 }
 
 .MPC-cm-td-s {
