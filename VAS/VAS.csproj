@@ -175,10 +175,12 @@
     <Compile Include="Areas\VAS\Controllers\VAS_056_AutoAllocatedAPPaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_065_APInvoicePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_074_CreateInvoiceLinePanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_107_CreateOrderBottomPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_105_AccountRightPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_106_OverviewSalesOrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_120_CustomerSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_122_TotalCustomersWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_123_QuotationRightPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_124_DelayedPaymentsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_125_OpenPipelineWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_126_OpenTicketsWidgetController.cs" />
@@ -471,6 +473,7 @@
     <Content Include="Areas\VAS\Content\InvoicesWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_065_APInvoicePanel.css" />
     <Content Include="Areas\VAS\Content\VAS_074_CreateInvoiceLinePanel.css" />
+    <Content Include="Areas\VAS\Content\VAS_107_CreateOrderBottomPanel.css" />
     <Content Include="Areas\VAS\Content\OutstandingSalesOrderWidget.css" />
     <Content Include="Areas\VAS\Content\OverdueWidget.css" />
     <Content Include="Areas\VAS\Content\PaidthismonthWidget.css" />
@@ -636,6 +639,7 @@
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_LeadConversation.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_065_APInvoicePanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_074_CreateInvoiceLinePanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_107_CreateOrderBottomPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_030_BouncedAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_027_ClearedAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_046_ReconciliationStatusWidget.js" />
@@ -652,6 +656,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\TotalAmountReceivedThisMonthWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\util\CurrencyFormat.js" />
     <Content Include="Areas\VAS\Scripts\app\util\AttributeControl.js" />
+    <Content Include="Areas\VAS\Scripts\app\util\VAS_PanelUtil.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AgingReceivablesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AvgDaysToPayWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\InvoicesWidget.js" />

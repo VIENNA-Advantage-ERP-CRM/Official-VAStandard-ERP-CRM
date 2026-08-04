@@ -790,6 +790,11 @@ namespace VAdvantage.Model
          */
         protected override bool BeforeSave(bool newRecord)
         {
+            if (!newRecord && Is_ValueChanged("EMail"))
+            {
+                SetAD_User_ID(0);
+                SetC_BPartner_ID(0);
+            }
             //	EMail Address specified
             if (GetEMail() != null && GetAD_User_ID() == 0)
                 SetAD_User_ID();
