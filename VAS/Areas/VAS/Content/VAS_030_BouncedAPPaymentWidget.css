@@ -240,6 +240,7 @@
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
     color: var(--vas-bounced-accent-strong);
+    padding-left: 0.3125em;
 }
 
 .vas-bounced-ap-payment-footer {

@@ -901,24 +901,30 @@ ORDER BY
 
                 currentLookup = "organizations";
 
-                List<object> organizations = ReadLookupRows(@"
+                List<object> organizations = ReadLookupRows(
+                    ctx,
+                    @"
 SELECT
     Organization.AD_Org_ID AS ID,
     Organization.Name AS Name
 FROM AD_Org Organization
 WHERE Organization.IsActive = 'Y'
 AND Organization.AD_Client_ID = " + clientIdSql + @"
-AND Organization.AD_Org_ID > 0
+AND Organization.AD_Org_ID > 0",
+                    "Organization",
+                    @"
 ORDER BY
     Organization.Name");
 
                 currentLookup = "bankAccounts";
 
-                List<object> bankAccounts = ReadBankAccountLookupRows(clientId, currencyId, adOrgId);
+                List<object> bankAccounts = ReadBankAccountLookupRows(ctx, clientId, currencyId, adOrgId);
 
                 currentLookup = "vendors";
 
-                List<object> vendors = ReadLookupRows(@"
+                List<object> vendors = ReadLookupRows(
+                    ctx,
+                    @"
 SELECT
     BusinessPartner.C_BPartner_ID AS ID,
     BusinessPartner.Name AS Name
@@ -926,30 +932,41 @@ FROM C_BPartner BusinessPartner
 WHERE BusinessPartner.IsActive = 'Y'
 AND BusinessPartner.IsVendor = 'Y'
 AND BusinessPartner.IsSummary = 'N'
-AND BusinessPartner.AD_Client_ID = " + clientIdSql + @"
+AND BusinessPartner.AD_Client_ID = " + clientIdSql + @"",
+                    "BusinessPartner",
+                    @"
 ORDER BY
     BusinessPartner.Name");
 
                 currentLookup = "currencies";
 
-                List<object> currencies = ReadLookupRows(@"
+                List<object> currencies = ReadLookupRows(
+                    ctx,
+                    @"
 SELECT
     Currency.C_Currency_ID AS ID,
     Currency.ISO_Code AS Name
 FROM C_Currency Currency
-WHERE Currency.IsActive = 'Y' and Currency.IsMyCurrency = 'Y'
+WHERE Currency.IsActive = 'Y'
+AND Currency.IsMyCurrency = 'Y'",
+                    "Currency",
+                    @"
 ORDER BY
     Currency.ISO_Code");
 
                 currentLookup = "conversionTypes";
 
-                List<object> conversionTypes = ReadLookupRows(@"
+                List<object> conversionTypes = ReadLookupRows(
+                    ctx,
+                    @"
 SELECT
     ConversionType.C_ConversionType_ID AS ID,
     ConversionType.Name AS Name
 FROM C_ConversionType ConversionType
 WHERE ConversionType.IsActive = 'Y'
-AND ConversionType.AD_Client_ID IN (0, " + clientIdSql + @")
+AND ConversionType.AD_Client_ID IN (0, " + clientIdSql + @")",
+                    "ConversionType",
+                    @"
 ORDER BY
     ConversionType.Name");
 
@@ -997,11 +1014,34 @@ ORDER BY
             }
         }
 
-        private List<object> ReadLookupRows(string sql)
+        /// <summary>
+        /// Runs a lookup SELECT and projects each row into the id/name shape
+        /// the popup dropdowns consume.
+        /// </summary>
+        /// <remarks>
+        /// MRole.AddAccessSQL appends its access predicate to the WHERE clause,
+        /// so ORDER BY cannot already be part of the statement when it runs.
+        /// The caller therefore hands the ordering over separately and it is
+        /// attached only after the query has been secured.
+        /// </remarks>
+        /// <param name="ctx">Session context supplying the role.</param>
+        /// <param name="selectSql">SELECT/FROM/WHERE text, without ORDER BY.</param>
+        /// <param name="mainTableAlias">Alias of the main physical table to secure.</param>
+        /// <param name="orderBySql">ORDER BY clause appended after securing.</param>
+        /// <returns>Lookup rows for the popup dropdowns.</returns>
+        private List<object> ReadLookupRows(
+            Ctx ctx,
+            string selectSql,
+            string mainTableAlias,
+            string orderBySql)
         {
             List<object> rows = new List<object>();
 
             IDataReader reader = null;
+
+            string sql = MRole.GetDefault(ctx).AddAccessSQL(
+                selectSql, mainTableAlias, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO)
+                + orderBySql;
 
             try
             {
@@ -1037,6 +1077,7 @@ ORDER BY
         /// are shared by every organization of the client.
         /// </summary>
         private List<object> ReadBankAccountLookupRows(
+            Ctx ctx,
             int clientId,
             int currencyId = 0,
             int adOrgId = 0)
@@ -1045,7 +1086,10 @@ ORDER BY
 
             IDataReader reader = null;
 
-            string sql = @"
+            /* MRole is applied to C_BankAccount only - the main physical table
+               of this lookup. C_Bank and C_Currency are joined for display
+               text and inherit the parent's authorization. */
+            string selectSql = @"
 SELECT
     BankAccount.C_BankAccount_ID AS ID,
     Bank.Name AS BankName,
@@ -1058,14 +1102,13 @@ LEFT OUTER JOIN C_Bank Bank ON
 LEFT OUTER JOIN C_Currency Currency ON
     (Currency.C_Currency_ID = BankAccount.C_Currency_ID)
 WHERE BankAccount.IsActive = 'Y'
-AND BankAccount.AD_Client_ID = " + clientId.ToString(CultureInfo.InvariantCulture)
-                + (currencyId > 0
-                    ? " AND BankAccount.C_Currency_ID = " + currencyId.ToString(CultureInfo.InvariantCulture)
-                    : string.Empty)
-                + (adOrgId > 0
-                    ? " AND BankAccount.AD_Org_ID IN (0, " + adOrgId.ToString(CultureInfo.InvariantCulture) + ")"
-                    : string.Empty)
-                + @" ORDER BY BankAccount.Name";
+AND BankAccount.AD_Client_ID = " + clientId
+                + (currencyId > 0 ? " AND BankAccount.C_Currency_ID = " + currencyId : string.Empty)
+                + (adOrgId > 0 ? " AND BankAccount.AD_Org_ID IN (0, " + adOrgId + ")" : string.Empty);
+
+            string sql = MRole.GetDefault(ctx).AddAccessSQL(
+                selectSql, "C_BankAccount", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO)
+                + " ORDER BY BankAccount.Name";
 
             try
             {
@@ -1079,34 +1122,21 @@ AND BankAccount.AD_Client_ID = " + clientId.ToString(CultureInfo.InvariantCultur
                     string accountNo = GetString(reader, "AccountNo");
                     string currencyISO = GetString(reader, "CurrencyISO");
 
-                    /*
-                     * Display format: "BankName - AccountNo - Currency"
-                     * e.g. "Iraqi National Bank - 123456789 - IQD".
-                     * The bank name is shown first, followed by the
-                     * account number, falling back to the account name when
-                     * the bank has no name.
-                     */
                     List<string> displayNameParts = new List<string>();
-
                     string primaryName = FirstNotEmpty(bankName, accountName);
-
                     if (!string.IsNullOrWhiteSpace(primaryName))
                     {
                         displayNameParts.Add(primaryName);
                     }
-
                     if (!string.IsNullOrWhiteSpace(accountNo))
                     {
                         displayNameParts.Add(accountNo);
                     }
-
                     string displayName = string.Join(" - ", displayNameParts);
-
                     if (!string.IsNullOrWhiteSpace(currencyISO))
                     {
                         displayName = displayName + " - " + currencyISO;
                     }
-
                     rows.Add(new
                     {
                         id = id,
@@ -1139,7 +1169,8 @@ AND BankAccount.AD_Client_ID = " + clientId.ToString(CultureInfo.InvariantCultur
         {
             int clientId = ctx.GetAD_Client_ID();
 
-            string sql = @" SELECT
+            string selectSql = @"
+SELECT
     DocumentType.C_DocType_ID AS ID,
     DocumentType.Name AS Name
 FROM C_DocType DocumentType
@@ -1147,10 +1178,13 @@ WHERE DocumentType.IsActive = 'Y'
 AND DocumentType.DocBaseType = 'APP'
 AND DocumentType.IsSOTrx = 'N'
 AND DocumentType.AD_Client_ID IN (0, " + clientId + @")"
-                + (adOrgId > 0 ? " AND DocumentType.AD_Org_ID IN (0, " + adOrgId + ")" : string.Empty)
-                + @" ORDER BY DocumentType.Name";
+                + (adOrgId > 0 ? " AND DocumentType.AD_Org_ID IN (0, " + adOrgId + ")" : string.Empty);
 
-            return ReadLookupRows(sql);
+            return ReadLookupRows(
+                ctx,
+                selectSql,
+                "DocumentType",
+                " ORDER BY DocumentType.Name");
         }
 
         private List<object> ReadTenderTypeLookupRows(Ctx ctx)
@@ -1235,7 +1269,7 @@ ORDER BY
 
             int clientIdSql = ctx.GetAD_Client_ID();
 
-            string sql = @"
+            string selectSql = @"
 SELECT
     PaymentMethod.VA009_PaymentMethod_ID AS ID,
     PaymentMethod.VA009_Name AS Name
@@ -1243,8 +1277,11 @@ FROM VA009_PaymentMethod PaymentMethod
 WHERE PaymentMethod.IsActive = 'Y'
 AND PaymentMethod.AD_Client_ID IN (0, " + clientIdSql + @")
 AND PaymentMethod.VA009_PAYMENTBASETYPE NOT IN ('B','C','P')"
-                + (adOrgId > 0 ? " AND PaymentMethod.AD_Org_ID IN (0, " + adOrgId + ")" : string.Empty)
-                + @" ORDER BY PaymentMethod.VA009_Name";
+                + (adOrgId > 0 ? " AND PaymentMethod.AD_Org_ID IN (0, " + adOrgId + ")" : string.Empty);
+
+            string sql = MRole.GetDefault(ctx).AddAccessSQL(
+                selectSql, "PaymentMethod", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO)
+                + " ORDER BY PaymentMethod.VA009_Name";
 
             try
             {
