@@ -457,7 +457,6 @@
             head.appendChild(el('span', null, lbl('VAS_129_PBT_ColCategory', 'category')));
             var uom = el('span', 'MPC-pt-uom-label', lbl('VAS_129_PBT_ColUom', 'UoM'));
             head.appendChild(uom);
-            head.appendChild(el('span', null, lbl('VAS_129_PBT_ColAttributes', 'attributes')));
             head.appendChild(el('span', null, lbl('VAS_129_PBT_ColStatus', 'status')));
             return head;
         }
@@ -465,21 +464,21 @@
         function buildModalDataRow(item) {
             var row = el('div', 'MPC-pt-m-row MPC-pt-m-datarow');
 
-            row.appendChild(el('span', 'MPC-pt-m-primary', item.name || ''));
-            row.appendChild(el('span', 'MPC-pt-m-cell', item.code || ''));
-            row.appendChild(el('span', 'MPC-pt-m-cell', item.category || ''));
-            row.appendChild(el('span', 'MPC-pt-m-cell', item.uom || ''));
+            var primaryCell = el('span', 'MPC-pt-m-primary', item.name || '');
+            if (item.name) { primaryCell.title = item.name; }
+            row.appendChild(primaryCell);
 
-            var attrsCell = el('span', 'MPC-pt-m-attrs');
-            var attrs = item.attributes || [];
-            if (attrs.length) {
-                attrs.forEach(function (a) {
-                    attrsCell.appendChild(el('span', 'MPC-pt-chip', a.label + ': ' + a.value));
-                });
-            } else {
-                attrsCell.appendChild(el('span', 'MPC-pt-em-dash', '—'));
-            }
-            row.appendChild(attrsCell);
+            var codeCell = el('span', 'MPC-pt-m-cell', item.code || '');
+            if (item.code) { codeCell.title = item.code; }
+            row.appendChild(codeCell);
+
+            var catCell = el('span', 'MPC-pt-m-cell', item.category || '');
+            if (item.category) { catCell.title = item.category; }
+            row.appendChild(catCell);
+
+            var uomCell = el('span', 'MPC-pt-m-cell', item.uom || '');
+            if (item.uom) { uomCell.title = item.uom; }
+            row.appendChild(uomCell);
 
             var statusText = item.isActive ? lbl('VAS_129_PBT_Active', 'Active') : lbl('VAS_129_PBT_Inactive', 'Inactive');
             var statusCell = el('span', 'MPC-pt-status ' + (item.isActive ? 'MPC-pt-status-active' : 'MPC-pt-status-inactive'), statusText);

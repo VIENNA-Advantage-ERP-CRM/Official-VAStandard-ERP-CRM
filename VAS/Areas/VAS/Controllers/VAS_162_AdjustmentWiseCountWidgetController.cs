@@ -101,29 +101,28 @@ namespace VAS.Controllers
                 DateTime startDate = new DateTime(year, month, 1);
                 DateTime endDate = startDate.AddMonths(1).AddDays(-1);
 
-                string sql = @"SELECT i.M_Inventory_ID,
-                                       (SELECT COUNT(*) FROM M_InventoryLine il WHERE il.M_Inventory_ID = i.M_Inventory_ID) AS LineCount,
-                                       (SELECT COALESCE(SUM(il.QtyCount - il.QtyBook), 0) FROM M_InventoryLine il WHERE il.M_Inventory_ID = i.M_Inventory_ID) AS TotalDiff
-                                FROM M_Inventory i
-                                WHERE i.IsActive = 'Y' 
-                                  AND i.DocStatus IN ('CO', 'CL')
-                                  AND i.MovementDate >= " + DB.TO_DATE(startDate, true) + @"
-                                  AND i.MovementDate <= " + DB.TO_DATE(endDate, true);
+                string sql = @"SELECT
+                                   COALESCE(SUM(CASE WHEN il.AdjustmentType = 'A' THEN 1 ELSE 0 END), 0) AS AsOnDateCount,
+                                   COALESCE(SUM(CASE WHEN il.AdjustmentType = 'D' THEN 1 ELSE 0 END), 0) AS QtyDiffCount,
+                                   COALESCE(SUM(CASE WHEN il.AdjustmentType = 'D' THEN COALESCE(il.DifferenceQty, COALESCE(il.QtyCount, 0) - COALESCE(il.QtyBook, 0)) ELSE 0 END), 0) AS NetDiffQty
+                               FROM M_Inventory i
+                               JOIN M_InventoryLine il ON (il.M_Inventory_ID = i.M_Inventory_ID)
+                               WHERE i.IsActive = 'Y' 
+                                 AND il.IsActive = 'Y'
+                                 AND COALESCE(i.IsInternalUse, 'N') = 'N'
+                                 AND i.DocStatus IN ('CO', 'CL')
+                                 AND il.AdjustmentType IN ('A', 'D')
+                                 AND i.MovementDate >= " + DB.TO_DATE(startDate, true) + @"
+                                 AND i.MovementDate <= " + DB.TO_DATE(endDate, true);
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
                 dr = DB.ExecuteReader(sql, null, null);
-                while (dr != null && dr.Read())
+                if (dr != null && dr.Read())
                 {
-                    int lineCount = Util.GetValueOfInt(dr["LineCount"]);
-                    decimal diff = Util.GetValueOfDecimal(dr["TotalDiff"]);
-
-                    if (lineCount > 0)
-                    {
-                        asOnDateRecordCount++;
-                        qtyDiffRecordCount++;
-                        netDiffQty += diff;
-                    }
+                    asOnDateRecordCount = Util.GetValueOfInt(dr["AsOnDateCount"]);
+                    qtyDiffRecordCount = Util.GetValueOfInt(dr["QtyDiffCount"]);
+                    netDiffQty = Util.GetValueOfDecimal(dr["NetDiffQty"]);
                 }
             }
             catch (Exception ex)
@@ -166,20 +165,32 @@ namespace VAS.Controllers
                 DateTime startDate = new DateTime(year, month, 1);
                 DateTime endDate = startDate.AddMonths(1).AddDays(-1);
 
+                string typeFilter = "";
+                if (type == "AS_ON_DATE" || type == "A")
+                {
+                    typeFilter = " AND il.AdjustmentType = 'A'";
+                }
+                else if (type == "QTY_DIFF" || type == "D")
+                {
+                    typeFilter = " AND il.AdjustmentType = 'D'";
+                }
+
                 string sql = @"SELECT p.Name AS ProductName, 
-                                       COALESCE(asi.Description, 'Standard') AS AttributeDesc, 
-                                       il.QtyBook, 
-                                       (il.QtyCount - il.QtyBook) AS DiffQty, 
-                                       il.QtyCount AS AsOnDateCount, 
+                                       COALESCE(asi.Description, N'Standard') AS AttributeDesc, 
+                                       COALESCE(il.QtyBook, 0) AS QtyBook, 
+                                       COALESCE(il.DifferenceQty, COALESCE(il.QtyCount, 0) - COALESCE(il.QtyBook, 0)) AS DiffQty, 
+                                       COALESCE(il.AsOnDateCount, COALESCE(il.QtyCount, COALESCE(il.QtyBook, 0) + COALESCE(il.DifferenceQty, 0))) AS AsOnDateCount, 
                                        i.MovementDate
                                 FROM M_InventoryLine il
                                 JOIN M_Inventory i ON (il.M_Inventory_ID = i.M_Inventory_ID)
                                 JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
                                 LEFT JOIN M_AttributeSetInstance asi ON (il.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
                                 WHERE i.IsActive = 'Y' 
+                                  AND il.IsActive = 'Y'
+                                  AND COALESCE(i.IsInternalUse, 'N') = 'N'
                                   AND i.DocStatus IN ('CO', 'CL')
                                   AND i.MovementDate >= " + DB.TO_DATE(startDate, true) + @"
-                                  AND i.MovementDate <= " + DB.TO_DATE(endDate, true);
+                                  AND i.MovementDate <= " + DB.TO_DATE(endDate, true) + typeFilter;
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                 sql += " ORDER BY p.Name ASC";
@@ -187,19 +198,12 @@ namespace VAS.Controllers
                 dr = DB.ExecuteReader(sql, null, null);
                 while (dr != null && dr.Read())
                 {
-                    decimal diffQty = Util.GetValueOfDecimal(dr["DiffQty"]);
-
-                    if (type == "QTY_DIFF" && diffQty == 0)
-                    {
-                        // Skip lines with no diff if strictly querying quantity differences
-                    }
-
                     details.Add(new
                     {
                         product = Util.GetValueOfString(dr["ProductName"]),
                         attribute = Util.GetValueOfString(dr["AttributeDesc"]),
                         qty = Util.GetValueOfDecimal(dr["QtyBook"]),
-                        diffQty = diffQty,
+                        diffQty = Util.GetValueOfDecimal(dr["DiffQty"]),
                         asOnDateCount = Util.GetValueOfDecimal(dr["AsOnDateCount"])
                     });
                 }
