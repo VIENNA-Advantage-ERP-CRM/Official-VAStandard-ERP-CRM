@@ -262,35 +262,10 @@ PaymentsData AS
 )
 SELECT
     COUNT(1) AS TotalRecords,
-
-    COALESCE
-    (
-        SUM
-        (
-            PaymentsData.Pay_Amount
-        ),
-        0
-    ) AS TotalAmount,
-
-    MIN
-    (
-        PaymentsData.Trx_Date
-    ) AS OldestDate,
-
-    COALESCE
-    (
-        SUM
-        (
-            PaymentsData.Auto_Match_Candidate
-        ),
-        0
-    ) AS AutoMatchCandidates,
-
-    COUNT
-    (
-        DISTINCT PaymentsData.C_Currency_ID
-    ) AS CurrencyCount
-
+    COALESCE(SUM(PaymentsData.Pay_Amount),0) AS TotalAmount,
+    MIN(PaymentsData.Trx_Date) AS OldestDate,
+    COALESCE(SUM(PaymentsData.Auto_Match_Candidate),0) AS AutoMatchCandidates,
+    COUNT(DISTINCT PaymentsData.C_Currency_ID) AS CurrencyCount
 FROM PaymentsData PaymentsData";
 
             SqlParameter[] summaryParameters =
@@ -441,15 +416,10 @@ NumberedData AS
         PaymentsData.Payment_Currency_Symbol,
         PaymentsData.Std_Precision,
         PaymentsData.Payment_Method,
-
         ROW_NUMBER() OVER
         (
-            ORDER BY
-                PaymentsData.Trx_Date DESC,
-                PaymentsData.Document_No DESC,
-                PaymentsData.Payment_ID DESC
+            ORDER BY PaymentsData.Trx_Date DESC,PaymentsData.Document_No DESC,PaymentsData.Payment_ID DESC
         ) AS RowNumber
-
     FROM PaymentsData PaymentsData
 )
 SELECT
@@ -466,27 +436,10 @@ SELECT
     NumberedData.Std_Precision,
     NumberedData.Payment_Method,
     CURRENT_DATE AS CurrentDate
-
 FROM NumberedData NumberedData
-
-WHERE NumberedData.RowNumber >=
-(
-    SELECT
-        QueryParameters.StartRow
-
-    FROM QueryParameters QueryParameters
-)
-
-AND NumberedData.RowNumber <=
-(
-    SELECT
-        QueryParameters.EndRow
-
-    FROM QueryParameters QueryParameters
-)
-
-ORDER BY
-    NumberedData.RowNumber";
+WHERE NumberedData.RowNumber>=(SELECT QueryParameters.StartRow FROM QueryParameters QueryParameters)
+AND NumberedData.RowNumber<=(SELECT QueryParameters.EndRow FROM QueryParameters QueryParameters)
+ORDER BY NumberedData.RowNumber";
 
                 SqlParameter[] rowsParameters =
                 {
@@ -817,8 +770,9 @@ ORDER BY
         #region Widget SQL
 
         /*
-         * Uses the same previous-period logic as the working popup,
-         * but calculates the unreconciled percentage for the widget.
+         * Counts the unreconciled AP payments the popup lists, all-time.
+         * No calendar period bounds either side, so the card figure and
+         * the popup rows always describe the same set.
          */
         private SqlQueryData BuildClearedAPPaymentSql(
             Ctx ctx
@@ -840,30 +794,9 @@ SELECT
     Payment.DateTrx,
     CAST(Payment.IsReconciled AS " + textType + @") AS IsReconciled
 FROM C_Payment Payment
-WHERE CAST(Payment.IsActive AS " + textType + @") = 'Y'
-AND CAST
-(
-    Payment.IsReceipt
-    AS " + textType + @"
-) = 'N'
-
-AND CAST
-(
-    Payment.DocStatus
-    AS " + textType + @"
-) IN
-(
-    'CO',
-    'CL'
-)
-
-AND Payment.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)";
+WHERE CAST(Payment.IsActive AS " + textType + @")='Y'
+AND CAST(Payment.IsReceipt AS " + textType + @")='N'
+AND CAST(Payment.DocStatus AS " + textType + $@") IN ('CO','CL')";
 
             paymentAccessSql =
                 MRole.GetDefault(ctx)
@@ -888,52 +821,15 @@ WITH QueryParameters AS
         @AD_Client_ID AS AD_Client_ID"
         + queryParametersFrom + @"
 ),
-
 PaymentFiltered AS
 (
 " + paymentAccessSql + @"
 )
-
 SELECT
-    COUNT
-    (
-        PaymentFiltered.C_Payment_ID
-    ) AS TotalPayments,
-
-    COALESCE
-    (
-        SUM
-        (
-            CASE
-                WHEN PaymentFiltered.IsReconciled IS NULL
-                  OR PaymentFiltered.IsReconciled = 'N'
-                THEN 1
-                ELSE 0
-            END
-        ),
-        0
-    ) AS UnreconciledPayments,
-
-    MIN
-    (
-        CASE
-            WHEN PaymentFiltered.IsReconciled IS NULL
-              OR PaymentFiltered.IsReconciled = 'N'
-            THEN PaymentFiltered.DateTrx
-            ELSE NULL
-        END
-    ) AS DateFrom,
-
-    MAX
-    (
-        CASE
-            WHEN PaymentFiltered.IsReconciled IS NULL
-              OR PaymentFiltered.IsReconciled = 'N'
-            THEN PaymentFiltered.DateTrx
-            ELSE NULL
-        END
-    ) AS DateTo
-
+    COUNT(PaymentFiltered.C_Payment_ID) AS TotalPayments,
+    COALESCE(SUM(CASE WHEN PaymentFiltered.IsReconciled IS NULL OR PaymentFiltered.IsReconciled='N' THEN 1 ELSE 0 END),0) AS UnreconciledPayments,
+    MIN(CASE WHEN PaymentFiltered.IsReconciled IS NULL OR PaymentFiltered.IsReconciled='N' THEN PaymentFiltered.DateTrx ELSE NULL END) AS DateFrom,
+    MAX(CASE WHEN PaymentFiltered.IsReconciled IS NULL OR PaymentFiltered.IsReconciled='N' THEN PaymentFiltered.DateTrx ELSE NULL END) AS DateTo
 FROM PaymentFiltered PaymentFiltered";
 
             SqlParameter[] parameters =
@@ -991,47 +887,10 @@ SELECT
     Payment.PayAmt
 
 FROM C_Payment Payment
-
-WHERE CAST
-(
-    Payment.IsActive
-    AS " + textType + @"
-) = 'Y'
-
-AND CAST
-(
-    Payment.IsReceipt
-    AS " + textType + @"
-) = 'N'
-
-AND CAST
-(
-    Payment.DocStatus
-    AS " + textType + @"
-) IN
-(
-    'CO',
-    'CL'
-)
-
-AND
-(
-    Payment.IsReconciled IS NULL
-
-    OR CAST
-    (
-        Payment.IsReconciled
-        AS " + textType + @"
-    ) = 'N'
-)
-
-AND Payment.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)";
+WHERE CAST(Payment.IsActive AS " + textType + @")='Y'
+AND CAST(Payment.IsReceipt AS " + textType + @")='N'
+AND CAST(Payment.DocStatus AS " + textType + @") IN ('CO','CL')
+AND (Payment.IsReconciled IS NULL OR CAST(Payment.IsReconciled AS " + textType + $@")='N')";
 
             paymentRoleSql =
                 MRole.GetDefault(ctx)
@@ -1054,88 +913,55 @@ AND Payment.AD_Client_ID =
                     ? "VARCHAR2(4000)"
                     : "VARCHAR(4000)";
 
-            return @"
-SELECT
-    PaymentAccess.C_Payment_ID
-        AS Payment_ID,
-    PaymentAccess.DateTrx
-        AS Trx_Date,
-    CAST
-    (
-        PaymentAccess.DocumentNo
-        AS " + textType + @"
-    ) AS Document_No,
-    CAST
-    (
-        BPartner.Name
-        AS " + textType + @"
-    ) AS Vendor_Name,
+            return @" SELECT
+    PaymentAccess.C_Payment_ID AS Payment_ID,
+    PaymentAccess.DateTrx AS Trx_Date,
+    CAST(PaymentAccess.DocumentNo AS " + textType + @") AS Document_No,
+    CAST(BPartner.Name AS " + textType + @") AS Vendor_Name,
     CASE
-        WHEN Bank.Name IS NOT NULL
-        THEN
-            CAST
-            (
-                Bank.Name
-                AS " + textType + @"
-            )
-        ELSE
-            CAST
-            (
-                BankAccount.Name
-                AS " + textType + @"
-            )
+        WHEN Bank.Name IS NOT NULL THEN CAST(Bank.Name AS " + textType + @")
+        ELSE CAST(BankAccount.Name AS " + textType + @")
     END AS Bank_Name,
-    CAST
-    (
-        BankAccount.AccountNo
-        AS " + textType + @"
-    ) AS Account_No,
-    PaymentAccess.PayAmt
-        AS Pay_Amount,
+    CAST(BankAccount.AccountNo AS " + textType + @") AS Account_No,
+    PaymentAccess.PayAmt AS Pay_Amount,
     PaymentAccess.C_Currency_ID,
-    CAST
-    (
-        Currency.ISO_Code
-        AS " + textType + @"
-    ) AS Payment_Currency,
+    CAST(Currency.ISO_Code AS " + textType + @") AS Payment_Currency,
     CASE
-        WHEN Currency.CurSymbol IS NOT NULL
-        THEN
-            CAST
-            (
-                Currency.CurSymbol
-                AS " + textType + @"
-            )
-        ELSE
-            CAST
-            (
-                Currency.ISO_Code
-                AS " + textType + @"
-            )
+        WHEN Currency.CurSymbol IS NOT NULL THEN CAST(Currency.CurSymbol AS " + textType + @")
+        ELSE CAST(Currency.ISO_Code AS " + textType + @")
     END AS Payment_Currency_Symbol,
-    Currency.StdPrecision
-        AS Std_Precision,
-    CAST
-    (
-        PaymentMethod.VA009_Name
-        AS " + textType + @"
-    ) AS Payment_Method,
+    Currency.StdPrecision AS Std_Precision,
+    CAST(PaymentMethod.VA009_Name AS " + textType + @") AS Payment_Method,
     CASE
-        WHEN PaymentAccess.C_BankAccount_ID > 0
+        WHEN PaymentAccess.C_BankAccount_ID>0
         AND PaymentAccess.DocumentNo IS NOT NULL
-        THEN 1
+            THEN 1
         ELSE 0
     END AS Auto_Match_Candidate
 FROM
 (
 " + paymentAccessSql + @"
 ) PaymentAccess
-
-INNER JOIN C_BankAccount BankAccount ON (BankAccount.C_BankAccount_ID = PaymentAccess.C_BankAccount_ID)
-INNER JOIN C_Bank Bank ON (Bank.C_Bank_ID = BankAccount.C_Bank_ID)
-INNER JOIN C_Currency Currency ON (Currency.C_Currency_ID = PaymentAccess.C_Currency_ID)
-INNER JOIN VA009_PaymentMethod PaymentMethod ON (PaymentMethod.VA009_PaymentMethod_ID = PaymentAccess.VA009_PaymentMethod_ID)
-LEFT JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID = PaymentAccess.C_BPartner_ID)";
+INNER JOIN C_BankAccount BankAccount ON
+(
+    BankAccount.C_BankAccount_ID=PaymentAccess.C_BankAccount_ID
+)
+INNER JOIN C_Bank Bank ON
+(
+    Bank.C_Bank_ID=BankAccount.C_Bank_ID
+)
+INNER JOIN C_Currency Currency ON
+(
+    Currency.C_Currency_ID=PaymentAccess.C_Currency_ID
+)
+INNER JOIN VA009_PaymentMethod PaymentMethod ON
+(
+    PaymentMethod.VA009_PaymentMethod_ID=PaymentAccess.VA009_PaymentMethod_ID
+)
+LEFT OUTER JOIN C_BPartner BPartner ON
+(
+    BPartner.C_BPartner_ID=PaymentAccess.C_BPartner_ID
+)";
         }
 
         #endregion

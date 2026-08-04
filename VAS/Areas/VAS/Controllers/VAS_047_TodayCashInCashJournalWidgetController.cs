@@ -638,8 +638,7 @@ SELECT
     CashJournal.C_Currency_ID,
     CashJournal.StatementDate
 FROM C_Cash CashJournal
-WHERE CashJournal.DocStatus IN ('CO','CL')
-AND CashJournal.AD_Client_ID = (SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)";
+WHERE CashJournal.DocStatus IN ('CO','CL')";
 
             /*
              * Apply MRole only to the physical C_Cash table query.
@@ -1024,13 +1023,7 @@ SELECT
     CashJournal.DocumentNo,
     CashJournal.StatementDate
 FROM C_Cash CashJournal
-WHERE CashJournal.DocStatus IN ('CO','CL')
-AND CashJournal.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-    FROM QueryParameters QueryParameters
-)";
+WHERE CashJournal.DocStatus IN ('CO','CL')";
 
             cashAccessSql =
                 MRole.GetDefault(ctx)

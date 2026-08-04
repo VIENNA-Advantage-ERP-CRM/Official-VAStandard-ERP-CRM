@@ -152,6 +152,7 @@
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
     color: #102c3f;
+    padding-left: 0.3125em;
 }
 
 .vas-finance-kpi-footer {

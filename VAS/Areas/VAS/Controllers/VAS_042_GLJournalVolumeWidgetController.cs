@@ -480,26 +480,15 @@ ORDER BY
 
         private string BuildProtectedJournalSql(Ctx ctx)
         {
-            string sql = @"
-SELECT
+            string sql = @" SELECT
     GL_Journal.GL_Journal_ID,
     GL_Journal.AD_Client_ID,
     GL_Journal.AD_Org_ID,
     GL_Journal.C_AcctSchema_ID,
     GL_Journal.DocumentNo,
     GL_Journal.DateAcct
-
 FROM GL_Journal GL_Journal
-
-WHERE GL_Journal.IsActive = 'Y'
-
-AND GL_Journal.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)";
+WHERE GL_Journal.IsActive = 'Y'";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
