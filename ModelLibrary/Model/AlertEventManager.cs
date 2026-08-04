@@ -27,10 +27,9 @@ namespace VAdvantage.Alert
     public class AlertEventManager : AlertEventMgr
     {
         #region Private variable
-        //	Document Workflow Manager		
+        //	Document Workflow Manager
         private static AlertEventManager _mgr = null;
-        private int tableID = 0;
-        //	Logger			
+        //	Logger
         private static VLogger log = VLogger.GetVLogger(typeof(AlertEventManager).FullName);
         #endregion
 
@@ -57,7 +56,7 @@ namespace VAdvantage.Alert
         public bool Process(PO document, POInfo pinfo, string eventType)
         {
             bool started = false;
-            tableID = pinfo.getAD_Table_ID();
+            int tableID = pinfo.getAD_Table_ID();
             if (tableID == 0)
             {
                 return false;
@@ -71,7 +70,7 @@ namespace VAdvantage.Alert
                 for (int i = 0; i < alerts.Length; i++)
                 {
                     MAlert alert = alerts[i];
-                    started = AlertRuleActivity(alert, document, pinfo, eventType);
+                    started = AlertRuleActivity(alert, document, pinfo, eventType, tableID);
                 }
             }
             else
@@ -87,13 +86,14 @@ namespace VAdvantage.Alert
         /// <param name="document">PO</param>
         /// <param name="POInfo">PO Info</param>
         /// <param name="eventtype">eventtype</param>
+        /// <param name="tableID">AD_Table_ID of the document being processed</param>
         /// <returns></returns>
 
-        public bool AlertRuleActivity(MAlert alert, PO document, POInfo pinfo, string eventType)
+        public bool AlertRuleActivity(MAlert alert, PO document, POInfo pinfo, string eventType, int tableID)
         {
             try
             {
-                MAlertRule[] rules = alert.GetRule(false);
+                MAlertRule[] rules = alert.GetRules(false);
                 List<RuleDetail> ruleDetails = new List<RuleDetail>();
                 for (int i = 0; i < rules.Length; i++)
                 {
