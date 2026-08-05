@@ -302,3 +302,4 @@ import "../app/widgets/VAS_163_InventoryAgingReportWidget.js";
 import "../app/widgets/VAS_164_StockSearchWidget.js";
 import "../app/widgets/VAS_165_LocationWiseInventoryCountWidget.js";
 import "../app/widgets/VAS_166_NewCycleCountWidget.js";
+import "../app/tabpanel/VAS_107_CreateOrderBottomPanel.js";
