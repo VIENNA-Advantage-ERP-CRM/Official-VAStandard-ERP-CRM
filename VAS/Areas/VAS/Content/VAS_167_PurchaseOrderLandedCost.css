@@ -29,6 +29,18 @@
  *                        -row-div / -card-radius) and the add / edit form
  *                        (.MPC-vaselc-form) dropped its tinted fill and dashed
  *                        outline for the same plain white card.
+ *   VAI163   2026-08-04  Added .MPC-vaselc-empty.is-standalone — the "no expected
+ *                        landed cost" message when it stands in for the whole
+ *                        Cost Elements section (no caption, no table around it),
+ *                        so it carries that surface itself.
+ *   VAI163   2026-08-04  Generated Lines is white: the drawer's blue fill
+ *                        (.MPC-vaselc-linesWrap) and the blue frame / header /
+ *                        footer bands of its table (.MPC-vaselc-lTable, -lHead,
+ *                        -lFoot) give way to the neutral card surface every other
+ *                        table in the panel uses. Added .MPC-vaselc-attr — the
+ *                        Attribute Set Instance beside a generated line's product.
+ *                        Dropped .MPC-vaselc-hint with the trailing hint row it
+ *                        styled.
  ***********************************************************/
 
 .MPC-vaselc-root {
@@ -212,6 +224,10 @@
     overflow-wrap: break-word;   /* a long vendor / type wraps instead of spilling */
 }
 
+/* A field value that opens its own record (the contract reference). */
+.MPC-vaselc-fVal.is-link { color: var(--vaselc-link); cursor: pointer; }
+.MPC-vaselc-fVal.is-link:hover { text-decoration: underline; }
+
 .MPC-vaselc-vendName {
     font-size: 14px;
     font-weight: 700;
@@ -295,18 +311,6 @@
 .MPC-vaselc-strip .MPC-vaselc-ic { flex: none; margin-top: 1px; }
 .MPC-vaselc-strip.tone-warn .MPC-vaselc-ic { color: var(--vaselc-warn-tx); }
 .MPC-vaselc-strip.tone-risk .MPC-vaselc-ic { color: var(--vaselc-risk-tx); }
-
-.MPC-vaselc-hint {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    margin-top: 8px;
-    font-size: 11px;
-    color: var(--vaselc-sub);
-    line-height: 1.45;
-}
-
-.MPC-vaselc-hint .MPC-vaselc-ic { flex: none; margin-top: 1px; }
 
 .MPC-vaselc-ic {
     display: inline-flex;
@@ -508,9 +512,11 @@
 
 /* ---------------- Generated lines block ---------------- */
 
+/* White, not tinted: the drawer is part of the entry it hangs under, and a blue
+   fill read as a separate object stacked inside the table. */
 .MPC-vaselc-linesWrap {
     padding: 10px 12px 13px;
-    background: var(--vaselc-faint);
+    background: var(--vaselc-white);
     border-bottom: 1px solid var(--vaselc-divider);
     animation: MPC-vaselc-rise 0.28s ease both;
 }
@@ -535,9 +541,11 @@
     color: var(--vaselc-muted);
 }
 
+/* Neutral card, like every other table surface in the panel — the blue frame
+   and blue header / footer bands went with the drawer's blue fill. */
 .MPC-vaselc-lTable {
     background: var(--vaselc-white);
-    border: 1px solid var(--vaselc-pale-bd);
+    border: 1px solid var(--vaselc-card-bd);
     border-radius: 10px;
     overflow: hidden;
 }
@@ -554,8 +562,8 @@
 .MPC-vaselc-lRow > span { min-width: 0; }
 
 .MPC-vaselc-lHead {
-    background: var(--vaselc-active);
-    border-bottom: 1px solid var(--vaselc-pale-bd);
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--vaselc-card-bd);
     font-size: 10.5px;
     color: var(--vaselc-muted);
 }
@@ -568,6 +576,15 @@
 .MPC-vaselc-lBody:last-child { border-bottom: none; }
 .MPC-vaselc-lBody:hover { background: #FAFCFE; }
 .MPC-vaselc-lBody .MPC-vaselc-name { font-size: 12px; }
+
+/* Attribute Set Instance — an inline suffix to the product name on a generated
+   line, never a line of its own. */
+.MPC-vaselc-attr {
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--vaselc-sub);
+}
 
 .MPC-vaselc-base {
     font-size: 11px;
@@ -582,8 +599,8 @@
     justify-content: flex-end;
     gap: 14px;
     padding: 7px 11px;
-    background: var(--vaselc-active);
-    border-top: 1px solid var(--vaselc-pale-bd);
+    background: #F5F8FB;
+    border-top: 1px solid var(--vaselc-card-bd);
     font-size: 11.5px;
 }
 
@@ -635,6 +652,17 @@
     text-align: center;
     font-size: 12px;
     color: var(--vaselc-muted);
+}
+
+/* The same message standing in for the whole Cost Elements section when the
+   order has no expected landed cost — it carries the surface the table would
+   have given it, since there is no table around it. */
+.MPC-vaselc-empty.is-standalone {
+    background: var(--vaselc-white);
+    border: 1px solid var(--vaselc-border);
+    border-radius: var(--vaselc-radius);
+    box-shadow: var(--vaselc-shadow);
+    padding: 18px 13px;
 }
 
 /* ---------------- Add / edit form ---------------- */

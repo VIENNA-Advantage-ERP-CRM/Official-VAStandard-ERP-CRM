@@ -31,6 +31,49 @@
  *                        two-column details card. Vendor, buyer, currency and
  *                        order-line count are now surfaced; document type moved
  *                        off the sub-line into the card.
+ *   VAI163   2026-08-04  - An order with no expected landed cost shows only the
+ *                          message: the Cost Elements caption and the empty
+ *                          table frame are not rendered at all, in draft as well
+ *                          as once the order is completed. The draft form stays,
+ *                          since it is how the first entry is added.
+ *                        - Cost Distribution drops its "Select type" placeholder
+ *                          (the list is the fixed set of types, so it stands on
+ *                          the first one) and its options are indented.
+ *   VAI163   2026-08-04  - Cost Element, Currency and Currency Rate Type drop
+ *                          their "select ..." placeholders too, and every option
+ *                          list is indented. Currency comes up on the order's own
+ *                          (pricelist) currency and the rate type on Spot, which
+ *                          the server resolves from the tenant's own
+ *                          C_ConversionType rows (DefaultConversionTypeId).
+ *                        - The Amount field accepts a number only: anything that
+ *                          could not be part of one is dropped as it is typed,
+ *                          pasted or dragged in (sanitizeAmount).
+ *   VAI163   2026-08-04  - The entries stay editable until the order is COMPLETED
+ *                          (data.IsEditable), not only while it is drafted, so an
+ *                          In Progress purchase order can still be worked on.
+ *                          Every edit affordance, the badge and the caption hint
+ *                          now read that flag; the server enforces the same rule.
+ *                        - The trailing hint row under the form is gone (both the
+ *                          draft and the completed variants), and with it the
+ *                          hintRow builder. The notice strip above the section
+ *                          stays, reworded to the new rule (VAS_167_EditableNotice).
+ *                        - Generated Lines drawers start collapsed and open on
+ *                          the entry's own Lines button.
+ *                        - A generated line names the order line's Attribute Set
+ *                          Instance after the product.
+ *   VAI163   2026-08-04  - The header card names the origins the order was raised
+ *                          from — the contract (C_Order.VAS_ContractMaster_ID),
+ *                          the RFQ (C_RfQResponse.C_Order_ID), the project
+ *                          (C_ProjectLine.C_OrderPO_ID) and the requisition
+ *                          (M_RequisitionLine.C_OrderLine_ID, or through the RFQ)
+ *                          — and each value opens that record: openRecord()
+ *                          resolves the window by NAME (WINDOW_NAME_BY_TABLE ->
+ *                          VAS_ContractMaster / VAS_RFQ / VAS_Project /
+ *                          VAS_Requisition) through
+ *                          VAS_167_PurchaseOrderLandedCost/GetWindow_ID,
+ *                          remembering the id per name, and falls back to the
+ *                          table's zoom target when a name cannot be resolved —
+ *                          the VAS_092 record-open pattern.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -56,7 +99,7 @@
         // C_ExpectedCost_ID currently being edited; null while adding.
         var editId = null;
         // Generated-lines drawer state, keyed by C_ExpectedCost_ID. Absent means
-        // "expanded" — the spec wants the allocation visible without hunting.
+        // collapsed — the allocation opens on the entry's own Lines button.
         var linesOpen = {};
         // True while a create / update / delete is in flight, so the form cannot
         // be submitted twice.
@@ -69,11 +112,11 @@
             VAS_167_Title: "Expected Landed Cost",
             VAS_167_BadgeExpected: "Expected",
             VAS_167_BadgeGenerated: "Lines Generated",
-            VAS_167_DraftNotice: "Draft — expected landed cost is editable. Lines are generated against each distribution type when the PO is completed.",
+            VAS_167_EditableNotice: "Expected landed cost is editable until the purchase order is completed. Lines are generated against each distribution type on completion.",
             VAS_167_NoLinesNotice: "This purchase order has no product lines, so there is nothing to allocate expected landed cost against.",
             VAS_167_NoRateNotice: "At least one entry has no exchange rate for its currency rate type, so it is left out of the converted total.",
             VAS_167_CostElements: "Cost Elements",
-            VAS_167_EditableInDraft: "Editable in draft",
+            VAS_167_EditableUntilCompleted: "Editable until completed",
             VAS_167_Locked: "Locked",
             VAS_167_ColElement: "Cost Element / Distribution",
             VAS_167_ColAmount: "Amount",
@@ -86,6 +129,11 @@
             VAS_167_DocType: "Document Type",
             VAS_167_Ordered: "Ordered",
             VAS_167_OrderLines: "Order Lines",
+            VAS_167_Contract: "Contract",
+            VAS_167_Rfq: "RFQ",
+            VAS_167_Project: "Project",
+            VAS_167_Requisition: "Requisition",
+            VAS_167_OpenRecord: "Open",
             VAS_167_NoVendor: "—",
             VAS_167_POTotal: "PO Total",
             VAS_167_ExpectedTotal: "Expected Landed Cost",
@@ -118,10 +166,6 @@
             VAS_167_FldAmount: "Amount",
             VAS_167_FldCurrency: "Currency",
             VAS_167_FldRateType: "Currency Rate Type",
-            VAS_167_SelectDistribution: "Select type",
-            VAS_167_SelectCostElement: "Select element",
-            VAS_167_SelectCurrency: "Select currency",
-            VAS_167_SelectRateType: "Select rate type",
             VAS_167_BtnAdd: "Add Expected Cost",
             VAS_167_BtnUpdate: "Update",
             VAS_167_BtnCancel: "Cancel",
@@ -129,8 +173,6 @@
             VAS_167_NoteReadyAdd: "Ready — click Add",
             VAS_167_NoteReadyUpdate: "Ready — click Update",
             VAS_167_Saving: "Saving …",
-            VAS_167_HintDraft: "On PO completion, the system generates lines against each distribution type — Order Line (Product), Base, Quantity and Amount.",
-            VAS_167_HintCompleted: "This PO is completed — expected landed cost entries cannot be edited.",
             VAS_167_ConfirmRemove: "Remove this expected landed cost entry?",
             VAS_167_SaveFailed: "The expected landed cost could not be saved.",
             VAS_167_DeleteFailed: "The expected landed cost could not be removed."
@@ -202,7 +244,7 @@
                 success: function (raw) {
                     data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     // A newly selected order starts in add mode with every
-                    // generated-lines drawer open.
+                    // generated-lines drawer collapsed.
                     editId = null;
                     linesOpen = {};
                     saving = false;
@@ -247,10 +289,10 @@
 
             $wrap.append(renderHeaderCard());
 
-            // Draft-only notice strip. A completed order shows no equivalent
-            // strip — the badge and the absent controls already say it is locked.
-            if (data.IsDrafted) {
-                $wrap.append(noticeStrip("pencil", "warn", getMsg("VAS_167_DraftNotice")));
+            // Editable-state notice. A locked order shows no equivalent strip —
+            // the badge and the absent controls already say it is frozen.
+            if (data.IsEditable) {
+                $wrap.append(noticeStrip("pencil", "warn", getMsg("VAS_167_EditableNotice")));
                 if (!data.EligibleLineCount) {
                     $wrap.append(noticeStrip("alert", "risk", getMsg("VAS_167_NoLinesNotice")));
                 }
@@ -259,14 +301,20 @@
                 $wrap.append(noticeStrip("alert", "risk", getMsg("VAS_167_NoRateNotice")));
             }
 
-            $wrap.append(renderSubCaption());
-            $wrap.append(renderTable());
-
-            if (data.IsDrafted) {
-                $wrap.append(renderForm());
-                $wrap.append(hintRow("info", getMsg("VAS_167_HintDraft")));
+            // With no expected landed cost on the order there is nothing for the
+            // Cost Elements section to show: its caption and the table frame would
+            // be an empty scaffold, so only the message renders — in draft too,
+            // where the form below it is how the first entry is added.
+            if ((data.ExpectedCosts || []).length) {
+                $wrap.append(renderSubCaption());
+                $wrap.append(renderTable());
             } else {
-                $wrap.append(hintRow("checkCircle", getMsg("VAS_167_HintCompleted")));
+                $wrap.append(renderEmptyNotice());
+            }
+
+            // The form, and nothing under it: the trailing hint row is gone.
+            if (data.IsEditable) {
+                $wrap.append(renderForm());
             }
 
             $body.append($wrap);
@@ -287,7 +335,7 @@
             }
 
             $headBadge.removeClass("is-generated");
-            if (data.IsDrafted) {
+            if (data.IsEditable) {
                 $headBadge.text(getMsg("VAS_167_BadgeExpected"));
             } else {
                 $headBadge.text(getMsg("VAS_167_BadgeGenerated")).addClass("is-generated");
@@ -327,15 +375,44 @@
             // beside the expected total it is there to be compared against.
             $right.append(headerField(getMsg("VAS_167_OrderLines"),
                 String(data.EligibleLineCount || 0)));
+            // Origins the order was raised from — each shown only when it exists,
+            // and clickable: the value opens that record.
+            if (data.ContractMasterId > 0) {
+                $right.append(headerField(getMsg("VAS_167_Contract"),
+                    data.ContractMasterNo || ("#" + data.ContractMasterId),
+                    "VAS_ContractMaster", data.ContractMasterId));
+            }
+            if (data.RfqId > 0) {
+                $right.append(headerField(getMsg("VAS_167_Rfq"),
+                    data.RfqNo || ("#" + data.RfqId), "C_RfQ", data.RfqId));
+            }
+            if (data.ProjectId > 0) {
+                $right.append(headerField(getMsg("VAS_167_Project"),
+                    data.ProjectNo || ("#" + data.ProjectId), "C_Project", data.ProjectId));
+            }
+            if (data.RequisitionId > 0) {
+                $right.append(headerField(getMsg("VAS_167_Requisition"),
+                    data.RequisitionNo || ("#" + data.RequisitionId),
+                    "M_Requisition", data.RequisitionId));
+            }
             $card.append($right);
 
             return $card;
         }
 
-        function headerField(label, value) {
+        // A labelled header field. Supplying a table + record id makes the value a
+        // link that opens that record.
+        function headerField(label, value, openTable, openId) {
             var $f = $('<div class="MPC-vaselc-hdrField"></div>');
             $f.append($('<div class="MPC-vaselc-fLabel"></div>').text(label));
-            $f.append($('<div class="MPC-vaselc-fVal"></div>').text(value));
+            var $v = $('<div class="MPC-vaselc-fVal"></div>').text(value);
+            if (openTable && +openId > 0) {
+                $v.addClass("is-link")
+                    .attr("data-elc-open-table", openTable)
+                    .attr("data-elc-open-id", openId)
+                    .attr("title", getMsg("VAS_167_OpenRecord"));
+            }
+            $f.append($v);
             return $f;
         }
 
@@ -346,13 +423,6 @@
             return $s;
         }
 
-        function hintRow(icon, text) {
-            var $h = $('<div class="MPC-vaselc-hint"></div>');
-            $h.append(svgIcon(icon));
-            $h.append($('<span></span>').text(text));
-            return $h;
-        }
-
         function renderSubCaption() {
             var $row = $('<div class="MPC-vaselc-subcap"></div>');
             var $cap = $('<span class="MPC-vaselc-cap"></span>');
@@ -361,12 +431,23 @@
                 getMsg("VAS_167_CostElements") + " (" + (data.ExpectedCostCount || 0) + ")"));
             $row.append($cap);
             $row.append($('<span class="MPC-vaselc-capHint"></span>').text(
-                data.IsDrafted ? getMsg("VAS_167_EditableInDraft") : getMsg("VAS_167_Locked")));
+                data.IsEditable ? getMsg("VAS_167_EditableUntilCompleted")
+                                : getMsg("VAS_167_Locked")));
             return $row;
         }
 
         // ---------- Cost elements table ---------- //
 
+        // Stands in for the whole Cost Elements section when the order carries no
+        // expected landed cost: the message alone, on its own card, with no
+        // caption and no empty table above it. A drafted order is told the entry
+        // is added below; a completed one simply that none was defined.
+        function renderEmptyNotice() {
+            return $('<div class="MPC-vaselc-empty is-standalone"></div>').text(
+                data.IsEditable ? getMsg("VAS_167_Empty") : getMsg("VAS_167_EmptyLocked"));
+        }
+
+        // Only ever called with at least one entry — see render().
         function renderTable() {
             var $tbl = $('<div class="MPC-vaselc-table"></div>');
 
@@ -377,17 +458,11 @@
             $tbl.append($head);
 
             var costs = data.ExpectedCosts || [];
-            if (!costs.length) {
-                $tbl.append($('<div class="MPC-vaselc-empty"></div>').text(
-                    data.IsDrafted ? getMsg("VAS_167_Empty") : getMsg("VAS_167_EmptyLocked")));
-                return $tbl;
-            }
-
             for (var i = 0; i < costs.length; i++) {
                 $tbl.append(buildCostRow(costs[i]));
-                // Generated lines belong to a completed order only — a drafted one
-                // has nothing generated yet.
-                if (!data.IsDrafted) $tbl.append(buildLinesBlock(costs[i]));
+                // Generated lines belong to a completed order only — an order that
+                // is still editable has nothing generated yet.
+                if (!data.IsEditable) $tbl.append(buildLinesBlock(costs[i]));
             }
 
             $tbl.append(buildTableFooter());
@@ -443,7 +518,7 @@
 
             // ---- Actions: edit / remove in draft, a Lines toggle when completed ----
             var $act = $('<span class="MPC-vaselc-acts"></span>');
-            if (data.IsDrafted) {
+            if (data.IsEditable) {
                 $act.append(iconButton("pencil", "edit", getMsg("VAS_167_Edit"))
                     .attr("data-elc-edit", c.ExpectedCostId));
                 $act.append(iconButton("trash", "rm", getMsg("VAS_167_Remove"))
@@ -531,9 +606,19 @@
         function buildLineRow(c, g, lineCount) {
             var $row = $('<div class="MPC-vaselc-lRow MPC-vaselc-lBody"></div>');
 
+            // Product name, with the line's Attribute Set Instance (size / lot /
+            // serial ...) after it — only when the line carries a real instance;
+            // a blank or "--" / "-" placeholder is not an attribute.
             var $item = $('<span></span>');
-            $item.append($('<div class="MPC-vaselc-name"></div>')
-                .attr("title", g.ProductName || "").text(g.ProductName || ""));
+            var $name = $('<div class="MPC-vaselc-name"></div>');
+            $name.append($('<span></span>').text(g.ProductName || ""));
+            var asi = $.trim(g.AttributeSetInstance || "");
+            var hasAsi = (asi && asi !== "--" && asi !== "-");
+            if (hasAsi) {
+                $name.append($('<span class="MPC-vaselc-attr"></span>').text(asi));
+            }
+            $name.attr("title", (g.ProductName || "") + (hasAsi ? " — " + asi : ""));
+            $item.append($name);
             $item.append($('<div class="MPC-vaselc-sub"></div>')
                 .text(getMsg("VAS_167_Code") + " " + (g.ProductCode || "")));
             $row.append($item);
@@ -612,19 +697,29 @@
             $form.append($cap);
 
             var $grid = $('<div class="MPC-vaselc-formGrid"></div>');
+            // Cost Distribution carries no "select" placeholder: the list is the
+            // fixed set of distribution types, so the first one stands selected
+            // and the reader changes it. Its options are indented (see
+            // selectField) so they read as a set under the closed control.
             $grid.append(selectField("elcDist", getMsg("VAS_167_FldDistribution"),
                 data.Distributions, "Code", c ? c.DistributionCode : "",
-                getMsg("VAS_167_SelectDistribution")));
+                null, true));
+            // Cost Element: no placeholder either — the list is what can be
+            // booked against, so it stands on its first element.
             $grid.append(selectField("elcElem", getMsg("VAS_167_FldCostElement"),
                 data.CostElements, "Id", c ? c.CostElementId : "",
-                getMsg("VAS_167_SelectCostElement")));
+                null, true));
             $grid.append(amountField(c ? c.EnteredAmount : ""));
+            // Currency comes up on the order's own (pricelist) currency.
             $grid.append(selectField("elcCur", getMsg("VAS_167_FldCurrency"),
                 data.Currencies, "Id", c ? c.EnteredCurrencyId : data.DocumentCurrencyId,
-                getMsg("VAS_167_SelectCurrency")));
+                null, true));
+            // Rate type comes up on Spot — resolved on the server against the
+            // tenant's own C_ConversionType rows, not assumed here.
             $grid.append(selectField("elcRate", getMsg("VAS_167_FldRateType"),
-                data.ConversionTypes, "Id", c ? c.ConversionTypeId : "",
-                getMsg("VAS_167_SelectRateType")));
+                data.ConversionTypes, "Id",
+                c ? c.ConversionTypeId : data.DefaultConversionTypeId,
+                null, true));
             $form.append($grid);
 
             var $foot = $('<div class="MPC-vaselc-formFoot"></div>');
@@ -659,19 +754,28 @@
             return { $ff: $ff, $content: $content };
         }
 
-        function selectField(name, label, items, valueKey, selectedValue, placeholder) {
+        // A placeholder is only added when one is passed — pass null for a list
+        // that should stand on its first entry instead of on "select ...".
+        // `indent` prefixes each option's label with a fixed space, so the values
+        // sit slightly in from the edge of the open list.
+        function selectField(name, label, items, valueKey, selectedValue, placeholder, indent) {
             var shell = fieldShell(label);
             shell.$content.addClass("is-select");
 
             var $sel = $('<select class="MPC-vaselc-input"></select>').attr("data-elc-field", name);
-            $sel.append($('<option value=""></option>').text(placeholder));
+            if (placeholder) {
+                $sel.append($('<option value=""></option>').text(placeholder));
+            }
 
+            // Non-breaking: a leading plain space is collapsed away in an option.
+            var pad = indent ? "  " : "";
             var list = items || [];
             var selected = (selectedValue === null || selectedValue === undefined)
                 ? "" : String(selectedValue);
             for (var i = 0; i < list.length; i++) {
                 var val = String(list[i][valueKey]);
-                var $op = $('<option></option>').attr("value", val).text(list[i].Name || val);
+                var $op = $('<option></option>').attr("value", val)
+                    .text(pad + (list[i].Name || val));
                 if (val === selected) $op.prop("selected", true);
                 $sel.append($op);
             }
@@ -705,6 +809,17 @@
                 currencyId:       parseInt(formField("elcCur").val() || "0", 10) || 0,
                 conversionTypeId: parseInt(formField("elcRate").val() || "0", 10) || 0
             };
+        }
+
+        // Strips everything that could never be part of an amount — letters,
+        // symbols, spaces, a sign — leaving digits and the two separators the
+        // parser below understands. Which of those is the decimal point and which
+        // is grouping stays parseAmountInput's decision, so "1,234.50" can still
+        // be typed; this only keeps the field free of characters that would make
+        // it unreadable.
+        function sanitizeAmount(text) {
+            return String(text === null || text === undefined ? "" : text)
+                .replace(/[^\d.,]/g, "");
         }
 
         // Reads a typed amount without assuming a decimal separator: "1,234.50"
@@ -846,7 +961,102 @@
         //  Events                                                           //
         // ----------------------------------------------------------------- //
 
+        // ----------------------------------------------------------------- //
+        //  Record navigation                                                 //
+        // ----------------------------------------------------------------- //
+
+        // Tables whose record opens in a NAMED window rather than the table's
+        // default zoom target — the contract reference opens VAS_ContractMaster
+        // and the RFQ opens VAS_RFQ. Any further screen that needs naming belongs
+        // here; nothing else has to change.
+        var WINDOW_NAME_BY_TABLE = {
+            "VAS_ContractMaster": "VAS_ContractMaster",
+            "C_RfQ":              "VAS_RFQ",
+            "C_Project":          "VAS_Project",
+            "M_Requisition":      "VAS_Requisition"
+        };
+
+        // Window name -> AD_Window_ID, resolved once per name and remembered for
+        // the life of the panel. A name the dictionary does not know is cached as
+        // -1 so a failed lookup is not repeated on every click.
+        var windowIdByName = {};
+
+        // Resolves a window id from its name through the panel's own endpoint.
+        // Returns 0 when it cannot be resolved, which leaves openRecord() to fall
+        // back to the table's zoom target.
+        function resolveWindowIdByName(windowName) {
+            if (!windowName) return 0;
+            if (windowIdByName.hasOwnProperty(windowName)) {
+                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_167_PurchaseOrderLandedCost/GetWindow_ID", windowName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) {
+                    windowIdByName[windowName] = -1;
+                    console.log("resolveWindowIdByName: no window named " + windowName);
+                    return 0;
+                }
+                windowIdByName[windowName] = id;
+                return id;
+            } catch (e) {
+                windowIdByName[windowName] = -1;
+                console.log(e);
+                return 0;
+            }
+        }
+
+        // Open the record's window filtered to that row: the window named for this
+        // table when it has one, else the table's default zoom target. Either way
+        // the window is started with an equal-query on the table's key column
+        // (TableName_ID). Degrades to a toast so a click never throws.
+        function openRecord(tableName, recordId) {
+            if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
+            try {
+                var windowId = resolveWindowIdByName(WINDOW_NAME_BY_TABLE[tableName]);
+
+                if (windowId <= 0 &&
+                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
+                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, false) || 0;
+                }
+                if (windowId > 0 && VIS.viewManager &&
+                    typeof VIS.viewManager.startWindow === "function") {
+                    var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
+                    VIS.viewManager.startWindow(windowId, zoomQuery);
+                    return;
+                }
+            } catch (e) { console.log(e); }
+            toast(getMsg("VAS_167_OpenRecord") + " " + tableName + " #" + recordId, true);
+        }
+
         function bindEvents() {
+            // Open a linked record (the contract reference) from its header field.
+            $root.on("click", "[data-elc-open-table]", function () {
+                openRecord($(this).attr("data-elc-open-table"),
+                           $(this).attr("data-elc-open-id"));
+            });
+
+            // The amount takes digits and a decimal separator and nothing else —
+            // anything typed, pasted or dragged into it that could not be part of
+            // a number is dropped as it arrives, before validation sees it.
+            $root.on("input", '[data-elc-field="elcAmt"]', function () {
+                var before = this.value;
+                var clean = sanitizeAmount(before);
+                if (clean === before) return;
+                // Keep the caret where the reader left it, minus whatever was
+                // dropped ahead of it.
+                var pos = this.selectionStart;
+                var head = before.slice(0, pos);
+                var shift = head.length - sanitizeAmount(head).length;
+                this.value = clean;
+                try { this.setSelectionRange(pos - shift, pos - shift); } catch (e) { }
+            });
+
             // Live validation while the reader fills the form.
             $root.on("input", "[data-elc-field]", validateForm);
             $root.on("change", "[data-elc-field]", validateForm);
@@ -907,9 +1117,11 @@
             return null;
         }
 
-        // Absent state means expanded — the allocation is visible by default.
+        // Closed until asked for: the drawer opens only once the reader clicks the
+        // entry's Lines button, which is what shows that entry's distribution
+        // detail for its own distribution method.
         function isLinesOpen(id) {
-            return linesOpen[id] !== false;
+            return linesOpen[id] === true;
         }
 
         // Chip colour per C_LandedCostDistribution code. I (Import Value) is no

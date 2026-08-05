@@ -167,6 +167,50 @@
  *                        To list with a Cc+Bcc count and the opened body lists
  *                        From / To / Cc / Bcc verbatim, and the history drawer's
  *                        Updated By is right-aligned under the Received column.
+ *   VAI163   2026-08-04  - Landed Cost shows the distribution method the server
+ *                          resolved from the dictionary for the value stored on
+ *                          C_ExpectedCost.LandedCostDistribution
+ *                          (DistributionName); the client's own I/Q/W/V/L/C
+ *                          labels are now only a fallback.
+ *                        - Quantities read in the entered (selected) UOM
+ *                          throughout: the snapshot cards and the Line Items
+ *                          summary now show the order's own unit and quantity
+ *                          scale instead of the converted base-UOM totals, and
+ *                          the Removed lines table names its unit like every
+ *                          other quantity.
+ *                        - New Record no longer leaves the previously selected
+ *                          order on screen: the panel listens to the tab's
+ *                          data-status events (the framework's New Record path
+ *                          never calls refreshPanelData) and empties itself for a
+ *                          row that has no key yet.
+ *                        - Line items: numeric columns right-aligned as one, and
+ *                          the Received cell redrawn as the VAS_099 GRN Received
+ *                          column — the figure on its own line with the progress
+ *                          bar stacked beneath it.
+ *   VAI163   2026-08-04  - A cell with no value is left blank: the placeholder
+ *                          dash is gone from the line items, both history views,
+ *                          the Documents table and the landed-cost actual /
+ *                          variance cells.
+ *                        - The line's Attribute Set Instance follows the product
+ *                          name on the same line (VAS_099 treatment) instead of
+ *                          sitting on a sub-line of its own.
+ *   VAI163   2026-08-04  Opening a record can now name the window it opens rather
+ *                        than relying on the table's default zoom target:
+ *                        WINDOW_NAME_BY_TABLE maps the table to a window name and
+ *                        resolveWindowIdByName() turns that into an AD_Window_ID
+ *                        through VAS_092_OverviewPurchaseOrder/GetWindow_ID
+ *                        (resolved once per name and remembered). The RFQ chip
+ *                        opens the VAS_RFQ screen this way, the Project chip
+ *                        VAS_Project, the Requisition chip VAS_Requisition, a
+ *                        Documents GRN row VAS_MaterialReceipt, a vendor invoice
+ *                        row VAS_APInvoice, an AP payment row VAS_APPayment, the
+ *                        Contract chip VAS_ContractMaster and the Blanket Order
+ *                        chip VAS_BlanketPurchaseOrder. C_Order is named on both
+ *                        sides — the blanket in the table map, the Sales Order
+ *                        chip in WINDOW_NAME_BY_TABLE_SOTRX, which wins when
+ *                        IsSOTrx is set. Any record with no name keeps the zoom
+ *                        target, which is also the fallback when a name cannot be
+ *                        resolved.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -191,6 +235,10 @@
         // C_OrderLine_ID. Survives a pager repaint; cleared per record.
         var lineHistOpen = {};
         var lcPage = 1;          // current Landed Cost page (1-based)
+        // The C_Order_ID the panel is currently showing (or loading). 0 = nothing
+        // on screen. Used to tell a real record change from the stream of
+        // data-status events the tab fires while a record is being edited.
+        var shownRecordId = 0;
 
         // Some AD_Message keys may not be seeded yet; fall back to a readable
         // English default so the panel never renders raw keys.
@@ -241,7 +289,7 @@
             VAS_092_ExpectedDelivery: "Expected Delivery",
             VAS_092_LineItems: "Line Items",
             VAS_092_Lines: "lines",
-            VAS_092_UnitsOrdered: "units ordered",
+            VAS_092_OrderedLower: "ordered",
             VAS_092_Of: "of",
             VAS_092_Received: "Received",
             // Progress
@@ -428,6 +476,7 @@
         }
 
         this.fetchData = function (recordID) {
+            shownRecordId = +recordID || 0;
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_092_OverviewPurchaseOrder/GetPurchaseOrderOverview",
@@ -453,10 +502,62 @@
             });
         };
 
+        // Empties the panel back to its "no purchase order selected" state. The
+        // per-record view state goes with it, so the next order never inherits the
+        // page, the open history drawers or the expanded sections of the last one.
         this.clear = function () {
             data = null;
+            shownRecordId = 0;
+            linesPage = 1;
+            historyOpen = false;
+            lineHistOpen = {};
+            lcPage = 1;
             render();
         };
+
+        // The framework notifies a tab panel when the selected record changes
+        // (refreshPanelData) but NOT when the user starts a new one:
+        // GridController.dataNew() never reaches the tab panel. The panel would
+        // therefore keep showing the previously selected order beside an empty new
+        // record. Listening to the tab's own data-status events closes that gap —
+        // a current row carrying no key yet (an unsaved new record) empties the
+        // panel, and a key other than the one on screen loads it.
+        function onTabDataStatus(e) {
+            // Two signals for "a new record is on screen": the event says the tab
+            // is inserting, and the current row carries no key yet.
+            var inserting = false;
+            try {
+                inserting = !!(e && typeof e.getIsInserting === "function" && e.getIsInserting());
+            } catch (ex) {
+                inserting = false;
+            }
+
+            var rid = 0;
+            try {
+                if ($self.curTab && typeof $self.curTab.getRecord_ID === "function") {
+                    rid = +$self.curTab.getRecord_ID() || 0;
+                }
+            } catch (ex2) {
+                rid = 0;
+            }
+
+            if (inserting || rid <= 0) {
+                // New (unsaved) record — nothing to show against it.
+                if (shownRecordId || data) {
+                    $self.record_ID = 0;
+                    $self.clear();
+                }
+                return;
+            }
+            if (rid !== shownRecordId) {
+                $self.record_ID = rid;
+                $self.fetchData(rid);
+            }
+        }
+
+        // Registered on the tab in startPanel, removed in dispose. Kept as an
+        // object because the framework calls listener.dataStatusChanged(event).
+        this.tabDataListener = { dataStatusChanged: function (e) { onTabDataStatus(e); } };
 
         function render() {
             $body.empty();
@@ -784,15 +885,18 @@
             // Expected Delivery — promised date + delivery-status caption.
             var st = statusTone(data);
             $snap.append(metricCard("delivery", "calendar", getMsg("VAS_092_ExpectedDelivery"),
-                formatDate(data.DatePromised) || "—", st.label, null));
+                formatDate(data.DatePromised), st.label, null));
 
-            // Line Items — line count + total units ordered.
+            // Line Items — line count + total quantity ordered, in the unit the
+            // order was keyed in.
             $snap.append(metricCard("lines", "box", getMsg("VAS_092_LineItems"),
                 (data.LineCount || 0) + " " + getMsg("VAS_092_Lines"),
-                formatNumber(+data.TotalQtyOrdered || 0, 0) + " " + getMsg("VAS_092_UnitsOrdered"),
+                qtyWithUnit(+data.TotalQtyOrdered || 0) + " " + getMsg("VAS_092_OrderedLower"),
                 null));
 
             // Received — delivered/ordered + percent and fully-received line count.
+            // Both figures are in the entered (selected) UOM, on the same scale as
+            // the line rows, with the unit named once after the pair.
             var ordered = +data.TotalQtyOrdered || 0;
             var delivered = +data.TotalQtyDelivered || 0;
             var pct = ordered > 0 ? Math.round((delivered / ordered) * 100) : 0;
@@ -803,7 +907,7 @@
                 getMsg("VAS_092_Of") + " " + (data.DeliverableLineCount || 0) + " " +
                 getMsg("VAS_092_Lines");
             $snap.append(metricCard("received", "inbox", getMsg("VAS_092_Received"),
-                formatNumber(delivered, 0) + " / " + formatNumber(ordered, 0), recvSub, pct));
+                formatQty(delivered) + " / " + qtyWithUnit(ordered), recvSub, pct));
 
             $body.append($snap);
         }
@@ -997,10 +1101,12 @@
             var lines = (data && data.Lines) || [];
             if (!lines.length) return;
 
+            // Quantities in the entered (selected) UOM, so the summary reads on the
+            // same scale as the rows below it.
             var $sec = section(getMsg("VAS_092_LineItems"), {
                 summary: (data.LineCount || 0) + " " + getMsg("VAS_092_Items") + " · " +
-                    formatNumber(+data.TotalQtyOrdered || 0, 0) + " " + getMsg("VAS_092_Units") + " · " +
-                    formatNumber(+data.TotalQtyDelivered || 0, 0) + " " + getMsg("VAS_092_Received")
+                    qtyWithUnit(+data.TotalQtyOrdered || 0) + " · " +
+                    qtyWithUnit(+data.TotalQtyDelivered || 0) + " " + getMsg("VAS_092_Received")
             });
 
             var $tbl = $('<div class="MPC-vaspo-table MPC-vaspo-itTable"></div>');
@@ -1021,10 +1127,13 @@
             var start = (linesPage - 1) * LINES_PER_PAGE;
             var end = Math.min(start + LINES_PER_PAGE, lines.length);
 
+            // Every numeric column (unit price, quantity, line amount, received)
+            // is right-aligned, so the figures line up on one edge down the table
+            // and against the totals footer beneath them.
             var $head = $('<div class="MPC-vaspo-tRow MPC-vaspo-tHead"></div>');
             $head.append($('<span></span>').text(getMsg("VAS_092_Item")));
-            $head.append($('<span></span>').text(getMsg("VAS_092_UnitPrice")));
-            $head.append($('<span class="ta-c"></span>').text(getMsg("VAS_092_Qty")));
+            $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
+            $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Qty")));
             $head.append($('<span></span>').text(getMsg("VAS_092_ExpDelivery")));
             $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
             $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Received")));
@@ -1117,70 +1226,81 @@
             var $tr = $('<div class="MPC-vaspo-tRow MPC-vaspo-tBody"></div>');
 
             var $item = $('<span class="MPC-vaspo-itItem"></span>');
-            // Full product name in a title tooltip so a truncated (ellipsised)
-            // name is still readable in full on hover.
-            $item.append($('<div class="MPC-vaspo-itName"></div>')
-                .text(ln.ProductName || "").attr("title", ln.ProductName || ""));
+
+            // Product name, with the Attribute Set Instance (size / colour / lot /
+            // serial ...) following it on the same line — the attribute reads as
+            // part of what the product IS, so it sits after the name rather than
+            // on a sub-line of its own. Only a real instance is shown: a blank or
+            // "--" / "-" placeholder (no M_AttributeSetInstance_ID) is not an
+            // attribute. The full text goes on a tooltip so a truncated
+            // (ellipsised) name stays readable on hover.
+            var $name = $('<div class="MPC-vaspo-itName"></div>');
+            $name.append($('<span></span>').text(ln.ProductName || ""));
+            var asi = (ln.AttributeSetInstance || "").trim();
+            var hasAsi = (asi && asi !== "--" && asi !== "-");
+            if (hasAsi) {
+                $name.append($('<span class="MPC-vaspo-itAttr"></span>').text(asi));
+            }
+            var nameTip = (ln.ProductName || "") + (hasAsi ? " — " + asi : "");
+            if (nameTip) $name.attr("title", nameTip);
+            $item.append($name);
+
             // Product search key (no "SKU" prefix) or, failing that, the line note.
             if (ln.ProductValue) {
                 $item.append($('<div class="MPC-vaspo-itSku"></div>').text(ln.ProductValue));
             } else if (ln.Description) {
                 $item.append($('<div class="MPC-vaspo-itSku"></div>').text(ln.Description));
             }
-            // Attribute Set Instance details (size / colour / lot / serial ...).
-            // Only when the line carries a real instance — a blank or "--" / "-"
-            // placeholder (no M_AttributeSetInstance_ID) is not shown.
-            var asi = (ln.AttributeSetInstance || "").trim();
-            if (asi && asi !== "--" && asi !== "-") {
-                $item.append($('<div class="MPC-vaspo-itAttr"></div>')
-                    .text(asi).attr("title", asi));
-            }
             $tr.append($item);
 
-            $tr.append($('<span></span>').text(formatAmount(
+            $tr.append($('<span class="ta-r"></span>').text(formatAmount(
                 +ln.PriceActual || 0, data.CurSymbol, data.ISO_Code,
                 ln.PricePrecision != null ? ln.PricePrecision : data.StdPrecision)));
 
-            // Entered quantity (C_OrderLine.QtyEntered) with its unit of measure.
+            // Ordered quantity in the line's entered (selected) UOM
+            // (C_OrderLine.QtyEntered), labelled with that unit.
             var qtyText = formatNumber(+ln.QtyEntered || 0, +ln.UOMPrecision || 0);
             if (ln.UOMSymbol) qtyText += " " + ln.UOMSymbol;
-            $tr.append($('<span class="ta-c"></span>').text(qtyText));
+            $tr.append($('<span class="ta-r"></span>').text(qtyText));
 
             // Delivery and receipt only mean something for a stockable item. A
             // charge line, or a Service / Resource / Expense product, is never
             // received — both cells stay empty rather than claiming "not received".
             var deliverable = isDeliverableLine(ln);
 
+            // A cell with nothing to report is left blank — no placeholder dash.
             var $exp = $('<span class="MPC-vaspo-expDate"></span>');
             if (deliverable) {
-                $exp.append(document.createTextNode(formatDate(ln.DatePromised) || "—"));
+                $exp.append(document.createTextNode(formatDate(ln.DatePromised)));
                 $exp.append($('<small></small>').text(recvLabel(ln.RecvState)));
-            } else {
-                $exp.append(document.createTextNode("—"));
             }
             $tr.append($exp);
 
             $tr.append($('<span class="ta-r"></span>').text(formatAmount(
                 +ln.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
 
-            // Received / ordered, both in the line's ENTERED UOM — received is
-            // Σ M_InOutLine.QtyEntered from the server, ordered is
-            // C_OrderLine.QtyEntered, so the pair reads on one scale.
+            // Received — the figure on its own line with the progress bar stacked
+            // beneath it (the VAS_099 GRN Received column), so the number shares a
+            // baseline and right edge with the Qty column instead of being pushed
+            // inward by an inline bar. It is the quantity received in the line's
+            // ENTERED UOM, the same scale and unit the Qty cell shows; the tooltip
+            // spells the pair out in full.
             var $recv = $('<span class="MPC-vaspo-recv ta-r"></span>');
             if (deliverable) {
                 var ordered  = +ln.QtyEntered || 0;
                 var received = +ln.QtyReceivedEntered || 0;
+                var prec = +ln.UOMPrecision || 0;
                 var pct = ordered > 0 ? Math.round((received / ordered) * 100) : 0;
                 $recv.addClass(ln.RecvState || "none");
+                $recv.append($('<span class="MPC-vaspo-recvVal"></span>')
+                    .text(formatNumber(received, prec)));
                 var $bar = $('<span class="MPC-vaspo-recvBar"><i></i></span>');
                 $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
                 $recv.append($bar);
-                var recvText = formatNumber(received, +ln.UOMPrecision || 0) + "/" +
-                               formatNumber(ordered, +ln.UOMPrecision || 0);
-                if (ln.UOMSymbol) recvText += " " + ln.UOMSymbol;
-                $recv.append(document.createTextNode(recvText));
-            } else {
-                $recv.append(document.createTextNode("—"));
+                var recvTip = formatNumber(received, prec) + " " + getMsg("VAS_092_Of") +
+                              " " + formatNumber(ordered, prec);
+                if (ln.UOMSymbol) recvTip += " " + ln.UOMSymbol;
+                $recv.attr("title", recvTip);
             }
             $tr.append($recv);
 
@@ -1245,8 +1365,8 @@
 
             var $h = $('<div class="MPC-vaspo-tRow MPC-vaspo-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_092_ChangedOn")));
-            $h.append($('<span></span>').text(getMsg("VAS_092_UnitPrice")));
-            $h.append($('<span class="ta-c"></span>').text(getMsg("VAS_092_Qty")));
+            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
+            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Qty")));
             $h.append($('<span></span>').text(getMsg("VAS_092_ExpDelivery")));
             $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
             // Who made the change, in the track the line's Received bar occupies —
@@ -1268,33 +1388,33 @@
             // Local system time (formatDateTime converts the UTC-stored value),
             // plus the note that version carried when it differs from now.
             var $when = $('<span class="MPC-vaspo-lhWhen"></span>');
-            $when.append(document.createTextNode(formatDateTime(h.ChangedOn) || "—"));
+            $when.append(document.createTextNode(formatDateTime(h.ChangedOn)));
             if (h.Description && h.Description !== ln.Description) {
                 $when.append($('<small></small>').text(h.Description).attr("title", h.Description));
             }
             $r.append($when);
 
-            $r.append($('<span></span>').text(formatAmount(
+            $r.append($('<span class="ta-r"></span>').text(formatAmount(
                 +h.PriceActual || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
 
             var qty = formatNumber(+h.QtyEntered || 0, +h.UOMPrecision || 0);
             if (h.UOMSymbol) qty += " " + h.UOMSymbol;
-            $r.append($('<span class="ta-c"></span>').text(qty));
+            $r.append($('<span class="ta-r"></span>').text(qty));
 
             // Same gate as the line above it: a charge / service line is never
             // goods-received, so a promised date is meaningless on any version.
             $r.append($('<span></span>').text(
-                isDeliverableLine(ln) ? (formatDate(h.DatePromised) || "—") : "—"));
+                isDeliverableLine(ln) ? formatDate(h.DatePromised) : ""));
 
             $r.append($('<span class="ta-r"></span>').text(formatAmount(
                 +h.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
 
             // Who changed the line (C_OrderLineHistory.UpdatedBy). A snapshot
             // written by a background/platform process can carry no resolvable
-            // user, so an unknown author shows a dash rather than an empty cell.
+            // user; the cell is then left blank.
             var by = h.UpdatedByName || "";
             $r.append($('<span class="MPC-vaspo-lhBy ta-r"></span>')
-                .text(by || "—").attr("title", by));
+                .text(by).attr("title", by));
 
             return $r;
         }
@@ -1355,7 +1475,7 @@
             var $h = $('<div class="MPC-vaspo-tRow MPC-vaspo-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_092_Item")));
             $h.append($('<span></span>').text(getMsg("VAS_092_ChangedOn")));
-            $h.append($('<span class="ta-c"></span>').text(getMsg("VAS_092_Qty")));
+            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Qty")));
             $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
             $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
             // Last column, same position the per-line history drawer puts it in.
@@ -1402,19 +1522,21 @@
             $tr.append($item);
 
             // Local system time (formatDateTime converts the UTC-stored value).
-            $tr.append($('<span></span>').text(formatDateTime(h.ChangedOn) || "—"));
-            // Entered quantity snapshot (C_OrderLineHistory.QtyEntered).
-            $tr.append($('<span class="ta-c"></span>').text(
-                formatNumber(+h.QtyEntered || 0, +h.UOMPrecision || 0)));
+            $tr.append($('<span></span>').text(formatDateTime(h.ChangedOn)));
+            // Entered-UOM quantity snapshot (C_OrderLineHistory.QtyEntered), named
+            // with its unit exactly as the line rows and the drawer show it.
+            var histQty = formatNumber(+h.QtyEntered || 0, +h.UOMPrecision || 0);
+            if (h.UOMSymbol) histQty += " " + h.UOMSymbol;
+            $tr.append($('<span class="ta-r"></span>').text(histQty));
             $tr.append($('<span class="ta-r"></span>').text(formatAmount(
                 +h.PriceActual || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
             $tr.append($('<span class="ta-r"></span>').text(formatAmount(
                 +h.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
             // Who changed the line; a platform/background snapshot leaves no
-            // resolvable user, so an unknown author shows a dash.
+            // resolvable user, and the cell is then blank.
             var by = h.UpdatedByName || "";
             $tr.append($('<span class="MPC-vaspo-lhBy"></span>')
-                .text(by || "—").attr("title", by));
+                .text(by).attr("title", by));
 
             return $tr;
         }
@@ -1499,7 +1621,7 @@
                         : (d.Type === "payment" ? "coins" : "doc");
             $item.append(svgIcon(docIcon));
             var $txt = $('<span class="MPC-vaspo-docTxt"></span>');
-            $txt.append($('<div class="MPC-vaspo-itName"></div>').text(d.DocumentNo || "—"));
+            $txt.append($('<div class="MPC-vaspo-itName"></div>').text(d.DocumentNo || ""));
             var sub;
             if (d.Type === "grn") {
                 sub = getMsg("VAS_092_GoodsReceipt");
@@ -1521,7 +1643,7 @@
             if (canOpen) $item.append(svgIcon("arrowUpRight"));
             $tr.append($item);
 
-            $tr.append($('<span></span>').text(formatDate(d.DocDate) || "—"));
+            $tr.append($('<span></span>').text(formatDate(d.DocDate)));
             $tr.append($('<span></span>').append(docStatusPill(d.DocStatus)));
 
             // Amount: invoices show the grand total; GRNs show the total
@@ -1531,7 +1653,7 @@
                 $amt.text(formatAmount(+d.Amount || 0, data.CurSymbol,
                     data.ISO_Code, data.StdPrecision));
             } else {
-                $amt.text("—");
+                $amt.text("");
             }
             $tr.append($amt);
 
@@ -1549,7 +1671,15 @@
             "C": { key: "VAS_092_ByCosts",    tone: "neutral" }
         };
 
-        function methodLabel(code) {
+        // The distribution method's label for one component. The server sends the
+        // dictionary's own name for the value stored on the row
+        // (C_ExpectedCost.LandedCostDistribution), so a renamed, translated or
+        // newly added method reads exactly as it does on the record screen.
+        // LC_METHODS is only the fallback for a deployment whose reference list
+        // could not be read; the raw code is the last resort.
+        function methodLabel(c) {
+            if (c && c.DistributionName) return c.DistributionName;
+            var code = c ? c.DistributionCode : null;
             var m = LC_METHODS[code];
             if (m) return getMsg(m.key);
             return code ? code : getMsg("VAS_092_NotSet");
@@ -1664,7 +1794,7 @@
             if (!comps.length) return "";
             var seen = {};
             for (var i = 0; i < comps.length; i++) {
-                seen[methodLabel(comps[i].DistributionCode)] = true;
+                seen[methodLabel(comps[i])] = true;
             }
             var methods = [];
             for (var k in seen) { if (seen.hasOwnProperty(k)) methods.push(k); }
@@ -1688,9 +1818,13 @@
             }
             $tr.append($name);
 
-            $tr.append($('<span></span>')
-                .attr("title", getMsg("VAS_092_TipMethod"))
-                .append(pill(methodLabel(c.DistributionCode), methodTone(c.DistributionCode))));
+            // The method name comes from the dictionary, so it can be longer than
+            // the two-word labels this column used to carry — the pill truncates
+            // inside its track and the cell's tooltip carries the full name.
+            var method = methodLabel(c);
+            $tr.append($('<span class="MPC-vaspo-ldMethod"></span>')
+                .attr("title", method + " — " + getMsg("VAS_092_TipMethod"))
+                .append(pill(method, methodTone(c.DistributionCode))));
 
             $tr.append($('<span class="ta-r MPC-vaspo-ldExp"></span>')
                 .attr("title", getMsg("VAS_092_TipExpected"))
@@ -1715,7 +1849,7 @@
             } else {
                 $act.addClass("is-pending");
                 $act.attr("title", getMsg("VAS_092_TipAwaiting"));
-                $act.append($('<span class="MPC-vaspo-ldAmt"></span>').text("—"));
+                $act.append($('<span class="MPC-vaspo-ldAmt"></span>').text(""));
                 $act.append($('<span class="MPC-vaspo-ldFlag wait"></span>')
                     .text(getMsg("VAS_092_AwaitingInvoice")));
             }
@@ -1760,7 +1894,7 @@
                 $v.addClass("flat").text(getMsg("VAS_092_OnBudget"))
                   .attr("title", getMsg("VAS_092_TipOnBudget"));
             } else {
-                $v.addClass("flat").text("—")
+                $v.addClass("flat").text("")
                   .attr("title", getMsg("VAS_092_TipVariance"));
             }
             return $v;
@@ -2025,16 +2159,89 @@
             });
         }
 
-        // Open the record's window filtered to that row, using the platform's
-        // zoom API (the same pattern as VAS_105_AccountRightPanel): resolve the
-        // table's default zoom window, then start it with an equal-query on the
-        // table's key column (TableName_ID). Degrades to a toast so a click
-        // never throws.
+        // Tables whose record does NOT open in the table's default zoom window,
+        // mapped to the name of the window it does open — the RFQ, Project and
+        // Requisition chips each open a named screen that is not what their
+        // table's zoom target resolves to, so the id comes from this name
+        // instead. Any further screen that needs naming belongs here — nothing
+        // else has to change.
+        // M_InOut, C_Invoice and C_Payment are dual-purpose (shipment / receipt,
+        // AR / AP, receipt / payment), but every one of them this panel opens is
+        // a goods receipt, a vendor invoice or an AP payment against this
+        // purchase order, so all three can be named outright.
+        // C_Order appears here on its PURCHASE side only, which in this panel is
+        // the Blanket Order chip — the sales side is named separately below.
+        var WINDOW_NAME_BY_TABLE = {
+            "C_RfQ":              "VAS_RFQ",
+            "C_Project":          "VAS_Project",
+            "M_Requisition":      "VAS_Requisition",
+            "M_InOut":            "VAS_MaterialReceipt",
+            "C_Invoice":          "VAS_APInvoice",
+            "C_Payment":          "VAS_APPayment",
+            "VAS_ContractMaster": "VAS_ContractMaster",
+            "C_Order":            "VAS_BlanketPurchaseOrder"
+        };
+
+        // The same map for records opened as a SALES transaction. C_Order serves
+        // both sides — the Sales Order origin chip opens it with IsSOTrx, the
+        // Blanket Order chip without — so each side names its own window and this
+        // one wins when the flag is set.
+        var WINDOW_NAME_BY_TABLE_SOTRX = {
+            "C_Order": "VAS_SalesOrder"
+        };
+
+        // Window name -> AD_Window_ID, resolved once per name and remembered for
+        // the life of the panel. A name the dictionary does not know is cached as
+        // -1 so a failed lookup is not repeated on every click.
+        var windowIdByName = {};
+
+        // Resolves a window id from its name through the panel's own endpoint.
+        // Returns 0 when it cannot be resolved, which leaves openRecord() to fall
+        // back to the table's zoom target.
+        function resolveWindowIdByName(windowName) {
+            if (!windowName) return 0;
+            if (windowIdByName.hasOwnProperty(windowName)) {
+                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_092_OverviewPurchaseOrder/GetWindow_ID", windowName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) {
+                    windowIdByName[windowName] = -1;
+                    console.log("resolveWindowIdByName: no window named " + windowName);
+                    return 0;
+                }
+                windowIdByName[windowName] = id;
+                return id;
+            } catch (e) {
+                windowIdByName[windowName] = -1;
+                console.log(e);
+                return 0;
+            }
+        }
+
+        // Open the record's window filtered to that row: the window named for this
+        // table when it has one, else the table's default zoom target (the
+        // VAS_105_AccountRightPanel pattern). Either way the window is started
+        // with an equal-query on the table's key column (TableName_ID). Degrades
+        // to a toast so a click never throws.
         function openRecord(tableName, recordId, isSOTrx) {
             if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
             try {
-                var windowId = 0;
-                if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
+                // A sales-transaction record takes its own name where the table
+                // has one; everything else takes the plain mapping.
+                var windowName = (isSOTrx && WINDOW_NAME_BY_TABLE_SOTRX[tableName])
+                    ? WINDOW_NAME_BY_TABLE_SOTRX[tableName]
+                    : WINDOW_NAME_BY_TABLE[tableName];
+                var windowId = resolveWindowIdByName(windowName);
+
+                if (windowId <= 0 &&
+                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
                     // The 4th arg (IsSOTrx) picks the sales vs purchase window for
                     // dual-purpose tables like C_Order — true opens the Sales Order
                     // window, false the Purchase Order window.
@@ -2099,6 +2306,25 @@
                 minimumFractionDigits: p,
                 maximumFractionDigits: p
             });
+        }
+
+        // An order-level quantity, in the entered (selected) UOM the server
+        // reports the totals in. Decimals are shown only when the unit has them
+        // and the value needs them — a whole number is never padded with zeros.
+        function formatQty(value) {
+            var p = (data && +data.QtyPrecision > 0) ? +data.QtyPrecision : 0;
+            return (+value || 0).toLocaleString(window.navigator.language, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: p
+            });
+        }
+
+        // The same quantity, named with its unit: the order's own UOM symbol when
+        // every item line shares one, else the generic "units" — a mixed-UOM order
+        // must not label a summed figure with one line's unit.
+        function qtyWithUnit(value) {
+            return formatQty(value) + " " +
+                ((data && data.QtyUOMSymbol) ? data.QtyUOMSymbol : getMsg("VAS_092_Units"));
         }
 
         function formatAmount(value, symbol, iso, precision) {
@@ -2182,6 +2408,11 @@
             this.table_ID = curTab.getAD_Table_ID();
         }
         this.init();
+        // Watch the tab itself so New Record (which never calls refreshPanelData)
+        // still empties the panel.
+        if (curTab && typeof curTab.addDataStatusListener === "function") {
+            try { curTab.addDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
     };
 
     /* Update tab panel based on selected record */
@@ -2202,6 +2433,10 @@
 
     /* Release variables from memory */
     VAS.VAS_092_OverviewPurchaseOrder.prototype.dispose = function () {
+        if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
+            try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
+        this.tabDataListener = null;
         this.record_ID = 0;
         this.table_ID = 0;
         this.windowNo = 0;
