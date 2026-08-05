@@ -1062,25 +1062,24 @@ namespace ModelLibrary.Classes
 
                 List<ColumnInfo> columnsInformation = GetTabColumnsInfo(windowVO, table_name);
 
-                Dictionary<string, ColumnInfo> columnInfoMap = columnsInformation
-                    .Where(column => !string.IsNullOrWhiteSpace(column.ColumnName))
+                // De-duplicate by column name, then order by AD_Field.SeqNo so NewJsonData - and any
+                // HTML built from it - lists columns in the same order they appear on the window tab.
+                List<ColumnInfo> orderedColumns = columnsInformation
+                    .Where(column => !string.IsNullOrWhiteSpace(column.ColumnName) && data.Columns.Contains(column.ColumnName))
                     .GroupBy(column => column.ColumnName, StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+                    .Select(group => group.First())
+                    .OrderBy(column => column.SeqNo)
+                    .ToList();
 
                 foreach (DataRow row in data.Rows)
                 {
-                    foreach (DataColumn column in data.Columns)
+                    foreach (ColumnInfo columnMeta in orderedColumns)
                     {
-                        if (!columnInfoMap.TryGetValue(column.ColumnName, out ColumnInfo columnMeta))
-                        {
-                            continue;
-                        }
-
                         string displayName = string.IsNullOrWhiteSpace(columnMeta.DisplayName)
-                            ? column.ColumnName
+                            ? columnMeta.ColumnName
                             : columnMeta.DisplayName;
 
-                        object value = row[column];
+                        object value = row[columnMeta.ColumnName];
 
                         if (!columnMeta.HasReference)
                         {
@@ -1186,6 +1185,9 @@ namespace ModelLibrary.Classes
 
                 List<GridField> fields = tab._gridTable?.m_fields ?? new List<GridField>();
 
+                // GridTabVO loads fields ordered by "IsDisplayed DESC, SeqNo" (AD_Field.SeqNo), and
+                // GridTab.LoadFields() adds them to m_fields in that same order, so the position in
+                // this list doubles as the AD_Field.SeqNo-based display order.                
                 foreach (GridField field in fields)
                 {
                     var vo = field._vo;
@@ -1246,7 +1248,8 @@ namespace ModelLibrary.Classes
                         LookupParentName = lookupParentName,
                         KeyColumn = keyColumn,
                         ReferenceValueId = referenceValueId,
-                        QueryDirect = queryDirect
+                        QueryDirect = queryDirect,
+                        SeqNo = vo.seqNo
                     });
                 }
             }
@@ -1345,6 +1348,7 @@ namespace ModelLibrary.Classes
             public string KeyColumn { get; set; } = string.Empty;
             public int ReferenceValueId { get; set; }
             public string QueryDirect { get; set; } = string.Empty;
+            public int SeqNo { get; set; }
         }
 
         #endregion
