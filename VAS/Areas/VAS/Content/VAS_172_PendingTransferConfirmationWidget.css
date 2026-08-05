@@ -1,0 +1,512 @@
+/* Pending Transfer Confirmation Widget (VAS_172)
+   3x2 operational work-queue with two-step modal.
+   All selectors prefixed .vas-172- */
+
+/* ── Card shell ─────────────────────────────────────────────────────── */
+.vas-172-container {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.vas-172-root {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.045), 24px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: .85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255,255,255,.70), rgba(255,255,255,.49));
+    box-shadow: 0 10px 24px rgba(15,61,97,.06);
+    backdrop-filter: blur(10px);
+    box-sizing: border-box;
+    gap: .4em;
+    overflow: hidden;
+}
+
+.vas-172-root,
+.vas-172-root * {
+    box-sizing: border-box;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.vas-172-header-row {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    flex-shrink: 0;
+}
+
+.vas-172-left-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-172-icon-well {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    min-height: 2em;
+    border-radius: 10px;
+    background: rgba(0, 131, 218, 0.10);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    flex-shrink: 0;
+}
+
+.vas-172-icon-well svg {
+    width: 1.1em;
+    height: 1.1em;
+    display: block;
+    stroke: #0083DA;
+}
+
+.vas-172-title-block {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-172-title {
+    font-weight: 500;
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 18px);
+    color: #102C3F;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-172-subtitle {
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.009625), 14px);
+    color: #717182;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Queue body (Perfect 4-row layout without 4th row cut-off) ──────── */
+.vas-172-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-172-empty {
+    color: #748494;
+    font-size: .75em;
+    padding: 1.5em 0;
+    text-align: center;
+}
+
+.vas-172-queue {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    flex: 1;
+}
+
+.vas-172-row {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: .15em;
+    padding: .2em .3em;
+    border: none;
+    border-bottom: 1px solid #EDF2F6;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    border-radius: 6px;
+    transition: background 120ms;
+    flex: 1;
+    min-height: 0;
+}
+
+.vas-172-row--last { border-bottom: none; }
+
+.vas-172-row:hover { background: rgba(31,131,255,.05); }
+
+.vas-172-row-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+}
+
+.vas-172-trno {
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-172-row-meta {
+    font-size: .6875em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Pills ──────────────────────────────────────────────────────────── */
+.vas-172-pill {
+    font-size: clamp(10px, 0.75vw, 14px);
+    font-weight: 600;
+    border-radius: 999px;
+    padding: clamp(0.15em, 0.3vw, 0.3em) clamp(0.5em, 0.8vw, 1em);
+    white-space: nowrap;
+}
+
+.vas-172-pill--warn  { background: #FCF1DD; color: #9A6500; }
+.vas-172-pill--bad   { background: #FBE3E4; color: #A33F3F; }
+.vas-172-pill--ok    { background: #E2F6EF; color: #0B6B45; }
+.vas-172-pill--amber { background: #FCF1DD; color: #9A6500; }
+
+/* ── Footer & Specification Pager Buttons ────────────────────────────── */
+.vas-172-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    border-top: 1px solid #EDF2F6;
+    padding-top: .35em;
+}
+
+.vas-172-footer-helper {
+    font-size: clamp(11px, 0.8vw, 15px) !important;
+    color: #748494 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-172-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+}
+
+.vas-172-pager-btn {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    max-width: 24px !important;
+    max-height: 24px !important;
+    border: 1px solid #E4EDF4 !important;
+    border-radius: 7px !important;
+    background-color: #FFFFFF !important;
+    color: #0083DA !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    cursor: pointer !important;
+    box-sizing: border-box !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease !important;
+}
+
+.vas-172-pager-btn:hover:not(:disabled) {
+    background-color: #EEF6FF !important;
+    border-color: #0083DA !important;
+}
+
+.vas-172-pager-btn:disabled {
+    color: #B8C6D2 !important;
+    background-color: #FAFAFA !important;
+    border-color: #E4EDF4 !important;
+    cursor: not-allowed !important;
+}
+
+.vas-172-pager-label {
+    font-size: clamp(11px, 0.8vw, 15px) !important;
+    color: #102C3F !important;
+    font-weight: 500 !important;
+    margin: 0 0.25em !important;
+}
+
+/* ── SCREEN-SIZE DYNAMIC RESPONSIVE MODAL (LOCKED STABLE HEIGHT) ────── */
+.vas-172-modal-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(8,30,48,.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: clamp(12px, 2vw, 32px);
+    box-sizing: border-box;
+}
+
+.vas-172-modal {
+    background: #fff;
+    border-radius: clamp(12px, 1.5vw, 24px);
+    width: clamp(340px, 72vw, 1160px);
+    height: clamp(420px, 78vh, 840px) !important;
+    max-height: 88vh;
+    max-width: 95vw;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    font-family: Roboto, Arial, sans-serif;
+    box-shadow: 0 30px 70px rgba(8,30,48,.35);
+    box-sizing: border-box;
+}
+
+.vas-172-modal-header {
+    display: flex;
+    align-items: center;
+    gap: clamp(0.4rem, 0.9vw, 1.2rem);
+    padding: clamp(0.65rem, 1.2vw, 1.5rem) clamp(0.85rem, 1.8vw, 2.5rem);
+    background: linear-gradient(180deg, #FBFDFF, #F2F9FF);
+    border-bottom: 1px solid #E4EDF4;
+    flex-shrink: 0;
+}
+
+.vas-172-modal-title {
+    font-size: clamp(14px, 1.15vw, 20px);
+    font-weight: 600;
+    color: #102C3F;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-172-modal-close {
+    width: clamp(28px, 2vw, 38px);
+    height: clamp(28px, 2vw, 38px);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: clamp(1rem, 1.3vw, 1.8rem);
+    color: #5F7283;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: clamp(6px, 0.6vw, 10px);
+    flex-shrink: 0;
+}
+
+.vas-172-modal-close:hover { background: #EDF2F6; }
+
+.vas-172-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: clamp(0.75rem, 1.5vw, 2rem);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.5rem, 1vw, 1.25rem);
+}
+
+.vas-172-back-link {
+    background: none;
+    border: none;
+    color: #1F83FF;
+    font-size: clamp(12px, 0.85vw, 16px);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    text-align: left;
+    flex-shrink: 0;
+}
+
+/* ── Header field grid ──────────────────────────────────────────────── */
+.vas-172-field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(0.4rem, 0.8vw, 1.2rem) clamp(0.6rem, 1.2vw, 1.8rem);
+    flex-shrink: 0;
+    background: #F8FAFC;
+    border: 1px solid #E4EDF4;
+    border-radius: clamp(8px, 1vw, 16px);
+    padding: clamp(0.6rem, 1.2vw, 1.5rem);
+}
+
+.vas-172-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.vas-172-field-label {
+    font-size: clamp(10px, 0.75vw, 14px);
+    font-weight: 600;
+    color: #748494;
+    text-transform: uppercase;
+}
+
+.vas-172-field-value {
+    font-size: clamp(12px, 0.9vw, 16px);
+    font-weight: 600;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-172-section-heading {
+    font-size: clamp(13px, 1vw, 18px);
+    font-weight: 700;
+    color: #102C3F;
+    flex-shrink: 0;
+}
+
+/* ── Confirmation line rows ─────────────────────────────────────────── */
+.vas-172-lines-list-container {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid #E4EDF4;
+    border-radius: clamp(8px, 1vw, 16px);
+    background: #FFFFFF;
+    padding: clamp(6px, 0.8vw, 12px);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.vas-172-lines-list { display: flex; flex-direction: column; gap: 6px; }
+
+.vas-172-line-row {
+    display: flex;
+    align-items: center;
+    gap: clamp(0.4rem, 0.8vw, 1.2rem);
+    width: 100%;
+    border: 1px solid #E4EDF4;
+    border-radius: clamp(8px, 1vw, 14px);
+    background: #fff;
+    padding: clamp(0.35rem, 0.65vw, 0.95rem) clamp(0.5rem, 0.9vw, 1.2rem);
+    cursor: pointer;
+    text-align: left;
+    transition: background 120ms;
+}
+
+.vas-172-line-row:hover { background: #EEF6FF; }
+
+.vas-172-line-left { flex: 1; min-width: 0; }
+
+.vas-172-line-no { font-size: clamp(12px, 0.9vw, 16px); font-weight: 700; color: #102C3F; }
+
+.vas-172-line-sub { font-size: clamp(10px, 0.75vw, 14px); color: #748494; }
+
+.vas-172-line-count { font-size: clamp(12px, 0.9vw, 16px); font-weight: 700; color: #102C3F; white-space: nowrap; }
+
+.vas-172-chevron { color: #9F9F9F; font-size: clamp(12px, 0.9vw, 16px); flex-shrink: 0; }
+
+/* ── Action bar ─────────────────────────────────────────────────────── */
+.vas-172-action-bar {
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+    border-top: 1px solid #EDF2F6;
+    padding-top: clamp(0.4rem, 0.8vw, 1rem);
+    flex-shrink: 0;
+}
+
+.vas-172-btn-complete {
+    font-size: clamp(12px, 0.85vw, 16px);
+    font-weight: 600;
+    color: #fff;
+    background: #1F83FF;
+    border: none;
+    border-radius: 999px;
+    padding: clamp(0.35rem, 0.6vw, 0.75rem) clamp(1rem, 1.5vw, 2rem);
+    cursor: pointer;
+    transition: background 150ms;
+}
+
+.vas-172-btn-complete--disabled {
+    background: #B8C6D2;
+    cursor: not-allowed;
+}
+
+/* ── View 2 field grid ──────────────────────────────────────────────── */
+.vas-172-v2-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(6px, 0.8vw, 14px) clamp(10px, 1.2vw, 20px);
+}
+
+.vas-172-v2-field { display: flex; flex-direction: column; gap: .2rem; }
+
+.vas-172-v2-span2 { grid-column: span 2; }
+
+.vas-172-v2-readonly {
+    background: #EEF6FF;
+    border: 1px solid #E4EDF4;
+    border-radius: 999px;
+    padding: clamp(4px, 0.6vw, 10px) clamp(10px, 1vw, 18px);
+}
+
+.vas-172-v2-editable {
+    background: #fff;
+    border: 1px solid #E4EDF4;
+    border-radius: 10px;
+    padding: clamp(4px, 0.6vw, 10px) clamp(10px, 1vw, 18px);
+}
+
+.vas-172-input {
+    border: 1px solid #D7D7D7;
+    border-radius: 6px;
+    font-size: clamp(12px, 0.9vw, 16px);
+    padding: .25rem .5rem;
+    text-align: right;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.vas-172-input:focus { border-color: #1F83FF; }
+
+.vas-172-textarea {
+    border: 1px solid #D7D7D7;
+    border-radius: 6px;
+    font-size: clamp(12px, 0.9vw, 16px);
+    padding: .25rem .5rem;
+    width: 100%;
+    box-sizing: border-box;
+    resize: none;
+    min-height: 3rem;
+    outline: none;
+    font-family: Roboto, Arial, sans-serif;
+}
+
+.vas-172-textarea:focus { border-color: #1F83FF; }
+
+.vas-172-diff--ok  { color: #20A464; font-weight: 700; }
+.vas-172-diff--bad { color: #D14545; font-weight: 700; }
+
+.vas-172-btn-save {
+    font-size: clamp(12px, 0.85vw, 16px);
+    font-weight: 600;
+    color: #fff;
+    background: #1F83FF;
+    border: none;
+    border-radius: 999px;
+    padding: clamp(0.35rem, 0.6vw, 0.75rem) clamp(1rem, 1.5vw, 2rem);
+    cursor: pointer;
+    margin-left: auto;
+    display: inline-block;
+}
