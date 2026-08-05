@@ -24,12 +24,7 @@
 .MPC-wc-card {
     position: relative;
     font-family: Roboto, sans-serif;
-    /* Single dynamic font anchor, viewport-based (vw) so it tracks the SCREEN,
-       not a JS-measured container width - the old clamp's fixed 24px ceiling and
-       its dependency on --dash-inline-size froze all text from growing past a
-       point. max()+rem floor guards very narrow windows; no ceiling above it, so
-       text keeps scaling at any resolution. Everything below is em off this. */
-    font-size: max(0.9rem, 1.3vw);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.014), 24px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -359,7 +354,7 @@
        width-driven anchor could outgrow the height budget on wide screens and
        the body scrolled - defeating the pagination that exists precisely so a
        page always fits without scrolling. */
-    font-size: min(clamp(0.9rem, 1.6vw, 2.2rem), 2.7vh);
+    font-size: clamp(16px, 1.17vw, 30px);
 }
 
 .MPC-wc-m-head {
@@ -640,7 +635,21 @@
 }
 
 .MPC-wc-select {
-    appearance: auto;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+    cursor: pointer;
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    padding: 0.35em 0.75em;
+    text-align: center;
+    text-align-last: center;
+}
+.MPC-wc-select:hover {
+    background: #EEF8FF;
+    border-color: #0083DA;
 }
 
 .MPC-wc-input {
