@@ -180,8 +180,8 @@ import "../app/widgets/VAS_034_ExpectedReceipts.js";
 import "../app/widgets/VAS_035_MatchSuggestions.js";
 import "../app/util/CurrencyFormat.js";
 import "../app/util/AttributeControl.js";
+import "../app/util/VAS_PanelUtil.js";
 import "../app/util/VAS_ZoomUtil.js";
-
 import "../app/widgets/RequestWidget.js";
 import "../app/widgets/AgingReceivablesWidget.js";
 import "../app/widgets/AvgDaysToPayWidget.js";
@@ -291,7 +291,6 @@ import "../app/tabpanel/VAS_107_CreateOrderBottomPanel.js";
 import "../app/widgets/VAS_056_AutoAllocatedAPPaymentWidget.js";
 import "../app/widgets/VAS_072_MatchSuggestionAPPayment.js";
 import "../app/tabpanel/VAS_105_AccountRightPanel.js";
-import "../app/tabpanel/VAS_107_CreateOrderBottomPanel.js";
 import "../app/tabpanel/VAS_106_OverviewSalesOrder.js";
 import "../app/widgets/VAS_156_CountedMTDWidget.js";
 import "../app/widgets/VAS_157_VarianceLinesWidget.js";
