@@ -14,31 +14,36 @@
 
 .vas-stocksearch-root {
     position: relative;
-    overflow: hidden;
-    font-size: clamp(16px, 1.4cqi, 24px);
-    font-size: clamp(16px, calc(var(--widget-inline-size, 380px) * 0.045), 24px);
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.75em 0;
+    padding: 1.125em 0;
+    overflow: visible;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    font-size: max(0.9rem, 1.3vw);
+    box-sizing: border-box;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    font-family: 'Roboto', sans-serif;
     user-select: none;
 }
 
-/* Glass Search Bar (80% width) */
+/* Glass Search Pill (80% width, standard search pill height) */
 .vas-stocksearch-bar {
     width: 80%;
+    min-width: 0;
     display: flex;
     align-items: center;
-    gap: 0.75em;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58));
+    gap: 0.625em;
+    padding: 0.75em 1.125em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
     border: 2px solid #FFFFFF;
     border-radius: 14px;
     box-shadow: 0 6px 14px rgba(16, 47, 74, 0.06);
-    padding: 0.7em 0.8em;
+    backdrop-filter: blur(10px);
     box-sizing: border-box;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
