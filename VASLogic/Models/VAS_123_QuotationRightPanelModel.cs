@@ -104,7 +104,7 @@ namespace VAS.Models
             string baseSql = @"SELECT o.C_Order_ID AS C_Order_ID,
                 o.DocumentNo AS DocumentNo,
                 o.DateOrdered AS DateOrdered,
-                o.OrderValidTo AS OrderValidTo,
+                o.ValidTillDate AS OrderValidTo,
                 o.DocStatus AS DocStatus,
                 o.DocAction AS DocAction,
                 COALESCE(o.GrandTotal, 0) AS GrandTotal,
@@ -1106,7 +1106,7 @@ namespace VAS.Models
                 sb.Append("       o.C_PaymentTerm_ID AS C_PaymentTerm_ID,");
                 sb.Append("       pt.Name AS PaymentTermName,");
                 sb.Append("       o.DateOrdered AS DateOrdered,");
-                sb.Append("       o.OrderValidTo AS OrderValidTo,");
+                sb.Append("       o.ValidTillDate AS OrderValidTo,");
                 sb.Append("       o.C_Currency_ID AS C_Currency_ID,");
                 sb.Append("       cur.ISO_Code AS CurrencyISO");
                 sb.Append("  FROM C_Order o");

@@ -147,6 +147,7 @@
     <Compile Include="Models\VASAttachUserToBP.cs" />
     <Compile Include="Models\VAS_065_APInvoicePanelModel.cs" />
     <Compile Include="Models\VAS_074_CreateInvoiceLinePanelModel.cs" />
+    <Compile Include="Models\VAS_107_CreateOrderBottomPanelModel.cs" />
     <Compile Include="Models\VAS_092_OverviewPurchaseOrderModel.cs" />
     <Compile Include="Models\VAS_123_QuotationRightPanelModel.cs" />
     <Compile Include="Models\VAS_167_PurchaseOrderLandedCostModel.cs" />
