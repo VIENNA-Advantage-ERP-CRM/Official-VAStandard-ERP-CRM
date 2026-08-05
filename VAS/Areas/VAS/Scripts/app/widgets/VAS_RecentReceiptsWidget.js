@@ -2,7 +2,8 @@
  * VAS_RecentReceipts Widget
  * Purpose - Glass dashboard card listing the most recent AR receipts of the
  *           last 30 days, server-side paged. Each row shows Date, Receipt No.,
- *           Customer, Method (tender-type chip), Bank account (short form
+ *           Customer, Method (VA009 payment-method chip, falling back to the
+ *           tender type), Bank account (short form
  *           "HDFC ****4821") and signed Amount (green for incoming, red for
  *           refund). Clicking a row opens the Receipt detail modal: a
  *           two-column Receipt-summary grid + an Allocation table that lists
@@ -32,6 +33,7 @@
  * 14  | Reference                                 | VAS_Reference
  * 15  | Currency                                  | VAS_Currency
  * 16  | Allocation                                | VAS_Allocation
+ * 16a | Allocation No.                            | VAS_AllocationNo
  * 17  | Invoice No.                               | VAS_InvoiceNo
  * 18  | Invoice date                              | VAS_InvoiceDate
  * 19  | Invoice amount                            | VAS_InvoiceAmount
@@ -122,6 +124,63 @@
         var currentPaymentId = 0;
         var printBusy = false;
 
+        /* Zoom targets. Ids start at 0 and are resolved from the window NAME on
+           first use by VAS.ZoomUtil (ids differ per environment, names do not);
+           the resolved id is cached back here so later clicks skip the lookup.
+              Receipt No.     -> the receipt record itself
+              Allocation No.  -> the allocation header the line belongs to */
+        var receiptZoomWindowId = 0;
+        var RECEIPT_ZOOM_WINDOW_NAME = 'VAS_ARReceipt';
+        var allocZoomWindowId = 0;
+        var ALLOC_ZOOM_WINDOW_NAME = 'VAS_ViewAllocation';
+
+        /* Open the receipt record.
+           Hosted inside a window (windowNo >= 0): fire the value the host tab
+           listens for, so the record opens in THIS screen's own tab rather than
+           launching a second window.
+           Otherwise - or when no host registered itself through
+           addChangeListener, which is the case on a plain dashboard - fall back
+           to opening the standard window. Best-effort: when the window name
+           cannot be resolved the helper resolves to 0 and nothing happens, so a
+           click never throws or navigates the page away. */
+        function zoomToReceipt(paymentId) {
+            if (!paymentId || !VAS.ZoomUtil) { return; }
+
+            if (widgetSelf.windowNo >= 0 && typeof widgetSelf.widgetFirevalueChanged === "function") {
+                var handled = widgetSelf.widgetFirevalueChanged({
+                    "TabWhereClause": "C_Payment.C_Payment_ID=" + paymentId,
+                    "TabLayout": "Y", /* 'N' Grid, 'Y' Single, 'C' Card */
+                    "TabIndex": "0"
+                });
+                if (handled) { return; }
+            }
+
+            VAS.ZoomUtil.zoomToRecord('C_Payment_ID', paymentId, receiptZoomWindowId, RECEIPT_ZOOM_WINDOW_NAME, '')
+                .done(function (windowId) {
+                    if (windowId > 0) { receiptZoomWindowId = windowId; }
+                });
+        }
+
+        /* The allocation lives in a DIFFERENT window (VAS_ViewAllocation), so it
+           always opens as its own window - firing the host value would only
+           re-filter the current screen's tab, which is not where an allocation
+           record is.
+
+           The link is inside the receipt modal, so the dialog is dismissed FIRST:
+           it is a fixed overlay that also puts `vas-rr-body-lock` on <body>, and
+           leaving it up would cover the window we just opened and keep the page
+           behind it unscrollable. */
+        function zoomToAllocation(allocationHdrId) {
+            if (!allocationHdrId || !VAS.ZoomUtil) { return; }
+
+            closeDialog();
+
+            VAS.ZoomUtil.zoomToRecord('C_AllocationHdr_ID', allocationHdrId, allocZoomWindowId, ALLOC_ZOOM_WINDOW_NAME, '')
+                .done(function (windowId) {
+                    if (windowId > 0) { allocZoomWindowId = windowId; }
+                });
+        }
+
         /* Server-paged list state. pageSize is 9 rows per page; pageNo /
            totalPages / totalRecords come from the server response. */
         var pageSize = 9;
@@ -188,6 +247,16 @@
             if (!code) { return ""; }
             var c = String(code).trim();
             return TENDER_TYPES[c] || c;
+        }
+
+        /* The Payment method column / field shows the configured VA009 payment
+           method name, which is what users administer and recognise. The
+           tender-type code stays as the fallback for a receipt booked without
+           a payment method, so the cell is never blank. */
+        function paymentMethodDisplay(source) {
+            var name = pick(source, "PaymentMethodName", "paymentMethodName");
+            if (name && String(name).trim() !== "") { return String(name).trim(); }
+            return methodDisplay(pick(source, "TenderType", "tenderType"));
         }
 
         /* Bank account display helpers. The widget table uses the short form
@@ -327,7 +396,7 @@
                 var dateText = formatDate(pick(row, "DateAcct", "dateAcct"));
                 var docNo = pick(row, "DocumentNo", "documentNo") || "";
                 var customer = pick(row, "CustomerName", "customerName") || "";
-                var method = methodDisplay(pick(row, "TenderType", "tenderType"));
+                var method = paymentMethodDisplay(row);
                 var bankName = pick(row, "BankName", "bankName") || "";
                 var accountNo = pick(row, "AccountNo", "accountNo") || "";
                 var bankText = bankShort(bankName, accountNo);
@@ -340,7 +409,9 @@
                     '<tr class="vas-rr-tr" data-payment-id="' + paymentId + '" tabindex="0">' +
                     '<td class="vas-rr-td-date" title="' + escapeHtml(dateText) + '">' + escapeHtml(dateText) + '</td>' +
                     '<td class="vas-rr-td-doc" title="' + escapeHtml(docNo) + '">' +
-                    '<span class="vas-rr-truncate">' + escapeHtml(docNo) + '</span>' +
+                    (docNo
+                        ? '<a href="javascript:void(0)" class="vas-rr-truncate vas-rr-zoom-link js-rr-doc-zoom">' + escapeHtml(docNo) + '</a>'
+                        : '<span class="vas-rr-truncate"></span>') +
                     '</td>' +
                     '<td class="vas-rr-td-customer" title="' + escapeHtml(customer) + '">' +
                     '<span class="vas-rr-truncate">' + escapeHtml(customer) + '</span>' +
@@ -544,7 +615,7 @@
             var accountNo = pick(detail, "AccountNo", "accountNo") || "";
             var bankLine = bankFull(bankName, accountNo);
             var reference = pick(detail, "Reference", "reference") || "";
-            var method = methodDisplay(pick(detail, "TenderType", "tenderType"));
+            var method = paymentMethodDisplay(detail);
             var payAmountNum = Number(pick(detail, "PayAmount", "payAmount") || 0);
             var payAmountText = formatExactAmount(Math.abs(payAmountNum), stdPrecision);
             var payAmountSign = payAmountNum < 0 ? '-' : '';
@@ -668,8 +739,19 @@
                               : type === "Invoice" ? "vas-rr-type-inv"
                               : "vas-rr-type-other";
 
+                /* Allocation document the line belongs to. Rendered as a zoom
+                   link to the allocation window; plain text when the header id
+                   is missing, so a row is never a link that goes nowhere. */
+                var allocDocText = String(pick(line, "AllocationDocumentNo", "allocationDocumentNo") || "");
+                var allocHdrId = Number(pick(line, "AllocationHdrId", "allocationHdrId") || 0);
+                var allocCellHtml = (allocDocText && allocHdrId > 0)
+                    ? '<a href="javascript:void(0)" class="vas-rr-zoom-link js-rr-alloc-zoom" data-alloc-hdr-id="' + allocHdrId + '">' +
+                      escapeHtml(allocDocText) + '</a>'
+                    : '<span class="vas-rr-d-inv-no">' + escapeHtml(allocDocText) + '</span>';
+
                 rowsHtml +=
                     '<tr>' +
+                    '<td class="vas-rr-d-alloc-no" title="' + escapeHtml(allocDocText) + '">' + allocCellHtml + '</td>' +
                     '<td>' +
                     '<span class="vas-rr-type-chip ' + chipCls + '" title="' + escapeHtml(type) + '">' + chipText + '</span>' +
                     '<span class="vas-rr-d-inv-no">' + escapeHtml(refDocText) + '</span>' +
@@ -700,6 +782,7 @@
                 '<table class="vas-rr-alloc-table">' +
                 '<thead>' +
                 '<tr>' +
+                '<th>' + escapeHtml(lbl("VAS_AllocationNo", "Allocation No.")) + '</th>' +
                 '<th>' + escapeHtml(lbl("VAS_Reference", "Reference")) + '</th>' +
                 '<th>' + escapeHtml(lbl("VAS_Date", "Date")) + '</th>' +
                 '<th class="vas-rr-d-num">' + escapeHtml(lbl("VAS_InvoiceAmount", "Document amount")) + '</th>' +
@@ -777,6 +860,15 @@
             $dialogPrint.on('click', function (e) {
                 e.stopPropagation();
                 printReceipt();
+            });
+
+            /* Allocation No. hyperlink → zoom to the allocation record.
+               Delegated on the container because the allocation table is
+               re-rendered on every modal open. */
+            $dialogAlloc.on('click', 'a.js-rr-alloc-zoom', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                zoomToAllocation(Number($(this).attr('data-alloc-hdr-id') || 0));
             });
 
             $dialog.find('.vas-rr-dialog-close').on('click', function (e) {
@@ -869,6 +961,17 @@
                 loadRows();
             });
 
+            /* Receipt No. hyperlink → zoom to the receipt record. Bound BEFORE
+               the row handler and stops propagation, so clicking the number
+               zooms instead of opening the detail modal; clicking anywhere
+               else on the row still opens the modal. */
+            $tbody.on('click', 'a.js-rr-doc-zoom', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var pid = Number($(this).closest('tr.vas-rr-tr').attr('data-payment-id') || 0);
+                zoomToReceipt(pid);
+            });
+
             /* Row click → open detail modal. Delegated so re-rendered rows
                keep their handler across pages. */
             $tbody.on('click', 'tr.vas-rr-tr', function () {
@@ -878,9 +981,26 @@
 
             $tbody.on('keydown', 'tr.vas-rr-tr', function (e) {
                 if (e.key === 'Enter' || e.key === ' ') {
+                    /* Focus sitting on the Receipt No. link: let the link act
+                       (zoom) instead of opening the modal underneath it. */
+                    if ($(e.target).closest('a.js-rr-doc-zoom').length) {
+                        if (e.key === ' ') { e.preventDefault(); }
+                        return;
+                    }
                     e.preventDefault();
                     var pid = Number($(this).attr('data-payment-id') || 0);
                     if (pid > 0) { openDialog(pid); }
+                }
+            });
+
+            /* Keyboard activation of the link itself (Enter fires a native
+               click on <a>, Space does not — handle it explicitly). */
+            $tbody.on('keydown', 'a.js-rr-doc-zoom', function (e) {
+                if (e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var pid = Number($(this).closest('tr.vas-rr-tr').attr('data-payment-id') || 0);
+                    zoomToReceipt(pid);
                 }
             });
 
@@ -929,6 +1049,26 @@
     };
 
     VAS.VAS_RecentReceiptsWidget.prototype.widgetSizeChange = function (height, width) { };
+
+    /* Relay the fired value (zoom params) to the registered widget host. Without
+       these two hooks the widget has no widgetFirevalueChanged at all and the
+       Receipt No. link throws instead of zooming.
+       Returns true when a host actually consumed the value, so the caller can
+       fall back to opening a separate window when the widget is running on a
+       plain dashboard with no host tab to drive. */
+    VAS.VAS_RecentReceiptsWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener && typeof this.listener.widgetFirevalueChanged === "function") {
+            this.listener.widgetFirevalueChanged(value);
+            return true;
+        }
+        return false;
+    };
+
+    /* The widget host registers itself here so the widget can drive the host
+       (open the record in the window's own tab instead of a new window). */
+    VAS.VAS_RecentReceiptsWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
+    };
 
     VAS.VAS_RecentReceiptsWidget.prototype.refreshWidget = function () {
         this.refreshWidget();

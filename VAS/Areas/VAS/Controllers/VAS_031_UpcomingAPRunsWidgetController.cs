@@ -903,8 +903,7 @@ ORDER BY
 
                 List<object> organizations = ReadLookupRows(
                     ctx,
-                    @"
-SELECT
+                    @" SELECT
     Organization.AD_Org_ID AS ID,
     Organization.Name AS Name
 FROM AD_Org Organization
@@ -912,9 +911,7 @@ WHERE Organization.IsActive = 'Y'
 AND Organization.AD_Client_ID = " + clientIdSql + @"
 AND Organization.AD_Org_ID > 0",
                     "Organization",
-                    @"
-ORDER BY
-    Organization.Name");
+                    @" ORDER BY Organization.Name");
 
                 currentLookup = "bankAccounts";
 
@@ -924,8 +921,7 @@ ORDER BY
 
                 List<object> vendors = ReadLookupRows(
                     ctx,
-                    @"
-SELECT
+                    @" SELECT
     BusinessPartner.C_BPartner_ID AS ID,
     BusinessPartner.Name AS Name
 FROM C_BPartner BusinessPartner
@@ -934,41 +930,33 @@ AND BusinessPartner.IsVendor = 'Y'
 AND BusinessPartner.IsSummary = 'N'
 AND BusinessPartner.AD_Client_ID = " + clientIdSql + @"",
                     "BusinessPartner",
-                    @"
-ORDER BY
-    BusinessPartner.Name");
+                    @" ORDER BY BusinessPartner.Name");
 
                 currentLookup = "currencies";
 
                 List<object> currencies = ReadLookupRows(
                     ctx,
-                    @"
-SELECT
+                    @" SELECT
     Currency.C_Currency_ID AS ID,
     Currency.ISO_Code AS Name
 FROM C_Currency Currency
 WHERE Currency.IsActive = 'Y'
 AND Currency.IsMyCurrency = 'Y'",
                     "Currency",
-                    @"
-ORDER BY
-    Currency.ISO_Code");
+                    @" ORDER BY Currency.ISO_Code");
 
                 currentLookup = "conversionTypes";
 
                 List<object> conversionTypes = ReadLookupRows(
                     ctx,
-                    @"
-SELECT
+                    @" SELECT
     ConversionType.C_ConversionType_ID AS ID,
     ConversionType.Name AS Name
 FROM C_ConversionType ConversionType
 WHERE ConversionType.IsActive = 'Y'
 AND ConversionType.AD_Client_ID IN (0, " + clientIdSql + @")",
                     "ConversionType",
-                    @"
-ORDER BY
-    ConversionType.Name");
+                    @" ORDER BY ConversionType.Name");
 
                 currentLookup = "documentTypes";
 
@@ -1096,11 +1084,9 @@ SELECT
     BankAccount.Name AS BankAccountName,
     BankAccount.AccountNo,
     Currency.ISO_Code AS CurrencyISO
-FROM C_BankAccount BankAccount
-LEFT OUTER JOIN C_Bank Bank ON
-    (Bank.C_Bank_ID = BankAccount.C_Bank_ID)
-LEFT OUTER JOIN C_Currency Currency ON
-    (Currency.C_Currency_ID = BankAccount.C_Currency_ID)
+FROM C_BankAccount BankAccount 
+LEFT OUTER JOIN C_Bank Bank ON (Bank.C_Bank_ID = BankAccount.C_Bank_ID) 
+LEFT OUTER JOIN C_Currency Currency ON (Currency.C_Currency_ID = BankAccount.C_Currency_ID) 
 WHERE BankAccount.IsActive = 'Y'
 AND BankAccount.AD_Client_ID = " + clientId
                 + (currencyId > 0 ? " AND BankAccount.C_Currency_ID = " + currencyId : string.Empty)

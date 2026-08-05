@@ -1,69 +1,97 @@
-﻿/**
+/**
  * AP Payment Match Suggestions Widget
- * Purpose - Shows the best purchase-invoice match for each available
- *           AP payment and allows individual or high-confidence allocation.
+ * Purpose - The PAYMENT (IsSOTrx = 'N') mirror of VAS_035_MatchSuggestions.
+ *           Pairs each unallocated vendor payment of the last 30 days with its
+ *           best-fit open purchase-invoice pay schedule (same partner, closest
+ *           amount in the PAYMENT currency, converted at the payment date) and
+ *           tags the pairing High / Review / Low. Every amount carries the AP
+ *           cycle sign — negative against a purchase invoice (API), positive
+ *           against a purchase return / credit memo (APC) — matching the
+ *           MultiplierAP convention the allocation line is written with. Each
+ *           row opens a match-review modal: confidence banner, payment ↔
+ *           invoice two-pane compare, balance strip and the "why this match"
+ *           signal list. The modal Apply
+ *           button POSTs to ApplyAllocation, which creates and completes a
+ *           C_AllocationHdr on the payment accounting date (same outcome as the
+ *           standard Allocation form). The header "Open allocation form" link
+ *           opens the standard Allocation form (AD_Form classname
+ *           VAdvantage.Apps.AForms.VAllocation) via
+ *           VIS.viewManager.startForm(AD_Form_ID); it stays visible and
+ *           clickable at all times, including while loading and when the list
+ *           has no suggestions.
+ *
+ * Backend - VAS_072_MatchSuggestionAPPaymentWidget/GetMatchSuggestions (paged list)
+ *           VAS_072_MatchSuggestionAPPaymentWidget/GetMatchDetail       (review modal)
+ *           VAS_072_MatchSuggestionAPPaymentWidget/ApplyAllocation      (create + complete allocation)
+ *           All three are thin wrappers over
+ *           VASLogic.Models.VAS_072_MatchSuggestionAPPaymentModel and return a
+ *           JSON string inside a JSON response, so responses are parsed twice.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────────────
  *  #  | Current Text                                      | Message Key
  * ----+---------------------------------------------------+---------------------------------------
  *  1  | Match Suggestions                                 | VAS_072_MatchSuggestions
  *  2  | Vendor payments paired with their best-fit...     | VAS_072_Subtitle
- *  3  | Apply high-confidence                             | VAS_072_ApplyHighConfidence
- *  4  | High                                              | VAS_072_High
- *  5  | Review                                            | VAS_072_Review
+ *  3  | High                                              | VAS_072_High
+ *  4  | Review                                            | VAS_072_Review
+ *  5  | Low                                               | VAS_072_Low
  *  6  | Open                                              | VAS_072_Open
  *  7  | Due                                               | VAS_072_Due
- *  8  | Suggestions                                       | VAS_072_Suggestions
- *  9  | Ready to allocate                                 | VAS_072_ReadyToAllocate
+ *  8  | suggestion                                        | VAS_072_Suggestion
+ *  9  | suggestions                                       | VAS_072_Suggestions
  * 10  | Open allocation form                              | VAS_072_OpenAllocationForm
+ * 10a | Could not open allocation form                    | VAS_072_OpenFormError
  * 11  | No match suggestions found                        | VAS_072_NoData
  * 12  | Could not load match suggestions                  | VAS_072_LoadError
  * 13  | Could not complete allocation                     | VAS_072_ApplyError
  * 14  | Allocation completed successfully                 | VAS_072_ApplySuccess
- * 15  | Could not open allocation form                    | VAS_072_OpenFormError
+ * 15  | Showing                                           | VAS_Showing
  * 16  | Previous                                          | VAS_Previous
  * 17  | Next                                              | VAS_Next
  * 18  | Of                                                | VAS_Of
  * 19  | Match review                                      | VAS_072_MatchReview
- * 20  | Could not load match details                       | VAS_072_LoadDetailError
+ * 20  | Could not load match details                      | VAS_072_LoadDetailError
  * 21  | Strong match                                      | VAS_072_HighConfidenceMatch
  * 22  | Needs review                                      | VAS_072_NeedsReview
- * 23  | payment and invoice line up                       | VAS_072_PaymentAndInvoiceLineUp
- * 24  | Vendor, amount and timing all agree.              | VAS_072_MatchSignalsAgree
- * 25  | Confidence                                        | VAS_072_Confidence
- * 26  | Vendor payment                                    | VAS_072_VendorPayment
- * 27  | Payment date                                      | VAS_PaymentDate
- * 28  | Vendor                                            | VAS_Vendor
- * 29  | Payment method                                    | VAS_072_PaymentMethod
- * 30  | Reference                                         | VAS_072_Reference
- * 31  | Bank account                                      | VAS_072_BankAccount
- * 32  | Currency                                          | VAS_PaymentCurrency
- * 33  | Amount paid                                       | VAS_072_AmountPaid
- * 34  | Suggested invoice                                 | VAS_072_SuggestedInvoice
- * 35  | Invoice date                                      | VAS_072_InvoiceDate
- * 36  | Payment terms                                     | VAS_072_PaymentTerms
- * 37  | Due date                                          | VAS_072_DueDate
- * 38  | Grand total                                       | VAS_072_GrandTotal
- * 39  | Open amount                                       | VAS_072_OpenAmount
- * 40  | balance — fully settles the invoice               | VAS_072_FullySettles
- * 41  | still open after apply                            | VAS_072_StillOpen
- * 42  | Why this match                                    | VAS_072_WhyThisMatch
- * 43  | Vendor matches                                    | VAS_072_VendorMatches
- * 44  | Payment and invoice belong to the same vendor     | VAS_072_VendorMatchesDetail
- * 45  | Amount matches                                    | VAS_072_AmountMatches
- * 46  | Amount differs                                    | VAS_072_AmountDiffers
- * 47  | vs                                                | VAS_072_Vs
- * 48  | Reference cited                                   | VAS_072_ReferenceCited
- * 49  | No reference cited                                | VAS_072_NoReferenceCited
- * 50  | Within due window                                 | VAS_072_WithinDueWindow
- * 51  | Outside due window                                | VAS_072_OutsideDueWindow
- * 52  | Apply as part-payment                             | VAS_072_ApplyPartPayment
- * 53  | Apply allocation                                  | VAS_072_ApplyAllocation
- * 54  | Close                                             | VAS_Close
- * 55  | High-confidence — safe to apply                   | VAS_072_HighConfidenceSafe
- * 56  | Skip                                              | VAS_072_Skip
- * 57  | Document type                                     | VAS_072_DocumentType
- * 58  | Return                                            | VAS_072_ReturnCycle
+ * 23  | Low confidence match                              | VAS_072_LowConfidence
+ * 24  | payment and invoice line up                       | VAS_072_PaymentAndInvoiceLineUp
+ * 25  | Vendor, amount and timing all agree.              | VAS_072_MatchSignalsAgree
+ * 26  | Confidence                                        | VAS_072_Confidence
+ * 27  | Vendor payment                                    | VAS_072_VendorPayment
+ * 28  | Payment date                                      | VAS_PaymentDate
+ * 29  | Vendor                                            | VAS_Vendor
+ * 30  | Payment method                                    | VAS_072_PaymentMethod
+ * 31  | Reference                                         | VAS_072_Reference
+ * 32  | Bank account                                      | VAS_072_BankAccount
+ * 33  | Currency                                          | VAS_PaymentCurrency
+ * 34  | Amount paid                                       | VAS_072_AmountPaid
+ * 35  | Suggested invoice                                 | VAS_072_SuggestedInvoice
+ * 36  | Invoice date                                      | VAS_072_InvoiceDate
+ * 37  | Payment terms                                     | VAS_072_PaymentTerms
+ * 38  | Due date                                          | VAS_072_DueDate
+ * 39  | Grand total                                       | VAS_072_GrandTotal
+ * 40  | Open amount                                       | VAS_072_OpenAmount
+ * 41  | balance — fully settles the invoice               | VAS_072_FullySettles
+ * 42  | still open after apply                            | VAS_072_StillOpen
+ * 43  | remains unallocated on the payment after apply    | VAS_072_RemainsOnPayment
+ * 44  | Why this match                                    | VAS_072_WhyThisMatch
+ * 45  | Vendor matches                                    | VAS_072_VendorMatches
+ * 46  | Payment and invoice belong to the same vendor     | VAS_072_VendorMatchesDetail
+ * 47  | Amount matches                                    | VAS_072_AmountMatches
+ * 48  | Amount differs                                    | VAS_072_AmountDiffers
+ * 49  | vs                                                | VAS_072_Vs
+ * 50  | Reference cited                                   | VAS_072_ReferenceCited
+ * 51  | Invoice number found in the payment reference     | VAS_072_ReferenceCitedDetail
+ * 52  | No reference cited                                | VAS_072_NoReferenceCited
+ * 53  | Invoice number not found in the payment reference | VAS_072_NoReferenceCitedDetail
+ * 54  | Within due window                                 | VAS_072_WithinDueWindow
+ * 55  | Outside due window                                | VAS_072_OutsideDueWindow
+ * 56  | days from due date                                | VAS_072_DaysFromDueDate
+ * 57  | Apply as part-payment                             | VAS_072_ApplyPartPayment
+ * 58  | Apply allocation                                  | VAS_072_ApplyAllocation
+ * 59  | Close                                             | VAS_Close
+ * 60  | Skip                                              | VAS_072_Skip
+ * 61  | Document type                                     | VAS_072_DocumentType
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -94,8 +122,6 @@
         var $busy = null;
         var $state = null;
         var $stateText = null;
-        var $applyHigh = null;
-        var $footerSummary = null;
         var $showingText = null;
         var $pagerPrev = null;
         var $pagerNext = null;
@@ -107,22 +133,30 @@
         var $reviewBusy = null;
         var $reviewTitle = null;
         var $reviewSub = null;
+        var $reviewFootnote = null;
         var $reviewApply = null;
 
         var pageNo = 1;
         var pageSize = 6;
         var totalPages = 0;
         var totalRecords = 0;
-        var totalReadyAmount = 0;
-        var highConfidenceCount = 0;
 
+        /* AD_Form_ID of the standard Allocation form (resolved server-side from
+           AD_Form.ClassName = 'VAdvantage.Apps.AForms.VAllocation'). */
         var allocationFormId = 0;
-        var serverStdPrecision = 2;
 
         var currentRows = [];
+
+        /* Pairing currently shown in the modal — the Apply target. The pay
+           schedule id pins the allocation to exactly the suggested schedule. */
         var currentReviewRow = null;
 
+        /* Only a pairing whose detail actually came back may be applied — the
+           busy overlay clearing must not re-enable Apply over an error state. */
+        var reviewDetailLoaded = false;
+
         var isLoading = false;
+        var isApplying = false;
         var isDisposed = false;
 
         var activeListRequest = null;
@@ -187,6 +221,11 @@
             return Math.floor(precision);
         }
 
+        /*
+         * The endpoints serialize the model to a JSON string and then return
+         * that string as the JSON payload, so a response can need parsing
+         * twice before it is an object.
+         */
         function parseResponse(response) {
             if (
                 response == null ||
@@ -219,96 +258,6 @@
             }
         }
 
-        function extractAjaxError(
-            xhr,
-            errorThrown
-        ) {
-            if (
-                xhr &&
-                xhr.responseJSON
-            ) {
-                var jsonData =
-                    parseResponse(
-                        xhr.responseJSON
-                    );
-
-                if (jsonData) {
-                    return getServerMessage(
-                        jsonData,
-                        errorThrown
-                    );
-                }
-            }
-
-            if (
-                xhr &&
-                xhr.responseText
-            ) {
-                var responseData =
-                    parseResponse(
-                        xhr.responseText
-                    );
-
-                if (responseData) {
-                    return getServerMessage(
-                        responseData,
-                        xhr.responseText
-                    );
-                }
-
-                return xhr.responseText;
-            }
-
-            if (errorThrown) {
-                return errorThrown;
-            }
-
-            return lbl(
-                "VAS_072_LoadError",
-                "Could not load match suggestions"
-            );
-        }
-
-        function getServerMessage(
-            data,
-            fallback
-        ) {
-            var key;
-
-            if (!data) {
-                return fallback || "";
-            }
-
-            key =
-                data.errorKey ||
-                data.messageKey;
-
-            if (key) {
-                return lbl(
-                    key,
-                    data.error ||
-                    data.errorText ||
-                    data.message ||
-                    fallback ||
-                    ""
-                );
-            }
-
-            if (data.error) {
-                return String(data.error);
-            }
-
-            if (data.errorText) {
-                return String(data.errorText);
-            }
-
-            if (data.message) {
-                return String(data.message);
-            }
-
-            return fallback || "";
-        }
-
         function setBusy(show) {
             isLoading = Boolean(show);
 
@@ -316,22 +265,6 @@
                 $busy.toggleClass(
                     "is-visible",
                     isLoading
-                );
-            }
-
-            if ($applyHigh) {
-                $applyHigh.prop(
-                    "disabled",
-                    isLoading ||
-                    highConfidenceCount <= 0
-                );
-            }
-
-            if ($openForm) {
-                $openForm.prop(
-                    "disabled",
-                    isLoading ||
-                    allocationFormId <= 0
                 );
             }
 
@@ -363,51 +296,6 @@
             }
         }
 
-        function getContextPrecision() {
-            var precision = 2;
-
-            try {
-                if (
-                    VIS.Env &&
-                    VIS.Env.getCtx &&
-                    VIS.Env.getCtx() &&
-                    VIS.Env.getCtx().getStdPrecision
-                ) {
-                    precision = Number(
-                        VIS.Env
-                            .getCtx()
-                            .getStdPrecision()
-                    );
-                }
-            }
-            catch (error) {
-                precision = 2;
-            }
-
-            return normalizePrecision(
-                precision
-            );
-        }
-
-        function getAmountPrecision(row) {
-            if (
-                row &&
-                row.stdPrecision != null
-            ) {
-                return normalizePrecision(
-                    row.stdPrecision
-                );
-            }
-
-            if (serverStdPrecision != null) {
-                return normalizePrecision(
-                    serverStdPrecision
-                );
-            }
-
-            return getContextPrecision();
-        }
-
         /**
          * True when the session runs a right-to-left culture
          * (Arabic/Farsi); the login sets dir on <html>.
@@ -432,42 +320,12 @@
                 : "→";
         }
 
-        function formatAmount(
-            value,
-            precision
-        ) {
+        function formatNumber(value, precision) {
             var amount =
-                toNumber(
-                    value,
-                    0
-                );
+                toNumber(value, 0);
 
             var decimalPrecision =
-                normalizePrecision(
-                    precision
-                );
-
-            try {
-                if (
-                    VIS.Utility &&
-                    VIS.Utility.Util &&
-                    VIS.Utility.Util
-                        .getValueOfDecimal
-                ) {
-                    amount =
-                        VIS.Utility.Util
-                            .getValueOfDecimal(
-                                amount
-                            );
-                }
-            }
-            catch (error) {
-                amount =
-                    toNumber(
-                        value,
-                        0
-                    );
-            }
+                normalizePrecision(precision);
 
             try {
                 return amount.toLocaleString(
@@ -486,6 +344,40 @@
                     decimalPrecision
                 );
             }
+        }
+
+        /*
+         * The sign is carried outside the symbol so a refund cycle reads
+         * "-$120.00" rather than "$-120.00".
+         */
+        function formatAmount(value, symbol, precision) {
+            var numericValue =
+                toNumber(value, 0);
+
+            var sign =
+                numericValue < 0
+                    ? "-"
+                    : "";
+
+            var amount =
+                formatNumber(
+                    Math.abs(numericValue),
+                    precision
+                );
+
+            var currencySymbol =
+                symbol
+                    ? String(symbol)
+                    : "";
+
+            /* 3-char ISO codes read better after the amount; glyph symbols before. */
+            if (currencySymbol.length === 3) {
+                return sign + amount + " " + currencySymbol;
+            }
+
+            return currencySymbol
+                ? sign + currencySymbol + amount
+                : sign + amount;
         }
 
         function formatDate(value) {
@@ -532,32 +424,67 @@
             }
         }
 
-        function buildAmountText(
-            row,
-            value
-        ) {
-            var symbol =
-                row.currencySymbol ||
-                row.currencyISOCode ||
-                "";
-
-            var numericValue =
-                toNumber(value, 0);
-
+        /* AP display sign, keyed off the invoice document base type: a purchase
+           invoice (API) reads NEGATIVE — money leaving — and a purchase return
+           / credit memo (APC) reads POSITIVE. This is the same MultiplierAP
+           convention the allocation line is written with, so what the card
+           shows agrees in sign with the document it creates. The server keeps
+           its own signing for the matching maths (both legs must agree in sign
+           to pair at all); this is presentation only, hence the magnitude.  */
+        function cycleAmount(value, invoiceDocBaseType) {
             var sign =
-                numericValue < 0
-                    ? "-"
-                    : "";
+                invoiceDocBaseType === "APC"
+                    ? 1
+                    : -1;
 
-            var amount =
-                formatAmount(
-                    Math.abs(numericValue),
-                    getAmountPrecision(row)
-                );
+            return sign * Math.abs(toNumber(value, 0));
+        }
 
-            return symbol
-                ? sign + symbol + amount
-                : sign + amount;
+        /* Both list amounts arrive in the PAYMENT currency (the invoice open
+           amount is converted server-side at the payment accounting date), so
+           one symbol/precision pair covers the whole row. */
+        function rowAmount(row, value) {
+            return formatAmount(
+                value,
+                row.PaymentCurrencySymbol ||
+                row.PaymentCurrency,
+                row.PaymentPrecision
+            );
+        }
+
+        function confidenceOf(value) {
+            var confidence =
+                String(value || "")
+                    .toUpperCase();
+
+            return confidence === "HIGH" ||
+                confidence === "REVIEW"
+                ? confidence
+                : "LOW";
+        }
+
+        function confidenceLabel(confidence) {
+            if (confidence === "HIGH") {
+                return lbl("VAS_072_High", "High");
+            }
+
+            if (confidence === "REVIEW") {
+                return lbl("VAS_072_Review", "Review");
+            }
+
+            return lbl("VAS_072_Low", "Low");
+        }
+
+        function confidenceSuffix(confidence) {
+            if (confidence === "HIGH") {
+                return "high";
+            }
+
+            if (confidence === "REVIEW") {
+                return "review";
+            }
+
+            return "low";
         }
 
         function renderRows(rows) {
@@ -594,21 +521,18 @@
                     currentRows[i] || {};
 
                 var confidence =
-                    String(
-                        row.confidence || ""
-                    ).toUpperCase();
+                    confidenceOf(row.Confidence);
 
-                var isHigh =
-                    confidence === "HIGH";
-
+                /* APC = purchase credit memo: the refund cycle, where both
+                   legs are negative and the allocation line flips sign. */
                 var isReturnCycle =
-                    !!row.isReturnCycle;
+                    row.InvoiceDocBaseType === "APC";
 
                 var rowClass =
                     classPrefix +
                     "row" +
                     (
-                        isHigh
+                        confidence === "HIGH"
                             ? ""
                             : " " +
                             classPrefix +
@@ -622,58 +546,33 @@
                             : ""
                     );
 
-                var returnTagHtml =
-                    isReturnCycle
-                        ? '<span class="' +
-                        classPrefix +
-                        'return-tag">' +
-                        escapeHtml(
-                            lbl(
-                                "VAS_072_ReturnCycle",
-                                "Return"
-                            )
-                        ) +
-                        "</span>"
-                        : "";
-
                 var confidenceClass =
                     classPrefix +
                     "confidence " +
-                    (
-                        isHigh
-                            ? classPrefix +
-                            "confidence-high"
-                            : classPrefix +
-                            "confidence-review"
-                    );
-
-                var confidenceText =
-                    isHigh
-                        ? lbl(
-                            "VAS_072_High",
-                            "High"
-                        )
-                        : lbl(
-                            "VAS_072_Review",
-                            "Review"
-                        );
+                    classPrefix +
+                    "confidence-" +
+                    confidenceSuffix(confidence);
 
                 var paymentAmount =
-                    buildAmountText(
+                    rowAmount(
                         row,
-                        row.paymentAmount
+                        cycleAmount(
+                            row.PaymentAmount,
+                            row.InvoiceDocBaseType
+                        )
                     );
 
                 var invoiceOpenAmount =
-                    buildAmountText(
+                    rowAmount(
                         row,
-                        row.invoiceOpenAmount
+                        cycleAmount(
+                            row.OpenAmount,
+                            row.InvoiceDocBaseType
+                        )
                     );
 
                 var dueDate =
-                    formatDate(
-                        row.dueDate
-                    );
+                    formatDate(row.DueDate);
 
                 /*
                  * Built as markup rather than plain text so each
@@ -729,7 +628,7 @@
                     'row-title">' +
 
                     escapeHtml(
-                        row.vendorName || ""
+                        row.Vendor || ""
                     ) +
 
                     /*
@@ -762,8 +661,7 @@
                     'mono">' +
 
                     escapeHtml(
-                        row.paymentDocumentNo ||
-                        ""
+                        row.PaymentNo || ""
                     ) +
 
                     "</span>" +
@@ -781,8 +679,7 @@
                     'invoice">' +
 
                     escapeHtml(
-                        row.invoiceDocumentNo ||
-                        ""
+                        row.InvoiceNo || ""
                     ) +
 
                     "</span>" +
@@ -802,14 +699,12 @@
                     classPrefix +
                     'actions">' +
 
-                    returnTagHtml +
-
                     '<span class="' +
                     confidenceClass +
                     '">' +
 
                     escapeHtml(
-                        confidenceText
+                        confidenceLabel(confidence)
                     ) +
 
                     "</span>" +
@@ -873,15 +768,15 @@
             data = data || {};
 
             var rows =
-                Array.isArray(data.rows)
-                    ? data.rows
+                Array.isArray(data.Rows)
+                    ? data.Rows
                     : [];
 
             pageNo =
                 Math.max(
                     1,
                     toNumber(
-                        data.pageNo,
+                        data.PageNo,
                         pageNo
                     )
                 );
@@ -890,7 +785,7 @@
                 Math.max(
                     0,
                     toNumber(
-                        data.totalPages,
+                        data.TotalPages,
                         0
                     )
                 );
@@ -899,145 +794,61 @@
                 Math.max(
                     0,
                     toNumber(
-                        data.totalRecords,
+                        data.TotalRecords,
                         0
                     )
                 );
 
-            totalReadyAmount =
-                toNumber(
-                    data.totalReadyAmount,
-                    0
-                );
-
-            highConfidenceCount =
+            /* Keep the last id that actually resolved: an empty page or a
+               failed reload must not take the Allocation form link away. */
+            var resolvedFormId =
                 Math.max(
                     0,
                     toNumber(
-                        data.highConfidenceCount,
+                        data.AllocationFormId,
                         0
                     )
                 );
 
-            serverStdPrecision =
-                normalizePrecision(
-                    data.stdPrecision != null
-                        ? data.stdPrecision
-                        : serverStdPrecision
-                );
-
-            allocationFormId =
-                Math.max(
-                    0,
-                    toNumber(
-                        data.allocationFormId,
-                        0
-                    )
-                );
-
-            if ($openForm) {
-                $openForm.toggle(
-                    allocationFormId > 0
-                );
-
-                $openForm.prop(
-                    "disabled",
-                    isLoading ||
-                    allocationFormId <= 0
-                );
+            if (resolvedFormId > 0) {
+                allocationFormId = resolvedFormId;
             }
 
             renderRows(rows);
-            updateFooter(data);
             updatePager();
-
-            if ($applyHigh) {
-                $applyHigh.prop(
-                    "disabled",
-                    isLoading ||
-                    highConfidenceCount <= 0
-                );
-            }
-        }
-
-        function updateFooter(data) {
-            if (!$footerSummary) {
-                return;
-            }
-
-            data = data || {};
-
-            var symbol =
-                data.currencySymbol ||
-                data.currencyISOCode ||
-                "";
-
-            var displayAmount =
-                (
-                    Number(totalReadyAmount || 0) < 0
-                        ? "-"
-                        : ""
-                ) +
-                (
-                    symbol
-                        ? symbol
-                        : ""
-                ) +
-                formatAmount(
-                    Math.abs(
-                        Number(totalReadyAmount || 0)
-                    ),
-                    serverStdPrecision
-                );
-
-            $footerSummary.html(
-                "<strong>" +
-                escapeHtml(
-                    totalRecords
-                ) +
-                "</strong> " +
-
-                escapeHtml(
-                    lbl(
-                        "VAS_072_Suggestions",
-                        "Suggestions"
-                    )
-                ) +
-
-                " · <strong>" +
-                escapeHtml(
-                    displayAmount
-                ) +
-                "</strong> " +
-
-                escapeHtml(
-                    lbl(
-                        "VAS_072_ReadyToAllocate",
-                        "Ready to allocate"
-                    )
-                )
-            );
         }
 
         function updatePager() {
+            /* Left helper: "Showing X-Y of Z suggestions" result range. */
             if ($showingText) {
-                var startIndex =
-                    totalRecords > 0
-                        ? ((pageNo - 1) * pageSize) + 1
-                        : 0;
+                if (totalRecords > 0) {
+                    var startIndex =
+                        ((pageNo - 1) * pageSize) + 1;
 
-                var endIndex =
-                    totalRecords > 0
-                        ? Math.min(pageNo * pageSize, totalRecords)
-                        : 0;
+                    var endIndex =
+                        Math.min(pageNo * pageSize, totalRecords);
 
-                $showingText.text(
-                    totalRecords > 0
-                        ? lbl("VAS_Showing", "Showing") + " " +
-                          startIndex + "–" + endIndex + " " +
-                          lbl("VAS_Of", "of") + " " + totalRecords
-                        : ""
-                );
+                    var suggestionLabel =
+                        totalRecords === 1
+                            ? lbl(
+                                "VAS_072_Suggestion",
+                                "suggestion"
+                            )
+                            : lbl(
+                                "VAS_072_Suggestions",
+                                "suggestions"
+                            );
+
+                    $showingText.text(
+                        lbl("VAS_Showing", "Showing") + " " +
+                        startIndex + "–" + endIndex + " " +
+                        lbl("VAS_Of", "of") + " " + totalRecords + " " +
+                        suggestionLabel
+                    );
+                }
+                else {
+                    $showingText.text("");
+                }
             }
 
             /* The indicator always reads, down to "1 of 1" on an empty or
@@ -1107,52 +918,20 @@
                     var data =
                         parseResponse(response);
 
-                    console.log(
-                        "VAS_072 GetMatchSuggestions response:",
-                        data
-                    );
-
-                    if (
-                        !data ||
-                        data.success !== true ||
-                        data.error
-                    ) {
+                    if (!data) {
                         renderResult({});
 
-                        var message =
-                            getServerMessage(
-                                data,
-                                lbl(
-                                    "VAS_072_LoadError",
-                                    "Could not load match suggestions"
-                                )
-                            );
-
-                        console.error(
-                            "VAS_072 GetMatchSuggestions error:",
-                            message,
-                            data
+                        showState(
+                            lbl(
+                                "VAS_072_LoadError",
+                                "Could not load match suggestions"
+                            )
                         );
-
-                        showState(message);
 
                         return;
                     }
 
                     renderResult(data);
-
-                    if (
-                        data.hasData === false ||
-                        !Array.isArray(data.rows) ||
-                        data.rows.length === 0
-                    ) {
-                        showState(
-                            lbl(
-                                "VAS_072_NoData",
-                                "No match suggestions found"
-                            )
-                        );
-                    }
                 },
 
                 error: function (
@@ -1169,12 +948,6 @@
 
                     renderResult({});
 
-                    var message =
-                        extractAjaxError(
-                            xhr,
-                            errorThrown
-                        );
-
                     console.error(
                         "VAS_072 GetMatchSuggestions AJAX error:",
                         status,
@@ -1184,7 +957,12 @@
                             : ""
                     );
 
-                    showState(message);
+                    showState(
+                        lbl(
+                            "VAS_072_LoadError",
+                            "Could not load match suggestions"
+                        )
+                    );
                 },
 
                 complete: function () {
@@ -1218,7 +996,8 @@
                     .prop(
                         "disabled",
                         Boolean(show) ||
-                        !currentReviewRow
+                        !currentReviewRow ||
+                        !reviewDetailLoaded
                     )
                     .toggleClass(
                         "is-loading",
@@ -1235,6 +1014,32 @@
             }
         }
 
+        /* ── Allocation form (VAdvantage.Apps.AForms.VAllocation) ─────── */
+
+        /* Always live — the link is not gated on the list having loaded or on
+           there being any suggestion to show. It only fails when the standard
+           Allocation form is not registered, and that is worth telling the
+           user rather than swallowing as a dead click. */
+        function openAllocationForm() {
+            if (allocationFormId <= 0) {
+                VIS.ADialog.error(
+                    null,
+                    null,
+                    lbl(
+                        "VAS_072_OpenFormError",
+                        "Could not open allocation form"
+                    )
+                );
+
+                return;
+            }
+
+            closeReviewDialog();
+            VIS.viewManager.startForm(allocationFormId);
+        }
+
+        /* ── Match-review modal ───────────────────────────────────────── */
+
         function openReviewDialog(row) {
             if (
                 isDisposed ||
@@ -1246,6 +1051,8 @@
             }
 
             currentReviewRow = row;
+            reviewDetailLoaded = false;
+            isApplying = false;
 
             if ($reviewTitle) {
                 $reviewTitle.text(
@@ -1254,8 +1061,8 @@
                         "Match review"
                     ) +
                     (
-                        row.vendorName
-                            ? " · " + row.vendorName
+                        row.Vendor
+                            ? " · " + row.Vendor
                             : ""
                     )
                 );
@@ -1264,14 +1071,14 @@
             if ($reviewSub) {
                 $reviewSub.text(
                     (
-                        row.paymentDocumentNo || ""
+                        row.PaymentNo || ""
                     ) +
                     (
-                        row.invoiceDocumentNo
+                        row.InvoiceNo
                             ? " " +
                               flowArrow() +
                               " " +
-                              row.invoiceDocumentNo
+                              row.InvoiceNo
                             : ""
                     )
                 );
@@ -1297,6 +1104,10 @@
                     .empty();
             }
 
+            if ($reviewFootnote) {
+                $reviewFootnote.text("");
+            }
+
             showReviewBusy(true);
 
             abortRequest(activeDetailRequest);
@@ -1312,19 +1123,19 @@
                 data: {
                     paymentId:
                         toNumber(
-                            row.paymentId,
+                            row.PaymentId,
                             0
                         ),
 
                     invoiceId:
                         toNumber(
-                            row.invoiceId,
+                            row.InvoiceId,
                             0
                         ),
 
                     payScheduleId:
                         toNumber(
-                            row.payScheduleId,
+                            row.InvoicePayScheduleId,
                             0
                         )
                 },
@@ -1337,26 +1148,18 @@
                     var data =
                         parseResponse(response);
 
-                    if (
-                        !data ||
-                        data.success !== true ||
-                        data.error ||
-                        !data.detail
-                    ) {
+                    if (!data) {
                         renderReviewEmpty(
-                            getServerMessage(
-                                data,
-                                lbl(
-                                    "VAS_072_LoadDetailError",
-                                    "Could not load match details"
-                                )
+                            lbl(
+                                "VAS_072_LoadDetailError",
+                                "Could not load match details"
                             )
                         );
 
                         return;
                     }
 
-                    renderReviewDetail(data.detail);
+                    renderReviewDetail(data);
                 },
 
                 error: function (
@@ -1371,10 +1174,19 @@
                         return;
                     }
 
+                    console.error(
+                        "VAS_072 GetMatchDetail AJAX error:",
+                        status,
+                        errorThrown,
+                        xhr
+                            ? xhr.responseText
+                            : ""
+                    );
+
                     renderReviewEmpty(
-                        extractAjaxError(
-                            xhr,
-                            errorThrown
+                        lbl(
+                            "VAS_072_LoadDetailError",
+                            "Could not load match details"
                         )
                     );
                 },
@@ -1404,6 +1216,7 @@
             );
 
             currentReviewRow = null;
+            reviewDetailLoaded = false;
 
             if ($reviewBody) {
                 $reviewBody.empty();
@@ -1411,6 +1224,8 @@
         }
 
         function renderReviewEmpty(message) {
+            reviewDetailLoaded = false;
+
             if (!$reviewBody) {
                 return;
             }
@@ -1428,59 +1243,39 @@
                 ) +
                 "</div>"
             );
+
+            if ($reviewApply) {
+                $reviewApply.prop("disabled", true);
+            }
         }
 
-        function formatDetailAmount(
-            detail,
-            value,
-            side
-        ) {
-            var symbol =
-                side === "invoice"
-                    ? (
-                        detail.invoiceCurrencySymbol ||
-                        detail.invoiceCurrencyISOCode ||
-                        ""
-                    )
-                    : (
-                        detail.paymentCurrencySymbol ||
-                        detail.paymentCurrencyISOCode ||
-                        ""
-                    );
+        function paymentAmountText(detail, value) {
+            return formatAmount(
+                value,
+                detail.PaymentCurrencySymbol ||
+                detail.PaymentCurrency,
+                detail.PaymentPrecision
+            );
+        }
 
-            var precision =
-                side === "invoice"
-                    ? detail.invoicePrecision
-                    : detail.paymentPrecision;
-
-            var numericValue =
-                toNumber(value, 0);
-
-            var sign =
-                numericValue < 0
-                    ? "-"
-                    : "";
-
-            var amount =
-                formatAmount(
-                    Math.abs(numericValue),
-                    normalizePrecision(precision)
-                );
-
-            return symbol
-                ? sign + symbol + amount
-                : sign + amount;
+        function invoiceAmountText(detail, value) {
+            return formatAmount(
+                value,
+                detail.InvoiceCurrencySymbol ||
+                detail.InvoiceCurrency,
+                detail.InvoicePrecision
+            );
         }
 
         function formatBankAccount(detail) {
             var bankName =
-                detail && detail.bankName
-                    ? String(detail.bankName).trim()
+                detail && detail.BankName
+                    ? String(detail.BankName).trim()
                     : "";
 
             var accountNo =
-                detail && detail.accountNo
-                    ? String(detail.accountNo).trim()
+                detail && detail.AccountNo
+                    ? String(detail.AccountNo).trim()
                     : "";
 
             var last4 =
@@ -1590,16 +1385,35 @@
             }
 
             var confidence =
-                String(
-                    detail.confidence || ""
-                ).toUpperCase();
+                confidenceOf(detail.Confidence);
+
+            /* Every amount on the card carries the AP cycle sign (API negative,
+               APC positive), so both panes, the balance strip and the amount
+               signal read the same way round. */
+            var invoiceDocBaseType =
+                detail.InvoiceDocBaseType;
+
+            var paymentMagnitude =
+                Math.abs(toNumber(detail.PaymentAmount, 0));
+
+            var openPayMagnitude =
+                Math.abs(toNumber(detail.OpenAmountPay, 0));
+
+            /* Short = the payment covers less than the schedule, so the
+               remainder stays open on the schedule (a part-payment).
+               Over = the payment exceeds it and the surplus stays
+               unallocated on the payment. Compared on magnitudes so the
+               refund cycle, where both legs are negative, reads the same. */
+            var isShort =
+                openPayMagnitude - paymentMagnitude > 0;
+
+            var isOver =
+                paymentMagnitude - openPayMagnitude > 0;
 
             var bannerClass =
-                confidence === "HIGH"
-                    ? classPrefix +
-                      "review-banner-high"
-                    : classPrefix +
-                      "review-banner-review";
+                classPrefix +
+                "review-banner-" +
+                confidenceSuffix(confidence);
 
             var verdict =
                 confidence === "HIGH"
@@ -1607,16 +1421,23 @@
                         "VAS_072_HighConfidenceMatch",
                         "Strong match"
                     )
-                    : lbl(
-                        "VAS_072_NeedsReview",
-                        "Needs review"
+                    : (
+                        confidence === "REVIEW"
+                            ? lbl(
+                                "VAS_072_NeedsReview",
+                                "Needs review"
+                            )
+                            : lbl(
+                                "VAS_072_LowConfidence",
+                                "Low confidence match"
+                            )
                     );
 
             var score =
                 Math.max(
                     0,
                     toNumber(
-                        detail.score,
+                        detail.Score,
                         0
                     )
                 );
@@ -1676,46 +1497,42 @@
                 );
 
             var paymentAmount =
-                formatDetailAmount(
+                paymentAmountText(
                     detail,
-                    detail.paymentOpenAmount,
-                    "payment"
+                    cycleAmount(
+                        detail.PaymentAmount,
+                        invoiceDocBaseType
+                    )
                 );
 
             var invoiceGrand =
-                formatDetailAmount(
+                invoiceAmountText(
                     detail,
-                    detail.invoiceOriginalAmount,
-                    "invoice"
+                    cycleAmount(
+                        detail.GrandTotal,
+                        invoiceDocBaseType
+                    )
                 );
 
             var invoiceOpen =
-                formatDetailAmount(
+                invoiceAmountText(
                     detail,
-                    detail.invoiceOpenAmount,
-                    "invoice"
+                    cycleAmount(
+                        detail.OpenAmount,
+                        invoiceDocBaseType
+                    )
                 );
 
+            /* Open amount converted to the payment currency at the payment
+               accounting date — basis of the compare, the balance line and
+               the amount signal. */
             var invoiceOpenPay =
-                formatDetailAmount(
+                paymentAmountText(
                     detail,
-                    detail.invoiceOpenAmountPaymentCurrency,
-                    "payment"
-                );
-
-            var balance =
-                toNumber(
-                    detail.balanceAfterApply,
-                    0
-                );
-
-            var balanceText =
-                formatDetailAmount(
-                    detail,
-                    detail.isReturnCycle
-                        ? -Math.abs(balance)
-                        : Math.abs(balance),
-                    "payment"
+                    cycleAmount(
+                        detail.OpenAmountPay,
+                        invoiceDocBaseType
+                    )
                 );
 
             var paymentPane =
@@ -1735,7 +1552,7 @@
                 "</span>" +
                 '<strong>' +
                 escapeHtml(
-                    detail.paymentDocumentNo || ""
+                    detail.PaymentNo || ""
                 ) +
                 "</strong>" +
                 "</div>" +
@@ -1744,32 +1561,32 @@
                         "VAS_072_DocumentType",
                         "Document type"
                     ),
-                    detail.paymentDocTypeName
+                    detail.PaymentDocType
                 ) +
                 reviewPaneRow(
                     lbl(
                         "VAS_PaymentDate",
                         "Payment date"
                     ),
-                    formatDate(detail.paymentDate)
+                    formatDate(detail.PaymentDate)
                 ) +
                 reviewPaneRow(
                     lbl("VAS_Vendor", "Vendor"),
-                    detail.vendorName
+                    detail.PaymentVendor
                 ) +
                 reviewPaneRow(
                     lbl(
                         "VAS_072_PaymentMethod",
                         "Payment method"
                     ),
-                    detail.paymentMethodName
+                    detail.PaymentMethod
                 ) +
                 reviewPaneRow(
                     lbl(
                         "VAS_072_Reference",
                         "Reference"
                     ),
-                    detail.reference
+                    detail.Reference
                 ) +
                 reviewPaneRow(
                     lbl(
@@ -1783,7 +1600,7 @@
                         "VAS_PaymentCurrency",
                         "Currency"
                     ),
-                    detail.paymentCurrencyISOCode
+                    detail.PaymentCurrency
                 ) +
                 reviewPaneRow(
                     lbl(
@@ -1813,7 +1630,7 @@
                 "</span>" +
                 '<strong>' +
                 escapeHtml(
-                    detail.invoiceDocumentNo || ""
+                    detail.InvoiceNo || ""
                 ) +
                 "</strong>" +
                 "</div>" +
@@ -1822,32 +1639,32 @@
                         "VAS_072_DocumentType",
                         "Document type"
                     ),
-                    detail.invoiceDocTypeName
+                    detail.InvoiceDocType
                 ) +
                 reviewPaneRow(
                     lbl(
                         "VAS_072_InvoiceDate",
                         "Invoice date"
                     ),
-                    formatDate(detail.invoiceDate)
+                    formatDate(detail.InvoiceDate)
                 ) +
                 reviewPaneRow(
                     lbl("VAS_Vendor", "Vendor"),
-                    detail.vendorName
+                    detail.InvoiceVendor
                 ) +
                 reviewPaneRow(
                     lbl(
                         "VAS_072_PaymentTerms",
                         "Payment terms"
                     ),
-                    detail.paymentTerms
+                    detail.PaymentTerms
                 ) +
                 reviewPaneRow(
                     lbl(
                         "VAS_072_DueDate",
                         "Due date"
                     ),
-                    formatDate(detail.dueDate)
+                    formatDate(detail.DueDate)
                 ) +
                 reviewPaneRow(
                     lbl(
@@ -1861,7 +1678,7 @@
                         "VAS_PaymentCurrency",
                         "Currency"
                     ),
-                    detail.invoiceCurrencyISOCode
+                    detail.InvoiceCurrency
                 ) +
                 reviewPaneRow(
                     lbl(
@@ -1873,24 +1690,6 @@
                     "review-open"
                 ) +
                 "</div>";
-
-            var balanceClass =
-                balance === 0
-                    ? classPrefix +
-                      "review-balance-exact"
-                    : classPrefix +
-                      "review-balance-open";
-
-            var balanceLabel =
-                balance === 0
-                    ? lbl(
-                        "VAS_072_FullySettles",
-                        "balance — fully settles the invoice"
-                    )
-                    : lbl(
-                        "VAS_072_StillOpen",
-                        "still open after apply"
-                    );
 
             var compare =
                 '<div class="' +
@@ -1908,6 +1707,80 @@
                 invoicePane +
                 "</div>";
 
+            /* Balance strip (payment currency): exact / short / over, carrying
+               the same AP cycle sign as the two panes above it. */
+            var balanceClass;
+            var balanceLabel;
+            var balanceText;
+
+            if (isShort) {
+                balanceClass =
+                    classPrefix +
+                    "review-balance-open";
+
+                balanceLabel =
+                    lbl(
+                        "VAS_072_StillOpen",
+                        "still open after apply"
+                    );
+
+                balanceText =
+                    paymentAmountText(
+                        detail,
+                        cycleAmount(
+                            detail.BalanceAfterApply,
+                            invoiceDocBaseType
+                        )
+                    );
+            }
+            else if (isOver) {
+                balanceClass =
+                    classPrefix +
+                    "review-balance-open";
+
+                balanceLabel =
+                    lbl(
+                        "VAS_072_RemainsOnPayment",
+                        "remains unallocated on the payment after apply"
+                    );
+
+                balanceText =
+                    paymentAmountText(
+                        detail,
+                        cycleAmount(
+                            detail.BalanceAfterApply,
+                            invoiceDocBaseType
+                        )
+                    );
+            }
+            else {
+                balanceClass =
+                    classPrefix +
+                    "review-balance-exact";
+
+                balanceLabel =
+                    lbl(
+                        "VAS_072_FullySettles",
+                        "balance — fully settles the invoice"
+                    );
+
+                balanceText =
+                    paymentAmountText(detail, 0);
+            }
+
+            var gapDays =
+                toNumber(detail.DateGapDays, -1);
+
+            var gapText =
+                gapDays >= 0
+                    ? gapDays +
+                      " " +
+                      lbl(
+                          "VAS_072_DaysFromDueDate",
+                          "days from due date"
+                      )
+                    : "-";
+
             var why =
                 '<div class="' +
                 classPrefix +
@@ -1923,7 +1796,7 @@
                 ) +
                 "</div>" +
                 reviewCheckRow(
-                    !!detail.partnerOk,
+                    !!detail.PartnerOk,
                     lbl(
                         "VAS_072_VendorMatches",
                         "Vendor matches"
@@ -1934,8 +1807,8 @@
                     )
                 ) +
                 reviewCheckRow(
-                    !!detail.amountOk,
-                    detail.amountOk
+                    !!detail.AmountOk,
+                    detail.AmountOk
                         ? lbl(
                             "VAS_072_AmountMatches",
                             "Amount matches"
@@ -1951,8 +1824,8 @@
                     invoiceOpenPay
                 ) +
                 reviewCheckRow(
-                    !!detail.referenceOk,
-                    detail.referenceOk
+                    !!detail.RefOk,
+                    detail.RefOk
                         ? lbl(
                             "VAS_072_ReferenceCited",
                             "Reference cited"
@@ -1961,11 +1834,19 @@
                             "VAS_072_NoReferenceCited",
                             "No reference cited"
                         ),
-                    detail.reference || ""
+                    detail.RefOk
+                        ? lbl(
+                            "VAS_072_ReferenceCitedDetail",
+                            "Invoice number found in the payment reference"
+                        )
+                        : lbl(
+                            "VAS_072_NoReferenceCitedDetail",
+                            "Invoice number not found in the payment reference"
+                        )
                 ) +
                 reviewCheckRow(
-                    !!detail.dateOk,
-                    detail.dateOk
+                    !!detail.DateOk,
+                    detail.DateOk
                         ? lbl(
                             "VAS_072_WithinDueWindow",
                             "Within due window"
@@ -1974,18 +1855,7 @@
                             "VAS_072_OutsideDueWindow",
                             "Outside due window"
                         ),
-                    (
-                        formatDate(detail.paymentDate) ||
-                        ""
-                    ) +
-                    (
-                        detail.dueDate
-                            ? " " +
-                              flowArrow() +
-                              " " +
-                              formatDate(detail.dueDate)
-                            : ""
-                    )
+                    gapText
                 ) +
                 "</div>";
 
@@ -2006,10 +1876,19 @@
                 why
             );
 
+            /* The footnote states the verdict rather than always claiming the
+               match is safe — the same modal serves REVIEW and LOW pairings. */
+            if ($reviewFootnote) {
+                $reviewFootnote.text(verdict);
+            }
+
+            reviewDetailLoaded = true;
+
             if ($reviewApply) {
                 $reviewApply
+                    .find("span")
                     .text(
-                        Math.abs(balance) > 0
+                        isShort
                             ? lbl(
                                 "VAS_072_ApplyPartPayment",
                                 "Apply as part-payment"
@@ -2018,50 +1897,60 @@
                                 "VAS_072_ApplyAllocation",
                                 "Apply allocation"
                             )
-                    )
-                    .prop("disabled", false);
+                    );
+
+                $reviewApply.prop("disabled", false);
             }
         }
 
+        /* The allocation DocumentNo is what lets the user find the document
+           that was just created, so the confirmation names it. Composed from
+           the widget's own label rather than echoing the server message: that
+           one is built on the platform-wide AllocationIsCreated key and shows
+           the raw key wherever it is not seeded. The server message is still
+           the fallback for the (unexpected) case of a completed allocation
+           that came back without a number. */
+        function applySuccessMessage(data) {
+            var documentNo =
+                data && data.DocumentNo
+                    ? String(data.DocumentNo).trim()
+                    : "";
+
+            var successText =
+                lbl(
+                    "VAS_072_ApplySuccess",
+                    "Allocation completed successfully"
+                );
+
+            if (!documentNo) {
+                return (data && data.Message) || successText;
+            }
+
+            return successText + ": " + documentNo;
+        }
+
+        /* POSTs the pairing to ApplyAllocation: the server creates and
+           completes a C_AllocationHdr dated on the payment accounting date
+           (part-payment when the payment is short), then the list reloads. */
         function applyCurrentReview() {
             if (
-                !currentReviewRow ||
-                isLoading
-            ) {
-                return;
-            }
-
-            applySingleSuggestion(
-                currentReviewRow
-            );
-        }
-
-        function applySingleSuggestion(row) {
-            if (
                 isDisposed ||
-                isLoading ||
-                !row
+                isApplying ||
+                !currentReviewRow
             ) {
                 return;
             }
+
+            var row = currentReviewRow;
 
             var paymentId =
-                toNumber(
-                    row.paymentId,
-                    0
-                );
+                toNumber(row.PaymentId, 0);
 
             var invoiceId =
-                toNumber(
-                    row.invoiceId,
-                    0
-                );
+                toNumber(row.InvoiceId, 0);
 
             var payScheduleId =
-                toNumber(
-                    row.payScheduleId,
-                    0
-                );
+                toNumber(row.InvoicePayScheduleId, 0);
 
             if (
                 paymentId <= 0 ||
@@ -2082,7 +1971,7 @@
 
             var reloadAfterComplete = false;
 
-            setBusy(true);
+            isApplying = true;
             showReviewBusy(true, true);
 
             activeActionRequest = $.ajax({
@@ -2094,14 +1983,9 @@
                 cache: false,
 
                 data: {
-                    paymentId:
-                        paymentId,
-
-                    invoiceId:
-                        invoiceId,
-
-                    payScheduleId:
-                        payScheduleId
+                    paymentId: paymentId,
+                    invoiceId: invoiceId,
+                    payScheduleId: payScheduleId
                 },
 
                 success: function (response) {
@@ -2112,54 +1996,35 @@
                     var data =
                         parseResponse(response);
 
-                    console.log(
-                        "VAS_072 ApplyAllocation response:",
-                        data
-                    );
-
+                    /* ADialog.info translates its FIRST arg as a message key;
+                       dynamic server text goes verbatim in the THIRD arg. */
                     if (
                         !data ||
-                        data.success !== true ||
-                        data.error
+                        data.Success !== true
                     ) {
-                        var message =
-                            getServerMessage(
-                                data,
-                                lbl(
-                                    "VAS_072_ApplyError",
-                                    "Could not complete allocation"
-                                )
-                            );
-
-                        console.error(
-                            "VAS_072 ApplyAllocation error:",
-                            message,
-                            data
-                        );
-
                         VIS.ADialog.error(
                             null,
                             null,
-                            message
+                            (data && data.Message) ||
+                            lbl(
+                                "VAS_072_ApplyError",
+                                "Could not complete allocation"
+                            )
                         );
 
                         return;
                     }
 
+                    closeReviewDialog();
+
                     VIS.ADialog.info(
                         null,
                         null,
-                        getServerMessage(
-                            data,
-                            lbl(
-                                "VAS_072_ApplySuccess",
-                                "Allocation completed successfully"
-                            )
-                        )
+                        applySuccessMessage(data)
                     );
 
-                    closeReviewDialog();
-
+                    /* The applied row leaves the result set; stepping back a
+                       page keeps the user on rows that still exist. */
                     if (
                         pageNo > 1 &&
                         currentRows.length <= 1
@@ -2182,12 +2047,6 @@
                         return;
                     }
 
-                    var message =
-                        extractAjaxError(
-                            xhr,
-                            errorThrown
-                        );
-
                     console.error(
                         "VAS_072 ApplyAllocation AJAX error:",
                         status,
@@ -2200,18 +2059,21 @@
                     VIS.ADialog.error(
                         null,
                         null,
-                        message
+                        lbl(
+                            "VAS_072_ApplyError",
+                            "Could not complete allocation"
+                        )
                     );
                 },
 
                 complete: function () {
                     activeActionRequest = null;
+                    isApplying = false;
 
                     if (isDisposed) {
                         return;
                     }
 
-                    setBusy(false);
                     showReviewBusy(false, true);
 
                     if (reloadAfterComplete) {
@@ -2219,260 +2081,6 @@
                     }
                 }
             });
-        }
-
-        function applyHighConfidence() {
-            if (
-                isDisposed ||
-                isLoading ||
-                highConfidenceCount <= 0
-            ) {
-                return;
-            }
-
-            var reloadAfterComplete = false;
-
-            setBusy(true);
-
-            activeActionRequest = $.ajax({
-                url:
-                    controllerUrl +
-                    "ApplyHighConfidence",
-
-                type: "POST",
-                cache: false,
-
-                success: function (response) {
-                    if (isDisposed) {
-                        return;
-                    }
-
-                    var data =
-                        parseResponse(response);
-
-                    console.log(
-                        "VAS_072 ApplyHighConfidence response:",
-                        data
-                    );
-
-                    if (
-                        !data ||
-                        data.success !== true ||
-                        data.error
-                    ) {
-                        var message =
-                            getServerMessage(
-                                data,
-                                lbl(
-                                    "VAS_072_ApplyError",
-                                    "Could not complete allocation"
-                                )
-                            );
-
-                        console.error(
-                            "VAS_072 ApplyHighConfidence error:",
-                            message,
-                            data
-                        );
-
-                        VIS.ADialog.error(
-                            null,
-                            null,
-                            message
-                        );
-
-                        return;
-                    }
-
-                    VIS.ADialog.info(
-                        null,
-                        null,
-                        getServerMessage(
-                            data,
-                            lbl(
-                                "VAS_072_ApplySuccess",
-                                "Allocation completed successfully"
-                            )
-                        )
-                    );
-
-                    pageNo = 1;
-                    reloadAfterComplete = true;
-                },
-
-                error: function (
-                    xhr,
-                    status,
-                    errorThrown
-                ) {
-                    if (
-                        isDisposed ||
-                        status === "abort"
-                    ) {
-                        return;
-                    }
-
-                    var message =
-                        extractAjaxError(
-                            xhr,
-                            errorThrown
-                        );
-
-                    console.error(
-                        "VAS_072 ApplyHighConfidence AJAX error:",
-                        status,
-                        errorThrown,
-                        xhr
-                            ? xhr.responseText
-                            : ""
-                    );
-
-                    VIS.ADialog.error(
-                        null,
-                        null,
-                        message
-                    );
-                },
-
-                complete: function () {
-                    activeActionRequest = null;
-
-                    if (isDisposed) {
-                        return;
-                    }
-
-                    setBusy(false);
-
-                    if (reloadAfterComplete) {
-                        loadData();
-                    }
-                }
-            });
-        }
-
-        function startFormSmart(formId) {
-            var numericFormId =
-                toNumber(
-                    formId,
-                    0
-                );
-
-            if (numericFormId <= 0) {
-                return false;
-            }
-
-            if (
-                VIS.viewManager &&
-                typeof VIS.viewManager.startForm ===
-                "function"
-            ) {
-                try {
-                    var viewManagerArgCount =
-                        VIS.viewManager
-                            .startForm.length || 0;
-
-                    if (viewManagerArgCount === 2) {
-                        VIS.viewManager.startForm(
-                            numericFormId,
-                            0
-                        );
-
-                        return true;
-                    }
-
-                    if (viewManagerArgCount >= 3) {
-                        VIS.viewManager.startForm(
-                            numericFormId,
-                            0,
-                            ""
-                        );
-
-                        return true;
-                    }
-
-                    VIS.viewManager.startForm(
-                        numericFormId
-                    );
-
-                    return true;
-                }
-                catch (error) {
-                    console.error(
-                        "VAS_072 viewManager.startForm error:",
-                        error
-                    );
-                }
-            }
-
-            if (
-                VIS.AEnv &&
-                typeof VIS.AEnv.startForm ===
-                "function"
-            ) {
-                try {
-                    var aEnvArgCount =
-                        VIS.AEnv
-                            .startForm.length || 0;
-
-                    if (aEnvArgCount === 2) {
-                        VIS.AEnv.startForm(
-                            numericFormId,
-                            ""
-                        );
-
-                        return true;
-                    }
-
-                    if (aEnvArgCount >= 3) {
-                        VIS.AEnv.startForm(
-                            numericFormId,
-                            0,
-                            ""
-                        );
-
-                        return true;
-                    }
-
-                    VIS.AEnv.startForm(
-                        numericFormId
-                    );
-
-                    return true;
-                }
-                catch (error) {
-                    console.error(
-                        "VAS_072 AEnv.startForm error:",
-                        error
-                    );
-                }
-            }
-
-            return false;
-        }
-
-        function openAllocationForm() {
-            if (
-                isLoading ||
-                allocationFormId <= 0
-            ) {
-                return;
-            }
-
-            var opened =
-                startFormSmart(
-                    allocationFormId
-                );
-
-            if (!opened) {
-                VIS.ADialog.error(
-                    null,
-                    null,
-                    lbl(
-                        "VAS_072_OpenFormError",
-                        "Could not open allocation form"
-                    )
-                );
-            }
         }
 
         function createReviewDialog() {
@@ -2546,14 +2154,7 @@
                 'review-footer">' +
                 '<span class="' +
                 classPrefix +
-                'review-footnote">' +
-                escapeHtml(
-                    lbl(
-                        "VAS_072_HighConfidenceSafe",
-                        "High-confidence — safe to apply"
-                    )
-                ) +
-                "</span>" +
+                'review-footnote"></span>' +
                 '<div class="' +
                 classPrefix +
                 'review-actions">' +
@@ -2630,6 +2231,13 @@
                     "." +
                     classPrefix +
                     "review-sub"
+                );
+
+            $reviewFootnote =
+                $reviewDialog.find(
+                    "." +
+                    classPrefix +
+                    "review-footnote"
                 );
 
             $reviewApply =
@@ -2779,9 +2387,13 @@
                 "</div>" +
                 "</div>" +
 
-                '<button type="button" class="' +
+                '<a href="javascript:void(0)" class="' +
                 classPrefix +
                 'open-form">' +
+
+                '<span class="' +
+                classPrefix +
+                'open-form-text">' +
 
                 escapeHtml(
                     lbl(
@@ -2790,9 +2402,15 @@
                     )
                 ) +
 
-                " " +
+                "</span>" +
+
+                '<span class="' +
+                classPrefix +
+                'open-form-arrow">' +
                 flowArrow() +
-                "</button>" +
+                "</span>" +
+
+                "</a>" +
 
                 "</div>" +
 
@@ -2800,17 +2418,11 @@
                 classPrefix +
                 'rows"></div>' +
 
+                /* Footer: "Showing X-Y of Z suggestions" helper (left) +
+                   compact pager (right), on one line. */
                 '<div class="' +
                 classPrefix +
                 'footer">' +
-
-                '<span class="' +
-                classPrefix +
-                'footer-summary"></span>' +
-
-                '<div class="' +
-                classPrefix +
-                'footer-right">' +
 
                 '<span class="' +
                 classPrefix +
@@ -2867,8 +2479,6 @@
                 "</button>" +
                 "</div>" +
 
-              
-                "</div>" +
                 "</div>" +
                 "</div>"
             );
@@ -2878,20 +2488,6 @@
                     "." +
                     classPrefix +
                     "rows"
-                );
-
-            $applyHigh =
-                $card.find(
-                    "." +
-                    classPrefix +
-                    "apply-high"
-                );
-
-            $footerSummary =
-                $card.find(
-                    "." +
-                    classPrefix +
-                    "footer-summary"
                 );
 
             $pagerPrev =
@@ -2928,16 +2524,6 @@
                     classPrefix +
                     "open-form"
                 );
-
-            $applyHigh.on(
-                "click",
-                function (event) {
-                    event.preventDefault();
-                    event.stopPropagation();
-
-                    applyHighConfidence();
-                }
-            );
 
             $pagerPrev.on(
                 "click",
@@ -2976,6 +2562,8 @@
                 }
             );
 
+            /* The header button lands the user on the standard Allocation form
+               where every suggestion is one click away. */
             $openForm.on(
                 "click",
                 function (event) {
@@ -2985,8 +2573,6 @@
                     openAllocationForm();
                 }
             );
-
-            $openForm.hide();
 
             $root.append($card);
 
@@ -3025,11 +2611,6 @@
             $root.append($state);
 
             updatePager();
-
-            $applyHigh.prop(
-                "disabled",
-                true
-            );
         }
 
         /*
@@ -3295,8 +2876,6 @@
             $busy = null;
             $state = null;
             $stateText = null;
-            $applyHigh = null;
-            $footerSummary = null;
             $pagerPrev = null;
             $pagerNext = null;
             $pagerText = null;
@@ -3306,6 +2885,7 @@
             $reviewBusy = null;
             $reviewTitle = null;
             $reviewSub = null;
+            $reviewFootnote = null;
             $reviewApply = null;
             $root = null;
         };
