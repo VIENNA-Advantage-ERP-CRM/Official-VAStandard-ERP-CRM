@@ -509,43 +509,6 @@
     background: #f3f7fb;
 }
 
-.vas-ptm-dialog-summary {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1.25em;
-    padding: 1.25em 2em;
-    border-bottom: 1px solid #e2eaf1;
-    background: #fbfdff;
-    flex-shrink: 0;
-}
-
-.vas-ptm-dialog-summary div {
-    min-width: 0;
-}
-
-.vas-ptm-dialog-summary span {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.75em;
-    line-height: 1.2;
-    font-weight: 700;
-    color: #5f7283;
-}
-
-.vas-ptm-dialog-summary strong {
-    display: block;
-    margin-top: 0.5em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 1.25em;
-    line-height: 1.15;
-    font-weight: 800;
-    color: #102c3f;
-}
-
 .vas-ptm-dialog-body {
     position: relative;
     flex: 1 1 auto;
@@ -781,14 +744,9 @@
     }
 
     .vas-ptm-dialog-header,
-    .vas-ptm-dialog-summary,
     .vas-ptm-dialog-footer {
         padding-left: 1em;
         padding-right: 1em;
-    }
-
-    .vas-ptm-dialog-summary {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .vas-ptm-dialog-body {
@@ -834,15 +792,6 @@
     text-align: right !important;
 }
 
-.vas-ptm-summary-total,
-.vas-ptm-summary-avg,
-.vas-ptm-summary-largest {
-    display: block;
-    text-align: left;
-    font-variant-numeric: tabular-nums;
-}
-
-
 /* --- RTL: pagination -------------------------------------------------------
    Switching the UI to Arabic flips the footer, which swaps the prev/next
    buttons while their chevrons keep pointing the same way -- so the arrows
@@ -865,8 +814,7 @@ html[dir="rtl"] .vas-ptm-pager-text {
    the cell reads "ID1,800.000-". `plaintext` lets each amount pick its own
    direction from its first strong character -- LTR for a Latin currency code,
    RTL for a translated one -- so the sign stays glued to the number. */
-html[dir="rtl"] .vas-ptm-td-amount,
-html[dir="rtl"] .vas-ptm-summary-total {
+html[dir="rtl"] .vas-ptm-td-amount {
     unicode-bidi: plaintext;
 }
 
@@ -881,10 +829,6 @@ html[dir="rtl"] .vas-ptm-summary-total {
    text stays RTL. */
 html[dir="rtl"] .vas-ptm-dialog td,
 html[dir="rtl"] .vas-ptm-dialog th,
-html[dir="rtl"] .vas-ptm-summary span,
-html[dir="rtl"] .vas-ptm-summary strong,
-html[dir="rtl"] .vas-ptm-dialog-summary span,
-html[dir="rtl"] .vas-ptm-dialog-summary strong,
 html[dir="rtl"] .vas-ptm-metric,
 html[dir="rtl"] .vas-ptm-sub,
 html[dir="rtl"] .vas-ptm-why-text,
@@ -899,11 +843,7 @@ html[dir="rtl"] .vas-ptm-dialog-subtitle {
    the cell and never reached the string that actually renders. Repeat the
    treatment for whatever sits inside. */
 html[dir="rtl"] .vas-ptm-dialog td *,
-html[dir="rtl"] .vas-ptm-dialog th *,
-html[dir="rtl"] .vas-ptm-summary span *,
-html[dir="rtl"] .vas-ptm-summary strong *,
-html[dir="rtl"] .vas-ptm-dialog-summary span *,
-html[dir="rtl"] .vas-ptm-dialog-summary strong * {
+html[dir="rtl"] .vas-ptm-dialog th * {
     unicode-bidi: plaintext;
 }
 
@@ -928,10 +868,6 @@ html[dir="rtl"] .vas-ptm-th-amount,
 html[dir="rtl"] .vas-ptm-th-amount *,
 html[dir="rtl"] .vas-ptm-td-amount,
 html[dir="rtl"] .vas-ptm-td-amount *,
-html[dir="rtl"] .vas-ptm-summary-total,
-html[dir="rtl"] .vas-ptm-summary-total *,
-html[dir="rtl"] .vas-ptm-dialog-summary strong,
-html[dir="rtl"] .vas-ptm-dialog-summary strong *,
 html[dir="rtl"] .vas-ptm-metric,
 html[dir="rtl"] .vas-ptm-metric * {
     direction: ltr;
@@ -947,13 +883,6 @@ html[dir="rtl"] .vas-ptm-metric {
     text-align: right;
 }
 
-/* Summary tiles and popup read-outs are not table columns -- they sit under a
-   right-aligned label, so the figure belongs on the same side. Only the
-   direction stays pinned, to keep the sign in front of the number. */
-html[dir="rtl"] .vas-ptm-summary-total,
-html[dir="rtl"] .vas-ptm-dialog-summary strong {
-    text-align: right !important;
-}
 
 /* The figure sits in a `display: block` ellipsis span inside the cell, which
    is its own alignment context -- name it too instead of trusting the cell to

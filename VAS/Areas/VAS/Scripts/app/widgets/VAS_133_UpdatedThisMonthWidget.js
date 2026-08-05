@@ -107,19 +107,36 @@
             return span.firstChild;
         }
 
+        function parseLocalDate(value) {
+            if (!value) { return null; }
+            var str = String(value).trim();
+            var parts = str.split(' ');
+            if (parts.length < 2) { parts = str.split('T'); }
+            if (parts.length < 2) { return new Date(str); }
+            var dateParts = parts[0].split('-');
+            var timeParts = parts[1].split(':');
+            if (dateParts.length < 3 || timeParts.length < 2) { return new Date(str); }
+            return new Date(
+                parseInt(dateParts[0], 10),
+                parseInt(dateParts[1], 10) - 1,
+                parseInt(dateParts[2], 10),
+                parseInt(timeParts[0], 10),
+                parseInt(timeParts[1], 10),
+                parseInt(timeParts[2] || '0', 10)
+            );
+        }
+
         function formatDate(value) {
             if (!value) { return ''; }
-            var iso = String(value).replace(' ', 'T');
-            var date = new Date(iso);
-            if (isNaN(date.getTime())) { return String(value); }
+            var date = parseLocalDate(value);
+            if (!date || isNaN(date.getTime())) { return String(value); }
             return date.toLocaleDateString(window.navigator.language, { day: 'numeric', month: 'long', year: 'numeric' });
         }
 
         function formatRelativeTime(value) {
             if (!value) { return ''; }
-            var iso = String(value).replace(' ', 'T');
-            var date = new Date(iso);
-            if (isNaN(date.getTime())) { return String(value); }
+            var date = parseLocalDate(value);
+            if (!date || isNaN(date.getTime())) { return String(value); }
             var diffMs = Date.now() - date.getTime();
             var diffMin = Math.floor(diffMs / 60000);
             if (diffMin < 1) { return lbl('VAS_133_UTM_JustNow', 'Just now'); }

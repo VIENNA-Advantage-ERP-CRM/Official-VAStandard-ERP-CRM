@@ -15,12 +15,13 @@ namespace VAS.Controllers
      * Cleared / Unreconciled AP Payment Widget Controller
      *
      * Widget:
-     *     Calculates the percentage of unreconciled AP payments
-     *     from the previous financial period.
+     *     Counts the AP payments still unreconciled, all-time. No
+     *     calendar period bounds the figure - the card reports a
+     *     standing backlog, not a period result. The unreconciled
+     *     share of all payments is still returned alongside it.
      *
      * Popup:
-     *     Displays unreconciled AP payments using the original,
-     *     working popup query.
+     *     Lists those same unreconciled AP payments, paged.
      */
     public class VAS_027_ClearedAPPaymentWidgetController : Controller
     {
@@ -133,11 +134,14 @@ namespace VAS.Controllers
                         description = GetMsg(
                             ctx,
                             "VAS_027_messageAPPaymentClearedWhy",
-                            "Of last month's AP payments unreconciled"
+                            "Not yet matched to statement"
                         ),
 
+                        /* The card reads the unreconciled count; the
+                           percentage is still returned for anything that
+                           wants the ratio. */
                         value =
-                            unreconciledPercentage,
+                            unreconciledPayments,
 
                         unreconciledPercentage =
                             unreconciledPercentage,
@@ -258,35 +262,10 @@ PaymentsData AS
 )
 SELECT
     COUNT(1) AS TotalRecords,
-
-    COALESCE
-    (
-        SUM
-        (
-            PaymentsData.Pay_Amount
-        ),
-        0
-    ) AS TotalAmount,
-
-    MIN
-    (
-        PaymentsData.Trx_Date
-    ) AS OldestDate,
-
-    COALESCE
-    (
-        SUM
-        (
-            PaymentsData.Auto_Match_Candidate
-        ),
-        0
-    ) AS AutoMatchCandidates,
-
-    COUNT
-    (
-        DISTINCT PaymentsData.C_Currency_ID
-    ) AS CurrencyCount
-
+    COALESCE(SUM(PaymentsData.Pay_Amount),0) AS TotalAmount,
+    MIN(PaymentsData.Trx_Date) AS OldestDate,
+    COALESCE(SUM(PaymentsData.Auto_Match_Candidate),0) AS AutoMatchCandidates,
+    COUNT(DISTINCT PaymentsData.C_Currency_ID) AS CurrencyCount
 FROM PaymentsData PaymentsData";
 
             SqlParameter[] summaryParameters =
@@ -437,15 +416,10 @@ NumberedData AS
         PaymentsData.Payment_Currency_Symbol,
         PaymentsData.Std_Precision,
         PaymentsData.Payment_Method,
-
         ROW_NUMBER() OVER
         (
-            ORDER BY
-                PaymentsData.Trx_Date DESC,
-                PaymentsData.Document_No DESC,
-                PaymentsData.Payment_ID DESC
+            ORDER BY PaymentsData.Trx_Date DESC,PaymentsData.Document_No DESC,PaymentsData.Payment_ID DESC
         ) AS RowNumber
-
     FROM PaymentsData PaymentsData
 )
 SELECT
@@ -462,27 +436,10 @@ SELECT
     NumberedData.Std_Precision,
     NumberedData.Payment_Method,
     CURRENT_DATE AS CurrentDate
-
 FROM NumberedData NumberedData
-
-WHERE NumberedData.RowNumber >=
-(
-    SELECT
-        QueryParameters.StartRow
-
-    FROM QueryParameters QueryParameters
-)
-
-AND NumberedData.RowNumber <=
-(
-    SELECT
-        QueryParameters.EndRow
-
-    FROM QueryParameters QueryParameters
-)
-
-ORDER BY
-    NumberedData.RowNumber";
+WHERE NumberedData.RowNumber>=(SELECT QueryParameters.StartRow FROM QueryParameters QueryParameters)
+AND NumberedData.RowNumber<=(SELECT QueryParameters.EndRow FROM QueryParameters QueryParameters)
+ORDER BY NumberedData.RowNumber";
 
                 SqlParameter[] rowsParameters =
                 {
@@ -813,8 +770,9 @@ ORDER BY
         #region Widget SQL
 
         /*
-         * Uses the same previous-period logic as the working popup,
-         * but calculates the unreconciled percentage for the widget.
+         * Counts the unreconciled AP payments the popup lists, all-time.
+         * No calendar period bounds either side, so the card figure and
+         * the popup rows always describe the same set.
          */
         private SqlQueryData BuildClearedAPPaymentSql(
             Ctx ctx
@@ -830,53 +788,15 @@ ORDER BY
                     ? "VARCHAR2(4000)"
                     : "VARCHAR(4000)";
 
-            string addOneDaySql =
-                DB.IsOracle()
-                    ? " + 1"
-                    : " + INTERVAL '1 DAY'";
-
             string paymentAccessSql = @"
 SELECT
     Payment.C_Payment_ID,
     Payment.DateTrx,
-
-    CAST
-    (
-        Payment.IsReconciled
-        AS " + textType + @"
-    ) AS IsReconciled
-
+    CAST(Payment.IsReconciled AS " + textType + @") AS IsReconciled
 FROM C_Payment Payment
-
-WHERE CAST
-(
-    Payment.IsActive
-    AS " + textType + @"
-) = 'Y'
-
-AND CAST
-(
-    Payment.IsReceipt
-    AS " + textType + @"
-) = 'N'
-
-AND CAST
-(
-    Payment.DocStatus
-    AS " + textType + @"
-) IN
-(
-    'CO',
-    'CL'
-)
-
-AND Payment.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)";
+WHERE CAST(Payment.IsActive AS " + textType + @")='Y'
+AND CAST(Payment.IsReceipt AS " + textType + @")='N'
+AND CAST(Payment.DocStatus AS " + textType + $@") IN ('CO','CL')";
 
             paymentAccessSql =
                 MRole.GetDefault(ctx)
@@ -887,6 +807,13 @@ AND Payment.AD_Client_ID =
                         MRole.SQL_RO
                     );
 
+            /*
+             * The card reports the all-time unreconciled backlog, so the
+             * payments are counted as they stand with no calendar period
+             * bounding them. DateFrom/DateTo are the oldest and newest
+             * unreconciled transaction dates - what the backlog actually
+             * spans - rather than a period's edges.
+             */
             string sql = @"
 WITH QueryParameters AS
 (
@@ -894,155 +821,16 @@ WITH QueryParameters AS
         @AD_Client_ID AS AD_Client_ID"
         + queryParametersFrom + @"
 ),
-
-CurrentPeriodSource AS
-(
-    SELECT
-        YearData.C_Calendar_ID,
-        Period.C_Period_ID,
-        Period.StartDate,
-        Period.EndDate,
-
-        ROW_NUMBER() OVER
-        (
-            ORDER BY
-                Period.StartDate DESC,
-                Period.C_Period_ID DESC
-        ) AS PeriodRowNumber
-
-    FROM AD_ClientInfo ClientInfo
-
-    INNER JOIN C_Year YearData ON
-    (
-        YearData.C_Calendar_ID =
-            ClientInfo.C_Calendar_ID
-    )
-
-    INNER JOIN C_Period Period ON
-    (
-        Period.C_Year_ID =
-            YearData.C_Year_ID
-    )
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND ClientInfo.AD_Client_ID =
-    (
-        SELECT
-            QueryParameters.AD_Client_ID
-
-        FROM QueryParameters QueryParameters
-    )
-
-    AND CURRENT_DATE >=
-        Period.StartDate
-
-    AND CURRENT_DATE <
-        Period.EndDate" + addOneDaySql + @"
-),
-
-CurrentPeriod AS
-(
-    SELECT
-        CurrentPeriodSource.C_Calendar_ID,
-        CurrentPeriodSource.C_Period_ID,
-        CurrentPeriodSource.StartDate,
-        CurrentPeriodSource.EndDate
-
-    FROM CurrentPeriodSource CurrentPeriodSource
-
-    WHERE CurrentPeriodSource.PeriodRowNumber = 1
-),
-
-PreviousPeriodSource AS
-(
-    SELECT
-        Period.C_Period_ID,
-        Period.StartDate,
-        Period.EndDate,
-
-        ROW_NUMBER() OVER
-        (
-            ORDER BY
-                Period.EndDate DESC,
-                Period.C_Period_ID DESC
-        ) AS PeriodRowNumber
-
-    FROM CurrentPeriod CurrentPeriod
-
-    INNER JOIN C_Year YearData ON
-    (
-        YearData.C_Calendar_ID =
-            CurrentPeriod.C_Calendar_ID
-    )
-
-    INNER JOIN C_Period Period ON
-    (
-        Period.C_Year_ID =
-            YearData.C_Year_ID
-    )
-
-    WHERE Period.EndDate <
-        CurrentPeriod.StartDate
-),
-
-PreviousPeriod AS
-(
-    SELECT
-        PreviousPeriodSource.C_Period_ID,
-        PreviousPeriodSource.StartDate,
-        PreviousPeriodSource.EndDate
-
-    FROM PreviousPeriodSource PreviousPeriodSource
-
-    WHERE PreviousPeriodSource.PeriodRowNumber = 1
-),
-
 PaymentFiltered AS
 (
 " + paymentAccessSql + @"
 )
-
 SELECT
-    COUNT
-    (
-        PaymentFiltered.C_Payment_ID
-    ) AS TotalPayments,
-
-    COALESCE
-    (
-        SUM
-        (
-            CASE
-                WHEN PaymentFiltered.IsReconciled IS NULL
-                  OR PaymentFiltered.IsReconciled = 'N'
-                THEN 1
-                ELSE 0
-            END
-        ),
-        0
-    ) AS UnreconciledPayments,
-
-    MIN
-    (
-        PreviousPeriod.StartDate
-    ) AS DateFrom,
-
-    MAX
-    (
-        PreviousPeriod.EndDate
-    ) AS DateTo
-
-FROM PreviousPeriod PreviousPeriod
-
-LEFT OUTER JOIN PaymentFiltered PaymentFiltered ON
-(
-    PaymentFiltered.DateTrx >=
-        PreviousPeriod.StartDate
-
-    AND PaymentFiltered.DateTrx <
-        PreviousPeriod.EndDate" + addOneDaySql + @"
-)";
+    COUNT(PaymentFiltered.C_Payment_ID) AS TotalPayments,
+    COALESCE(SUM(CASE WHEN PaymentFiltered.IsReconciled IS NULL OR PaymentFiltered.IsReconciled='N' THEN 1 ELSE 0 END),0) AS UnreconciledPayments,
+    MIN(CASE WHEN PaymentFiltered.IsReconciled IS NULL OR PaymentFiltered.IsReconciled='N' THEN PaymentFiltered.DateTrx ELSE NULL END) AS DateFrom,
+    MAX(CASE WHEN PaymentFiltered.IsReconciled IS NULL OR PaymentFiltered.IsReconciled='N' THEN PaymentFiltered.DateTrx ELSE NULL END) AS DateTo
+FROM PaymentFiltered PaymentFiltered";
 
             SqlParameter[] parameters =
             {
@@ -1076,11 +864,11 @@ LEFT OUTER JOIN PaymentFiltered PaymentFiltered ON
                     ? "VARCHAR2(4000)"
                     : "VARCHAR(4000)";
 
-            string addOneDaySql =
-                DB.IsOracle()
-                    ? " + 1"
-                    : " + INTERVAL '1 DAY'";
-
+            /*
+             * Every unreconciled AP payment is listed, whatever its
+             * transaction date - the popup is an all-time backlog, not a
+             * period report, so no calendar period bounds it.
+             */
             string paymentRoleSql = @"
 SELECT
     Payment.C_Payment_ID,
@@ -1099,124 +887,10 @@ SELECT
     Payment.PayAmt
 
 FROM C_Payment Payment
-
-WHERE CAST
-(
-    Payment.IsActive
-    AS " + textType + @"
-) = 'Y'
-
-AND CAST
-(
-    Payment.IsReceipt
-    AS " + textType + @"
-) = 'N'
-
-AND CAST
-(
-    Payment.DocStatus
-    AS " + textType + @"
-) IN
-(
-    'CO',
-    'CL'
-)
-
-AND
-(
-    Payment.IsReconciled IS NULL
-
-    OR CAST
-    (
-        Payment.IsReconciled
-        AS " + textType + @"
-    ) = 'N'
-)
-
-AND Payment.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)
-
-AND EXISTS
-(
-    SELECT
-        1
-
-    FROM AD_ClientInfo ClientInfo
-
-    INNER JOIN C_Year CurrentYear ON
-    (
-        CurrentYear.C_Calendar_ID =
-            ClientInfo.C_Calendar_ID
-    )
-
-    INNER JOIN C_Period CurrentPeriod ON
-    (
-        CurrentPeriod.C_Year_ID =
-            CurrentYear.C_Year_ID
-    )
-
-    INNER JOIN C_Year PreviousYear ON
-    (
-        PreviousYear.C_Calendar_ID =
-            CurrentYear.C_Calendar_ID
-    )
-
-    INNER JOIN C_Period PreviousPeriod ON
-    (
-        PreviousPeriod.C_Year_ID =
-            PreviousYear.C_Year_ID
-    )
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND ClientInfo.AD_Client_ID =
-    (
-        SELECT
-            QueryParameters.AD_Client_ID
-
-        FROM QueryParameters QueryParameters
-    )
-
-    AND CURRENT_DATE >=
-        CurrentPeriod.StartDate
-
-    AND CURRENT_DATE <
-        CurrentPeriod.EndDate" + addOneDaySql + @"
-
-    AND PreviousPeriod.EndDate =
-    (
-        SELECT
-            MAX
-            (
-                PeriodData.EndDate
-            )
-
-        FROM C_Period PeriodData
-
-        INNER JOIN C_Year YearData ON
-        (
-            PeriodData.C_Year_ID =
-                YearData.C_Year_ID
-        )
-
-        WHERE YearData.C_Calendar_ID =
-            CurrentYear.C_Calendar_ID
-
-        AND PeriodData.EndDate <
-            CurrentPeriod.StartDate
-    )
-
-    AND Payment.DateTrx >=
-        PreviousPeriod.StartDate
-
-    AND Payment.DateTrx <
-        PreviousPeriod.EndDate" + addOneDaySql + @"
-)";
+WHERE CAST(Payment.IsActive AS " + textType + @")='Y'
+AND CAST(Payment.IsReceipt AS " + textType + @")='N'
+AND CAST(Payment.DocStatus AS " + textType + @") IN ('CO','CL')
+AND (Payment.IsReconciled IS NULL OR CAST(Payment.IsReconciled AS " + textType + $@")='N')";
 
             paymentRoleSql =
                 MRole.GetDefault(ctx)
@@ -1239,126 +913,54 @@ AND EXISTS
                     ? "VARCHAR2(4000)"
                     : "VARCHAR(4000)";
 
-            return @"
-SELECT
-    PaymentAccess.C_Payment_ID
-        AS Payment_ID,
-
-    PaymentAccess.DateTrx
-        AS Trx_Date,
-
-    CAST
-    (
-        PaymentAccess.DocumentNo
-        AS " + textType + @"
-    ) AS Document_No,
-
-    CAST
-    (
-        BPartner.Name
-        AS " + textType + @"
-    ) AS Vendor_Name,
-
+            return @" SELECT
+    PaymentAccess.C_Payment_ID AS Payment_ID,
+    PaymentAccess.DateTrx AS Trx_Date,
+    CAST(PaymentAccess.DocumentNo AS " + textType + @") AS Document_No,
+    CAST(BPartner.Name AS " + textType + @") AS Vendor_Name,
     CASE
-        WHEN Bank.Name IS NOT NULL
-        THEN
-            CAST
-            (
-                Bank.Name
-                AS " + textType + @"
-            )
-
-        ELSE
-            CAST
-            (
-                BankAccount.Name
-                AS " + textType + @"
-            )
+        WHEN Bank.Name IS NOT NULL THEN CAST(Bank.Name AS " + textType + @")
+        ELSE CAST(BankAccount.Name AS " + textType + @")
     END AS Bank_Name,
-
-    CAST
-    (
-        BankAccount.AccountNo
-        AS " + textType + @"
-    ) AS Account_No,
-
-    PaymentAccess.PayAmt
-        AS Pay_Amount,
-
+    CAST(BankAccount.AccountNo AS " + textType + @") AS Account_No,
+    PaymentAccess.PayAmt AS Pay_Amount,
     PaymentAccess.C_Currency_ID,
-
-    CAST
-    (
-        Currency.ISO_Code
-        AS " + textType + @"
-    ) AS Payment_Currency,
-
+    CAST(Currency.ISO_Code AS " + textType + @") AS Payment_Currency,
     CASE
-        WHEN Currency.CurSymbol IS NOT NULL
-        THEN
-            CAST
-            (
-                Currency.CurSymbol
-                AS " + textType + @"
-            )
-
-        ELSE
-            CAST
-            (
-                Currency.ISO_Code
-                AS " + textType + @"
-            )
+        WHEN Currency.CurSymbol IS NOT NULL THEN CAST(Currency.CurSymbol AS " + textType + @")
+        ELSE CAST(Currency.ISO_Code AS " + textType + @")
     END AS Payment_Currency_Symbol,
-
-    Currency.StdPrecision
-        AS Std_Precision,
-
-    CAST
-    (
-        PaymentMethod.VA009_Name
-        AS " + textType + @"
-    ) AS Payment_Method,
-
+    Currency.StdPrecision AS Std_Precision,
+    CAST(PaymentMethod.VA009_Name AS " + textType + @") AS Payment_Method,
     CASE
-        WHEN PaymentAccess.C_BankAccount_ID > 0
+        WHEN PaymentAccess.C_BankAccount_ID>0
         AND PaymentAccess.DocumentNo IS NOT NULL
-        THEN 1
+            THEN 1
         ELSE 0
     END AS Auto_Match_Candidate
-
 FROM
 (
 " + paymentAccessSql + @"
 ) PaymentAccess
-
-INNER JOIN C_BPartner BPartner ON
+INNER JOIN C_BankAccount BankAccount ON
 (
-    BPartner.C_BPartner_ID =
-        PaymentAccess.C_BPartner_ID
+    BankAccount.C_BankAccount_ID=PaymentAccess.C_BankAccount_ID
 )
-
-LEFT OUTER JOIN C_BankAccount BankAccount ON
+INNER JOIN C_Bank Bank ON
 (
-    BankAccount.C_BankAccount_ID =
-        PaymentAccess.C_BankAccount_ID
+    Bank.C_Bank_ID=BankAccount.C_Bank_ID
 )
-
-LEFT OUTER JOIN C_Bank Bank ON
-(
-    Bank.C_Bank_ID =
-        BankAccount.C_Bank_ID
-)
-
 INNER JOIN C_Currency Currency ON
 (
-    Currency.C_Currency_ID =
-        PaymentAccess.C_Currency_ID
+    Currency.C_Currency_ID=PaymentAccess.C_Currency_ID
 )
-
-LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
+INNER JOIN VA009_PaymentMethod PaymentMethod ON
 (
-    PaymentMethod.VA009_PaymentMethod_ID =
-        PaymentAccess.VA009_PaymentMethod_ID
+    PaymentMethod.VA009_PaymentMethod_ID=PaymentAccess.VA009_PaymentMethod_ID
+)
+LEFT OUTER JOIN C_BPartner BPartner ON
+(
+    BPartner.C_BPartner_ID=PaymentAccess.C_BPartner_ID
 )";
         }
 

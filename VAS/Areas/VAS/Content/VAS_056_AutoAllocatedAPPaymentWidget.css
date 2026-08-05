@@ -217,6 +217,7 @@
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
     color: #9a6500;
+    padding-left: .3125em;
 }
 
 .VAS-056-AutoAllocatedAPPayment-footer {
@@ -604,7 +605,7 @@
 
 .VAS-056-AutoAllocatedAPPayment-th-currency,
 .VAS-056-AutoAllocatedAPPayment-td-currency {
-    width: 7em;
+    width: 8em;
     text-align: left;
 }
 
@@ -692,11 +693,25 @@
     display: table-cell;
 }
 
+/* An empty result is the whole body, not a row: the table takes the height the
+   scroll area gives it so the message centres in that space, instead of being
+   pinned to the top with a stray rule ruling off an otherwise blank table.
+   Only the empty state stretches - data rows keep their natural height. */
+.VAS-056-AutoAllocatedAPPayment-dialog-table.VAS-056-AutoAllocatedAPPayment-dialog-table-empty {
+    height: 100%;
+}
+
 .VAS-056-AutoAllocatedAPPayment-dialog-empty {
     padding: 2.25em 1em !important;
+    border-bottom: 0 !important;
     text-align: center;
+    vertical-align: middle;
     color: #5f7283 !important;
 }
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-table tbody tr:hover .VAS-056-AutoAllocatedAPPayment-dialog-empty {
+        background: transparent;
+    }
 
 .VAS-056-AutoAllocatedAPPayment-dialog-footer {
     flex: 0 0 auto;

@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name : VAS
  * Purpose     : Styles for the Delivery Order (DO) Overview tab panel
  *               (VAS.VAS_100_OverviewDO). All classes are MPC-prefixed
@@ -14,6 +14,12 @@
  *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
  *                        columns with a divider between them (stacking to a
  *                        bottom rule when narrow), plus its RTL mirror.
+ *   VAI163   2026-07-31  Header aligned to the VAS_092 Purchase Order Overview
+ *                        standard: details card is 40%/1fr (was 1.4fr/1fr) and
+ *                        its field column (-hdrColR) is a two-across grid
+ *                        instead of a single tall stack, collapsing to one
+ *                        column under 460px. Field values wrap rather than
+ *                        ellipsis-truncate now that the column is narrower.
  ***********************************************************/
 
 .MPC-vasdo-root {
@@ -166,9 +172,12 @@
 /* ----------------------------------------------------------- */
 /*  Header — details card (customer | dispatch)                 */
 /* ----------------------------------------------------------- */
+/* Identity takes 40% of the card; the fields take the rest and run two across,
+   so short fields sit in rows instead of stacking into a tall column that
+   leaves the identity half empty. */
 .MPC-vasdo-hdrCard {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: 40% 1fr;
     gap: 0.875em 1.75em;
     border: 1px solid var(--do-card-bd);
     border-radius: var(--do-card-radius);
@@ -180,9 +189,10 @@
 
 .MPC-vasdo-hdrColR {
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.625em;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75em 1.5em;
+    align-content: start;
 }
 
 .MPC-vasdo-hdrField { min-width: 0; }
@@ -202,14 +212,15 @@
     color: var(--do-text);
     line-height: 1.35;
     margin-top: 0.125em;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
 }
 .MPC-vasdo-fVal.is-link { color: var(--do-link); }
 
 @container (max-width: 460px) {
     .MPC-vasdo-hdrCard { grid-template-columns: 1fr; }
     .MPC-vasdo-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--do-row-div); padding-bottom: 0.75em; }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .MPC-vasdo-hdrColR { grid-template-columns: 1fr; }
     .MPC-vasdo-hdrTop  { flex-direction: column; }
     .MPC-vasdo-hdrPills { justify-content: flex-start; }
 }

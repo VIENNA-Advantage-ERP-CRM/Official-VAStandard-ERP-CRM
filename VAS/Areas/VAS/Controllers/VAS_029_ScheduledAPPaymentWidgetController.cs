@@ -588,11 +588,8 @@ WeekRange AS
 (
     SELECT
         " + GetWeekStartSql() + @" AS DateFrom,
-
         " + GetWeekEndExclusiveSql() + @" AS DateToExclusive,
-
         " + GetWeekEndDisplaySql() + @" AS DateTo
-
     FROM QueryParameters QueryParameters
 )";
 
@@ -605,33 +602,20 @@ SchemaCurrency AS
         Currency.StdPrecision,
         Currency.ISO_Code,
         Currency.CurSymbol
-
     FROM AD_ClientInfo ClientInfo
-
     INNER JOIN C_AcctSchema AcctSchema ON
     (
-        AcctSchema.C_AcctSchema_ID =
-        ClientInfo.C_AcctSchema1_ID
+        AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID
     )
-
     INNER JOIN C_Currency Currency ON
     (
-        Currency.C_Currency_ID =
-        AcctSchema.C_Currency_ID
+        Currency.C_Currency_ID=AcctSchema.C_Currency_ID
     )
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND ClientInfo.AD_Client_ID =
-    (
-        SELECT
-            QueryParameters.AD_Client_ID
-
-        FROM QueryParameters QueryParameters
-    )
+    WHERE ClientInfo.IsActive='Y'
+    AND ClientInfo.AD_Client_ID=(SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)
 )";
 
-            string invoiceAccessSql = @"
+            string invoiceAccessSql = $@"
 SELECT
     Invoice.C_Invoice_ID,
     Invoice.AD_Client_ID,
@@ -641,26 +625,10 @@ SELECT
     Invoice.DateAcct,
     Invoice.C_ConversionType_ID,
     Invoice.IsReturnTrx
-
 FROM C_Invoice Invoice
-
-WHERE Invoice.IsActive = 'Y'
-
-AND Invoice.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)
-
-AND Invoice.IsSOTrx = 'N'
-
-AND Invoice.DocStatus IN
-(
-    'CO',
-    'CL'
-)";
+WHERE Invoice.IsActive='Y'
+AND Invoice.IsSOTrx='N'
+AND Invoice.DocStatus IN ('CO','CL')";
 
             invoiceAccessSql =
                 MRole.GetDefault(ctx)
@@ -673,29 +641,8 @@ AND Invoice.DocStatus IN
 
             string convertedAmountExpression = @"
 CASE
-    WHEN Invoice.C_Currency_ID =
-         SchemaCurrency.C_Currency_ID
-
-    THEN COALESCE
-    (
-        InvoicePaySchedule.DueAmt,
-        0
-    )
-
-    ELSE CurrencyConvert
-    (
-        COALESCE
-        (
-            InvoicePaySchedule.DueAmt,
-            0
-        ),
-        Invoice.C_Currency_ID,
-        SchemaCurrency.C_Currency_ID,
-        Invoice.DateAcct,
-        Invoice.C_ConversionType_ID,
-        Invoice.AD_Client_ID,
-        Invoice.AD_Org_ID
-    )
+    WHEN Invoice.C_Currency_ID=SchemaCurrency.C_Currency_ID THEN COALESCE(InvoicePaySchedule.DueAmt,0)
+    ELSE CurrencyConvert(COALESCE(InvoicePaySchedule.DueAmt,0),Invoice.C_Currency_ID,SchemaCurrency.C_Currency_ID,Invoice.DateAcct,Invoice.C_ConversionType_ID,Invoice.AD_Client_ID,Invoice.AD_Org_ID)
 END";
 
             string sql = @"
@@ -711,144 +658,55 @@ ScheduledData AS
 (
     SELECT
         SchemaCurrency.C_Currency_ID,
-
-        SchemaCurrency.ISO_Code
-            AS CurrencyISO,
-
+        SchemaCurrency.ISO_Code AS CurrencyISO,
         CASE
-            WHEN SchemaCurrency.CurSymbol IS NOT NULL
-            THEN SchemaCurrency.CurSymbol
+            WHEN SchemaCurrency.CurSymbol IS NOT NULL THEN SchemaCurrency.CurSymbol
             ELSE SchemaCurrency.ISO_Code
         END AS CurrencySymbol,
-
         SchemaCurrency.StdPrecision,
-
         CAST
         (
             CASE
-                WHEN COALESCE
-                (
-                    Invoice.IsReturnTrx,
-                    'N'
-                ) = 'Y'
-
-                THEN
-                    0 -
-                    (
-                        " + convertedAmountExpression + @"
-                    )
-
-                ELSE
-                    " + convertedAmountExpression + @"
+                WHEN COALESCE(Invoice.IsReturnTrx,'N')='Y'
+                    THEN 0-(" + convertedAmountExpression + @")
+                ELSE " + convertedAmountExpression + @"
             END
             AS " + numericType + @"
         ) AS ScheduledAmount,
-
         WeekRange.DateFrom,
         WeekRange.DateTo
-
     FROM InvoiceFiltered Invoice
-
     INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
     (
-        InvoicePaySchedule.C_Invoice_ID =
-        Invoice.C_Invoice_ID
+        InvoicePaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID
     )
-
     INNER JOIN SchemaCurrency SchemaCurrency ON
     (
-        SchemaCurrency.AD_Client_ID =
-        Invoice.AD_Client_ID
+        SchemaCurrency.AD_Client_ID=Invoice.AD_Client_ID
     )
-
     INNER JOIN WeekRange WeekRange ON
     (
-        InvoicePaySchedule.DueDate >=
-        WeekRange.DateFrom
-
-        AND InvoicePaySchedule.DueDate <
-        WeekRange.DateToExclusive
+        InvoicePaySchedule.DueDate>=WeekRange.DateFrom
+        AND InvoicePaySchedule.DueDate<WeekRange.DateToExclusive
     )
-
-    WHERE InvoicePaySchedule.IsActive = 'Y'
-
-    AND COALESCE
-    (
-        InvoicePaySchedule.VA009_IsPaid,
-        'N'
-    ) <> 'Y'
-
-    AND COALESCE
-    (
-        InvoicePaySchedule.DueAmt,
-        0
-    ) <> 0
+    WHERE InvoicePaySchedule.IsActive='Y'
+    AND COALESCE(InvoicePaySchedule.VA009_IsPaid,'N')<>'Y'
+    AND COALESCE(InvoicePaySchedule.DueAmt,0)<>0
 )
 SELECT
-    MAX
-    (
-        ScheduledData.C_Currency_ID
-    ) AS C_Currency_ID,
-
-    MAX
-    (
-        ScheduledData.CurrencyISO
-    ) AS CurrencyISO,
-
-    MAX
-    (
-        ScheduledData.CurrencySymbol
-    ) AS CurrencySymbol,
-
-    COALESCE
-    (
-        MAX
-        (
-            ScheduledData.StdPrecision
-        ),
-        2
-    ) AS StdPrecision,
-
-    ROUND
-    (
-        CAST
-        (
-            COALESCE
-            (
-                SUM
-                (
-                    ScheduledData.ScheduledAmount
-                ),
-                0
-            )
-            AS " + numericType + @"
-        ),
-
-        CAST
-        (
-            COALESCE
-            (
-                MAX
-                (
-                    ScheduledData.StdPrecision
-                ),
-                2
-            )
-            AS INTEGER
-        )
-    ) AS ScheduledAmount,
-
-    MIN
-    (
-        ScheduledData.DateFrom
-    ) AS DateFrom,
-
-    MAX
-    (
-        ScheduledData.DateTo
-    ) AS DateTo
-
-FROM ScheduledData ScheduledData";
+    MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
+    MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
+    MAX(CASE WHEN SchemaCurrency.CurSymbol IS NOT NULL THEN SchemaCurrency.CurSymbol ELSE SchemaCurrency.ISO_Code END) AS CurrencySymbol,
+    COALESCE(MAX(SchemaCurrency.StdPrecision),2) AS StdPrecision,
+    ROUND(CAST(COALESCE(SUM(ScheduledData.ScheduledAmount),0) AS " + numericType + @"),CAST(COALESCE(MAX(SchemaCurrency.StdPrecision),2) AS INTEGER)) AS ScheduledAmount,
+    MIN(WeekRange.DateFrom) AS DateFrom,
+    MAX(WeekRange.DateTo) AS DateTo
+FROM SchemaCurrency SchemaCurrency
+CROSS JOIN WeekRange WeekRange
+LEFT OUTER JOIN ScheduledData ScheduledData ON
+(
+    1=1
+)";
 
             SqlParameter[] parameters =
                 new SqlParameter[]
@@ -939,11 +797,8 @@ WeekRange AS
 (
     SELECT
         " + GetWeekStartSql() + @" AS DateFrom,
-
         " + GetWeekEndExclusiveSql() + @" AS DateToExclusive,
-
         " + GetWeekEndDisplaySql() + @" AS DateTo
-
     FROM QueryParameters QueryParameters
 )";
 
@@ -969,23 +824,9 @@ SELECT
 
 FROM C_Invoice Invoice
 
-WHERE Invoice.IsActive = 'Y'
-
-AND Invoice.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)
-
-AND Invoice.IsSOTrx = 'N'
-
-AND Invoice.DocStatus IN
-(
-    'CO',
-    'CL'
-)";
+WHERE Invoice.IsActive='Y'
+AND Invoice.IsSOTrx='N'
+AND Invoice.DocStatus IN ('CO','CL')";
 
             invoiceAccessSql =
                 MRole.GetDefault(ctx)
@@ -998,26 +839,8 @@ AND Invoice.DocStatus IN
 
             string dueAmountExpression = @"
 CASE
-    WHEN COALESCE
-    (
-        Invoice.IsReturnTrx,
-        'N'
-    ) = 'Y'
-
-    THEN
-        0 -
-        COALESCE
-        (
-            InvoicePaySchedule.DueAmt,
-            0
-        )
-
-    ELSE
-        COALESCE
-        (
-            InvoicePaySchedule.DueAmt,
-            0
-        )
+    WHEN COALESCE(Invoice.IsReturnTrx,'N')='Y' THEN 0-COALESCE(InvoicePaySchedule.DueAmt,0)
+    ELSE COALESCE(InvoicePaySchedule.DueAmt,0)
 END";
 
             string sql = @"
@@ -1035,120 +858,51 @@ ScheduledRowsData AS
         Invoice.C_BPartner_ID,
         Invoice.DocumentNo,
 
-        Invoice.DateInvoiced
-            AS InvoiceDate,
-
+        Invoice.DateInvoiced AS InvoiceDate,
         InvoicePaySchedule.DueDate,
-
-        BPartner.Name
-            AS VendorName,
-
-        Currency.ISO_Code
-            AS InvoiceCurrency,
-
+        BPartner.Name AS VendorName,
+        Currency.ISO_Code AS InvoiceCurrency,
         CASE
-            WHEN Currency.CurSymbol IS NOT NULL
-            THEN Currency.CurSymbol
+            WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
             ELSE Currency.ISO_Code
         END AS InvoiceCurrencySymbol,
-
-        COALESCE
-        (
-            Currency.StdPrecision,
-            2
-        ) AS StdPrecision,
-
-        " + paymentMethodIdSelect + @"
-            AS PaymentMethod_ID,
-
-        " + paymentMethodDisplaySelect + @"
-            AS PaymentMethodDisplay,
-
+        COALESCE(Currency.StdPrecision,2) AS StdPrecision,
+        " + paymentMethodIdSelect + @" AS PaymentMethod_ID,
+        " + paymentMethodDisplaySelect + @" AS PaymentMethodDisplay,
         Invoice.PaymentRule,
-
-        ROUND
-        (
-            CAST
-            (
-                " + dueAmountExpression + @"
-                AS " + numericType + @"
-            ),
-
-            CAST
-            (
-                COALESCE
-                (
-                    Currency.StdPrecision,
-                    2
-                )
-                AS INTEGER
-            )
-        ) AS DueAmount,
-
+        ROUND(CAST(" + dueAmountExpression + @" AS " + numericType + @"),CAST(COALESCE(Currency.StdPrecision,2) AS INTEGER)) AS DueAmount,
         WeekRange.DateFrom,
         WeekRange.DateTo
-
     FROM InvoiceFiltered Invoice
-
     INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
     (
-        InvoicePaySchedule.C_Invoice_ID =
-        Invoice.C_Invoice_ID
+        InvoicePaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID
     )
-
     INNER JOIN WeekRange WeekRange ON
     (
-        InvoicePaySchedule.DueDate >=
-        WeekRange.DateFrom
-
-        AND InvoicePaySchedule.DueDate <
-        WeekRange.DateToExclusive
+        InvoicePaySchedule.DueDate>=WeekRange.DateFrom
+        AND InvoicePaySchedule.DueDate<WeekRange.DateToExclusive
     )
-
     LEFT OUTER JOIN C_BPartner BPartner ON
     (
-        BPartner.C_BPartner_ID =
-        Invoice.C_BPartner_ID
+        BPartner.C_BPartner_ID=Invoice.C_BPartner_ID
     )
-
     LEFT OUTER JOIN C_Currency Currency ON
     (
-        Currency.C_Currency_ID =
-        Invoice.C_Currency_ID
+        Currency.C_Currency_ID=Invoice.C_Currency_ID
     )
 "
     + paymentMethodJoin + @"
-
-    WHERE InvoicePaySchedule.IsActive = 'Y'
-
-    AND COALESCE
-    (
-        InvoicePaySchedule.VA009_IsPaid,
-        'N'
-    ) <> 'Y'
-
-    AND COALESCE
-    (
-        InvoicePaySchedule.DueAmt,
-        0
-    ) <> 0
+    WHERE InvoicePaySchedule.IsActive='Y'
+    AND COALESCE(InvoicePaySchedule.VA009_IsPaid,'N')<>'Y'
+    AND COALESCE(InvoicePaySchedule.DueAmt,0)<>0
 ),
 SummaryData AS
 (
     SELECT
-        COUNT(1)
-            AS TotalRecords,
-
-        COUNT
-        (
-            DISTINCT ScheduledRowsData.C_BPartner_ID
-        ) AS VendorCount,
-
-        COUNT
-        (
-            DISTINCT ScheduledRowsData.PaymentMethod_ID
-        ) AS PaymentMethodCount
-
+        COUNT(1) AS TotalRecords,
+        COUNT(DISTINCT ScheduledRowsData.C_BPartner_ID) AS VendorCount,
+        COUNT(DISTINCT ScheduledRowsData.PaymentMethod_ID) AS PaymentMethodCount
     FROM ScheduledRowsData ScheduledRowsData
 ),
 NumberedRows AS
@@ -1169,15 +923,10 @@ NumberedRows AS
         ScheduledRowsData.DueAmount,
         ScheduledRowsData.DateFrom,
         ScheduledRowsData.DateTo,
-
         ROW_NUMBER() OVER
         (
-            ORDER BY
-                ScheduledRowsData.DueDate,
-                ScheduledRowsData.DocumentNo,
-                ScheduledRowsData.C_Invoice_ID
+            ORDER BY ScheduledRowsData.DueDate,ScheduledRowsData.DocumentNo,ScheduledRowsData.C_Invoice_ID
         ) AS RowNumber
-
     FROM ScheduledRowsData ScheduledRowsData
 )
 SELECT
@@ -1199,32 +948,14 @@ SELECT
     SummaryData.TotalRecords,
     SummaryData.VendorCount,
     SummaryData.PaymentMethodCount
-
 FROM NumberedRows NumberedRows
-
 INNER JOIN SummaryData SummaryData ON
 (
-    1 = 1
+    1=1
 )
-
-WHERE NumberedRows.RowNumber >=
-(
-    SELECT
-        QueryParameters.StartRow
-
-    FROM QueryParameters QueryParameters
-)
-
-AND NumberedRows.RowNumber <=
-(
-    SELECT
-        QueryParameters.EndRow
-
-    FROM QueryParameters QueryParameters
-)
-
-ORDER BY
-    NumberedRows.RowNumber";
+WHERE NumberedRows.RowNumber>=(SELECT QueryParameters.StartRow FROM QueryParameters QueryParameters)
+AND NumberedRows.RowNumber<=(SELECT QueryParameters.EndRow FROM QueryParameters QueryParameters)
+ORDER BY NumberedRows.RowNumber";
 
             SqlParameter[] parameters =
                 new SqlParameter[]
@@ -1361,19 +1092,14 @@ ORDER BY
             string sql = @"
 SELECT
     COUNT(1)
-
 FROM AD_Table TableData
-
 INNER JOIN AD_Column ColumnData ON
 (
-    ColumnData.AD_Table_ID =
-    TableData.AD_Table_ID
+    ColumnData.AD_Table_ID=TableData.AD_Table_ID
 )
-
-WHERE TableData.TableName = "
+WHERE TableData.TableName="
                 + ToSqlString(tableName) + @"
-
-AND ColumnData.ColumnName = "
+AND ColumnData.ColumnName="
                 + ToSqlString(columnName);
 
             return Util.GetValueOfInt(

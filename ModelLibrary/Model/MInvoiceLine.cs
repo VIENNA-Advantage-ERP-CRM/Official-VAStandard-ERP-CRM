@@ -594,7 +594,7 @@ namespace VAdvantage.Model
                     GetM_Product_ID(), C_BPartner_ID, GetQtyInvoiced(), _IsSOTrx);
                 _productPricing.SetM_PriceList_ID(M_PriceList_ID);
                 _productPricing.SetPriceDate(_DateInvoiced);
-                _productPricing.SetM_AttributeSetInstance_ID(M_AttributeSetInstance_ID);
+                _productPricing.SetM_AttributeSetInstance_ID(GetM_AttributeSetInstance_ID());
                 //Amit 25-nov-2014
                 if (Env.IsModuleInstalled("ED011_"))
                 {
@@ -605,6 +605,7 @@ namespace VAdvantage.Model
                 SetPriceList(_productPricing.GetPriceList());
                 SetPriceLimit(_productPricing.GetPriceLimit());
                 // VAI_145: 29-July-2026, Already converted value 
+                SetPriceEntered(GetPriceActual());
                 //if (Decimal.Compare(GetQtyEntered(), GetQtyInvoiced()) == 0)
                 //    SetPriceEntered(GetPriceActual());
                 //else

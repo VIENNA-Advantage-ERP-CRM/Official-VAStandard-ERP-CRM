@@ -45,6 +45,12 @@
  *                        - Issue lines page client-side at 10 rows with a
  *                          Previous / Next pager; the KPI cards and the totals
  *                          footer always cover the whole issue, never the page.
+ *   VAI163   2026-08-03  - Activity shows the e-mails sent against the issue
+ *                          (type "email"): the subject headlines the row, the
+ *                          recipient runs underneath it and the timestamp /
+ *                          sender sit where every other entry carries them. The
+ *                          message body opens on click, headed by the full
+ *                          From / To / Cc / Bcc set.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -783,11 +789,13 @@
             updated:   { tone: "info",    icon: "pencil", tagKey: "VAS_102_TagUpdated",   tagText: "Updated",   titleKey: "VAS_102_ActUpdated",   titleText: "Inventory use updated" },
             completed: { tone: "success", icon: "check",  tagKey: "VAS_102_TagCompleted", tagText: "Completed", titleKey: "VAS_102_ActCompleted", titleText: "Inventory use completed" },
             posted:    { tone: "purple",  icon: "coins",  tagKey: "VAS_102_TagPosted",    tagText: "Posted",    titleKey: "VAS_102_ActPosted",    titleText: "Posted to accounting" },
-            note:      { tone: "neutral", icon: "mail",   tagKey: "VAS_102_TagNote",      tagText: "Note",      titleKey: null,                   titleText: "" }
+            note:      { tone: "neutral", icon: "mail",   tagKey: "VAS_102_TagNote",      tagText: "Note",      titleKey: null,                   titleText: "" },
+            email:     { tone: "purple",  icon: "mail",   tagKey: "VAS_102_TagEmail",     tagText: "Email",     titleKey: null,                   titleText: "" }
         };
 
         // The issue's audit trail, newest first: who created it, who changed it and
-        // when, when it was completed and posted, plus any notes logged against it.
+        // when, when it was completed and posted, plus any notes and e-mails logged
+        // against it.
         function renderActivity() {
             var rows = (data && data.Activity) || [];
             if (!rows.length) return;
@@ -799,6 +807,10 @@
             var $list = $('<div class="MPC-vasiu-actList"></div>');
             for (var i = 0; i < rows.length; i++) {
                 $list.append(activityRow(rows[i]));
+                // An e-mail's body is heavy — it stays collapsed under its row and
+                // opens only when the reader asks for it.
+                var $mail = activityBody(rows[i]);
+                if ($mail) $list.append($mail);
             }
             $sec.append($list);
         }
@@ -813,14 +825,28 @@
             $tag.append($('<span></span>').text(msg(meta.tagKey, meta.tagText)));
             $row.append($tag);
 
-            // For a note the title is the note text itself; for everything else it
-            // is the event sentence. A tooltip keeps a long line readable once the
-            // cell ellipsises.
+            // For a note the title is the note text itself, for an e-mail its
+            // subject; for everything else it is the event sentence. A tooltip
+            // keeps a long line readable once the cell ellipsises.
             var title = activityTitle(a, meta);
-            $row.append($('<span class="MPC-vasiu-actTitle"></span>')
+            var $title = $('<span class="MPC-vasiu-actTitle"></span>');
+            $title.append($('<span class="MPC-vasiu-actLead"></span>')
                 .text(title).attr("title", title));
 
-            // "when · by whom" — the audit trail's whole point.
+            // An e-mail names its recipients under the subject: the To list, plus
+            // a count of the Cc / Bcc addresses so a reader can see at a glance
+            // that others were copied. Every address itself is listed in the body.
+            if (a.Type === "email") {
+                var to = recipientSummary(a);
+                if (to) {
+                    $title.append($('<small class="MPC-vasiu-actSub"></small>')
+                        .text(to).attr("title", allRecipients(a) || to));
+                }
+            }
+            $row.append($title);
+
+            // "when · by whom" — the audit trail's whole point. For an e-mail that
+            // is when it went out and who sent it.
             var when = formatDateTime(a.Created);
             if (a.UserName) {
                 when = when
@@ -829,14 +855,91 @@
             }
             $row.append($('<span class="MPC-vasiu-actWhen"></span>').text(when).attr("title", when));
 
+            // Rows carrying a body are clickable; the caret shows the state.
+            if (hasActivityBody(a)) {
+                $row.addClass("is-openable");
+                $row.attr("title", msg("VAS_102_ShowMailBody", "Click to read the message"));
+                $row.append($('<span class="MPC-vasiu-actCaret"></span>').append(svgIcon("chevRight")));
+                $row.on("click", function () {
+                    var $panel = $row.next(".MPC-vasiu-actBody");
+                    if (!$panel.length) return;
+                    var nowOpen = !$row.hasClass("is-open");
+                    $row.toggleClass("is-open", nowOpen)
+                        .attr("title", nowOpen ? msg("VAS_102_HideMailBody", "Click to hide the message")
+                                               : msg("VAS_102_ShowMailBody", "Click to read the message"));
+                    $panel.toggle(nowOpen);
+                });
+            }
+
             return $row;
         }
 
         function activityTitle(a, meta) {
             if (a.Type === "note") return (a.Text || "").trim();
+            if (a.Type === "email") {
+                return (a.Text || "").trim() || msg("VAS_102_NoSubject", "(no subject)");
+            }
             var title = meta.titleKey ? msg(meta.titleKey, meta.titleText) : (meta.titleText || "");
             if (a.DocumentNo) title += " — " + a.DocumentNo;
             return title;
+        }
+
+        // Only an e-mail carries a body worth opening; a mail stored without one
+        // stays a plain, non-clickable row.
+        function hasActivityBody(a) {
+            return a && a.Type === "email" && !!(a.Body && String(a.Body).trim());
+        }
+
+        // The e-mail body, collapsed beneath its activity row. The full recipient
+        // set (From / To / Cc / Bcc) heads it, so every address the mail went to is
+        // on screen once the reader opens the message.
+        function activityBody(a) {
+            if (!hasActivityBody(a)) return null;
+
+            var $panel = $('<div class="MPC-vasiu-actBody" style="display:none;"></div>');
+            appendMailMeta($panel, "VAS_102_MailFrom", "From:", a.MailFrom);
+            appendMailMeta($panel, "VAS_102_MailTo",   "To:",   a.MailTo);
+            appendMailMeta($panel, "VAS_102_MailCc",   "Cc:",   a.MailCc);
+            appendMailMeta($panel, "VAS_102_MailBcc",  "Bcc:",  a.MailBcc);
+            $panel.append($('<p></p>').text(String(a.Body).trim()));
+            return $panel;
+        }
+
+        function appendMailMeta($panel, key, fallback, value) {
+            if (!value || !String(value).trim()) return;
+            $panel.append($('<div class="MPC-vasiu-actMeta"></div>')
+                .text(msg(key, fallback) + " " + String(value).trim()));
+        }
+
+        // Row sub-line: the To list, plus "+n more" covering the Cc / Bcc
+        // addresses. Counting by comma / semicolon is enough for a summary — the
+        // body lists the addresses verbatim.
+        function recipientSummary(a) {
+            var to = (a.MailTo || "").trim();
+            var extra = countAddresses(a.MailCc) + countAddresses(a.MailBcc);
+            if (!to && !extra) return "";
+            var s = msg("VAS_102_MailTo", "To:") + " " + (to || VIS.Msg.getMsg("VAS_102_NA"));
+            if (extra > 0) s += " +" + extra + " " + msg("VAS_102_MoreRecipients", "more");
+            return s;
+        }
+
+        // Every address on the mail, for the row's hover tooltip.
+        function allRecipients(a) {
+            var bits = [];
+            if (a.MailTo)  bits.push(msg("VAS_102_MailTo",  "To:")  + " " + a.MailTo);
+            if (a.MailCc)  bits.push(msg("VAS_102_MailCc",  "Cc:")  + " " + a.MailCc);
+            if (a.MailBcc) bits.push(msg("VAS_102_MailBcc", "Bcc:") + " " + a.MailBcc);
+            return bits.join("\n");
+        }
+
+        function countAddresses(value) {
+            if (!value || !String(value).trim()) return 0;
+            var parts = String(value).split(/[;,]/);
+            var n = 0;
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].trim()) n++;
+            }
+            return n;
         }
 
         // Issue Stock / Post Inventory are not repeated here — both actions are

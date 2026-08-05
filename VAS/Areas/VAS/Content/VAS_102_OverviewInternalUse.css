@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name : VAS
  * Purpose     : Styles for the Internal Use / Material Issue Overview tab panel
  *               (VAS.VAS_102_OverviewInternalUse). All classes are MPC-prefixed
@@ -34,6 +34,18 @@
  *                        render for links that exist, plus the "nothing linked"
  *                        line (.MPC-vasiu-refEmpty) that replaces the old row of
  *                        N/A cells.
+ *   VAI163   2026-07-31  Header aligned to the VAS_092 Purchase Order Overview
+ *                        standard: details card is 40%/1fr (was 1.4fr/1fr) and
+ *                        its field column (-hdrColR) is a two-across grid
+ *                        instead of a single tall stack, collapsing to one
+ *                        column under 460px. Field values wrap rather than
+ *                        ellipsis-truncate now that the column is narrower.
+ *   VAI163   2026-08-03  Activity e-mail rows: a recipient sub-line
+ *                        (.MPC-vasiu-actLead / -actSub) and a message body that
+ *                        opens on click (.MPC-vasiu-actRow.is-openable /
+ *                        -actCaret / -actBody / -actMeta). Only an openable row
+ *                        widens to a fourth column, so every other entry keeps
+ *                        the tag | what happened | when layout.
  ***********************************************************/
 
 .MPC-vasiu-root {
@@ -134,7 +146,7 @@
 .MPC-vasiu-hdrTitleWrap { min-width: 0; }
 
 .MPC-vasiu-hdrTitle {
-    font-size: 1.4em;
+    font-size: 1.25em;
     font-weight: 700;
     color: var(--iu-text);
     line-height: 1.2;
@@ -186,9 +198,12 @@
 /* ----------------------------------------------------------- */
 /*  Header — details card (warehouse | document)               */
 /* ----------------------------------------------------------- */
+/* Identity takes 40% of the card; the fields take the rest and run two across,
+   so short fields sit in rows instead of stacking into a tall column that
+   leaves the identity half empty. */
 .MPC-vasiu-hdrCard {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: 40% 1fr;
     gap: 0.875em 1.75em;
     border: 1px solid var(--iu-card-bd);
     border-radius: var(--iu-card-radius);
@@ -200,9 +215,10 @@
 
 .MPC-vasiu-hdrColR {
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.625em;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75em 1.5em;
+    align-content: start;
 }
 
 .MPC-vasiu-hdrField { min-width: 0; }
@@ -222,14 +238,15 @@
     color: var(--iu-text);
     line-height: 1.35;
     margin-top: 0.125em;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
 }
 .MPC-vasiu-fVal.is-link { color: var(--iu-link); }
 
 @container (max-width: 460px) {
     .MPC-vasiu-hdrCard { grid-template-columns: 1fr; }
     .MPC-vasiu-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--iu-row-div); padding-bottom: 0.75em; }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .MPC-vasiu-hdrColR { grid-template-columns: 1fr; }
     .MPC-vasiu-hdrTop  { flex-direction: column; }
     .MPC-vasiu-hdrPills { justify-content: flex-start; }
 }
@@ -717,8 +734,22 @@
     min-width: 0;
     color: var(--iu-text);
     overflow: hidden;
+}
+
+/* The headline (event sentence / note text / e-mail subject) and, for an
+   e-mail, the recipient beneath it. Each line clips on its own so the row
+   height stays predictable. */
+.MPC-vasiu-actLead,
+.MPC-vasiu-actSub {
+    display: block;
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+.MPC-vasiu-actSub {
+    font-size: 0.8462em; /* ~0.6875em against the body anchor */
+    color: var(--iu-muted);
+    margin-top: 0.125em;
 }
 
 .MPC-vasiu-actWhen {
@@ -729,10 +760,48 @@
     white-space: nowrap;
 }
 
-/* Narrow panels: drop the timestamp onto its own line under the description. */
+/* An activity carrying a body (e-mail) opens on click — only those rows make
+   room for the caret, so every other row keeps the three-column layout. */
+.MPC-vasiu-actRow.is-openable {
+    grid-template-columns: auto 1fr auto auto;
+    cursor: pointer;
+}
+.MPC-vasiu-actRow.is-openable:hover { background: #F7FBFE; }
+
+.MPC-vasiu-actCaret {
+    display: inline-flex;
+    align-items: center;
+    color: var(--iu-muted);
+    transition: transform .15s ease;
+}
+.MPC-vasiu-actRow.is-open .MPC-vasiu-actCaret {
+    transform: rotate(90deg);
+    color: var(--iu-action);
+}
+
+/* The message body, revealed under its row. */
+.MPC-vasiu-actBody {
+    background: #F7FAFD;
+    border-bottom: 1px solid var(--iu-row-div);
+    padding: 0.625em 0.875em 0.75em 2.5em;
+    font-size: 0.8125em;
+    color: var(--iu-text);
+    line-height: 1.55;
+}
+.MPC-vasiu-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.MPC-vasiu-actMeta {
+    font-size: 0.8462em;
+    color: var(--iu-muted);
+    margin-bottom: 0.3125em;
+}
+
+/* Narrow panels: drop the timestamp onto its own line under the description.
+   The caret stays on the first line, beside the subject it opens. */
 @container (max-width: 460px) {
     .MPC-vasiu-actRow { grid-template-columns: auto 1fr; }
+    .MPC-vasiu-actRow.is-openable { grid-template-columns: auto 1fr auto; }
     .MPC-vasiu-actWhen { grid-column: 2; text-align: left; }
+    .MPC-vasiu-actRow.is-openable .MPC-vasiu-actCaret { grid-column: 3; grid-row: 1; }
 }
 
 /* ----------------------------------------------------------- */
@@ -745,4 +814,7 @@
 [dir="rtl"] .MPC-vasiu-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
 [dir="rtl"] .MPC-vasiu-actRow { text-align: right; }
 [dir="rtl"] .MPC-vasiu-actWhen { text-align: left; }
+[dir="rtl"] .MPC-vasiu-actBody { padding-left: 0.875em; padding-right: 2.5em; }
+[dir="rtl"] .MPC-vasiu-actCaret svg { transform: scaleX(-1); }
+[dir="rtl"] .MPC-vasiu-actRow.is-open .MPC-vasiu-actCaret { transform: rotate(-90deg); }
 [dir="rtl"] .MPC-vasiu-pgBtn .MPC-vasiu-ic svg { transform: scaleX(-1); }

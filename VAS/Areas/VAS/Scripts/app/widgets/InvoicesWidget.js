@@ -114,6 +114,9 @@
         var reviewSets = [];
         var $review = null;
 
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_ARInvoice';
+        var windowId = 0;
+
         var INVOICES = [];
         /* Columns match the header order: invoice, customer, due, status, amount. */
         var COL_TMPL = '1fr 1.4fr minmax(60px,0.8fr) minmax(80px,1.1fr) minmax(70px,0.9fr)';
@@ -617,22 +620,38 @@
            itself through addChangeListener and reacts to this fired value to switch the tab into
            new-record mode; existing filters and widget state are left untouched. */
         function onNewInvoice() {
-            var windowParam = {
-                "IsTabInNewMode": "true",
-                "TabIndex": "0"
-            };
-            $self.widgetFirevalueChanged(windowParam);
+            if ($self.windowNo >= 0) {
+                var windowParam = {
+                    "IsTabInNewMode": "true",
+                    "TabIndex": "0"
+                };
+                $self.widgetFirevalueChanged(windowParam);
+            }
+            else {
+                VAS.ZoomUtil.zoomToRecord("C_Invoice_ID", 0, windowId, ZOOM_WINDOW_NAME_NEW, "")
+                    .done(function (id) {
+                        if (id > 0) { windowId = id; }
+                    });
+            }
+
         }
 
         /* Zoom: fire the value the host listens for to open the clicked invoice in the window's first
            tab, filtered to the single record (single/form layout). */
         function zoomInvoice(cInvoiceId) {
             if (!cInvoiceId) { return; }
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": "C_Invoice.C_Invoice_ID=" + cInvoiceId,
-                "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
-                "TabIndex": "0"
-            });
+            if ($self.windowNo >= 0) {
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "C_Invoice.C_Invoice_ID=" + cInvoiceId,
+                    "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                    "TabIndex": "0"
+                });
+            } else {
+                VAS.ZoomUtil.zoomToRecord("C_Invoice_ID", cInvoiceId, windowId, ZOOM_WINDOW_NAME_NEW, "")
+                    .done(function (id) {
+                        if (id > 0) { windowId = id; }
+                    });
+            }
         }
 
         /* ── Duplicate review dialog ────────────────────────────────────────────────

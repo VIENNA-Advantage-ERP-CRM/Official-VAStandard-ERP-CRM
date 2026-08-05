@@ -152,6 +152,7 @@
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
     color: #102c3f;
+    padding-left: 0.3125em;
 }
 
 .vas-finance-kpi-footer {
@@ -418,45 +419,6 @@
     background: #f3f7fb;
     box-shadow: none;
     outline: none;
-}
-
-.vas-cpa-summary {
-    flex: 0 0 auto;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1.25em;
-    padding: 1.25em 2em;
-    border-bottom: 1px solid #e2eaf1;
-    background: #fbfdff;
-}
-
-.vas-cpa-summary div {
-    min-width: 0;
-}
-
-.vas-cpa-summary span {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.75em;
-    font-weight: 700;
-    line-height: 1.2;
-    letter-spacing: 0;
-    color: #5f7283;
-}
-
-.vas-cpa-summary strong {
-    display: block;
-    margin-top: 0.5em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 1.25em;
-    font-weight: 800;
-    line-height: 1.15;
-    color: #102c3f;
-    font-variant-numeric: tabular-nums;
 }
 
 .vas-cpa-dialog-body {
@@ -739,14 +701,9 @@
     }
 
     .vas-cpa-dialog-header,
-    .vas-cpa-summary,
     .vas-cpa-dialog-footer {
         padding-left: 1em;
         padding-right: 1em;
-    }
-
-    .vas-cpa-summary {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .vas-cpa-dialog-body {
@@ -790,12 +747,6 @@
     text-align: right !important;
 }
 
-.vas-cpa-summary-amount {
-    display: block;
-    text-align: left;
-    font-variant-numeric: tabular-nums;
-}
-
 /* --- RTL: pagination -------------------------------------------------------
    Switching the UI to Arabic flips the footer, which swaps the prev/next
    buttons while their chevrons keep pointing the same way -- so the arrows
@@ -819,7 +770,6 @@ html[dir="rtl"] .vas-cpa-pager-text {
    direction from its first strong character -- LTR for a Latin currency code,
    RTL for a translated one -- so the sign stays glued to the number. */
 html[dir="rtl"] .vas-cpa-td-amount,
-html[dir="rtl"] .vas-cpa-summary-amount,
 html[dir="rtl"] .vas-finance-kpi-value {
     unicode-bidi: plaintext;
 }
@@ -835,8 +785,6 @@ html[dir="rtl"] .vas-finance-kpi-value {
    text stays RTL. */
 html[dir="rtl"] .vas-cpa-dialog td,
 html[dir="rtl"] .vas-cpa-dialog th,
-html[dir="rtl"] .vas-cpa-summary span,
-html[dir="rtl"] .vas-cpa-summary strong,
 html[dir="rtl"] .vas-cpa-dialog-subtitle,
 html[dir="rtl"] .vas-finance-kpi-sub,
 html[dir="rtl"] .vas-finance-kpi-desc {
@@ -849,9 +797,7 @@ html[dir="rtl"] .vas-finance-kpi-desc {
    the cell and never reached the string that actually renders. Repeat the
    treatment for whatever sits inside. */
 html[dir="rtl"] .vas-cpa-dialog td *,
-html[dir="rtl"] .vas-cpa-dialog th *,
-html[dir="rtl"] .vas-cpa-summary span *,
-html[dir="rtl"] .vas-cpa-summary strong * {
+html[dir="rtl"] .vas-cpa-dialog th * {
     unicode-bidi: plaintext;
 }
 
@@ -876,8 +822,6 @@ html[dir="rtl"] .vas-cpa-td-amount,
 html[dir="rtl"] .vas-cpa-td-amount *,
 html[dir="rtl"] .vas-cpa-dialog-table th:last-child,
 html[dir="rtl"] .vas-cpa-dialog-table th:last-child *,
-html[dir="rtl"] .vas-cpa-summary-amount,
-html[dir="rtl"] .vas-cpa-summary-amount *,
 html[dir="rtl"] .vas-finance-kpi-value,
 html[dir="rtl"] .vas-finance-kpi-value * {
     direction: ltr;
@@ -891,13 +835,6 @@ html[dir="rtl"] .vas-finance-kpi-value * {
    elements never declared an alignment of their own. */
 html[dir="rtl"] .vas-finance-kpi-value {
     text-align: right;
-}
-
-/* Summary tiles and popup read-outs are not table columns -- they sit under a
-   right-aligned label, so the figure belongs on the same side. Only the
-   direction stays pinned, to keep the sign in front of the number. */
-html[dir="rtl"] .vas-cpa-summary-amount {
-    text-align: right !important;
 }
 
 /* The figure sits in a `display: block` ellipsis span inside the cell, which

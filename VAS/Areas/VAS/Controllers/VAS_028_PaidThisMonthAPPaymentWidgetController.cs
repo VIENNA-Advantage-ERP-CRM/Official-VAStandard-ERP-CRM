@@ -570,25 +570,7 @@ namespace VAS.Controllers
                     ? "CurrentPeriod.DateTo + 1"
                     : "CurrentPeriod.DateTo + INTERVAL '1 DAY'";
 
-            bool hasExecutionStatus =
-                HasPaymentExecutionStatusColumn();
-
-            string executionStatusFilter =
-                hasExecutionStatus
-                    ? @"
-AND COALESCE
-(
-    Payment.VA009_ExecutionStatus,
-    'R'
-) NOT IN
-(
-    'B',
-    'C'
-)"
-                    : string.Empty;
-
-            string paymentAccessSql = @"
-SELECT
+            string paymentAccessSql = $@" SELECT
     Payment.C_Payment_ID,
     Payment.AD_Client_ID,
     Payment.AD_Org_ID,
@@ -597,27 +579,10 @@ SELECT
     Payment.C_ConversionType_ID,
     Payment.DateAcct,
     Payment.PayAmt
-
 FROM C_Payment Payment
-
-WHERE Payment.IsActive = 'Y'
-
-AND Payment.IsReceipt = 'N'
-
-AND Payment.DocStatus IN
-(
-    'CO',
-    'CL'
-)
-
-AND Payment.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)"
-                + executionStatusFilter;
+WHERE Payment.IsActive='Y'
+AND Payment.IsReceipt='N'
+AND Payment.DocStatus IN ('CO','CL')";
 
             paymentAccessSql =
                 MRole.GetDefault(ctx).AddAccessSQL(
@@ -627,18 +592,10 @@ AND Payment.AD_Client_ID =
                     MRole.SQL_RO
                 );
 
-            string amountSumExpression = @"
-COALESCE
-(
-    SUM
-    (
-        PaidThisMonthData.PaidAmount
-    ),
-    0
-)";
+            string amountSumExpression =
+                @"COALESCE(SUM(PaidThisMonthData.PaidAmount),0)";
 
-            string sql = @"
-WITH QueryParameters AS
+            string sql = @" WITH QueryParameters AS
 (
     SELECT
         @AD_Client_ID AS AD_Client_ID"
@@ -651,87 +608,44 @@ SchemaCurrency AS
         AcctSchema.C_Currency_ID,
         Currency.StdPrecision,
         Currency.ISO_Code,
-
         CASE
-            WHEN Currency.CurSymbol IS NOT NULL
-            THEN Currency.CurSymbol
+            WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
             ELSE Currency.ISO_Code
         END AS Cur_Symbol
-
     FROM AD_ClientInfo ClientInfo
-
     INNER JOIN C_AcctSchema AcctSchema ON
     (
-        AcctSchema.C_AcctSchema_ID =
-        ClientInfo.C_AcctSchema1_ID
+        AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID
     )
-
     INNER JOIN C_Currency Currency ON
     (
-        Currency.C_Currency_ID =
-        AcctSchema.C_Currency_ID
+        Currency.C_Currency_ID=AcctSchema.C_Currency_ID
     )
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND ClientInfo.AD_Client_ID =
-    (
-        SELECT
-            QueryParameters.AD_Client_ID
-
-        FROM QueryParameters QueryParameters
-    )
+    WHERE ClientInfo.IsActive='Y'
+    AND ClientInfo.AD_Client_ID=(SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)
 ),
 CurrentPeriod AS
 (
     SELECT
         ClientInfo.AD_Client_ID,
-        MIN
-        (
-            Period.StartDate
-        ) AS DateFrom,
-
-        MAX
-        (
-            Period.EndDate
-        ) AS DateTo
-
+        MIN(Period.StartDate) AS DateFrom,
+        MAX(Period.EndDate) AS DateTo
     FROM AD_ClientInfo ClientInfo
-
     INNER JOIN C_Year YearData ON
     (
-        YearData.C_Calendar_ID =
-        ClientInfo.C_Calendar_ID
+        YearData.C_Calendar_ID=ClientInfo.C_Calendar_ID
     )
-
     INNER JOIN C_Period Period ON
     (
-        Period.C_Year_ID =
-        YearData.C_Year_ID
+        Period.C_Year_ID=YearData.C_Year_ID
     )
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND YearData.IsActive = 'Y'
-
-    AND Period.IsActive = 'Y'
-
-    AND ClientInfo.AD_Client_ID =
-    (
-        SELECT
-            QueryParameters.AD_Client_ID
-
-        FROM QueryParameters QueryParameters
-    )
-
-    AND CURRENT_DATE >=
-        Period.StartDate
-
-    AND CURRENT_DATE <
-        " + periodEndExclusiveSql + @"
-
-    GROUP BY
-        ClientInfo.AD_Client_ID
+    WHERE ClientInfo.IsActive='Y'
+    AND YearData.IsActive='Y'
+    AND Period.IsActive='Y'
+    AND ClientInfo.AD_Client_ID=(SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)
+    AND CURRENT_DATE>=Period.StartDate
+    AND CURRENT_DATE<" + periodEndExclusiveSql + @"
+    GROUP BY ClientInfo.AD_Client_ID
 ),
 PaymentSecured AS
 (
@@ -748,20 +662,13 @@ PaymentFiltered AS
         Payment.C_ConversionType_ID,
         Payment.DateAcct,
         Payment.PayAmt
-
     FROM PaymentSecured Payment
-
     INNER JOIN CurrentPeriod CurrentPeriod ON
     (
-        CurrentPeriod.AD_Client_ID =
-        Payment.AD_Client_ID
+        CurrentPeriod.AD_Client_ID=Payment.AD_Client_ID
     )
-
-    WHERE Payment.DateAcct >=
-        CurrentPeriod.DateFrom
-
-    AND Payment.DateAcct <
-        " + currentPeriodEndExclusiveSql + @"
+    WHERE Payment.DateAcct>=CurrentPeriod.DateFrom
+    AND Payment.DateAcct<" + currentPeriodEndExclusiveSql + @"
 ),
 PaidThisMonthData AS
 (
@@ -769,111 +676,34 @@ PaidThisMonthData AS
         Payment.C_Payment_ID,
         Payment.AD_Client_ID,
         Payment.C_BPartner_ID,
-
         CASE
-            WHEN Payment.C_Currency_ID =
-                 SchemaCurrency.C_Currency_ID
-
-            THEN COALESCE
-            (
-                Payment.PayAmt,
-                0
-            )
-
-            ELSE CurrencyConvert
-            (
-                COALESCE
-                (
-                    Payment.PayAmt,
-                    0
-                ),
-                Payment.C_Currency_ID,
-                SchemaCurrency.C_Currency_ID,
-                Payment.DateAcct,
-                Payment.C_ConversionType_ID,
-                Payment.AD_Client_ID,
-                Payment.AD_Org_ID
-            )
+            WHEN Payment.C_Currency_ID=SchemaCurrency.C_Currency_ID THEN COALESCE(Payment.PayAmt,0)
+            ELSE CurrencyConvert(COALESCE(Payment.PayAmt,0),Payment.C_Currency_ID,SchemaCurrency.C_Currency_ID,Payment.DateAcct,Payment.C_ConversionType_ID,Payment.AD_Client_ID,Payment.AD_Org_ID)
         END AS PaidAmount
-
     FROM PaymentFiltered Payment
-
     INNER JOIN SchemaCurrency SchemaCurrency ON
     (
-        SchemaCurrency.AD_Client_ID =
-        Payment.AD_Client_ID
+        SchemaCurrency.AD_Client_ID=Payment.AD_Client_ID
     )
 )
 SELECT
-    ROUND
-    (
-        " + CastNumberSql(amountSumExpression) + @",
-
-        CAST
-        (
-            COALESCE
-            (
-                MAX
-                (
-                    SchemaCurrency.StdPrecision
-                ),
-                2
-            ) AS INTEGER
-        )
-    ) AS PaidThisMonth,
-
-    COUNT
-    (
-        DISTINCT PaidThisMonthData.C_BPartner_ID
-    ) AS VendorCount,
-
-    COUNT
-    (
-        PaidThisMonthData.C_Payment_ID
-    ) AS PaymentCount,
-
-    MAX
-    (
-        SchemaCurrency.C_Currency_ID
-    ) AS C_Currency_ID,
-
-    MAX
-    (
-        SchemaCurrency.ISO_Code
-    ) AS CurrencyISO,
-
-    MAX
-    (
-        SchemaCurrency.Cur_Symbol
-    ) AS CurrencySymbol,
-
-    MAX
-    (
-        SchemaCurrency.StdPrecision
-    ) AS StdPrecision,
-
-    MAX
-    (
-        CurrentPeriod.DateFrom
-    ) AS DateFrom,
-
-    MAX
-    (
-        CurrentPeriod.DateTo
-    ) AS DateTo
-
+    ROUND(" + CastNumberSql(amountSumExpression) + @",CAST(COALESCE(MAX(SchemaCurrency.StdPrecision),2) AS INTEGER)) AS PaidThisMonth,
+    COUNT(DISTINCT PaidThisMonthData.C_BPartner_ID) AS VendorCount,
+    COUNT(PaidThisMonthData.C_Payment_ID) AS PaymentCount,
+    MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
+    MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
+    MAX(SchemaCurrency.Cur_Symbol) AS CurrencySymbol,
+    MAX(SchemaCurrency.StdPrecision) AS StdPrecision,
+    MAX(CurrentPeriod.DateFrom) AS DateFrom,
+    MAX(CurrentPeriod.DateTo) AS DateTo
 FROM SchemaCurrency SchemaCurrency
-
 LEFT OUTER JOIN CurrentPeriod CurrentPeriod ON
 (
-    CurrentPeriod.AD_Client_ID =
-    SchemaCurrency.AD_Client_ID
+    CurrentPeriod.AD_Client_ID=SchemaCurrency.AD_Client_ID
 )
-
 LEFT OUTER JOIN PaidThisMonthData PaidThisMonthData ON
 (
-    PaidThisMonthData.AD_Client_ID =
-    SchemaCurrency.AD_Client_ID
+    PaidThisMonthData.AD_Client_ID=SchemaCurrency.AD_Client_ID
 )";
 
             SqlParameter[] parameters =
@@ -921,20 +751,6 @@ LEFT OUTER JOIN PaidThisMonthData PaidThisMonthData ON
             bool hasExecutionStatus =
                 HasPaymentExecutionStatusColumn();
 
-            string executionStatusFilter =
-                hasExecutionStatus
-                    ? @"
-AND COALESCE
-(
-    Payment.VA009_ExecutionStatus,
-    'R'
-) NOT IN
-(
-    'B',
-    'C'
-)"
-                    : string.Empty;
-
             string executionStatusColumn =
                 hasExecutionStatus
                     ? "Payment.VA009_ExecutionStatus"
@@ -954,28 +770,11 @@ SELECT
     Payment.DocStatus,
     Payment.IsReconciled,
     Payment.PayAmt,
-    " + executionStatusColumn + @"
-
+    " + executionStatusColumn + $@"
 FROM C_Payment Payment
-
-WHERE Payment.IsActive = 'Y'
-
-AND Payment.IsReceipt = 'N'
-
-AND Payment.DocStatus IN
-(
-    'CO',
-    'CL'
-)
-
-AND Payment.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)"
-                + executionStatusFilter;
+WHERE Payment.IsActive='Y'
+AND Payment.IsReceipt='N'
+AND Payment.DocStatus IN ('CO','CL')";
 
             paymentAccessSql =
                 MRole.GetDefault(ctx).AddAccessSQL(
@@ -998,66 +797,35 @@ StatusListSource AS
         " + GetTextCastSql("RefList.Value") + @" AS StatusValue,
         " + GetTextCastSql("RefList.Name") + @" AS ExecutionStatusName,
         " + GetTextCastSql("RefListTrl.Name") + @" AS TranslatedExecutionStatusName,
-
         ROW_NUMBER() OVER
         (
-            PARTITION BY
-                " + GetTextCastSql("RefList.Value") + @"
-
-            ORDER BY
-                CASE
-                    WHEN RefListTrl.Name IS NOT NULL
-                    THEN 0
-                    ELSE 1
-                END,
-                RefList.AD_Ref_List_ID
+            PARTITION BY " + GetTextCastSql("RefList.Value") + @"
+            ORDER BY CASE WHEN RefListTrl.Name IS NOT NULL THEN 0 ELSE 1 END,RefList.AD_Ref_List_ID
         ) AS StatusRowNumber
-
     FROM AD_Table TableInfo
-
     INNER JOIN AD_Column ColumnInfo ON
     (
-        ColumnInfo.AD_Table_ID =
-        TableInfo.AD_Table_ID
+        ColumnInfo.AD_Table_ID=TableInfo.AD_Table_ID
     )
-
     INNER JOIN AD_Reference ReferenceInfo ON
     (
-        ReferenceInfo.AD_Reference_ID =
-        ColumnInfo.AD_Reference_Value_ID
+        ReferenceInfo.AD_Reference_ID=ColumnInfo.AD_Reference_Value_ID
     )
-
     INNER JOIN AD_Ref_List RefList ON
     (
-        RefList.AD_Reference_ID =
-        ReferenceInfo.AD_Reference_ID
+        RefList.AD_Reference_ID=ReferenceInfo.AD_Reference_ID
     )
-
     LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
     (
-        RefListTrl.AD_Ref_List_ID =
-        RefList.AD_Ref_List_ID
-
-        AND RefListTrl.AD_Language =
-        (
-            SELECT
-                QueryParameters.AD_Language
-
-            FROM QueryParameters QueryParameters
-        )
+        RefListTrl.AD_Ref_List_ID=RefList.AD_Ref_List_ID
+        AND RefListTrl.AD_Language=(SELECT QueryParameters.AD_Language FROM QueryParameters QueryParameters)
     )
-
-    WHERE TableInfo.TableName = 'C_Payment'
-
-    AND ColumnInfo.ColumnName = 'VA009_ExecutionStatus'
-
-    AND TableInfo.IsActive = 'Y'
-
-    AND ColumnInfo.IsActive = 'Y'
-
-    AND ReferenceInfo.IsActive = 'Y'
-
-    AND RefList.IsActive = 'Y'
+    WHERE TableInfo.TableName='C_Payment'
+    AND ColumnInfo.ColumnName='VA009_ExecutionStatus'
+    AND TableInfo.IsActive='Y'
+    AND ColumnInfo.IsActive='Y'
+    AND ReferenceInfo.IsActive='Y'
+    AND RefList.IsActive='Y'
 ),
 StatusList AS
 (
@@ -1065,10 +833,8 @@ StatusList AS
         StatusListSource.StatusValue,
         StatusListSource.ExecutionStatusName,
         StatusListSource.TranslatedExecutionStatusName
-
     FROM StatusListSource StatusListSource
-
-    WHERE StatusListSource.StatusRowNumber = 1
+    WHERE StatusListSource.StatusRowNumber=1
 )";
 
                 statusColumns = @"
@@ -1079,8 +845,7 @@ StatusList.TranslatedExecutionStatusName,";
                 statusJoin = @"
 LEFT OUTER JOIN StatusList StatusList ON
 (
-    StatusList.StatusValue =
-    " + GetTextCastSql("Payment.VA009_ExecutionStatus") + @"
+    StatusList.StatusValue=" + GetTextCastSql("Payment.VA009_ExecutionStatus") + @"
 )";
             }
             else
@@ -1095,7 +860,7 @@ NULL AS TranslatedExecutionStatusName,";
 
             string amountExpression =
                 CastNumberSql(
-                    "COALESCE(Payment.PayAmt, 0)"
+                    "COALESCE(Payment.PayAmt,0)"
                 );
 
             string sql = @"
@@ -1112,53 +877,24 @@ CurrentPeriod AS
 (
     SELECT
         ClientInfo.AD_Client_ID,
-
-        MIN
-        (
-            Period.StartDate
-        ) AS DateFrom,
-
-        MAX
-        (
-            Period.EndDate
-        ) AS DateTo
-
+        MIN(Period.StartDate) AS DateFrom,
+        MAX(Period.EndDate) AS DateTo
     FROM AD_ClientInfo ClientInfo
-
     INNER JOIN C_Year YearData ON
     (
-        YearData.C_Calendar_ID =
-        ClientInfo.C_Calendar_ID
+        YearData.C_Calendar_ID=ClientInfo.C_Calendar_ID
     )
-
     INNER JOIN C_Period Period ON
     (
-        Period.C_Year_ID =
-        YearData.C_Year_ID
+        Period.C_Year_ID=YearData.C_Year_ID
     )
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND YearData.IsActive = 'Y'
-
-    AND Period.IsActive = 'Y'
-
-    AND ClientInfo.AD_Client_ID =
-    (
-        SELECT
-            QueryParameters.AD_Client_ID
-
-        FROM QueryParameters QueryParameters
-    )
-
-    AND CURRENT_DATE >=
-        Period.StartDate
-
-    AND CURRENT_DATE <
-        " + periodEndExclusiveSql + @"
-
-    GROUP BY
-        ClientInfo.AD_Client_ID
+    WHERE ClientInfo.IsActive='Y'
+    AND YearData.IsActive='Y'
+    AND Period.IsActive='Y'
+    AND ClientInfo.AD_Client_ID=(SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)
+    AND CURRENT_DATE>=Period.StartDate
+    AND CURRENT_DATE<" + periodEndExclusiveSql + @"
+    GROUP BY ClientInfo.AD_Client_ID
 ),
 PaymentSecured AS
 (
@@ -1182,20 +918,13 @@ PaymentFiltered AS
         Payment.VA009_ExecutionStatus,
         CurrentPeriod.DateFrom,
         CurrentPeriod.DateTo
-
     FROM PaymentSecured Payment
-
     INNER JOIN CurrentPeriod CurrentPeriod ON
     (
-        CurrentPeriod.AD_Client_ID =
-        Payment.AD_Client_ID
+        CurrentPeriod.AD_Client_ID=Payment.AD_Client_ID
     )
-
-    WHERE Payment.DateAcct >=
-        CurrentPeriod.DateFrom
-
-    AND Payment.DateAcct <
-        " + currentPeriodEndExclusiveSql + @"
+    WHERE Payment.DateAcct>=CurrentPeriod.DateFrom
+    AND Payment.DateAcct<" + currentPeriodEndExclusiveSql + @"
 )"
         + statusListCte + @",
 PaidRows AS
@@ -1214,64 +943,36 @@ PaidRows AS
         Payment.IsReconciled,
         Payment.VA009_ExecutionStatus,
         " + statusColumns + @"
-
-        ROUND
-        (
-            " + amountExpression + @",
-
-            CAST
-            (
-                COALESCE
-                (
-                    PaymentCurrency.StdPrecision,
-                    2
-                ) AS INTEGER
-            )
-        ) AS Amount,
-
+        ROUND(" + amountExpression + @",CAST(COALESCE(PaymentCurrency.StdPrecision,2) AS INTEGER)) AS Amount,
         Payment.C_Currency_ID,
         PaymentCurrency.StdPrecision,
         PaymentCurrency.ISO_Code AS CurrencyISO,
-
         CASE
-            WHEN PaymentCurrency.CurSymbol IS NOT NULL
-            THEN PaymentCurrency.CurSymbol
+            WHEN PaymentCurrency.CurSymbol IS NOT NULL THEN PaymentCurrency.CurSymbol
             ELSE PaymentCurrency.ISO_Code
         END AS CurrencySymbol,
-
         Payment.DateFrom,
         Payment.DateTo
-
     FROM PaymentFiltered Payment
-
     INNER JOIN C_Currency PaymentCurrency ON
     (
-        PaymentCurrency.C_Currency_ID =
-        Payment.C_Currency_ID
+        PaymentCurrency.C_Currency_ID=Payment.C_Currency_ID
     )
-
     LEFT OUTER JOIN C_BPartner BPartner ON
     (
-        BPartner.C_BPartner_ID =
-        Payment.C_BPartner_ID
+        BPartner.C_BPartner_ID=Payment.C_BPartner_ID
     )
-
     LEFT OUTER JOIN C_BankAccount BankAccount ON
     (
-        BankAccount.C_BankAccount_ID =
-        Payment.C_BankAccount_ID
+        BankAccount.C_BankAccount_ID=Payment.C_BankAccount_ID
     )
-
     LEFT OUTER JOIN C_Bank Bank ON
     (
-        Bank.C_Bank_ID =
-        BankAccount.C_Bank_ID
+        Bank.C_Bank_ID=BankAccount.C_Bank_ID
     )
-
     LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
     (
-        PaymentMethod.VA009_PaymentMethod_ID =
-        Payment.VA009_PaymentMethod_ID
+        PaymentMethod.VA009_PaymentMethod_ID=Payment.VA009_PaymentMethod_ID
     )
     " + statusJoin + @"
 ),
@@ -1279,16 +980,11 @@ NumberedRows AS
 (
     SELECT
         PaidRows.*,
-
         COUNT(1) OVER () AS TotalRecords,
-
         ROW_NUMBER() OVER
         (
-            ORDER BY
-                PaidRows.PaymentDate DESC,
-                PaidRows.C_Payment_ID DESC
+            ORDER BY PaidRows.PaymentDate DESC,PaidRows.C_Payment_ID DESC
         ) AS RowNumber
-
     FROM PaidRows PaidRows
 )
 SELECT
@@ -1315,27 +1011,10 @@ SELECT
     NumberedRows.DateFrom,
     NumberedRows.DateTo,
     NumberedRows.TotalRecords
-
 FROM NumberedRows NumberedRows
-
-WHERE NumberedRows.RowNumber >=
-(
-    SELECT
-        QueryParameters.StartRow
-
-    FROM QueryParameters QueryParameters
-)
-
-AND NumberedRows.RowNumber <=
-(
-    SELECT
-        QueryParameters.EndRow
-
-    FROM QueryParameters QueryParameters
-)
-
-ORDER BY
-    NumberedRows.RowNumber";
+WHERE NumberedRows.RowNumber>=(SELECT QueryParameters.StartRow FROM QueryParameters QueryParameters)
+AND NumberedRows.RowNumber<=(SELECT QueryParameters.EndRow FROM QueryParameters QueryParameters)
+ORDER BY NumberedRows.RowNumber";
 
             SqlParameter[] parameters =
             {
@@ -1404,23 +1083,15 @@ ORDER BY
             string sql = @"
 SELECT
     COUNT(1)
-
 FROM AD_Table TableData
-
 INNER JOIN AD_Column ColumnData ON
 (
-    ColumnData.AD_Table_ID =
-    TableData.AD_Table_ID
+    ColumnData.AD_Table_ID=TableData.AD_Table_ID
 )
-
-WHERE TableData.TableName = 'C_Payment'
-
-AND ColumnData.ColumnName =
-    'VA009_ExecutionStatus'
-
-AND TableData.IsActive = 'Y'
-
-AND ColumnData.IsActive = 'Y'";
+WHERE TableData.TableName='C_Payment'
+AND ColumnData.ColumnName='VA009_ExecutionStatus'
+AND TableData.IsActive='Y'
+AND ColumnData.IsActive='Y'";
 
             return Util.GetValueOfInt(
                 DB.ExecuteScalar(sql)

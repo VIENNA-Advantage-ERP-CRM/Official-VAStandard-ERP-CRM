@@ -184,6 +184,9 @@ namespace VASLogic.Models
             data.PostedName = GetListReferenceName(ctx, "C_Invoice", "Posted", data.Posted);
             data.Processed = Util.GetValueOfString(r["Processed"]) == "Y";
             data.IsApproved = Util.GetValueOfString(r["IsApproved"]) == "Y";
+            // Reversing a purchase invoice (ReverseCorrectIt) leaves the document on
+            // DocStatus 'RE'. The panel shows "Reversed" instead of "Completed" for it.
+            data.IsReversed = data.DocStatus == "RE";
             data.Created = Util.GetValueOfDateTime(r["Created"]);
             data.CreatedByName = Util.GetValueOfString(r["CreatedByName"]);
             data.Updated = Util.GetValueOfDateTime(r["Updated"]);
@@ -548,7 +551,7 @@ namespace VASLogic.Models
                               o.DocumentNo       AS OrderDocumentNo,
                               ol.QtyOrdered,
                               ol.PriceEntered    AS OrderPrice,
-                              (il.QtyEntered - COALESCE(iol.MovementQty, il.QtyEntered)) AS QuantityVariance,
+                              (ABS(il.QtyEntered) - COALESCE(ABS(iol.MovementQty), ABS(il.QtyEntered))) AS QuantityVariance,
                               (il.PriceEntered - COALESCE(ol.PriceEntered, il.PriceEntered)) AS PriceVariance
                            FROM C_InvoiceLine il
                            INNER JOIN M_Product pr   ON (il.M_Product_ID  = pr.M_Product_ID)
@@ -588,7 +591,11 @@ namespace VASLogic.Models
                 row.QuantityVariance = Util.GetValueOfDecimal(r["QuantityVariance"]);
                 gr.Rows.Add(row);
 
-                totalRecvQty += row.ReceivedQty;
+                // Quantities are compared as magnitudes: a reversal / credit-memo line
+                // carries a negative QtyEntered, and subtracting it from a positive
+                // receipt quantity would ADD the two instead of differencing them
+                // (200 received vs -184 invoiced must read 16, not 384).
+                totalRecvQty += Math.Abs(row.ReceivedQty);
                 totalQtyVar += Math.Abs(row.QuantityVariance);
                 if (Math.Abs(row.PriceVariance) > Math.Abs(maxPriceVar)) maxPriceVar = row.PriceVariance;
 
@@ -2363,6 +2370,8 @@ namespace VASLogic.Models
             public string PostedName { get; set; }
             public bool Processed { get; set; }
             public bool IsApproved { get; set; }
+            /// <summary>Document was reversed (ReverseCorrectIt leaves DocStatus 'RE').</summary>
+            public bool IsReversed { get; set; }
             public DateTime? Created { get; set; }
             public string CreatedByName { get; set; }
             public DateTime? Updated { get; set; }

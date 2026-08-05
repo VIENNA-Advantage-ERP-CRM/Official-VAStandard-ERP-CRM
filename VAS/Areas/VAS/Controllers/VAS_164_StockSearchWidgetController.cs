@@ -54,8 +54,8 @@ namespace VAS.Controllers
                                       p.Value AS ProductCode, 
                                       p.Name AS ProductName, 
                                       p.ProductType, 
-                                      COALESCE(pc.Name, 'Standard') AS CategoryName, 
-                                      COALESCE(u.UOMSymbol, COALESCE(u.Name, 'Each')) AS UOMName, 
+                                      COALESCE(pc.Name, N'Standard') AS CategoryName, 
+                                      COALESCE(u.UOMSymbol, COALESCE(u.Name, N'Each')) AS UOMName, 
                                       p.IsActive, 
                                       COALESCE(SUM(s.QtyOnHand), 0) AS TotalQtyOnHand 
                                FROM M_Product p 
@@ -123,8 +123,8 @@ namespace VAS.Controllers
                                       p.Value AS ProductCode, 
                                       p.Name AS ProductName, 
                                       p.ProductType, 
-                                      COALESCE(pc.Name, 'Standard') AS CategoryName, 
-                                      COALESCE(u.UOMSymbol, COALESCE(u.Name, 'Each')) AS UOMName, 
+                                      COALESCE(pc.Name, N'Standard') AS CategoryName, 
+                                      COALESCE(u.UOMSymbol, COALESCE(u.Name, N'Each')) AS UOMName, 
                                       p.IsActive, 
                                       COALESCE(SUM(s.QtyOnHand), 0) AS TotalQtyOnHand 
                                FROM M_Product p 

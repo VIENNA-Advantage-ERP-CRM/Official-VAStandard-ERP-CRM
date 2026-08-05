@@ -4,16 +4,15 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────────────
  *  #  | Current Text                                      | Message Key
  * ----+---------------------------------------------------+------------------------------
- *  1  | Paid this month                                   | VAS_028_MessagePaidThisMonth
+ *  1  | Paid This Month                                   | VAS_028_MessagePaidThisMonth
  *  1b | Total Vendor Payments                             | VAS_028_MessageTotalVendorPayments
  *  2  | Loading                                           | VAS_028_MessageLoading
- *  3  | No Data                                           | VAS_ErrorLoading
+ *  3  | Could not load data                               | VAS_ErrorLoading
  *  4  | vendor                                            | VAS_028_MessageVendor
  *  5  | vendors                                           | VAS_028_MessageVendors
  *  6  | Paid to                                           | VAS_028_MessagePaidTo
- *  7  | so far this month.                                | VAS_028_MessageSoFarThisMonth
+ *  7  | so far this month                                 | VAS_028_MessageSoFarThisMonth
  *  8  | No payments this month.                           | VAS_028_MessageNoPaymentsThisMonth
- *  9  | No Data                                           | VAS_028_MessageNoData
  * 10  | Cash paid                                         | VAS_028_MessageCashPaid
  * 11  | payments                                          | VAS_028_MessagePayments
  * 12  | Not Specified                                     | VAS_028_MessageNotSpecified
@@ -23,17 +22,14 @@
  * 16  | Bounced                                           | VAS_028_MessageBounced
  * 17  | In transit                                        | VAS_028_MessageInTransit
  * 18  | Close                                             | VAS_Close
- * 19  | Total paid                                        | VAS_028_MessageTotalPaid
- * 20  | Avg ticket                                        | VAS_028_MessageAvgTicket
- * 21  | Largest                                           | VAS_028_MessageLargest
  * 22  | Payment No.                                       | VAS_028_MessagePaymentNo
  * 23  | Date                                              | VAS_028_MessageDate
  * 24  | Vendor                                            | VAS_028_MessageVendor
  * 25  | Bank account                                      | VAS_028_BankAccount
  * 26  | Currency                                          | VAS_PaymentCurrency
  * 27  | Amount                                            | VAS_028_MessageAmount
- * 28  | Method                                            | VAS_028_MessageMethod
- * 29  | Status                                            | VAS_028_MessageStatus
+ * 28  | Payment Method                                    | VAS_028_MessageMethod
+ * 29  | Execution Status                                  | VAS_028_MessageStatus
  * 30  | Previous                                          | VAS_Previous
  * 31  | Next                                              | VAS_Next
  * ──────────────────────────────────────────────────────────────────────────────
@@ -43,15 +39,14 @@
  * Labels / Message Keys
  * #  | Current Text                                      | Message Key
  * ---+---------------------------------------------------+------------------------------
- * 1  | Paid this month                                   | VAS_028_MessagePaidThisMonth
+ * 1  | Paid This Month                                   | VAS_028_MessagePaidThisMonth
  * 2  | Loading                                           | VAS_028_MessageLoading
  * 3  | Could not load data                               | VAS_ErrorLoading
  * 4  | vendor                                            | VAS_028_MessageVendor
  * 5  | vendors                                           | VAS_028_MessageVendors
  * 6  | Paid to                                           | VAS_028_MessagePaidTo
- * 7  | so far this month.                                | VAS_028_MessageSoFarThisMonth
+ * 7  | so far this month                                 | VAS_028_MessageSoFarThisMonth
  * 8  | No payments this month.                           | VAS_028_MessageNoPaymentsThisMonth
- * 9  | No Data                                           | VAS_028_MessageNoData
  * 10 | Cash paid                                         | VAS_028_MessageCashPaid
  * 11 | payments                                          | VAS_028_MessagePayments
  * 12 | Not Specified                                     | VAS_028_MessageNotSpecified
@@ -61,17 +56,14 @@
  * 16 | Bounced                                           | VAS_028_MessageBounced
  * 17 | In transit                                        | VAS_028_MessageInTransit
  * 18 | Close                                             | VAS_Close
- * 19 | Total paid                                        | VAS_028_MessageTotalPaid
- * 20 | Avg ticket                                        | VAS_028_MessageAvgTicket
- * 21 | Largest                                           | VAS_028_MessageLargest
  * 22 | Payment No.                                       | VAS_028_MessagePaymentNo
  * 23 | Date                                              | VAS_028_MessageDate
  * 24 | Vendor                                            | VAS_028_MessageVendor
  * 25 | Bank account                                      | VAS_028_BankAccount
  * 26 | Currency                                          | VAS_PaymentCurrency
  * 27 | Amount                                            | VAS_028_MessageAmount
- * 28 | Method                                            | VAS_028_MessageMethod
- * 29 | Status                                            | VAS_028_MessageStatus
+ * 28 | Payment Method                                    | VAS_028_MessageMethod
+ * 29 | Execution Status                                  | VAS_028_MessageStatus
  * 30 | Previous                                          | VAS_Previous
  * 31 | Next                                              | VAS_Next
  */
@@ -108,11 +100,6 @@
         var $pagerPrev = null;
         var $pagerNext = null;
         var $pagerText = null;
-
-        var $summaryTotal = null;
-        var $summaryCount = null;
-        var $summaryAvg = null;
-        var $summaryLargest = null;
 
         var isDisposed = false;
         var rowsLoaded = false;
@@ -227,7 +214,7 @@
             var $title = $('<div class="vas-ptm-title">').text(
                 lbl(
                     'VAS_028_MessagePaidThisMonth',
-                    'Paid this month'
+                    'Paid This Month'
                 )
             );
 
@@ -326,7 +313,7 @@
                             true,
                             lbl(
                                 'VAS_ErrorLoading',
-                                'No Data'
+                                'Could not load data'
                             )
                         );
 
@@ -342,7 +329,7 @@
                             true,
                             lbl(
                                 'VAS_ErrorLoading',
-                                'No Data'
+                                'Could not load data'
                             )
                         );
                     }
@@ -370,12 +357,13 @@
             }
 
             /*
-             * AP amounts are outflows and arrive negative, so only a
-             * missing or zero total means there is nothing to show.
+             * A month with no payments is a real answer, not a failure, so
+             * the card keeps its normal layout and reads the zero amount
+             * (for example ID0.00) instead of swapping in a "No Data"
+             * state. Only a load error still takes over the card.
              */
-            if (isNaN(amount) || amount === 0) {
-                setNoData();
-                return;
+            if (isNaN(amount)) {
+                amount = 0;
             }
 
             showState(false, '');
@@ -456,7 +444,7 @@
                     ' ' +
                     lbl(
                         'VAS_028_MessageSoFarThisMonth',
-                        'so far this month.'
+                        'so far this month'
                     )
                 );
             }
@@ -536,26 +524,6 @@
             }
 
             return stdPrecision;
-        }
-
-        function setNoData() {
-            lastData = null;
-
-            if ($metricEl) {
-                $metricEl.text('');
-            }
-
-            if ($whyText) {
-                $whyText.text('');
-            }
-
-            showState(
-                true,
-                lbl(
-                    'VAS_028_MessageNoData',
-                    'No Data'
-                )
-            );
         }
 
         function openDialog() {
@@ -885,7 +853,6 @@
             }
 
             renderDialogHeader(data || {});
-            renderSummary(data || {}, rows);
             renderRows(rows);
 
             var from = totalRecords === 0
@@ -906,7 +873,7 @@
                     data.title ||
                     lbl(
                         'VAS_028_MessagePaidThisMonth',
-                        'Paid this month'
+                        'Paid This Month'
                     )
                 );
             }
@@ -959,104 +926,6 @@
                     lastData.currencyISO
                 )
             );
-        }
-
-        function renderSummary(data, rows) {
-            rows = $.isArray(rows)
-                ? rows
-                : [];
-
-            var totalAmount = Number(
-                lastData &&
-                    lastData.totalPaidAmount
-                    ? lastData.totalPaidAmount
-                    : 0
-            );
-
-            var paymentCount = Number(
-                data.totalRecords ||
-                totalRecords ||
-                rows.length ||
-                0
-            );
-
-            var pageTotal = 0;
-            var largestPayment = 0;
-
-            for (var i = 0; i < rows.length; i++) {
-                var rowAmount = Number(
-                    rows[i].amount || 0
-                );
-
-                pageTotal += rowAmount;
-
-                if (rowAmount > largestPayment) {
-                    largestPayment = rowAmount;
-                }
-            }
-
-            var averagePayment = rows.length > 0
-                ? pageTotal / rows.length
-                : 0;
-
-            var firstRow = rows.length > 0
-                ? rows[0]
-                : {};
-
-            var symbol =
-                lastData && lastData.symbol
-                    ? lastData.symbol
-                    : (
-                        firstRow.paymentCurrencySymbol ||
-                        ''
-                    );
-
-            var iso =
-                firstRow.paymentCurrency ||
-                '';
-
-            if ($summaryTotal) {
-                $summaryTotal.text(
-                    formatHeaderAmount(
-                        totalAmount,
-                        symbol,
-                        iso
-                    )
-                );
-            }
-
-            if ($summaryCount) {
-                $summaryCount.text(
-                    paymentCount.toLocaleString(
-                        window.navigator.language
-                    )
-                );
-            }
-
-            /*
-             * The current controller does not return the monthly
-             * average and largest payment. These two values are
-             * calculated from the currently loaded page.
-             */
-            if ($summaryAvg) {
-                $summaryAvg.text(
-                    formatHeaderAmount(
-                        averagePayment,
-                        symbol,
-                        iso
-                    )
-                );
-            }
-
-            if ($summaryLargest) {
-                $summaryLargest.text(
-                    formatHeaderAmount(
-                        largestPayment,
-                        symbol,
-                        iso
-                    )
-                );
-            }
         }
 
         function renderRows(rows) {
@@ -1496,58 +1365,6 @@
 
                 '</div>' +
 
-                '<div class="vas-ptm-dialog-summary">' +
-
-                '<div>' +
-                '<span>' +
-                escapeHtml(
-                    lbl(
-                        'VAS_028_MessageTotalPaid',
-                        'Total paid'
-                    )
-                ) +
-                '</span>' +
-                '<strong class="vas-ptm-summary-total">-</strong>' +
-                '</div>' +
-
-                '<div>' +
-                '<span>' +
-                escapeHtml(
-                    lbl(
-                        'VAS_028_MessagePayments',
-                        'Payments'
-                    )
-                ) +
-                '</span>' +
-                '<strong class="vas-ptm-summary-count">-</strong>' +
-                '</div>' +
-
-                '<div>' +
-                '<span>' +
-                escapeHtml(
-                    lbl(
-                        'VAS_028_MessageAvgTicket',
-                        'Avg ticket'
-                    )
-                ) +
-                '</span>' +
-                '<strong class="vas-ptm-summary-avg">-</strong>' +
-                '</div>' +
-
-                '<div>' +
-                '<span>' +
-                escapeHtml(
-                    lbl(
-                        'VAS_028_MessageLargest',
-                        'Largest'
-                    )
-                ) +
-                '</span>' +
-                '<strong class="vas-ptm-summary-largest">-</strong>' +
-                '</div>' +
-
-                '</div>' +
-
                 '<div class="vas-ptm-dialog-body">' +
 
                 '<div class="vas-ptm-dialog-busy">' +
@@ -1610,7 +1427,7 @@
                 escapeHtml(
                     lbl(
                         'VAS_028_MessageMethod',
-                        'Method'
+                        'Payment Method'
                     )
                 ) +
                 '</th>' +
@@ -1619,7 +1436,7 @@
                 escapeHtml(
                     lbl(
                         'VAS_028_MessageStatus',
-                        'Status'
+                        'Execution Status'
                     )
                 ) +
                 '</th>' +
@@ -1713,22 +1530,6 @@
 
             $pagerText = $dialog.find(
                 '.vas-ptm-pager-text'
-            );
-
-            $summaryTotal = $dialog.find(
-                '.vas-ptm-summary-total'
-            );
-
-            $summaryCount = $dialog.find(
-                '.vas-ptm-summary-count'
-            );
-
-            $summaryAvg = $dialog.find(
-                '.vas-ptm-summary-avg'
-            );
-
-            $summaryLargest = $dialog.find(
-                '.vas-ptm-summary-largest'
             );
 
             $dialog
@@ -1840,11 +1641,6 @@
             $pagerPrev = null;
             $pagerNext = null;
             $pagerText = null;
-
-            $summaryTotal = null;
-            $summaryCount = null;
-            $summaryAvg = null;
-            $summaryLargest = null;
 
             lastData = null;
         };

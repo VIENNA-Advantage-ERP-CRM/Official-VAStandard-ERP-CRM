@@ -27,14 +27,20 @@ using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
+using VASLogic.Models;
 using VIS.Filters;
 
 namespace VAS.Controllers
 {
     public class VAS_032_RecentAPPaymentsWidgetController : Controller
     {
-        [AjaxAuthorizeAttribute]
-        [AjaxSessionFilterAttribute]
+        /// <summary>
+        /// Length of the trailing transaction-date window the card covers,
+        /// in days, counting today. Backs the "last 30 days" the widget
+        /// subtitle has always claimed (VAS_032_MessageReceiptsLast30Days).
+        /// </summary>
+        private const int RecentPaymentWindowDays = 30;
+
         public JsonResult GetRecentAPPayments()
         {
             Ctx ctx = GetContext();
@@ -49,41 +55,21 @@ namespace VAS.Controllers
 
             try
             {
-                SqlQueryData queryData =
-                    BuildRecentPaymentsSql(
-                        ctx
-                    );
+                SqlQueryData queryData =BuildRecentPaymentsSql(ctx);
 
-                sql =
-                    queryData.Sql;
+                sql =queryData.Sql;
 
-                dr = DB.ExecuteReader(
-                    queryData.Sql,
-                    queryData.Parameters,
-                    null
-                );
+                dr = DB.ExecuteReader(queryData.Sql,queryData.Parameters,null);
 
-                List<object> payments =
-                    new List<object>();
+                List<object> payments =new List<object>();
 
-                List<string> autoMatchedRefs =
-                    new List<string>();
+                List<string> autoMatchedRefs =new List<string>();
 
                 int autoMatchedCount = 0;
 
-                while (
-                    dr != null &&
-                    dr.Read() &&
-                    payments.Count < 30
-                )
+                while (dr != null && dr.Read() && payments.Count < 30)
                 {
-                    AddPaymentRow(
-                        ctx,
-                        dr,
-                        payments,
-                        autoMatchedRefs,
-                        ref autoMatchedCount
-                    );
+                    AddPaymentRow(ctx,dr,payments,autoMatchedRefs,ref autoMatchedCount);
                 }
 
                 return Json(
@@ -133,8 +119,7 @@ namespace VAS.Controllers
 
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetPaymentAllocationDetail(
-    int paymentId)
+        public JsonResult GetPaymentAllocationDetail(int paymentId)
         {
             Ctx ctx = GetContext();
 
@@ -229,8 +214,7 @@ namespace VAS.Controllers
                 /*
                  * Apply MRole only on physical C_Payment table.
                  */
-                string paymentAccessSql = @"
-SELECT
+                string paymentAccessSql = $@" SELECT
     Payment.C_Payment_ID,
     Payment.AD_Client_ID,
     Payment.AD_Org_ID,
@@ -242,26 +226,9 @@ SELECT
     Payment.PayAmt,
     Payment.DocStatus,
     Payment.IsAllocated
-
 FROM C_Payment Payment
-
-WHERE Payment.IsActive = 'Y'
-
-AND Payment.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)
-
-AND Payment.C_Payment_ID =
-(
-    SELECT
-        QueryParameters.C_Payment_ID
-
-    FROM QueryParameters QueryParameters
-)";
+WHERE Payment.IsActive='Y'
+AND Payment.C_Payment_ID=({paymentId})";
 
                 paymentAccessSql =
                     MRole.GetDefault(ctx).AddAccessSQL(
@@ -285,188 +252,77 @@ AccessiblePayment AS
 )
 SELECT
     Payment.C_Payment_ID,
-
-    " + paymentDocumentNoSql + @"
-        AS PaymentDocumentNo,
-
-    Payment.DateTrx
-        AS PaymentDate,
-
-    Payment.PayAmt
-        AS PaymentAmount,
-
-    " + paymentDocStatusSql + @"
-        AS PaymentDocStatus,
-
-    " + paymentIsAllocatedSql + @"
-        AS IsAllocated,
-
+    " + paymentDocumentNoSql + @" AS PaymentDocumentNo,
+    Payment.DateTrx AS PaymentDate,
+    Payment.PayAmt AS PaymentAmount,
+    " + paymentDocStatusSql + @" AS PaymentDocStatus,
+    " + paymentIsAllocatedSql + @" AS IsAllocated,
     AllocationHdr.C_AllocationHdr_ID,
-
-    " + allocationDocumentNoSql + @"
-        AS AllocationDocumentNo,
-
-    AllocationHdr.DateTrx
-        AS AllocationTransactionDate,
-
-    AllocationHdr.DateAcct
-        AS AllocationDate,
-
-    " + allocationDocStatusSql + @"
-        AS AllocationDocStatus,
-
+    " + allocationDocumentNoSql + @" AS AllocationDocumentNo,
+    AllocationHdr.DateTrx AS AllocationTransactionDate,
+    AllocationHdr.DateAcct AS AllocationDate,
+    " + allocationDocStatusSql + @" AS AllocationDocStatus,
     AllocationLine.C_AllocationLine_ID,
-
     AllocationLine.C_Invoice_ID,
-
     AllocationLine.C_InvoicePaySchedule_ID,
-
     CASE
-        WHEN Invoice.DocumentNo IS NULL
-        THEN " + emptyText + @"
+        WHEN Invoice.DocumentNo IS NULL THEN " + emptyText + @"
         ELSE " + invoiceDocumentNoSql + @"
     END AS InvoiceDocumentNo,
-
     Invoice.DateInvoiced,
-
-    COALESCE
-    (
-        InvoicePaySchedule.DueDate,
-        Invoice.DateAcct
-    ) AS DueDate,
-
+    COALESCE(InvoicePaySchedule.DueDate,Invoice.DateAcct) AS DueDate,
     CASE
-        WHEN BusinessPartner.Name IS NULL
-        THEN " + emptyText + @"
+        WHEN BusinessPartner.Name IS NULL THEN " + emptyText + @"
         ELSE " + vendorNameSql + @"
     END AS VendorName,
-
-    COALESCE
-    (
-        AllocationLine.Amount,
-        0
-    ) AS AllocatedAmount,
-
-    COALESCE
-    (
-        AllocationLine.DiscountAmt,
-        0
-    ) AS DiscountAmt,
-
-    COALESCE
-    (
-        AllocationLine.WriteOffAmt,
-        0
-    ) AS WriteOffAmt,
-
-    COALESCE
-    (
-        AllocationLine.OverUnderAmt,
-        0
-    ) AS OverUnderAmt,
-
-    (
-        COALESCE
-        (
-            AllocationLine.Amount,
-            0
-        )
-        +
-        COALESCE
-        (
-            AllocationLine.DiscountAmt,
-            0
-        )
-        +
-        COALESCE
-        (
-            AllocationLine.WriteOffAmt,
-            0
-        )
-    ) AS TotalAllocatedAmount,
-
+    COALESCE(AllocationLine.Amount,0) AS AllocatedAmount,
+    COALESCE(AllocationLine.DiscountAmt,0) AS DiscountAmt,
+    COALESCE(AllocationLine.WriteOffAmt,0) AS WriteOffAmt,
+    COALESCE(AllocationLine.OverUnderAmt,0) AS OverUnderAmt,
+    (COALESCE(AllocationLine.Amount,0)+COALESCE(AllocationLine.DiscountAmt,0)+COALESCE(AllocationLine.WriteOffAmt,0)) AS TotalAllocatedAmount,
     AllocationHdr.C_Currency_ID,
-
     CASE
-        WHEN Currency.ISO_Code IS NULL
-        THEN " + emptyText + @"
+        WHEN Currency.ISO_Code IS NULL THEN " + emptyText + @"
         ELSE " + currencyISOSql + @"
     END AS CurrencyISO,
-
     CASE
-        WHEN Currency.CurSymbol IS NULL
-        THEN " + emptyText + @"
+        WHEN Currency.CurSymbol IS NULL THEN " + emptyText + @"
         ELSE " + currencySymbolSql + @"
     END AS CurrencySymbol,
-
-    COALESCE
-    (
-        Currency.StdPrecision,
-        2
-    ) AS StdPrecision
-
+    COALESCE(Currency.StdPrecision,2) AS StdPrecision
 FROM AccessiblePayment Payment
-
 INNER JOIN C_AllocationLine AllocationLine ON
 (
-    AllocationLine.C_Payment_ID =
-    Payment.C_Payment_ID
-
-    AND AllocationLine.IsActive = 'Y'
-
-    AND AllocationLine.AD_Client_ID =
-    Payment.AD_Client_ID
+    AllocationLine.C_Payment_ID=Payment.C_Payment_ID
+    AND AllocationLine.IsActive='Y'
+    AND AllocationLine.AD_Client_ID=Payment.AD_Client_ID
 )
-
 INNER JOIN C_AllocationHdr AllocationHdr ON
 (
-    AllocationHdr.C_AllocationHdr_ID =
-    AllocationLine.C_AllocationHdr_ID
-
-    AND AllocationHdr.IsActive = 'Y'
-
-    AND AllocationHdr.AD_Client_ID =
-    Payment.AD_Client_ID
-
-    AND AllocationHdr.DocStatus IN
-    (
-        'CO',
-        'CL'
-    )
+    AllocationHdr.C_AllocationHdr_ID=AllocationLine.C_AllocationHdr_ID
+    AND AllocationHdr.IsActive='Y'
+    AND AllocationHdr.AD_Client_ID=Payment.AD_Client_ID
+    AND AllocationHdr.DocStatus IN ('CO','CL')
 )
-
 LEFT OUTER JOIN C_Invoice Invoice ON
 (
-    Invoice.C_Invoice_ID =
-    AllocationLine.C_Invoice_ID
-
-    AND Invoice.IsActive = 'Y'
+    Invoice.C_Invoice_ID=AllocationLine.C_Invoice_ID
+    AND Invoice.IsActive='Y'
 )
-
 LEFT OUTER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
 (
-    InvoicePaySchedule.C_InvoicePaySchedule_ID =
-    AllocationLine.C_InvoicePaySchedule_ID
-
-    AND InvoicePaySchedule.IsActive = 'Y'
+    InvoicePaySchedule.C_InvoicePaySchedule_ID=AllocationLine.C_InvoicePaySchedule_ID
+    AND InvoicePaySchedule.IsActive='Y'
 )
-
 LEFT OUTER JOIN C_BPartner BusinessPartner ON
 (
-    BusinessPartner.C_BPartner_ID =
-    Invoice.C_BPartner_ID
+    BusinessPartner.C_BPartner_ID=Invoice.C_BPartner_ID
 )
-
 LEFT OUTER JOIN C_Currency Currency ON
 (
-    Currency.C_Currency_ID =
-    AllocationHdr.C_Currency_ID
+    Currency.C_Currency_ID=AllocationHdr.C_Currency_ID
 )
-
-ORDER BY
-    AllocationHdr.DateAcct DESC,
-    AllocationHdr.C_AllocationHdr_ID DESC,
-    AllocationLine.C_AllocationLine_ID DESC";
+ORDER BY AllocationHdr.DateAcct DESC,AllocationHdr.C_AllocationHdr_ID DESC,AllocationLine.C_AllocationLine_ID DESC";
 
                 SqlParameter[] parameters =
                     new SqlParameter[]
@@ -880,8 +736,7 @@ ORDER BY
                     ? @"
 LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
 (
-    PaymentMethod.VA009_PaymentMethod_ID =
-    Payment.VA009_PaymentMethod_ID
+    PaymentMethod.VA009_PaymentMethod_ID=Payment.VA009_PaymentMethod_ID
 )"
                     : string.Empty;
 
@@ -904,75 +759,40 @@ ExecutionStatusListSource AS
         " + GetTextCastSql(
             "RefList.Name"
         ) + @" AS BaseStatusName,
-
         " + GetTextCastSql(
             "RefListTrl.Name"
         ) + @" AS TranslatedStatusName,
-
         ROW_NUMBER() OVER
         (
-            PARTITION BY
-                " + GetTextCastSql(
+            PARTITION BY " + GetTextCastSql(
                     "RefList.Value"
                 ) + @"
-
-            ORDER BY
-                CASE
-                    WHEN RefListTrl.Name IS NOT NULL
-                    THEN 0
-                    ELSE 1
-                END,
-
-                RefList.AD_Ref_List_ID
+            ORDER BY CASE WHEN RefListTrl.Name IS NOT NULL THEN 0 ELSE 1 END,RefList.AD_Ref_List_ID
         ) AS StatusRowNumber
-
     FROM AD_Table TableInfo
-
     INNER JOIN AD_Column ColumnInfo ON
     (
-        ColumnInfo.AD_Table_ID =
-        TableInfo.AD_Table_ID
+        ColumnInfo.AD_Table_ID=TableInfo.AD_Table_ID
     )
-
     INNER JOIN AD_Reference ReferenceInfo ON
     (
-        ReferenceInfo.AD_Reference_ID =
-        ColumnInfo.AD_Reference_Value_ID
+        ReferenceInfo.AD_Reference_ID=ColumnInfo.AD_Reference_Value_ID
     )
-
     INNER JOIN AD_Ref_List RefList ON
     (
-        RefList.AD_Reference_ID =
-        ReferenceInfo.AD_Reference_ID
+        RefList.AD_Reference_ID=ReferenceInfo.AD_Reference_ID
     )
-
     LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
     (
-        RefListTrl.AD_Ref_List_ID =
-        RefList.AD_Ref_List_ID
-
-        AND RefListTrl.AD_Language =
-        (
-            SELECT
-                QueryParameters.AD_Language
-
-            FROM QueryParameters QueryParameters
-        )
+        RefListTrl.AD_Ref_List_ID=RefList.AD_Ref_List_ID
+        AND RefListTrl.AD_Language=(SELECT QueryParameters.AD_Language FROM QueryParameters QueryParameters)
     )
-
-    WHERE TableInfo.TableName =
-        'C_Payment'
-
-    AND ColumnInfo.ColumnName =
-        'VA009_ExecutionStatus'
-
-    AND TableInfo.IsActive = 'Y'
-
-    AND ColumnInfo.IsActive = 'Y'
-
-    AND ReferenceInfo.IsActive = 'Y'
-
-    AND RefList.IsActive = 'Y'
+    WHERE TableInfo.TableName='C_Payment'
+    AND ColumnInfo.ColumnName='VA009_ExecutionStatus'
+    AND TableInfo.IsActive='Y'
+    AND ColumnInfo.IsActive='Y'
+    AND ReferenceInfo.IsActive='Y'
+    AND RefList.IsActive='Y'
 ),
 ExecutionStatusList AS
 (
@@ -980,10 +800,8 @@ ExecutionStatusList AS
         ExecutionStatusListSource.StatusValue,
         ExecutionStatusListSource.BaseStatusName,
         ExecutionStatusListSource.TranslatedStatusName
-
     FROM ExecutionStatusListSource ExecutionStatusListSource
-
-    WHERE ExecutionStatusListSource.StatusRowNumber = 1
+    WHERE ExecutionStatusListSource.StatusRowNumber=1
 )"
                     : string.Empty;
 
@@ -992,8 +810,7 @@ ExecutionStatusList AS
                     ? @"
 LEFT OUTER JOIN ExecutionStatusList ExecutionStatusList ON
 (
-    ExecutionStatusList.StatusValue =
-    " + GetTextCastSql(
+    ExecutionStatusList.StatusValue=" + GetTextCastSql(
         "Payment.VA009_ExecutionStatus"
     ) + @"
 )"
@@ -1046,48 +863,29 @@ SELECT
     Payment.C_Payment_ID,
 
     Payment.AD_Client_ID,
-
     Payment.AD_Org_ID,
-
     Payment.C_BPartner_ID,
-
     Payment.C_BankAccount_ID,
-
     Payment.C_Currency_ID,
-
     Payment.C_ConversionType_ID,
-
+    Payment.DateTrx,
     Payment.DateAcct,
-
     Payment.DocumentNo,
-
     Payment.DocStatus,
-
     Payment.IsReconciled,
-
     Payment.PayAmt"
         + paymentMethodColumnInAccess
         + executionStatusColumnInAccess + @"
-
 FROM C_Payment Payment
-
-WHERE Payment.IsActive = 'Y'
-
-AND Payment.IsReceipt = 'N'
-
-AND Payment.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)
-
-AND Payment.DocStatus IN
-(
-    'CO',
-    'CL'
-)";
+WHERE Payment.IsActive='Y'
+AND Payment.IsReceipt='N'
+AND Payment.DocStatus IN ('CO','CL')
+AND Payment.DateTrx>=" + GetTrailingWindowStartSql(
+        RecentPaymentWindowDays
+    ) + @"
+AND Payment.DateTrx<" + GetNextDaySql(
+        GetCurrentDateSql()
+    );
 
             paymentAccessSql =
                 MRole.GetDefault(ctx).AddAccessSQL(
@@ -1097,12 +895,8 @@ AND Payment.DocStatus IN
                     MRole.SQL_RO
                 );
 
-            string amountExpression = @"
-COALESCE
-(
-    Payment.PayAmt,
-    0
-)";
+            string amountExpression =
+                @"COALESCE(Payment.PayAmt,0)";
 
             string sql = @"
 WITH
@@ -1114,146 +908,63 @@ PaymentFiltered AS
     + executionStatusListCte + @"
 SELECT
     Payment.C_Payment_ID,
-
     Payment.DateAcct AS PaymentDate,
-
     Payment.DocumentNo AS DocumentNo,
-
     BPartner.Name AS VendorName,
-
-    " + paymentMethodNameSelect + @"
-        AS PaymentMethodName,
-
+    " + paymentMethodNameSelect + @" AS PaymentMethodName,
     BankAccount.Name AS BankAccountName,
-
     BankAccount.AccountNo AS BankAccountNo,
-
     Bank.Name AS BankName,
-
-    MAX
-    (
-        Invoice.DocumentNo
-    ) AS InvoiceDocumentNo,
-
-    MAX
-    (
-        SalesOrder.DocumentNo
-    ) AS OrderDocumentNo,
-
+    MAX(Invoice.DocumentNo) AS InvoiceDocumentNo,
+    MAX(SalesOrder.DocumentNo) AS OrderDocumentNo,
     CASE
-        WHEN MAX
-        (
-            Invoice.C_Invoice_ID
-        ) IS NOT NULL
-
-        OR MAX
-        (
-            SalesOrder.C_Order_ID
-        ) IS NOT NULL
-
-        THEN 'Y'
+        WHEN MAX(Invoice.C_Invoice_ID) IS NOT NULL
+        OR MAX(SalesOrder.C_Order_ID) IS NOT NULL
+            THEN 'Y'
         ELSE 'N'
     END AS HasBusinessRef,
-
     Payment.DocStatus,
-
     Payment.IsReconciled,
-
-    " + executionStatusValueSelect + @"
-        AS VA009_ExecutionStatus,
-
-    " + executionStatusNameSelect + @"
-        AS ExecutionStatusName,
-
-    " + translatedExecutionStatusNameSelect + @"
-        AS TranslatedExecutionStatusName,
-
-    ROUND
-    (
-        " + CastNumberSql(
+    " + executionStatusValueSelect + @" AS VA009_ExecutionStatus,
+    " + executionStatusNameSelect + @" AS ExecutionStatusName,
+    " + translatedExecutionStatusNameSelect + @" AS TranslatedExecutionStatusName,
+    ROUND(" + CastNumberSql(
             amountExpression
-        ) + @",
-
-        CAST
-        (
-            COALESCE
-            (
-                MAX
-                (
-                    Currency.StdPrecision
-                ),
-                2
-            ) AS INTEGER
-        )
-    ) AS Amount,
-
-    MAX
-    (
-        Payment.C_Currency_ID
-    ) AS C_Currency_ID,
-
-    MAX
-    (
-        Currency.StdPrecision
-    ) AS StdPrecision,
-
-    MAX
-    (
-        Currency.ISO_Code
-    ) AS CurrencyISO,
-
-    MAX
-    (
-        CASE
-            WHEN Currency.CurSymbol IS NOT NULL
-            THEN Currency.CurSymbol
-            ELSE Currency.ISO_Code
-        END
-    ) AS CurrencySymbol
-
+        ) + @",CAST(COALESCE(MAX(Currency.StdPrecision),2) AS INTEGER)) AS Amount,
+    MAX(Payment.C_Currency_ID) AS C_Currency_ID,
+    MAX(Currency.StdPrecision) AS StdPrecision,
+    MAX(Currency.ISO_Code) AS CurrencyISO,
+    MAX(CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END) AS CurrencySymbol
 FROM PaymentFiltered Payment
-
 LEFT OUTER JOIN C_BPartner BPartner ON
 (
-    BPartner.C_BPartner_ID =
-    Payment.C_BPartner_ID
+    BPartner.C_BPartner_ID=Payment.C_BPartner_ID
 )
 "
     + paymentMethodJoin + @"
 LEFT OUTER JOIN C_BankAccount BankAccount ON
 (
-    BankAccount.C_BankAccount_ID =
-    Payment.C_BankAccount_ID
+    BankAccount.C_BankAccount_ID=Payment.C_BankAccount_ID
 )
-
 LEFT OUTER JOIN C_Bank Bank ON
 (
-    Bank.C_Bank_ID =
-    BankAccount.C_Bank_ID
+    Bank.C_Bank_ID=BankAccount.C_Bank_ID
 )
-
 LEFT OUTER JOIN C_Currency Currency ON
 (
-    Currency.C_Currency_ID =
-    Payment.C_Currency_ID
+    Currency.C_Currency_ID=Payment.C_Currency_ID
 )
-
 LEFT OUTER JOIN C_AllocationLine AllocationLine ON
 (
-    AllocationLine.C_Payment_ID =
-    Payment.C_Payment_ID
+    AllocationLine.C_Payment_ID=Payment.C_Payment_ID
 )
-
 LEFT OUTER JOIN C_Invoice Invoice ON
 (
-    Invoice.C_Invoice_ID =
-    AllocationLine.C_Invoice_ID
+    Invoice.C_Invoice_ID=AllocationLine.C_Invoice_ID
 )
-
 LEFT OUTER JOIN C_Order SalesOrder ON
 (
-    SalesOrder.C_Order_ID =
-    Invoice.C_Order_ID
+    SalesOrder.C_Order_ID=Invoice.C_Order_ID
 )
 "
     + executionStatusJoin + @"
@@ -1274,10 +985,7 @@ GROUP BY
     Payment.AD_Org_ID"
     + paymentMethodGroupBy
     + executionStatusGroupBy + @"
-
-ORDER BY
-    Payment.DateAcct DESC,
-    Payment.C_Payment_ID DESC";
+ORDER BY Payment.DateAcct DESC,Payment.C_Payment_ID DESC";
 
             SqlParameter[] parameters =
                 new SqlParameter[]
@@ -1663,20 +1371,13 @@ ORDER BY
             string sql = @"
 SELECT
     COUNT(1)
-
 FROM AD_Table TableData
-
 INNER JOIN AD_Column ColumnData ON
 (
-    ColumnData.AD_Table_ID =
-    TableData.AD_Table_ID
+    ColumnData.AD_Table_ID=TableData.AD_Table_ID
 )
-
-WHERE TableData.TableName =
-    " + ToSqlString(tableName) + @"
-
-AND ColumnData.ColumnName =
-    " + ToSqlString(columnName);
+WHERE TableData.TableName=" + ToSqlString(tableName) + @"
+AND ColumnData.ColumnName=" + ToSqlString(columnName);
 
             return Util.GetValueOfInt(
                 DB.ExecuteScalar(sql)
@@ -1711,6 +1412,66 @@ AND ColumnData.ColumnName =
             return "CAST("
                 + expression
                 + " AS VARCHAR(4000))";
+        }
+
+        /// <summary>
+        /// Returns the current database date without time.
+        /// </summary>
+        private string GetCurrentDateSql()
+        {
+            return DB.IsOracle()
+                ? "TRUNC(CURRENT_DATE)"
+                : "CURRENT_DATE";
+        }
+
+        /// <summary>
+        /// Turns an inclusive date into the exclusive upper bound that
+        /// follows it, so a same-day timestamp still falls inside.
+        /// </summary>
+        private string GetNextDaySql(
+            string expression)
+        {
+            if (DB.IsOracle())
+            {
+                return "CAST("
+                    + expression
+                    + " AS DATE) + 1";
+            }
+
+            return "CAST("
+                + expression
+                + " AS DATE) + INTERVAL '1 DAY'";
+        }
+
+        /// <summary>
+        /// Returns the inclusive start of the trailing window of
+        /// <paramref name="days"/> days ending today.
+        /// </summary>
+        /// <remarks>
+        /// The date comes from the database rather than the web server, so
+        /// the window does not shift when the two sit in different time
+        /// zones. The count is inclusive of today: a 30-day window starts
+        /// 29 days back.
+        /// </remarks>
+        private string GetTrailingWindowStartSql(
+            int days)
+        {
+            string offset =
+                (days - 1).ToString(
+                    CultureInfo.InvariantCulture
+                );
+
+            if (DB.IsOracle())
+            {
+                return GetCurrentDateSql()
+                    + " - "
+                    + offset;
+            }
+
+            return GetCurrentDateSql()
+                + " - INTERVAL '"
+                + offset
+                + " DAY'";
         }
 
         private string ToSqlString(

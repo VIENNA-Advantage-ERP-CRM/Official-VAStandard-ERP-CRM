@@ -19,11 +19,11 @@
  * 10  | Payment No.                                       | VAS_030_MessagePaymentNo
  * 11  | Date                                              | VAS_Date
  * 12  | Vendor                                            | VAS_Vendor
- * 13  | Bank account                                      | VAS_BankAccount
+ * 13  | Bank Account                                      | VAS_BankAccount
  * 14  | Payment Currency                                  | VAS_PaymentCurrency
  * 15  | Amount                                            | VAS_Amount
- * 16  | Method                                            | VAS_Method
- * 17  | Status                                            | VAS_Status
+ * 16  | Payment Method                                    | VAS_Method
+ * 17  | Execution Status                                  | VAS_030_Status
  * 18  | Previous                                          | VAS_Previous
  * 19  | Next                                              | VAS_Next
  * ──────────────────────────────────────────────────────────────────────────────
@@ -534,9 +534,14 @@
                 );
             }
 
-            if (isNaN(count) || count <= 0) {
-                setNoData();
-                return;
+            /*
+             * No bounced cheques is a real answer, not a failure, so the
+             * card keeps its normal layout and reads 0 instead of swapping
+             * in a "No Data" state. Only a load error still takes over the
+             * card.
+             */
+            if (isNaN(count) || count < 0) {
+                count = 0;
             }
 
             showState(false, '');
@@ -608,19 +613,6 @@
             if ($footer) {
                 $footer.toggle(!show);
             }
-        }
-
-        /**
-         * Shows no data state.
-         */
-        function setNoData() {
-            showState(
-                true,
-                lbl(
-                    'VAS_030_MessageNoData',
-                    'No Data'
-                )
-            );
         }
 
         /**
@@ -1754,7 +1746,7 @@
                 escapeHtml(
                     lbl(
                         'VAS_BankAccount',
-                        'Bank account'
+                        'Bank Account'
                     )
                 ) +
                 '</th>' +
@@ -1773,7 +1765,7 @@
                 escapeHtml(
                     lbl(
                         'VAS_Method',
-                        'Method'
+                        'Payment Method'
                     )
                 ) +
                 '</th>' +
@@ -1781,8 +1773,8 @@
                 '<th>' +
                 escapeHtml(
                     lbl(
-                        'VAS_Status',
-                        'Status'
+                        'VAS_030_Status',
+                        'Execution Status'
                     )
                 ) +
                 '</th>' +

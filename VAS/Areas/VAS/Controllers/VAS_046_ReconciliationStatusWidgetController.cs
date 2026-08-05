@@ -246,13 +246,9 @@ SELECT
     Payment.C_Payment_ID,
     Payment.IsReconciled,
     Payment.DateAcct
-
 FROM C_Payment Payment
-
 WHERE Payment.IsActive = 'Y'
-
 AND Payment.IsReceipt = 'N'
-
 AND Payment.DocStatus IN
 (
     'CO',

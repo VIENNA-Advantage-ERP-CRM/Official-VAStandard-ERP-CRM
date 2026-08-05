@@ -239,7 +239,7 @@ namespace VASLogic.Models
                   AND DocType.AD_Client_ID = " + ctx.GetAD_Client_ID();
             if (Env.IsModuleInstalled("VA028_"))
             {
-                sql += "AND VA028_IsBatchDoc = 'N' ";
+                sql += " AND VA028_IsBatchDoc = 'N' ";
             }
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "DocType", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);

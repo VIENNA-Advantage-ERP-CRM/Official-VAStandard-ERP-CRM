@@ -543,37 +543,16 @@
 
     VAS.VAS_044_GLJournalRecentWidget =
         function () {
-            this.frame =
-                null;
-
-            this.windowNo =
-                0;
-
-            this.AD_UserHomeWidgetID =
-                0;
-
-            var $self =
-                this;
-
-            var $root =
-                $(
-                    '<div class="VAS-gljr-root">'
-                );
-
-            var currentData =
-                null;
-
-            var pageNo =
-                1;
-
-            var pageSize =
-                4;                       // initial guess; replaced by the adaptive measure
-
-            var totalPages =
-                0;
-
-            var totalCount =
-                0;
+            this.frame = null;
+            this.windowNo = 0;
+            this.AD_UserHomeWidgetID = 0;
+            var $self = this;
+            var $root = $('<div class="VAS-gljr-root">');
+            var currentData = null;
+            var pageNo = 1;
+            var pageSize = 4;                       // initial guess; replaced by the adaptive measure
+            var totalPages = 0;
+            var totalCount = 0;
 
             /* Adaptive page size (VAS_020 pattern): derive the visible row count from the
                table's available height at runtime so rows always fit the card (no clipped
@@ -585,14 +564,13 @@
             var LIST_MIN_ROWS = 1;       // never force more rows than physically fit
             var LIST_ROW_FALLBACK = 40;  // px, used only before a real row is measured
 
-            var loadRequest =
-                null;
+            var loadRequest = null;
+            var isDisposed = false;
 
-            var isDisposed =
-                false;
+            var ZOOM_WINDOW_NAME_NEW = 'VAS_GLJournal';
+            var windowId = 0;
 
-            var baseUrl =
-                VIS.Application.contextUrl;
+            var baseUrl = VIS.Application.contextUrl;
 
             this.Initalize =
                 function () {
@@ -930,13 +908,13 @@
                             "GET",
 
                         data:
-                            {
-                                pageNo:
-                                    pageNo,
+                        {
+                            pageNo:
+                                pageNo,
 
-                                pageSize:
-                                    pageSize
-                            },
+                            pageSize:
+                                pageSize
+                        },
 
                         dataType:
                             "json",
@@ -1548,25 +1526,26 @@
             /* Zoom to the GL Journal record (opens the GL Journal window at that
                record). Relayed to the host via the widget listener. */
             function zoomToJournal(recordId) {
-                recordId =
-                    parseInt(
-                        recordId,
-                        10
-                    );
+                recordId = parseInt(recordId, 10);
 
-                if (
-                    isNaN(recordId) ||
-                    recordId <= 0
-                ) {
+                if (isNaN(recordId) || recordId <= 0) {
                     return;
                 }
 
                 try {
-                    $self.widgetFirevalueChanged({
-                        "TabWhereClause": "GL_Journal.GL_Journal_ID=" + recordId,
-                        "TabLayout": "Y", /* 'N' Grid, 'Y' Single, 'C' Card */
-                        "TabIndex": "0"
-                    });
+                    if ($self.windowNo >= 0) {
+                        $self.widgetFirevalueChanged({
+                            "TabWhereClause": "GL_Journal.GL_Journal_ID=" + recordId,
+                            "TabLayout": "Y", /* 'N' Grid, 'Y' Single, 'C' Card */
+                            "TabIndex": "0"
+                        });
+                    }
+                    else {
+                        VAS.ZoomUtil.zoomToRecord("GL_Journal_ID", recordId, windowId, ZOOM_WINDOW_NAME_NEW, "")
+                            .done(function (id) {
+                                if (id > 0) { windowId = id; }
+                            });
+                    }
                 }
                 catch (e) { /* zoom is best-effort */ }
             }

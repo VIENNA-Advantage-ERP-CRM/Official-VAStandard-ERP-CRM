@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name : VAS
  * Purpose     : Styles for the Purchase Order Overview tab panel
  *               (VAS.VAS_OverviewPurchaseOrder). All classes are
@@ -86,6 +86,13 @@
  *                        Removed lines table gained the same column, last in the
  *                        row to match the drawer, so its grid went from five
  *                        tracks to six.
+ *   VAI163   2026-07-31  History tables (drawer + Removed lines) sit a step below
+ *                        the line-items type scale, and their Updated By cell is
+ *                        right-aligned so it lands directly under Received. Root
+ *                        no longer scrolls horizontally (overflow-x hidden, plus
+ *                        min-width:0 down the body chain); under 380px the wide
+ *                        tables scroll inside their own card instead — so the
+ *                        panel lays out correctly at 80% browser zoom.
  ***********************************************************/
 
 .MPC-vaspo-root {
@@ -109,7 +116,15 @@
 
     position: relative;
     height: 100%;
+    width: 100%;
+    max-width: 100%;
     overflow-y: auto;
+    /* The panel itself never scrolls sideways. At 80% browser zoom the side
+       panel is a different CSS-pixel width than the layout was tuned for, and a
+       single over-wide child (the seven-column line row) used to push the whole
+       panel into a horizontal scroll. Wide tables now scroll inside their own
+       card instead — see the @container rule under the column templates. */
+    overflow-x: hidden;
     color: var(--vaspo-text);
     font-family: Roboto, "Segoe UI", Arial, sans-serif;
     /* Body anchor: container-query inline size drives the em scale. */
@@ -126,7 +141,14 @@
     display: flex;
     flex-direction: column;
     gap: 0.875em;
+    /* A flex column's items refuse to shrink past their content unless told to;
+       without this a wide table stretches the column and re-introduces the
+       sideways scroll this panel is not allowed to have. */
+    min-width: 0;
+    max-width: 100%;
 }
+
+.MPC-vaspo-body > * { min-width: 0; max-width: 100%; }
 
 .MPC-vaspo-empty {
     padding: 40px 18px;
@@ -532,10 +554,14 @@
     display: flex;
     align-items: flex-start;
     gap: 0;
+    min-width: 0;
 }
 
 .MPC-vaspo-step {
+    /* min-width: 0 so a long stage label shrinks its step instead of widening
+       the stepper past the panel. */
     flex: 1 1 0;
+    min-width: 0;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -773,6 +799,27 @@
     grid-template-columns: 2.6fr 1.0fr;
 }
 
+/* Last resort for a genuinely narrow panel: the seven-column line table (and the
+   history drawer sharing its grid) gets a floor width and scrolls inside its own
+   card, rather than crushing its columns or widening the panel. Everything else
+   on the page keeps its full width. */
+@container (max-width: 380px) {
+    .MPC-vaspo-itTable,
+    .MPC-vaspo-histTable,
+    .MPC-vaspo-docTable,
+    .MPC-vaspo-ldTable {
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+    .MPC-vaspo-itTable   .MPC-vaspo-tRow,
+    .MPC-vaspo-histTable .MPC-vaspo-tRow,
+    .MPC-vaspo-docTable  .MPC-vaspo-tRow,
+    .MPC-vaspo-ldTable   .MPC-vaspo-tRow { min-width: 360px; }
+    /* The drawer must scroll with its parent table, not on its own, or a past
+       version stops lining up with the line above it. */
+    .MPC-vaspo-lhTable { overflow: visible; }
+}
+
 /* ----------------------------------------------------------- */
 /*  Per-line history (drawer under the line it belongs to)      */
 /* ----------------------------------------------------------- */
@@ -833,14 +880,24 @@
 .MPC-vaspo-lhTable .MPC-vaspo-tBody:last-child { border-bottom: none; }
 .MPC-vaspo-lhTable .MPC-vaspo-tBody:hover { background: rgba(255, 255, 255, .65); }
 
+/* History reads as supporting detail under the line it belongs to, so both
+   history views sit a step below the line-items scale. */
+.MPC-vaspo-lhTable .MPC-vaspo-tBody,
+.MPC-vaspo-histTable .MPC-vaspo-tBody { font-size: 0.75em; }
+.MPC-vaspo-lhTable .MPC-vaspo-tHead,
+.MPC-vaspo-histTable .MPC-vaspo-tHead { font-size: 0.625em; }
+
 /* Author cell: who made the change. Used by both the per-line history drawer and
-   the Removed lines table; truncates rather than widening its row. */
+   the Removed lines table; truncates rather than widening its row. It occupies
+   the line's Received track, so it is right-aligned to sit directly under that
+   column instead of hanging off its left edge. */
 .MPC-vaspo-lhBy {
     min-width: 0;
     color: var(--vaspo-sub);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: right;
 }
 
 /* Timestamp cell: the change moment, with that version's line note beneath. */

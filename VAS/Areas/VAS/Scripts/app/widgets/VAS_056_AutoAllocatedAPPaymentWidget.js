@@ -25,6 +25,7 @@
  * 19  | Auto-allocated AP                                 | VAS_056_AutoAllocatedAPPayments
  * 20  | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
  * 21  | Un Allocated                               | VAS_UnAllocatedAmount
+ * 22  | Could not load data                               | VAS_ErrorLoading
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -54,6 +55,7 @@
  * 20 | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
  * 21 | Last 30 days                                      | VAS_Last30Days
  * 22 | Partially allocated                               | VAS_UnAllocatedAmount
+ * 23 | Could not load data                               | VAS_ErrorLoading
  */
 
 ; VAS = window.VAS || {};
@@ -79,6 +81,7 @@
 
         var $dialog = null;
         var $dialogBody = null;
+        var $dialogTable = null;
         var $dialogTbody = null;
         var $dialogBusy = null;
 
@@ -205,7 +208,12 @@
                     var data = parseResponse(response);
 
                     if (!data || data.error) {
-                        setNoData();
+                        setLoadError(
+                            data
+                                ? data.error
+                                : ""
+                        );
+
                         return;
                     }
 
@@ -217,7 +225,7 @@
                         return;
                     }
 
-                    setNoData();
+                    setLoadError();
                 },
 
                 complete: function () {
@@ -229,6 +237,22 @@
         }
 
         function measureDialogRowHeight() {
+            /*
+             * The empty state stretches the table to fill the scroll area, and
+             * a stretched table shares its surplus height out across its rows.
+             * Anything measured inside one - including the probe row below -
+             * comes back inflated, which would shrink the page size the other
+             * tab then loads with. Keep the estimate until real rows exist.
+             */
+            if (
+                $dialogTable &&
+                $dialogTable.hasClass(
+                    classPrefix + "dialog-table-empty"
+                )
+            ) {
+                return dialogRowHeightEstimate;
+            }
+
             var $row = $dialogTbody
                 ? $dialogTbody
                     .find("tr")
@@ -569,11 +593,10 @@
                 unmatched = 0;
             }
 
-            if (matched + unmatched <= 0) {
-                setNoData();
-                return;
-            }
-
+            /* A period with no payments is a valid answer, not a failure: the
+               card keeps its normal layout and reads 0.00% with empty tabs.
+               The state takeover is reserved for a request that could not be
+               loaded at all. */
             showState(false, "");
 
             tabState.allocated.totalRecords = matched;
@@ -653,6 +676,49 @@
             updateTabCounts();
         }
 
+        /*
+         * The unallocated-only column is hidden on the allocated tab, and the
+         * table lays out fixed - the column grid comes from the header cells
+         * that actually render. A hardcoded colspan therefore invents a column
+         * the header never sized, and that column swallows the leftover width:
+         * the header rule stops short while the row beneath it runs the full
+         * width. Count what is on screen instead.
+         *
+         * The check reads the declared display rather than :visible so it
+         * still answers correctly when the dialog itself is hidden.
+         */
+        function getVisibleColumnCount() {
+            var count = 0;
+
+            if ($dialog) {
+                count = $dialog
+                    .find(
+                        "." +
+                        classPrefix +
+                        "dialog-table thead th"
+                    )
+                    .filter(function () {
+                        return $(this).css("display") !== "none";
+                    })
+                    .length;
+            }
+
+            return count > 0
+                ? count
+                : 1;
+        }
+
+        function setTableEmpty(isEmpty) {
+            if (!$dialogTable) {
+                return;
+            }
+
+            $dialogTable.toggleClass(
+                classPrefix + "dialog-table-empty",
+                Boolean(isEmpty)
+            );
+        }
+
         function renderRows(rows) {
             if (!$dialogTbody) {
                 return;
@@ -661,11 +727,15 @@
             $dialogTbody.empty();
 
             if (!rows || rows.length === 0) {
+                setTableEmpty(true);
+
                 $dialogTbody.html(
                     "<tr>" +
                     '<td class="' +
                     classPrefix +
-                    'dialog-empty" colspan="7">' +
+                    'dialog-empty" colspan="' +
+                    getVisibleColumnCount() +
+                    '">' +
                     escapeHtml(
                         lbl(
                             "VAS_056_NoPaymentsThisPeriod",
@@ -678,6 +748,8 @@
 
                 return;
             }
+
+            setTableEmpty(false);
 
             for (var i = 0; i < rows.length; i++) {
                 var row = rows[i] || {};
@@ -1029,9 +1101,9 @@
             }
         }
 
-        function setNoData() {
+        function setLoadError(message) {
             if ($metricEl) {
-                $metricEl.text("");
+                $metricEl.text(formatPercent(0));
             }
 
             tabState.allocated.totalRecords = 0;
@@ -1044,9 +1116,10 @@
 
             showState(
                 true,
+                message ||
                 lbl(
-                    "VAS_056_MessageNoData",
-                    "No Data"
+                    "VAS_ErrorLoading",
+                    "Could not load data"
                 )
             );
         }
@@ -1512,6 +1585,10 @@
                 "." + classPrefix + "dialog-body"
             );
 
+            $dialogTable = $dialog.find(
+                "." + classPrefix + "dialog-table"
+            );
+
             $dialogTbody = $dialog.find(
                 "." + classPrefix + "dialog-tbody"
             );
@@ -1802,6 +1879,7 @@
             $busy = null;
             $state = null;
             $dialogBody = null;
+            $dialogTable = null;
             $dialogTbody = null;
             $dialogBusy = null;
             $pagerHelper = null;
