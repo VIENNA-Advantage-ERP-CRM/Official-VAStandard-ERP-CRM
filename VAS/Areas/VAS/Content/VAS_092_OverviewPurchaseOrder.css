@@ -93,6 +93,21 @@
  *                        min-width:0 down the body chain); under 380px the wide
  *                        tables scroll inside their own card instead — so the
  *                        panel lays out correctly at 80% browser zoom.
+ *   VAI163   2026-08-04  Line-item grid alignment reworked, following VAS_099:
+ *                        every column track is minmax(0, Nfr) so a long product
+ *                        name or amount can no longer widen its column and knock
+ *                        the row out of line with its header; cells clip with an
+ *                        ellipsis inside their track; numeric and header cells
+ *                        never wrap and use tabular figures. The Received cell
+ *                        (.MPC-vaspo-recv / .MPC-vaspo-recvVal) now stacks its
+ *                        value above the progress bar — the VAS_099 GRN Received
+ *                        design — so the figure shares a baseline and right edge
+ *                        with the Qty column. Landed Cost's Distribution Method
+ *                        track widened for the dictionary's own method name, with
+ *                        the pill truncating inside it (.MPC-vaspo-ldMethod).
+ *   VAI163   2026-08-04  The line-item Attribute Set Instance (.MPC-vaspo-itAttr)
+ *                        is now an inline suffix to the product name rather than
+ *                        a sub-line of its own, matching VAS_099.
  ***********************************************************/
 
 .MPC-vaspo-root {
@@ -780,23 +795,61 @@
 }
 
 /* Per-table column templates */
+/* Every track is minmax(0, Nfr). A bare Nfr track cannot shrink below its own
+   content, so one long product name or amount widened its column and pushed the
+   rest of the row out of alignment with the header above it. */
 /* Six data columns + a narrow trailing action column (per-line history toggle).
    The history drawer reuses this same template, so a past version lines up
    column-for-column with the line above it. */
 .MPC-vaspo-itTable .MPC-vaspo-tRow {
-    grid-template-columns: 2.3fr 0.9fr 0.6fr 1.05fr 0.95fr 1.15fr 2em;
+    grid-template-columns:
+        minmax(0, 2.3fr) minmax(0, 0.9fr) minmax(0, 0.75fr) minmax(0, 1.05fr)
+        minmax(0, 0.95fr) minmax(0, 1.0fr) 2em;
 }
+/* The Distribution Method column carries the dictionary's own name for
+   C_ExpectedCost.LandedCostDistribution, which can run longer than a two-word
+   label — it gets a wider track than the amount columns beside it. */
 .MPC-vaspo-ldTable .MPC-vaspo-tRow {
-    grid-template-columns: 1.9fr 1.15fr 0.95fr 1.15fr 0.95fr;
+    grid-template-columns:
+        minmax(0, 1.8fr) minmax(0, 1.35fr) minmax(0, 0.95fr) minmax(0, 1.15fr)
+        minmax(0, 0.95fr);
 }
 .MPC-vaspo-histTable .MPC-vaspo-tRow {
-    grid-template-columns: 2.3fr 1.2fr 0.7fr 1.0fr 1.0fr 1.1fr;
+    grid-template-columns:
+        minmax(0, 2.3fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.0fr)
+        minmax(0, 1.0fr) minmax(0, 1.1fr);
 }
 .MPC-vaspo-docTable .MPC-vaspo-tRow {
-    grid-template-columns: 2.3fr 1.1fr 1.0fr 1.1fr;
+    grid-template-columns:
+        minmax(0, 2.3fr) minmax(0, 1.1fr) minmax(0, 1.0fr) minmax(0, 1.1fr);
 }
 .MPC-vaspo-budgetTable .MPC-vaspo-tRow {
-    grid-template-columns: 2.6fr 1.0fr;
+    grid-template-columns: minmax(0, 2.6fr) minmax(0, 1.0fr);
+}
+
+/* Cells clip inside their own track rather than widening it. The item cell's
+   children carry their own ellipsis and the Received cell is a flex column, so
+   neither is harmed by the clip. Numeric and header cells never wrap — a wrapped
+   figure would sit off the shared baseline. */
+.MPC-vaspo-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.MPC-vaspo-tHead > span,
+.MPC-vaspo-tRow > span.ta-r,
+.MPC-vaspo-tRow > span.ta-c { white-space: nowrap; }
+
+/* Tabular figures so the numeric columns line up digit for digit instead of
+   drifting with proportional glyph widths. */
+.MPC-vaspo-table .ta-r,
+.MPC-vaspo-recvVal { font-variant-numeric: tabular-nums; }
+
+/* A pill in a table cell (distribution method, document status) still hugs its
+   own text, but truncates instead of being clipped mid-word when the label is
+   longer than its track — those cells carry the full text as a tooltip. */
+.MPC-vaspo-tRow > span > .MPC-vaspo-pill {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
 }
 
 /* Last resort for a genuinely narrow panel: the seven-column line table (and the
@@ -973,14 +1026,13 @@
     white-space: nowrap;
 }
 
-/* Attribute Set Instance sub-line (size / colour / lot / serial ...) */
+/* Attribute Set Instance (size / colour / lot / serial ...) — an inline suffix
+   to the product name, not a line of its own. */
 .MPC-vaspo-itAttr {
-    font-size: 0.9231em; /* ~0.75em against the body anchor */
+    margin-left: 0.5em;
+    font-size: 0.857em;  /* ~0.75em against the body anchor, inside -itName */
+    font-weight: 400;
     color: var(--vaspo-sub);
-    margin-top: 0.125em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 /* Expected-delivery cell (date + small status) */
@@ -991,13 +1043,20 @@
     color: var(--vaspo-muted);
 }
 
-/* Received cell (mini bar + value) */
+/* Received cell — value on its own line with the progress bar stacked beneath,
+   so the figure shares a baseline and right edge with the Qty column instead of
+   being pushed inward by an inline bar. Same treatment as the GRN overview
+   (VAS_099) Received column. */
 .MPC-vaspo-recv {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5em;
-    justify-content: flex-end;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    /* .ta-r sets justify-content for row-direction cells; on this column-direction
+       cell that would sink the content to the bottom. */
+    justify-content: center;
+    gap: 0.3em;
 }
+.MPC-vaspo-recvVal { line-height: 1.25; }
 .MPC-vaspo-recvBar {
     width: 42px;
     height: 5px;
@@ -1218,7 +1277,7 @@
 [dir="rtl"] .MPC-vaspo-budgetAmt { margin-left: 0; margin-right: auto; }
 [dir="rtl"] .MPC-vaspo-hdrColL { border-right: none; border-left: 1px solid var(--vaspo-row-div); padding-right: 0; padding-left: 1.25em; }
 [dir="rtl"] .MPC-vaspo-table .ta-r { text-align: left; justify-content: flex-start; }
-[dir="rtl"] .MPC-vaspo-recv { justify-content: flex-start; }
+[dir="rtl"] .MPC-vaspo-recv { align-items: flex-start; }
 [dir="rtl"] .MPC-vaspo-tFoot { justify-content: flex-start; }
 [dir="rtl"] .MPC-vaspo-tf b { margin-left: 0; margin-right: 0.375em; }
 [dir="rtl"] .MPC-vaspo-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
