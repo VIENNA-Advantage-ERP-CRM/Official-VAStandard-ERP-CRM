@@ -1,8 +1,8 @@
 /******************************************************
  * Module Name    : VASLogic
- * Purpose        : Match Suggestions dashboard widget data (Widget 19)
+ * Purpose        : AP Payment Match Suggestions dashboard widget data
  * chronological  : Development
- * Created Date   : 2026-06-04
+ * Created Date   : 2026-08-05
  * Created by     : VAI145
  ******************************************************/
 
@@ -20,74 +20,81 @@ using VAdvantage.Utility;
 namespace VASLogic.Models
 {
     /// <summary>
-    /// Module Name : VAS_035_MatchSuggestions
-    /// Purpose     : Backs the VAS_035_MatchSuggestions dashboard widget. Pairs
-    ///               each unallocated, completed customer receipt of the last
-    ///               30 days (by accounting date) with its best-fit open sales
-    ///               invoice for the same business partner and ranks the
-    ///               pairing by an amount-agreement confidence (HIGH / REVIEW;
-    ///               LOW pairings are filtered out). The invoice open amount is
-    ///               converted to the RECEIPT (payment) currency at the payment
-    ///               accounting date, so the compare — and everything the
-    ///               widget displays — happens in the payment's own currency
-    ///               (no base-currency conversion anywhere). ApplyAllocation
-    ///               creates and completes a C_AllocationHdr (one line per
-    ///               invoice pay schedule covered) dated on the payment
-    ///               accounting date — the same outcome as the standard
-    ///               Allocation form. MRole row-level security is applied only
-    ///               on the main physical table (C_Payment, alias Payment)
-    ///               inside the OpenReceipts / ReceiptData CTE bodies — never
-    ///               on CTE aliases nor on the outer combined query. The only
-    ///               dialect-specific SQL is the last-30-days receipt window
-    ///               (the PostgreSQL date-diff quirk); the match-signal date
-    ///               window is computed in C#.
+    /// Module Name : VAS_072_MatchSuggestionAPPayment
+    /// Purpose     : Backs the VAS_072_MatchSuggestionAPPayment dashboard
+    ///               widget — the PAYMENT (IsSOTrx = 'N') mirror of
+    ///               VAS_035_MatchSuggestions. Pairs each unallocated,
+    ///               completed vendor payment of the last 30 days (by
+    ///               accounting date) with its best-fit open purchase invoice
+    ///               for the same business partner and ranks the pairing by an
+    ///               amount-agreement confidence (HIGH / REVIEW / LOW). The
+    ///               invoice open amount is converted to the PAYMENT currency
+    ///               at the payment accounting date, so the compare — and
+    ///               everything the widget displays — happens in the payment's
+    ///               own currency (no base-currency conversion anywhere).
+    ///               ApplyAllocation creates and completes a C_AllocationHdr
+    ///               (one line against the suggested invoice pay schedule)
+    ///               dated on the payment accounting date — the same outcome
+    ///               as the standard Allocation form. MRole row-level security
+    ///               is applied only on the main physical table (C_Payment,
+    ///               alias Payment / C_Invoice, alias Invoice) inside the CTE
+    ///               bodies — never on CTE aliases nor on the outer combined
+    ///               query. The only dialect-specific SQL is the last-30-days
+    ///               payment window (the PostgreSQL date-diff quirk); the
+    ///               match-signal date window is computed in C#.
+    ///
+    ///               Differences from VAS_035 (the AR original), all deliberate:
+    ///                 * IsReceipt = 'N' / IsSOTrx = 'N', DocBaseType API / APC.
+    ///                 * Cash-line payments and tender type 'B' are excluded —
+    ///                   they are settled through their own documents and must
+    ///                   never be offered here (carried over from the previous
+    ///                   VAS_072 implementation).
+    ///                 * The allocation LINE sign keeps the VAS_072 convention,
+    ///                   which mirrors the standard Allocation form's
+    ///                   MultiplierAP: purchase invoice → negative line,
+    ///                   purchase return → positive line. The return cycle is
+    ///                   classified by the invoice DOCUMENT TYPE flag
+    ///                   (C_DocType.IsReturnTrx on C_DocType_ID), not by the
+    ///                   invoice-header IsReturnTrx column, which can disagree
+    ///                   with the document type in legacy data.
+    ///                 * Payment method / bank account / payment term join as
+    ///                   LEFT OUTER — an AP payment legitimately has none of
+    ///                   them and must still open its review modal.
     /// Chronological development:
-    ///   VAI145      2026-06-04 Created
-    ///   VAI145      2026-06-04 PaymentAmount instead of PayAmt; last-30-days
-    ///                          receipt filter; invoice open amount converted to
-    ///                          the payment currency at the payment date.
-    ///   VAI145      2026-06-04 Dropped base-currency conversion; switched all
-    ///                          receipt dates to DateAcct; ApplyAllocation
-    ///                          creates + completes the allocation document.
-    ///   VAI145      2026-06-04 Receipt open amount via ALLOCPAYMENTAVAILABLE;
-    ///                          suggestions made (and applied) per individual
-    ///                          C_InvoicePaySchedule_ID.
-    ///   VAI_145    2026-07-17 Sign-aware pairing: schedule open amount signed by
-    ///                          DocBaseType (ARI positive, ARC negative), so a
-    ///                          positive receipt matches only regular AR invoices
-    ///                          and a negative receipt matches only AR credit
-    ///                          memos (ARC). Enforced across the list, the detail
-    ///                          modal and ApplyAllocation (with a magnitude-aware
-    ///                          applied amount and a server-side sign guard).
+    ///   VAI145      2026-08-05 Created — VAS_035 query + allocation logic
+    ///                          ported to the payment (AP) side; widget logic
+    ///                          moved out of
+    ///                          VAS_072_MatchSuggestionAPPaymentWidgetController.
     /// </summary>
-    public class VAS_035_MatchSuggestionsModel
+    public class VAS_072_MatchSuggestionAPPaymentModel
     {
-        /// <summary>Exact-amount tolerance in payment-currency units (PROMPT.md ":AmountTolerance").</summary>
+        /// <summary>Exact-amount tolerance in payment-currency units.</summary>
         private const decimal AMOUNT_TOLERANCE = 1m;
 
         /// <summary>Amount difference percentage still considered a HIGH match.</summary>
         private const decimal HIGH_PCT_THRESHOLD = 10m;
 
-        /// <summary>Amount difference percentage still surfaced for REVIEW; above this the pairing is dropped.</summary>
+        /// <summary>Amount difference percentage still surfaced for REVIEW.</summary>
         private const decimal REVIEW_PCT_THRESHOLD = 30m;
 
-        /// <summary>Receipt-date / invoice-due-date proximity window in days (PROMPT.md ":DateWindowDays").</summary>
+        /// <summary>Payment-date / invoice-due-date proximity window in days.</summary>
         private const int DATE_WINDOW_DAYS = 10;
 
-        /// <summary>Rolling window (days) of receipts considered by the widget.</summary>
-        private const int RECEIPT_WINDOW_DAYS = 30;
+        /// <summary>Rolling window (days) of payments considered by the widget.</summary>
+        private const int PAYMENT_WINDOW_DAYS = 30;
 
         /// <summary>AD_Form classname of the standard Allocation form opened by the widget.</summary>
         private const string ALLOCATION_FORM_CLASSNAME = "VAdvantage.Apps.AForms.VAllocation";
 
         /// <summary>
-        /// Returns one page of best-fit receipt↔invoice pairings (one suggestion
-        /// per receipt of the last 30 accounting days, the closest-amount open
-        /// invoice of the same partner), ordered HIGH before REVIEW and then by
-        /// smallest amount difference. Amount comparison, the displayed invoice
-        /// open amount and the footer ready-to-allocate total are all in the
-        /// receipt's own currency (converted at the payment accounting date) —
-        /// no base-currency conversion. The envelope also carries the full-set
+        /// Returns one page of best-fit payment↔invoice pairings (one
+        /// suggestion per payment of the last 30 accounting days, the
+        /// closest-amount open purchase invoice schedule of the same partner),
+        /// ordered HIGH before REVIEW before LOW and then by smallest amount
+        /// difference. Amount comparison, the displayed invoice open amount and
+        /// the footer ready-to-allocate total are all in the payment's own
+        /// currency (converted at the payment accounting date) — no
+        /// base-currency conversion. The envelope also carries the full-set
         /// suggestion count and the AD_Form_ID of the standard Allocation form.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
@@ -101,7 +108,7 @@ namespace VASLogic.Models
 
             if (ctx == null) { return result; }
             if (pageNo <= 0) { pageNo = 1; }
-            if (pageSize <= 0) { pageSize = 5; }
+            if (pageSize <= 0) { pageSize = 6; }
 
             int clientId = ctx.GetAD_Client_ID();
             int offset = (pageNo - 1) * pageSize;
@@ -109,66 +116,65 @@ namespace VASLogic.Models
             /* Last-30-days window on the ACCOUNTING date, built per dialect.
                PostgreSQL: DateAcct behaves as a timestamp here, so
                (date - integer) is the only well-defined day arithmetic;
-               CURRENT_DATE + 1 with < includes every receipt dated today
+               CURRENT_DATE + 1 with < includes every payment dated today
                regardless of its time part. Oracle: TRUNC drops the time
                component so the range is whole days. */
             string dateCondition;
             if (DB.IsPostgreSQL())
             {
-                dateCondition = "Payment.DateAcct >= CURRENT_DATE - " + RECEIPT_WINDOW_DAYS + " AND Payment.DateAcct < CURRENT_DATE + 1";
+                dateCondition = "Payment.DateAcct >= CURRENT_DATE - " + PAYMENT_WINDOW_DAYS + " AND Payment.DateAcct < CURRENT_DATE + 1";
             }
             else
             {
-                dateCondition = "TRUNC(Payment.DateAcct) >= TRUNC(SYSDATE) - " + RECEIPT_WINDOW_DAYS + " AND TRUNC(Payment.DateAcct) <= TRUNC(SYSDATE)";
+                dateCondition = "TRUNC(Payment.DateAcct) >= TRUNC(SYSDATE) - " + PAYMENT_WINDOW_DAYS + " AND TRUNC(Payment.DateAcct) <= TRUNC(SYSDATE)";
             }
 
-            /* OpenReceipts CTE — the main physical table is C_Payment (alias
-               Payment): completed, active, unallocated customer receipts of the
+            /* OpenPayments CTE — the main physical table is C_Payment (alias
+               Payment): completed, active, unallocated vendor payments of the
                last 30 accounting days. The amount open for allocation comes
                from the framework function ALLOCPAYMENTAVAILABLE (payment's own
                currency, net of existing allocations). MRole is applied to this
                body. */
-            string openReceiptsSql = @"
+            string openPaymentsSql = @"
                 SELECT Payment.C_Payment_ID AS Payment_ID,
                        Payment.AD_Client_ID AS Client_ID,
                        Payment.AD_Org_ID AS Org_ID,
                        Payment.C_BPartner_ID AS BPartner_ID,
-                       BPartner.Name AS Customer_Name,
-                       Payment.DocumentNo AS Receipt_No,
-                       Payment.DateAcct AS Receipt_Date,
-                       Payment.C_Currency_ID AS Receipt_Currency_ID,
-                       Payment.C_ConversionType_ID AS Receipt_ConversionType_ID,
-                       ReceiptCurrency.ISO_Code AS Receipt_Currency,
-                       CASE WHEN ReceiptCurrency.CurSymbol IS NOT NULL THEN ReceiptCurrency.CurSymbol ELSE ReceiptCurrency.ISO_Code END AS Receipt_Currency_Symbol,
-                       ReceiptCurrency.StdPrecision AS Receipt_Precision,
-                       COALESCE(ALLOCPAYMENTAVAILABLE(Payment.C_Payment_ID), 0) AS Receipt_Amount
+                       BPartner.Name AS Vendor_Name,
+                       Payment.DocumentNo AS Payment_No,
+                       Payment.DateAcct AS Payment_Date,
+                       Payment.C_Currency_ID AS Payment_Currency_ID,
+                       Payment.C_ConversionType_ID AS Payment_ConversionType_ID,
+                       PaymentCurrency.ISO_Code AS Payment_Currency,
+                       CASE WHEN PaymentCurrency.CurSymbol IS NOT NULL THEN PaymentCurrency.CurSymbol ELSE PaymentCurrency.ISO_Code END AS Payment_Currency_Symbol,
+                       PaymentCurrency.StdPrecision AS Payment_Precision,
+                       COALESCE(ALLOCPAYMENTAVAILABLE(Payment.C_Payment_ID), 0) AS Payment_Amount
                 FROM C_Payment Payment
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=Payment.C_BPartner_ID)
-                INNER JOIN C_Currency ReceiptCurrency ON (ReceiptCurrency.C_Currency_ID=Payment.C_Currency_ID)
-                WHERE Payment.IsReceipt = 'Y'
+                INNER JOIN C_Currency PaymentCurrency ON (PaymentCurrency.C_Currency_ID=Payment.C_Currency_ID)
+                WHERE Payment.IsReceipt = 'N'
                   AND Payment.IsActive = 'Y'
-                  AND NVL(Payment.VA009_OrderPaySchedule_ID, 0) = 0 
+                  AND COALESCE(Payment.VA009_OrderPaySchedule_ID, 0) = 0
                   AND Payment.DocStatus IN ('CO', 'CL')
                   AND COALESCE(Payment.IsAllocated, 'N') = 'N'
                   AND COALESCE(ALLOCPAYMENTAVAILABLE(Payment.C_Payment_ID), 0) != 0
-                  AND " + dateCondition + @"
-                  AND Payment.AD_Client_ID = " + clientId;
+                  AND " + dateCondition;
 
             /* MRole only on the main physical table (C_Payment / alias Payment). */
-            openReceiptsSql = MRole.GetDefault(ctx).AddAccessSQL(
-                openReceiptsSql,
+            openPaymentsSql = MRole.GetDefault(ctx).AddAccessSQL(
+                openPaymentsSql,
                 "Payment",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
 
             string sql = @"
-                WITH OpenReceipts AS (
-                    " + openReceiptsSql + @"
+                WITH OpenPayments AS (
+                    " + openPaymentsSql + @"
                 ),
-                ReceiptPartners AS (
-                    SELECT DISTINCT OpenReceipts.Client_ID, OpenReceipts.BPartner_ID, OpenReceipts.Org_ID  
-                    FROM OpenReceipts OpenReceipts
+                PaymentPartners AS (
+                    SELECT DISTINCT OpenPayments.Client_ID, OpenPayments.BPartner_ID, OpenPayments.Org_ID
+                    FROM OpenPayments OpenPayments
                 ),
                 OpenSchedules AS (
                     SELECT PaySchedule.C_InvoicePaySchedule_ID AS PaySchedule_ID,
@@ -180,115 +186,116 @@ namespace VASLogic.Models
                            PaySchedule.DueDate AS Due_Date,
                            Invoice.C_Currency_ID AS Invoice_Currency_ID,
                            InvDocType.DocBaseType AS Doc_Base_Type,
-                           CASE WHEN InvDocType.DocBaseType = 'ARC'
+                           CASE WHEN InvDocType.DocBaseType = 'APC'
                                 THEN -(COALESCE(PaySchedule.DueAmt, 0))
                                 ELSE (COALESCE(PaySchedule.DueAmt, 0))
                            END AS Open_Amount
-                    FROM ReceiptPartners ReceiptPartners
-                    INNER JOIN C_Invoice Invoice ON (Invoice.AD_Client_ID=ReceiptPartners.Client_ID AND Invoice.AD_Org_ID=ReceiptPartners.Org_ID
-                                AND Invoice.C_BPartner_ID=ReceiptPartners.BPartner_ID)
+                    FROM PaymentPartners PaymentPartners
+                    INNER JOIN C_Invoice Invoice ON (Invoice.AD_Client_ID=PaymentPartners.Client_ID AND Invoice.AD_Org_ID=PaymentPartners.Org_ID
+                                AND Invoice.C_BPartner_ID=PaymentPartners.BPartner_ID)
                     INNER JOIN C_DocType InvDocType ON (InvDocType.C_DocType_ID=Invoice.C_DocTypeTarget_ID)
                     INNER JOIN C_InvoicePaySchedule PaySchedule ON (PaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID)
-                    WHERE Invoice.IsSOTrx = 'Y'
+                    WHERE Invoice.IsSOTrx = 'N'
                       AND Invoice.IsActive = 'Y'
                       AND Invoice.DocStatus IN ('CO', 'CL')
                       AND COALESCE(Invoice.IsPaid, 'N') = 'N'
-                      AND InvDocType.DocBaseType IN ('ARI', 'ARC')
+                      AND InvDocType.DocBaseType IN ('API', 'APC')
                       AND PaySchedule.IsActive = 'Y'
                       AND COALESCE(PaySchedule.IsValid, 'Y') = 'Y'
+                      AND COALESCE(PaySchedule.IsHoldPayment, 'N') = 'N'
                       AND COALESCE(PaySchedule.VA009_IsPaid, 'N') = 'N'
                       AND COALESCE(PaySchedule.DueAmt, 0) <> 0
                 ),
                 MatchCandidates AS (
-                    SELECT Receipt.Payment_ID,
-                           Receipt.Customer_Name,
-                           Receipt.Receipt_No,
-                           Receipt.Receipt_Date,
-                           Receipt.Receipt_Currency,
-                           Receipt.Receipt_Currency_Symbol,
-                           Receipt.Receipt_Precision,
-                           Receipt.Receipt_Amount,
+                    SELECT Payment.Payment_ID,
+                           Payment.Vendor_Name,
+                           Payment.Payment_No,
+                           Payment.Payment_Date,
+                           Payment.Payment_Currency,
+                           Payment.Payment_Currency_Symbol,
+                           Payment.Payment_Precision,
+                           Payment.Payment_Amount,
                            Schedule.PaySchedule_ID,
                            Schedule.Invoice_ID,
                            Schedule.Invoice_No,
                            Schedule.Invoice_Date,
                            Schedule.Due_Date,
-                           /* Schedule open amount in the RECEIPT currency, converted
-                              at the payment accounting date with the payment's
-                              conversion type. */
+                           Schedule.Doc_Base_Type,
                            CASE
-                               WHEN Schedule.Invoice_Currency_ID = Receipt.Receipt_Currency_ID
+                               WHEN Schedule.Invoice_Currency_ID = Payment.Payment_Currency_ID
                                THEN Schedule.Open_Amount
                                ELSE CurrencyConvert(
                                    Schedule.Open_Amount,
                                    Schedule.Invoice_Currency_ID,
-                                   Receipt.Receipt_Currency_ID,
-                                   Receipt.Receipt_Date,
-                                   Receipt.Receipt_ConversionType_ID,
-                                   Receipt.Client_ID,
-                                   Receipt.Org_ID
+                                   Payment.Payment_Currency_ID,
+                                   Payment.Payment_Date,
+                                   Payment.Payment_ConversionType_ID,
+                                   Payment.Client_ID,
+                                   Payment.Org_ID
                                )
                            END AS Open_Amount_Pay
-                    FROM OpenReceipts Receipt
-                    INNER JOIN OpenSchedules Schedule ON (Schedule.Client_ID=Receipt.Client_ID AND Schedule.BPartner_ID=Receipt.BPartner_ID
-                                AND ((Receipt.Receipt_Amount > 0 AND Schedule.Doc_Base_Type = 'ARI')
-                                  OR (Receipt.Receipt_Amount < 0 AND Schedule.Doc_Base_Type = 'ARC')))
+                    FROM OpenPayments Payment
+                    INNER JOIN OpenSchedules Schedule ON (Schedule.Client_ID=Payment.Client_ID AND Schedule.BPartner_ID=Payment.BPartner_ID
+                                AND ((Payment.Payment_Amount > 0 AND Schedule.Doc_Base_Type = 'APC')
+                                  OR (Payment.Payment_Amount < 0 AND Schedule.Doc_Base_Type = 'API')))
                 ),
                 ScoredCandidates AS (
                     SELECT MatchCandidates.Payment_ID,
-                           MatchCandidates.Customer_Name,
-                           MatchCandidates.Receipt_No,
-                           MatchCandidates.Receipt_Date,
-                           MatchCandidates.Receipt_Currency,
-                           MatchCandidates.Receipt_Currency_Symbol,
-                           MatchCandidates.Receipt_Precision,
-                           MatchCandidates.Receipt_Amount,
+                           MatchCandidates.Vendor_Name,
+                           MatchCandidates.Payment_No,
+                           MatchCandidates.Payment_Date,
+                           MatchCandidates.Payment_Currency,
+                           MatchCandidates.Payment_Currency_Symbol,
+                           MatchCandidates.Payment_Precision,
+                           MatchCandidates.Payment_Amount,
                            MatchCandidates.PaySchedule_ID,
                            MatchCandidates.Invoice_ID,
                            MatchCandidates.Invoice_No,
                            MatchCandidates.Invoice_Date,
                            MatchCandidates.Due_Date,
+                           MatchCandidates.Doc_Base_Type,
                            MatchCandidates.Open_Amount_Pay,
-                           ABS(MatchCandidates.Receipt_Amount - MatchCandidates.Open_Amount_Pay) AS Difference_Amount,
+                           ABS(MatchCandidates.Payment_Amount - MatchCandidates.Open_Amount_Pay) AS Difference_Amount,
                            CASE
-                               WHEN ABS(MatchCandidates.Receipt_Amount - MatchCandidates.Open_Amount_Pay) <= " + AMOUNT_TOLERANCE.ToString(CultureInfo.InvariantCulture) + @" THEN 'HIGH'
+                               WHEN ABS(MatchCandidates.Payment_Amount - MatchCandidates.Open_Amount_Pay) <= " + AMOUNT_TOLERANCE.ToString(CultureInfo.InvariantCulture) + @" THEN 'HIGH'
                                WHEN MatchCandidates.Open_Amount_Pay <> 0
-                                    AND ABS(MatchCandidates.Receipt_Amount - MatchCandidates.Open_Amount_Pay) * 100 / ABS(MatchCandidates.Open_Amount_Pay) <= " + HIGH_PCT_THRESHOLD.ToString(CultureInfo.InvariantCulture) + @" THEN 'HIGH'
+                                    AND ABS(MatchCandidates.Payment_Amount - MatchCandidates.Open_Amount_Pay) * 100 / ABS(MatchCandidates.Open_Amount_Pay) <= " + HIGH_PCT_THRESHOLD.ToString(CultureInfo.InvariantCulture) + @" THEN 'HIGH'
                                WHEN MatchCandidates.Open_Amount_Pay <> 0
-                                    AND ABS(MatchCandidates.Receipt_Amount - MatchCandidates.Open_Amount_Pay) * 100 / ABS(MatchCandidates.Open_Amount_Pay) <= " + REVIEW_PCT_THRESHOLD.ToString(CultureInfo.InvariantCulture) + @" THEN 'REVIEW'
+                                    AND ABS(MatchCandidates.Payment_Amount - MatchCandidates.Open_Amount_Pay) * 100 / ABS(MatchCandidates.Open_Amount_Pay) <= " + REVIEW_PCT_THRESHOLD.ToString(CultureInfo.InvariantCulture) + @" THEN 'REVIEW'
                                ELSE 'LOW'
                            END AS Match_Confidence,
                            ROW_NUMBER() OVER (
                                PARTITION BY MatchCandidates.Payment_ID
-                               ORDER BY ABS(MatchCandidates.Receipt_Amount - MatchCandidates.Open_Amount_Pay), MatchCandidates.Due_Date, MatchCandidates.Invoice_No, MatchCandidates.PaySchedule_ID
+                               ORDER BY ABS(MatchCandidates.Payment_Amount - MatchCandidates.Open_Amount_Pay), MatchCandidates.Due_Date, MatchCandidates.Invoice_No, MatchCandidates.PaySchedule_ID
                            ) AS Match_Rank
                     FROM MatchCandidates
                 )
                 SELECT ScoredCandidates.Payment_ID,
-                       ScoredCandidates.Customer_Name,
-                       ScoredCandidates.Receipt_No,
-                       ScoredCandidates.Receipt_Date,
-                       ScoredCandidates.Receipt_Currency,
-                       ScoredCandidates.Receipt_Currency_Symbol,
-                       ScoredCandidates.Receipt_Precision,
-                       ScoredCandidates.Receipt_Amount,
+                       ScoredCandidates.Vendor_Name,
+                       ScoredCandidates.Payment_No,
+                       ScoredCandidates.Payment_Date,
+                       ScoredCandidates.Payment_Currency,
+                       ScoredCandidates.Payment_Currency_Symbol,
+                       ScoredCandidates.Payment_Precision,
+                       ScoredCandidates.Payment_Amount,
                        ScoredCandidates.PaySchedule_ID,
                        ScoredCandidates.Invoice_ID,
                        ScoredCandidates.Invoice_No,
                        ScoredCandidates.Invoice_Date,
                        ScoredCandidates.Due_Date,
+                       ScoredCandidates.Doc_Base_Type,
                        ScoredCandidates.Open_Amount_Pay,
                        ScoredCandidates.Match_Confidence,
                        COUNT(*) OVER () AS Total_Records,
-                       SUM(ScoredCandidates.Receipt_Amount) OVER () AS Ready_To_Allocate
+                       SUM(ScoredCandidates.Payment_Amount) OVER () AS Ready_To_Allocate
                 FROM ScoredCandidates
                 WHERE ScoredCandidates.Match_Rank = 1
                   AND ScoredCandidates.Match_Confidence IN ('HIGH', 'REVIEW', 'LOW')
                 ORDER BY CASE WHEN ScoredCandidates.Match_Confidence = 'HIGH' THEN 1
                               WHEN ScoredCandidates.Match_Confidence = 'REVIEW' THEN 2
                               ELSE 3 END,
-                         ScoredCandidates.Customer_Name,
-                         ScoredCandidates.Receipt_Date DESC,
+                         ScoredCandidates.Vendor_Name,
+                         ScoredCandidates.Payment_Date DESC,
                          ScoredCandidates.Difference_Amount
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
@@ -304,21 +311,21 @@ namespace VASLogic.Models
                 dr = DB.ExecuteReader(sql, parameters);
                 while (dr != null && dr.Read())
                 {
-                    int receiptPrecision = Util.GetValueOfInt(dr["Receipt_Precision"]);
+                    int paymentPrecision = Util.GetValueOfInt(dr["Payment_Precision"]);
 
                     /* Full-set figures ride on every row; capture once. The
-                       footer total stays in the receipt currency (no
+                       footer total stays in the payment currency (no
                        base-currency conversion), so its symbol/precision come
                        from the first (best-ranked) row. */
                     if (result.Rows.Count == 0)
                     {
                         result.TotalRecords = Util.GetValueOfInt(dr["Total_Records"]);
-                        result.CurrencySymbol = Util.GetValueOfString(dr["Receipt_Currency_Symbol"]);
-                        result.CurrencyIso = Util.GetValueOfString(dr["Receipt_Currency"]);
-                        result.Precision = receiptPrecision;
+                        result.CurrencySymbol = Util.GetValueOfString(dr["Payment_Currency_Symbol"]);
+                        result.CurrencyIso = Util.GetValueOfString(dr["Payment_Currency"]);
+                        result.Precision = paymentPrecision;
                         result.ReadyToAllocate = Math.Round(
                             Util.GetValueOfDecimal(dr["Ready_To_Allocate"]),
-                            receiptPrecision,
+                            paymentPrecision,
                             MidpointRounding.AwayFromZero
                         );
                     }
@@ -328,20 +335,18 @@ namespace VASLogic.Models
                         PaymentId = Util.GetValueOfInt(dr["Payment_ID"]),
                         InvoiceId = Util.GetValueOfInt(dr["Invoice_ID"]),
                         InvoicePayScheduleId = Util.GetValueOfInt(dr["PaySchedule_ID"]),
-                        Customer = Util.GetValueOfString(dr["Customer_Name"]),
-                        ReceiptNo = Util.GetValueOfString(dr["Receipt_No"]),
-                        ReceiptDate = FormatDate(Util.GetValueOfDateTime(dr["Receipt_Date"])),
-                        ReceiptCurrency = Util.GetValueOfString(dr["Receipt_Currency"]),
-                        ReceiptCurrencySymbol = Util.GetValueOfString(dr["Receipt_Currency_Symbol"]),
-                        ReceiptPrecision = receiptPrecision,
-                        ReceiptAmount = Math.Round(Util.GetValueOfDecimal(dr["Receipt_Amount"]), receiptPrecision, MidpointRounding.AwayFromZero),
+                        Vendor = Util.GetValueOfString(dr["Vendor_Name"]),
+                        PaymentNo = Util.GetValueOfString(dr["Payment_No"]),
+                        PaymentDate = FormatDate(Util.GetValueOfDateTime(dr["Payment_Date"])),
+                        PaymentCurrency = Util.GetValueOfString(dr["Payment_Currency"]),
+                        PaymentCurrencySymbol = Util.GetValueOfString(dr["Payment_Currency_Symbol"]),
+                        PaymentPrecision = paymentPrecision,
+                        PaymentAmount = Math.Round(Util.GetValueOfDecimal(dr["Payment_Amount"]), paymentPrecision, MidpointRounding.AwayFromZero),
                         InvoiceNo = Util.GetValueOfString(dr["Invoice_No"]),
                         InvoiceDate = FormatDate(Util.GetValueOfDateTime(dr["Invoice_Date"])),
                         DueDate = FormatDate(Util.GetValueOfDateTime(dr["Due_Date"])),
-                        /* Invoice open amount already converted to the receipt
-                           currency at the payment accounting date — display with
-                           the receipt symbol/precision. */
-                        OpenAmount = Math.Round(Util.GetValueOfDecimal(dr["Open_Amount_Pay"]), receiptPrecision, MidpointRounding.AwayFromZero),
+                        InvoiceDocBaseType = Util.GetValueOfString(dr["Doc_Base_Type"]),
+                        OpenAmount = Math.Round(Util.GetValueOfDecimal(dr["Open_Amount_Pay"]), paymentPrecision, MidpointRounding.AwayFromZero),
                         Confidence = Util.GetValueOfString(dr["Match_Confidence"])
                     });
                 }
@@ -364,16 +369,16 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Returns the match-review detail for a single receipt↔invoice-schedule
-        /// pairing: the payment (receipt) pane, the suggested-invoice pane (open
-        /// amount / due date of the SUGGESTED pay schedule only), the
-        /// balance-after-apply (receipt currency, converted at the payment
-        /// accounting date) and the four "why this match" signal flags plus the
-        /// 0..100 evidence score. The signals are computed in C# from the
-        /// fetched values so no dialect-specific date arithmetic is needed in SQL.
+        /// Returns the match-review detail for a single payment↔invoice-schedule
+        /// pairing: the payment pane, the suggested-invoice pane (open amount /
+        /// due date of the SUGGESTED pay schedule only), the balance-after-apply
+        /// (payment currency, converted at the payment accounting date) and the
+        /// four "why this match" signal flags plus the 0..100 evidence score.
+        /// The signals are computed in C# from the fetched values so no
+        /// dialect-specific date arithmetic is needed in SQL.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
-        /// <param name="paymentId">C_Payment_ID of the receipt side.</param>
+        /// <param name="paymentId">C_Payment_ID of the payment side.</param>
         /// <param name="invoiceId">C_Invoice_ID of the suggested invoice.</param>
         /// <param name="payScheduleId">C_InvoicePaySchedule_ID the suggestion was made with.</param>
         /// <returns>Populated <see cref="MatchDetail"/>, or null when either side is not found / not accessible.</returns>
@@ -381,43 +386,45 @@ namespace VASLogic.Models
         {
             if (ctx == null || paymentId <= 0 || invoiceId <= 0 || payScheduleId <= 0) { return null; }
 
-            /* ReceiptData CTE — main physical table C_Payment (alias Payment);
-               MRole keeps a hand-crafted ID from leaking another org's receipt. */
-            string receiptDataSql = @"
+            /* PaymentData CTE — main physical table C_Payment (alias Payment);
+               MRole keeps a hand-crafted ID from leaking another org's payment.
+               Payment method / bank account join LEFT OUTER: an AP payment
+               legitimately has neither and must still open its review modal. */
+            string paymentDataSql = @"
                 SELECT Payment.C_Payment_ID AS Payment_ID,
                        Payment.AD_Client_ID AS Client_ID,
                        Payment.AD_Org_ID AS Org_ID,
-                       Payment.C_BPartner_ID AS Receipt_BPartner_ID,
-                       Payment.DocumentNo AS Receipt_No,
-                       Payment.DateAcct AS Receipt_Date,
-                       Payment.C_Currency_ID AS Receipt_Currency_ID,
-                       Payment.C_ConversionType_ID AS Receipt_ConversionType_ID,
-                       BPartner.Name AS Receipt_Customer,
-                       DocType.Name AS Receipt_DocType,
-                       DocType.DocBaseType AS Receipt_DocBaseType,
+                       Payment.C_BPartner_ID AS Payment_BPartner_ID,
+                       Payment.DocumentNo AS Payment_No,
+                       Payment.DateAcct AS Payment_Date,
+                       Payment.C_Currency_ID AS Payment_Currency_ID,
+                       Payment.C_ConversionType_ID AS Payment_ConversionType_ID,
+                       BPartner.Name AS Payment_Vendor,
+                       DocType.Name AS Payment_DocType,
+                       DocType.DocBaseType AS Payment_DocBaseType,
                        PayMethod.VA009_Name AS Payment_Method,
                        COALESCE(Payment.TrxNo, Payment.CheckNo) AS Reference_No,
                        Bank.Name AS Bank_Name,
                        BankAccount.AccountNo AS Account_No,
-                       ReceiptCurrency.ISO_Code AS Receipt_Currency,
-                       CASE WHEN ReceiptCurrency.CurSymbol IS NOT NULL THEN ReceiptCurrency.CurSymbol ELSE ReceiptCurrency.ISO_Code END AS Receipt_Currency_Symbol,
-                       ReceiptCurrency.StdPrecision AS Receipt_Precision,
-                       COALESCE(ALLOCPAYMENTAVAILABLE(Payment.C_Payment_ID), 0) AS Receipt_Amount
+                       PaymentCurrency.ISO_Code AS Payment_Currency,
+                       CASE WHEN PaymentCurrency.CurSymbol IS NOT NULL THEN PaymentCurrency.CurSymbol ELSE PaymentCurrency.ISO_Code END AS Payment_Currency_Symbol,
+                       PaymentCurrency.StdPrecision AS Payment_Precision,
+                       COALESCE(ALLOCPAYMENTAVAILABLE(Payment.C_Payment_ID), 0) AS Payment_Amount
                 FROM C_Payment Payment
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=Payment.C_BPartner_ID)
                 INNER JOIN C_DocType DocType ON (DocType.C_DocType_ID=Payment.C_DocType_ID)
-                INNER JOIN C_Currency ReceiptCurrency ON (ReceiptCurrency.C_Currency_ID=Payment.C_Currency_ID)
-                INNER JOIN VA009_PaymentMethod PayMethod ON (PayMethod.VA009_PaymentMethod_ID=Payment.VA009_PaymentMethod_ID)
-                INNER JOIN C_BankAccount BankAccount ON (BankAccount.C_BankAccount_ID=Payment.C_BankAccount_ID)
-                INNER JOIN C_Bank Bank ON (Bank.C_Bank_ID=BankAccount.C_Bank_ID)
+                INNER JOIN C_Currency PaymentCurrency ON (PaymentCurrency.C_Currency_ID=Payment.C_Currency_ID)
+                LEFT OUTER JOIN VA009_PaymentMethod PayMethod ON (PayMethod.VA009_PaymentMethod_ID=Payment.VA009_PaymentMethod_ID)
+                LEFT OUTER JOIN C_BankAccount BankAccount ON (BankAccount.C_BankAccount_ID=Payment.C_BankAccount_ID)
+                LEFT OUTER JOIN C_Bank Bank ON (Bank.C_Bank_ID=BankAccount.C_Bank_ID)
                 WHERE Payment.C_Payment_ID = @PaymentId
-                  AND Payment.IsReceipt = 'Y'
+                  AND Payment.IsReceipt = 'N'
                   AND Payment.IsActive = 'Y'
                   AND Payment.DocStatus IN ('CO', 'CL')";
 
             /* MRole only on the main physical table (C_Payment / alias Payment). */
-            receiptDataSql = MRole.GetDefault(ctx).AddAccessSQL(
-                receiptDataSql,
+            paymentDataSql = MRole.GetDefault(ctx).AddAccessSQL(
+                paymentDataSql,
                 "Payment",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
@@ -431,7 +438,7 @@ namespace VASLogic.Models
                            Invoice.C_BPartner_ID AS Invoice_BPartner_ID,
                            Invoice.DocumentNo AS Invoice_No,
                            Invoice.DateInvoiced AS Invoice_Date,
-                           BPartner.Name AS Invoice_Customer,
+                           BPartner.Name AS Invoice_Vendor,
                            DocType.Name AS Invoice_DocType,
                            DocType.DocBaseType AS Invoice_DocBaseType,
                            PaymentTerm.Name AS Payment_Terms,
@@ -441,10 +448,11 @@ namespace VASLogic.Models
                            InvoiceCurrency.ISO_Code AS Invoice_Currency,
                            CASE WHEN InvoiceCurrency.CurSymbol IS NOT NULL THEN InvoiceCurrency.CurSymbol ELSE InvoiceCurrency.ISO_Code END AS Invoice_Currency_Symbol,
                            InvoiceCurrency.StdPrecision AS Invoice_Precision,
-                           /* Signed open amount — AR credit memos (ARC) come back
-                              negative so the modal, the balance line and the amount
-                              signal all agree in sign with a negative receipt. */
-                           CASE WHEN DocType.DocBaseType = 'ARC'
+                           /* Signed open amount — purchase credit memos (APC) come
+                              back negative so the modal, the balance line and the
+                              amount signal all agree in sign with a negative
+                              (refund) payment. */
+                           CASE WHEN DocType.DocBaseType = 'APC'
                                 THEN -(COALESCE(PaySchedule.DueAmt, 0))
                                 ELSE (COALESCE(PaySchedule.DueAmt, 0))
                            END AS Open_Amount
@@ -453,14 +461,15 @@ namespace VASLogic.Models
                     INNER JOIN C_DocType DocType ON (DocType.C_DocType_ID=Invoice.C_DocTypeTarget_ID)
                     INNER JOIN C_InvoicePaySchedule PaySchedule ON (PaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID)
                     INNER JOIN C_Currency InvoiceCurrency ON (InvoiceCurrency.C_Currency_ID=Invoice.C_Currency_ID)
-                    INNER JOIN C_PaymentTerm PaymentTerm ON (PaymentTerm.C_PaymentTerm_ID=Invoice.C_PaymentTerm_ID)
+                    LEFT OUTER JOIN C_PaymentTerm PaymentTerm ON (PaymentTerm.C_PaymentTerm_ID=Invoice.C_PaymentTerm_ID)
                     WHERE Invoice.C_Invoice_ID = @InvoiceId
                       AND PaySchedule.C_InvoicePaySchedule_ID = @PayScheduleId
-                      AND Invoice.IsSOTrx = 'Y'
+                      AND Invoice.IsSOTrx = 'N'
                       AND Invoice.IsActive = 'Y'
                       AND Invoice.DocStatus IN ('CO', 'CL')
                       AND PaySchedule.IsActive = 'Y'
                       AND COALESCE(PaySchedule.IsValid, 'Y') = 'Y'
+                      AND COALESCE(PaySchedule.IsHoldPayment, 'N') = 'N'
                       AND COALESCE(PaySchedule.VA009_IsPaid, 'N') = 'N'
                       AND COALESCE(PaySchedule.DueAmt, 0) <> 0";
 
@@ -473,33 +482,33 @@ namespace VASLogic.Models
             );
 
             string sql = @"
-                WITH ReceiptData AS (
-                    " + receiptDataSql + @"
+                WITH PaymentData AS (
+                    " + paymentDataSql + @"
                 ),
                 InvoiceData AS (
                     " + invoiceDataSql + @"
                 )
-                SELECT ReceiptData.Payment_ID,
-                       ReceiptData.Receipt_BPartner_ID,
-                       ReceiptData.Receipt_No,
-                       ReceiptData.Receipt_Date,
-                       ReceiptData.Receipt_Customer,
-                       ReceiptData.Receipt_DocType,
-                       ReceiptData.Receipt_DocBaseType,
-                       ReceiptData.Payment_Method,
-                       ReceiptData.Reference_No,
-                       ReceiptData.Bank_Name,
-                       ReceiptData.Account_No,
-                       ReceiptData.Receipt_Currency,
-                       ReceiptData.Receipt_Currency_Symbol,
-                       ReceiptData.Receipt_Precision,
-                       ReceiptData.Receipt_Amount,
+                SELECT PaymentData.Payment_ID,
+                       PaymentData.Payment_BPartner_ID,
+                       PaymentData.Payment_No,
+                       PaymentData.Payment_Date,
+                       PaymentData.Payment_Vendor,
+                       PaymentData.Payment_DocType,
+                       PaymentData.Payment_DocBaseType,
+                       PaymentData.Payment_Method,
+                       PaymentData.Reference_No,
+                       PaymentData.Bank_Name,
+                       PaymentData.Account_No,
+                       PaymentData.Payment_Currency,
+                       PaymentData.Payment_Currency_Symbol,
+                       PaymentData.Payment_Precision,
+                       PaymentData.Payment_Amount,
                        InvoiceData.Invoice_ID,
                        InvoiceData.PaySchedule_ID,
                        InvoiceData.Invoice_BPartner_ID,
                        InvoiceData.Invoice_No,
                        InvoiceData.Invoice_Date,
-                       InvoiceData.Invoice_Customer,
+                       InvoiceData.Invoice_Vendor,
                        InvoiceData.Invoice_DocType,
                        InvoiceData.Invoice_DocBaseType,
                        InvoiceData.Payment_Terms,
@@ -509,23 +518,23 @@ namespace VASLogic.Models
                        InvoiceData.Invoice_Currency_Symbol,
                        InvoiceData.Invoice_Precision,
                        InvoiceData.Open_Amount,
-                       /* Invoice open amount in the RECEIPT currency, converted
+                       /* Invoice open amount in the PAYMENT currency, converted
                           at the payment accounting date with the payment's
                           conversion type. */
                        CASE
-                           WHEN InvoiceData.Invoice_Currency_ID = ReceiptData.Receipt_Currency_ID
+                           WHEN InvoiceData.Invoice_Currency_ID = PaymentData.Payment_Currency_ID
                            THEN InvoiceData.Open_Amount
                            ELSE CurrencyConvert(
                                InvoiceData.Open_Amount,
                                InvoiceData.Invoice_Currency_ID,
-                               ReceiptData.Receipt_Currency_ID,
-                               ReceiptData.Receipt_Date,
-                               ReceiptData.Receipt_ConversionType_ID,
-                               ReceiptData.Client_ID,
-                               ReceiptData.Org_ID
+                               PaymentData.Payment_Currency_ID,
+                               PaymentData.Payment_Date,
+                               PaymentData.Payment_ConversionType_ID,
+                               PaymentData.Client_ID,
+                               PaymentData.Org_ID
                            )
                        END AS Open_Amount_Pay
-                FROM ReceiptData ReceiptData
+                FROM PaymentData PaymentData
                 CROSS JOIN InvoiceData InvoiceData";
 
             SqlParameter[] parameters = new SqlParameter[]
@@ -543,45 +552,45 @@ namespace VASLogic.Models
                 dr = DB.ExecuteReader(sql, parameters);
                 if (dr != null && dr.Read())
                 {
-                    int receiptPrecision = Util.GetValueOfInt(dr["Receipt_Precision"]);
+                    int paymentPrecision = Util.GetValueOfInt(dr["Payment_Precision"]);
                     int invoicePrecision = Util.GetValueOfInt(dr["Invoice_Precision"]);
 
-                    DateTime? receiptDate = Util.GetValueOfDateTime(dr["Receipt_Date"]);
+                    DateTime? paymentDate = Util.GetValueOfDateTime(dr["Payment_Date"]);
                     DateTime? dueDate = Util.GetValueOfDateTime(dr["Due_Date"]);
 
-                    decimal receiptAmount = Util.GetValueOfDecimal(dr["Receipt_Amount"]);
-                    /* Invoice open amount in the receipt currency (payment accounting-date rate). */
+                    decimal paymentAmount = Util.GetValueOfDecimal(dr["Payment_Amount"]);
+                    /* Invoice open amount in the payment currency (payment accounting-date rate). */
                     decimal openAmountPay = Util.GetValueOfDecimal(dr["Open_Amount_Pay"]);
 
-                    string receiptNo = Util.GetValueOfString(dr["Receipt_No"]);
+                    string paymentNo = Util.GetValueOfString(dr["Payment_No"]);
                     string invoiceNo = Util.GetValueOfString(dr["Invoice_No"]);
                     string referenceNo = Util.GetValueOfString(dr["Reference_No"]);
 
-                    /* ── "Why this match" signals (PROMPT.md match scoring) ── */
+                    /* ── "Why this match" signals ── */
 
                     /* Partner matches — both legs belong to the same business partner. */
-                    bool partnerOk = Util.GetValueOfInt(dr["Receipt_BPartner_ID"]) == Util.GetValueOfInt(dr["Invoice_BPartner_ID"]);
+                    bool partnerOk = Util.GetValueOfInt(dr["Payment_BPartner_ID"]) == Util.GetValueOfInt(dr["Invoice_BPartner_ID"]);
 
                     /* Amount matches — within the absolute tolerance or the HIGH
-                       percentage window, compared in the receipt currency. */
-                    decimal differencePay = Math.Abs(receiptAmount - openAmountPay);
+                       percentage window, compared in the payment currency. */
+                    decimal differencePay = Math.Abs(paymentAmount - openAmountPay);
                     decimal differencePct = openAmountPay == 0 ? 100 : differencePay * 100 / Math.Abs(openAmountPay);
                     bool amountOk = differencePay <= AMOUNT_TOLERANCE || differencePct <= HIGH_PCT_THRESHOLD;
 
-                    /* Reference cited — the invoice DocumentNo appears in the receipt's TrxNo / CheckNo. */
+                    /* Reference cited — the invoice DocumentNo appears in the payment's TrxNo / CheckNo. */
                     bool refOk = !string.IsNullOrEmpty(invoiceNo)
                         && !string.IsNullOrEmpty(referenceNo)
                         && referenceNo.IndexOf(invoiceNo, StringComparison.OrdinalIgnoreCase) >= 0;
 
-                    /* Within due window — receipt accounting date within DATE_WINDOW_DAYS of the earliest open due date. */
-                    int dateGapDays = receiptDate.HasValue && dueDate.HasValue
-                        ? Math.Abs((int)(receiptDate.Value.Date - dueDate.Value.Date).TotalDays)
+                    /* Within due window — payment accounting date within DATE_WINDOW_DAYS of the schedule due date. */
+                    int dateGapDays = paymentDate.HasValue && dueDate.HasValue
+                        ? Math.Abs((int)(paymentDate.Value.Date - dueDate.Value.Date).TotalDays)
                         : int.MaxValue;
                     bool dateOk = dateGapDays <= DATE_WINDOW_DAYS;
 
                     /* Evidence score (0..100): amount 55 / 35 / 20,
                        due window +13, partner +32 — exact + cited + in-window = 100. */
-                    int score = (amountOk ? 55 : (receiptAmount < openAmountPay ? 35 : 20))
+                    int score = (amountOk ? 55 : (Math.Abs(paymentAmount) < Math.Abs(openAmountPay) ? 35 : 20))
                         + (dateOk ? 13 : 0)
                         + (partnerOk ? 32 : 0);
 
@@ -593,25 +602,25 @@ namespace VASLogic.Models
                     detail = new MatchDetail
                     {
                         PaymentId = Util.GetValueOfInt(dr["Payment_ID"]),
-                        ReceiptNo = receiptNo,
-                        ReceiptDate = FormatDate(receiptDate),
-                        ReceiptCustomer = Util.GetValueOfString(dr["Receipt_Customer"]),
-                        ReceiptDocType = Util.GetValueOfString(dr["Receipt_DocType"]),
-                        ReceiptDocBaseType = Util.GetValueOfString(dr["Receipt_DocBaseType"]),
+                        PaymentNo = paymentNo,
+                        PaymentDate = FormatDate(paymentDate),
+                        PaymentVendor = Util.GetValueOfString(dr["Payment_Vendor"]),
+                        PaymentDocType = Util.GetValueOfString(dr["Payment_DocType"]),
+                        PaymentDocBaseType = Util.GetValueOfString(dr["Payment_DocBaseType"]),
                         PaymentMethod = Util.GetValueOfString(dr["Payment_Method"]),
                         Reference = referenceNo,
                         BankName = Util.GetValueOfString(dr["Bank_Name"]),
                         AccountNo = Util.GetValueOfString(dr["Account_No"]),
-                        ReceiptCurrency = Util.GetValueOfString(dr["Receipt_Currency"]),
-                        ReceiptCurrencySymbol = Util.GetValueOfString(dr["Receipt_Currency_Symbol"]),
-                        ReceiptPrecision = receiptPrecision,
-                        ReceiptAmount = Math.Round(receiptAmount, receiptPrecision, MidpointRounding.AwayFromZero),
+                        PaymentCurrency = Util.GetValueOfString(dr["Payment_Currency"]),
+                        PaymentCurrencySymbol = Util.GetValueOfString(dr["Payment_Currency_Symbol"]),
+                        PaymentPrecision = paymentPrecision,
+                        PaymentAmount = Math.Round(paymentAmount, paymentPrecision, MidpointRounding.AwayFromZero),
 
                         InvoiceId = Util.GetValueOfInt(dr["Invoice_ID"]),
                         InvoicePayScheduleId = Util.GetValueOfInt(dr["PaySchedule_ID"]),
                         InvoiceNo = invoiceNo,
                         InvoiceDate = FormatDate(Util.GetValueOfDateTime(dr["Invoice_Date"])),
-                        InvoiceCustomer = Util.GetValueOfString(dr["Invoice_Customer"]),
+                        InvoiceVendor = Util.GetValueOfString(dr["Invoice_Vendor"]),
                         InvoiceDocType = Util.GetValueOfString(dr["Invoice_DocType"]),
                         InvoiceDocBaseType = Util.GetValueOfString(dr["Invoice_DocBaseType"]),
                         PaymentTerms = Util.GetValueOfString(dr["Payment_Terms"]),
@@ -622,11 +631,19 @@ namespace VASLogic.Models
                         InvoicePrecision = invoicePrecision,
                         OpenAmount = Math.Round(Util.GetValueOfDecimal(dr["Open_Amount"]), invoicePrecision, MidpointRounding.AwayFromZero),
 
-                        /* Open amount in the receipt currency (payment accounting-date
+                        /* Open amount in the payment currency (payment accounting-date
                            rate) — also the basis of the balance line and amount signal. */
-                        OpenAmountPay = Math.Round(openAmountPay, receiptPrecision, MidpointRounding.AwayFromZero),
-                        /* > 0 ⇒ the receipt is short and the apply becomes a part-payment. */
-                        BalanceAfterApply = Math.Round(openAmountPay - receiptAmount, receiptPrecision, MidpointRounding.AwayFromZero),
+                        OpenAmountPay = Math.Round(openAmountPay, paymentPrecision, MidpointRounding.AwayFromZero),
+                        /* Magnitude difference: how much of the two legs is left
+                           over once the smaller one is applied. Subtracting the
+                           raw signed values would ADD them whenever the legs
+                           carry opposite signs (a negative refund payment against
+                           a positive purchase invoice), reporting a leftover
+                           larger than either document. > 0 ⇒ the payment is short
+                           and the apply becomes a part-payment; < 0 ⇒ the surplus
+                           stays unallocated on the payment. The widget applies the
+                           AP cycle sign for display. */
+                        BalanceAfterApply = Math.Round(Math.Abs(openAmountPay) - Math.Abs(paymentAmount), paymentPrecision, MidpointRounding.AwayFromZero),
 
                         PartnerOk = partnerOk,
                         AmountOk = amountOk,
@@ -654,15 +671,22 @@ namespace VASLogic.Models
         /// Applies one match suggestion: creates a manual C_AllocationHdr in the
         /// payment's currency, dated (DateTrx + DateAcct) on the PAYMENT
         /// ACCOUNTING DATE, with a single C_AllocationLine against EXACTLY the
-        /// invoice pay schedule the suggestion was made with (the receipt's
+        /// invoice pay schedule the suggestion was made with (the payment's
         /// open-for-allocation amount comes from ALLOCPAYMENTAVAILABLE; an
         /// under-payment goes to OverUnderAmt so the schedule balance stays
         /// open), then completes the allocation document and flags the payment
         /// allocated — the same outcome as the standard Allocation form
         /// (vallocation).
+        ///
+        /// The line sign follows the standard form's MultiplierAP convention:
+        /// a purchase invoice takes a NEGATIVE line, a purchase return
+        /// (C_DocType.IsReturnTrx on the invoice's C_DocType_ID) a POSITIVE
+        /// one. The document-type flag is the classifier — not the
+        /// invoice-header IsReturnTrx column, which can disagree with the
+        /// document type in legacy data.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
-        /// <param name="paymentId">C_Payment_ID of the receipt to apply.</param>
+        /// <param name="paymentId">C_Payment_ID of the payment to apply.</param>
         /// <param name="invoiceId">C_Invoice_ID of the suggested invoice.</param>
         /// <param name="payScheduleId">C_InvoicePaySchedule_ID the suggestion was made with — the only schedule allocated.</param>
         /// <returns><see cref="ApplyResult"/> with Success, the completed allocation DocumentNo and a user message.</returns>
@@ -680,10 +704,10 @@ namespace VASLogic.Models
             Trx trx = Trx.GetTrx(Trx.CreateTrxName("AL"));
             try
             {
-                /* ── Receipt side ── */
+                /* ── Payment side ── */
                 MPayment payment = new MPayment(ctx, paymentId, trx);
                 if (payment.Get_ID() == 0
-                    || !payment.IsReceipt()
+                    || payment.IsReceipt()
                     || !(payment.GetDocStatus() == "CO" || payment.GetDocStatus() == "CL"))
                 {
                     trx.Rollback();
@@ -718,6 +742,7 @@ namespace VASLogic.Models
                            COALESCE(PaySchedule.DueAmt, 0) AS Due_Amount,
                            InvDocType.DocBaseType AS Doc_Base_Type,
                            Invoice.C_Invoice_ID AS Invoice_ID,
+                           Invoice.C_DocType_ID AS Invoice_DocType_ID,
                            Invoice.C_BPartner_ID AS Invoice_BPartner_ID,
                            Invoice.C_Currency_ID AS Invoice_Currency_ID,
                            Invoice.AD_Client_ID AS Client_ID,
@@ -725,18 +750,25 @@ namespace VASLogic.Models
                     FROM C_InvoicePaySchedule PaySchedule
                     INNER JOIN C_Invoice Invoice ON (Invoice.C_Invoice_ID=PaySchedule.C_Invoice_ID)
                     INNER JOIN C_DocType InvDocType ON (InvDocType.C_DocType_ID=Invoice.C_DocTypeTarget_ID)
-                    WHERE Invoice.C_Invoice_ID = " + invoiceId + @"
-                      AND PaySchedule.C_InvoicePaySchedule_ID = " + payScheduleId + @"
-                      AND Invoice.IsSOTrx = 'Y'
+                    WHERE Invoice.C_Invoice_ID = @InvoiceId
+                      AND PaySchedule.C_InvoicePaySchedule_ID = @PayScheduleId
+                      AND Invoice.IsSOTrx = 'N'
                       AND Invoice.IsActive = 'Y'
                       AND Invoice.DocStatus IN ('CO', 'CL')
-                      AND InvDocType.DocBaseType IN ('ARI', 'ARC')
+                      AND InvDocType.DocBaseType IN ('API', 'APC')
                       AND PaySchedule.IsActive = 'Y'
                       AND COALESCE(PaySchedule.IsValid, 'Y') = 'Y'
+                      AND COALESCE(PaySchedule.IsHoldPayment, 'N') = 'N'
                       AND COALESCE(PaySchedule.VA009_IsPaid, 'N') = 'N'
                       AND COALESCE(PaySchedule.DueAmt, 0) <> 0";
 
-                DataSet dsSchedules = DB.ExecuteDataset(scheduleSql, null, trx);
+                SqlParameter[] scheduleParams = new SqlParameter[]
+                {
+                    new SqlParameter("@InvoiceId", invoiceId),
+                    new SqlParameter("@PayScheduleId", payScheduleId)
+                };
+
+                DataSet dsSchedules = DB.ExecuteDataset(scheduleSql, scheduleParams, trx);
                 if (dsSchedules == null || dsSchedules.Tables.Count == 0 || dsSchedules.Tables[0].Rows.Count == 0)
                 {
                     trx.Rollback();
@@ -746,14 +778,24 @@ namespace VASLogic.Models
 
                 DataRow schedule = dsSchedules.Tables[0].Rows[0];
 
+                /* Same-partner guard — the suggestion query pairs on the partner,
+                   but this POST endpoint can be called with a hand-crafted pairing. */
+                if (payment.GetC_BPartner_ID() != Util.GetValueOfInt(schedule["Invoice_BPartner_ID"]))
+                {
+                    trx.Rollback();
+                    result.Message = Msg.GetMsg(ctx, "VIS_NoRecordFound");
+                    return result;
+                }
+
                 string docBaseType = Util.GetValueOfString(schedule["Doc_Base_Type"]);
 
-                /* Sign gate (mirrors the suggestion query): a negative receipt may only
-                   be applied to an AR credit memo (ARC); a positive receipt only to a
-                   regular AR invoice (ARI). Defends this POST endpoint against a
-                   hand-crafted, sign-mismatched pairing. */
-                bool signMatches = (availableAmt < 0 && docBaseType == "ARC")
-                                   || (availableAmt > 0 && docBaseType == "ARI");
+                /* Sign gate (mirrors the suggestion query): a negative (refund)
+                   payment may only be applied to a purchase credit memo (APC); a
+                   positive payment only to a regular purchase invoice (API).
+                   Defends this POST endpoint against a hand-crafted,
+                   sign-mismatched pairing. */
+                bool signMatches = (availableAmt < 0 && docBaseType == "API")
+                                   || (availableAmt > 0 && docBaseType == "APC");
                 if (!signMatches)
                 {
                     trx.Rollback();
@@ -761,24 +803,20 @@ namespace VASLogic.Models
                     return result;
                 }
 
-                /* Signed schedule due — ARC negative so it nets against the negative
-                   receipt (ABS() normalises whatever sign DueAmt is physically stored
-                   with). */
-                decimal dueAmt = docBaseType == "ARC"
-                    ? -Math.Abs(Util.GetValueOfDecimal(schedule["Due_Amount"]))
-                    : Math.Abs(Util.GetValueOfDecimal(schedule["Due_Amount"]));
                 int invoiceCurrencyId = Util.GetValueOfInt(schedule["Invoice_Currency_ID"]);
 
-                /* Schedule due in the PAYMENT currency, converted at the
-                   payment accounting date (same basis as the suggestion). */
+                /* Schedule due in the PAYMENT currency, converted at the payment
+                   accounting date (same basis as the suggestion). Magnitudes
+                   only — the line sign is decided by the document type below. */
+                decimal dueAmt = Math.Abs(Util.GetValueOfDecimal(schedule["Due_Amount"]));
                 decimal duePay = dueAmt;
                 if (invoiceCurrencyId != payment.GetC_Currency_ID())
                 {
-                    duePay = MConversionRate.Convert(ctx, dueAmt,
+                    duePay = Math.Abs(MConversionRate.Convert(ctx, dueAmt,
                         invoiceCurrencyId, payment.GetC_Currency_ID(),
                         paymentDateAcct, payment.GetC_ConversionType_ID(),
                         Util.GetValueOfInt(schedule["Client_ID"]),
-                        Util.GetValueOfInt(schedule["Org_ID"]));
+                        Util.GetValueOfInt(schedule["Org_ID"])));
                 }
 
                 if (duePay == 0)
@@ -814,16 +852,21 @@ namespace VASLogic.Models
                 }
 
                 /* ── Single line against the suggested schedule (payment currency) ──
-                   Work in magnitudes then reapply the receipt sign, so we apply the
-                   smaller of the receipt's open amount and the schedule due. An
-                   over-payment leaves the receipt open; an under-payment leaves the
-                   schedule balance open — correct for both positive receipt↔ARI and
-                   negative receipt↔ARC (a raw numeric MIN/MAX would pick the wrong
-                   operand once the amounts go negative). */
-                int applySign = availableAmt < 0 ? -1 : 1;
-                decimal appliedAmt = applySign * Math.Min(Math.Abs(availableAmt), Math.Abs(duePay));
+                   Work in magnitudes: apply the smaller of the payment's open
+                   amount and the schedule due, so an over-payment leaves the
+                   payment open and an under-payment leaves the schedule balance
+                   open. The AP cycle sign is then applied to both figures:
+                   purchase invoice → negative line, purchase return → positive
+                   (the standard Allocation form's MultiplierAP convention). */
+                decimal appliedMagnitude = Math.Min(Math.Abs(availableAmt), duePay);
+                decimal remainingMagnitude = duePay - appliedMagnitude;
+
+                bool invoiceIsReturn = MDocType.Get(ctx, Util.GetValueOfInt(schedule["Invoice_DocType_ID"])).IsReturnTrx();
+                decimal cycleSign = invoiceIsReturn ? 1m : -1m;
+
+                decimal appliedAmt = cycleSign * appliedMagnitude;
                 /* Under-payment keeps the remaining schedule balance open. */
-                decimal overUnderAmt = duePay - appliedAmt;
+                decimal overUnderAmt = cycleSign * remainingMagnitude;
 
                 MAllocationLine aLine = new MAllocationLine(alloc, appliedAmt,
                     Env.ZERO, Env.ZERO, overUnderAmt);
@@ -920,7 +963,9 @@ namespace VASLogic.Models
         /// <summary>
         /// Resolves the AD_Form_ID of the standard Allocation form
         /// (VAdvantage.Apps.AForms.VAllocation) the widget opens via
-        /// VIS.viewManager.startForm. Returns 0 when the form is not registered.
+        /// VIS.viewManager.startForm. Matching the exact classname is what
+        /// keeps an unrelated form whose name merely contains "allocation"
+        /// from being opened. Returns 0 when the form is not registered.
         /// </summary>
         /// <returns>AD_Form_ID or 0.</returns>
         private static int GetAllocationFormId()
@@ -951,7 +996,7 @@ namespace VASLogic.Models
 
         /// <summary>
         /// Result envelope for the suggestion list: paged rows plus the full-set
-        /// suggestion count, the ready-to-allocate total (receipt currency) and
+        /// suggestion count, the ready-to-allocate total (payment currency) and
         /// the Allocation form id for the Open-allocation-form action.
         /// </summary>
         public class MatchSuggestionList
@@ -961,7 +1006,7 @@ namespace VASLogic.Models
             public int PageSize { get; set; }
             public int TotalRecords { get; set; }
             public int TotalPages { get; set; }
-            /// <summary>Sum of the suggestion receipts' open-for-allocation amounts (ALLOCPAYMENTAVAILABLE, receipt currency).</summary>
+            /// <summary>Sum of the suggestion payments' open-for-allocation amounts (ALLOCPAYMENTAVAILABLE, payment currency).</summary>
             public decimal ReadyToAllocate { get; set; }
             public string CurrencySymbol { get; set; }
             public string CurrencyIso { get; set; }
@@ -970,9 +1015,9 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// One suggestion row: the receipt leg, its best-fit invoice leg and the
-        /// confidence tag. OpenAmount is already in the RECEIPT currency
-        /// (converted at the payment accounting date), so the receipt
+        /// One suggestion row: the payment leg, its best-fit invoice leg and the
+        /// confidence tag. OpenAmount is already in the PAYMENT currency
+        /// (converted at the payment accounting date), so the payment
         /// symbol/precision apply to both amounts.
         /// </summary>
         public class MatchSuggestionRow
@@ -981,19 +1026,21 @@ namespace VASLogic.Models
             public int InvoiceId { get; set; }
             /// <summary>The exact pay schedule the suggestion was made with — the Apply target.</summary>
             public int InvoicePayScheduleId { get; set; }
-            public string Customer { get; set; }
-            public string ReceiptNo { get; set; }
-            public string ReceiptDate { get; set; }
-            public string ReceiptCurrency { get; set; }
-            public string ReceiptCurrencySymbol { get; set; }
-            public int ReceiptPrecision { get; set; }
-            public decimal ReceiptAmount { get; set; }
+            public string Vendor { get; set; }
+            public string PaymentNo { get; set; }
+            public string PaymentDate { get; set; }
+            public string PaymentCurrency { get; set; }
+            public string PaymentCurrencySymbol { get; set; }
+            public int PaymentPrecision { get; set; }
+            public decimal PaymentAmount { get; set; }
             public string InvoiceNo { get; set; }
             public string InvoiceDate { get; set; }
             public string DueDate { get; set; }
-            /// <summary>Invoice open amount in the receipt currency (payment accounting-date rate).</summary>
+            /// <summary>API (purchase invoice) or APC (purchase credit memo / return cycle).</summary>
+            public string InvoiceDocBaseType { get; set; }
+            /// <summary>Invoice open amount in the payment currency (payment accounting-date rate).</summary>
             public decimal OpenAmount { get; set; }
-            /// <summary>HIGH or REVIEW (LOW pairings never reach the widget).</summary>
+            /// <summary>HIGH / REVIEW / LOW.</summary>
             public string Confidence { get; set; }
         }
 
@@ -1001,26 +1048,26 @@ namespace VASLogic.Models
         public class MatchDetail
         {
             public int PaymentId { get; set; }
-            public string ReceiptNo { get; set; }
-            public string ReceiptDate { get; set; }
-            public string ReceiptCustomer { get; set; }
-            public string ReceiptDocType { get; set; }
-            public string ReceiptDocBaseType { get; set; }
+            public string PaymentNo { get; set; }
+            public string PaymentDate { get; set; }
+            public string PaymentVendor { get; set; }
+            public string PaymentDocType { get; set; }
+            public string PaymentDocBaseType { get; set; }
             public string PaymentMethod { get; set; }
             public string Reference { get; set; }
             public string BankName { get; set; }
             public string AccountNo { get; set; }
-            public string ReceiptCurrency { get; set; }
-            public string ReceiptCurrencySymbol { get; set; }
-            public int ReceiptPrecision { get; set; }
-            public decimal ReceiptAmount { get; set; }
+            public string PaymentCurrency { get; set; }
+            public string PaymentCurrencySymbol { get; set; }
+            public int PaymentPrecision { get; set; }
+            public decimal PaymentAmount { get; set; }
 
             public int InvoiceId { get; set; }
             /// <summary>The exact pay schedule the suggestion was made with — the Apply target.</summary>
             public int InvoicePayScheduleId { get; set; }
             public string InvoiceNo { get; set; }
             public string InvoiceDate { get; set; }
-            public string InvoiceCustomer { get; set; }
+            public string InvoiceVendor { get; set; }
             public string InvoiceDocType { get; set; }
             public string InvoiceDocBaseType { get; set; }
             public string PaymentTerms { get; set; }
@@ -1032,16 +1079,21 @@ namespace VASLogic.Models
             /// <summary>Open amount in the invoice's own currency (pane display).</summary>
             public decimal OpenAmount { get; set; }
 
-            /// <summary>Open amount in the RECEIPT currency, converted at the payment accounting date.</summary>
+            /// <summary>Open amount in the PAYMENT currency, converted at the payment accounting date.</summary>
             public decimal OpenAmountPay { get; set; }
-            /// <summary>OpenAmountPay − receipt amount, receipt currency; &gt; 0 ⇒ part-payment.</summary>
+            /// <summary>
+            /// |OpenAmountPay| − |PaymentAmount|, payment currency — what is left
+            /// over after the smaller leg is applied. &gt; 0 ⇒ the payment is short
+            /// (part-payment, remainder stays on the schedule); &lt; 0 ⇒ the surplus
+            /// stays unallocated on the payment.
+            /// </summary>
             public decimal BalanceAfterApply { get; set; }
 
             public bool PartnerOk { get; set; }
             public bool AmountOk { get; set; }
             public bool RefOk { get; set; }
             public bool DateOk { get; set; }
-            /// <summary>Whole-day gap between receipt accounting date and due date (-1 when unknown).</summary>
+            /// <summary>Whole-day gap between payment accounting date and due date (-1 when unknown).</summary>
             public int DateGapDays { get; set; }
             /// <summary>Evidence score 0..100 shown in the modal banner.</summary>
             public int Score { get; set; }

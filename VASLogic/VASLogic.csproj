@@ -146,6 +146,9 @@
     <Compile Include="Models\RelatedProductModel.cs" />
     <Compile Include="Models\VASAttachUserToBP.cs" />
     <Compile Include="Models\VAS_065_APInvoicePanelModel.cs" />
+    <Compile Include="Models\VAS_189_ARInvoiceDetailPanelModel.cs" />
+    <Compile Include="Models\VAS_189_ARInvoiceDetailPanelModel.Payment.cs" />
+    <Compile Include="Models\VAS_189_ARInvoiceDetailPanelModel.Recurring.cs" />
     <Compile Include="Models\VAS_074_CreateInvoiceLinePanelModel.cs" />
     <Compile Include="Models\VAS_092_OverviewPurchaseOrderModel.cs" />
     <Compile Include="Models\VAS_098_PurchaseRequisitionModel.cs" />
@@ -164,6 +167,7 @@
     <Compile Include="Models\VAS_014_DailyCollectionTrendModel.cs" />
     <Compile Include="Models\VAS_015_OutstandingVsReceivedModel.cs" />
     <Compile Include="Models\VAS_035_MatchSuggestionsModel.cs" />
+    <Compile Include="Models\VAS_072_MatchSuggestionAPPaymentModel.cs" />
     <Compile Include="Models\VAS_118_QuickJournalModel.cs" />
     <Compile Include="Models\VAS_SentEmailDocModel.cs" />
     <Compile Include="Models\VAS_LeadModel.cs" />
