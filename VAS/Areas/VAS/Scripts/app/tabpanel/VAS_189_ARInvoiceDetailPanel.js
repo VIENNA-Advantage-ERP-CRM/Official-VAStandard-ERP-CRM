@@ -42,6 +42,7 @@
  *   Invoice Details                       | VAS_189_InvoiceDetails
  *   Customer Reference No.                | VAS_189_CustomerReferenceNo
  *   Sales Order                           | VAS_189_SalesOrder
+ *     (IsReturnTrx: Customer RMA)         | VAS_189_CustomerRMA
  *   Document Status / Posted Status       | VAS_189_DocumentStatus / VAS_189_PostedStatus
  *   Payment Terms / Payment Method        | VAS_189_PaymentTerms / VAS_189_PaymentMethod
  *   Invoice Currency / Accounting Currency| VAS_189_InvoiceCurrency / VAS_189_AccountingCurrency
@@ -73,6 +74,8 @@
  *   Goods / Services                      | VAS_189_Goods / VAS_189_Services
  *   Fulfilled / Partially fulfilled       | VAS_189_Fulfilled / VAS_189_PartiallyFulfilled
  *   Shipment / Delivered on / Delivered qty | VAS_189_Shipment / VAS_189_DeliveredOn / VAS_189_DeliveredQty
+ *     (IsReturnTrx: Customer Return /     | VAS_189_CustomerReturn /
+ *      Returned On / Returned Qty)        |   VAS_189_ReturnedOn / VAS_189_ReturnedQty
  *   Warehouse / Acknowledged by           | VAS_189_Warehouse / VAS_189_AcknowledgedBy
  *   Variance {0}                          | VAS_189_VarianceOf
  *   Approval / Approved                   | VAS_189_Approval / VAS_189_Approved
@@ -792,12 +795,41 @@
             return $b;
         }
 
+        /* A return document (C_Invoice.IsReturnTrx) runs the RMA cycle, so the four
+           outbound labels have to read the other way round: the order it came from
+           is a Customer RMA, the movement is a Customer Return, and the delivery
+           date / quantity are the returned date / quantity. Same underlying data -
+           only what it is called changes - so both sections read from these. */
+        function orderLabel() {
+            return data.IsReturnTrx
+                ? lbl("VAS_189_CustomerRMA", "Customer RMA")
+                : lbl("VAS_189_SalesOrder", "Sales Order");
+        }
+
+        function shipmentLabel() {
+            return data.IsReturnTrx
+                ? lbl("VAS_189_CustomerReturn", "Customer Return")
+                : lbl("VAS_189_Shipment", "Shipment");
+        }
+
+        function deliveredOnLabel() {
+            return data.IsReturnTrx
+                ? lbl("VAS_189_ReturnedOn", "Returned On")
+                : lbl("VAS_189_DeliveredOn", "Delivered on");
+        }
+
+        function deliveredQtyLabel() {
+            return data.IsReturnTrx
+                ? lbl("VAS_189_ReturnedQty", "Returned Qty")
+                : lbl("VAS_189_DeliveredQty", "Delivered quantity");
+        }
+
         /* Invoice details (key/value pairs - only non-empty rows) */
         function buildInvoiceDetails() {
             var rows = [
                 { k: lbl("VAS_189_CustomerReferenceNo", "Customer Reference No."), v: data.InvoiceReference },
                 { k: lbl("InvoiceNo"), v: data.DocumentNo },
-                { k: lbl("VAS_189_SalesOrder", "Sales Order"), v: data.OrderDocumentNo },
+                { k: orderLabel(), v: data.OrderDocumentNo },
                 { k: lbl("VAS_189_DocumentStatus", "Document Status"), v: data.DocStatusName || docStatusLabel(data.DocStatus) },
                 { k: lbl("VAS_189_PostedStatus", "Posted Status"), v: data.PostedName || (data.Posted ? data.Posted : "") },
                 { k: lbl("VAS_189_PaymentTerms", "Payment Terms"), v: data.PaymentTermName },
@@ -1287,11 +1319,11 @@
             var deliveredOn = (dl.DeliveredDates && dl.DeliveredDates.length)
                 ? dl.DeliveredDates.map(function (d) { return fmtDate(d); }).join(", ")
                 : fmtDate(dl.DeliveredDate);
-            kvRow($kv, lbl("VAS_189_Shipment", "Shipment"), dl.ShipmentDocumentNo);
-            kvRow($kv, lbl("VAS_189_SalesOrder", "Sales Order"), dl.OrderDocumentNo);
-            kvRow($kv, lbl("VAS_189_DeliveredOn", "Delivered on"), deliveredOn);
+            kvRow($kv, shipmentLabel(), dl.ShipmentDocumentNo);
+            kvRow($kv, orderLabel(), dl.OrderDocumentNo);
+            kvRow($kv, deliveredOnLabel(), deliveredOn);
             var qtyVar = +dl.QtyVariance || 0;
-            kvRow($kv, lbl("VAS_189_DeliveredQty", "Delivered quantity"),
+            kvRow($kv, deliveredQtyLabel(),
                 fmtNumber(dl.TotalDelivered, 0),
                 qtyVar !== 0 ? "warn" : "",
                 qtyVar !== 0
