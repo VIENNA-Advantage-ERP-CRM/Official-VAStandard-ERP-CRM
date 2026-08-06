@@ -229,7 +229,7 @@
     display: inline-block;
     padding: 0.1875em 0.625em;       /* 3px 10px */
     border-radius: 999px;            /* physical edge — stays in px */
-    font-size: 0.6875em;             /* xs token */
+    font-size: 0.5875em;             /* xs token */
     font-weight: 700;
     white-space: nowrap;
     letter-spacing: 0.04em;

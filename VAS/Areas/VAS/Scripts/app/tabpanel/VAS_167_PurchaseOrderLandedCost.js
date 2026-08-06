@@ -74,9 +74,69 @@
  *                          remembering the id per name, and falls back to the
  *                          table's zoom target when a name cannot be resolved —
  *                          the VAS_092 record-open pattern.
+ *   VAI163   2026-08-05  The details card names the sales order the PO was
+ *                        raised against (C_Order.Ref_Order_ID), clickable like
+ *                        the other origins. Both sides of that reference live in
+ *                        C_Order, so the link carries an IsSOTrx flag
+ *                        (WINDOW_NAME_BY_TABLE_SOTRX -> VAS_SalesOrder) and
+ *                        opens the Sales Order window rather than the Purchase
+ *                        Order one.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vaselc- -> vas_167- so the panel's
+ *                          styles cannot collide with another panel's.
+ *   VAI163   2026-08-05  New Record / Copy Record now empty the panel instead
+ *                        of leaving the previously selected record on screen.
+ *                        Both refreshPanelData and a new data-status listener
+ *                        ask isTabInserting(), which reads GridTab.gridTable
+ *                        .getIsInserting() — the flag GridTable.dataNew() raises
+ *                        for both actions. The record id cannot answer it: a
+ *                        copied row carries the source record's key until saved.
+ *                        Ported from VAS_092.
+ *   VAI163   2026-08-06  The cost-elements table paginates at 15 rows a page
+ *                        (COSTS_PER_PAGE), with buildPager() / pagerButton() and
+ *                        the chevLeft / chevRight icons added here — the panel had
+ *                        no pager of its own. A table that fits on one page shows
+ *                        no controls, the totals footer keeps covering the whole
+ *                        order rather than the page, and a page's rows are replaced
+ *                        in place so the card, header and footer are untouched.
+ *                        Repainting rows is safe because every row control is
+ *                        reached through a delegated [data-elc-*] handler on $root.
+ *                        The page resets to the first alongside editId / linesOpen
+ *                        whenever the payload is re-read — a record change and a
+ *                        save / remove reload alike.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
+
+    // True when the tab is sitting on a row that has not been saved yet —
+    // whether it came from New Record or from Copy Record.
+    //
+    // The authority is the GRID TABLE's insert flag: VIS.GridTable.dataNew()
+    // raises it for both actions and clears it again on save, refresh or undo,
+    // and GridTable.getIsInserting() reads it. GridTab does NOT expose that
+    // method — it only holds the table as .gridTable — so asking the tab itself
+    // always answers "no".
+    //
+    // The record id cannot answer this on its own: a copied row carries the
+    // SOURCE record's field values, its key included, so the id handed to the
+    // panel is the record that was copied FROM. Either way the panel would
+    // otherwise show a saved record's details beside an unsaved new one.
+    function isTabInserting(curTab) {
+        if (!curTab) return false;
+        try {
+            if (curTab.gridTable && typeof curTab.gridTable.getIsInserting === "function"
+                && curTab.gridTable.getIsInserting()) {
+                return true;
+            }
+        } catch (e) { }
+
+        var probes = ["getIsInserting", "isInserting", "getIsNew", "isNew"];
+        for (var i = 0; i < probes.length; i++) {
+            try {
+                if (typeof curTab[probes[i]] === "function" && curTab[probes[i]]()) return true;
+            } catch (e2) { }
+        }
+        return false;
+    }
 
     VAS.VAS_167_PurchaseOrderLandedCost = function () {
         this.record_ID = 0;
@@ -87,6 +147,50 @@
         this.panelWidth;
 
         var $self = this;
+
+        // The framework notifies a tab panel when the selected record changes
+        // (refreshPanelData) but NOT when the user starts a new one:
+        // GridController.dataNew() never reaches the tab panel, so the panel
+        // would keep showing the previously selected record beside an empty new
+        // one. Listening to the tab's own data-status events closes that gap.
+        function onTabDataStatus(e) {
+            var inserting = false;
+            try {
+                inserting = !!(e && typeof e.getIsInserting === "function" && e.getIsInserting());
+            } catch (ex) {
+                inserting = false;
+            }
+            // The event does not report insert state on every build, and a
+            // COPIED row still carries the source record's key — so ask the tab
+            // as well before trusting the id below.
+            if (!inserting) inserting = isTabInserting($self.curTab);
+
+            var rid = 0;
+            try {
+                if ($self.curTab && typeof $self.curTab.getRecord_ID === "function") {
+                    rid = +$self.curTab.getRecord_ID() || 0;
+                }
+            } catch (ex2) {
+                rid = 0;
+            }
+
+            if (inserting || rid <= 0) {
+                // New (unsaved) record — nothing to show against it.
+                if ($self.record_ID) {
+                    $self.record_ID = 0;
+                    $self.clear();
+                }
+                return;
+            }
+            if (rid !== $self.record_ID) {
+                $self.record_ID = rid;
+                $self.fetchData(rid);
+            }
+        }
+
+        // Registered on the tab in startPanel, removed in dispose. Kept as an
+        // object because the framework calls listener.dataStatusChanged(event).
+        this.tabDataListener = { dataStatusChanged: function (e) { onTabDataStatus(e); } };
         var $root;
         var $busy;
         var $header;
@@ -104,6 +208,11 @@
         // True while a create / update / delete is in flight, so the form cannot
         // be submitted twice.
         var saving = false;
+        // Maximum cost-element rows shown per page; the table paginates beyond
+        // this. An order carrying many expected costs otherwise pushed the Add /
+        // Edit form far below the fold.
+        var COSTS_PER_PAGE = 15;
+        var costsPage = 0;   // 0-based
 
         // Some AD_Message keys may not be seeded yet; fall back to a readable
         // English default so the panel never renders raw keys.
@@ -133,6 +242,7 @@
             VAS_167_Rfq: "RFQ",
             VAS_167_Project: "Project",
             VAS_167_Requisition: "Requisition",
+            VAS_167_SalesOrder: "Sales Order",
             VAS_167_OpenRecord: "Open",
             VAS_167_NoVendor: "—",
             VAS_167_POTotal: "PO Total",
@@ -155,6 +265,11 @@
             VAS_167_BaseVolume: "Volume",
             VAS_167_BaseWeight: "Weight",
             VAS_167_Of: "of",
+            // Cost-table pager
+            VAS_167_Showing: "Showing",
+            VAS_167_Page: "Page",
+            VAS_167_Previous: "Previous",
+            VAS_167_Next: "Next",
             VAS_167_Distributed: "Distributed",
             VAS_167_NotReconciled: "Does not add up to the entry amount",
             VAS_167_NoGeneratedLines: "No generated lines for this cost element.",
@@ -188,24 +303,24 @@
         }
 
         this.init = function () {
-            $root = $('<div class="MPC-vaselc-root"></div>');
+            $root = $('<div class="vas_167-root"></div>');
 
             // ---- Fixed title strip (never scrolls) ----
             // Title + sub-line on the left, state pills on the right; the order's
             // own details live in the card at the top of the body below.
-            $header = $('<div class="MPC-vaselc-head"></div>');
-            var $htext = $('<div class="MPC-vaselc-headText"></div>');
-            $htext.append($('<div class="MPC-vaselc-headTitle"></div>').text(getMsg("VAS_167_Title")));
-            $headSub = $('<div class="MPC-vaselc-headSub"></div>');
+            $header = $('<div class="vas_167-head"></div>');
+            var $htext = $('<div class="vas_167-headText"></div>');
+            $htext.append($('<div class="vas_167-headTitle"></div>').text(getMsg("VAS_167_Title")));
+            $headSub = $('<div class="vas_167-headSub"></div>');
             $htext.append($headSub);
-            $headPills = $('<div class="MPC-vaselc-headPills"></div>');
-            $headBadge = $('<span class="MPC-vaselc-badge"></span>');
+            $headPills = $('<div class="vas_167-headPills"></div>');
+            $headBadge = $('<span class="vas_167-badge"></span>');
             $headPills.append($headBadge);
             $header.append($htext).append($headPills);
 
             // ---- Scrolling body ----
-            $body = $('<div class="MPC-vaselc-body"></div>');
-            $emptyState = $('<div class="MPC-vaselc-noRecord"></div>').text(getMsg("VAS_167_NoData"));
+            $body = $('<div class="vas_167-body"></div>');
+            $emptyState = $('<div class="vas_167-noRecord"></div>').text(getMsg("VAS_167_NoData"));
             $emptyState.hide();
 
             $root.append($header).append($body).append($emptyState);
@@ -244,9 +359,14 @@
                 success: function (raw) {
                     data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     // A newly selected order starts in add mode with every
-                    // generated-lines drawer collapsed.
+                    // generated-lines drawer collapsed, on the first page of the
+                    // cost table. This runs after a save / remove too, which is
+                    // deliberate and matches the drawer state beside it: the list
+                    // has just changed under the reader, so the table returns to
+                    // the top exactly as the panel's scroll position does below.
                     editId = null;
                     linesOpen = {};
+                    costsPage = 0;
                     saving = false;
                     render();
                     // Selection always returns the reader to the top of the panel.
@@ -262,6 +382,9 @@
 
         this.clear = function () {
             data = null;
+            editId = null;
+            linesOpen = {};
+            costsPage = 0;
             render();
         };
 
@@ -285,14 +408,14 @@
 
             renderHeaderMeta();
 
-            var $wrap = $('<div class="MPC-vaselc-stack"></div>');
+            var $wrap = $('<div class="vas_167-stack"></div>');
 
             $wrap.append(renderHeaderCard());
 
             // Editable-state notice. A locked order shows no equivalent strip —
             // the badge and the absent controls already say it is frozen.
             if (data.IsEditable) {
-                $wrap.append(noticeStrip("pencil", "warn", getMsg("VAS_167_EditableNotice")));
+                //$wrap.append(noticeStrip("pencil", "warn", getMsg("VAS_167_EditableNotice")));
                 if (!data.EligibleLineCount) {
                     $wrap.append(noticeStrip("alert", "risk", getMsg("VAS_167_NoLinesNotice")));
                 }
@@ -346,15 +469,15 @@
         // order's own fields (right, two across) — the Purchase Order Overview
         // header card, carrying what this panel already knows about the order.
         function renderHeaderCard() {
-            var $card = $('<section class="MPC-vaselc-hdrCard"></section>');
+            var $card = $('<section class="vas_167-hdrCard"></section>');
 
-            var $left = $('<div class="MPC-vaselc-hdrColL"></div>');
-            $left.append($('<div class="MPC-vaselc-fLabel"></div>').text(getMsg("VAS_167_Vendor")));
-            $left.append($('<div class="MPC-vaselc-vendName"></div>')
+            var $left = $('<div class="vas_167-hdrColL"></div>');
+            $left.append($('<div class="vas_167-fLabel"></div>').text(getMsg("VAS_167_Vendor")));
+            $left.append($('<div class="vas_167-vendName"></div>')
                 .text(data.VendorName || getMsg("VAS_167_NoVendor")));
             if (data.BuyerName) {
-                var $contact = $('<div class="MPC-vaselc-vendContact"></div>');
-                var $bit = $('<span class="MPC-vaselc-contactBit"></span>');
+                var $contact = $('<div class="vas_167-vendContact"></div>');
+                var $bit = $('<span class="vas_167-contactBit"></span>');
                 $bit.append(svgIcon("user"));
                 $bit.append($('<span></span>').text(data.BuyerName));
                 $contact.append($bit);
@@ -362,7 +485,7 @@
             }
             $card.append($left);
 
-            var $right = $('<div class="MPC-vaselc-hdrColR"></div>');
+            var $right = $('<div class="vas_167-hdrColR"></div>');
             if (data.DocumentTypeName) {
                 $right.append(headerField(getMsg("VAS_167_DocType"), data.DocumentTypeName));
             }
@@ -395,6 +518,15 @@
                     data.RequisitionNo || ("#" + data.RequisitionId),
                     "M_Requisition", data.RequisitionId));
             }
+            // Sales order the PO was raised against (C_Order.Ref_Order_ID).
+            // Opened as a sales transaction so the framework resolves the Sales
+            // Order window — both sides of the reference live in C_Order, and
+            // without the flag the link would open the Purchase Order window.
+            if (data.SalesOrderId > 0) {
+                $right.append(headerField(getMsg("VAS_167_SalesOrder"),
+                    data.SalesOrderNo || ("#" + data.SalesOrderId),
+                    "C_Order", data.SalesOrderId, true));
+            }
             $card.append($right);
 
             return $card;
@@ -402,35 +534,38 @@
 
         // A labelled header field. Supplying a table + record id makes the value a
         // link that opens that record.
-        function headerField(label, value, openTable, openId) {
-            var $f = $('<div class="MPC-vaselc-hdrField"></div>');
-            $f.append($('<div class="MPC-vaselc-fLabel"></div>').text(label));
-            var $v = $('<div class="MPC-vaselc-fVal"></div>').text(value);
+        function headerField(label, value, openTable, openId, isSOTrx) {
+            var $f = $('<div class="vas_167-hdrField"></div>');
+            $f.append($('<div class="vas_167-fLabel"></div>').text(label));
+            var $v = $('<div class="vas_167-fVal"></div>').text(value);
             if (openTable && +openId > 0) {
                 $v.addClass("is-link")
                     .attr("data-elc-open-table", openTable)
                     .attr("data-elc-open-id", openId)
                     .attr("title", getMsg("VAS_167_OpenRecord"));
+                // Dual-purpose tables (C_Order is both sides) need to say which
+                // window they mean.
+                if (isSOTrx) $v.attr("data-elc-open-sotrx", "Y");
             }
             $f.append($v);
             return $f;
         }
 
         function noticeStrip(icon, tone, text) {
-            var $s = $('<div class="MPC-vaselc-strip"></div>').addClass("tone-" + tone);
+            var $s = $('<div class="vas_167-strip"></div>').addClass("tone-" + tone);
             $s.append(svgIcon(icon));
             $s.append($('<span></span>').text(text));
             return $s;
         }
 
         function renderSubCaption() {
-            var $row = $('<div class="MPC-vaselc-subcap"></div>');
-            var $cap = $('<span class="MPC-vaselc-cap"></span>');
+            var $row = $('<div class="vas_167-subcap"></div>');
+            var $cap = $('<span class="vas_167-cap"></span>');
             $cap.append(svgIcon("coins"));
             $cap.append($('<span></span>').text(
                 getMsg("VAS_167_CostElements") + " (" + (data.ExpectedCostCount || 0) + ")"));
             $row.append($cap);
-            $row.append($('<span class="MPC-vaselc-capHint"></span>').text(
+            $row.append($('<span class="vas_167-capHint"></span>').text(
                 data.IsEditable ? getMsg("VAS_167_EditableUntilCompleted")
                                 : getMsg("VAS_167_Locked")));
             return $row;
@@ -443,46 +578,107 @@
         // caption and no empty table above it. A drafted order is told the entry
         // is added below; a completed one simply that none was defined.
         function renderEmptyNotice() {
-            return $('<div class="MPC-vaselc-empty is-standalone"></div>').text(
+            return $('<div class="vas_167-empty is-standalone"></div>').text(
                 data.IsEditable ? getMsg("VAS_167_Empty") : getMsg("VAS_167_EmptyLocked"));
         }
 
         // Only ever called with at least one entry — see render().
         function renderTable() {
-            var $tbl = $('<div class="MPC-vaselc-table"></div>');
+            var $tbl = $('<div class="vas_167-table"></div>');
 
-            var $head = $('<div class="MPC-vaselc-row MPC-vaselc-rowHead"></div>');
+            var $head = $('<div class="vas_167-row vas_167-rowHead"></div>');
             $head.append($('<span></span>').text(getMsg("VAS_167_ColElement")));
             $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_167_ColAmount")));
             $head.append($('<span></span>'));
             $tbl.append($head);
 
             var costs = data.ExpectedCosts || [];
-            for (var i = 0; i < costs.length; i++) {
-                $tbl.append(buildCostRow(costs[i]));
-                // Generated lines belong to a completed order only — an order that
-                // is still editable has nothing generated yet.
-                if (!data.IsEditable) $tbl.append(buildLinesBlock(costs[i]));
+
+            // The totals footer always covers the whole order, never the page, so
+            // it is built once and the page's rows are inserted ahead of it.
+            var $foot = buildTableFooter();
+            $tbl.append($foot);
+
+            // The pager closes the table card, under the footer. A table that fits
+            // on one page carries no controls at all.
+            var $pager = $('<div class="vas_167-pager"></div>');
+            if (costs.length > COSTS_PER_PAGE) $tbl.append($pager);
+
+            // Rows are replaced in place, so the card, its header and its footer
+            // stay exactly as they were. Safe to repaint: every row control is
+            // reached through a delegated [data-elc-*] handler bound on $root, not
+            // a handler bound to the row itself.
+            function paintPage() {
+                var pageCount = Math.max(1, Math.ceil(costs.length / COSTS_PER_PAGE));
+                if (costsPage >= pageCount) costsPage = pageCount - 1;
+                if (costsPage < 0) costsPage = 0;
+
+                var start = costsPage * COSTS_PER_PAGE;
+                var end = Math.min(costs.length, start + COSTS_PER_PAGE);
+
+                $tbl.find(".vas_167-rowBody, .vas_167-linesWrap").remove();
+                for (var i = start; i < end; i++) {
+                    $foot.before(buildCostRow(costs[i]));
+                    // Generated lines belong to a completed order only — an order
+                    // that is still editable has nothing generated yet.
+                    if (!data.IsEditable) $foot.before(buildLinesBlock(costs[i]));
+                }
+
+                buildPager($pager, costsPage, pageCount, costs.length, start, end,
+                    function (p) { costsPage = p; paintPage(); });
             }
 
-            $tbl.append(buildTableFooter());
+            paintPage();
             return $tbl;
         }
 
+        // Range caption on the left, Previous / page-of / Next on the right.
+        // Rebuilt on every page change so the disabled states stay accurate.
+        // `page` is 0-based and `onGo` is handed the page to move to, so the
+        // caller owns its page state. Nothing is drawn for a single-page table.
+        function buildPager($pager, page, pageCount, total, start, end, onGo) {
+            $pager.empty();
+            if (pageCount <= 1) return;
+
+            $pager.append($('<span class="vas_167-pgRange"></span>').text(
+                getMsg("VAS_167_Showing") + " " + (start + 1) + "-" + end + " " +
+                getMsg("VAS_167_Of") + " " + total));
+
+            var $ctrls = $('<span class="vas_167-pgCtrls"></span>');
+            $ctrls.append(pagerButton(getMsg("VAS_167_Previous"), "chevLeft",
+                page <= 0, function () { onGo(page - 1); }));
+            $ctrls.append($('<span class="vas_167-pgPos"></span>').text(
+                getMsg("VAS_167_Page") + " " + (page + 1) + " " +
+                getMsg("VAS_167_Of") + " " + pageCount));
+            $ctrls.append(pagerButton(getMsg("VAS_167_Next"), "chevRight",
+                page >= pageCount - 1, function () { onGo(page + 1); }));
+            $pager.append($ctrls);
+        }
+
+        function pagerButton(label, icon, disabled, handler) {
+            var $b = $('<span class="vas_167-pgBtn"></span>');
+            if (icon === "chevLeft") $b.append(svgIcon(icon));
+            $b.append($('<span></span>').text(label));
+            if (icon === "chevRight") $b.append(svgIcon(icon));
+            if (disabled) $b.addClass("is-disabled");
+            else $b.on("click", handler);
+            return $b;
+        }
+
         function buildCostRow(c) {
-            var $row = $('<div class="MPC-vaselc-row MPC-vaselc-rowBody"></div>');
+            var $row = $('<div class="vas_167-row vas_167-rowBody"></div>');
             if (editId === c.ExpectedCostId) $row.addClass("is-editing");
 
             // ---- Identity: element name, distribution chip, meta sub-line ----
             var $id = $('<span></span>');
-            $id.append($('<div class="MPC-vaselc-name"></div>')
+            $id.append($('<div class="vas_167-name"></div>')
                 .attr("title", c.CostElementName || "")
                 .text(c.CostElementName || ""));
 
-            var $chipWrap = $('<div class="MPC-vaselc-chipWrap"></div>');
-            var $chip = $('<span class="MPC-vaselc-distChip"></span>')
+            var $chipWrap = $('<div class="vas_167-chipWrap"></div>');
+            var $chip = $('<span class="vas_167-distChip"></span>')
                 .addClass("dist-" + distTone(c.DistributionCode));
-            $chip.append($('<span class="MPC-vaselc-dot"></span>'));
+            $chip.append($('<span class="vas_167-dot"></span>'));
             $chip.append($('<span></span>').text(c.DistributionLabel || c.DistributionCode || ""));
             $chipWrap.append($chip);
             $id.append($chipWrap);
@@ -491,33 +687,33 @@
             // position-derived identifier is invented.
             var meta = "#" + c.ExpectedCostId;
             if (c.ConversionTypeName) meta += " · " + c.ConversionTypeName;
-            $id.append($('<div class="MPC-vaselc-sub"></div>').text(meta));
+            $id.append($('<div class="vas_167-sub"></div>').text(meta));
             if (c.Description) {
-                $id.append($('<div class="MPC-vaselc-sub"></div>')
+                $id.append($('<div class="vas_167-sub"></div>')
                     .attr("title", c.Description).text(c.Description));
             }
             $row.append($id);
 
             // ---- Amount: entered amount + converted document-currency line ----
-            var $amt = $('<span class="MPC-vaselc-amt"></span>');
-            var $v = $('<div class="MPC-vaselc-amtV"></div>');
+            var $amt = $('<span class="vas_167-amt"></span>');
+            var $v = $('<div class="vas_167-amtV"></div>');
             $v.append(document.createTextNode(formatNumber(c.EnteredAmount, enteredPrecision(c))));
             $v.append($('<span></span>').text(c.EnteredCurrencyCode || ""));
             $amt.append($v);
             if (!c.IsSameCurrency) {
                 if (c.IsConversionAvailable) {
-                    $amt.append($('<div class="MPC-vaselc-sub"></div>').text(
+                    $amt.append($('<div class="vas_167-sub"></div>').text(
                         "≈ " + formatNumber(c.ConvertedAmount, docPrecision()) +
                         " " + (data.DocumentCurrencyCode || "")));
                 } else {
-                    $amt.append($('<div class="MPC-vaselc-sub is-warn"></div>')
+                    $amt.append($('<div class="vas_167-sub is-warn"></div>')
                         .text(getMsg("VAS_167_NoRate")));
                 }
             }
             $row.append($amt);
 
             // ---- Actions: edit / remove in draft, a Lines toggle when completed ----
-            var $act = $('<span class="MPC-vaselc-acts"></span>');
+            var $act = $('<span class="vas_167-acts"></span>');
             if (data.IsEditable) {
                 $act.append(iconButton("pencil", "edit", getMsg("VAS_167_Edit"))
                     .attr("data-elc-edit", c.ExpectedCostId));
@@ -525,7 +721,7 @@
                     .attr("data-elc-remove", c.ExpectedCostId));
             } else {
                 var open = isLinesOpen(c.ExpectedCostId);
-                var $tg = $('<button type="button" class="MPC-vaselc-linesBtn"></button>')
+                var $tg = $('<button type="button" class="vas_167-linesBtn"></button>')
                     .attr("data-elc-lines", c.ExpectedCostId)
                     .attr("aria-expanded", open ? "true" : "false")
                     .attr("aria-label", open ? getMsg("VAS_167_HideLines") : getMsg("VAS_167_ShowLines"))
@@ -543,11 +739,11 @@
         // Generated (server-side) distribution lines for one entry. Read straight
         // from C_ExpectedCostDistribution — never recalculated here.
         function buildLinesBlock(c) {
-            var $wrap = $('<div class="MPC-vaselc-linesWrap"></div>')
+            var $wrap = $('<div class="vas_167-linesWrap"></div>')
                 .attr("data-elc-linesfor", c.ExpectedCostId);
             if (!isLinesOpen(c.ExpectedCostId)) $wrap.addClass("is-closed");
 
-            var $cap = $('<div class="MPC-vaselc-linesCap"></div>');
+            var $cap = $('<div class="vas_167-linesCap"></div>');
             $cap.append(svgIcon("checkCircle"));
             $cap.append($('<span></span>').text(
                 getMsg("VAS_167_GeneratedLines") + " · " +
@@ -556,13 +752,13 @@
 
             var lines = c.GeneratedLines || [];
             if (!lines.length) {
-                $wrap.append($('<div class="MPC-vaselc-linesEmpty"></div>')
+                $wrap.append($('<div class="vas_167-linesEmpty"></div>')
                     .text(getMsg("VAS_167_NoGeneratedLines")));
                 return $wrap;
             }
 
-            var $tbl = $('<div class="MPC-vaselc-lTable"></div>');
-            var $lh = $('<div class="MPC-vaselc-lRow MPC-vaselc-lHead"></div>');
+            var $tbl = $('<div class="vas_167-lTable"></div>');
+            var $lh = $('<div class="vas_167-lRow vas_167-lHead"></div>');
             $lh.append($('<span></span>').text(getMsg("VAS_167_ColOrderLine")));
             $lh.append($('<span></span>').text(getMsg("VAS_167_ColBase")));
             $lh.append($('<span class="ta-c"></span>').text(getMsg("VAS_167_ColQty")));
@@ -577,8 +773,8 @@
             // actually stored in, and — when that differs from the document
             // currency — the document-currency equivalent of the parent amount
             // beside it. The two are never conflated.
-            var $foot = $('<div class="MPC-vaselc-lFoot"></div>');
-            var $tf = $('<span class="MPC-vaselc-tf"></span>');
+            var $foot = $('<div class="vas_167-lFoot"></div>');
+            var $tf = $('<span class="vas_167-tf"></span>');
             $tf.append(document.createTextNode(getMsg("VAS_167_Distributed")));
             $tf.append($('<b></b>').text(
                 formatNumber(c.DistributedAmount, enteredPrecision(c)) +
@@ -586,7 +782,7 @@
             $foot.append($tf);
 
             if (!c.IsSameCurrency && c.IsConversionAvailable) {
-                var $conv = $('<span class="MPC-vaselc-tf"></span>');
+                var $conv = $('<span class="vas_167-tf"></span>');
                 $conv.append(document.createTextNode("≈"));
                 $conv.append($('<b></b>').text(
                     formatNumber(c.ConvertedAmount, docPrecision()) +
@@ -594,7 +790,7 @@
                 $foot.append($conv);
             }
             if (c.IsReconciled === false) {
-                $foot.append($('<span class="MPC-vaselc-tf is-warn"></span>')
+                $foot.append($('<span class="vas_167-tf is-warn"></span>')
                     .text(getMsg("VAS_167_NotReconciled")));
             }
             $tbl.append($foot);
@@ -604,26 +800,26 @@
         }
 
         function buildLineRow(c, g, lineCount) {
-            var $row = $('<div class="MPC-vaselc-lRow MPC-vaselc-lBody"></div>');
+            var $row = $('<div class="vas_167-lRow vas_167-lBody"></div>');
 
             // Product name, with the line's Attribute Set Instance (size / lot /
             // serial ...) after it — only when the line carries a real instance;
             // a blank or "--" / "-" placeholder is not an attribute.
             var $item = $('<span></span>');
-            var $name = $('<div class="MPC-vaselc-name"></div>');
+            var $name = $('<div class="vas_167-name"></div>');
             $name.append($('<span></span>').text(g.ProductName || ""));
             var asi = $.trim(g.AttributeSetInstance || "");
             var hasAsi = (asi && asi !== "--" && asi !== "-");
             if (hasAsi) {
-                $name.append($('<span class="MPC-vaselc-attr"></span>').text(asi));
+                $name.append($('<span class="vas_167-attr"></span>').text(asi));
             }
             $name.attr("title", (g.ProductName || "") + (hasAsi ? " — " + asi : ""));
             $item.append($name);
-            $item.append($('<div class="MPC-vaselc-sub"></div>')
+            $item.append($('<div class="vas_167-sub"></div>')
                 .text(getMsg("VAS_167_Code") + " " + (g.ProductCode || "")));
             $row.append($item);
 
-            $row.append($('<span class="MPC-vaselc-base"></span>').text(baseLabel(c, g, lineCount)));
+            $row.append($('<span class="vas_167-base"></span>').text(baseLabel(c, g, lineCount)));
             $row.append($('<span class="ta-c"></span>').text(formatNumber(g.LineQuantity, 0)));
 
             // Stored in the entry's entered currency, so shown in it — the platform
@@ -665,14 +861,14 @@
         // PO total beside the expected landed cost total — both in the document
         // currency, computed server-side from converted amounts.
         function buildTableFooter() {
-            var $foot = $('<div class="MPC-vaselc-foot"></div>');
+            var $foot = $('<div class="vas_167-foot"></div>');
 
-            var $po = $('<span class="MPC-vaselc-tf"></span>');
+            var $po = $('<span class="vas_167-tf"></span>');
             $po.append(document.createTextNode(getMsg("VAS_167_POTotal")));
             $po.append($('<b></b>').text(money(data.PurchaseOrderTotal)));
             $foot.append($po);
 
-            var $grand = $('<span class="MPC-vaselc-grand"></span>');
+            var $grand = $('<span class="vas_167-grand"></span>');
             $grand.append(document.createTextNode(getMsg("VAS_167_ExpectedTotal")));
             $grand.append($('<b></b>').text(money(data.ExpectedCostTotalConverted)));
             $foot.append($grand);
@@ -687,16 +883,16 @@
             var c = editing ? findCost(editId) : null;
             if (editing && !c) { editId = null; editing = false; }
 
-            var $form = $('<div class="MPC-vaselc-form"></div>');
+            var $form = $('<div class="vas_167-form"></div>');
 
-            var $cap = $('<div class="MPC-vaselc-formCap"></div>');
+            var $cap = $('<div class="vas_167-formCap"></div>');
             $cap.append(svgIcon(editing ? "pencil" : "plus"));
             $cap.append($('<span></span>').text(editing
                 ? getMsg("VAS_167_EditCaption") + " · #" + c.ExpectedCostId
                 : getMsg("VAS_167_AddCaption")));
             $form.append($cap);
 
-            var $grid = $('<div class="MPC-vaselc-formGrid"></div>');
+            var $grid = $('<div class="vas_167-formGrid"></div>');
             // Cost Distribution carries no "select" placeholder: the list is the
             // fixed set of distribution types, so the first one stands selected
             // and the reader changes it. Its options are indented (see
@@ -722,13 +918,13 @@
                 null, true));
             $form.append($grid);
 
-            var $foot = $('<div class="MPC-vaselc-formFoot"></div>');
+            var $foot = $('<div class="vas_167-formFoot"></div>');
             if (editing) {
-                $foot.append($('<button type="button" class="MPC-vaselc-btn is-ghost"></button>')
+                $foot.append($('<button type="button" class="vas_167-btn is-ghost"></button>')
                     .attr("data-elc-cancel", "1").text(getMsg("VAS_167_BtnCancel")));
             }
-            $foot.append($('<span class="MPC-vaselc-formNote"></span>'));
-            var $submit = $('<button type="button" class="MPC-vaselc-btn is-primary"></button>')
+            $foot.append($('<span class="vas_167-formNote"></span>'));
+            var $submit = $('<button type="button" class="vas_167-btn is-primary"></button>')
                 .attr("data-elc-save", "1").prop("disabled", true);
             $submit.append(svgIcon(editing ? "check" : "plus"));
             $submit.append($('<span></span>').text(
@@ -736,7 +932,7 @@
             $foot.append($submit);
             $form.append($foot);
 
-            var $err = $('<div class="MPC-vaselc-formErr"></div>').hide();
+            var $err = $('<div class="vas_167-formErr"></div>').hide();
             $form.append($err);
 
             return $form;
@@ -744,11 +940,11 @@
 
         // Shared underline-only field: label above value, transparent background.
         function fieldShell(label) {
-            var $ff = $('<div class="MPC-vaselc-ff"></div>');
-            var $content = $('<div class="MPC-vaselc-ffBody"></div>');
+            var $ff = $('<div class="vas_167-ff"></div>');
+            var $content = $('<div class="vas_167-ffBody"></div>');
             var $label = $('<label></label>');
             $label.append(document.createTextNode(label));
-            $label.append($('<span class="MPC-vaselc-req"></span>').text("*"));
+            $label.append($('<span class="vas_167-req"></span>').text("*"));
             $content.append($label);
             $ff.append($content);
             return { $ff: $ff, $content: $content };
@@ -762,7 +958,7 @@
             var shell = fieldShell(label);
             shell.$content.addClass("is-select");
 
-            var $sel = $('<select class="MPC-vaselc-input"></select>').attr("data-elc-field", name);
+            var $sel = $('<select class="vas_167-input"></select>').attr("data-elc-field", name);
             if (placeholder) {
                 $sel.append($('<option value=""></option>').text(placeholder));
             }
@@ -785,7 +981,7 @@
 
         function amountField(value) {
             var shell = fieldShell(getMsg("VAS_167_FldAmount"));
-            var $inp = $('<input type="text" class="MPC-vaselc-input is-num" inputmode="decimal" />')
+            var $inp = $('<input type="text" class="vas_167-input is-num" inputmode="decimal" />')
                 .attr("data-elc-field", "elcAmt")
                 .attr("placeholder", "0.00")
                 .val(value === "" || value === null || value === undefined ? "" : String(value));
@@ -858,7 +1054,7 @@
                      v.conversionTypeId > 0 && !isNaN(amount) && amount > 0;
 
             $btn.prop("disabled", !ok || saving);
-            var $note = $body.find(".MPC-vaselc-formNote");
+            var $note = $body.find(".vas_167-formNote");
             if (saving) {
                 $note.text(getMsg("VAS_167_Saving"));
             } else {
@@ -870,7 +1066,7 @@
         }
 
         function showFormError(message) {
-            var $err = $body.find(".MPC-vaselc-formErr");
+            var $err = $body.find(".vas_167-formErr");
             if (!$err.length) { toast(message, true); return; }
             $err.text(message).show();
         }
@@ -976,6 +1172,14 @@
             "M_Requisition":      "VAS_Requisition"
         };
 
+        // The same map for records opened as a SALES transaction. C_Order serves
+        // both sides — this panel's only sales-side link is the Ref_Order_ID
+        // sales order — so it names its own window and this map wins when the
+        // flag is set.
+        var WINDOW_NAME_BY_TABLE_SOTRX = {
+            "C_Order": "VAS_SalesOrder"
+        };
+
         // Window name -> AD_Window_ID, resolved once per name and remembered for
         // the life of the panel. A name the dictionary does not know is cached as
         // -1 so a failed lookup is not repeated on every click.
@@ -1015,14 +1219,21 @@
         // table when it has one, else the table's default zoom target. Either way
         // the window is started with an equal-query on the table's key column
         // (TableName_ID). Degrades to a toast so a click never throws.
-        function openRecord(tableName, recordId) {
+        function openRecord(tableName, recordId, isSOTrx) {
             if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
             try {
-                var windowId = resolveWindowIdByName(WINDOW_NAME_BY_TABLE[tableName]);
+                // A sales-transaction record takes its own window name where the
+                // table has one; everything else takes the plain mapping.
+                var windowName = (isSOTrx && WINDOW_NAME_BY_TABLE_SOTRX[tableName])
+                    ? WINDOW_NAME_BY_TABLE_SOTRX[tableName]
+                    : WINDOW_NAME_BY_TABLE[tableName];
+                var windowId = resolveWindowIdByName(windowName);
 
                 if (windowId <= 0 &&
                     VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
-                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, false) || 0;
+                    // The 4th arg (IsSOTrx) picks the sales vs purchase window for
+                    // a dual-purpose table like C_Order.
+                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, !!isSOTrx) || 0;
                 }
                 if (windowId > 0 && VIS.viewManager &&
                     typeof VIS.viewManager.startWindow === "function") {
@@ -1038,7 +1249,8 @@
             // Open a linked record (the contract reference) from its header field.
             $root.on("click", "[data-elc-open-table]", function () {
                 openRecord($(this).attr("data-elc-open-table"),
-                           $(this).attr("data-elc-open-id"));
+                           $(this).attr("data-elc-open-id"),
+                           $(this).attr("data-elc-open-sotrx") === "Y");
             });
 
             // The amount takes digits and a decimal separator and nothing else —
@@ -1095,7 +1307,7 @@
         }
 
         function toast(message, isError) {
-            var $t = $('<div class="MPC-vaselc-toast"></div>')
+            var $t = $('<div class="vas_167-toast"></div>')
                 .addClass(isError ? "err" : "ok").text(message);
             $root.append($t);
             setTimeout(function () { $t.addClass("show"); }, 10);
@@ -1151,7 +1363,7 @@
         }
 
         function iconButton(icon, kind, label) {
-            var $b = $('<button type="button" class="MPC-vaselc-icBtn"></button>')
+            var $b = $('<button type="button" class="vas_167-icBtn"></button>')
                 .addClass("is-" + kind)
                 .attr("title", label)
                 .attr("aria-label", label);
@@ -1166,6 +1378,8 @@
             check: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
             checkCircle: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>',
             chevDown: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+            chevLeft: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
+            chevRight: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
             info: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
             alert: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01"/></svg>',
             coins: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5"/><path d="M14.5 4.2a5 5 0 0 1 0 15.6"/><path d="M7 18.7a5 5 0 0 0 6 0"/></svg>',
@@ -1173,7 +1387,7 @@
         };
 
         function svgIcon(name) {
-            var $wrap = $('<span class="MPC-vaselc-ic"></span>');
+            var $wrap = $('<span class="vas_167-ic"></span>');
             $wrap[0].innerHTML = SVG_ICONS[name] || "";
             return $wrap;
         }
@@ -1224,11 +1438,21 @@
             this.table_ID = curTab.getAD_Table_ID();
         }
         this.init();
+        // Watch the tab itself so New Record / Copy Record (neither of which
+        // reliably calls refreshPanelData) still empty the panel.
+        if (curTab && typeof curTab.addDataStatusListener === "function") {
+            try { curTab.addDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
     };
 
     /* Update tab panel based on selected record */
     VAS.VAS_167_PurchaseOrderLandedCost.prototype.refreshPanelData = function (recordID, selectedRow) {
-        if (selectedRow == undefined || recordID <= 0) {
+        // The insert check is what makes New Record / Copy Record behave:
+        // the id handed in for an unsaved row can still be the previously
+        // selected (or copied-from) record's, so the tab's own insert state
+        // decides, not the id.
+        if (selectedRow == undefined || recordID <= 0 || isTabInserting(this.curTab)) {
+            this.record_ID = 0;
             this.clear();
             return;
         }
@@ -1244,6 +1468,10 @@
 
     /* Release variables from memory */
     VAS.VAS_167_PurchaseOrderLandedCost.prototype.dispose = function () {
+        if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
+            try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
+        this.tabDataListener = null;
         this.record_ID = 0;
         this.table_ID = 0;
         this.windowNo = 0;

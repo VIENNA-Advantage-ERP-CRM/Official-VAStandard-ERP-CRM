@@ -220,6 +220,7 @@ namespace VASLogic.Models
             result.EligibleLineCount = GetEligibleLineCount(C_Order_ID);
 
             // ----- Origin references the order was raised from -----
+            LoadSalesOrderReference(C_Order_ID, result);
             LoadContractReference(C_Order_ID, result);
             LoadRfqReference(C_Order_ID, result);
             LoadProjectReference(C_Order_ID, result);
@@ -798,6 +799,45 @@ namespace VASLogic.Models
         /// instead — which is why this runs after <see cref="LoadRfqReference"/>.
         /// Non-fatal: a failure just leaves the panel without the reference.
         /// </summary>
+        // VAI163 2026-08-05: added LoadSalesOrderReference so the panel can name
+        // and open the sales order behind a PO raised from one.
+
+        /// <summary>
+        /// Reads the sales order this purchase order was raised against
+        /// (C_Order.Ref_Order_ID), so the panel can name it and open it.
+        ///
+        /// Both sides live in C_Order, so the referenced row is required to be a
+        /// sales transaction — a Ref_Order_ID pointing at anything else is not a
+        /// sales-order origin and is left alone. Non-fatal: a failure just leaves
+        /// the panel without the reference.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected purchase order id.</param>
+        /// <param name="d">Panel payload being populated.</param>
+        private void LoadSalesOrderReference(int C_Order_ID, LandedCostPanelData d)
+        {
+            try
+            {
+                string sql = @"SELECT so.C_Order_ID  AS SalesOrderId,
+                                      so.DocumentNo  AS SalesOrderNo
+                                 FROM C_Order o
+                                 INNER JOIN C_Order so ON (so.C_Order_ID = o.Ref_Order_ID)
+                                WHERE o.C_Order_ID = @C_Order_ID
+                                  AND NVL(so.IsSOTrx, 'N') = 'Y'
+                                  AND NVL(so.IsActive, 'Y') = 'Y'";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow r0 = ds.Tables[0].Rows[0];
+                    d.SalesOrderId = Util.GetValueOfInt(r0["SalesOrderId"]);
+                    d.SalesOrderNo = Util.GetValueOfString(r0["SalesOrderNo"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadSalesOrderReference (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
         private void LoadRequisitionReference(int C_Order_ID, LandedCostPanelData d)
         {
             try
@@ -1441,6 +1481,11 @@ namespace VASLogic.Models
             public int       RequisitionId       { get; set; }
             /// <summary>That requisition's DocumentNo.</summary>
             public string    RequisitionNo       { get; set; }
+            /// <summary>Sales order the PO was raised against
+            /// (C_Order.Ref_Order_ID); 0 when there is none.</summary>
+            public int       SalesOrderId        { get; set; }
+            /// <summary>That sales order's DocumentNo.</summary>
+            public string    SalesOrderNo        { get; set; }
 
             // ----- Document currency -----
             public int    DocumentCurrencyId        { get; set; }

@@ -255,18 +255,23 @@ namespace VASLogic.Models
                            MatchCandidates.Due_Date,
                            MatchCandidates.Doc_Base_Type,
                            MatchCandidates.Open_Amount_Pay,
-                           ABS(MatchCandidates.Payment_Amount - MatchCandidates.Open_Amount_Pay) AS Difference_Amount,
+                           ABS(ABS(MatchCandidates.Payment_Amount) - CASE WHEN MatchCandidates.Doc_Base_Type = 'API' THEN MatchCandidates.Open_Amount_Pay 
+                           else -1 * MatchCandidates.Open_Amount_Pay END) AS Difference_Amount,
                            CASE
-                               WHEN ABS(MatchCandidates.Payment_Amount - MatchCandidates.Open_Amount_Pay) <= " + AMOUNT_TOLERANCE.ToString(CultureInfo.InvariantCulture) + @" THEN 'HIGH'
+                               WHEN ABS(ABS(MatchCandidates.Payment_Amount) - CASE WHEN MatchCandidates.Doc_Base_Type = 'API' THEN MatchCandidates.Open_Amount_Pay 
+                           else -1 * MatchCandidates.Open_Amount_Pay END) <= " + AMOUNT_TOLERANCE.ToString(CultureInfo.InvariantCulture) + @" THEN 'HIGH'
                                WHEN MatchCandidates.Open_Amount_Pay <> 0
-                                    AND ABS(MatchCandidates.Payment_Amount - MatchCandidates.Open_Amount_Pay) * 100 / ABS(MatchCandidates.Open_Amount_Pay) <= " + HIGH_PCT_THRESHOLD.ToString(CultureInfo.InvariantCulture) + @" THEN 'HIGH'
+                                    AND ABS(ABS(MatchCandidates.Payment_Amount) - CASE WHEN MatchCandidates.Doc_Base_Type = 'API' THEN MatchCandidates.Open_Amount_Pay 
+                           else -1 * MatchCandidates.Open_Amount_Pay END) * 100 / ABS(MatchCandidates.Open_Amount_Pay) <= " + HIGH_PCT_THRESHOLD.ToString(CultureInfo.InvariantCulture) + @" THEN 'HIGH'
                                WHEN MatchCandidates.Open_Amount_Pay <> 0
-                                    AND ABS(MatchCandidates.Payment_Amount - MatchCandidates.Open_Amount_Pay) * 100 / ABS(MatchCandidates.Open_Amount_Pay) <= " + REVIEW_PCT_THRESHOLD.ToString(CultureInfo.InvariantCulture) + @" THEN 'REVIEW'
+                                    AND ABS(ABS(MatchCandidates.Payment_Amount) - CASE WHEN MatchCandidates.Doc_Base_Type = 'API' THEN MatchCandidates.Open_Amount_Pay 
+                           else -1 * MatchCandidates.Open_Amount_Pay END) * 100 / ABS(MatchCandidates.Open_Amount_Pay) <= " + REVIEW_PCT_THRESHOLD.ToString(CultureInfo.InvariantCulture) + @" THEN 'REVIEW'
                                ELSE 'LOW'
                            END AS Match_Confidence,
                            ROW_NUMBER() OVER (
                                PARTITION BY MatchCandidates.Payment_ID
-                               ORDER BY ABS(MatchCandidates.Payment_Amount - MatchCandidates.Open_Amount_Pay), MatchCandidates.Due_Date, MatchCandidates.Invoice_No, MatchCandidates.PaySchedule_ID
+                               ORDER BY ABS(MatchCandidates.Payment_Amount - CASE WHEN MatchCandidates.Doc_Base_Type = 'API' THEN MatchCandidates.Open_Amount_Pay 
+                           else -1 * MatchCandidates.Open_Amount_Pay END), MatchCandidates.Due_Date, MatchCandidates.Invoice_No, MatchCandidates.PaySchedule_ID
                            ) AS Match_Rank
                     FROM MatchCandidates
                 )
