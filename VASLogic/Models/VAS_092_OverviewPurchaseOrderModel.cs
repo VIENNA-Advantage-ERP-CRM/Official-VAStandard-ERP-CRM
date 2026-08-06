@@ -211,6 +211,14 @@
 ///                          window NAME for the panel's record-open path, so a
 ///                          record whose screen is not its table's default zoom
 ///                          target (the RFQ -> VAS_RFQ window) can be opened.
+///   VAI163   2026-08-05  - Generated From gained the MRP plan origin
+///                          (LoadPlanOrigin / VAMRP_PlanRun_ID): a PO raised by
+///                          a planning run named its plan nowhere, so it fell
+///                          through to the "Manual" chip. The id column is
+///                          looked for on C_Order then C_OrderLine and the plan
+///                          run's identifier column is chosen from whichever the
+///                          schema has, all AD_Column-guarded — a deployment
+///                          without VAMRP behaves exactly as before.
 /// </summary>
 
 using System;
@@ -1047,6 +1055,9 @@ namespace VASLogic.Models
                     _log.Severe("LoadOrigins/BlanketOrder (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
                 }
             }
+
+            // --- MRP plan run (module-optional VAMRP_PlanRun_ID). ---
+            LoadPlanOrigin(C_Order_ID, d);
         }
 
         /// <summary>
@@ -1419,6 +1430,101 @@ namespace VASLogic.Models
         /// AD_Column dictionary. A DB issue degrades to "absent" (false) so a
         /// lookup failure never breaks the overview.
         /// </summary>
+        /// <summary>
+        /// Returns the first of the candidate columns that exists on the table, or
+        /// an empty string when the table has none of them. Used where an optional
+        /// module names the same concept differently across its revisions.
+        /// </summary>
+        private string FirstExistingColumn(string tableName, string[] candidates)
+        {
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                if (ColumnExists(tableName, candidates[i])) return candidates[i];
+            }
+            return "";
+        }
+
+        /// <summary>
+        /// Fills PlanRunId / PlanRunNo / PlanRunCount from the MRP plan run that
+        /// generated this order (VAMRP_PlanRun_ID), so a PO raised by a planning
+        /// run names its plan in the Generated From strip instead of reading
+        /// "Manual".
+        ///
+        /// VAMRP is an optional module and is not part of this solution, so the
+        /// tables are reached through plain SQL under AD_Column guards: the id
+        /// column is looked for on C_Order first and on C_OrderLine second (the
+        /// module stamps it in different places across revisions), and without
+        /// either this is a no-op that leaves the strip exactly as it was.
+        ///
+        /// Read in two independent steps, like the contract origin above: the id
+        /// comes from the order alone, so an unreadable VAMRP_PlanRun table cannot
+        /// suppress the chip — it just renders from the id.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected purchase order id.</param>
+        /// <param name="d">Overview payload being populated.</param>
+        private void LoadPlanOrigin(int C_Order_ID, PurchaseOrderOverviewData d)
+        {
+            bool onHeader = ColumnExists("C_Order", "VAMRP_PlanRun_ID");
+            bool onLine   = ColumnExists("C_OrderLine", "VAMRP_PlanRun_ID");
+            if (!onHeader && !onLine) return;
+
+            // --- Step 1: the plan run id(s) the order carries. ---
+            try
+            {
+                string sql = onHeader
+                    ? @"SELECT DISTINCT o.VAMRP_PlanRun_ID AS PlanRunId
+                          FROM C_Order o
+                         WHERE o.C_Order_ID = @C_Order_ID
+                           AND NVL(o.VAMRP_PlanRun_ID, 0) > 0"
+                    : @"SELECT DISTINCT ol.VAMRP_PlanRun_ID AS PlanRunId
+                          FROM C_OrderLine ol
+                         WHERE ol.C_Order_ID = @C_Order_ID
+                           AND NVL(ol.IsActive, 'Y') = 'Y'
+                           AND NVL(ol.VAMRP_PlanRun_ID, 0) > 0";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                d.PlanRunId    = Util.GetValueOfInt(ds.Tables[0].Rows[0]["PlanRunId"]);
+                // Several plan runs can feed one order when the id sits on the
+                // lines; the panel names the first and hints the rest with "+n".
+                d.PlanRunCount = ds.Tables[0].Rows.Count;
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadPlanOrigin/PlanRunId (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                return;
+            }
+
+            if (d.PlanRunId <= 0) return;
+
+            // --- Step 2: the plan run's human identifier, whichever column this
+            // revision of the module names it with. ---
+            try
+            {
+                string noCol = FirstExistingColumn("VAMRP_PlanRun", new string[]
+                {
+                    "DocumentNo", "Name", "Value", "Description"
+                });
+                if (string.IsNullOrEmpty(noCol)) return;
+
+                string sql = "SELECT pr." + noCol + @" AS PlanRunNo
+                                FROM VAMRP_PlanRun pr
+                               WHERE pr.VAMRP_PlanRun_ID = @VAMRP_PlanRun_ID";
+                SqlParameter[] p = new SqlParameter[]
+                {
+                    new SqlParameter("@VAMRP_PlanRun_ID", d.PlanRunId)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, p, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    d.PlanRunNo = Util.GetValueOfString(ds.Tables[0].Rows[0]["PlanRunNo"]);
+            }
+            catch (Exception ex)
+            {
+                // The number is a nicety; the chip still shows the id.
+                _log.Severe("LoadPlanOrigin/PlanRunNo (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
         private bool ColumnExists(string tableName, string columnName)
         {
             try
@@ -2735,6 +2841,10 @@ namespace VASLogic.Models
             public int       RequisitionCount     { get; set; }   // distinct requisitions
             public int       ContractMasterId     { get; set; }   // C_Order.VAS_ContractMaster_ID
             public string    ContractMasterNo     { get; set; }
+            // MRP plan run the order was generated by (VAMRP_PlanRun_ID).
+            public int       PlanRunId            { get; set; }
+            public string    PlanRunNo            { get; set; }
+            public int       PlanRunCount         { get; set; }   // distinct plan runs
             /// <summary>True when the requisition was reached through the RFQ
             /// (Requisition -> RFQ -> PO) rather than raised into the PO directly.</summary>
             public bool      IsRequisitionViaRfq  { get; set; }

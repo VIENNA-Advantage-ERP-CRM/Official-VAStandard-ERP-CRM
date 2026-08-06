@@ -2,7 +2,7 @@
  * Module Name : VAS
  * Purpose     : Styles for the Purchase Requisition overview tab panel
  *               (VAS.VAS_098_PurchaseRequisition). All classes are
- *               MPC-prefixed (MPC-vasrq-*) and scoped under the panel root
+ *               panel-prefixed (vas_098-*) and scoped under the panel root
  *               to avoid global collisions. Ports the attached
  *               requisition-window reference design (glass/white surfaces,
  *               soft blue borders, chips with leading dots, stat cards with
@@ -25,17 +25,17 @@
  *                        panel at any browser zoom (80% included) — the old
  *                        900px / 560px viewport breakpoints never matched there.
  *   VAI163   2026-07-28  People block gains a heading and a per-name role caption
- *                        (.MPC-vasrq-peopleLbl / -personRole / -personName). Line
+ *                        (.vas_098-peopleLbl / -personRole / -personName). Line
  *                        items gain the Attribute Set Instance sub-line
- *                        (.MPC-vasrq-itattr) and ellipsis on the name / key cells.
+ *                        (.vas_098-itattr) and ellipsis on the name / key cells.
  *   VAI163   2026-07-28  Items / Activity / Notes tab bar replaced by stacked
- *                        sections (.MPC-vasrq-lowerhead / -lowersec); the tab
+ *                        sections (.vas_098-lowerhead / -lowersec); the tab
  *                        styles and the count badge are gone. Product-category
- *                        chip replaced by a plain UOM cell (.MPC-vasrq-uom).
+ *                        chip replaced by a plain UOM cell (.vas_098-uom).
  *   VAI163   2026-07-28  Priority tones now match the requisition window (urgent
  *                        red / high orange / medium blue / low green / minor
  *                        grey). Convert strip wraps instead of overflowing the
- *                        panel. Added the line-items pager (.MPC-vasrq-pager) and
+ *                        panel. Added the line-items pager (.vas_098-pager) and
  *                        the PO / GRN activity badges.
  *   VAI163   2026-07-31  Header aligned to the VAS_092 Purchase Order Overview
  *                        standard: details card is 40%/1fr (was 1.4fr/1fr) and
@@ -43,9 +43,11 @@
  *                        instead of a single tall stack, collapsing to one
  *                        column under 460px. Field values wrap rather than
  *                        ellipsis-truncate now that the column is narrower.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vasrq- -> vas_098- so the panel's
+ *                        styles cannot collide with another panel's.
  ***********************************************************/
 
-.MPC-vasrq-root {
+.vas_098-root {
     /* Palette (from the reference design) */
     --rq-primary:#0083DA; --rq-action:#1F83FF; --rq-link:#106AB0;
     --rq-faint-blue:#EEF6FF; --rq-divider:#EDF2F6; --rq-border:#E4EDF4;
@@ -75,219 +77,219 @@
     font-family: Roboto, "Segoe UI", Arial, sans-serif;
     box-sizing: border-box;
 }
-.MPC-vasrq-root * { box-sizing: border-box; }
+.vas_098-root * { box-sizing: border-box; }
 
-.MPC-vasrq-body { padding: 16px 20px 18px; display: flex; flex-direction: column; }
+.vas_098-body { padding: 16px 20px 18px; display: flex; flex-direction: column; }
 
-.MPC-vasrq-empty { padding: 40px 18px; text-align: center; color: var(--rq-text-muted); font-size: 14px; }
-.MPC-vasrq-na { color: var(--rq-text-muted); }
+.vas_098-empty { padding: 40px 18px; text-align: center; color: var(--rq-text-muted); font-size: 14px; }
+.vas_098-na { color: var(--rq-text-muted); }
 
 /* ---------- Tags / pills ---------- */
-.MPC-vasrq-tag { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:4px 9px;
+.vas_098-tag { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:4px 9px;
     font-size:11px; font-weight:700; line-height:1; white-space:nowrap }
-.MPC-vasrq-tag .MPC-vasrq-dot { width:6px; height:6px; border-radius:50% }
-.MPC-vasrq-tag.sent{background:var(--rq-sent-bg);color:var(--rq-sent-tx)} .MPC-vasrq-tag.sent .MPC-vasrq-dot{background:var(--rq-sent-tx)}
-.MPC-vasrq-tag.approved{background:var(--rq-success-bg);color:var(--rq-success-tx)} .MPC-vasrq-tag.approved .MPC-vasrq-dot{background:var(--rq-success-tx)}
-.MPC-vasrq-tag.draft{background:var(--rq-draft-bg);color:var(--rq-draft-tx)} .MPC-vasrq-tag.draft .MPC-vasrq-dot{background:var(--rq-draft-tx)}
-.MPC-vasrq-tag.partial{background:var(--rq-warn-bg);color:var(--rq-warn-tx)} .MPC-vasrq-tag.partial .MPC-vasrq-dot{background:var(--rq-warn-tx)}
-.MPC-vasrq-tag.cancelled{background:var(--rq-danger-bg);color:var(--rq-danger-tx)} .MPC-vasrq-tag.cancelled .MPC-vasrq-dot{background:var(--rq-danger-tx)}
-.MPC-vasrq-tag.mwo{background:#EFEAFF;color:#5F4AA6} .MPC-vasrq-tag.mwo .MPC-vasrq-dot{background:#5F4AA6}
+.vas_098-tag .vas_098-dot { width:6px; height:6px; border-radius:50% }
+.vas_098-tag.sent{background:var(--rq-sent-bg);color:var(--rq-sent-tx)} .vas_098-tag.sent .vas_098-dot{background:var(--rq-sent-tx)}
+.vas_098-tag.approved{background:var(--rq-success-bg);color:var(--rq-success-tx)} .vas_098-tag.approved .vas_098-dot{background:var(--rq-success-tx)}
+.vas_098-tag.draft{background:var(--rq-draft-bg);color:var(--rq-draft-tx)} .vas_098-tag.draft .vas_098-dot{background:var(--rq-draft-tx)}
+.vas_098-tag.partial{background:var(--rq-warn-bg);color:var(--rq-warn-tx)} .vas_098-tag.partial .vas_098-dot{background:var(--rq-warn-tx)}
+.vas_098-tag.cancelled{background:var(--rq-danger-bg);color:var(--rq-danger-tx)} .vas_098-tag.cancelled .vas_098-dot{background:var(--rq-danger-tx)}
+.vas_098-tag.mwo{background:#EFEAFF;color:#5F4AA6} .vas_098-tag.mwo .vas_098-dot{background:#5F4AA6}
 
-.MPC-vasrq-ic { display:inline-flex; align-items:center; flex:none }
-.MPC-vasrq-ic svg { display:block }
+.vas_098-ic { display:inline-flex; align-items:center; flex:none }
+.vas_098-ic svg { display:block }
 
 /* ---------- Priority pill ---------- */
 /* Tones mirror the colours the requisition window uses for PriorityRule:
    urgent red, high orange, medium blue, low green, minor grey. */
-.MPC-vasrq-prio { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:5px 11px; font-size:12px; font-weight:700; line-height:1 }
-.MPC-vasrq-prio.urgent{background:#FAD7D7;color:#B44045}
-.MPC-vasrq-prio.high{background:#FCE3D2;color:#A8430F}
-.MPC-vasrq-prio.med{background:#E4F0FF;color:#0E5DA8}
-.MPC-vasrq-prio.low{background:#CCEFDD;color:#0C5D38}
-.MPC-vasrq-prio.minor{background:#E9EDF1;color:#5A6B79}
+.vas_098-prio { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:5px 11px; font-size:12px; font-weight:700; line-height:1 }
+.vas_098-prio.urgent{background:#FAD7D7;color:#B44045}
+.vas_098-prio.high{background:#FCE3D2;color:#A8430F}
+.vas_098-prio.med{background:#E4F0FF;color:#0E5DA8}
+.vas_098-prio.low{background:#CCEFDD;color:#0C5D38}
+.vas_098-prio.minor{background:#E9EDF1;color:#5A6B79}
 
 /* ---------- Header — title strip ---------- */
 /* Untinted strip carrying the title + subtitle and the priority / type /
    status pills, matching VAS_106_OverviewSalesOrder. Status reads from the
    pills on the right rather than a banner tint. */
-.MPC-vasrq-hdr { border-radius:14px; padding:14px 16px }
-.MPC-vasrq-hdrTop { display:flex; align-items:flex-start; justify-content:space-between; gap:16px }
-.MPC-vasrq-hdrTitleWrap { min-width:0 }
+.vas_098-hdr { border-radius:14px; padding:14px 16px }
+.vas_098-hdrTop { display:flex; align-items:flex-start; justify-content:space-between; gap:16px }
+.vas_098-hdrTitleWrap { min-width:0 }
 /* Panel heading, on the standard header scale (VAS_092: 1.25em of a ~16px body). */
-.MPC-vasrq-hdrTitle { font-size:20px; font-weight:700; color:var(--rq-text); line-height:1.2 }
-.MPC-vasrq-hdrSub { font-size:12px; color:var(--rq-text-2); margin-top:4px }
-.MPC-vasrq-hdrPills { flex:none; display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px }
+.vas_098-hdrTitle { font-size:20px; font-weight:700; color:var(--rq-text); line-height:1.2 }
+.vas_098-hdrSub { font-size:12px; color:var(--rq-text-2); margin-top:4px }
+.vas_098-hdrPills { flex:none; display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px }
 
 /* ---------- Header — details card (Source Warehouse | fields) ---------- */
 /* Identity takes 40% of the card; the fields take the rest and run two across,
    so short fields sit in rows instead of stacking into a tall column that
    leaves the identity half empty. Flat card — no shadow — on the standard
    12px radius, matching every other overview panel. */
-.MPC-vasrq-hdrCard { display:grid; grid-template-columns:40% 1fr; gap:14px 28px;
+.vas_098-hdrCard { display:grid; grid-template-columns:40% 1fr; gap:14px 28px;
     border:1px solid var(--rq-border); border-radius:12px; background:#fff;
     padding:14px 16px; margin:10px 0 12px }
-.MPC-vasrq-hdrColL { min-width:0; border-right:1px solid var(--rq-divider); padding-right:20px }
-.MPC-vasrq-hdrColR { min-width:0; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
+.vas_098-hdrColL { min-width:0; border-right:1px solid var(--rq-divider); padding-right:20px }
+.vas_098-hdrColR { min-width:0; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:12px 24px; align-content:start }
-.MPC-vasrq-fLabel { font-size:10.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted); line-height:1.3 }
-.MPC-vasrq-fVal { font-size:13px; font-weight:700; color:var(--rq-text); line-height:1.35; margin-top:2px;
+.vas_098-fLabel { font-size:10.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted); line-height:1.3 }
+.vas_098-fVal { font-size:13px; font-weight:700; color:var(--rq-text); line-height:1.35; margin-top:2px;
     overflow-wrap:break-word }
-.MPC-vasrq-srcName { font-size:16px; font-weight:700; color:var(--rq-text); margin-top:3px }
-/* .MPC-vasrq-srcRoute removed with the duplicated requester-warehouse line. */
-.MPC-vasrq-peopleLbl { margin-top:11px }
-.MPC-vasrq-srcPeople { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12.5px; color:var(--rq-text); margin-top:4px }
-.MPC-vasrq-personBit { display:inline-flex; align-items:baseline; gap:7px; min-width:0 }
-.MPC-vasrq-personBit .MPC-vasrq-ic { color:var(--rq-primary); align-self:center }
+.vas_098-srcName { font-size:16px; font-weight:700; color:var(--rq-text); margin-top:3px }
+/* .vas_098-srcRoute removed with the duplicated requester-warehouse line. */
+.vas_098-peopleLbl { margin-top:11px }
+.vas_098-srcPeople { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12.5px; color:var(--rq-text); margin-top:4px }
+.vas_098-personBit { display:inline-flex; align-items:baseline; gap:7px; min-width:0 }
+.vas_098-personBit .vas_098-ic { color:var(--rq-primary); align-self:center }
 /* Role reads as a quiet caption; the name carries the weight. */
-.MPC-vasrq-personRole { color:var(--rq-text-muted); font-size:11px; font-weight:700;
+.vas_098-personRole { color:var(--rq-text-muted); font-size:11px; font-weight:700;
     letter-spacing:.3px; text-transform:uppercase; white-space:nowrap; flex:none }
-.MPC-vasrq-personName { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.MPC-vasrq-hdrField { min-width:0 }
+.vas_098-personName { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.vas_098-hdrField { min-width:0 }
 
 /* ---------- Convert strip ---------- */
 /* The strip must wrap inside the panel. It used to be a single non-wrapping flex
    row with flex:none actions, so three buttons that cannot shrink pushed straight
    past the panel's right edge. */
-.MPC-vasrq-convert { display:flex; align-items:center; justify-content:space-between;
+.vas_098-convert { display:flex; align-items:center; justify-content:space-between;
     gap:10px 14px; flex-wrap:wrap;
     background:linear-gradient(180deg,rgba(230,243,252,0.55),rgba(245,250,253,0.7));
     border:1px solid var(--rq-border); border-radius:12px; padding:10px 14px; margin-bottom:13px }
-.MPC-vasrq-cvnote { font-size:12.5px; color:var(--rq-text-2); display:flex; align-items:center; gap:7px;
+.vas_098-cvnote { font-size:12.5px; color:var(--rq-text-2); display:flex; align-items:center; gap:7px;
     min-width:0; flex:1 1 auto }
-.MPC-vasrq-cvnote .MPC-vasrq-ok { color:var(--rq-success-tx); display:flex; flex:none }
-.MPC-vasrq-cvactions { display:flex; gap:9px; flex:0 1 auto; flex-wrap:wrap; justify-content:flex-end; min-width:0 }
-.MPC-vasrq-btn { height:34px; padding:0 15px; border-radius:999px; font-size:13px; font-weight:500; font-family:inherit;
+.vas_098-cvnote .vas_098-ok { color:var(--rq-success-tx); display:flex; flex:none }
+.vas_098-cvactions { display:flex; gap:9px; flex:0 1 auto; flex-wrap:wrap; justify-content:flex-end; min-width:0 }
+.vas_098-btn { height:34px; padding:0 15px; border-radius:999px; font-size:13px; font-weight:500; font-family:inherit;
     cursor:pointer; display:inline-flex; align-items:center; gap:7px; white-space:nowrap; max-width:100% }
-.MPC-vasrq-btn.primary { background:var(--rq-action); color:#fff; border:none }
-.MPC-vasrq-btn.primary:hover:not(:disabled) { background:#0069AE }
-.MPC-vasrq-btn.secondary { background:#fff; color:var(--rq-primary); border:1px solid var(--rq-action) }
-.MPC-vasrq-btn.secondary:hover:not(:disabled) { background:var(--rq-faint-blue) }
-.MPC-vasrq-btn:disabled { opacity:.45; cursor:not-allowed }
+.vas_098-btn.primary { background:var(--rq-action); color:#fff; border:none }
+.vas_098-btn.primary:hover:not(:disabled) { background:#0069AE }
+.vas_098-btn.secondary { background:#fff; color:var(--rq-primary); border:1px solid var(--rq-action) }
+.vas_098-btn.secondary:hover:not(:disabled) { background:var(--rq-faint-blue) }
+.vas_098-btn:disabled { opacity:.45; cursor:not-allowed }
 
 /* ---------- Stat strip ---------- */
-.MPC-vasrq-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px }
-.MPC-vasrq-stat { position:relative; background:rgba(255,255,255,0.85); border:1px solid var(--rq-border);
+.vas_098-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px }
+.vas_098-stat { position:relative; background:rgba(255,255,255,0.85); border:1px solid var(--rq-border);
     border-radius:11px; padding:10px 13px 10px 15px; overflow:hidden; min-width:0 }
-.MPC-vasrq-stat::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px }
-.MPC-vasrq-stat.a-blue::before { background:var(--rq-action) }
-.MPC-vasrq-stat.a-violet::before { background:#8B7CFF }
-.MPC-vasrq-stat.a-green::before { background:#20A464 }
-.MPC-vasrq-stat.a-amber::before { background:#D78B10 }
-.MPC-vasrq-stat.breach { background:linear-gradient(180deg,#FFF1F0,#FFF9F9) }
-.MPC-vasrq-stat.breach::before { background:var(--rq-danger) }
-.MPC-vasrq-scap { font-size:10.5px; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted) }
-.MPC-vasrq-sval { font-size:19px; font-weight:700; color:var(--rq-text); margin-top:5px; line-height:1.1;
+.vas_098-stat::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px }
+.vas_098-stat.a-blue::before { background:var(--rq-action) }
+.vas_098-stat.a-violet::before { background:#8B7CFF }
+.vas_098-stat.a-green::before { background:#20A464 }
+.vas_098-stat.a-amber::before { background:#D78B10 }
+.vas_098-stat.breach { background:linear-gradient(180deg,#FFF1F0,#FFF9F9) }
+.vas_098-stat.breach::before { background:var(--rq-danger) }
+.vas_098-scap { font-size:10.5px; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted) }
+.vas_098-sval { font-size:19px; font-weight:700; color:var(--rq-text); margin-top:5px; line-height:1.1;
     display:flex; align-items:center; gap:7px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.MPC-vasrq-ssub { font-size:11.5px; color:var(--rq-text-2); margin-top:3px }
-.MPC-vasrq-ssub.breach { color:#A33F3F; font-weight:700 }
-.MPC-vasrq-breachic { color:var(--rq-danger); display:flex }
+.vas_098-ssub { font-size:11.5px; color:var(--rq-text-2); margin-top:3px }
+.vas_098-ssub.breach { color:#A33F3F; font-weight:700 }
+.vas_098-breachic { color:var(--rq-danger); display:flex }
 
 /* ---------- Section head ---------- */
-.MPC-vasrq-sechead { display:flex; align-items:center; justify-content:space-between; margin:4px 0 8px }
-.MPC-vasrq-sechead h2 { font-size:15px; font-weight:700; color:var(--rq-text); margin:0 }
-.MPC-vasrq-secright { font-size:12.5px; color:var(--rq-text-2) }
+.vas_098-sechead { display:flex; align-items:center; justify-content:space-between; margin:4px 0 8px }
+.vas_098-sechead h2 { font-size:15px; font-weight:700; color:var(--rq-text); margin:0 }
+.vas_098-secright { font-size:12.5px; color:var(--rq-text-2) }
 
 /* ---------- Stepper ---------- */
-.MPC-vasrq-stepper { display:flex; background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px;
+.vas_098-stepper { display:flex; background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px;
     padding:15px 12px 11px; box-shadow:var(--rq-widget-shadow); margin-bottom:14px }
-.MPC-vasrq-step { flex:1; position:relative; display:flex; flex-direction:column; align-items:center; text-align:center;
+.vas_098-step { flex:1; position:relative; display:flex; flex-direction:column; align-items:center; text-align:center;
     padding:0 2px; --nb:#E7ECF1; --nf:#5A6B79; --ln:#E1EAF2 }
-.MPC-vasrq-step.c1{--nb:#E4E9EF;--nf:#5A6B79}
-.MPC-vasrq-step.c2{--nb:#D6F0E2;--nf:#0C5D38}
-.MPC-vasrq-step.c3{--nb:#D6EBFF;--nf:#0E5DA8}
-.MPC-vasrq-step.c4{--nb:#E8E1FF;--nf:#5F4AA6}
-.MPC-vasrq-step.c5{--nb:#FCE6C9;--nf:#9A6500}
-.MPC-vasrq-step.c6{--nb:#D4F1EC;--nf:#0B7A6B}
-.MPC-vasrq-step::before { content:''; position:absolute; top:11px; left:-50%; width:100%; height:3px; background:var(--ln); z-index:1 }
-.MPC-vasrq-step:first-child::before { display:none }
-.MPC-vasrq-step.done::before, .MPC-vasrq-step.active::before { background:#9ED1FF }
-.MPC-vasrq-node { width:24px; height:24px; border-radius:50%; z-index:2; display:flex; align-items:center; justify-content:center;
+.vas_098-step.c1{--nb:#E4E9EF;--nf:#5A6B79}
+.vas_098-step.c2{--nb:#D6F0E2;--nf:#0C5D38}
+.vas_098-step.c3{--nb:#D6EBFF;--nf:#0E5DA8}
+.vas_098-step.c4{--nb:#E8E1FF;--nf:#5F4AA6}
+.vas_098-step.c5{--nb:#FCE6C9;--nf:#9A6500}
+.vas_098-step.c6{--nb:#D4F1EC;--nf:#0B7A6B}
+.vas_098-step::before { content:''; position:absolute; top:11px; left:-50%; width:100%; height:3px; background:var(--ln); z-index:1 }
+.vas_098-step:first-child::before { display:none }
+.vas_098-step.done::before, .vas_098-step.active::before { background:#9ED1FF }
+.vas_098-node { width:24px; height:24px; border-radius:50%; z-index:2; display:flex; align-items:center; justify-content:center;
     font-size:11px; font-weight:700; background:var(--nb); color:var(--nf) }
-.MPC-vasrq-step.active .MPC-vasrq-node { border:2px solid var(--nf); box-shadow:0 0 0 4px rgba(15,61,97,0.06) }
-.MPC-vasrq-step.pending .MPC-vasrq-node { opacity:.8 }
-.MPC-vasrq-slabel { margin-top:9px; font-size:11.5px; font-weight:500; color:var(--rq-text-2); line-height:1.2 }
-.MPC-vasrq-step.done .MPC-vasrq-slabel, .MPC-vasrq-step.active .MPC-vasrq-slabel { color:var(--rq-text); font-weight:700 }
-.MPC-vasrq-ssub2 { margin-top:2px; font-size:10.5px; color:var(--rq-text-muted) }
-.MPC-vasrq-step.active .MPC-vasrq-ssub2 { color:var(--nf); font-weight:700 }
+.vas_098-step.active .vas_098-node { border:2px solid var(--nf); box-shadow:0 0 0 4px rgba(15,61,97,0.06) }
+.vas_098-step.pending .vas_098-node { opacity:.8 }
+.vas_098-slabel { margin-top:9px; font-size:11.5px; font-weight:500; color:var(--rq-text-2); line-height:1.2 }
+.vas_098-step.done .vas_098-slabel, .vas_098-step.active .vas_098-slabel { color:var(--rq-text); font-weight:700 }
+.vas_098-ssub2 { margin-top:2px; font-size:10.5px; color:var(--rq-text-muted) }
+.vas_098-step.active .vas_098-ssub2 { color:var(--nf); font-weight:700 }
 
 /* ---------- Lower region (Items / Activity / Notes, stacked) ---------- */
 /* Replaced the Items / Activity / Notes tab bar: all three are sections down the
    panel now, so Activity and Notes are visible without a click. */
-.MPC-vasrq-lowerhead { margin-top:16px }
-.MPC-vasrq-lowersec { margin-bottom:2px; animation:MPC-vasrq-fade .25s ease both }
-@keyframes MPC-vasrq-fade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+.vas_098-lowerhead { margin-top:16px }
+.vas_098-lowersec { margin-bottom:2px; animation:vas_098-fade .25s ease both }
+@keyframes vas_098-fade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
 
 /* ---------- Items ---------- */
-.MPC-vasrq-items { background:#fff; border:1px solid var(--rq-border); border-radius:13px; overflow:hidden; box-shadow:var(--rq-widget-shadow) }
-.MPC-vasrq-itrow { display:grid; grid-template-columns:2.2fr 1fr 0.6fr 1.2fr 1fr 1fr; align-items:center; padding:9px 14px; gap:10px }
+.vas_098-items { background:#fff; border:1px solid var(--rq-border); border-radius:13px; overflow:hidden; box-shadow:var(--rq-widget-shadow) }
+.vas_098-itrow { display:grid; grid-template-columns:2.2fr 1fr 0.6fr 1.2fr 1fr 1fr; align-items:center; padding:9px 14px; gap:10px }
 /* Grid items default to min-width:auto, which blocks the ellipsis on the cells
    below from ever kicking in. */
-.MPC-vasrq-itrow > * { min-width:0 }
-.MPC-vasrq-ithead { background:var(--rq-faint-blue); font-size:12px; color:var(--rq-text-muted); border-bottom:1px solid var(--rq-border) }
-.MPC-vasrq-itbody { font-size:13.5px; border-bottom:1px solid var(--rq-divider) }
-.MPC-vasrq-itbody:last-of-type { border-bottom:none }
-.MPC-vasrq-itbody:hover { background:#FAFCFE }
-.MPC-vasrq-itname { font-weight:700; color:var(--rq-text); font-size:13.5px; line-height:1.2;
+.vas_098-itrow > * { min-width:0 }
+.vas_098-ithead { background:var(--rq-faint-blue); font-size:12px; color:var(--rq-text-muted); border-bottom:1px solid var(--rq-border) }
+.vas_098-itbody { font-size:13.5px; border-bottom:1px solid var(--rq-divider) }
+.vas_098-itbody:last-of-type { border-bottom:none }
+.vas_098-itbody:hover { background:#FAFCFE }
+.vas_098-itname { font-weight:700; color:var(--rq-text); font-size:13.5px; line-height:1.2;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.MPC-vasrq-itsku { font-size:11px; color:var(--rq-text-muted); margin-top:1px;
+.vas_098-itsku { font-size:11px; color:var(--rq-text-muted); margin-top:1px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 /* Attribute Set Instance sub-line (lot / serial / size ...). */
-.MPC-vasrq-itattr { font-size:11px; color:var(--rq-text-2); margin-top:1px;
+.vas_098-itattr { font-size:11px; color:var(--rq-text-2); margin-top:1px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.MPC-vasrq-items .ta-r { text-align:right } .MPC-vasrq-items .ta-c { text-align:center }
+.vas_098-items .ta-r { text-align:right } .vas_098-items .ta-c { text-align:center }
 /* Unit of measure cell (replaced the product-category chip). */
-.MPC-vasrq-uom { display:inline-block; font-size:12.5px; color:var(--rq-text);
+.vas_098-uom { display:inline-block; font-size:12.5px; color:var(--rq-text);
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.MPC-vasrq-src { display:inline-flex; align-items:center; gap:6px; justify-content:flex-end; font-size:12.5px }
-.MPC-vasrq-src .MPC-vasrq-bar { width:40px; height:5px; border-radius:99px; background:#E7EEF4; overflow:hidden; flex:none }
-.MPC-vasrq-src .MPC-vasrq-bar i { display:block; height:100%; border-radius:99px }
-.MPC-vasrq-src.full i { background:var(--rq-success-tx) } .MPC-vasrq-src.short i { background:var(--rq-warn-tx) }
-.MPC-vasrq-src.full { color:var(--rq-success-tx); font-weight:500 } .MPC-vasrq-src.short { color:var(--rq-warn-tx); font-weight:500 }
-.MPC-vasrq-itfoot { display:flex; align-items:center; justify-content:flex-end; gap:22px; flex-wrap:wrap; padding:10px 16px;
+.vas_098-src { display:inline-flex; align-items:center; gap:6px; justify-content:flex-end; font-size:12.5px }
+.vas_098-src .vas_098-bar { width:40px; height:5px; border-radius:99px; background:#E7EEF4; overflow:hidden; flex:none }
+.vas_098-src .vas_098-bar i { display:block; height:100%; border-radius:99px }
+.vas_098-src.full i { background:var(--rq-success-tx) } .vas_098-src.short i { background:var(--rq-warn-tx) }
+.vas_098-src.full { color:var(--rq-success-tx); font-weight:500 } .vas_098-src.short { color:var(--rq-warn-tx); font-weight:500 }
+.vas_098-itfoot { display:flex; align-items:center; justify-content:flex-end; gap:22px; flex-wrap:wrap; padding:10px 16px;
     background:var(--rq-faint-blue); border-top:1px solid var(--rq-border); font-size:13px }
-.MPC-vasrq-tf { color:var(--rq-text-2) } .MPC-vasrq-tf b { color:var(--rq-text); font-weight:600; margin-left:6px }
-.MPC-vasrq-grand { font-size:14px; color:var(--rq-text); font-weight:700 }
-.MPC-vasrq-grand b { color:var(--rq-primary); margin-left:8px; font-size:16px }
-.MPC-vasrq-itempty { padding:20px 16px; text-align:center; color:var(--rq-text-muted); font-size:13px }
+.vas_098-tf { color:var(--rq-text-2) } .vas_098-tf b { color:var(--rq-text); font-weight:600; margin-left:6px }
+.vas_098-grand { font-size:14px; color:var(--rq-text); font-weight:700 }
+.vas_098-grand b { color:var(--rq-primary); margin-left:8px; font-size:16px }
+.vas_098-itempty { padding:20px 16px; text-align:center; color:var(--rq-text-muted); font-size:13px }
 
 /* ---------- Pager (line items) ---------- */
 /* Sibling of the items box, not a child: that box takes its own horizontal
    scroll on narrow panels and the controls must stay put. */
-.MPC-vasrq-pager { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+.vas_098-pager { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
     gap:8px 14px; margin-top:9px; font-size:12px; color:var(--rq-text-muted) }
-.MPC-vasrq-pgCtrls { display:inline-flex; align-items:center; gap:8px }
-.MPC-vasrq-pgPos { color:var(--rq-text); font-weight:700 }
-.MPC-vasrq-pgBtn { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--rq-border);
+.vas_098-pgCtrls { display:inline-flex; align-items:center; gap:8px }
+.vas_098-pgPos { color:var(--rq-text); font-weight:700 }
+.vas_098-pgBtn { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--rq-border);
     border-radius:999px; background:#fff; padding:5px 12px; color:var(--rq-primary);
     font-weight:700; line-height:1; cursor:pointer; user-select:none; white-space:nowrap }
-.MPC-vasrq-pgBtn:hover { background:var(--rq-faint-blue); border-color:var(--rq-action) }
-.MPC-vasrq-pgBtn.is-disabled { opacity:.45; cursor:default; pointer-events:none; color:var(--rq-text-muted) }
+.vas_098-pgBtn:hover { background:var(--rq-faint-blue); border-color:var(--rq-action) }
+.vas_098-pgBtn.is-disabled { opacity:.45; cursor:default; pointer-events:none; color:var(--rq-text-muted) }
 
 /* ---------- Activity ---------- */
-.MPC-vasrq-panelcard { background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px; padding:8px 18px; box-shadow:var(--rq-widget-shadow) }
-.MPC-vasrq-actrow { display:flex; align-items:flex-start; gap:10px; padding:9px 0 }
-.MPC-vasrq-actrow + .MPC-vasrq-actrow { border-top:1px solid var(--rq-divider) }
-.MPC-vasrq-actbadge { display:inline-flex; align-items:center; gap:5px; border-radius:8px; padding:4px 8px; font-size:10.5px; font-weight:700; flex:none }
-.MPC-vasrq-actbadge.create { background:#EEF3F8; color:#5A6B79 }
-.MPC-vasrq-actbadge.submit { background:#E8F2FC; color:#0E5DA8 }
-.MPC-vasrq-actbadge.status { background:#E4F5EC; color:#0C5D38 }
-.MPC-vasrq-actbadge.comment { background:#EFEAFF; color:#5F4AA6 }
-.MPC-vasrq-actbadge.link { background:#E0F2F1; color:#0B7A6B }
+.vas_098-panelcard { background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px; padding:8px 18px; box-shadow:var(--rq-widget-shadow) }
+.vas_098-actrow { display:flex; align-items:flex-start; gap:10px; padding:9px 0 }
+.vas_098-actrow + .vas_098-actrow { border-top:1px solid var(--rq-divider) }
+.vas_098-actbadge { display:inline-flex; align-items:center; gap:5px; border-radius:8px; padding:4px 8px; font-size:10.5px; font-weight:700; flex:none }
+.vas_098-actbadge.create { background:#EEF3F8; color:#5A6B79 }
+.vas_098-actbadge.submit { background:#E8F2FC; color:#0E5DA8 }
+.vas_098-actbadge.status { background:#E4F5EC; color:#0C5D38 }
+.vas_098-actbadge.comment { background:#EFEAFF; color:#5F4AA6 }
+.vas_098-actbadge.link { background:#E0F2F1; color:#0B7A6B }
 /* Downstream lifecycle documents. */
-.MPC-vasrq-actbadge.po  { background:#E4F0FF; color:#0E5DA8 }
-.MPC-vasrq-actbadge.grn { background:#CCEFDD; color:#0C5D38 }
-.MPC-vasrq-actmain { flex:1; min-width:0 }
-.MPC-vasrq-atwrap { display:flex; justify-content:space-between; gap:12px; align-items:baseline }
-.MPC-vasrq-at { font-size:13.5px; color:var(--rq-text) }
-.MPC-vasrq-attime { font-size:11.5px; color:var(--rq-text-muted); white-space:nowrap }
+.vas_098-actbadge.po  { background:#E4F0FF; color:#0E5DA8 }
+.vas_098-actbadge.grn { background:#CCEFDD; color:#0C5D38 }
+.vas_098-actmain { flex:1; min-width:0 }
+.vas_098-atwrap { display:flex; justify-content:space-between; gap:12px; align-items:baseline }
+.vas_098-at { font-size:13.5px; color:var(--rq-text) }
+.vas_098-attime { font-size:11.5px; color:var(--rq-text-muted); white-space:nowrap }
 
 /* ---------- Notes ---------- */
-.MPC-vasrq-notescard { padding:16px 18px }
-.MPC-vasrq-notesbody { font-size:13.5px; color:var(--rq-text); line-height:1.55 }
-.MPC-vasrq-notesbody p { margin:0 } .MPC-vasrq-notesbody p + p { margin-top:9px }
+.vas_098-notescard { padding:16px 18px }
+.vas_098-notesbody { font-size:13.5px; color:var(--rq-text); line-height:1.55 }
+.vas_098-notesbody p { margin:0 } .vas_098-notesbody p + p { margin-top:9px }
 
 /* ---------- Toast (convert-action feedback) ---------- */
-.MPC-vasrq-toast {
+.vas_098-toast {
     position:absolute; left:50%; bottom:16px; transform:translate(-50%, 12px);
     max-width:90%; padding:8px 14px; border-radius:8px;
     background:#102C3F; color:#fff; font-size:13px; line-height:1.4;
@@ -295,46 +297,46 @@
     opacity:0; z-index:1000; pointer-events:none;
     transition:opacity .25s ease, transform .25s ease;
 }
-.MPC-vasrq-toast.show { opacity:1; transform:translate(-50%, 0) }
-.MPC-vasrq-toast.err  { background:#B23636 }
-.MPC-vasrq-toast.ok   { background:#0C5D38 }
+.vas_098-toast.show { opacity:1; transform:translate(-50%, 0) }
+.vas_098-toast.err  { background:#B23636 }
+.vas_098-toast.ok   { background:#0C5D38 }
 
 /* Disabled convert buttons still need to read as deliberately unavailable. */
-.MPC-vasrq-btn:disabled { opacity:.45; cursor:default }
+.vas_098-btn:disabled { opacity:.45; cursor:default }
 
 /* ---------- Reveal ---------- */
-.MPC-vasrq-hdr,.MPC-vasrq-hdrCard,.MPC-vasrq-convert,.MPC-vasrq-stats,.MPC-vasrq-stepper { animation:MPC-vasrq-rise .4s ease both }
-@keyframes MPC-vasrq-rise { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+.vas_098-hdr,.vas_098-hdrCard,.vas_098-convert,.vas_098-stats,.vas_098-stepper { animation:vas_098-rise .4s ease both }
+@keyframes vas_098-rise { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
 
 /* ---------- Responsive ---------- */
-/* Container queries, measured against .MPC-vasrq-root's own width. The former
+/* Container queries, measured against .vas_098-root's own width. The former
    @media breakpoints (900px / 560px) were viewport-based: in a ~400px side panel
    on a desktop screen they never matched, so the six-column item row and the
    four-up stat strip stayed crammed at every zoom level. Breakpoints are aligned
    with VAS_099_OverviewGRN so the two panels collapse at the same widths. */
 @container (max-width: 620px) {
-    .MPC-vasrq-stats { grid-template-columns:repeat(2,1fr) }
-    .MPC-vasrq-itrow { grid-template-columns:1.8fr 1fr 0.6fr 1.1fr; }
-    .MPC-vasrq-itrow > :nth-child(5), .MPC-vasrq-itrow > :nth-child(6) { display:none }
+    .vas_098-stats { grid-template-columns:repeat(2,1fr) }
+    .vas_098-itrow { grid-template-columns:1.8fr 1fr 0.6fr 1.1fr; }
+    .vas_098-itrow > :nth-child(5), .vas_098-itrow > :nth-child(6) { display:none }
 }
 @container (max-width: 460px) {
-    .MPC-vasrq-hdrCard { grid-template-columns:1fr }
-    .MPC-vasrq-hdrColL { border-right:none; padding-right:0; border-bottom:1px solid var(--rq-divider); padding-bottom:12px }
+    .vas_098-hdrCard { grid-template-columns:1fr }
+    .vas_098-hdrColL { border-right:none; padding-right:0; border-bottom:1px solid var(--rq-divider); padding-bottom:12px }
     /* Two field columns are too cramped this narrow — back to a single stack. */
-    .MPC-vasrq-hdrColR { grid-template-columns:1fr }
-    .MPC-vasrq-hdrTop { flex-direction:column }
-    .MPC-vasrq-hdrPills { justify-content:flex-start }
+    .vas_098-hdrColR { grid-template-columns:1fr }
+    .vas_098-hdrTop { flex-direction:column }
+    .vas_098-hdrPills { justify-content:flex-start }
 }
 @container (max-width: 400px) {
-    .MPC-vasrq-stats { grid-template-columns:1fr }
-    .MPC-vasrq-convert { flex-direction:column; align-items:stretch }
+    .vas_098-stats { grid-template-columns:1fr }
+    .vas_098-convert { flex-direction:column; align-items:stretch }
     /* Last resort: let the four remaining item columns scroll rather than crush. */
-    .MPC-vasrq-items { overflow-x:auto; overflow-y:hidden }
-    .MPC-vasrq-itrow { min-width:360px }
+    .vas_098-items { overflow-x:auto; overflow-y:hidden }
+    .vas_098-itrow { min-width:360px }
 }
 
 /* ---------- RTL ---------- */
 /* Mirrors the header column divider only; the rest of this panel has no RTL
    overrides yet. */
-[dir="rtl"] .MPC-vasrq-hdrColL { border-right:none; border-left:1px solid var(--rq-divider); padding-right:0; padding-left:20px }
-[dir="rtl"] .MPC-vasrq-pgBtn .MPC-vasrq-ic svg { transform:scaleX(-1) }
+[dir="rtl"] .vas_098-hdrColL { border-right:none; border-left:1px solid var(--rq-divider); padding-right:0; padding-left:20px }
+[dir="rtl"] .vas_098-pgBtn .vas_098-ic svg { transform:scaleX(-1) }

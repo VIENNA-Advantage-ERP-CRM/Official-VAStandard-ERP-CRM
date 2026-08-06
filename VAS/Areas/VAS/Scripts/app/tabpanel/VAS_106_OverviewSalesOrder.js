@@ -17,9 +17,56 @@
  *                  server generation is wired in a follow-up.
  * Chronological development:
  *   VAI163   2026-07-08  Created
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vaso- -> vas_106- so the panel's
+ *                          styles cannot collide with another panel's.
+ *   VAI163   2026-08-05  New Record / Copy Record now empty the panel instead
+ *                        of leaving the previously selected record on screen.
+ *                        Both refreshPanelData and a new data-status listener
+ *                        ask isTabInserting(), which reads GridTab.gridTable
+ *                        .getIsInserting() — the flag GridTable.dataNew() raises
+ *                        for both actions. The record id cannot answer it: a
+ *                        copied row carries the source record's key until saved.
+ *                        Ported from VAS_092.
+ *   VAI163   2026-08-06  Activity paginates at 15 rows a page (ACTIVITY_PER_PAGE).
+ *                        The panel had no pager of its own, so buildPager() /
+ *                        pagerButton() and the chevLeft / chevRight icons were added
+ *                        here, modelled on VAS_099. A feed that fits on one page
+ *                        shows no controls, and the section's count badge keeps
+ *                        counting the whole feed. Ported from VAS_092.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
+
+    // True when the tab is sitting on a row that has not been saved yet —
+    // whether it came from New Record or from Copy Record.
+    //
+    // The authority is the GRID TABLE's insert flag: VIS.GridTable.dataNew()
+    // raises it for both actions and clears it again on save, refresh or undo,
+    // and GridTable.getIsInserting() reads it. GridTab does NOT expose that
+    // method — it only holds the table as .gridTable — so asking the tab itself
+    // always answers "no".
+    //
+    // The record id cannot answer this on its own: a copied row carries the
+    // SOURCE record's field values, its key included, so the id handed to the
+    // panel is the record that was copied FROM. Either way the panel would
+    // otherwise show a saved record's details beside an unsaved new one.
+    function isTabInserting(curTab) {
+        if (!curTab) return false;
+        try {
+            if (curTab.gridTable && typeof curTab.gridTable.getIsInserting === "function"
+                && curTab.gridTable.getIsInserting()) {
+                return true;
+            }
+        } catch (e) { }
+
+        var probes = ["getIsInserting", "isInserting", "getIsNew", "isNew"];
+        for (var i = 0; i < probes.length; i++) {
+            try {
+                if (typeof curTab[probes[i]] === "function" && curTab[probes[i]]()) return true;
+            } catch (e2) { }
+        }
+        return false;
+    }
 
     VAS.VAS_106_OverviewSalesOrder = function () {
         this.record_ID = 0;
@@ -30,16 +77,66 @@
         this.panelWidth;
 
         var $self = this;
+
+        // The framework notifies a tab panel when the selected record changes
+        // (refreshPanelData) but NOT when the user starts a new one:
+        // GridController.dataNew() never reaches the tab panel, so the panel
+        // would keep showing the previously selected record beside an empty new
+        // one. Listening to the tab's own data-status events closes that gap.
+        function onTabDataStatus(e) {
+            var inserting = false;
+            try {
+                inserting = !!(e && typeof e.getIsInserting === "function" && e.getIsInserting());
+            } catch (ex) {
+                inserting = false;
+            }
+            // The event does not report insert state on every build, and a
+            // COPIED row still carries the source record's key — so ask the tab
+            // as well before trusting the id below.
+            if (!inserting) inserting = isTabInserting($self.curTab);
+
+            var rid = 0;
+            try {
+                if ($self.curTab && typeof $self.curTab.getRecord_ID === "function") {
+                    rid = +$self.curTab.getRecord_ID() || 0;
+                }
+            } catch (ex2) {
+                rid = 0;
+            }
+
+            if (inserting || rid <= 0) {
+                // New (unsaved) record — nothing to show against it.
+                if ($self.record_ID) {
+                    $self.record_ID = 0;
+                    $self.clear();
+                }
+                return;
+            }
+            if (rid !== $self.record_ID) {
+                $self.record_ID = rid;
+                $self.fetchData(rid);
+            }
+        }
+
+        // Registered on the tab in startPanel, removed in dispose. Kept as an
+        // object because the framework calls listener.dataStatusChanged(event).
+        this.tabDataListener = { dataStatusChanged: function (e) { onTabDataStatus(e); } };
         var $root;
         var $busy;
         var $body;
         var $emptyState;
         var data = null;
+        // Maximum activity rows shown per page; the feed paginates beyond this.
+        // An order accumulates every status change, delivery, invoice and note,
+        // and an unpaged feed made the section scroll past everything below it.
+        // The section's own count badge still counts the WHOLE feed, not the page.
+        var ACTIVITY_PER_PAGE = 15;
+        var activityPage = 0;   // current Activity page (0-based)
 
         this.init = function () {
-            $root = $('<div class="MPC-vaso-root"></div>');
-            $body = $('<div class="MPC-vaso-body"></div>');
-            $emptyState = $('<div class="MPC-vaso-empty" style="display:none;"></div>');
+            $root = $('<div class="vas_106-root"></div>');
+            $body = $('<div class="vas_106-body"></div>');
+            $emptyState = $('<div class="vas_106-empty" style="display:none;"></div>');
             $emptyState.text(getMsg("VAS_106_NoData", "No sales order selected"));
             $root.append($body).append($emptyState);
             createBusyIndicator();
@@ -82,6 +179,8 @@
                 data: { C_Order_ID: recordID },
                 success: function (raw) {
                     data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    // A newly selected order starts on the first activity page.
+                    activityPage = 0;
                     render();
                     showBusy(false);
                 },
@@ -94,6 +193,7 @@
 
         this.clear = function () {
             data = null;
+            activityPage = 0;
             render();
         };
 
@@ -217,11 +317,11 @@
         }
 
         function renderHeader() {
-            var $strip = $('<section class="MPC-vaso-hdr"></section>');
-            var $top = $('<div class="MPC-vaso-hdrTop"></div>');
+            var $strip = $('<section class="vas_106-hdr"></section>');
+            var $top = $('<div class="vas_106-hdrTop"></div>');
 
-            var $tl = $('<div class="MPC-vaso-hdrTitleWrap"></div>');
-            $tl.append($('<div class="MPC-vaso-hdrTitle"></div>').text(
+            var $tl = $('<div class="vas_106-hdrTitleWrap"></div>');
+            $tl.append($('<div class="vas_106-hdrTitle"></div>').text(
                 getMsg("VAS_106_SalesOrder", "Sales Order") +
                 (data.DocumentNo ? " — " + data.DocumentNo : "")));
 
@@ -230,11 +330,11 @@
             var od = formatDate(data.DateOrdered);
             if (od) subBits.push(getMsg("VAS_106_Ordered", "Ordered") + " " + od);
             if (subBits.length)
-                $tl.append($('<div class="MPC-vaso-hdrSub"></div>').text(subBits.join(" · ")));
+                $tl.append($('<div class="vas_106-hdrSub"></div>').text(subBits.join(" · ")));
             $top.append($tl);
 
             var pm = priorityMeta(), cm = creditMeta(), sm = statusMeta();
-            var $pills = $('<div class="MPC-vaso-hdrPills"></div>');
+            var $pills = $('<div class="vas_106-hdrPills"></div>');
             $pills.append(headerPill(pm.label, pm.tone, pm.icon, false));
             $pills.append(headerPill(cm.label, cm.tone, null, true));
             $pills.append(headerPill(sm.label, sm.tone, null, true));
@@ -245,9 +345,9 @@
         }
 
         function headerPill(label, tone, icon, withDot) {
-            var $p = $('<span class="MPC-vaso-hdrPill"></span>').addClass("tone-" + (tone || "neutral"));
+            var $p = $('<span class="vas_106-hdrPill"></span>').addClass("tone-" + (tone || "neutral"));
             if (icon) $p.append(svgIcon(icon));
-            if (withDot) $p.append($('<span class="MPC-vaso-hdrDot"></span>'));
+            if (withDot) $p.append($('<span class="vas_106-hdrDot"></span>'));
             $p.append($('<span></span>').text(label));
             return $p;
         }
@@ -269,24 +369,24 @@
         }
 
         function renderCustomerCard() {
-            var $card = $('<section class="MPC-vaso-hdrCard"></section>');
+            var $card = $('<section class="vas_106-hdrCard"></section>');
 
             // Left: customer identity.
-            var $left = $('<div class="MPC-vaso-hdrColL"></div>');
-            $left.append($('<div class="MPC-vaso-fLabel"></div>').text(getMsg("VAS_106_Customer", "Customer")));
-            $left.append($('<div class="MPC-vaso-custName"></div>').text(data.CustomerName || ""));
+            var $left = $('<div class="vas_106-hdrColL"></div>');
+            $left.append($('<div class="vas_106-fLabel"></div>').text(getMsg("VAS_106_Customer", "Customer")));
+            $left.append($('<div class="vas_106-custName"></div>').text(data.CustomerName || ""));
 
             var addrBits = [];
             if (data.BillToAddress) addrBits.push(getMsg("VAS_106_BillTo", "Bill to") + ": " + data.BillToAddress);
             if (data.ShipToAddress) addrBits.push(getMsg("VAS_106_ShipTo", "Ship to") + ": " + data.ShipToAddress);
             if (addrBits.length) {
-                var $addr = $('<div class="MPC-vaso-custAddr"></div>');
+                var $addr = $('<div class="vas_106-custAddr"></div>');
                 $addr.append(svgIcon("pin"));
                 $addr.append($('<span></span>').text(addrBits.join(" · ")));
                 $left.append($addr);
             }
 
-            var $contact = $('<div class="MPC-vaso-custContact"></div>');
+            var $contact = $('<div class="vas_106-custContact"></div>');
             appendContactBit($contact, "user", data.ContactName);
             appendContactBit($contact, "phone", data.ContactPhone);
             appendContactBit($contact, "mail", data.ContactEmail);
@@ -294,7 +394,7 @@
             $card.append($left);
 
             // Right: commercial terms.
-            var $right = $('<div class="MPC-vaso-hdrColR"></div>');
+            var $right = $('<div class="vas_106-hdrColR"></div>');
             if (data.SalesRepName)    $right.append(headerField(getMsg("VAS_106_Salesperson", "Salesperson"), data.SalesRepName));
             if (data.PaymentTermName) $right.append(headerField(getMsg("VAS_106_PaymentTerms", "Payment Terms"), data.PaymentTermName));
             if (data.PriceListName)   $right.append(headerField(getMsg("VAS_106_Pricelist", "Pricelist"), data.PriceListName));
@@ -306,15 +406,15 @@
         }
 
         function headerField(label, value) {
-            var $f = $('<div class="MPC-vaso-hdrField"></div>');
-            $f.append($('<div class="MPC-vaso-fLabel"></div>').text(label));
-            $f.append($('<div class="MPC-vaso-fVal"></div>').text(value));
+            var $f = $('<div class="vas_106-hdrField"></div>');
+            $f.append($('<div class="vas_106-fLabel"></div>').text(label));
+            $f.append($('<div class="vas_106-fVal"></div>').text(value));
             return $f;
         }
 
         function appendContactBit($container, icon, value) {
             if (!value) return;
-            var $bit = $('<span class="MPC-vaso-contactBit"></span>');
+            var $bit = $('<span class="vas_106-contactBit"></span>');
             $bit.append(svgIcon(icon));
             $bit.append($('<span></span>').text(value));
             $container.append($bit);
@@ -325,9 +425,9 @@
         // ----------------------------------------------------------------- //
 
         function renderCreatedFrom() {
-            var $strip = $('<section class="MPC-vaso-genfrom"></section>');
-            $strip.append($('<span class="MPC-vaso-gfLabel"></span>').text(getMsg("VAS_106_CreatedFrom", "Created From")));
-            var $chips = $('<div class="MPC-vaso-gfChips"></div>');
+            var $strip = $('<section class="vas_106-genfrom"></section>');
+            $strip.append($('<span class="vas_106-gfLabel"></span>').text(getMsg("VAS_106_CreatedFrom", "Created From")));
+            var $chips = $('<div class="vas_106-gfChips"></div>');
 
             var any = false;
             if (data.QuotationNo) {
@@ -356,13 +456,13 @@
         }
 
         function originChip(icon, label, value, $statusPill, iconTone, tableName, recordId) {
-            var $chip = $('<span class="MPC-vaso-chip"></span>').addClass("ic-" + (iconTone || "muted"));
+            var $chip = $('<span class="vas_106-chip"></span>').addClass("ic-" + (iconTone || "muted"));
             if (tableName && recordId) {
                 $chip.addClass("is-link").attr("data-open-table", tableName).attr("data-open-id", recordId);
             }
             $chip.append(svgIcon(icon));
-            $chip.append($('<span class="MPC-vaso-chipLabel"></span>').text(label));
-            if (value) $chip.append($('<span class="MPC-vaso-chipVal"></span>').text(value));
+            $chip.append($('<span class="vas_106-chipLabel"></span>').text(label));
+            if (value) $chip.append($('<span class="vas_106-chipVal"></span>').text(value));
             if ($statusPill) $chip.append($statusPill);
             return $chip;
         }
@@ -372,22 +472,22 @@
         // ----------------------------------------------------------------- //
 
         function renderActionBar() {
-            var $bar = $('<section class="MPC-vaso-actionbar"></section>');
+            var $bar = $('<section class="vas_106-actionbar"></section>');
 
             var completed = isCompleted();
             var msg = completed
                 ? getMsg("VAS_106_OrderCompletedMsg", "Order completed")
                 : (data.DocStatus === "VO" ? getMsg("VAS_106_OrderVoidedMsg", "Order voided")
                    : getMsg("VAS_106_OrderInProgressMsg", "Order confirmed — fulfilment in progress"));
-            var $note = $('<span class="MPC-vaso-cvNote"></span>');
-            $note.append($('<span class="MPC-vaso-cvOk"></span>').append(svgIcon("check")));
+            var $note = $('<span class="vas_106-cvNote"></span>');
+            $note.append($('<span class="vas_106-cvOk"></span>').append(svgIcon("check")));
             $note.append($('<span></span>').text(msg));
             $bar.append($note);
 
-            var $actions = $('<div class="MPC-vaso-cvActions"></div>');
+            var $actions = $('<div class="vas_106-cvActions"></div>');
 
             // Complete Sales Order (wired).
-            var $complete = $('<button class="MPC-vaso-btn primary" data-act="complete"></button>');
+            var $complete = $('<button class="vas_106-btn primary" data-act="complete"></button>');
             $complete.append(svgIcon("checkCircle"));
             if (completed) {
                 $complete.append($('<span></span>').text(getMsg("VAS_106_SalesOrderCompleted", "Sales Order Completed")));
@@ -402,14 +502,14 @@
 
             // Create Delivery (enabled from pending stock; generation wired later).
             var pendingToDeliver = readiness().pending > 0 || hasUndelivered();
-            var $delivery = $('<button class="MPC-vaso-btn secondary" data-act="delivery"></button>');
+            var $delivery = $('<button class="vas_106-btn secondary" data-act="delivery"></button>');
             $delivery.append(svgIcon("truck"));
             $delivery.append($('<span></span>').text(getMsg("VAS_106_CreateDelivery", "Create Delivery")));
             $delivery.prop("disabled", !completed || !pendingToDeliver);
             $actions.append($delivery);
 
             // Create Invoice (enabled while not fully invoiced; generation wired later).
-            var $invoice = $('<button class="MPC-vaso-btn secondary" data-act="invoice"></button>');
+            var $invoice = $('<button class="vas_106-btn secondary" data-act="invoice"></button>');
             $invoice.append(svgIcon("fileText"));
             $invoice.append($('<span></span>').text(getMsg("VAS_106_CreateInvoice", "Create Invoice")));
             $invoice.prop("disabled", !completed || invoiced().fully);
@@ -432,7 +532,7 @@
         // ----------------------------------------------------------------- //
 
         function renderKpis() {
-            var $snap = $('<section class="MPC-vaso-snap"></section>');
+            var $snap = $('<section class="vas_106-snap"></section>');
 
             // Order Total.
             var totSub = (data.ISO_Code || "") + (data.ISO_Code ? " · " : "") + getMsg("VAS_106_InclTax", "incl. tax");
@@ -464,15 +564,15 @@
         }
 
         function metricCard(tone, icon, label, value, sub, pct) {
-            var $c = $('<div class="MPC-vaso-metric"></div>').addClass("tone-" + tone);
-            var $head = $('<div class="MPC-vaso-mHead"></div>');
+            var $c = $('<div class="vas_106-metric"></div>').addClass("tone-" + tone);
+            var $head = $('<div class="vas_106-mHead"></div>');
             $head.append(svgIcon(icon));
-            $head.append($('<span class="MPC-vaso-mLabel"></span>').text(label));
+            $head.append($('<span class="vas_106-mLabel"></span>').text(label));
             $c.append($head);
-            $c.append($('<div class="MPC-vaso-mVal"></div>').text(value));
-            if (sub) $c.append($('<div class="MPC-vaso-mSub"></div>').text(sub));
+            $c.append($('<div class="vas_106-mVal"></div>').text(value));
+            if (sub) $c.append($('<div class="vas_106-mSub"></div>').text(sub));
             if (pct != null) {
-                var $bar = $('<div class="MPC-vaso-mBar"><i></i></div>');
+                var $bar = $('<div class="vas_106-mBar"><i></i></div>');
                 $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
                 $c.append($bar);
             }
@@ -509,18 +609,18 @@
             for (var a = 0; a < stages.length; a++) { if (!stages[a].done) { active = a; break; } }
 
             var posted = data.Posted === "Y";
-            var $sec = $('<section class="MPC-vaso-sec"></section>');
-            var $head = $('<div class="MPC-vaso-secHead"></div>');
-            var $title = $('<h2 class="MPC-vaso-secTitle"></h2>').text(getMsg("VAS_106_OrderProgress", "Order Progress"));
+            var $sec = $('<section class="vas_106-sec"></section>');
+            var $head = $('<div class="vas_106-secHead"></div>');
+            var $title = $('<h2 class="vas_106-secTitle"></h2>').text(getMsg("VAS_106_OrderProgress", "Order Progress"));
             $title.append(postBadge(posted));
             $head.append($title);
-            $head.append($('<div class="MPC-vaso-secRight"></div>').append(
-                $('<span class="MPC-vaso-secSummary"></span>').text(
+            $head.append($('<div class="vas_106-secRight"></div>').append(
+                $('<span class="vas_106-secSummary"></span>').text(
                     getMsg("VAS_106_Stage", "Stage") + " " + Math.min(active + 1, stages.length) + " " +
                     getMsg("VAS_106_Of", "of") + " " + stages.length + " · " + statusMeta().label)));
             $sec.append($head);
 
-            var $tl = $('<div class="MPC-vaso-stepper"></div>');
+            var $tl = $('<div class="vas_106-stepper"></div>');
             for (var i = 0; i < stages.length; i++) {
                 var s = stages[i];
                 var stateCls, metaText;
@@ -534,24 +634,24 @@
         }
 
         function postBadge(posted) {
-            var $b = $('<span class="MPC-vaso-postBadge"></span>');
+            var $b = $('<span class="vas_106-postBadge"></span>');
             if (posted) $b.addClass("posted").text(getMsg("VAS_106_Posted", "Posted"));
             else $b.text(getMsg("VAS_106_NotPosted", "Not Posted"));
             return $b;
         }
 
         function stepEntry(num, title, meta, done, stateCls) {
-            var $entry = $('<div class="MPC-vaso-step"></div>').addClass(stateCls || "");
-            var $rail = $('<div class="MPC-vaso-stepRail"></div>');
-            $rail.append($('<span class="MPC-vaso-stepLine MPC-vaso-stepLine-l"></span>'));
-            var $dot = $('<span class="MPC-vaso-stepDot"></span>');
+            var $entry = $('<div class="vas_106-step"></div>').addClass(stateCls || "");
+            var $rail = $('<div class="vas_106-stepRail"></div>');
+            $rail.append($('<span class="vas_106-stepLine vas_106-stepLine-l"></span>'));
+            var $dot = $('<span class="vas_106-stepDot"></span>');
             if (done) $dot.append(svgIcon("check")); else $dot.text(num);
             $rail.append($dot);
-            $rail.append($('<span class="MPC-vaso-stepLine MPC-vaso-stepLine-r"></span>'));
+            $rail.append($('<span class="vas_106-stepLine vas_106-stepLine-r"></span>'));
             $entry.append($rail);
-            var $lbl = $('<div class="MPC-vaso-stepLabel"></div>');
-            $lbl.append($('<div class="MPC-vaso-stepTitle"></div>').text(title));
-            if (meta) $lbl.append($('<div class="MPC-vaso-stepMeta"></div>').text(meta));
+            var $lbl = $('<div class="vas_106-stepLabel"></div>');
+            $lbl.append($('<div class="vas_106-stepTitle"></div>').text(title));
+            if (meta) $lbl.append($('<div class="vas_106-stepMeta"></div>').text(meta));
             $entry.append($lbl);
             return $entry;
         }
@@ -561,21 +661,21 @@
         // ----------------------------------------------------------------- //
 
         function collapsible(id, iconName, title, badgeText) {
-            var $sec = $('<section class="MPC-vaso-dsec"></section>').attr("data-sec", id);
-            var $head = $('<button type="button" class="MPC-vaso-dsecHead" aria-expanded="true"></button>');
-            $head.append($('<span class="MPC-vaso-tIc"></span>').append(svgIcon(iconName)));
-            $head.append($('<span class="MPC-vaso-dsecTitle"></span>').text(title));
+            var $sec = $('<section class="vas_106-dsec"></section>').attr("data-sec", id);
+            var $head = $('<button type="button" class="vas_106-dsecHead" aria-expanded="true"></button>');
+            $head.append($('<span class="vas_106-tIc"></span>').append(svgIcon(iconName)));
+            $head.append($('<span class="vas_106-dsecTitle"></span>').text(title));
             if (badgeText != null && badgeText !== "")
-                $head.append($('<span class="MPC-vaso-badge"></span>').text(badgeText));
-            $head.append($('<span class="MPC-vaso-dsecChev"></span>').append(svgIcon("chevUp")));
-            var $bodyWrap = $('<div class="MPC-vaso-dsecBody"></div>');
+                $head.append($('<span class="vas_106-badge"></span>').text(badgeText));
+            $head.append($('<span class="vas_106-dsecChev"></span>').append(svgIcon("chevUp")));
+            var $bodyWrap = $('<div class="vas_106-dsecBody"></div>');
             $sec.append($head).append($bodyWrap);
             $body.append($sec);
             return $bodyWrap;
         }
 
         function emptyRow(text) {
-            return $('<div class="MPC-vaso-secEmpty"></div>').text(text);
+            return $('<div class="vas_106-secEmpty"></div>').text(text);
         }
 
         // ----------------------------------------------------------------- //
@@ -587,8 +687,8 @@
             var $wrap = collapsible("lines", "list", getMsg("VAS_106_OrderLines", "Order Lines"), lines.length);
             if (!lines.length) { $wrap.append(emptyRow(getMsg("VAS_106_NoLines", "No order lines"))); return; }
 
-            var $tbl = $('<div class="MPC-vaso-table MPC-vaso-linesTable"></div>');
-            var $h = $('<div class="MPC-vaso-tRow MPC-vaso-tHead"></div>');
+            var $tbl = $('<div class="vas_106-table vas_106-linesTable"></div>');
+            var $h = $('<div class="vas_106-tRow vas_106-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_106_ProductService", "Product / Service")));
             $h.append($('<span class="ta-c"></span>').text(getMsg("VAS_106_Qty", "Qty")));
             $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_106_UnitPrice", "Unit price")));
@@ -605,7 +705,7 @@
             }
 
             // Totals footer.
-            var $foot = $('<div class="MPC-vaso-tFoot"></div>');
+            var $foot = $('<div class="vas_106-tFoot"></div>');
             $foot.append(totalBit(getMsg("VAS_106_Subtotal", "Subtotal"),
                 formatAmount(+data.TotalLines || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision), false));
             $foot.append(totalBit(getMsg("VAS_106_Tax", "Tax"),
@@ -618,7 +718,7 @@
 
             // Contract hint (hidden once the order is completed).
             if (!isCompleted()) {
-                var $hint = $('<div class="MPC-vaso-ccHint"></div>');
+                var $hint = $('<div class="vas_106-ccHint"></div>');
                 $hint.append(svgIcon("info"));
                 $hint.append($('<span></span>').text(getMsg("VAS_106_ContractHint",
                     "Contract applies to Service & Charge lines only — enable the toggle on the line; once the order is completed, fill the contract details below the line and click Create Contract")));
@@ -627,17 +727,17 @@
         }
 
         function buildLineRow(ln) {
-            var $tr = $('<div class="MPC-vaso-tRow MPC-vaso-tBody"></div>').attr("data-line", ln.C_OrderLine_ID);
+            var $tr = $('<div class="vas_106-tRow vas_106-tBody"></div>').attr("data-line", ln.C_OrderLine_ID);
 
             // Product / service identity.
-            var $item = $('<span class="MPC-vaso-itItem"></span>');
-            $item.append($('<div class="MPC-vaso-itName"></div>').text(ln.ProductName || ""));
+            var $item = $('<span class="vas_106-itItem"></span>');
+            $item.append($('<div class="vas_106-itName"></div>').text(ln.ProductName || ""));
             var sub;
             if (ln.LineType === "product") sub = getMsg("VAS_106_ProductTag", "PRODUCT") + (ln.ProductValue ? " · " + getMsg("VAS_106_SKU", "SKU") + " " + ln.ProductValue : "");
             else if (ln.LineType === "service") sub = getMsg("VAS_106_ServiceTag", "SERVICE") + (ln.ProductValue ? " · " + ln.ProductValue : "");
             else if (ln.LineType === "charge") sub = getMsg("VAS_106_ChargeTag", "CHARGE") + (ln.ChargeName ? " · " + ln.ChargeName : "");
             else sub = ln.ProductValue || "";
-            if (sub) $item.append($('<div class="MPC-vaso-itSku"></div>').text(sub));
+            if (sub) $item.append($('<div class="vas_106-itSku"></div>').text(sub));
             $tr.append($item);
 
             var uomP = +ln.UOMPrecision || 0;
@@ -650,14 +750,14 @@
             if (ln.LineType === "product") {
                 var ordered = +ln.QtyOrdered || 0, delivered = +ln.QtyDelivered || 0;
                 var pct = ordered > 0 ? Math.round(delivered / ordered * 100) : 0;
-                var $prog = $('<span class="MPC-vaso-prog ta-r"></span>').addClass(ln.DeliveredState || "none");
-                var $bar = $('<span class="MPC-vaso-progBar"><i></i></span>');
+                var $prog = $('<span class="vas_106-prog ta-r"></span>').addClass(ln.DeliveredState || "none");
+                var $bar = $('<span class="vas_106-progBar"><i></i></span>');
                 $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
                 $prog.append($bar);
                 $prog.append(document.createTextNode(formatNumber(delivered, uomP) + "/" + formatNumber(ordered, uomP)));
                 $tr.append($prog);
             } else {
-                $tr.append($('<span class="ta-r MPC-vaso-naDash"></span>').text("—"));
+                $tr.append($('<span class="ta-r vas_106-naDash"></span>').text("—"));
             }
 
             // Contract — service / charge only.
@@ -672,25 +772,25 @@
             var isServiceCharge = (ln.LineType === "service" || ln.LineType === "charge");
 
             if (!isServiceCharge) {
-                $cell.addClass("MPC-vaso-naDash").text("—");
+                $cell.addClass("vas_106-naDash").text("—");
                 return $cell;
             }
 
-            var $lc = $('<span class="MPC-vaso-lineContract"></span>');
+            var $lc = $('<span class="vas_106-lineContract"></span>');
             if (ln.C_Contract_ID > 0) {
                 // Already contracted — locked toggle + link chip.
-                $lc.append($('<span class="MPC-vaso-switch on locked"></span>'));
-                var $link = $('<a class="MPC-vaso-ctrLink show" href="#"></a>')
+                $lc.append($('<span class="vas_106-switch on locked"></span>'));
+                var $link = $('<a class="vas_106-ctrLink show" href="#"></a>')
                     .attr("data-open-table", "C_Contract").attr("data-open-id", ln.C_Contract_ID);
                 $link.append(svgIcon("doc"));
-                $link.append($('<span class="MPC-vaso-ctrNo"></span>').text(ln.ContractNo || ("#" + ln.C_Contract_ID)));
+                $link.append($('<span class="vas_106-ctrNo"></span>').text(ln.ContractNo || ("#" + ln.C_Contract_ID)));
                 $link.append(svgIcon("arrowUpRight"));
                 $lc.append($link);
             } else {
-                var $sw = $('<span class="MPC-vaso-switch" role="switch"></span>').attr("data-line", ln.C_OrderLine_ID);
+                var $sw = $('<span class="vas_106-switch" role="switch"></span>').attr("data-line", ln.C_OrderLine_ID);
                 if (ln.IsContractFlag) $sw.addClass("on").attr("aria-checked", "true"); else $sw.attr("aria-checked", "false");
                 $lc.append($sw);
-                $lc.append($('<span class="MPC-vaso-swLabel"></span>').text(getMsg("VAS_106_Contract", "Contract")));
+                $lc.append($('<span class="vas_106-swLabel"></span>').text(getMsg("VAS_106_Contract", "Contract")));
             }
             $cell.append($lc);
             return $cell;
@@ -703,24 +803,24 @@
             if (!isServiceCharge || ln.C_Contract_ID > 0) return null;
 
             var open = isCompleted() && ln.IsContractFlag;
-            var $form = $('<div class="MPC-vaso-contractForm"></div>').attr("data-line", ln.C_OrderLine_ID);
+            var $form = $('<div class="vas_106-contractForm"></div>').attr("data-line", ln.C_OrderLine_ID);
             if (open) $form.addClass("open");
 
-            $form.append($('<div class="MPC-vaso-cfCap"></div>')
+            $form.append($('<div class="vas_106-cfCap"></div>')
                 .append(svgIcon("doc"))
                 .append($('<span></span>').text(getMsg("VAS_106_ContractFor", "Contract") + " · " + (ln.ProductName || ""))));
 
-            var $grid = $('<div class="MPC-vaso-formGrid"></div>');
+            var $grid = $('<div class="vas_106-formGrid"></div>');
 
             // Billing Frequency (required) — select from C_Frequency.
             var $freqWrap = fieldWrap(getMsg("VAS_106_BillingFrequency", "Billing Frequency"), true);
-            var $sel = $('<select class="MPC-vaso-ffInput MPC-vaso-cfFreq" data-req></select>');
+            var $sel = $('<select class="vas_106-ffInput vas_106-cfFreq" data-req></select>');
             $sel.append($('<option value="0"></option>').text(getMsg("VAS_106_SelectFrequency", "Select…")));
             var freqs = data.Frequencies || [];
             for (var i = 0; i < freqs.length; i++) {
                 $sel.append($('<option></option>').attr("value", freqs[i].C_Frequency_ID).text(freqs[i].Name));
             }
-            $freqWrap.find(".MPC-vaso-ffContent").append($sel);
+            $freqWrap.find(".vas_106-ffContent").append($sel);
             $grid.append($freqWrap);
 
             $grid.append(numField(getMsg("VAS_106_NoOfCycle", "No of Cycle"), "cfCycles", "1"));
@@ -730,9 +830,9 @@
             $grid.append(textField(getMsg("VAS_106_EndDate", "End Date"), "cfEnd", "DD-MM-YYYY", false));
             $form.append($grid);
 
-            var $foot = $('<div class="MPC-vaso-cfFoot"></div>');
-            $foot.append($('<span class="MPC-vaso-cfNote"></span>').text(getMsg("VAS_106_FillRequired", "Fill the required fields (*) to create the contract")));
-            var $btn = $('<button type="button" class="MPC-vaso-btn primary sm MPC-vaso-cfCreate" data-line="' + ln.C_OrderLine_ID + '" disabled></button>');
+            var $foot = $('<div class="vas_106-cfFoot"></div>');
+            $foot.append($('<span class="vas_106-cfNote"></span>').text(getMsg("VAS_106_FillRequired", "Fill the required fields (*) to create the contract")));
+            var $btn = $('<button type="button" class="vas_106-btn primary sm vas_106-cfCreate" data-line="' + ln.C_OrderLine_ID + '" disabled></button>');
             $btn.append(svgIcon("plus"));
             $btn.append($('<span></span>').text(getMsg("VAS_106_CreateContract", "Create Contract")));
             $foot.append($btn);
@@ -743,8 +843,8 @@
         }
 
         function fieldWrap(label, required) {
-            var $ff = $('<div class="MPC-vaso-ff"></div>');
-            var $content = $('<div class="MPC-vaso-ffContent"></div>');
+            var $ff = $('<div class="vas_106-ff"></div>');
+            var $content = $('<div class="vas_106-ffContent"></div>');
             var $lbl = $('<label></label>').text(label);
             if (required) { $lbl.addClass("req"); $lbl.append($('<span></span>').text("*")); }
             $content.append($lbl);
@@ -754,21 +854,21 @@
 
         function numField(label, cls, placeholder) {
             var $ff = fieldWrap(label, false);
-            $ff.find(".MPC-vaso-ffContent").append(
-                $('<input type="text" class="MPC-vaso-ffInput num ' + cls + '">').attr("placeholder", placeholder));
+            $ff.find(".vas_106-ffContent").append(
+                $('<input type="text" class="vas_106-ffInput num ' + cls + '">').attr("placeholder", placeholder));
             return $ff;
         }
 
         function textField(label, cls, placeholder, required) {
             var $ff = fieldWrap(label, required);
-            var $in = $('<input type="text" class="MPC-vaso-ffInput ' + cls + '">').attr("placeholder", placeholder);
+            var $in = $('<input type="text" class="vas_106-ffInput ' + cls + '">').attr("placeholder", placeholder);
             if (required) $in.attr("data-req", "");
-            $ff.find(".MPC-vaso-ffContent").append($in);
+            $ff.find(".vas_106-ffContent").append($in);
             return $ff;
         }
 
         function totalBit(label, value, isGrand) {
-            var $bit = $('<span class="MPC-vaso-tf"></span>');
+            var $bit = $('<span class="vas_106-tf"></span>');
             if (isGrand) $bit.addClass("is-grand");
             $bit.append(document.createTextNode(label));
             $bit.append($('<b></b>').text(value));
@@ -786,8 +886,8 @@
             var $wrap = collapsible("readiness", "cube", getMsg("VAS_106_DeliveryReadiness", "Delivery Readiness"), badge);
             if (!rows.length) { $wrap.append(emptyRow(getMsg("VAS_106_NoReadiness", "No stockable pending lines"))); return; }
 
-            var $tbl = $('<div class="MPC-vaso-table MPC-vaso-rdTable"></div>');
-            var $h = $('<div class="MPC-vaso-tRow MPC-vaso-tHead"></div>');
+            var $tbl = $('<div class="vas_106-table vas_106-rdTable"></div>');
+            var $h = $('<div class="vas_106-tRow vas_106-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_106_Item", "Item")));
             $h.append($('<span></span>').text(getMsg("VAS_106_Warehouse", "Warehouse")));
             $h.append($('<span class="ta-c"></span>').text(getMsg("VAS_106_PendingToDeliver", "Pending to Deliver")));
@@ -798,7 +898,7 @@
             for (var i = 0; i < rows.length; i++) $tbl.append(buildReadinessRow(rows[i]));
             $wrap.append($tbl);
 
-            var $note = $('<div class="MPC-vaso-note"></div>');
+            var $note = $('<div class="vas_106-note"></div>');
             $note.append(svgIcon("info"));
             $note.append($('<span></span>').text(getMsg("VAS_106_ReadinessNote",
                 "On Hand = physical stock in the warehouse right now · Service lines excluded — readiness tracks stockable items against the next delivery")));
@@ -806,10 +906,10 @@
         }
 
         function buildReadinessRow(rd) {
-            var $tr = $('<div class="MPC-vaso-tRow MPC-vaso-tBody"></div>');
-            var $item = $('<span class="MPC-vaso-itItem"></span>');
-            $item.append($('<div class="MPC-vaso-itName"></div>').text(rd.ProductName || ""));
-            if (rd.ProductValue) $item.append($('<div class="MPC-vaso-itSku"></div>').text(getMsg("VAS_106_SKU", "SKU") + " " + rd.ProductValue));
+            var $tr = $('<div class="vas_106-tRow vas_106-tBody"></div>');
+            var $item = $('<span class="vas_106-itItem"></span>');
+            $item.append($('<div class="vas_106-itName"></div>').text(rd.ProductName || ""));
+            if (rd.ProductValue) $item.append($('<div class="vas_106-itSku"></div>').text(getMsg("VAS_106_SKU", "SKU") + " " + rd.ProductValue));
             $tr.append($item);
             $tr.append($('<span></span>').text(rd.WarehouseName || "—"));
             $tr.append($('<span class="ta-c"></span>').text(formatNumber(+rd.PendingQty || 0, 0)));
@@ -822,8 +922,8 @@
             else { tag = getMsg("VAS_106_Awaited", "Awaited"); tone = "awaited"; }
 
             var $rt = $('<span class="ta-r"></span>');
-            var $pill = $('<span class="MPC-vaso-rdTag"></span>').addClass(tone);
-            if (dot) $pill.append($('<span class="MPC-vaso-rdDot"></span>'));
+            var $pill = $('<span class="vas_106-rdTag"></span>').addClass(tone);
+            if (dot) $pill.append($('<span class="vas_106-rdDot"></span>'));
             $pill.append($('<span></span>').text(tag));
             $rt.append($pill);
             $tr.append($rt);
@@ -839,8 +939,8 @@
             var $wrap = collapsible("deliveries", "truck", getMsg("VAS_106_Deliveries", "Deliveries"), rows.length);
             if (!rows.length) { $wrap.append(emptyRow(getMsg("VAS_106_NoDeliveries", "No deliveries yet"))); return; }
 
-            var $tbl = $('<div class="MPC-vaso-table MPC-vaso-dvTable"></div>');
-            var $h = $('<div class="MPC-vaso-tRow MPC-vaso-tHead"></div>');
+            var $tbl = $('<div class="vas_106-table vas_106-dvTable"></div>');
+            var $h = $('<div class="vas_106-tRow vas_106-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_106_Delivery", "Delivery")));
             $h.append($('<span></span>').text(getMsg("VAS_106_Warehouse", "Warehouse")));
             $h.append($('<span></span>').text(getMsg("VAS_106_Tracking", "Tracking")));
@@ -850,12 +950,12 @@
 
             for (var i = 0; i < rows.length; i++) {
                 var dv = rows[i];
-                var $tr = $('<div class="MPC-vaso-tRow MPC-vaso-tBody is-link"></div>')
+                var $tr = $('<div class="vas_106-tRow vas_106-tBody is-link"></div>')
                     .attr("data-open-table", "M_InOut").attr("data-open-id", dv.M_InOut_ID);
-                var $item = $('<span class="MPC-vaso-itItem"></span>');
-                $item.append($('<div class="MPC-vaso-itName"></div>').text(dv.DocumentNo || ""));
+                var $item = $('<span class="vas_106-itItem"></span>');
+                $item.append($('<div class="vas_106-itName"></div>').text(dv.DocumentNo || ""));
                 var d = formatDate(dv.MovementDate);
-                if (d) $item.append($('<div class="MPC-vaso-itSku"></div>').text(d));
+                if (d) $item.append($('<div class="vas_106-itSku"></div>').text(d));
                 $tr.append($item);
                 $tr.append($('<span></span>').text(dv.WarehouseName || "—"));
                 $tr.append($('<span></span>').text(dv.TrackingNo || "—"));
@@ -875,8 +975,8 @@
             var $wrap = collapsible("invoices", "fileText", getMsg("VAS_106_Invoices", "Invoices"), rows.length);
             if (!rows.length) { $wrap.append(emptyRow(getMsg("VAS_106_NoInvoices", "No invoices yet"))); return; }
 
-            var $tbl = $('<div class="MPC-vaso-table MPC-vaso-invTable"></div>');
-            var $h = $('<div class="MPC-vaso-tRow MPC-vaso-tHead"></div>');
+            var $tbl = $('<div class="vas_106-table vas_106-invTable"></div>');
+            var $h = $('<div class="vas_106-tRow vas_106-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_106_Invoice", "Invoice")));
             $h.append($('<span></span>').text(getMsg("VAS_106_Issued", "Issued")));
             $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_106_Amount", "Amount")));
@@ -886,9 +986,9 @@
             var iv = invoiced();
             for (var i = 0; i < rows.length; i++) {
                 var r = rows[i];
-                var $tr = $('<div class="MPC-vaso-tRow MPC-vaso-tBody is-link"></div>')
+                var $tr = $('<div class="vas_106-tRow vas_106-tBody is-link"></div>')
                     .attr("data-open-table", "C_Invoice").attr("data-open-id", r.C_Invoice_ID);
-                $tr.append($('<span class="MPC-vaso-itName"></span>').text(r.DocumentNo || ""));
+                $tr.append($('<span class="vas_106-itName"></span>').text(r.DocumentNo || ""));
                 $tr.append($('<span></span>').text(formatDate(r.DateInvoiced) || "—"));
                 $tr.append($('<span class="ta-r"></span>').text(formatAmount(+r.GrandTotal || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
                 var stTone = r.IsPaid ? "approved" : "sent";
@@ -897,7 +997,7 @@
                 $tbl.append($tr);
             }
 
-            var $foot = $('<div class="MPC-vaso-tFoot"></div>');
+            var $foot = $('<div class="vas_106-tFoot"></div>');
             $foot.append(totalBit(getMsg("VAS_106_Invoiced", "Invoiced"),
                 formatAmount(iv.amount, data.CurSymbol, data.ISO_Code, data.StdPrecision), false));
             $foot.append(totalBit(getMsg("VAS_106_YetToInvoice", "Yet to invoice"),
@@ -924,25 +1024,80 @@
             var $wrap = collapsible("activity", "clock", getMsg("VAS_106_Activity", "Activity"), rows.length);
             if (!rows.length) { $wrap.append(emptyRow(getMsg("VAS_106_NoActivity", "No activity yet"))); return; }
 
-            var $card = $('<div class="MPC-vaso-panelcard"></div>');
-            for (var i = 0; i < rows.length; i++) $card.append(activityRow(rows[i]));
+            var $card = $('<div class="vas_106-panelcard"></div>');
             $wrap.append($card);
+
+            // The pager is a sibling of the card, so it keeps its place while the
+            // card's rows are replaced underneath it.
+            var $pager = $('<div class="vas_106-pager"></div>');
+            if (rows.length > ACTIVITY_PER_PAGE) $wrap.append($pager);
+
+            function paintPage() {
+                var pageCount = Math.max(1, Math.ceil(rows.length / ACTIVITY_PER_PAGE));
+                if (activityPage >= pageCount) activityPage = pageCount - 1;
+                if (activityPage < 0) activityPage = 0;
+
+                var start = activityPage * ACTIVITY_PER_PAGE;
+                var end = Math.min(rows.length, start + ACTIVITY_PER_PAGE);
+
+                $card.empty();
+                for (var i = start; i < end; i++) $card.append(activityRow(rows[i]));
+
+                buildPager($pager, activityPage, pageCount, rows.length, start, end,
+                    function (p) { activityPage = p; paintPage(); });
+            }
+
+            paintPage();
+        }
+
+        // Range caption on the left, Previous / page-of / Next on the right.
+        // Rebuilt on every page change so the disabled states stay accurate.
+        // `page` is 0-based and `onGo` is handed the page to move to, so the
+        // caller owns its own page state. Nothing is drawn for a single-page
+        // list, so a short feed shows no controls at all.
+        function buildPager($pager, page, pageCount, total, start, end, onGo) {
+            $pager.empty();
+            if (pageCount <= 1) return;
+
+            $pager.append($('<span class="vas_106-pgRange"></span>').text(
+                getMsg("VAS_106_Showing", "Showing") + " " + (start + 1) + "-" + end + " " +
+                getMsg("VAS_106_Of", "of") + " " + total));
+
+            var $ctrls = $('<span class="vas_106-pgCtrls"></span>');
+            $ctrls.append(pagerButton(getMsg("VAS_106_Previous", "Previous"), "chevLeft",
+                page <= 0, function () { onGo(page - 1); }));
+            $ctrls.append($('<span class="vas_106-pgPos"></span>').text(
+                getMsg("VAS_106_Page", "Page") + " " + (page + 1) + " " +
+                getMsg("VAS_106_Of", "of") + " " + pageCount));
+            $ctrls.append(pagerButton(getMsg("VAS_106_Next", "Next"), "chevRight",
+                page >= pageCount - 1, function () { onGo(page + 1); }));
+            $pager.append($ctrls);
+        }
+
+        function pagerButton(label, icon, disabled, handler) {
+            var $b = $('<span class="vas_106-pgBtn"></span>');
+            if (icon === "chevLeft") $b.append(svgIcon(icon));
+            $b.append($('<span></span>').text(label));
+            if (icon === "chevRight") $b.append(svgIcon(icon));
+            if (disabled) $b.addClass("is-disabled");
+            else $b.on("click", handler);
+            return $b;
         }
 
         function activityRow(a) {
             var meta = ACT_TYPES[a.EventType] || ACT_TYPES.Updated;
-            var $row = $('<div class="MPC-vaso-actRow"></div>');
-            var $badge = $('<span class="MPC-vaso-actBadge"></span>').addClass("tone-" + meta.tone);
+            var $row = $('<div class="vas_106-actRow"></div>');
+            var $badge = $('<span class="vas_106-actBadge"></span>').addClass("tone-" + meta.tone);
             $badge.append(svgIcon(meta.icon));
             $badge.append($('<span></span>').text(getMsg("VAS_106_Act" + a.EventType, meta.label)));
             $row.append($badge);
 
-            var $main = $('<div class="MPC-vaso-actMain"></div>');
-            var $wrapT = $('<div class="MPC-vaso-atWrap"></div>');
-            $wrapT.append($('<span class="MPC-vaso-at"></span>').text(activityTitle(a, meta)));
+            var $main = $('<div class="vas_106-actMain"></div>');
+            var $wrapT = $('<div class="vas_106-atWrap"></div>');
+            $wrapT.append($('<span class="vas_106-at"></span>').text(activityTitle(a, meta)));
             var when = formatDateTime(a.EventTime);
             if (a.ActorName) when += " · " + a.ActorName;
-            $wrapT.append($('<span class="MPC-vaso-actTime"></span>').text(when));
+            $wrapT.append($('<span class="vas_106-actTime"></span>').text(when));
             $main.append($wrapT);
             $row.append($main);
             return $row;
@@ -971,8 +1126,8 @@
             var $wrap = collapsible("notes", "note", getMsg("VAS_106_Notes", "Notes"), rows.length);
             if (!rows.length) { $wrap.append(emptyRow(getMsg("VAS_106_NoNotes", "No notes"))); return; }
 
-            var $card = $('<div class="MPC-vaso-panelcard MPC-vaso-notesCard"></div>');
-            var $notes = $('<div class="MPC-vaso-notesBody"></div>');
+            var $card = $('<div class="vas_106-panelcard vas_106-notesCard"></div>');
+            var $notes = $('<div class="vas_106-notesBody"></div>');
             for (var i = 0; i < rows.length; i++) $notes.append($('<p></p>').text(rows[i].Text));
             $card.append($notes);
             $wrap.append($card);
@@ -983,12 +1138,12 @@
         // ----------------------------------------------------------------- //
 
         function pill(label, tone) {
-            return $('<span class="MPC-vaso-pill"></span>').addClass("tone-" + (tone || "neutral")).text(label);
+            return $('<span class="vas_106-pill"></span>').addClass("tone-" + (tone || "neutral")).text(label);
         }
 
         function tagPill(label, tone) {
-            var $t = $('<span class="MPC-vaso-tag"></span>').addClass(tone);
-            $t.append($('<span class="MPC-vaso-dot"></span>'));
+            var $t = $('<span class="vas_106-tag"></span>').addClass(tone);
+            $t.append($('<span class="vas_106-dot"></span>'));
             $t.append($('<span></span>').text(label));
             return $t;
         }
@@ -1011,46 +1166,46 @@
 
         function bindEvents() {
             // Section collapse.
-            $root.on("click", ".MPC-vaso-dsecHead", function () {
-                var $sec = $(this).closest(".MPC-vaso-dsec");
+            $root.on("click", ".vas_106-dsecHead", function () {
+                var $sec = $(this).closest(".vas_106-dsec");
                 var collapsed = $sec.toggleClass("collapsed").hasClass("collapsed");
                 $(this).attr("aria-expanded", collapsed ? "false" : "true");
             });
 
             // Contract toggle (service / charge lines, before a contract exists).
-            $root.on("click", ".MPC-vaso-switch:not(.locked)", function () {
+            $root.on("click", ".vas_106-switch:not(.locked)", function () {
                 var lineId = $(this).attr("data-line");
                 var on = $(this).toggleClass("on").hasClass("on");
                 $(this).attr("aria-checked", on ? "true" : "false");
-                var $form = $root.find('.MPC-vaso-contractForm[data-line="' + lineId + '"]');
+                var $form = $root.find('.vas_106-contractForm[data-line="' + lineId + '"]');
                 if (!$form.length) return;
                 if (isCompleted() && on) { $form.addClass("open"); validateContractForm($form); }
                 else if (!on) { $form.removeClass("open"); }
             });
 
             // Contract form validation.
-            $root.on("input change", ".MPC-vaso-contractForm .MPC-vaso-ffInput", function () {
-                validateContractForm($(this).closest(".MPC-vaso-contractForm"));
+            $root.on("input change", ".vas_106-contractForm .vas_106-ffInput", function () {
+                validateContractForm($(this).closest(".vas_106-contractForm"));
             });
 
             // Create Contract.
-            $root.on("click", ".MPC-vaso-cfCreate:not([disabled])", function () {
+            $root.on("click", ".vas_106-cfCreate:not([disabled])", function () {
                 handleCreateContract($(this));
             });
 
             // Action-bar buttons.
-            $root.on("click", '.MPC-vaso-btn[data-act="complete"]:not([disabled])', function () {
+            $root.on("click", '.vas_106-btn[data-act="complete"]:not([disabled])', function () {
                 handleCompleteSalesOrder();
             });
-            $root.on("click", '.MPC-vaso-btn[data-act="delivery"]:not([disabled])', function () {
+            $root.on("click", '.vas_106-btn[data-act="delivery"]:not([disabled])', function () {
                 toast(getMsg("VAS_106_DeliverySoon", "Create Delivery will be available shortly."), false);
             });
-            $root.on("click", '.MPC-vaso-btn[data-act="invoice"]:not([disabled])', function () {
+            $root.on("click", '.vas_106-btn[data-act="invoice"]:not([disabled])', function () {
                 toast(getMsg("VAS_106_InvoiceSoon", "Create Invoice will be available shortly."), false);
             });
 
             // Open linked records.
-            $root.on("click", ".is-link[data-open-table], .MPC-vaso-chip.is-link, .MPC-vaso-ctrLink", function (e) {
+            $root.on("click", ".is-link[data-open-table], .vas_106-chip.is-link, .vas_106-ctrLink", function (e) {
                 e.preventDefault();
                 openRecord($(this).attr("data-open-table"), $(this).attr("data-open-id"));
             });
@@ -1058,13 +1213,13 @@
 
         function validateContractForm($form) {
             var ok = true;
-            $form.find(".MPC-vaso-ffInput[data-req]").each(function () {
+            $form.find(".vas_106-ffInput[data-req]").each(function () {
                 var v = ($(this).val() || "").toString().trim();
                 if (!v || v === "0") ok = false;
             });
-            var $btn = $form.find(".MPC-vaso-cfCreate");
+            var $btn = $form.find(".vas_106-cfCreate");
             if (!$btn.hasClass("done")) $btn.prop("disabled", !ok);
-            var $note = $form.find(".MPC-vaso-cfNote");
+            var $note = $form.find(".vas_106-cfNote");
             if (!$btn.hasClass("done"))
                 $note.text(ok ? getMsg("VAS_106_ReadyToCreate", "Ready — click Create Contract")
                               : getMsg("VAS_106_FillRequired", "Fill the required fields (*) to create the contract"));
@@ -1094,16 +1249,16 @@
         }
 
         function handleCreateContract($btn) {
-            var $form = $btn.closest(".MPC-vaso-contractForm");
+            var $form = $btn.closest(".vas_106-contractForm");
             var lineId = $form.attr("data-line");
             var payload = {
                 C_Order_ID: data.C_Order_ID,
                 C_OrderLine_ID: lineId,
-                C_Frequency_ID: parseInt($form.find(".MPC-vaso-cfFreq").val(), 10) || 0,
-                noOfCycle: parseInt(($form.find(".MPC-vaso-cfCycles").val() || "0"), 10) || 0,
-                qtyPerCycle: parseFloat(($form.find(".MPC-vaso-cfQty").val() || "0")) || 0,
-                startDate: ($form.find(".MPC-vaso-cfStart").val() || "").trim(),
-                endDate: ($form.find(".MPC-vaso-cfEnd").val() || "").trim()
+                C_Frequency_ID: parseInt($form.find(".vas_106-cfFreq").val(), 10) || 0,
+                noOfCycle: parseInt(($form.find(".vas_106-cfCycles").val() || "0"), 10) || 0,
+                qtyPerCycle: parseFloat(($form.find(".vas_106-cfQty").val() || "0")) || 0,
+                startDate: ($form.find(".vas_106-cfStart").val() || "").trim(),
+                endDate: ($form.find(".vas_106-cfEnd").val() || "").trim()
             };
             $btn.prop("disabled", true);
             $.ajax({
@@ -1115,11 +1270,11 @@
                     var res = parseResult(raw);
                     if (res && res.Success) {
                         // Lock the form, then reload so the contract chip appears.
-                        $form.find(".MPC-vaso-ffInput").prop("disabled", true);
+                        $form.find(".vas_106-ffInput").prop("disabled", true);
                         $btn.addClass("done");
                         $btn.html("").append(svgIcon("check")).append($('<span></span>')
                             .text(getMsg("VAS_106_ContractCreated", "Contract Created")));
-                        $form.find(".MPC-vaso-cfNote").text(
+                        $form.find(".vas_106-cfNote").text(
                             getMsg("VAS_106_ContractCreatedNote", "Contract") + " " + (res.DocumentNo || "") + " " +
                             getMsg("VAS_106_CreatedFromLine", "created from this line"));
                         toast(getMsg("VAS_106_ContractCreatedToast", "Contract created"), false);
@@ -1161,7 +1316,7 @@
 
         // Lightweight self-contained toast (no dependency on a host toast API).
         function toast(message, isError) {
-            var $t = $('<div class="MPC-vaso-toast"></div>').addClass(isError ? "err" : "ok").text(message);
+            var $t = $('<div class="vas_106-toast"></div>').addClass(isError ? "err" : "ok").text(message);
             $root.append($t);
             setTimeout(function () { $t.addClass("show"); }, 10);
             setTimeout(function () { $t.removeClass("show"); setTimeout(function () { $t.remove(); }, 300); }, 3200);
@@ -1192,12 +1347,14 @@
             check:    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
             checkCircle: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
             chevUp:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>',
+            chevLeft: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
+            chevRight:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
             plus:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
             arrowUpRight: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>'
         };
 
         function svgIcon(name) {
-            var $wrap = $('<span class="MPC-vaso-ic"></span>');
+            var $wrap = $('<span class="vas_106-ic"></span>');
             $wrap[0].innerHTML = SVG_ICONS[name] || "";
             return $wrap;
         }
@@ -1253,11 +1410,21 @@
             this.table_ID = curTab.getAD_Table_ID();
         }
         this.init();
+        // Watch the tab itself so New Record / Copy Record (neither of which
+        // reliably calls refreshPanelData) still empty the panel.
+        if (curTab && typeof curTab.addDataStatusListener === "function") {
+            try { curTab.addDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
     };
 
     /* Update tab panel based on selected record */
     VAS.VAS_106_OverviewSalesOrder.prototype.refreshPanelData = function (recordID, selectedRow) {
-        if (selectedRow == undefined || recordID <= 0) {
+        // The insert check is what makes New Record / Copy Record behave:
+        // the id handed in for an unsaved row can still be the previously
+        // selected (or copied-from) record's, so the tab's own insert state
+        // decides, not the id.
+        if (selectedRow == undefined || recordID <= 0 || isTabInserting(this.curTab)) {
+            this.record_ID = 0;
             this.clear();
             return;
         }
@@ -1273,6 +1440,10 @@
 
     /* Release variables from memory */
     VAS.VAS_106_OverviewSalesOrder.prototype.dispose = function () {
+        if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
+            try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
+        this.tabDataListener = null;
         this.record_ID = 0;
         this.table_ID = 0;
         this.windowNo = 0;

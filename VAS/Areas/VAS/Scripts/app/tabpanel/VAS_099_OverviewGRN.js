@@ -122,9 +122,99 @@
  *                        - Priority Low and Minor now badge green.
  *                        - The timeline's Invoiced stage captions with the date
  *                          the invoice was raised, not the date typed on it.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vasgrn- -> vas_099- so the panel's
+ *                          styles cannot collide with another panel's.
+ *   VAI163   2026-08-05  New Record / Copy Record now empty the panel instead
+ *                        of leaving the previously selected record on screen.
+ *                        Both refreshPanelData and a new data-status listener
+ *                        ask isTabInserting(), which reads GridTab.gridTable
+ *                        .getIsInserting() — the flag GridTable.dataNew() raises
+ *                        for both actions. The record id cannot answer it: a
+ *                        copied row carries the source record's key until saved.
+ *                        Ported from VAS_092.
+ *   VAI163   2026-08-06  - Snapshot cards carry their full text as a tooltip. Every
+ *                          line inside a card clips to one line, so a long figure
+ *                          read as ellipsised with no way to see it. The title sits
+ *                          on the card, so hovering anywhere over it reads the
+ *                          label, value and caption out.
+ *                        - Reference chips likewise, since a long document number
+ *                          now truncates inside the chip rather than running the
+ *                          strip off the panel edge.
+ *                        Ported from VAS_092.
+ *                        - The material table carries a .vas_099-matTable modifier
+ *                          (like the Documents / Quality Parameters tables), so a
+ *                          rule can address its own columns — the UOM cell's
+ *                          trailing inset — without catching theirs.
+ *   VAI163   2026-08-06  Activity paginates at 15 rows a page (ACTIVITY_PER_PAGE),
+ *                          reusing the material-lines pager. buildPager() is no
+ *                          longer tied to linesPage / LINES_PER_PAGE: it takes the
+ *                          0-based page and an onGo(page) callback, so the lines
+ *                          table and the activity feed page independently. A feed
+ *                          that fits on one page shows no controls, and the section
+ *                          summary keeps counting the whole feed.
+ *   VAI163   2026-08-06  - render() draws each section behind its own guard
+ *                          (drawSection). They ran in a bare sequence, so the first
+ *                          section to throw took every section below it off the
+ *                          screen — silently, with nothing logged.
+ *                        - msg() falls back properly. VIS.Msg answers an unseeded
+ *                          key with the key BRACKETED and upper-cased, which is
+ *                          never equal to the key, so the English fallback was
+ *                          unreachable and the panel printed [VAS_099_...] labels.
+ *                        - References section removed: the purchase order, the
+ *                          reference invoice and the sales order are already
+ *                          clickable chips in Generated From, and the section only
+ *                          repeated them as dead N/A text. Against PO and Expected
+ *                          Delivery are gone from the header card for the same
+ *                          reason (the promised date belongs to the order, not the
+ *                          receipt).
+ *                        - Material Lines always renders, with an empty state, so a
+ *                          receipt whose lines did not come back is no longer
+ *                          indistinguishable from one with no lines section at all.
+ *                        - Line quantities read in the line's ENTERED uom — the one
+ *                          the UOM cell names — and Rate is restated per that uom
+ *                          so Qty x Rate reconciles to Amount on a converted line.
+ *                        - Generate Invoice: a blocked button now says why (hover
+ *                          and click) instead of being mute; a failure to load the
+ *                          document types no longer claims an invoice was attempted;
+ *                          and the success toast names the invoice itself, through
+ *                          AD_Message, rather than relying on the server sentence.
+ *                        - Activity follows VAS_092: a wrapping flex row with the
+ *                          timestamp held right by margin-left:auto, and the pager
+ *                          inside the list card.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
+
+    // True when the tab is sitting on a row that has not been saved yet —
+    // whether it came from New Record or from Copy Record.
+    //
+    // The authority is the GRID TABLE's insert flag: VIS.GridTable.dataNew()
+    // raises it for both actions and clears it again on save, refresh or undo,
+    // and GridTable.getIsInserting() reads it. GridTab does NOT expose that
+    // method — it only holds the table as .gridTable — so asking the tab itself
+    // always answers "no".
+    //
+    // The record id cannot answer this on its own: a copied row carries the
+    // SOURCE record's field values, its key included, so the id handed to the
+    // panel is the record that was copied FROM. Either way the panel would
+    // otherwise show a saved record's details beside an unsaved new one.
+    function isTabInserting(curTab) {
+        if (!curTab) return false;
+        try {
+            if (curTab.gridTable && typeof curTab.gridTable.getIsInserting === "function"
+                && curTab.gridTable.getIsInserting()) {
+                return true;
+            }
+        } catch (e) { }
+
+        var probes = ["getIsInserting", "isInserting", "getIsNew", "isNew"];
+        for (var i = 0; i < probes.length; i++) {
+            try {
+                if (typeof curTab[probes[i]] === "function" && curTab[probes[i]]()) return true;
+            } catch (e2) { }
+        }
+        return false;
+    }
 
     VAS.VAS_099_OverviewGRN = function () {
         this.record_ID = 0;
@@ -135,6 +225,50 @@
         this.panelWidth;
 
         var $self = this;
+
+        // The framework notifies a tab panel when the selected record changes
+        // (refreshPanelData) but NOT when the user starts a new one:
+        // GridController.dataNew() never reaches the tab panel, so the panel
+        // would keep showing the previously selected record beside an empty new
+        // one. Listening to the tab's own data-status events closes that gap.
+        function onTabDataStatus(e) {
+            var inserting = false;
+            try {
+                inserting = !!(e && typeof e.getIsInserting === "function" && e.getIsInserting());
+            } catch (ex) {
+                inserting = false;
+            }
+            // The event does not report insert state on every build, and a
+            // COPIED row still carries the source record's key — so ask the tab
+            // as well before trusting the id below.
+            if (!inserting) inserting = isTabInserting($self.curTab);
+
+            var rid = 0;
+            try {
+                if ($self.curTab && typeof $self.curTab.getRecord_ID === "function") {
+                    rid = +$self.curTab.getRecord_ID() || 0;
+                }
+            } catch (ex2) {
+                rid = 0;
+            }
+
+            if (inserting || rid <= 0) {
+                // New (unsaved) record — nothing to show against it.
+                if ($self.record_ID) {
+                    $self.record_ID = 0;
+                    $self.clear();
+                }
+                return;
+            }
+            if (rid !== $self.record_ID) {
+                $self.record_ID = rid;
+                $self.fetchData(rid);
+            }
+        }
+
+        // Registered on the tab in startPanel, removed in dispose. Kept as an
+        // object because the framework calls listener.dataStatusChanged(event).
+        this.tabDataListener = { dataStatusChanged: function (e) { onTabDataStatus(e); } };
         var $root;
         var $busy;
         var $body;
@@ -147,11 +281,12 @@
         // once there is a second page to reach.
         var LINES_PER_PAGE = 25;
         var linesPage = 0;
+        var activityPage = 0;   // current Activity page (0-based, like linesPage)
 
         this.init = function () {
-            $root = $('<div class="MPC-vasgrn-root"></div>');
-            $body = $('<div class="MPC-vasgrn-body"></div>');
-            $emptyState = $('<div class="MPC-vasgrn-empty" style="display:none;"></div>');
+            $root = $('<div class="vas_099-root"></div>');
+            $body = $('<div class="vas_099-body"></div>');
+            $emptyState = $('<div class="vas_099-empty" style="display:none;"></div>');
             $emptyState.text(VIS.Msg.getMsg("VAS_099_NoData"));
             $root.append($body).append($emptyState);
             createBusyIndicator();
@@ -165,7 +300,7 @@
         // Delegated once on the root, so it survives every re-render: an origin
         // chip or a document row opens the record it points at.
         function bindEvents() {
-            $root.on("click", ".MPC-vasgrn-chip.is-link, .is-link[data-open-table]", function (e) {
+            $root.on("click", ".vas_099-chip.is-link, .is-link[data-open-table]", function (e) {
                 e.preventDefault();
                 openRecord($(this).attr("data-open-table"), $(this).attr("data-open-id"),
                     $(this).attr("data-open-sotrx") === "Y");
@@ -222,6 +357,7 @@
                     var parsed = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     data = parsed;
                     linesPage = 0;
+                    activityPage = 0;
                     render();
                     showBusy(false);
                 },
@@ -235,6 +371,7 @@
         this.clear = function () {
             data = null;
             linesPage = 0;
+            activityPage = 0;
             render();
         };
 
@@ -255,18 +392,39 @@
             $emptyState.hide();
             $body.show();
 
-            // Body is a flat stack of self-contained sections.
-            renderHeader();
-            renderLinked();
-            renderReferences();
-            renderSnapshot();
-            renderTimeline();
-            renderLines();
-            renderQualityProducts();
-            renderDocuments();
-            renderNotes();
-            renderActivity();
-            renderActions();
+            // Body is a flat stack of self-contained sections, each drawn behind
+            // its own guard.
+            //
+            // They used to be called in a bare sequence, so the FIRST one to throw
+            // took every section below it off the screen with it — a single bad
+            // field in the snapshot silently erased the material lines, the quality
+            // parameters, the documents and the action buttons, with nothing on
+            // screen and nothing in the log to say why. A section that fails now
+            // costs only itself.
+            //
+            // References is gone: every field it carried is already on screen — the
+            // purchase order, reference invoice and sales order as clickable chips
+            // in Generated From, and the rest in the header card. The section only
+            // repeated them as dead N/A text.
+            drawSection("header",   renderHeader);
+            drawSection("linked",   renderLinked);
+            drawSection("snapshot", renderSnapshot);
+            drawSection("timeline", renderTimeline);
+            drawSection("lines",    renderLines);
+            drawSection("quality",  renderQualityProducts);
+            drawSection("documents", renderDocuments);
+            drawSection("notes",    renderNotes);
+            drawSection("activity", renderActivity);
+            drawSection("actions",  renderActions);
+        }
+
+        // Runs one section's renderer, containing any failure to that section.
+        function drawSection(name, fn) {
+            try {
+                fn();
+            } catch (e) {
+                try { console.log("VAS_099 section '" + name + "' failed to render:", e); } catch (e2) { }
+            }
         }
 
         // True when a quality check applies anywhere on this receipt — the two QC
@@ -283,11 +441,11 @@
         // by a content node. Returns the section element so callers can append.
         function section(title, opts, $parent) {
             opts = opts || {};
-            var $sec = $('<section class="MPC-vasgrn-sec"></section>');
-            var $head = $('<div class="MPC-vasgrn-secHead"></div>');
-            $head.append($('<h2 class="MPC-vasgrn-secTitle"></h2>').text(title));
+            var $sec = $('<section class="vas_099-sec"></section>');
+            var $head = $('<div class="vas_099-secHead"></div>');
+            $head.append($('<h2 class="vas_099-secTitle"></h2>').text(title));
             if (opts.summary) {
-                $head.append($('<span class="MPC-vasgrn-secSummary"></span>').text(opts.summary));
+                $head.append($('<span class="vas_099-secSummary"></span>').text(opts.summary));
             }
             $sec.append($head);
             ($parent || $body).append($sec);
@@ -303,12 +461,24 @@
 
         // Prefer the seeded AD_Message; else a readable English fallback; else the
         // key. Used for message keys that may not be seeded yet.
+        //
+        // VIS.Msg does NOT answer an unseeded key with the key itself — it answers
+        // with the key bracketed and upper-cased ("[VAS_099_GENERATEDFROM]"). That
+        // is never equal to the key, so the fallback below was unreachable and the
+        // panel printed raw keys on any database where the VAS_099_* messages have
+        // not been seeded. A bracketed answer is treated as "not found".
         function msg(key, fallback) {
             try {
                 var m = VIS.Msg.getMsg(key);
-                if (m && m !== key) return m;
+                if (m && m !== key && !isMissingMsg(m)) return m;
             } catch (e) { }
             return (fallback !== null && fallback !== undefined) ? fallback : key;
+        }
+
+        // True for VIS.Msg's "key not seeded" answer: the key, bracketed.
+        function isMissingMsg(text) {
+            var t = String(text);
+            return t.length > 1 && t.charAt(0) === "[" && t.charAt(t.length - 1) === "]";
         }
 
         // The currency token: prefer the linked order's symbol / ISO, else INR.
@@ -364,11 +534,11 @@
             var pm = priorityMeta(data.PriorityCode);
 
             // --- Title strip: title + subtitle (left), priority + status (right) ---
-            var $strip = $('<section class="MPC-vasgrn-hdr"></section>');
-            var $top = $('<div class="MPC-vasgrn-hdrTop"></div>');
+            var $strip = $('<section class="vas_099-hdr"></section>');
+            var $top = $('<div class="vas_099-hdrTop"></div>');
 
-            var $tl = $('<div class="MPC-vasgrn-hdrTitleWrap"></div>');
-            $tl.append($('<div class="MPC-vasgrn-hdrTitle"></div>').text(
+            var $tl = $('<div class="vas_099-hdrTitleWrap"></div>');
+            $tl.append($('<div class="vas_099-hdrTitle"></div>').text(
                 VIS.Msg.getMsg("VAS_099_GoodsReceiptNote") +
                 (data.DocumentNo ? " — " + data.DocumentNo : "")));
 
@@ -377,11 +547,11 @@
             if (received) subBits.push(VIS.Msg.getMsg("VAS_099_Received") + " " + received);
             if (data.ReceivedBy) subBits.push(VIS.Msg.getMsg("VAS_099_ReceivedBy") + " " + data.ReceivedBy);
             if (subBits.length) {
-                $tl.append($('<div class="MPC-vasgrn-hdrSub"></div>').text(subBits.join(" · ")));
+                $tl.append($('<div class="vas_099-hdrSub"></div>').text(subBits.join(" · ")));
             }
             $top.append($tl);
 
-            var $pills = $('<div class="MPC-vasgrn-hdrPills"></div>');
+            var $pills = $('<div class="vas_099-hdrPills"></div>');
             if (pm) $pills.append(headerPill(pm.label, pm.tone, "chevUp", false));
             $pills.append(headerPill(st.label, st.tone, null, true));
             // Posted status shown as a pill on the right (moved out of the vendor
@@ -395,50 +565,48 @@
             $body.append($strip);
 
             // --- Details card: supplier identity (left) + receipt fields (right) ---
-            var $card = $('<section class="MPC-vasgrn-hdrCard"></section>');
+            var $card = $('<section class="vas_099-hdrCard"></section>');
 
             // Left column: vendor name + GSTIN + address + contact bits.
-            var $left = $('<div class="MPC-vasgrn-hdrColL"></div>');
-            $left.append($('<div class="MPC-vasgrn-fLabel"></div>').text(VIS.Msg.getMsg("VAS_099_Vendor")));
-            $left.append($('<div class="MPC-vasgrn-vendName"></div>').text(na(data.VendorName)));
+            var $left = $('<div class="vas_099-hdrColL"></div>');
+            $left.append($('<div class="vas_099-fLabel"></div>').text(VIS.Msg.getMsg("VAS_099_Vendor")));
+            $left.append($('<div class="vas_099-vendName"></div>').text(na(data.VendorName)));
 
             if (data.VendorTaxID) {
-                var $gst = $('<div class="MPC-vasgrn-vendGst"></div>');
-                $gst.append($('<span class="MPC-vasgrn-gstLbl"></span>')
+                var $gst = $('<div class="vas_099-vendGst"></div>');
+                $gst.append($('<span class="vas_099-gstLbl"></span>')
                     .text(VIS.Msg.getMsg("VAS_099_GSTIN") + " "));
                 $gst.append($('<span></span>').text(data.VendorTaxID));
                 $left.append($gst);
             }
 
             if (data.VendorAddress) {
-                var $addr = $('<div class="MPC-vasgrn-vendAddr"></div>');
+                var $addr = $('<div class="vas_099-vendAddr"></div>');
                 $addr.append(svgIcon("pin"));
                 $addr.append($('<span></span>').text(data.VendorAddress));
                 $left.append($addr);
             }
-            var $contact = $('<div class="MPC-vasgrn-vendContact"></div>');
+            var $contact = $('<div class="vas_099-vendContact"></div>');
             appendContactBit($contact, "user",  data.ContactName);
             appendContactBit($contact, "phone", data.ContactPhone);
             appendContactBit($contact, "mail",  data.ContactEmail);
             if ($contact.children().length) $left.append($contact);
             $card.append($left);
 
-            // Right column: labelled receipt / reference fields.
-            var $right = $('<div class="MPC-vasgrn-hdrColR"></div>');
-            // Manually-created receipts have no purchase order — Purchase Order and
-            // Expected Delivery both read N/A (na() handles the blank values).
-            $right.append(headerField(VIS.Msg.getMsg("VAS_099_AgainstPO"),
-                na(data.PONo), !!data.PONo));
-            $right.append(headerField(msg("VAS_099_ExpectedDelivery", "Expected Delivery"),
-                na(formatDate(data.ExpectedDate)), false));
-            $right.append(headerField(VIS.Msg.getMsg("VAS_099_Warehouse"), na(data.WarehouseName), false));
-            $right.append(headerField(VIS.Msg.getMsg("VAS_099_ReceivedDate"),
+            // Right column: labelled receipt fields.
+            //
+            // Against PO and Expected Delivery are deliberately NOT here. The
+            // purchase order is already a clickable chip in Generated From
+            // immediately below, where it opens the order rather than sitting as
+            // dead text; the promised date belongs to that order, not to the
+            // receipt, and read N/A on every manually created one.
+            var $right = $('<div class="vas_099-hdrColR"></div>');
+            $right.append(headerField(msg("VAS_099_Warehouse", "Warehouse"), na(data.WarehouseName), false));
+            $right.append(headerField(msg("VAS_099_ReceivedDate", "Received Date"),
                 na(formatDate(data.MovementDate)), false));
             // Drop Shipment flag (M_InOut.IsDropShip).
             $right.append(headerField(msg("VAS_099_DropShipment", "Drop Shipment"),
                 data.IsDropShip ? msg("VAS_099_Yes", "Yes") : msg("VAS_099_No", "No"), false));
-            // Reference Invoice / Reference Sales Order live in the References
-            // section below, not here.
             $card.append($right);
 
             $body.append($card);
@@ -453,11 +621,11 @@
         // the source record; "Manual" is the fallback for a receipt entered
         // directly, so it only appears when every origin came back empty.
         function renderLinked() {
-            var $strip = $('<section class="MPC-vasgrn-genfrom"></section>');
-            $strip.append($('<span class="MPC-vasgrn-gfLabel"></span>')
+            var $strip = $('<section class="vas_099-genfrom"></section>');
+            $strip.append($('<span class="vas_099-gfLabel"></span>')
                 .text(msg("VAS_099_GeneratedFrom", "Generated From")));
 
-            var $chips = $('<div class="MPC-vasgrn-gfChips"></div>');
+            var $chips = $('<div class="vas_099-gfChips"></div>');
             var any = false;
 
             // Purchase Order — opened on the purchase side (isSOTrx false), since
@@ -500,7 +668,7 @@
         // with an optional trailing status pill. When a table + record id is
         // supplied the chip becomes a link that opens that record.
         function originChip(icon, label, value, $statusPill, iconTone, tableName, recordId, isSOTrx) {
-            var $chip = $('<span class="MPC-vasgrn-chip"></span>').addClass("ic-" + (iconTone || "muted"));
+            var $chip = $('<span class="vas_099-chip"></span>').addClass("ic-" + (iconTone || "muted"));
             var isLink = tableName && recordId && +recordId > 0;
             if (isLink) {
                 $chip.addClass("is-link")
@@ -508,47 +676,25 @@
                     .attr("data-open-id", recordId);
                 if (isSOTrx) $chip.attr("data-open-sotrx", "Y");
             }
+            // The chip caps at the strip's width and its value truncates inside
+            // it, so one long document number cannot run off the panel — the
+            // untruncated text stays readable on the chip's own tooltip.
+            $chip.attr("title", value ? label + ": " + value : label);
             $chip.append(svgIcon(icon));
-            $chip.append($('<span class="MPC-vasgrn-chipLabel"></span>').text(label));
-            if (value) $chip.append($('<span class="MPC-vasgrn-chipVal"></span>').text(value));
+            $chip.append($('<span class="vas_099-chipLabel"></span>').text(label));
+            if (value) $chip.append($('<span class="vas_099-chipVal"></span>').text(value));
             if ($statusPill) $chip.append($statusPill);
             if (isLink) $chip.append(svgIcon("arrowUpRight"));
             return $chip;
         }
 
-        // ---------- References (PO + linked documents) ---------- //
-
-        // The receipt's reference documents in one block: the purchase order it
-        // was raised against (number + order date + the vendor's own reference),
-        // the AP invoice raised for that order, and the originating sales order.
-        // Every field falls back to N/A so the grid never shows a blank cell.
-        function renderReferences() {
-            var $sec = section(msg("VAS_099_References", "References"), null);
-
-            var $card = $('<div class="MPC-vasgrn-refCard"></div>');
-            $card.append(headerField(VIS.Msg.getMsg("VAS_099_AgainstPO"),
-                na(data.PONo), !!data.PONo));
-            $card.append(headerField(msg("VAS_099_PODate", "PO Date"),
-                na(formatDate(data.PODate)), false));
-            $card.append(headerField(msg("VAS_099_VendorRef", "Vendor Ref"),
-                na(data.POReference), false));
-            // Neither reference is clickable, so they keep the plain value colour;
-            // only the PO number carries the link tint, as in the header card.
-            $card.append(headerField(VIS.Msg.getMsg("VAS_099_ReferenceInvoice"),
-                na(data.ReferenceInvoice), false));
-            $card.append(headerField(VIS.Msg.getMsg("VAS_099_ReferenceSalesOrder"),
-                na(data.RefOrderDocNo), false));
-
-            $sec.append($card);
-        }
-
         // Header pill: tinted chip with an optional leading chevron (priority) or
         // a leading dot (status).
         function headerPill(label, tone, icon, withDot) {
-            var $p = $('<span class="MPC-vasgrn-hdrPill"></span>')
+            var $p = $('<span class="vas_099-hdrPill"></span>')
                 .addClass("tone-" + (tone || "neutral"));
             if (icon) $p.append(svgIcon(icon));
-            if (withDot) $p.append($('<span class="MPC-vasgrn-hdrDot"></span>'));
+            if (withDot) $p.append($('<span class="vas_099-hdrDot"></span>'));
             $p.append($('<span></span>').text(label));
             return $p;
         }
@@ -556,9 +702,9 @@
         // Labelled field block for the details card's right column. When `link`
         // is set the value is rendered in the link colour (e.g. the PO number).
         function headerField(label, value, link) {
-            var $f = $('<div class="MPC-vasgrn-hdrField"></div>');
-            $f.append($('<div class="MPC-vasgrn-fLabel"></div>').text(label));
-            var $v = $('<div class="MPC-vasgrn-fVal"></div>').text(value);
+            var $f = $('<div class="vas_099-hdrField"></div>');
+            $f.append($('<div class="vas_099-fLabel"></div>').text(label));
+            var $v = $('<div class="vas_099-fVal"></div>').text(value);
             if (link) $v.addClass("is-link");
             $f.append($v);
             return $f;
@@ -566,7 +712,7 @@
 
         function appendContactBit($container, icon, value) {
             if (!value) return;
-            var $bit = $('<span class="MPC-vasgrn-contactBit"></span>');
+            var $bit = $('<span class="vas_099-contactBit"></span>');
             $bit.append(svgIcon(icon));
             $bit.append($('<span></span>').text(value));
             $container.append($bit);
@@ -577,7 +723,7 @@
         function renderSnapshot() {
             var qc = qualityApplicable();
 
-            var $snap = $('<section class="MPC-vasgrn-snap"></section>');
+            var $snap = $('<section class="vas_099-snap"></section>');
             // With the two quality cards in play the grid runs three-up, so the six
             // cards form two even rows instead of a 4 + 2 orphan.
             if (qc) $snap.addClass("has-qc");
@@ -624,15 +770,25 @@
         // Metric card: colour-accented left border (via tone class), a header
         // (icon + label), a large value and a caption.
         function metricCard(tone, icon, label, value, sub) {
-            var $c = $('<div class="MPC-vasgrn-metric"></div>').addClass("tone-" + tone);
+            var $c = $('<div class="vas_099-metric"></div>').addClass("tone-" + tone);
 
-            var $head = $('<div class="MPC-vasgrn-mHead"></div>');
+            // Label, value and caption each clip to a single line inside the card,
+            // so a long figure (the Received quantity / received value above all)
+            // shows ellipsised. The whole card carries the untruncated text as a
+            // tooltip — a title on the card serves every cell inside it, so
+            // hovering anywhere over the card reads out the full value.
+            var tip = label;
+            if (value) tip += ": " + value;
+            if (sub) tip += " · " + sub;
+            $c.attr("title", tip);
+
+            var $head = $('<div class="vas_099-mHead"></div>');
             $head.append(svgIcon(icon));
-            $head.append($('<span class="MPC-vasgrn-mLabel"></span>').text(label));
+            $head.append($('<span class="vas_099-mLabel"></span>').text(label));
             $c.append($head);
 
-            $c.append($('<div class="MPC-vasgrn-mVal"></div>').text(value));
-            if (sub) $c.append($('<div class="MPC-vasgrn-mSub"></div>').text(sub));
+            $c.append($('<div class="vas_099-mVal"></div>').text(value));
+            if (sub) $c.append($('<div class="vas_099-mSub"></div>').text(sub));
             return $c;
         }
 
@@ -688,7 +844,7 @@
 
             var $sec = section(VIS.Msg.getMsg("VAS_099_ReceiptTimeline"), null);
 
-            var $tl = $('<div class="MPC-vasgrn-stepper"></div>');
+            var $tl = $('<div class="vas_099-stepper"></div>');
             for (var i = 0; i < stages.length; i++) {
                 var s = stages[i];
 
@@ -714,23 +870,23 @@
         // Stepper node: connector rail (left line + circle + right line) above a
         // centred label. The circle shows a check when done, else its number.
         function stepEntry(num, title, meta, done, stateCls) {
-            var $entry = $('<div class="MPC-vasgrn-step"></div>').addClass(stateCls || "");
+            var $entry = $('<div class="vas_099-step"></div>').addClass(stateCls || "");
 
-            var $rail = $('<div class="MPC-vasgrn-stepRail"></div>');
-            $rail.append($('<span class="MPC-vasgrn-stepLine MPC-vasgrn-stepLine-l"></span>'));
-            var $dot = $('<span class="MPC-vasgrn-stepDot"></span>');
+            var $rail = $('<div class="vas_099-stepRail"></div>');
+            $rail.append($('<span class="vas_099-stepLine vas_099-stepLine-l"></span>'));
+            var $dot = $('<span class="vas_099-stepDot"></span>');
             if (done) {
                 $dot.append(svgIcon("check"));
             } else {
                 $dot.text(num);
             }
             $rail.append($dot);
-            $rail.append($('<span class="MPC-vasgrn-stepLine MPC-vasgrn-stepLine-r"></span>'));
+            $rail.append($('<span class="vas_099-stepLine vas_099-stepLine-r"></span>'));
             $entry.append($rail);
 
-            var $lbl = $('<div class="MPC-vasgrn-stepLabel"></div>');
-            $lbl.append($('<div class="MPC-vasgrn-stepTitle"></div>').text(title));
-            if (meta) $lbl.append($('<div class="MPC-vasgrn-stepMeta"></div>').text(meta));
+            var $lbl = $('<div class="vas_099-stepLabel"></div>');
+            $lbl.append($('<div class="vas_099-stepTitle"></div>').text(title));
+            if (meta) $lbl.append($('<div class="vas_099-stepMeta"></div>').text(meta));
             $entry.append($lbl);
 
             return $entry;
@@ -740,14 +896,23 @@
 
         function renderLines() {
             var lines = (data && data.Lines) || [];
-            if (!lines.length) return;
-
             var cur = currencyToken();
 
-            var $sec = section(VIS.Msg.getMsg("VAS_099_MaterialLines"), {
-                summary: (data.LineCount || 0) + " " + VIS.Msg.getMsg("VAS_099_Items") + " · " +
-                    formatNumber(+data.ReceivedQty || 0, 0) + " " + VIS.Msg.getMsg("VAS_099_Units")
+            var $sec = section(msg("VAS_099_MaterialLines", "Material Lines"), {
+                summary: (data.LineCount || 0) + " " + msg("VAS_099_Items", "items") + " · " +
+                    formatNumber(+data.ReceivedQty || 0, 0) + " " + msg("VAS_099_Units", "units")
             });
+
+            // The section always renders, even with nothing to put in it. It used
+            // to return before drawing anything, so a receipt whose lines did not
+            // come back was indistinguishable from one that has no lines section at
+            // all — the reader saw the panel jump from the timeline to the
+            // documents with no explanation. An empty receipt now says so.
+            if (!lines.length) {
+                $sec.append($('<div class="vas_099-qpEmpty"></div>')
+                    .text(msg("VAS_099_NoLines", "No lines have been recorded on this receipt yet.")));
+                return;
+            }
 
             // The Quality column is only meaningful when a quality check actually
             // applies to something on this receipt — with none, the column (header
@@ -757,11 +922,14 @@
                 if (lines[q].QualityApplicable) { showQuality = true; break; }
             }
 
-            var $tbl = $('<div class="MPC-vasgrn-table"></div>');
+            // Named like the Documents / Quality Parameters tables so a rule can
+            // address the material table's own columns without also catching
+            // theirs — they share .vas_099-tRow but not its column meanings.
+            var $tbl = $('<div class="vas_099-table vas_099-matTable"></div>');
             if (!showQuality) $tbl.addClass("no-quality");
 
             // Header row
-            var $head = $('<div class="MPC-vasgrn-tRow MPC-vasgrn-tHead"></div>');
+            var $head = $('<div class="vas_099-tRow vas_099-tHead"></div>');
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_099_Item")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_099_UOM")));
             $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_099_Ordered")));
@@ -774,8 +942,8 @@
             $tbl.append($head);
 
             // Totals footer — always the whole receipt, never just the page.
-            var $foot = $('<div class="MPC-vasgrn-tFoot"></div>');
-            var $bit = $('<span class="MPC-vasgrn-tf is-grand"></span>');
+            var $foot = $('<div class="vas_099-tFoot"></div>');
+            var $bit = $('<span class="vas_099-tf is-grand"></span>');
             $bit.append(document.createTextNode(VIS.Msg.getMsg("VAS_099_TotalReceivedValue")));
             $bit.append($('<b></b>').text(formatAmount(+data.ReceivedValue || 0, cur, data.StdPrecision)));
             $foot.append($bit);
@@ -786,7 +954,7 @@
             // The pager sits outside the table: the table gets its own horizontal
             // scroll on narrow panels, and the controls must not scroll away with
             // the columns.
-            var $pager = $('<div class="MPC-vasgrn-pager"></div>');
+            var $pager = $('<div class="vas_099-pager"></div>');
             if (lines.length > LINES_PER_PAGE) $sec.append($pager);
 
             // Rows are replaced in place, ahead of the totals footer, so the
@@ -800,12 +968,13 @@
                 var start = linesPage * LINES_PER_PAGE;
                 var end = Math.min(lines.length, start + LINES_PER_PAGE);
 
-                $tbl.find(".MPC-vasgrn-tBody").remove();
+                $tbl.find(".vas_099-tBody").remove();
                 for (var i = start; i < end; i++) {
                     $foot.before(buildLineRow(lines[i], cur, showQuality));
                 }
 
-                buildPager($pager, lines.length, pageCount, start, end, paintPage);
+                buildPager($pager, linesPage, pageCount, lines.length, start, end,
+                    function (p) { linesPage = p; paintPage(); });
             }
 
             paintPage();
@@ -814,31 +983,36 @@
         // Renders the pager into $pager: a range caption on the left, Previous /
         // page-of / Next on the right. Rebuilt on every page change so the
         // disabled states stay accurate.
-        function buildPager($pager, total, pageCount, start, end, onChange) {
+        //
+        // `page` is the 0-based page being shown and `onGo` is handed the page to
+        // move to, so each paged section owns its own page variable — the material
+        // lines and the activity feed page independently of one another. Nothing
+        // is drawn for a single-page list, so a short section shows no controls.
+        function buildPager($pager, page, pageCount, total, start, end, onGo) {
             $pager.empty();
-            if (total <= LINES_PER_PAGE) return;
+            if (pageCount <= 1) return;
 
-            $pager.append($('<span class="MPC-vasgrn-pgRange"></span>').text(
+            $pager.append($('<span class="vas_099-pgRange"></span>').text(
                 msg("VAS_099_Showing", "Showing") + " " + (start + 1) + "-" + end + " " +
                 msg("VAS_099_Of", "of") + " " + total));
 
-            var $ctrls = $('<span class="MPC-vasgrn-pgCtrls"></span>');
+            var $ctrls = $('<span class="vas_099-pgCtrls"></span>');
 
             $ctrls.append(pagerButton(msg("VAS_099_Previous", "Previous"), "chevLeft",
-                linesPage <= 0, function () { linesPage--; onChange(); }));
+                page <= 0, function () { onGo(page - 1); }));
 
-            $ctrls.append($('<span class="MPC-vasgrn-pgPos"></span>').text(
-                msg("VAS_099_Page", "Page") + " " + (linesPage + 1) + " " +
+            $ctrls.append($('<span class="vas_099-pgPos"></span>').text(
+                msg("VAS_099_Page", "Page") + " " + (page + 1) + " " +
                 msg("VAS_099_Of", "of") + " " + pageCount));
 
             $ctrls.append(pagerButton(msg("VAS_099_Next", "Next"), "chevRight",
-                linesPage >= pageCount - 1, function () { linesPage++; onChange(); }));
+                page >= pageCount - 1, function () { onGo(page + 1); }));
 
             $pager.append($ctrls);
         }
 
         function pagerButton(label, icon, disabled, handler) {
-            var $b = $('<span class="MPC-vasgrn-pgBtn"></span>');
+            var $b = $('<span class="vas_099-pgBtn"></span>');
             if (icon === "chevLeft") $b.append(svgIcon(icon));
             $b.append($('<span></span>').text(label));
             if (icon === "chevRight") $b.append(svgIcon(icon));
@@ -851,13 +1025,13 @@
         }
 
         function buildLineRow(ln, cur, showQuality) {
-            var $tr = $('<div class="MPC-vasgrn-tRow MPC-vasgrn-tBody"></div>');
+            var $tr = $('<div class="vas_099-tRow vas_099-tBody"></div>');
 
             // Item (name + attribute, then product code / locator). The name cell
             // ellipsises, so the full text goes on a hover tooltip — same treatment
             // as the locator below, and it leaves the layout untouched.
-            var $item = $('<span class="MPC-vasgrn-itItem"></span>');
-            var $name = $('<div class="MPC-vasgrn-itName"></div>');
+            var $item = $('<span class="vas_099-itItem"></span>');
+            var $name = $('<div class="vas_099-itName"></div>');
             $name.append($('<span></span>').text(na(ln.ProductName)));
 
             // Attribute Set Instance (size / lot / serial ...) reads as part of
@@ -867,7 +1041,7 @@
             var asi = (ln.AttributeSetInstance || "").trim();
             var hasAsi = (asi && asi !== "--" && asi !== "-");
             if (hasAsi) {
-                $name.append($('<span class="MPC-vasgrn-itAttr"></span>').text(asi));
+                $name.append($('<span class="vas_099-itAttr"></span>').text(asi));
             }
             var nameTip = (ln.ProductName || "") + (hasAsi ? " — " + asi : "");
             if (nameTip) $name.attr("title", nameTip);
@@ -876,20 +1050,20 @@
             // Sub-line: product search key (no "SKU" prefix) · locator. The line
             // ellipsises when the column is narrow, so the locator carries the full
             // name as a hover tooltip — readable without widening the layout.
-            var $sku = $('<div class="MPC-vasgrn-itSku"></div>');
+            var $sku = $('<div class="vas_099-itSku"></div>');
             if (ln.ProductCode) {
                 $sku.append($('<span></span>').text(ln.ProductCode));
             }
             if (ln.LocatorName) {
                 if ($sku.children().length) $sku.append(document.createTextNode(" · "));
-                $sku.append($('<span class="MPC-vasgrn-itLoc"></span>')
+                $sku.append($('<span class="vas_099-itLoc"></span>')
                     .text(VIS.Msg.getMsg("VAS_099_Locator") + " " + ln.LocatorName)
                     .attr("title", ln.LocatorName));
             }
             if ($sku.children().length) {
                 $item.append($sku);
             } else if (ln.Description) {
-                $item.append($('<div class="MPC-vasgrn-itSku"></div>').text(ln.Description));
+                $item.append($('<div class="vas_099-itSku"></div>').text(ln.Description));
             }
             $tr.append($item);
 
@@ -908,16 +1082,26 @@
             var received = +ln.ReceivedQty || 0;
             var pct = ordered > 0 ? Math.min(100, Math.round((received / ordered) * 100)) : (received > 0 ? 100 : 0);
             var recvState = ordered > 0 && received >= ordered ? "full" : (received > 0 ? "part" : "none");
-            var $recv = $('<span class="MPC-vasgrn-recv ta-r"></span>').addClass(recvState);
-            $recv.append($('<span class="MPC-vasgrn-recvVal"></span>').text(formatNumber(received, prec)));
-            var $bar = $('<span class="MPC-vasgrn-recvBar"><i></i></span>');
+            var $recv = $('<span class="vas_099-recv ta-r"></span>').addClass(recvState);
+            $recv.append($('<span class="vas_099-recvVal"></span>').text(formatNumber(received, prec)));
+            var $bar = $('<span class="vas_099-recvBar"><i></i></span>');
             $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
             $recv.append($bar);
+            // Every quantity on the row is in the line's ENTERED uom — the one the
+            // UOM cell names. The tooltip spells the pair out with that unit, so a
+            // converted line (2 Box, not 24 Each) is unambiguous on hover.
+            var recvTip = formatNumber(received, prec) + " " + msg("VAS_099_Of", "of") +
+                          " " + formatNumber(ordered, prec);
+            if (ln.UOMName) recvTip += " " + ln.UOMName;
+            $recv.attr("title", recvTip);
             $tr.append($recv);
 
-            // Rate
+            // Rate — per the entered uom, so Qty x Rate reconciles to Amount on the
+            // row as shown (the model restates it for a converted line).
             $tr.append($('<span class="ta-r"></span>').text(
-                formatAmount(+ln.UnitRate || 0, cur, data.StdPrecision)));
+                formatAmount(+ln.UnitRate || 0, cur, data.StdPrecision))
+                .attr("title", formatAmount(+ln.UnitRate || 0, cur, data.StdPrecision) +
+                    (ln.UOMName ? " / " + ln.UOMName : "")));
 
             // Amount
             $tr.append($('<span class="ta-r"></span>').text(
@@ -928,10 +1112,10 @@
             if (showQuality) {
                 var $q = $('<span class="ta-c"></span>');
                 if (ln.QualityApplicable) {
-                    $q.append($('<span class="MPC-vasgrn-tag q-on"></span>')
+                    $q.append($('<span class="vas_099-tag q-on"></span>')
                         .text(VIS.Msg.getMsg("VAS_099_Applicable")));
                 } else {
-                    $q.append($('<span class="MPC-vasgrn-tag q-off"></span>')
+                    $q.append($('<span class="vas_099-tag q-off"></span>')
                         .text(VIS.Msg.getMsg("VAS_099_NotApplicable")));
                 }
                 $tr.append($q);
@@ -969,15 +1153,15 @@
             // A quality check applies but nothing has been recorded yet — say so
             // rather than showing an empty frame.
             if (!rows.length) {
-                $sec.append($('<div class="MPC-vasgrn-qpEmpty"></div>')
+                $sec.append($('<div class="vas_099-qpEmpty"></div>')
                     .text(msg("VAS_099_NoQualityParams",
                               "No quality parameters have been recorded for this receipt yet.")));
                 return;
             }
 
-            var $tbl = $('<div class="MPC-vasgrn-table MPC-vasgrn-qpTable"></div>');
+            var $tbl = $('<div class="vas_099-table vas_099-qpTable"></div>');
 
-            var $head = $('<div class="MPC-vasgrn-tRow MPC-vasgrn-tHead"></div>');
+            var $head = $('<div class="vas_099-tRow vas_099-tHead"></div>');
             $head.append($('<span></span>').text(msg("VAS_099_Product", "Product")));
             $head.append($('<span></span>').text(msg("VAS_099_Parameter", "Parameter")));
             $head.append($('<span class="ta-r"></span>').text(msg("VAS_099_ToVerify", "To Verify")));
@@ -996,25 +1180,25 @@
         }
 
         function buildQualityRow(q) {
-            var $tr = $('<div class="MPC-vasgrn-tRow MPC-vasgrn-tBody"></div>');
+            var $tr = $('<div class="vas_099-tRow vas_099-tBody"></div>');
 
             // Product (name + search key), with the full name on hover since the
             // cell ellipsises.
-            var $prod = $('<span class="MPC-vasgrn-itItem"></span>');
+            var $prod = $('<span class="vas_099-itItem"></span>');
             var pname = na(q.ProductName);
-            $prod.append($('<div class="MPC-vasgrn-itName"></div>').text(pname).attr("title", pname));
+            $prod.append($('<div class="vas_099-itName"></div>').text(pname).attr("title", pname));
             if (q.ProductCode) {
-                $prod.append($('<div class="MPC-vasgrn-itSku"></div>').text(q.ProductCode));
+                $prod.append($('<div class="vas_099-itSku"></div>').text(q.ProductCode));
             }
             $tr.append($prod);
 
             // Parameter (Colour / Size / Grade ...), with the QA remark beneath it
             // when one was entered.
-            var $param = $('<span class="MPC-vasgrn-itItem"></span>');
-            $param.append($('<div class="MPC-vasgrn-qpName"></div>').text(na(q.ParameterName)));
+            var $param = $('<span class="vas_099-itItem"></span>');
+            $param.append($('<div class="vas_099-qpName"></div>').text(na(q.ParameterName)));
             var remark = (q.Remark || "").trim();
             if (remark) {
-                $param.append($('<div class="MPC-vasgrn-itSku"></div>')
+                $param.append($('<div class="vas_099-itSku"></div>')
                     .text(remark).attr("title", remark));
             }
             $tr.append($param);
@@ -1032,7 +1216,7 @@
             // Verdict.
             var st = QC_STATUS_MAP[q.StatusCode] || QC_STATUS_MAP["N"];
             var $status = $('<span class="ta-c"></span>');
-            $status.append($('<span class="MPC-vasgrn-tag"></span>')
+            $status.append($('<span class="vas_099-tag"></span>')
                 .addClass(st.tone).text(msg(st.key, st.fallback)));
             $tr.append($status);
 
@@ -1057,9 +1241,9 @@
                 summary: buildDocumentsSummary(rows)
             });
 
-            var $tbl = $('<div class="MPC-vasgrn-table MPC-vasgrn-docTable"></div>');
+            var $tbl = $('<div class="vas_099-table vas_099-docTable"></div>');
 
-            var $h = $('<div class="MPC-vasgrn-tRow MPC-vasgrn-tHead"></div>');
+            var $h = $('<div class="vas_099-tRow vas_099-tHead"></div>');
             $h.append($('<span></span>').text(msg("VAS_099_Document", "Document")));
             $h.append($('<span></span>').text(msg("VAS_099_DocDate", "Date")));
             $h.append($('<span></span>').text(msg("VAS_099_DocStatus", "Status")));
@@ -1089,7 +1273,7 @@
         }
 
         function buildDocumentRow(d) {
-            var $tr = $('<div class="MPC-vasgrn-tRow MPC-vasgrn-tBody"></div>');
+            var $tr = $('<div class="vas_099-tRow vas_099-tBody"></div>');
 
             var canOpen = d.TableName && +d.RecordId > 0;
             if (canOpen) {
@@ -1099,13 +1283,13 @@
             }
 
             // Identity: doc number + kind, with the open affordance on the right.
-            var $item = $('<span class="MPC-vasgrn-itItem MPC-vasgrn-docItem"></span>');
+            var $item = $('<span class="vas_099-itItem vas_099-docItem"></span>');
             var docIcon = d.Type === "confirmation" ? "clipboardCheck"
                         : (d.Type === "payment" ? "coins" : "doc");
             $item.append(svgIcon(docIcon));
 
-            var $txt = $('<span class="MPC-vasgrn-docTxt"></span>');
-            $txt.append($('<div class="MPC-vasgrn-itName"></div>').text(d.DocumentNo || "—"));
+            var $txt = $('<span class="vas_099-docTxt"></span>');
+            $txt.append($('<div class="vas_099-itName"></div>').text(d.DocumentNo || "—"));
 
             var sub;
             if (d.Type === "confirmation") {
@@ -1121,7 +1305,7 @@
                 sub = msg("VAS_099_VendorInvoice", "Vendor Invoice");
                 if (d.IsPaid) sub += " · " + msg("VAS_099_Paid", "Paid");
             }
-            $txt.append($('<div class="MPC-vasgrn-itSku"></div>').text(sub));
+            $txt.append($('<div class="vas_099-itSku"></div>').text(sub));
             $item.append($txt);
             if (canOpen) $item.append(svgIcon("arrowUpRight"));
             $tr.append($item);
@@ -1134,7 +1318,7 @@
 
             var st = statusMeta(d.DocStatus);
             $tr.append($('<span></span>').append(
-                $('<span class="MPC-vasgrn-tag"></span>').addClass("s-" + st.tone).text(st.label)));
+                $('<span class="vas_099-tag"></span>').addClass("s-" + st.tone).text(st.label)));
 
             // A confirmation has no amount of its own.
             var $amt = $('<span class="ta-r"></span>');
@@ -1155,7 +1339,7 @@
             if (!text) return;
 
             var $sec = section(msg("VAS_099_Notes", "Notes"), null);
-            var $card = $('<div class="MPC-vasgrn-textCard"></div>');
+            var $card = $('<div class="vas_099-textCard"></div>');
             $card.append($('<p></p>').text(text));
             $sec.append($card);
         }
@@ -1177,6 +1361,12 @@
         // The receipt's audit trail, newest first: who created it, who changed it
         // and when, when it was completed and posted, plus the confirmations,
         // invoices, e-mails and notes raised against it.
+        // Maximum activity rows shown per page; the feed paginates beyond this.
+        // A receipt accumulates every mail, status change and linked document, and
+        // an unpaged feed made the panel scroll past everything below it. The
+        // section summary still counts the WHOLE feed, not the page.
+        var ACTIVITY_PER_PAGE = 15;
+
         function renderActivity() {
             var rows = (data && data.Activity) || [];
             if (!rows.length) return;
@@ -1185,23 +1375,50 @@
                 summary: rows.length + " " + msg("VAS_099_Updates", "updates")
             });
 
-            var $list = $('<div class="MPC-vasgrn-actList"></div>');
-            for (var i = 0; i < rows.length; i++) {
-                $list.append(activityRow(rows[i]));
-                // An e-mail's body is heavy — it stays collapsed under its row and
-                // opens only when the reader asks for it.
-                var $mail = activityBody(rows[i]);
-                if ($mail) $list.append($mail);
-            }
+            var $list = $('<div class="vas_099-actList"></div>');
             $sec.append($list);
+
+            // The pager sits INSIDE the list card, closing it — the VAS_092
+            // Purchase Order treatment. (The material-lines pager is a sibling of
+            // its table for a different reason: that table takes its own horizontal
+            // scroll and the controls must not scroll away with the columns. The
+            // activity list never scrolls sideways, so the pager belongs to the
+            // card it pages.)
+            var $pager = $('<div class="vas_099-pager vas_099-actPager"></div>');
+
+            function paintPage() {
+                var pageCount = Math.max(1, Math.ceil(rows.length / ACTIVITY_PER_PAGE));
+                if (activityPage >= pageCount) activityPage = pageCount - 1;
+                if (activityPage < 0) activityPage = 0;
+
+                var start = activityPage * ACTIVITY_PER_PAGE;
+                var end = Math.min(rows.length, start + ACTIVITY_PER_PAGE);
+
+                $list.empty();
+                for (var i = start; i < end; i++) {
+                    $list.append(activityRow(rows[i]));
+                    // An e-mail's body is heavy — it stays collapsed under its row
+                    // and opens only when the reader asks for it.
+                    var $mail = activityBody(rows[i]);
+                    if ($mail) $list.append($mail);
+                }
+
+                // Re-appended after the rows on every repaint: emptying the card to
+                // draw a page takes the pager with it.
+                buildPager($pager, activityPage, pageCount, rows.length, start, end,
+                    function (p) { activityPage = p; paintPage(); });
+                if (pageCount > 1) $list.append($pager);
+            }
+
+            paintPage();
         }
 
         function activityRow(a) {
             var meta = ACT_TYPES[a.Type] || ACT_TYPES.note;
 
-            var $row = $('<div class="MPC-vasgrn-actRow"></div>');
+            var $row = $('<div class="vas_099-actRow"></div>');
 
-            var $tag = $('<span class="MPC-vasgrn-actTag"></span>').addClass("tone-" + meta.tone);
+            var $tag = $('<span class="vas_099-actTag"></span>').addClass("tone-" + meta.tone);
             $tag.append(svgIcon(meta.icon));
             $tag.append($('<span></span>').text(msg(meta.tagKey, meta.tagText)));
             $row.append($tag);
@@ -1211,8 +1428,8 @@
             // related document number. A tooltip keeps a long line readable once
             // the cell ellipsises.
             var title = activityTitle(a, meta);
-            var $title = $('<span class="MPC-vasgrn-actTitle"></span>');
-            $title.append($('<span class="MPC-vasgrn-actLead"></span>')
+            var $title = $('<span class="vas_099-actTitle"></span>');
+            $title.append($('<span class="vas_099-actLead"></span>')
                 .text(title).attr("title", title));
 
             // An e-mail names its recipients under the subject: the To list, plus
@@ -1221,7 +1438,7 @@
             if (a.Type === "email") {
                 var to = recipientSummary(a);
                 if (to) {
-                    $title.append($('<small class="MPC-vasgrn-actSub"></small>')
+                    $title.append($('<small class="vas_099-actSub"></small>')
                         .text(to).attr("title", allRecipients(a) || to));
                 }
             }
@@ -1235,15 +1452,15 @@
                     ? when + " · " + msg("VAS_099_By", "by") + " " + a.UserName
                     : msg("VAS_099_By", "by") + " " + a.UserName;
             }
-            $row.append($('<span class="MPC-vasgrn-actWhen"></span>').text(when).attr("title", when));
+            $row.append($('<span class="vas_099-actWhen"></span>').text(when).attr("title", when));
 
             // Rows carrying a body are clickable; the caret shows the state.
             if (hasActivityBody(a)) {
                 $row.addClass("is-openable");
                 $row.attr("title", msg("VAS_099_ShowMailBody", "Click to read the message"));
-                $row.append($('<span class="MPC-vasgrn-actCaret"></span>').append(svgIcon("chevRight")));
+                $row.append($('<span class="vas_099-actCaret"></span>').append(svgIcon("chevRight")));
                 $row.on("click", function () {
-                    var $panel = $row.next(".MPC-vasgrn-actBody");
+                    var $panel = $row.next(".vas_099-actBody");
                     if (!$panel.length) return;
                     var nowOpen = !$row.hasClass("is-open");
                     $row.toggleClass("is-open", nowOpen)
@@ -1278,7 +1495,7 @@
         function activityBody(a) {
             if (!hasActivityBody(a)) return null;
 
-            var $panel = $('<div class="MPC-vasgrn-actBody" style="display:none;"></div>');
+            var $panel = $('<div class="vas_099-actBody" style="display:none;"></div>');
             appendMailMeta($panel, "VAS_099_MailFrom", "From:", a.MailFrom);
             appendMailMeta($panel, "VAS_099_MailTo",   "To:",   a.MailTo);
             appendMailMeta($panel, "VAS_099_MailCc",   "Cc:",   a.MailCc);
@@ -1289,7 +1506,7 @@
 
         function appendMailMeta($panel, key, fallback, value) {
             if (!value || !String(value).trim()) return;
-            $panel.append($('<div class="MPC-vasgrn-actMeta"></div>')
+            $panel.append($('<div class="vas_099-actMeta"></div>')
                 .text(msg(key, fallback) + " " + String(value).trim()));
         }
 
@@ -1331,7 +1548,7 @@
         // purchase order. Both confirm first, POST to the controller, then refresh
         // the panel. Buttons disable themselves when the action does not apply.
         function renderActions() {
-            var $bar = $('<section class="MPC-vasgrn-actions"></section>');
+            var $bar = $('<section class="vas_099-actions"></section>');
 
             var isCompleted = (data.StatusCode === "CO" || data.StatusCode === "CL");
             var isClosedOff = (data.StatusCode === "VO" || data.StatusCode === "RE");
@@ -1356,9 +1573,17 @@
             // purchase order the invoice covers the order's uninvoiced received
             // quantity; a manually created receipt (no order) is invoiced from the
             // receipt's own lines, so the button no longer depends on a PO.
-            var $invoice = actionButton("doc", VIS.Msg.getMsg("VAS_099_GenerateInvoice"), "sec");
+            var $invoice = actionButton("doc", msg("VAS_099_GenerateInvoice", "Generate Invoice"), "sec");
             if (!isCompleted) {
-                disableBtn($invoice);
+                // A disabled button used to be silent: clicking it did nothing at
+                // all, so the reason it cannot run was never stated. It now says
+                // which of the two reasons applies — the receipt is not completed
+                // yet, or it is voided / reversed and never will be.
+                blockBtn($invoice, isClosedOff
+                    ? msg("VAS_099_InvoiceNotOnVoided",
+                          "This goods receipt is voided or reversed — no invoice can be generated from it.")
+                    : msg("VAS_099_InvoiceNeedsComplete",
+                          "Complete the goods receipt before generating an invoice."));
             } else {
                 // Same as the main screen: the document type and the vendor's
                 // invoice reference are asked for before anything is generated.
@@ -1370,13 +1595,24 @@
         }
 
         function actionButton(icon, label, kind) {
-            var $b = $('<span class="MPC-vasgrn-btn"></span>').addClass("btn-" + (kind || "sec"));
+            var $b = $('<span class="vas_099-btn"></span>').addClass("btn-" + (kind || "sec"));
             $b.append(svgIcon(icon));
             $b.append($('<span></span>').text(label));
             return $b;
         }
 
         function disableBtn($b) { $b.addClass("is-disabled"); }
+
+        // A button that cannot run, but says so. `is-disabled` sets
+        // pointer-events:none, which also swallows the tooltip and the click — so a
+        // greyed button was completely mute about why it was greyed. `is-blocked`
+        // looks the same and still receives the pointer, so the reason reaches the
+        // reader both on hover and on click. It carries no action handler, so it
+        // stays as unable to run as `is-disabled` is.
+        function blockBtn($b, why) {
+            $b.addClass("is-blocked").attr("title", why);
+            $b.on("click", function () { toast(why, true); });
+        }
 
         // POSTs a document action to the controller, then refreshes the panel on
         // success. Guards against double-clicks while the action is in flight.
@@ -1407,7 +1643,7 @@
                     // repeated as a toast behind the dialog.
                     var handled = onDone ? (onDone(res) === true) : false;
                     if (res && res.success) {
-                        toast(res.message || msg("VAS_099_Done", "Done."), false);
+                        toast(successText(res), false);
                         // Re-fetch so the status pill, timeline and buttons reflect
                         // the new document state.
                         $self.fetchData($self.record_ID);
@@ -1430,6 +1666,21 @@
             });
         }
 
+        // The text a successful action leaves on screen.
+        //
+        // A generated invoice is named here rather than taken from the server's
+        // sentence, so the number is guaranteed to reach the reader (it is the one
+        // thing they need in order to go and find the document) and the wording is
+        // translatable through AD_Message like the rest of the panel. The server's
+        // own message is the fallback, and a plain "Done." the last resort.
+        function successText(res) {
+            if (res && res.invoiceNo) {
+                return msg("VAS_099_InvoiceCreated", "Invoice") + " " + res.invoiceNo + " " +
+                       msg("VAS_099_Generated", "generated.");
+            }
+            return (res && res.message) || msg("VAS_099_Done", "Done.");
+        }
+
         // ---------- Generate Invoice dialog ---------- //
 
         // The panel asks for the same two things the main screen's Generate
@@ -1447,19 +1698,31 @@
                 type: "GET",
                 dataType: "json",
                 data: { M_InOut_ID: $self.record_ID },
+                // Nothing has been generated at this point — this call only reads
+                // the document types the dialog offers. Reporting a failure here as
+                // "Could not generate the invoice" told the reader an invoice had
+                // been attempted and had failed, which is not what happened; the
+                // message now names what actually went wrong.
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     if (!res || !res.success) {
                         toast((res && (res.error || res.message)) ||
-                            msg("VAS_099_InvoiceFailed", "Could not generate the invoice."), true);
+                            msg("VAS_099_DocTypesFailed",
+                                "Could not load the invoice document types."), true);
+                        return;
+                    }
+                    if (!(res.docTypes || []).length) {
+                        toast(msg("VAS_099_NoInvoiceDocTypes",
+                            "No invoice document type is available for this goods receipt."), true);
                         return;
                     }
                     buildInvoiceDialog($btn, res);
                 },
                 error: function () {
                     showBusy(false);
-                    toast(msg("VAS_099_InvoiceFailed", "Could not generate the invoice."), true);
+                    toast(msg("VAS_099_DocTypesFailed",
+                        "Could not load the invoice document types."), true);
                 }
             });
         }
@@ -1467,24 +1730,24 @@
         function buildInvoiceDialog($btn, res) {
             var docTypes = res.docTypes || [];
 
-            var $overlay = $('<div class="MPC-vasgrn-modal"></div>');
-            var $card = $('<div class="MPC-vasgrn-modalCard"></div>');
+            var $overlay = $('<div class="vas_099-modal"></div>');
+            var $card = $('<div class="vas_099-modalCard"></div>');
 
-            var $head = $('<div class="MPC-vasgrn-modalHead"></div>');
+            var $head = $('<div class="vas_099-modalHead"></div>');
             $head.append($('<h3></h3>').text(msg("VAS_099_CreateInvoice", "Create Invoice")));
             if (res.documentNo) {
-                $head.append($('<span class="MPC-vasgrn-modalSub"></span>')
+                $head.append($('<span class="vas_099-modalSub"></span>')
                     .text(VIS.Msg.getMsg("VAS_099_GoodsReceiptNote") + " " + res.documentNo));
             }
             $card.append($head);
 
-            var $body = $('<div class="MPC-vasgrn-modalBody"></div>');
+            var $body = $('<div class="vas_099-modalBody"></div>');
 
             // Document type — mandatory, as on the main screen.
-            var $docField = $('<label class="MPC-vasgrn-fld"></label>');
-            $docField.append($('<span class="MPC-vasgrn-fldLbl"></span>')
+            var $docField = $('<label class="vas_099-fld"></label>');
+            $docField.append($('<span class="vas_099-fldLbl"></span>')
                 .text(msg("VAS_099_DocumentType", "Document Type") + " *"));
-            var $docSel = $('<select class="MPC-vasgrn-input"></select>');
+            var $docSel = $('<select class="vas_099-input"></select>');
             $docSel.append($('<option></option>').attr("value", "")
                 .text(msg("VAS_099_SelectDocType", "Select a document type")));
             for (var i = 0; i < docTypes.length; i++) {
@@ -1498,29 +1761,29 @@
 
             // Invoice reference — mandatory on the purchase side, as on the main
             // screen: it is the vendor's own invoice number against this receipt.
-            var $refField = $('<label class="MPC-vasgrn-fld"></label>');
-            $refField.append($('<span class="MPC-vasgrn-fldLbl"></span>')
+            var $refField = $('<label class="vas_099-fld"></label>');
+            $refField.append($('<span class="vas_099-fldLbl"></span>')
                 .text(msg("VAS_099_InvoiceReference", "Invoice Reference") + " *"));
-            var $ref = $('<input type="text" class="MPC-vasgrn-input" maxlength="60">');
+            var $ref = $('<input type="text" class="vas_099-input" maxlength="60">');
             $refField.append($ref);
             $body.append($refField);
 
             // Generate charges — spreads the receipt's charges over the lines.
-            var $chargeField = $('<label class="MPC-vasgrn-fldChk"></label>');
+            var $chargeField = $('<label class="vas_099-fldChk"></label>');
             var $charges = $('<input type="checkbox">');
             $chargeField.append($charges);
             $chargeField.append($('<span></span>')
                 .text(msg("VAS_099_GenerateCharges", "Generate Charges")));
             $body.append($chargeField);
 
-            var $error = $('<div class="MPC-vasgrn-modalErr" style="display:none;"></div>');
+            var $error = $('<div class="vas_099-modalErr" style="display:none;"></div>');
             $body.append($error);
             $card.append($body);
 
-            var $foot = $('<div class="MPC-vasgrn-modalFoot"></div>');
-            var $cancel = $('<span class="MPC-vasgrn-btn btn-sec"></span>')
+            var $foot = $('<div class="vas_099-modalFoot"></div>');
+            var $cancel = $('<span class="vas_099-btn btn-sec"></span>')
                 .append($('<span></span>').text(msg("VAS_099_Cancel", "Cancel")));
-            var $create = $('<span class="MPC-vasgrn-btn btn-pri"></span>')
+            var $create = $('<span class="vas_099-btn btn-pri"></span>')
                 .append($('<span></span>').text(msg("VAS_099_CreateInvoice", "Create Invoice")));
             $foot.append($cancel).append($create);
             $card.append($foot);
@@ -1585,7 +1848,7 @@
 
         // Lightweight self-contained toast.
         function toast(message, isError) {
-            var $t = $('<div class="MPC-vasgrn-toast"></div>')
+            var $t = $('<div class="vas_099-toast"></div>')
                 .addClass(isError ? "err" : "ok").text(message);
             $root.append($t);
             setTimeout(function () { $t.addClass("show"); }, 10);
@@ -1623,7 +1886,7 @@
         // Returns a span wrapping the named inline SVG (innerHTML so the browser
         // parses the SVG in HTML context — no namespace juggling).
         function svgIcon(name) {
-            var $wrap = $('<span class="MPC-vasgrn-ic"></span>');
+            var $wrap = $('<span class="vas_099-ic"></span>');
             $wrap[0].innerHTML = SVG_ICONS[name] || "";
             return $wrap;
         }
@@ -1732,11 +1995,21 @@
             this.table_ID = curTab.getAD_Table_ID();
         }
         this.init();
+        // Watch the tab itself so New Record / Copy Record (neither of which
+        // reliably calls refreshPanelData) still empty the panel.
+        if (curTab && typeof curTab.addDataStatusListener === "function") {
+            try { curTab.addDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
     };
 
     /* Update tab panel based on selected record */
     VAS.VAS_099_OverviewGRN.prototype.refreshPanelData = function (recordID, selectedRow) {
-        if (selectedRow == undefined || recordID <= 0) {
+        // The insert check is what makes New Record / Copy Record behave:
+        // the id handed in for an unsaved row can still be the previously
+        // selected (or copied-from) record's, so the tab's own insert state
+        // decides, not the id.
+        if (selectedRow == undefined || recordID <= 0 || isTabInserting(this.curTab)) {
+            this.record_ID = 0;
             this.clear();
             return;
         }
@@ -1752,6 +2025,10 @@
 
     /* Release variables from memory */
     VAS.VAS_099_OverviewGRN.prototype.dispose = function () {
+        if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
+            try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
+        this.tabDataListener = null;
         this.record_ID = 0;
         this.table_ID = 0;
         this.windowNo = 0;
