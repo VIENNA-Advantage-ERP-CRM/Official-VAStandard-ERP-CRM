@@ -67,6 +67,39 @@
 ///                          what makes it one; the table id is matched with
 ///                          IN + UPPER so a differently-cased or duplicated
 ///                          dictionary entry still resolves.
+///   VAI163   2026-08-05  - Added Notes (LoadNotes / NoteData, mirroring the
+///                          Purchase Order overview): the issue header's
+///                          description followed by the description entered on
+///                          each line's child tab (M_InventoryLine.Description),
+///                          labelled with the line no and product / charge. The
+///                          header note was previously the only one the panel
+///                          could show, so a note typed against a line was
+///                          invisible.
+///                        - Chat-note activity resolves its author from
+///                          CM_ChatEntry.AD_User_ID falling back to CreatedBy —
+///                          a note logged through the platform's own chat
+///                          plumbing leaves AD_User_ID null, which printed a
+///                          comment with a timestamp but no commenter name.
+///   VAI163   2026-08-05  - Line quantities and rates are reported in the line's
+///                          SELECTED UOM (C_UOM_ID). QtyEntered is already on
+///                          that scale; QtyInternalUse, the requisition Qty and
+///                          the M_Storage on-hand are in the product's BASE UOM,
+///                          so the panel was labelling base figures with the
+///                          selected unit's name. Each line converts with its
+///                          own QtyEntered / QtyInternalUse ratio, and the unit
+///                          rate is restated per selected unit so the line VALUE
+///                          is unchanged.
+///                        - The KPI aggregates (LineCount / RequestedQty /
+///                          IssuedQty / NotFullCount / NotFullQty / TotalValue)
+///                          are now summed from the loaded lines instead of read
+///                          from the header SQL, which still counts in base UOM
+///                          — the cards and the rows have to agree.
+///                        - The manufacturing production order
+///                          (VAMFG_M_WorkOrder_ID) travels in its own fields
+///                          (ProductionOrderNo / VAMFG_M_WorkOrder_ID /
+///                          ProductionOrderCount) via LoadProductionOrder. It
+///                          used to be written into WorkOrderNo, which made the
+///                          panel label a production order "Work Order".
 /// </summary>
 
 using System;
@@ -236,6 +269,8 @@ namespace VASLogic.Models
             if (result.Requisitions.Count > 0)
             {
                 RequisitionRefData first = result.Requisitions[0];
+                // The id the panel's Reference chip opens the requisition with.
+                result.M_Requisition_ID = first.M_Requisition_ID;
                 result.RequisitionNo    = first.DocumentNo;
                 result.RequisitionDate  = first.DateDoc;
                 result.DateRequired     = first.DateRequired;
@@ -245,10 +280,13 @@ namespace VASLogic.Models
                 // shows the first and a "+n" hint from this count.
                 result.RequisitionCount = result.Requisitions.Count;
             }
-            // The manufacturing work order only fills in when the VA075 service
-            // module did not already supply one.
-            if (hasWorkOrder && string.IsNullOrEmpty(result.WorkOrderNo))
-                result.WorkOrderNo = GetWorkOrderNo(M_Inventory_ID);
+            // The manufacturing production order (M_InventoryLine.
+            // VAMFG_M_WorkOrder_ID). It is a DIFFERENT document to the VA075
+            // service work order and travels in its own fields: it used to be
+            // written into WorkOrderNo, which made the panel label a production
+            // order "Work Order".
+            if (hasWorkOrder)
+                LoadProductionOrder(M_Inventory_ID, result);
 
             // ----- Timeline stamps -----
             // Created is the record's own stamp (not the movement date) and Issued
@@ -267,17 +305,163 @@ namespace VASLogic.Models
             // ----- Issue lines -----
             result.Lines = LoadLines(M_Inventory_ID, rateExpr, woExpr, hasAsi, M_Warehouse_ID);
 
-            // Line values may have been re-rated from M_CostDetail, so the issue
-            // total is summed from the lines rather than kept from the header
-            // aggregate — the KPI card, the table rows and the footer must agree.
-            decimal total = 0;
-            for (int i = 0; i < result.Lines.Count; i++) total += result.Lines[i].LineValue;
-            result.TotalValue = total;
+            // Every KPI aggregate is re-derived from the loaded lines, replacing
+            // the SQL sums read above.
+            //
+            // Two reasons the header query cannot produce these. Line values may
+            // have been re-rated from M_CostDetail, and — since the lines are now
+            // reported in each line's SELECTED UOM — the SQL sums are on the
+            // product's BASE scale, so a line keyed in millilitres against a
+            // litre-based product had the cards reading a thousandth of what its
+            // own row showed. Summing the lines is what keeps the KPI cards, the
+            // table rows and the totals footer telling the same story.
+            //
+            // Quantities across lines with different UOMs are still only as
+            // meaningful as the units allow — the same caveat the issue's own
+            // UOM mix carries — but they now at least match the rows they
+            // summarise.
+            decimal total = 0, requested = 0, issued = 0, notFullQty = 0;
+            int notFullCount = 0;
+            for (int i = 0; i < result.Lines.Count; i++)
+            {
+                InternalUseLineData ln = result.Lines[i];
+                total     += ln.LineValue;
+                requested += ln.RequestedQty;
+                issued    += ln.IssuedQty;
+                if (ln.IssuedQty < ln.RequestedQty)
+                {
+                    notFullCount++;
+                    notFullQty += ln.RequestedQty - ln.IssuedQty;
+                }
+            }
+            result.TotalValue   = total;
+            result.RequestedQty = requested;
+            result.IssuedQty    = issued;
+            result.NotFullCount = notFullCount;
+            result.NotFullQty   = notFullQty;
+            result.LineCount    = result.Lines.Count;
+
+            // ----- Notes (issue header + each line's own description) -----
+            result.Notes = LoadNotes(M_Inventory_ID);
 
             // ----- Audit trail -----
             result.Activity = LoadActivity(M_Inventory_ID, result.StatusCode);
 
             return result;
+        }
+
+        /// <summary>
+        /// Loads notes for the Notes section, mirroring the Purchase Order
+        /// overview: the issue header note (M_Inventory.Description) followed by
+        /// each line's own note (M_InventoryLine.Description), the description
+        /// entered on the child tab. Composed in C# so the SQL stays portable (no
+        /// DB-specific string functions).
+        ///
+        /// LEFT OUTER JOIN to M_InventoryLine (with IsActive in the join, not the
+        /// WHERE) so the M_Inventory row — and thus the header note — is still
+        /// returned for an issue with no active lines.
+        /// </summary>
+        /// <param name="M_Inventory_ID">Selected internal-use issue id.</param>
+        /// <returns>Header note first, then one entry per line note (may be empty).</returns>
+        private List<NoteData> LoadNotes(int M_Inventory_ID)
+        {
+            List<NoteData> notes = new List<NoteData>();
+            try
+            {
+                string sql = @"SELECT inv.Description AS HeaderNote,
+                                      l.Line          AS LineNo,
+                                      l.Description   AS LineDescription,
+                                      p.Name          AS ProductName,
+                                      ch.Name         AS ChargeName
+                                 FROM M_Inventory inv
+                                 LEFT OUTER JOIN M_InventoryLine l ON (l.M_Inventory_ID = inv.M_Inventory_ID
+                                                                       AND l.IsActive    = 'Y')
+                                 LEFT OUTER JOIN M_Product p  ON (p.M_Product_ID = l.M_Product_ID)
+                                 LEFT OUTER JOIN C_Charge  ch ON (ch.C_Charge_ID = l.C_Charge_ID)
+                                WHERE inv.M_Inventory_ID = @M_Inventory_ID
+                                  AND inv.IsActive       = 'Y'
+                                ORDER BY l.Line";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return notes;
+
+                bool headerAdded = false;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    if (!headerAdded)
+                    {
+                        string headerNote = Util.GetValueOfString(r["HeaderNote"]);
+                        if (!string.IsNullOrEmpty(headerNote.Trim()))
+                            notes.Add(new NoteData { NoteType = "header", Text = headerNote.Trim() });
+                        headerAdded = true;
+                    }
+
+                    // Per-line note = the description entered on M_InventoryLine.
+                    string lineDesc = Util.GetValueOfString(r["LineDescription"]);
+                    if (string.IsNullOrEmpty(lineDesc.Trim())) continue;
+
+                    string prod = Util.GetValueOfString(r["ProductName"]);
+                    if (string.IsNullOrEmpty(prod)) prod = Util.GetValueOfString(r["ChargeName"]);
+
+                    // Prefix with the line number (and product / charge, when
+                    // present) so the line description is attributable on sight.
+                    int lineNo = Util.GetValueOfInt(r["LineNo"]);
+                    string label = lineNo > 0 ? "#" + lineNo : "";
+                    if (!string.IsNullOrEmpty(prod))
+                        label = string.IsNullOrEmpty(label) ? prod.Trim() : label + " " + prod.Trim();
+
+                    string text = string.IsNullOrEmpty(label)
+                        ? lineDesc.Trim()
+                        : label + " — " + lineDesc.Trim();
+                    notes.Add(new NoteData { NoteType = "line", Text = text });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: the panel simply shows no Notes section.
+                _log.Severe("LoadNotes (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+            return notes;
+        }
+
+        /// <summary>
+        /// Resolves a window's AD_Window_ID from its name (AD_Window.Name) for the
+        /// panel's record-open path, so a Reference chip can open its source
+        /// document on a named screen rather than whatever the table's default
+        /// zoom target resolves to.
+        ///
+        /// Restricted to windows this tenant can see (AD_Client_ID 0 or its own),
+        /// preferring the tenant's own row over the system one. Whether the ROLE
+        /// may open it is the platform's call, made when the window is started.
+        /// </summary>
+        /// <param name="ctx">User context (client).</param>
+        /// <param name="windowName">Window name to resolve.</param>
+        /// <returns>The window id, or 0 when the name is unknown to this client.</returns>
+        public int GetWindowId(Ctx ctx, string windowName)
+        {
+            if (string.IsNullOrEmpty(windowName)) return 0;
+            try
+            {
+                string sql = @"SELECT w.AD_Window_ID
+                                 FROM AD_Window w
+                                WHERE w.Name         = @Name
+                                  AND w.IsActive     = 'Y'
+                                  AND w.AD_Client_ID IN (0, @AD_Client_ID)
+                                ORDER BY w.AD_Client_ID DESC";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@Name", windowName.Trim()),
+                    new SqlParameter("@AD_Client_ID", ctx == null ? 0 : ctx.GetAD_Client_ID())
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return 0;
+                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetWindowId (" + windowName + "): " + ex.Message);
+                return 0;
+            }
         }
 
         /// <summary>
@@ -330,9 +514,15 @@ namespace VASLogic.Models
                               l.Line,
                               l.Description     AS LineDescription,
                               l.M_Product_ID,
-                              NVL(rql.Qty, NVL(l.QtyEntered, 0)) AS RequestedQty,
-                              NVL(l.QtyInternalUse, 0) AS IssuedQty,
-                              NVL(st.AvailableQty, 0)  AS AvailableQty,
+                              -- Quantities travel on two scales and are reconciled
+                              -- in C# below: QtyEntered is in the line's SELECTED
+                              -- UOM (C_UOM_ID), while QtyInternalUse, the
+                              -- requisition's Qty and M_Storage's on-hand are all
+                              -- in the product's BASE UOM.
+                              rql.Qty                  AS ReqQtyBase,
+                              NVL(l.QtyEntered, 0)     AS QtyEnteredUOM,
+                              NVL(l.QtyInternalUse, 0) AS QtyBase,
+                              NVL(st.AvailableQty, 0)  AS AvailableQtyBase,
                               p.Value           AS ProductCode,
                               p.Name            AS ProductName,
                               loc.Value         AS LocatorCode,
@@ -386,9 +576,35 @@ namespace VASLogic.Models
                 ln.Line               = Util.GetValueOfInt(r["Line"]);
                 ln.Description        = Util.GetValueOfString(r["LineDescription"]);
                 ln.M_Product_ID       = Util.GetValueOfInt(r["M_Product_ID"]);
-                ln.RequestedQty       = Util.GetValueOfDecimal(r["RequestedQty"]);
-                ln.IssuedQty          = Util.GetValueOfDecimal(r["IssuedQty"]);
-                ln.AvailableQty       = Util.GetValueOfDecimal(r["AvailableQty"]);
+
+                // ---- Put every quantity on the line's SELECTED UOM scale ----
+                //
+                // The panel labels each row with the selected UOM (C_UOM_ID), so
+                // every figure on the row has to be expressed in it. QtyEntered
+                // already is; QtyInternalUse, the requisition Qty and the storage
+                // on-hand are in the product's base UOM.
+                //
+                // The line carries its own exact conversion: QtyEntered and
+                // QtyInternalUse are the SAME physical quantity on the two scales
+                // (MInventoryLine.BeforeSave converts one into the other whenever
+                // the quantity or the UOM changes), so their ratio converts base
+                // into selected without a conversion-table lookup — and it stays
+                // right for a product whose rate is defined per line.
+                decimal qtyEntered = Util.GetValueOfDecimal(r["QtyEnteredUOM"]);
+                decimal qtyBase    = Util.GetValueOfDecimal(r["QtyBase"]);
+                decimal perBase    = (qtyBase != 0 && qtyEntered != 0) ? (qtyEntered / qtyBase) : 1;
+
+                ln.IssuedQty    = qtyEntered != 0 ? qtyEntered : qtyBase;
+                ln.AvailableQty = Util.GetValueOfDecimal(r["AvailableQtyBase"]) * perBase;
+
+                // Requested: the requisition asked in base UOM, so it converts
+                // like the rest. A line with no requisition falls back to what
+                // was keyed, which is already in the selected UOM.
+                if (r["ReqQtyBase"] != DBNull.Value)
+                    ln.RequestedQty = Util.GetValueOfDecimal(r["ReqQtyBase"]) * perBase;
+                else
+                    ln.RequestedQty = ln.IssuedQty;
+
                 ln.ProductCode        = Util.GetValueOfString(r["ProductCode"]);
                 ln.ProductName        = Util.GetValueOfString(r["ProductName"]);
                 ln.LocatorCode        = Util.GetValueOfString(r["LocatorCode"]);
@@ -417,6 +633,17 @@ namespace VASLogic.Models
                 {
                     ln.CostSource = "PRICE";
                 }
+
+                // Every rate resolved above is per BASE unit (M_CostDetail books
+                // Amt / Qty in base, and the line's own cost columns are base
+                // too), so it is restated per SELECTED unit to match the quantity
+                // beside it — a rate per litre shown against a millilitre
+                // quantity would read a thousand times high.
+                //
+                // The line's VALUE is unchanged by any of this: issued × rate is
+                // the same money on either scale, which is what keeps the row, the
+                // KPI card and the totals footer agreeing.
+                if (perBase != 0 && perBase != 1) ln.UnitRate = ln.UnitRate / perBase;
                 ln.LineValue = ln.IssuedQty * ln.UnitRate;
 
                 lines.Add(ln);
@@ -474,33 +701,49 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Returns the document no of the manufacturing work order the issue was
-        /// raised against. Only called when M_InventoryLine.VAMFG_M_WorkOrder_ID
-        /// exists; a DB issue degrades to an empty string so a missing / renamed
-        /// VAMFG table never breaks the overview.
+        /// Fills ProductionOrderNo / VAMFG_M_WorkOrder_ID / ProductionOrderCount
+        /// from the manufacturing production order(s) the issue's lines were
+        /// raised against (M_InventoryLine.VAMFG_M_WorkOrder_ID).
+        ///
+        /// This is a production order, NOT the VA075 service work order — the two
+        /// are separate documents on separate tables, and each gets its own chip
+        /// in the panel's Reference strip so neither is labelled as the other.
+        /// The id travels with the document no so the chip can open the record.
+        ///
+        /// Only called when M_InventoryLine.VAMFG_M_WorkOrder_ID exists; a DB
+        /// issue degrades to nothing loaded, so a missing / renamed VAMFG table
+        /// never breaks the overview.
         /// </summary>
         /// <param name="M_Inventory_ID">Owning internal-use issue id.</param>
-        /// <returns>Work-order document no, or an empty string.</returns>
-        private string GetWorkOrderNo(int M_Inventory_ID)
+        /// <param name="result">Overview payload being populated.</param>
+        private void LoadProductionOrder(int M_Inventory_ID, InternalUseOverviewData result)
         {
             try
             {
-                string sql = @"SELECT MAX(wo.DocumentNo)
+                string sql = @"SELECT DISTINCT wo.VAMFG_M_WorkOrder_ID, wo.DocumentNo
                                  FROM M_InventoryLine l
                                 INNER JOIN VAMFG_M_WorkOrder wo
                                    ON (wo.VAMFG_M_WorkOrder_ID = l.VAMFG_M_WorkOrder_ID)
                                 WHERE l.M_Inventory_ID = @M_Inventory_ID
-                                  AND l.IsActive       = 'Y'";
+                                  AND l.IsActive       = 'Y'
+                                ORDER BY wo.DocumentNo";
                 SqlParameter[] param = new SqlParameter[]
                 {
                     new SqlParameter("@M_Inventory_ID", M_Inventory_ID)
                 };
-                return Util.GetValueOfString(DB.ExecuteScalar(sql, param, null));
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                result.VAMFG_M_WorkOrder_ID = Util.GetValueOfInt(r["VAMFG_M_WorkOrder_ID"]);
+                result.ProductionOrderNo    = Util.GetValueOfString(r["DocumentNo"]);
+                // More than one production order can feed a single issue; the
+                // panel names the first and hints the rest with "+n".
+                result.ProductionOrderCount = ds.Tables[0].Rows.Count;
             }
             catch (Exception ex)
             {
-                _log.Severe("GetWorkOrderNo (" + M_Inventory_ID + "): " + ex.Message);
-                return "";
+                _log.Severe("LoadProductionOrder (" + M_Inventory_ID + "): " + ex.Message);
             }
         }
 
@@ -931,16 +1174,26 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Adds free-text chat notes (CM_ChatEntry) logged against this issue.
+        /// Adds free-text chat notes (CM_ChatEntry) logged against this issue —
+        /// each carrying the commenter's name, the moment it was posted and the
+        /// comment text, which is what the panel prints on the row.
+        ///
+        /// The author is taken from CM_ChatEntry.AD_User_ID, falling back to
+        /// CreatedBy: an entry logged through the platform's own chat plumbing
+        /// often leaves AD_User_ID null, which left the activity feed printing a
+        /// bare timestamp with no name against the comment.
         /// </summary>
         private void LoadNoteActivity(int M_Inventory_ID, List<InternalUseActivityData> list)
         {
             try
             {
-                string sql = @"SELECT ce.CharacterData, ce.Created, u.Name AS UserName
+                string sql = @"SELECT ce.CharacterData,
+                                      ce.Created,
+                                      NVL(u.Name, cu.Name) AS UserName
                                  FROM CM_ChatEntry ce
-                                INNER JOIN CM_Chat ch     ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
-                                 LEFT OUTER JOIN AD_User u ON (ce.AD_User_ID = u.AD_User_ID)
+                                INNER JOIN CM_Chat ch      ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
+                                 LEFT OUTER JOIN AD_User u  ON (ce.AD_User_ID = u.AD_User_ID)
+                                 LEFT OUTER JOIN AD_User cu ON (ce.CreatedBy  = cu.AD_User_ID)
                                 WHERE ch.AD_Table_ID =
                                       (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'M_Inventory')
                                   AND ch.Record_ID = @M_Inventory_ID
@@ -1194,6 +1447,16 @@ namespace VASLogic.Models
             public bool      IsMailSent { get; set; }
         }
 
+        /// <summary>
+        /// One note shown in the Notes section: the issue header's description, or
+        /// the description entered on one of its lines (the child tab).
+        /// </summary>
+        public class NoteData
+        {
+            public string NoteType { get; set; }   // header | line
+            public string Text     { get; set; }
+        }
+
         /// <summary>A requisition the issue's lines were raised against.</summary>
         public class RequisitionRefData
         {
@@ -1232,16 +1495,24 @@ namespace VASLogic.Models
             public bool      HasRequisition { get; set; }
 
             // Reference documents (References section)
+            public int       M_Requisition_ID { get; set; }  // first linked requisition (chip target)
             public string    RequisitionNo    { get; set; }  // first linked requisition
             public DateTime? RequisitionDate  { get; set; }
             public DateTime? DateRequired     { get; set; }
             public string    RequestedBy      { get; set; }
             public string    RequisitionNote  { get; set; }
             public int       RequisitionCount { get; set; }
+            // VA075 service work order
             public string    WorkOrderNo      { get; set; }
             public string    WorkOrderRef     { get; set; }   // the work order's own reference
             public int       VA075_WorkOrder_ID { get; set; }
             public int       WorkOrderCount   { get; set; }
+
+            // VAMFG manufacturing production order — a separate document to the
+            // service work order above, and labelled as one in the panel.
+            public string    ProductionOrderNo    { get; set; }
+            public int       VAMFG_M_WorkOrder_ID { get; set; }
+            public int       ProductionOrderCount { get; set; }
 
             // Currency
             public int       StdPrecision   { get; set; }
@@ -1259,6 +1530,8 @@ namespace VASLogic.Models
             public List<InternalUseLineData>     Lines        { get; set; }
             public List<RequisitionRefData>      Requisitions { get; set; }
             public List<InternalUseActivityData> Activity     { get; set; }
+            // Header description + each line's own description (child tab).
+            public List<NoteData>                Notes        { get; set; }
         }
     }
 }

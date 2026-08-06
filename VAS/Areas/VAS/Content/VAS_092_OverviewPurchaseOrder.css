@@ -2,7 +2,7 @@
  * Module Name : VAS
  * Purpose     : Styles for the Purchase Order Overview tab panel
  *               (VAS.VAS_OverviewPurchaseOrder). All classes are
- *               MPC-prefixed (MPC-vaspo-*) and scoped under the panel
+ *               panel-prefixed (vas_092-*) and scoped under the panel
  *               root to avoid global collisions.
  * Chronological development:
  *   VAI163   2026-06-10  Created
@@ -20,68 +20,68 @@
  *                        typography follows the Typography Quick Reference.
  *                        Glassmorphism gradients / shadows removed.
  *   VAI163   2026-07-01  Header restyled to the reference design: soft-gradient
- *                        title strip (.MPC-vaspo-hdr) with priority / status
- *                        pills (.MPC-vaspo-hdrPill), and a white two-column
- *                        details card (.MPC-vaspo-hdrCard) for vendor + terms.
+ *                        title strip (.vas_092-hdr) with priority / status
+ *                        pills (.vas_092-hdrPill), and a white two-column
+ *                        details card (.vas_092-hdrCard) for vendor + terms.
  *                        Replaces the Hero Status Card and 2-col Metric Grid.
  *   VAI163   2026-07-29  Recent Activity: e-mail rows carry a recipient sub-line
- *                        (.MPC-vaspo-actLead / -actSub) and open their message
- *                        body on click (.MPC-vaspo-actRow.is-openable /
- *                        .MPC-vaspo-actCaret / .MPC-vaspo-actBody).
+ *                        (.vas_092-actLead / -actSub) and open their message
+ *                        body on click (.vas_092-actRow.is-openable /
+ *                        .vas_092-actCaret / .vas_092-actBody).
  *   VAI163   2026-07-29  Line-items table gained a trailing action column (2em)
  *                        holding the icon-only history toggle
- *                        (.MPC-vaspo-itAct / .MPC-vaspo-histBtn), moved out of the
+ *                        (.vas_092-itAct / .vas_092-histBtn), moved out of the
  *                        item cell to the right-hand edge of the row.
  *   VAI163   2026-07-29  Line history moved under the line it belongs to: the
- *                        per-line toggle chip (.MPC-vaspo-histBtn) and the drawer
- *                        it opens (.MPC-vaspo-lineHist / -lhTable / -lhWhen), a
+ *                        per-line toggle chip (.vas_092-histBtn) and the drawer
+ *                        it opens (.vas_092-lineHist / -lhTable / -lhWhen), a
  *                        tinted, accent-railed sibling of the line row. The drawer
  *                        reuses the line table's own grid so a past version lines
  *                        up column-for-column with the line above it. The
  *                        standalone history table now only carries removed lines.
  *   VAI163   2026-07-29  Details card re-proportioned: vendor column fixed at 40%
- *                        and the terms column (.MPC-vaspo-hdrColR) is now a
+ *                        and the terms column (.vas_092-hdrColR) is now a
  *                        two-across grid instead of a single tall stack, so the
  *                        card is shorter and the vendor side is no longer mostly
  *                        blank. Collapses to one field column under 460px.
  *   VAI163   2026-07-01  Replaced the Compact List with a Generated From chip
- *                        strip (.MPC-vaspo-genfrom / .MPC-vaspo-chip) and added
- *                        a four-card metric snapshot (.MPC-vaspo-snap /
- *                        .MPC-vaspo-metric) above Order Progress.
+ *                        strip (.vas_092-genfrom / .vas_092-chip) and added
+ *                        a four-card metric snapshot (.vas_092-snap /
+ *                        .vas_092-metric) above Order Progress.
  *   VAI163   2026-07-01  Replaced the vertical activity timeline with a two-
- *                        column bottom row (.MPC-vaspo-bottom) — Terms & Notes
- *                        beside a typed Recent Activity list (.MPC-vaspo-actList
- *                        / .MPC-vaspo-actRow / .MPC-vaspo-actTag).
+ *                        column bottom row (.vas_092-bottom) — Terms & Notes
+ *                        beside a typed Recent Activity list (.vas_092-actList
+ *                        / .vas_092-actRow / .vas_092-actTag).
  *   VAI163   2026-07-17  Bottom row now stacks Notes above Activity. Added
  *                        clickable Generated From chips (.is-link), the Line
- *                        History table (.MPC-vaspo-histTable), per-line landed-
- *                        cost distribution rows (.MPC-vaspo-ldDist) and a
- *                        record-open toast (.MPC-vaspo-toast).
- *   VAI163   2026-07-17  Added the Documents table (.MPC-vaspo-docTable /
- *                        .MPC-vaspo-docItem) listing the GRNs / invoices raised
- *                        from the PO, with clickable rows (.MPC-vaspo-tBody.is-link).
+ *                        History table (.vas_092-histTable), per-line landed-
+ *                        cost distribution rows (.vas_092-ldDist) and a
+ *                        record-open toast (.vas_092-toast).
+ *   VAI163   2026-07-17  Added the Documents table (.vas_092-docTable /
+ *                        .vas_092-docItem) listing the GRNs / invoices raised
+ *                        from the PO, with clickable rows (.vas_092-tBody.is-link).
  *   VAI163   2026-07-17  Header title strip is now untinted (gradient dropped),
  *                        matching VAS_106_OverviewSalesOrder.
  *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
  *                        columns with a divider between them (stacking to a
  *                        bottom rule when narrow), plus its RTL mirror.
  *   VAI163   2026-07-27  Added the line-item Attribute Set Instance sub-line
- *                        (.MPC-vaspo-itAttr).
+ *                        (.vas_092-itAttr).
  *   VAI163   2026-07-27  Comment/chat notes now use the standard symmetric
  *                        activity-row layout (tag | title | right-aligned
  *                        timestamp · author); the earlier multi-line note block
- *                        (.MPC-vaspo-actNote) was removed.
- *   VAI163   2026-07-27  Added the line-items pager (.MPC-vaspo-pager /
- *                        .MPC-vaspo-pgBtn), the Line History Show/Hide Details
- *                        toggle (.MPC-vaspo-showDetails) and the Budget breach
- *                        card + per-line table (.MPC-vaspo-budget /
- *                        .MPC-vaspo-budgetTable).
+ *                        (.vas_092-actNote) was removed.
+ *   VAI163   2026-07-27  Added the line-items pager (.vas_092-pager /
+ *                        .vas_092-pgBtn), the Line History Show/Hide Details
+ *                        toggle (.vas_092-showDetails) and the Budget breach
+ *                        card + per-line table (.vas_092-budget /
+ *                        .vas_092-budgetTable).
  *   VAI163   2026-07-27  Activity rows wrap (flex-wrap) with the timestamp/author
  *                        right-aligned via margin-left:auto, so on a narrow panel
  *                        it drops to its own line instead of being clipped off the
  *                        right edge.
  *   VAI163   2026-07-30  Line history drawer: the Received column was replaced by
- *                        Updated By (.MPC-vaspo-lhBy), which truncates instead of
+ *                        Updated By (.vas_092-lhBy), which truncates instead of
  *                        widening the drawer out of alignment with its line. The
  *                        Removed lines table gained the same column, last in the
  *                        row to match the drawer, so its grid went from five
@@ -99,18 +99,35 @@
  *                        the row out of line with its header; cells clip with an
  *                        ellipsis inside their track; numeric and header cells
  *                        never wrap and use tabular figures. The Received cell
- *                        (.MPC-vaspo-recv / .MPC-vaspo-recvVal) now stacks its
+ *                        (.vas_092-recv / .vas_092-recvVal) now stacks its
  *                        value above the progress bar — the VAS_099 GRN Received
  *                        design — so the figure shares a baseline and right edge
  *                        with the Qty column. Landed Cost's Distribution Method
  *                        track widened for the dictionary's own method name, with
- *                        the pill truncating inside it (.MPC-vaspo-ldMethod).
- *   VAI163   2026-08-04  The line-item Attribute Set Instance (.MPC-vaspo-itAttr)
+ *                        the pill truncating inside it (.vas_092-ldMethod).
+ *   VAI163   2026-08-04  The line-item Attribute Set Instance (.vas_092-itAttr)
  *                        is now an inline suffix to the product name rather than
  *                        a sub-line of its own, matching VAS_099.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vaspo- -> vas_092- so the panel's
+ *                        styles cannot collide with another panel's.
+ *   VAI163   2026-08-06  Line items: the Exp. delivery cell (4th track, header and
+ *                        drawer included) gained a leading inset, so the
+ *                        right-aligned Qty and the left-aligned date no longer
+ *                        meet across a single gutter; its track widened to match.
+ *                        Zoom / narrow-panel robustness: the snapshot only goes
+ *                        four-across from 700px (at 80% zoom the panel reads ~1.25x
+ *                        more CSS pixels, which used to crush a 2-up row into 4-up
+ *                        and ellipsise the Received figure), the Received bar's
+ *                        width is em- not px-based so it can no longer floor its
+ *                        track, stage labels break inside a long word instead of
+ *                        setting the stepper's floor, and a Generated From chip
+ *                        caps at the strip width with its value truncating inside.
+ *   VAI163   2026-08-06  The pager now also serves the Recent Activity feed. Inside
+ *                        the activity list it drops its top border, since the row
+ *                        above it already draws the list's divider.
  ***********************************************************/
 
-.MPC-vaspo-root {
+.vas_092-root {
     /* Canonical palette (windows-and-panels.md) */
     --vaspo-text:        #102C3F;
     --vaspo-muted:       #5F7283;
@@ -147,10 +164,10 @@
     box-sizing: border-box;
 }
 
-.MPC-vaspo-root * { box-sizing: border-box; }
+.vas_092-root * { box-sizing: border-box; }
 
 /* The body sets the em anchor — every internal size below is em against this. */
-.MPC-vaspo-body {
+.vas_092-body {
     font-size: clamp(15px, 2.8cqi, 17px);
     padding: 1.125em 0.875em;
     display: flex;
@@ -163,9 +180,9 @@
     max-width: 100%;
 }
 
-.MPC-vaspo-body > * { min-width: 0; max-width: 100%; }
+.vas_092-body > * { min-width: 0; max-width: 100%; }
 
-.MPC-vaspo-empty {
+.vas_092-empty {
     padding: 40px 18px;
     text-align: center;
     color: var(--vaspo-muted);
@@ -175,9 +192,9 @@
 /* ----------------------------------------------------------- */
 /*  Section + Section Header                                    */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-sec { display: block; }
+.vas_092-sec { display: block; }
 
-.MPC-vaspo-secHead {
+.vas_092-secHead {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -185,7 +202,7 @@
     margin-bottom: 0.5em;
 }
 
-.MPC-vaspo-secTitle {
+.vas_092-secTitle {
     font-size: 1em;
     font-weight: 700;
     color: var(--vaspo-text);
@@ -193,27 +210,27 @@
     line-height: 1.2;
 }
 
-.MPC-vaspo-secRight {
+.vas_092-secRight {
     display: flex;
     align-items: center;
     gap: 0.5em;
     flex: none;
 }
 
-.MPC-vaspo-secSummary {
+.vas_092-secSummary {
     font-size: 0.75em;
     font-weight: 400;
     color: var(--vaspo-muted);
 }
 
-.MPC-vaspo-secAction {
+.vas_092-secAction {
     font-size: 0.8125em;
     color: var(--vaspo-action);
     cursor: pointer;
 }
-.MPC-vaspo-secAction:hover { color: var(--vaspo-action-dk); }
+.vas_092-secAction:hover { color: var(--vaspo-action-dk); }
 
-.MPC-vaspo-secEmpty {
+.vas_092-secEmpty {
     font-size: 0.8125em;
     color: var(--vaspo-muted);
     padding: 0.75em 0;
@@ -222,7 +239,7 @@
 /* ----------------------------------------------------------- */
 /*  Status pill (tinted)                                        */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-pill {
+.vas_092-pill {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
@@ -233,46 +250,46 @@
     white-space: nowrap;
 }
 
-.MPC-vaspo-pill.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
-.MPC-vaspo-pill.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
-.MPC-vaspo-pill.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
-.MPC-vaspo-pill.tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
-.MPC-vaspo-pill.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
-.MPC-vaspo-pill.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
+.vas_092-pill.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
+.vas_092-pill.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
+.vas_092-pill.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
+.vas_092-pill.tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
+.vas_092-pill.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
+.vas_092-pill.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
 
 /* ----------------------------------------------------------- */
 /*  Header — title strip                                        */
 /* ----------------------------------------------------------- */
 /* Soft-gradient banner (no border) carrying the title + subtitle and the
    priority / delivery-status pills, per the reference design. */
-.MPC-vaspo-hdr {
+.vas_092-hdr {
     border-radius: 14px;
     padding: 0.875em 1em;
 }
 
-.MPC-vaspo-hdrTop {
+.vas_092-hdrTop {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.875em;
 }
 
-.MPC-vaspo-hdrTitleWrap { min-width: 0; }
+.vas_092-hdrTitleWrap { min-width: 0; }
 
-.MPC-vaspo-hdrTitle {
+.vas_092-hdrTitle {
     font-size: 1.25em;
     font-weight: 700;
     color: var(--vaspo-text);
     line-height: 1.2;
 }
 
-.MPC-vaspo-hdrSub {
+.vas_092-hdrSub {
     font-size: 0.75em;
     color: var(--vaspo-sub);
     margin-top: 0.3125em;
 }
 
-.MPC-vaspo-hdrPills {
+.vas_092-hdrPills {
     flex: none;
     display: flex;
     align-items: center;
@@ -282,7 +299,7 @@
 }
 
 /* Header pill — tinted chip; priority carries a chevron, status a leading dot. */
-.MPC-vaspo-hdrPill {
+.vas_092-hdrPill {
     display: inline-flex;
     align-items: center;
     gap: 0.3125em;
@@ -294,16 +311,16 @@
     white-space: nowrap;
 }
 
-.MPC-vaspo-hdrPill.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
-.MPC-vaspo-hdrPill.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
-.MPC-vaspo-hdrPill.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
-.MPC-vaspo-hdrPill.tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
-.MPC-vaspo-hdrPill.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
-.MPC-vaspo-hdrPill.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
+.vas_092-hdrPill.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
+.vas_092-hdrPill.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
+.vas_092-hdrPill.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
+.vas_092-hdrPill.tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
+.vas_092-hdrPill.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
+.vas_092-hdrPill.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
 
-.MPC-vaspo-hdrPill .MPC-vaspo-ic { color: currentColor; }
+.vas_092-hdrPill .vas_092-ic { color: currentColor; }
 
-.MPC-vaspo-hdrDot {
+.vas_092-hdrDot {
     width: 0.5em;
     height: 0.5em;
     border-radius: 50%;
@@ -317,7 +334,7 @@
 /* Vendor identity takes 40% of the card; the terms take the rest and run two
    fields wide, so five short fields sit three rows deep instead of stacking into
    a tall column that leaves the vendor half empty. */
-.MPC-vaspo-hdrCard {
+.vas_092-hdrCard {
     display: grid;
     grid-template-columns: 40% 1fr;
     gap: 0.875em 1.75em;
@@ -327,9 +344,9 @@
     padding: 0.875em 1em;
 }
 
-.MPC-vaspo-hdrColL { min-width: 0; border-right: 1px solid var(--vaspo-row-div); padding-right: 1.25em; }
+.vas_092-hdrColL { min-width: 0; border-right: 1px solid var(--vaspo-row-div); padding-right: 1.25em; }
 
-.MPC-vaspo-hdrColR {
+.vas_092-hdrColR {
     min-width: 0;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -337,10 +354,10 @@
     align-content: start;
 }
 
-.MPC-vaspo-hdrField { min-width: 0; }
+.vas_092-hdrField { min-width: 0; }
 
 /* Field label (uppercase caption) + value */
-.MPC-vaspo-fLabel {
+.vas_092-fLabel {
     font-size: 0.6875em;
     font-weight: 700;
     letter-spacing: .4px;
@@ -349,7 +366,7 @@
     line-height: 1.3;
 }
 
-.MPC-vaspo-fVal {
+.vas_092-fVal {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--vaspo-text);
@@ -360,25 +377,25 @@
 
 /* Narrow panels: stack the two columns and drop the pills below the title. */
 @container (max-width: 460px) {
-    .MPC-vaspo-hdrCard { grid-template-columns: 1fr; }
-    .MPC-vaspo-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--vaspo-row-div); padding-bottom: 0.75em; }
+    .vas_092-hdrCard { grid-template-columns: 1fr; }
+    .vas_092-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--vaspo-row-div); padding-bottom: 0.75em; }
     /* Two field columns are too cramped this narrow — back to a single stack. */
-    .MPC-vaspo-hdrColR { grid-template-columns: 1fr; }
-    .MPC-vaspo-hdrTop  { flex-direction: column; }
-    .MPC-vaspo-hdrPills { justify-content: flex-start; }
+    .vas_092-hdrColR { grid-template-columns: 1fr; }
+    .vas_092-hdrTop  { flex-direction: column; }
+    .vas_092-hdrPills { justify-content: flex-start; }
 }
 
 /* ----------------------------------------------------------- */
 /*  Vendor identity                                            */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-vendName {
+.vas_092-vendName {
     font-size: 0.9375em;
     font-weight: 700;
     color: var(--vaspo-text);
     margin-top: 0.1875em;
 }
 
-.MPC-vaspo-vendAddr {
+.vas_092-vendAddr {
     display: flex;
     align-items: flex-start;
     gap: 0.5em;
@@ -388,9 +405,9 @@
     margin-top: 0.25em;
 }
 
-.MPC-vaspo-vendAddr .MPC-vaspo-ic { color: var(--vaspo-muted); margin-top: 0.15em; }
+.vas_092-vendAddr .vas_092-ic { color: var(--vaspo-muted); margin-top: 0.15em; }
 
-.MPC-vaspo-vendContact {
+.vas_092-vendContact {
     display: flex;
     flex-wrap: wrap;
     gap: 0.375em 1.125em;
@@ -399,18 +416,18 @@
     margin-top: 0.375em;
 }
 
-.MPC-vaspo-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
-.MPC-vaspo-contactBit .MPC-vaspo-ic { color: var(--vaspo-action); }
+.vas_092-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.vas_092-contactBit .vas_092-ic { color: var(--vaspo-action); }
 
-.MPC-vaspo-ic { display: inline-flex; align-items: center; flex: none; }
-.MPC-vaspo-ic svg { display: block; }
+.vas_092-ic { display: inline-flex; align-items: center; flex: none; }
+.vas_092-ic svg { display: block; }
 
 /* ----------------------------------------------------------- */
 /*  Generated From (chip strip)                                 */
 /* ----------------------------------------------------------- */
 /* Light rounded strip carrying an uppercase caption and one chip per origin
    document (Sales Order / Requisition / Production Order). */
-.MPC-vaspo-genfrom {
+.vas_092-genfrom {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -421,7 +438,7 @@
     padding: 0.625em 0.75em;
 }
 
-.MPC-vaspo-gfLabel {
+.vas_092-gfLabel {
     flex: none;
     font-size: 0.6875em;
     font-weight: 700;
@@ -430,7 +447,7 @@
     color: var(--vaspo-muted);
 }
 
-.MPC-vaspo-gfChips {
+.vas_092-gfChips {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -440,10 +457,15 @@
 
 /* Chip: white pill with a leading (tinted) icon, grey label, dark value and an
    optional trailing status pill. */
-.MPC-vaspo-chip {
+/* The chip never outgrows the strip that holds it: the strip already wraps its
+   chips onto new lines, but a single chip whose value is a long document number
+   used to run past the panel edge on its own. It caps at the strip width and the
+   value truncates inside it — the chip carries the full text as a tooltip. */
+.vas_092-chip {
     display: inline-flex;
     align-items: center;
     gap: 0.4375em;
+    max-width: 100%;
     background: #fff;
     border: 1px solid var(--vaspo-card-bd);
     border-radius: 8px;
@@ -453,37 +475,43 @@
     white-space: nowrap;
 }
 
-.MPC-vaspo-chip .MPC-vaspo-ic          { color: var(--vaspo-muted); }
-.MPC-vaspo-chip.ic-info    .MPC-vaspo-ic { color: var(--vaspo-info-tx); }
-.MPC-vaspo-chip.ic-success .MPC-vaspo-ic { color: var(--vaspo-success-tx); }
-.MPC-vaspo-chip.ic-warning .MPC-vaspo-ic { color: var(--vaspo-warning-tx); }
-.MPC-vaspo-chip.ic-purple  .MPC-vaspo-ic { color: var(--vaspo-purple-tx); }
-.MPC-vaspo-chip.ic-muted   .MPC-vaspo-ic { color: var(--vaspo-muted); }
+.vas_092-chip .vas_092-ic          { color: var(--vaspo-muted); }
+.vas_092-chip.ic-info    .vas_092-ic { color: var(--vaspo-info-tx); }
+.vas_092-chip.ic-success .vas_092-ic { color: var(--vaspo-success-tx); }
+.vas_092-chip.ic-warning .vas_092-ic { color: var(--vaspo-warning-tx); }
+.vas_092-chip.ic-purple  .vas_092-ic { color: var(--vaspo-purple-tx); }
+.vas_092-chip.ic-muted   .vas_092-ic { color: var(--vaspo-muted); }
 
-.MPC-vaspo-chipLabel { color: var(--vaspo-muted); }
-.MPC-vaspo-chipVal   { color: var(--vaspo-text); font-weight: 700; }
-.MPC-vaspo-chip .MPC-vaspo-pill { margin-left: 0.0625em; }
+.vas_092-chipLabel { flex: none; color: var(--vaspo-muted); }
+.vas_092-chipVal   {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--vaspo-text);
+    font-weight: 700;
+}
+.vas_092-chip .vas_092-pill { margin-left: 0.0625em; }
 
 /* Clickable origin chip — opens the source record. */
-.MPC-vaspo-chip.is-link { cursor: pointer; }
-.MPC-vaspo-chip.is-link:hover {
+.vas_092-chip.is-link { cursor: pointer; }
+.vas_092-chip.is-link:hover {
     border-color: var(--vaspo-action);
     box-shadow: 0 0 0 1px var(--vaspo-action) inset;
 }
-.MPC-vaspo-chip.is-link .arrowUpRight,
-.MPC-vaspo-chip.is-link > .MPC-vaspo-ic:last-child { color: var(--vaspo-action); }
+.vas_092-chip.is-link .arrowUpRight,
+.vas_092-chip.is-link > .vas_092-ic:last-child { color: var(--vaspo-action); }
 
 /* ----------------------------------------------------------- */
 /*  Snapshot (metric grid)                                      */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-snap {
+.vas_092-snap {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 0.75em;
 }
 
 /* Metric card: flat white surface with a colour-accented left border. */
-.MPC-vaspo-metric {
+.vas_092-metric {
     min-width: 0;
     border: 1px solid var(--vaspo-card-bd);
     border-left: 3px solid var(--vaspo-neutral-tx);
@@ -492,19 +520,19 @@
     padding: 0.75em 0.875em;
 }
 
-.MPC-vaspo-metric.tone-total    { border-left-color: var(--vaspo-info-tx); }
-.MPC-vaspo-metric.tone-delivery { border-left-color: var(--vaspo-purple-tx); }
-.MPC-vaspo-metric.tone-lines    { border-left-color: var(--vaspo-success-tx); }
-.MPC-vaspo-metric.tone-received { border-left-color: #E08A1E; }
+.vas_092-metric.tone-total    { border-left-color: var(--vaspo-info-tx); }
+.vas_092-metric.tone-delivery { border-left-color: var(--vaspo-purple-tx); }
+.vas_092-metric.tone-lines    { border-left-color: var(--vaspo-success-tx); }
+.vas_092-metric.tone-received { border-left-color: #E08A1E; }
 
-.MPC-vaspo-mHead {
+.vas_092-mHead {
     display: flex;
     align-items: center;
     gap: 0.375em;
     margin-bottom: 0.375em;
 }
 
-.MPC-vaspo-mLabel {
+.vas_092-mLabel {
     min-width: 0;
     font-size: 0.6875em;
     font-weight: 700;
@@ -516,12 +544,12 @@
     white-space: nowrap;
 }
 
-.MPC-vaspo-metric.tone-total    .MPC-vaspo-mHead .MPC-vaspo-ic { color: var(--vaspo-info-tx); }
-.MPC-vaspo-metric.tone-delivery .MPC-vaspo-mHead .MPC-vaspo-ic { color: var(--vaspo-purple-tx); }
-.MPC-vaspo-metric.tone-lines    .MPC-vaspo-mHead .MPC-vaspo-ic { color: var(--vaspo-success-tx); }
-.MPC-vaspo-metric.tone-received .MPC-vaspo-mHead .MPC-vaspo-ic { color: #E08A1E; }
+.vas_092-metric.tone-total    .vas_092-mHead .vas_092-ic { color: var(--vaspo-info-tx); }
+.vas_092-metric.tone-delivery .vas_092-mHead .vas_092-ic { color: var(--vaspo-purple-tx); }
+.vas_092-metric.tone-lines    .vas_092-mHead .vas_092-ic { color: var(--vaspo-success-tx); }
+.vas_092-metric.tone-received .vas_092-mHead .vas_092-ic { color: #E08A1E; }
 
-.MPC-vaspo-mVal {
+.vas_092-mVal {
     font-size: 1.25em;
     font-weight: 700;
     color: var(--vaspo-text);
@@ -531,7 +559,7 @@
     white-space: nowrap;
 }
 
-.MPC-vaspo-mSub {
+.vas_092-mSub {
     font-size: 0.6875em;
     color: var(--vaspo-muted);
     margin-top: 0.25em;
@@ -540,43 +568,50 @@
     white-space: nowrap;
 }
 
-.MPC-vaspo-mBar {
+.vas_092-mBar {
     margin-top: 0.5em;
     height: 5px;
     border-radius: 999px;
     background: #E7EEF4;
     overflow: hidden;
 }
-.MPC-vaspo-mBar i {
+.vas_092-mBar i {
     display: block;
     height: 100%;
     border-radius: 999px;
     background: #E08A1E;
 }
 
-/* Narrow panels: 2-up, then single-column. */
-@container (max-width: 620px) {
-    .MPC-vaspo-snap { grid-template-columns: repeat(2, 1fr); }
+/* Narrow panels: 2-up, then single-column.
+
+   The four-across row needs real room: each card carries an uppercase label, a
+   1.25em figure and a caption, all of which clip to one line. At 620px a card is
+   ~145px of content — an amount with a currency, or the Received pair
+   "delivered / ordered UOM", ellipsises there. Browser zoom is what exposed this:
+   at 80% the panel measures ~1.25x more CSS pixels for the same physical width,
+   which used to carry it over the old 620px threshold and switch a comfortable
+   2-up row into a crushed 4-up one. Four cards only from 700px. */
+@container (max-width: 700px) {
+    .vas_092-snap { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container (max-width: 340px) {
-    .MPC-vaspo-snap { grid-template-columns: 1fr; }
+    .vas_092-snap { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ----------------------------------------------------------- */
 /*  Order Progress (horizontal stepper)                         */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-stepper {
+.vas_092-stepper {
     display: flex;
     align-items: flex-start;
     gap: 0;
     min-width: 0;
 }
 
-.MPC-vaspo-step {
+.vas_092-step {
     /* min-width: 0 so a long stage label shrinks its step instead of widening
        the stepper past the panel. */
     flex: 1 1 0;
-    min-width: 0;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -584,26 +619,26 @@
 }
 
 /* Connector rail: left line + circle + right line on a single row. */
-.MPC-vaspo-stepRail {
+.vas_092-stepRail {
     display: flex;
     align-items: center;
     width: 100%;
 }
 
-.MPC-vaspo-stepLine {
+.vas_092-stepLine {
     flex: 1 1 auto;
     height: 2px;
     background: #D9E6F2;
 }
-.MPC-vaspo-step:first-child .MPC-vaspo-stepLine-l,
-.MPC-vaspo-step:last-child  .MPC-vaspo-stepLine-r { visibility: hidden; }
+.vas_092-step:first-child .vas_092-stepLine-l,
+.vas_092-step:last-child  .vas_092-stepLine-r { visibility: hidden; }
 
 /* A segment is "filled" once its leading circle is reached. */
-.MPC-vaspo-step.is-done   .MPC-vaspo-stepLine-r,
-.MPC-vaspo-step.is-done   .MPC-vaspo-stepLine-l,
-.MPC-vaspo-step.is-active .MPC-vaspo-stepLine-l { background: #67B98A; }
+.vas_092-step.is-done   .vas_092-stepLine-r,
+.vas_092-step.is-done   .vas_092-stepLine-l,
+.vas_092-step.is-active .vas_092-stepLine-l { background: #67B98A; }
 
-.MPC-vaspo-stepDot {
+.vas_092-stepDot {
     flex: none;
     width: 2em;
     height: 2em;
@@ -618,45 +653,53 @@
     color: #8A99A8;
     border: 1.5px solid #DCE5EE;
 }
-.MPC-vaspo-stepDot .MPC-vaspo-ic { display: inline-flex; }
+.vas_092-stepDot .vas_092-ic { display: inline-flex; }
 
-.MPC-vaspo-step.is-done .MPC-vaspo-stepDot {
+.vas_092-step.is-done .vas_092-stepDot {
     background: #E4F3EC;
     color: #1F9D5B;
     border-color: #BFE6D2;
 }
-.MPC-vaspo-step.is-active .MPC-vaspo-stepDot {
+.vas_092-step.is-active .vas_092-stepDot {
     background: #fff;
     color: #E08A1E;
     border: 2px solid #F0A93D;
 }
 
-.MPC-vaspo-stepLabel {
+.vas_092-stepLabel {
     margin-top: 0.5em;
     text-align: center;
     padding: 0 0.25em;
     min-width: 0;
 }
 
-.MPC-vaspo-stepTitle {
+/* Seven stages share the panel width, so a step is only ever a fraction of it.
+   min-width:0 lets the step shrink, but a single long stage name ("Acknowledged",
+   "Partial Received") is still an unbreakable word — without this the labels set
+   the stepper's floor and the panel overflows (or, with the root's overflow-x
+   hidden, the last stage is clipped away). Breaking inside the word keeps the
+   seven stages on one rail at any panel width or zoom level. */
+.vas_092-stepTitle {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--vaspo-text);
+    overflow-wrap: anywhere;
 }
 
-.MPC-vaspo-stepMeta {
+.vas_092-stepMeta {
     font-size: 0.6875em;
     color: var(--vaspo-muted);
     margin-top: 0.25em;
+    overflow-wrap: anywhere;
 }
-.MPC-vaspo-step.is-active .MPC-vaspo-stepMeta { color: #E08A1E; font-weight: 600; }
+.vas_092-step.is-active .vas_092-stepMeta { color: #E08A1E; font-weight: 600; }
 
 /* ----------------------------------------------------------- */
 /*  Bottom (Notes stacked above Activity)                       */
 /* ----------------------------------------------------------- */
 /* Notes and Activity render one below the other (Notes then Activity), each
    full width. */
-.MPC-vaspo-bottom {
+.vas_092-bottom {
     display: flex;
     flex-direction: column;
     gap: 0.875em;
@@ -665,7 +708,7 @@
 /* ----------------------------------------------------------- */
 /*  Recent Activity (typed feed)                                */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-actList {
+.vas_092-actList {
     border: 1px solid var(--vaspo-card-bd);
     border-radius: var(--vaspo-card-radius);
     background: #fff;
@@ -675,7 +718,7 @@
 /* Row: tag chip | title | right-aligned timestamp. The row wraps so on a
    narrow panel the timestamp/author drops to its own line (right-aligned)
    instead of being clipped off the right edge. */
-.MPC-vaspo-actRow {
+.vas_092-actRow {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -683,10 +726,10 @@
     padding: 0.625em 0.75em;
     border-bottom: 1px solid var(--vaspo-row-div);
 }
-.MPC-vaspo-actRow:last-child { border-bottom: none; }
+.vas_092-actRow:last-child { border-bottom: none; }
 
 /* Tag chip — tinted, with a leading icon. */
-.MPC-vaspo-actTag {
+.vas_092-actTag {
     flex: none;
     display: inline-flex;
     align-items: center;
@@ -698,16 +741,16 @@
     line-height: 1.3;
     white-space: nowrap;
 }
-.MPC-vaspo-actTag .MPC-vaspo-ic { color: currentColor; }
-.MPC-vaspo-actTag .MPC-vaspo-ic svg { width: 0.9375em; height: 0.9375em; }
+.vas_092-actTag .vas_092-ic { color: currentColor; }
+.vas_092-actTag .vas_092-ic svg { width: 0.9375em; height: 0.9375em; }
 
-.MPC-vaspo-actTag.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
-.MPC-vaspo-actTag.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
-.MPC-vaspo-actTag.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
-.MPC-vaspo-actTag.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
-.MPC-vaspo-actTag.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
+.vas_092-actTag.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
+.vas_092-actTag.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
+.vas_092-actTag.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
+.vas_092-actTag.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
+.vas_092-actTag.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
 
-.MPC-vaspo-actTitle {
+.vas_092-actTitle {
     flex: 1 1 auto;
     min-width: 0;
     font-size: 0.8125em;
@@ -717,37 +760,37 @@
 
 /* The headline (note text / e-mail subject) and, for an e-mail, the recipient
    beneath it. Each line clips on its own so the row height stays predictable. */
-.MPC-vaspo-actLead,
-.MPC-vaspo-actSub {
+.vas_092-actLead,
+.vas_092-actSub {
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.MPC-vaspo-actSub {
+.vas_092-actSub {
     font-size: 0.8462em; /* ~0.6875em against the body anchor */
     color: var(--vaspo-muted);
     margin-top: 0.125em;
 }
 
 /* An activity carrying a body (e-mail) opens on click. */
-.MPC-vaspo-actRow.is-openable { cursor: pointer; }
-.MPC-vaspo-actRow.is-openable:hover { background: #F7FBFE; }
+.vas_092-actRow.is-openable { cursor: pointer; }
+.vas_092-actRow.is-openable:hover { background: #F7FBFE; }
 
-.MPC-vaspo-actCaret {
+.vas_092-actCaret {
     flex: none;
     display: inline-flex;
     align-items: center;
     color: var(--vaspo-muted);
     transition: transform .15s ease;
 }
-.MPC-vaspo-actRow.is-open .MPC-vaspo-actCaret {
+.vas_092-actRow.is-open .vas_092-actCaret {
     transform: rotate(90deg);
     color: var(--vaspo-action);
 }
 
 /* The message body, revealed under its row. */
-.MPC-vaspo-actBody {
+.vas_092-actBody {
     background: #F7FAFD;
     border-bottom: 1px solid var(--vaspo-row-div);
     padding: 0.625em 0.875em 0.75em 2.5em;
@@ -755,18 +798,18 @@
     color: var(--vaspo-text);
     line-height: 1.55;
 }
-.MPC-vaspo-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
-.MPC-vaspo-actMeta {
+.vas_092-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.vas_092-actMeta {
     font-size: 0.8462em;
     color: var(--vaspo-muted);
     margin-bottom: 0.3125em;
 }
 
-[dir="rtl"] .MPC-vaspo-actBody { padding-left: 0.875em; padding-right: 2.5em; }
-[dir="rtl"] .MPC-vaspo-actCaret svg { transform: scaleX(-1); }
-[dir="rtl"] .MPC-vaspo-actRow.is-open .MPC-vaspo-actCaret { transform: rotate(-90deg); }
+[dir="rtl"] .vas_092-actBody { padding-left: 0.875em; padding-right: 2.5em; }
+[dir="rtl"] .vas_092-actCaret svg { transform: scaleX(-1); }
+[dir="rtl"] .vas_092-actRow.is-open .vas_092-actCaret { transform: rotate(-90deg); }
 
-.MPC-vaspo-actWhen {
+.vas_092-actWhen {
     flex: none;
     margin-left: auto;      /* keep right-aligned, incl. when wrapped to its own line */
     max-width: 100%;
@@ -780,14 +823,14 @@
 /* ----------------------------------------------------------- */
 /* Flat operational surface: white card, #D9E2EB border, #E2EAF1
    row dividers. Columns and footers stay; only the styling is flat. */
-.MPC-vaspo-table {
+.vas_092-table {
     border: 1px solid var(--vaspo-card-bd);
     border-radius: var(--vaspo-card-radius);
     background: #fff;
     overflow: hidden;
 }
 
-.MPC-vaspo-tRow {
+.vas_092-tRow {
     display: grid;
     align-items: center;
     gap: 0.625em;
@@ -801,29 +844,41 @@
 /* Six data columns + a narrow trailing action column (per-line history toggle).
    The history drawer reuses this same template, so a past version lines up
    column-for-column with the line above it. */
-.MPC-vaspo-itTable .MPC-vaspo-tRow {
+.vas_092-itTable .vas_092-tRow {
     grid-template-columns:
-        minmax(0, 2.3fr) minmax(0, 0.9fr) minmax(0, 0.75fr) minmax(0, 1.05fr)
+        minmax(0, 2.3fr) minmax(0, 0.9fr) minmax(0, 0.75fr) minmax(0, 1.2fr)
         minmax(0, 0.95fr) minmax(0, 1.0fr) 2em;
+}
+
+/* Qty is right-aligned and Exp. delivery left-aligned, so the two run together
+   across the single 0.625em gutter between them — the quantity's unit symbol
+   ends up all but touching the date. The delivery cell (4th track, header and
+   body alike, in the drawer too since it shares this grid) carries its own
+   leading inset, widening THAT gutter only; its track was widened to match so
+   the date keeps the room it had. */
+.vas_092-itTable .vas_092-tRow > span:nth-child(4) { padding-left: 0.75em; }
+[dir="rtl"] .vas_092-itTable .vas_092-tRow > span:nth-child(4) {
+    padding-left: 0;
+    padding-right: 0.75em;
 }
 /* The Distribution Method column carries the dictionary's own name for
    C_ExpectedCost.LandedCostDistribution, which can run longer than a two-word
    label — it gets a wider track than the amount columns beside it. */
-.MPC-vaspo-ldTable .MPC-vaspo-tRow {
+.vas_092-ldTable .vas_092-tRow {
     grid-template-columns:
         minmax(0, 1.8fr) minmax(0, 1.35fr) minmax(0, 0.95fr) minmax(0, 1.15fr)
         minmax(0, 0.95fr);
 }
-.MPC-vaspo-histTable .MPC-vaspo-tRow {
+.vas_092-histTable .vas_092-tRow {
     grid-template-columns:
         minmax(0, 2.3fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.0fr)
         minmax(0, 1.0fr) minmax(0, 1.1fr);
 }
-.MPC-vaspo-docTable .MPC-vaspo-tRow {
+.vas_092-docTable .vas_092-tRow {
     grid-template-columns:
         minmax(0, 2.3fr) minmax(0, 1.1fr) minmax(0, 1.0fr) minmax(0, 1.1fr);
 }
-.MPC-vaspo-budgetTable .MPC-vaspo-tRow {
+.vas_092-budgetTable .vas_092-tRow {
     grid-template-columns: minmax(0, 2.6fr) minmax(0, 1.0fr);
 }
 
@@ -831,20 +886,20 @@
    children carry their own ellipsis and the Received cell is a flex column, so
    neither is harmed by the clip. Numeric and header cells never wrap — a wrapped
    figure would sit off the shared baseline. */
-.MPC-vaspo-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.MPC-vaspo-tHead > span,
-.MPC-vaspo-tRow > span.ta-r,
-.MPC-vaspo-tRow > span.ta-c { white-space: nowrap; }
+.vas_092-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vas_092-tHead > span,
+.vas_092-tRow > span.ta-r,
+.vas_092-tRow > span.ta-c { white-space: nowrap; }
 
 /* Tabular figures so the numeric columns line up digit for digit instead of
    drifting with proportional glyph widths. */
-.MPC-vaspo-table .ta-r,
-.MPC-vaspo-recvVal { font-variant-numeric: tabular-nums; }
+.vas_092-table .ta-r,
+.vas_092-recvVal { font-variant-numeric: tabular-nums; }
 
 /* A pill in a table cell (distribution method, document status) still hugs its
    own text, but truncates instead of being clipped mid-word when the label is
    longer than its track — those cells carry the full text as a tooltip. */
-.MPC-vaspo-tRow > span > .MPC-vaspo-pill {
+.vas_092-tRow > span > .vas_092-pill {
     display: inline-block;
     max-width: 100%;
     overflow: hidden;
@@ -857,20 +912,20 @@
    card, rather than crushing its columns or widening the panel. Everything else
    on the page keeps its full width. */
 @container (max-width: 380px) {
-    .MPC-vaspo-itTable,
-    .MPC-vaspo-histTable,
-    .MPC-vaspo-docTable,
-    .MPC-vaspo-ldTable {
+    .vas_092-itTable,
+    .vas_092-histTable,
+    .vas_092-docTable,
+    .vas_092-ldTable {
         overflow-x: auto;
         overflow-y: hidden;
     }
-    .MPC-vaspo-itTable   .MPC-vaspo-tRow,
-    .MPC-vaspo-histTable .MPC-vaspo-tRow,
-    .MPC-vaspo-docTable  .MPC-vaspo-tRow,
-    .MPC-vaspo-ldTable   .MPC-vaspo-tRow { min-width: 360px; }
+    .vas_092-itTable   .vas_092-tRow,
+    .vas_092-histTable .vas_092-tRow,
+    .vas_092-docTable  .vas_092-tRow,
+    .vas_092-ldTable   .vas_092-tRow { min-width: 360px; }
     /* The drawer must scroll with its parent table, not on its own, or a past
        version stops lining up with the line above it. */
-    .MPC-vaspo-lhTable { overflow: visible; }
+    .vas_092-lhTable { overflow: visible; }
 }
 
 /* ----------------------------------------------------------- */
@@ -879,14 +934,14 @@
 /* The toggle sits in the row's trailing action cell, at the right-hand edge.
    Icon-only — its tooltip (title/aria-label) names the action and the number of
    changes, so the column stays narrow. */
-.MPC-vaspo-itAct {
+.vas_092-itAct {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     min-width: 0;
 }
 
-.MPC-vaspo-histBtn {
+.vas_092-histBtn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -901,50 +956,50 @@
     color: var(--vaspo-action);
     cursor: pointer;
 }
-.MPC-vaspo-histBtn:hover { background: var(--vaspo-info-bg); border-color: var(--vaspo-action); }
-.MPC-vaspo-histBtn.is-open {
+.vas_092-histBtn:hover { background: var(--vaspo-info-bg); border-color: var(--vaspo-action); }
+.vas_092-histBtn.is-open {
     background: var(--vaspo-info-bg);
     border-color: var(--vaspo-action);
     color: var(--vaspo-action);
 }
-.MPC-vaspo-histBtn .MPC-vaspo-ic { color: currentColor; }
+.vas_092-histBtn .vas_092-ic { color: currentColor; }
 
 /* The drawer: a sibling of the line row, tinted with a left accent rail so it
    reads as belonging to the line above. It carries NO padding of its own and the
    table inside drops its border — the version rows then sit on exactly the same
    column grid as the line row above them. */
-.MPC-vaspo-lineHist {
+.vas_092-lineHist {
     background: #F7FAFD;
     border-bottom: 1px solid var(--vaspo-row-div);
     box-shadow: inset 3px 0 0 var(--vaspo-action);
 }
 
-.MPC-vaspo-lhTable {
+.vas_092-lhTable {
     border: none;
     border-radius: 0;
     background: transparent;
     overflow: visible;
 }
-.MPC-vaspo-lhTable .MPC-vaspo-tHead {
+.vas_092-lhTable .vas_092-tHead {
     background: transparent;
     border-bottom: 1px solid var(--vaspo-row-div);
 }
-.MPC-vaspo-lhTable .MPC-vaspo-tBody { border-bottom: 1px solid var(--vaspo-row-div); }
-.MPC-vaspo-lhTable .MPC-vaspo-tBody:last-child { border-bottom: none; }
-.MPC-vaspo-lhTable .MPC-vaspo-tBody:hover { background: rgba(255, 255, 255, .65); }
+.vas_092-lhTable .vas_092-tBody { border-bottom: 1px solid var(--vaspo-row-div); }
+.vas_092-lhTable .vas_092-tBody:last-child { border-bottom: none; }
+.vas_092-lhTable .vas_092-tBody:hover { background: rgba(255, 255, 255, .65); }
 
 /* History reads as supporting detail under the line it belongs to, so both
    history views sit a step below the line-items scale. */
-.MPC-vaspo-lhTable .MPC-vaspo-tBody,
-.MPC-vaspo-histTable .MPC-vaspo-tBody { font-size: 0.75em; }
-.MPC-vaspo-lhTable .MPC-vaspo-tHead,
-.MPC-vaspo-histTable .MPC-vaspo-tHead { font-size: 0.625em; }
+.vas_092-lhTable .vas_092-tBody,
+.vas_092-histTable .vas_092-tBody { font-size: 0.75em; }
+.vas_092-lhTable .vas_092-tHead,
+.vas_092-histTable .vas_092-tHead { font-size: 0.625em; }
 
 /* Author cell: who made the change. Used by both the per-line history drawer and
    the Removed lines table; truncates rather than widening its row. It occupies
    the line's Received track, so it is right-aligned to sit directly under that
    column instead of hanging off its left edge. */
-.MPC-vaspo-lhBy {
+.vas_092-lhBy {
     min-width: 0;
     color: var(--vaspo-sub);
     overflow: hidden;
@@ -954,8 +1009,8 @@
 }
 
 /* Timestamp cell: the change moment, with that version's line note beneath. */
-.MPC-vaspo-lhWhen { min-width: 0; }
-.MPC-vaspo-lhWhen small {
+.vas_092-lhWhen { min-width: 0; }
+.vas_092-lhWhen small {
     display: block;
     color: var(--vaspo-muted);
     font-size: 0.9231em;
@@ -964,28 +1019,28 @@
     white-space: nowrap;
 }
 
-[dir="rtl"] .MPC-vaspo-lineHist { box-shadow: inset -3px 0 0 var(--vaspo-action); }
+[dir="rtl"] .vas_092-lineHist { box-shadow: inset -3px 0 0 var(--vaspo-action); }
 
 /* Document identity cell: kind icon + doc no / caption + open affordance */
-.MPC-vaspo-docItem {
+.vas_092-docItem {
     display: flex;
     align-items: center;
     gap: 0.5em;
     min-width: 0;
 }
-.MPC-vaspo-docTxt { min-width: 0; flex: 1; }
+.vas_092-docTxt { min-width: 0; flex: 1; }
 
 /* A whole document row is clickable — the open arrow tints on hover. */
-.MPC-vaspo-tBody.is-link { cursor: pointer; }
-.MPC-vaspo-tBody.is-link:hover { background: #F2F8FD; }
-.MPC-vaspo-tBody.is-link .MPC-vaspo-docItem > .MPC-vaspo-ic:last-child {
+.vas_092-tBody.is-link { cursor: pointer; }
+.vas_092-tBody.is-link:hover { background: #F2F8FD; }
+.vas_092-tBody.is-link .vas_092-docItem > .vas_092-ic:last-child {
     color: var(--vaspo-muted);
     flex: none;
 }
-.MPC-vaspo-tBody.is-link:hover .MPC-vaspo-docItem > .MPC-vaspo-ic:last-child,
-.MPC-vaspo-tBody.is-link:hover .MPC-vaspo-itName { color: var(--vaspo-action); }
+.vas_092-tBody.is-link:hover .vas_092-docItem > .vas_092-ic:last-child,
+.vas_092-tBody.is-link:hover .vas_092-itName { color: var(--vaspo-action); }
 
-.MPC-vaspo-tHead {
+.vas_092-tHead {
     background: #F5F8FB;
     border-bottom: 1px solid var(--vaspo-card-bd);
     font-size: 0.6875em;
@@ -995,20 +1050,20 @@
     color: var(--vaspo-muted);
 }
 
-.MPC-vaspo-tBody {
+.vas_092-tBody {
     border-bottom: 1px solid var(--vaspo-row-div);
     font-size: 0.8125em;
     color: var(--vaspo-text);
 }
-.MPC-vaspo-tBody:last-of-type { border-bottom: none; }
-.MPC-vaspo-tBody:hover { background: #FAFCFE; }
+.vas_092-tBody:last-of-type { border-bottom: none; }
+.vas_092-tBody:hover { background: #FAFCFE; }
 
-.MPC-vaspo-table .ta-r { text-align: right; justify-content: flex-end; }
-.MPC-vaspo-table .ta-c { text-align: center; justify-content: center; }
+.vas_092-table .ta-r { text-align: right; justify-content: flex-end; }
+.vas_092-table .ta-c { text-align: center; justify-content: center; }
 
 /* Item / component identity cell */
-.MPC-vaspo-itItem { min-width: 0; }
-.MPC-vaspo-itName {
+.vas_092-itItem { min-width: 0; }
+.vas_092-itName {
     font-size: 1.0769em; /* ~0.875em against the body anchor */
     font-weight: 700;
     color: var(--vaspo-text);
@@ -1017,7 +1072,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.MPC-vaspo-itSku {
+.vas_092-itSku {
     font-size: 0.9231em; /* ~0.75em against the body anchor */
     color: var(--vaspo-muted);
     margin-top: 0.125em;
@@ -1028,7 +1083,7 @@
 
 /* Attribute Set Instance (size / colour / lot / serial ...) — an inline suffix
    to the product name, not a line of its own. */
-.MPC-vaspo-itAttr {
+.vas_092-itAttr {
     margin-left: 0.5em;
     font-size: 0.857em;  /* ~0.75em against the body anchor, inside -itName */
     font-weight: 400;
@@ -1036,8 +1091,8 @@
 }
 
 /* Expected-delivery cell (date + small status) */
-.MPC-vaspo-expDate { color: var(--vaspo-text); }
-.MPC-vaspo-expDate small {
+.vas_092-expDate { color: var(--vaspo-text); }
+.vas_092-expDate small {
     display: block;
     font-size: 0.9231em;
     color: var(--vaspo-muted);
@@ -1047,7 +1102,7 @@
    so the figure shares a baseline and right edge with the Qty column instead of
    being pushed inward by an inline bar. Same treatment as the GRN overview
    (VAS_099) Received column. */
-.MPC-vaspo-recv {
+.vas_092-recv {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -1056,28 +1111,32 @@
     justify-content: center;
     gap: 0.3em;
 }
-.MPC-vaspo-recvVal { line-height: 1.25; }
-.MPC-vaspo-recvBar {
-    width: 42px;
+.vas_092-recvVal { line-height: 1.25; }
+/* Width in em, not px: the bar has to shrink with the panel like the rest of the
+   cell. A fixed 42px cannot, so on a narrow (or zoomed) panel it became the
+   Received track's floor and pushed the row out of its grid. */
+.vas_092-recvBar {
+    width: 3.4em;
+    max-width: 100%;
     height: 5px;
     border-radius: 999px;
     background: #E7EEF4;
     overflow: hidden;
     flex: none;
 }
-.MPC-vaspo-recvBar i { display: block; height: 100%; border-radius: 999px; }
-.MPC-vaspo-recv.full i { background: var(--vaspo-success-tx); }
-.MPC-vaspo-recv.part i { background: var(--vaspo-warning-tx); }
-.MPC-vaspo-recv.none i { background: #CBD5DF; }
-.MPC-vaspo-recv.full { color: var(--vaspo-success-tx); font-weight: 500; }
-.MPC-vaspo-recv.part { color: var(--vaspo-warning-tx); font-weight: 500; }
-.MPC-vaspo-recv.none { color: var(--vaspo-muted); }
+.vas_092-recvBar i { display: block; height: 100%; border-radius: 999px; }
+.vas_092-recv.full i { background: var(--vaspo-success-tx); }
+.vas_092-recv.part i { background: var(--vaspo-warning-tx); }
+.vas_092-recv.none i { background: #CBD5DF; }
+.vas_092-recv.full { color: var(--vaspo-success-tx); font-weight: 500; }
+.vas_092-recv.part { color: var(--vaspo-warning-tx); font-weight: 500; }
+.vas_092-recv.none { color: var(--vaspo-muted); }
 
 /* Landed-cost cells */
-.MPC-vaspo-ldExp { font-weight: 700; color: var(--vaspo-text); }
-.MPC-vaspo-ldAct .MPC-vaspo-ldAmt { font-weight: 700; color: var(--vaspo-text); }
-.MPC-vaspo-ldAct.is-pending .MPC-vaspo-ldAmt { color: var(--vaspo-muted); font-weight: 500; }
-.MPC-vaspo-ldFlag {
+.vas_092-ldExp { font-weight: 700; color: var(--vaspo-text); }
+.vas_092-ldAct .vas_092-ldAmt { font-weight: 700; color: var(--vaspo-text); }
+.vas_092-ldAct.is-pending .vas_092-ldAmt { color: var(--vaspo-muted); font-weight: 500; }
+.vas_092-ldFlag {
     display: block;
     margin-top: 0.125em;
     font-size: 0.8462em;
@@ -1085,25 +1144,25 @@
     letter-spacing: .3px;
     text-transform: uppercase;
 }
-.MPC-vaspo-ldFlag.inv { color: var(--vaspo-success-tx); }
-.MPC-vaspo-ldFlag.wait {
+.vas_092-ldFlag.inv { color: var(--vaspo-success-tx); }
+.vas_092-ldFlag.wait {
     color: var(--vaspo-muted);
     font-weight: 600;
     letter-spacing: 0;
     text-transform: none;
 }
-.MPC-vaspo-ldVar { font-weight: 700; }
-.MPC-vaspo-ldVar.over  { color: var(--vaspo-risk-tx); }
-.MPC-vaspo-ldVar.under { color: var(--vaspo-success-tx); }
-.MPC-vaspo-ldVar.flat  { color: var(--vaspo-muted); font-weight: 500; }
+.vas_092-ldVar { font-weight: 700; }
+.vas_092-ldVar.over  { color: var(--vaspo-risk-tx); }
+.vas_092-ldVar.under { color: var(--vaspo-success-tx); }
+.vas_092-ldVar.flat  { color: var(--vaspo-muted); font-weight: 500; }
 
 /* Per-line distribution breakdown (under a landed-cost component row) */
-.MPC-vaspo-ldDist {
+.vas_092-ldDist {
     padding: 0.5em 0.875em 0.625em 1.75em;
     background: #FAFCFE;
     border-bottom: 1px solid var(--vaspo-row-div);
 }
-.MPC-vaspo-ldDistCap {
+.vas_092-ldDistCap {
     font-size: 0.6875em;
     font-weight: 700;
     letter-spacing: .3px;
@@ -1111,7 +1170,7 @@
     color: var(--vaspo-muted);
     margin-bottom: 0.375em;
 }
-.MPC-vaspo-ldDistRow {
+.vas_092-ldDistRow {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1120,16 +1179,16 @@
     color: var(--vaspo-sub);
     padding: 0.1875em 0;
 }
-.MPC-vaspo-ldDistItem {
+.vas_092-ldDistItem {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.MPC-vaspo-ldDistAmt { flex: none; font-weight: 700; color: var(--vaspo-text); }
+.vas_092-ldDistAmt { flex: none; font-weight: 700; color: var(--vaspo-text); }
 
 /* Totals footer */
-.MPC-vaspo-tFoot {
+.vas_092-tFoot {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -1140,17 +1199,17 @@
     border-top: 1px solid var(--vaspo-card-bd);
     font-size: 0.8125em;
 }
-.MPC-vaspo-tf { color: var(--vaspo-muted); }
-.MPC-vaspo-tf b { color: var(--vaspo-text); font-weight: 700; margin-left: 0.375em; }
-.MPC-vaspo-tf b.warn { color: var(--vaspo-warning-tx); }
-.MPC-vaspo-tf.is-grand { color: var(--vaspo-text); font-weight: 700; }
-.MPC-vaspo-tf.is-grand b { color: var(--vaspo-action); margin-left: 0.5em; font-size: 1.15em; }
-.MPC-vaspo-ldFoot .MPC-vaspo-lf.is-grand { margin-left: auto; }
+.vas_092-tf { color: var(--vaspo-muted); }
+.vas_092-tf b { color: var(--vaspo-text); font-weight: 700; margin-left: 0.375em; }
+.vas_092-tf b.warn { color: var(--vaspo-warning-tx); }
+.vas_092-tf.is-grand { color: var(--vaspo-text); font-weight: 700; }
+.vas_092-tf.is-grand b { color: var(--vaspo-action); margin-left: 0.5em; font-size: 1.15em; }
+.vas_092-ldFoot .vas_092-lf.is-grand { margin-left: auto; }
 
 /* ----------------------------------------------------------- */
 /*  Methodology note (quiet caption)                            */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-note {
+.vas_092-note {
     display: flex;
     align-items: flex-start;
     gap: 0.5em;
@@ -1159,12 +1218,12 @@
     color: var(--vaspo-muted);
     line-height: 1.5;
 }
-.MPC-vaspo-note .MPC-vaspo-ic { color: var(--vaspo-action); margin-top: 0.1em; }
+.vas_092-note .vas_092-ic { color: var(--vaspo-action); margin-top: 0.1em; }
 
 /* ----------------------------------------------------------- */
 /*  Terms & Notes text card                                     */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-textCard {
+.vas_092-textCard {
     border: 1px solid var(--vaspo-card-bd);
     border-radius: var(--vaspo-card-radius);
     background: #fff;
@@ -1174,14 +1233,14 @@
     line-height: 1.5;
 }
 
-.MPC-vaspo-textCard p { margin: 0; }
-.MPC-vaspo-textCard p + p { margin-top: 0.5em; }
-.MPC-vaspo-muted { color: var(--vaspo-muted); }
+.vas_092-textCard p { margin: 0; }
+.vas_092-textCard p + p { margin-top: 0.5em; }
+.vas_092-muted { color: var(--vaspo-muted); }
 
 /* ----------------------------------------------------------- */
 /*  Toast (record-open fallback)                                */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-toast {
+.vas_092-toast {
     position: absolute;
     left: 50%;
     bottom: 16px;
@@ -1199,13 +1258,13 @@
     transition: opacity .25s ease, transform .25s ease;
     pointer-events: none;
 }
-.MPC-vaspo-toast.show { opacity: 1; transform: translate(-50%, 0); }
-.MPC-vaspo-toast.err  { background: #B23636; }
+.vas_092-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.vas_092-toast.err  { background: #B23636; }
 
 /* ----------------------------------------------------------- */
 /*  Line-items pager (Showing a–b of N · prev / page / next)    */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-pager {
+.vas_092-pager {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1217,9 +1276,13 @@
     font-size: 0.75em;
     color: var(--vaspo-muted);
 }
-.MPC-vaspo-pagerNav { display: flex; align-items: center; gap: 0.5em; }
-.MPC-vaspo-pagerLabel { font-weight: 700; color: var(--vaspo-sub); min-width: 4em; text-align: center; }
-.MPC-vaspo-pgBtn {
+/* Inside the activity feed the row above the pager already draws the list's
+   divider, so the pager does not repeat it as a second line. */
+.vas_092-actList > .vas_092-pager { border-top: none; }
+
+.vas_092-pagerNav { display: flex; align-items: center; gap: 0.5em; }
+.vas_092-pagerLabel { font-weight: 700; color: var(--vaspo-sub); min-width: 4em; text-align: center; }
+.vas_092-pgBtn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1233,14 +1296,14 @@
     cursor: pointer;
     transition: background .15s ease, color .15s ease, border-color .15s ease;
 }
-.MPC-vaspo-pgBtn:hover:not(:disabled) { background: var(--vaspo-info-bg); color: var(--vaspo-action); border-color: var(--vaspo-action); }
-.MPC-vaspo-pgBtn:disabled { opacity: .45; cursor: default; }
-.MPC-vaspo-pgBtn .MPC-vaspo-ic { display: inline-flex; }
+.vas_092-pgBtn:hover:not(:disabled) { background: var(--vaspo-info-bg); color: var(--vaspo-action); border-color: var(--vaspo-action); }
+.vas_092-pgBtn:disabled { opacity: .45; cursor: default; }
+.vas_092-pgBtn .vas_092-ic { display: inline-flex; }
 
 /* ----------------------------------------------------------- */
 /*  Show / Hide Details toggle (Line History)                  */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-showDetails {
+.vas_092-showDetails {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--vaspo-action);
@@ -1248,12 +1311,12 @@
     text-decoration: none;
     white-space: nowrap;
 }
-.MPC-vaspo-showDetails:hover { color: var(--vaspo-action-dk); text-decoration: underline; }
+.vas_092-showDetails:hover { color: var(--vaspo-action-dk); text-decoration: underline; }
 
 /* ----------------------------------------------------------- */
 /*  Budget breach                                              */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-budget {
+.vas_092-budget {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -1264,21 +1327,21 @@
     background: var(--vaspo-risk-bg);
     margin-bottom: 0.625em;
 }
-.MPC-vaspo-budgetHead { display: flex; align-items: center; gap: 0.5em; }
-.MPC-vaspo-budget .MPC-vaspo-ic { color: var(--vaspo-risk-tx); }
-.MPC-vaspo-budgetTitle { font-size: 0.875em; font-weight: 700; color: var(--vaspo-risk-tx); }
-.MPC-vaspo-budgetAmt { display: flex; align-items: baseline; gap: 0.375em; margin-left: auto; font-size: 0.8125em; color: var(--vaspo-sub); }
-.MPC-vaspo-budgetAmt b { font-size: 1.15em; font-weight: 700; color: var(--vaspo-risk-tx); }
-.MPC-vaspo-budgetOver { color: var(--vaspo-risk-tx); font-weight: 700; }
+.vas_092-budgetHead { display: flex; align-items: center; gap: 0.5em; }
+.vas_092-budget .vas_092-ic { color: var(--vaspo-risk-tx); }
+.vas_092-budgetTitle { font-size: 0.875em; font-weight: 700; color: var(--vaspo-risk-tx); }
+.vas_092-budgetAmt { display: flex; align-items: baseline; gap: 0.375em; margin-left: auto; font-size: 0.8125em; color: var(--vaspo-sub); }
+.vas_092-budgetAmt b { font-size: 1.15em; font-weight: 700; color: var(--vaspo-risk-tx); }
+.vas_092-budgetOver { color: var(--vaspo-risk-tx); font-weight: 700; }
 
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
-[dir="rtl"] .MPC-vaspo-budgetAmt { margin-left: 0; margin-right: auto; }
-[dir="rtl"] .MPC-vaspo-hdrColL { border-right: none; border-left: 1px solid var(--vaspo-row-div); padding-right: 0; padding-left: 1.25em; }
-[dir="rtl"] .MPC-vaspo-table .ta-r { text-align: left; justify-content: flex-start; }
-[dir="rtl"] .MPC-vaspo-recv { align-items: flex-start; }
-[dir="rtl"] .MPC-vaspo-tFoot { justify-content: flex-start; }
-[dir="rtl"] .MPC-vaspo-tf b { margin-left: 0; margin-right: 0.375em; }
-[dir="rtl"] .MPC-vaspo-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
-[dir="rtl"] .MPC-vaspo-ldFoot .MPC-vaspo-lf.is-grand { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .vas_092-budgetAmt { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .vas_092-hdrColL { border-right: none; border-left: 1px solid var(--vaspo-row-div); padding-right: 0; padding-left: 1.25em; }
+[dir="rtl"] .vas_092-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_092-recv { align-items: flex-start; }
+[dir="rtl"] .vas_092-tFoot { justify-content: flex-start; }
+[dir="rtl"] .vas_092-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .vas_092-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .vas_092-ldFoot .vas_092-lf.is-grand { margin-left: 0; margin-right: auto; }
