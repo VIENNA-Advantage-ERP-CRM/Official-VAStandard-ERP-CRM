@@ -800,8 +800,16 @@ namespace VASLogic.Models
                 {
                     trx.Rollback();
                     ValueNamePair pp = VLogger.RetrieveError();
+                    string val = pp.GetName();
+                    if (pp != null)
+                    {
+                        if (String.IsNullOrEmpty(val))
+                        {
+                            val = pp.GetValue();
+                        }
+                    }
                     result.Message = Msg.GetMsg(ctx, "VIS_AllocationHdrNotSaved")
-                        + (pp != null ? " :- " + pp.GetName() : "");
+                        + (!string.IsNullOrEmpty(val) ? " :- " + val : "");
                     return result;
                 }
 
@@ -830,8 +838,16 @@ namespace VASLogic.Models
                 {
                     trx.Rollback();
                     ValueNamePair pp = VLogger.RetrieveError();
+                    string val = pp.GetName();
+                    if (pp != null)
+                    {
+                        if (String.IsNullOrEmpty(val))
+                        {
+                            val = pp.GetValue();
+                        }
+                    }
                     result.Message = Msg.GetMsg(ctx, "VIS_AllocLineNotCreated")
-                        + (pp != null ? " :- " + pp.GetName() : "");
+                        + (!string.IsNullOrEmpty(val) ? " :- " + val : "");
                     return result;
                 }
 
@@ -848,8 +864,16 @@ namespace VASLogic.Models
                 {
                     trx.Rollback();
                     ValueNamePair pp = VLogger.RetrieveError();
+                    string val = pp.GetName();
+                    if (pp != null)
+                    {
+                        if (String.IsNullOrEmpty(val))
+                        {
+                            val = pp.GetValue();
+                        }
+                    }
                     result.Message = Msg.GetMsg(ctx, "VIS_AllocationHdrNotSaved")
-                        + (pp != null ? " :- " + pp.GetName() : "");
+                        + (!string.IsNullOrEmpty(val) ? " :- " + val : "");
                     return result;
                 }
 
@@ -860,8 +884,16 @@ namespace VASLogic.Models
                     {
                         trx.Rollback();
                         ValueNamePair pp = VLogger.RetrieveError();
+                        string val = pp.GetName();
+                        if (pp != null)
+                        {
+                            if (String.IsNullOrEmpty(val))
+                            {
+                                val = pp.GetValue();
+                            }
+                        }
                         result.Message = Msg.GetMsg(ctx, "PaymentNotCreated")
-                            + (pp != null ? " :- " + pp.GetName() : "");
+                            + (!string.IsNullOrEmpty(val) ? " :- " + val : "");
                         return result;
                     }
                 }

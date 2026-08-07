@@ -1,0 +1,629 @@
+/* Transfers by Warehouse Widget (VAS_173)
+   3x2 bar-list widget with period picker and detail modal.
+   All selectors prefixed .vas-173- */
+
+/* ── Container & Card Shell ─────────────────────────────────────────── */
+.vas-173-container {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.vas-173-root {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.045), 24px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    backdrop-filter: blur(10px);
+    padding: 0.85em;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+.vas-173-root,
+.vas-173-root * {
+    box-sizing: border-box;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.vas-173-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas-173-left-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-173-icon-well {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    min-height: 2em;
+    border-radius: 10px;
+    background: rgba(0, 131, 218, 0.10);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    flex-shrink: 0;
+}
+
+.vas-173-icon-well svg {
+    width: 1.1em;
+    height: 1.1em;
+    display: block;
+    stroke: #0083DA;
+}
+
+.vas-173-title-block {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-173-title {
+    font-weight: 500;
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 18px);
+    color: #102C3F;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-173-subtitle {
+    font-weight: 400;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.009625), 14px);
+    color: #717182;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-173-period-btn {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+    font-size: 0.75em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    color: #102C3F;
+    background-color: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    padding: 0.35em 0.75em;
+    min-width: 4.5em;
+    text-align: center;
+    outline: none;
+    cursor: pointer;
+    box-sizing: border-box;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.vas-173-period-btn:hover {
+    background-color: #EEF8FF;
+    border-color: #0083DA;
+}
+
+/* ── Body / Bar List ─────────────────────────────────────────────────── */
+.vas-173-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    margin-top: 0.5em;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-173-empty {
+    color: #748494;
+    font-size: 0.75em;
+    padding: 2em 0;
+    text-align: center;
+}
+
+.vas-173-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    flex: 1;
+}
+
+.vas-173-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.4em 0.3em;
+    border: none;
+    border-bottom: 1px solid #EDF2F6;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    border-radius: 8px;
+    transition: background-color 120ms ease;
+    outline: none;
+}
+
+.vas-173-row:last-child {
+    border-bottom: none;
+}
+
+.vas-173-row:hover,
+.vas-173-row:focus-visible {
+    background-color: rgba(31, 131, 255, 0.05);
+}
+
+.vas-173-dot {
+    width: 0.55em;
+    height: 0.55em;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.vas-173-wh-name {
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #102C3F;
+    min-width: 4em;
+    max-width: 6.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas-173-moves-meta {
+    font-size: 0.6875em;
+    color: #748494;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas-173-bar-track {
+    flex: 1;
+    height: 0.36em;
+    background: rgba(16, 44, 63, 0.06);
+    border-radius: 999px;
+    overflow: hidden;
+    min-width: 2em;
+}
+
+.vas-173-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 300ms ease;
+}
+
+.vas-173-qty-share {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+}
+
+.vas-173-qty-val {
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-173-share-pct {
+    font-size: 0.6875em;
+    color: #748494;
+}
+
+/* ── Footer & Specification Pager Buttons ────────────────────────────── */
+.vas-173-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #EDF2F6;
+    padding-top: 0.4em;
+    margin-top: 0.4em;
+    flex-shrink: 0;
+}
+
+.vas-173-footer-helper {
+    font-size: clamp(11px, 0.8vw, 15px) !important;
+    color: #748494 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-173-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+}
+
+.vas-173-pager-btn {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    max-width: 24px !important;
+    max-height: 24px !important;
+    border: 1px solid #E4EDF4 !important;
+    border-radius: 7px !important;
+    background-color: #FFFFFF !important;
+    color: #0083DA !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    cursor: pointer !important;
+    box-sizing: border-box !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease !important;
+}
+
+.vas-173-pager-btn:hover:not(:disabled) {
+    background-color: #EEF6FF !important;
+    border-color: #0083DA !important;
+}
+
+.vas-173-pager-btn:disabled {
+    color: #B8C6D2 !important;
+    background-color: #FAFAFA !important;
+    border-color: #E4EDF4 !important;
+    cursor: not-allowed !important;
+}
+
+.vas-173-pager-label {
+    font-size: clamp(11px, 0.8vw, 15px) !important;
+    color: #102C3F !important;
+    font-weight: 500 !important;
+    margin: 0 0.25em !important;
+}
+
+/* ── Period Picker Popover ───────────────────────────────────────────── */
+.vas-173-popover {
+    position: absolute;
+    top: 3.2em;
+    right: 0.5em;
+    z-index: 300;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(8, 30, 48, 0.18);
+    padding: 0.75rem;
+    width: 216px;
+    font-family: 'Roboto', sans-serif;
+}
+
+.vas-173-popover-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid #EDF2F6;
+    padding-bottom: 0.35rem;
+}
+
+.vas-173-year-btn {
+    background: none;
+    border: 1px solid #E4EDF4;
+    border-radius: 7px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.vas-173-year-btn:disabled {
+    color: #B8C6D2;
+    cursor: not-allowed;
+}
+
+.vas-173-year-label {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-173-month-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+}
+
+.vas-173-month-btn {
+    font-size: 0.6875rem;
+    padding: 0.35rem 0.1rem;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: none;
+    cursor: pointer;
+    color: #102C3F;
+    text-align: center;
+    transition: background-color 100ms ease;
+}
+
+.vas-173-month-btn:hover:not(:disabled) {
+    background-color: #EEF6FF;
+    color: #0083DA;
+}
+
+.vas-173-month-btn--selected {
+    background-color: #0083DA !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
+}
+
+.vas-173-month-btn--current {
+    border-color: #BFE4FF;
+    color: #0083DA;
+    font-weight: 700;
+}
+
+.vas-173-month-btn--disabled {
+    color: #C4CFD8;
+    cursor: not-allowed;
+}
+
+.vas-173-popover-foot {
+    margin-top: 0.5rem;
+    border-top: 1px solid #EDF2F6;
+    padding-top: 0.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vas-173-cur-month-btn {
+    font-size: 0.75rem;
+    color: #0083DA;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    padding: 0;
+}
+
+.vas-173-cur-month-btn:hover {
+    text-decoration: underline;
+}
+
+.vas-173-popover-hint {
+    font-size: 0.6875rem;
+    color: #748494;
+}
+
+/* ── SCREEN-SIZE DYNAMIC RESPONSIVE MODAL (LOCKED STABLE HEIGHT) ────── */
+.vas-173-modal-scrim {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(8, 30, 48, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: clamp(12px, 2vw, 32px);
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+}
+
+.vas-173-modal {
+    background-color: #FFFFFF;
+    border-radius: clamp(12px, 1.5vw, 24px);
+    width: clamp(340px, 78vw, 1360px);
+    height: clamp(440px, 78vh, 880px) !important;
+    max-height: 88vh;
+    max-width: 95vw;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 30px 70px rgba(8, 30, 48, 0.35);
+    box-sizing: border-box;
+}
+
+.vas-173-modal-header {
+    display: flex;
+    align-items: center;
+    gap: clamp(0.4rem, 0.9vw, 1.2rem);
+    padding: clamp(0.65rem, 1.2vw, 1.5rem) clamp(0.85rem, 1.8vw, 2.5rem);
+    background: linear-gradient(180deg, #FBFDFF, #F2F9FF);
+    border-bottom: 1px solid #E4EDF4;
+    flex-shrink: 0;
+}
+
+.vas-173-modal-title {
+    font-size: clamp(14px, 1.15vw, 20px);
+    font-weight: 600;
+    color: #102C3F;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-173-info-pill {
+    font-size: clamp(10px, 0.75vw, 14px);
+    font-weight: 700;
+    color: #106AB0;
+    background-color: #DFF1FF;
+    border-radius: 999px;
+    padding: clamp(0.15em, 0.3vw, 0.3em) clamp(0.5em, 0.8vw, 1em);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas-173-modal-close {
+    width: clamp(28px, 2vw, 38px);
+    height: clamp(28px, 2vw, 38px);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: clamp(1rem, 1.3vw, 1.8rem);
+    color: #5F7283;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: clamp(6px, 0.6vw, 10px);
+    flex-shrink: 0;
+    transition: background-color 0.15s ease;
+}
+
+.vas-173-modal-close:hover {
+    background-color: #EDF2F6;
+}
+
+.vas-173-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: clamp(0.75rem, 1.5vw, 2rem);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.5rem, 1vw, 1.25rem);
+}
+
+/* ── Summary Strip (4 cells) ─────────────────────────────────────────── */
+.vas-173-summary-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: clamp(0.5rem, 1vw, 1.5rem);
+    flex-shrink: 0;
+}
+
+.vas-173-sum-cell {
+    background-color: #EEF6FF;
+    border: 1px solid #E4EDF4;
+    border-radius: clamp(8px, 1vw, 16px);
+    padding: clamp(0.5rem, 1vw, 1.25rem) clamp(0.75rem, 1.2vw, 1.5rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.vas-173-sum-label {
+    font-size: clamp(10px, 0.75vw, 14px);
+    font-weight: 600;
+    color: #748494;
+    text-transform: uppercase;
+}
+
+.vas-173-sum-val {
+    font-size: clamp(14px, 1.3vw, 22px);
+    font-weight: 700;
+    color: #102C3F;
+}
+
+/* ── Transfer Lines Table ────────────────────────────────────────────── */
+.vas-173-modal-section-heading {
+    font-size: clamp(13px, 1vw, 18px);
+    font-weight: 700;
+    color: #102C3F;
+    flex-shrink: 0;
+}
+
+.vas-173-modal-tbl-container {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid #E4EDF4;
+    border-radius: clamp(8px, 1vw, 16px);
+    background: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.vas-173-tbl {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: clamp(12px, 0.9vw, 16px);
+}
+
+.vas-173-tbl thead tr {
+    background-color: #F6FAFD;
+}
+
+.vas-173-tbl th {
+    font-size: clamp(10px, 0.75vw, 14px);
+    font-weight: 600;
+    color: #748494;
+    text-transform: uppercase;
+    padding: clamp(0.4rem, 0.7vw, 1rem) clamp(0.5rem, 0.9vw, 1.2rem);
+    border-bottom: 1px solid #E4EDF4;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-173-tbl td {
+    padding: clamp(0.35rem, 0.65vw, 0.95rem) clamp(0.5rem, 0.9vw, 1.2rem);
+    color: #102C3F;
+    border-bottom: 1px solid #EDF2F6;
+    vertical-align: middle;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-173-tbl tbody tr:hover {
+    background-color: #EEF6FF;
+}
+
+.vas-173-tbl-right {
+    text-align: right;
+}
+
+.vas-173-from-to {
+    font-weight: 600;
+    color: #102C3F;
+}
+
+.vas-173-loc-sub {
+    font-size: clamp(10px, 0.75vw, 14px);
+    color: #748494;
+}
+
+.vas-173-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #EDF2F6;
+    padding-top: clamp(0.4rem, 0.8vw, 1rem);
+    flex-shrink: 0;
+}

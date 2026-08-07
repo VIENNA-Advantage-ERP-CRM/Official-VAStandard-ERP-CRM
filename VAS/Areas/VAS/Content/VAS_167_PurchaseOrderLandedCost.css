@@ -2,7 +2,7 @@
  * Module Name : VAS
  * Purpose     : Styles for the Expected Landed Cost tab panel
  *               (VAS.VAS_167_PurchaseOrderLandedCost). All classes are
- *               MPC-prefixed (MPC-vaselc-*) and scoped under the panel
+ *               panel-prefixed (vas_167-*) and scoped under the panel
  *               root to avoid global collisions.
  *
  *               Structure: a fixed title strip (title, PO Number · Ordered
@@ -20,18 +20,37 @@
  * Chronological development:
  *   VAI163   2026-07-30  Created
  *   VAI163   2026-07-31  Header restyled to the VAS_092 Purchase Order Overview
- *                        pattern: an untinted title strip (.MPC-vaselc-head)
+ *                        pattern: an untinted title strip (.vas_167-head)
  *                        carrying the title, sub-line and state pills
- *                        (.MPC-vaselc-headPills), above a white two-column
- *                        details card (.MPC-vaselc-hdrCard) — vendor identity
+ *                        (.vas_167-headPills), above a white two-column
+ *                        details card (.vas_167-hdrCard) — vendor identity
  *                        left, labelled order fields right. Card surfaces now
  *                        share that panel's tokens (--vaselc-card-bd /
  *                        -row-div / -card-radius) and the add / edit form
- *                        (.MPC-vaselc-form) dropped its tinted fill and dashed
+ *                        (.vas_167-form) dropped its tinted fill and dashed
  *                        outline for the same plain white card.
+ *   VAI163   2026-08-04  Added .vas_167-empty.is-standalone — the "no expected
+ *                        landed cost" message when it stands in for the whole
+ *                        Cost Elements section (no caption, no table around it),
+ *                        so it carries that surface itself.
+ *   VAI163   2026-08-04  Generated Lines is white: the drawer's blue fill
+ *                        (.vas_167-linesWrap) and the blue frame / header /
+ *                        footer bands of its table (.vas_167-lTable, -lHead,
+ *                        -lFoot) give way to the neutral card surface every other
+ *                        table in the panel uses. Added .vas_167-attr — the
+ *                        Attribute Set Instance beside a generated line's product.
+ *                        Dropped .vas_167-hint with the trailing hint row it
+ *                        styled.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vaselc- -> vas_167- so the panel's
+ *                        styles cannot collide with another panel's.
+ *   VAI163   2026-08-06  Added the cost-table pager (.vas_167-pager / -pgRange /
+ *                        -pgCtrls / -pgPos / -pgBtn, plus its RTL chevron mirror).
+ *                        It closes the table card under the totals footer and
+ *                        borrows that footer's tinted strip, so the two read as one
+ *                        base to the card rather than two competing bars.
  ***********************************************************/
 
-.MPC-vaselc-root {
+.vas_167-root {
     /* Canonical palette */
     --vaselc-text:        #102C3F;
     --vaselc-text-strong: #141414;
@@ -82,7 +101,7 @@
     box-sizing: border-box;
 }
 
-.MPC-vaselc-root * { box-sizing: border-box; }
+.vas_167-root * { box-sizing: border-box; }
 
 /* ---------------- Header — title strip ---------------- */
 
@@ -90,7 +109,7 @@
    left, tinted state pills on the right. Unlike that panel's strip this one
    stays fixed above the scrolling body, so it keeps a hairline rule — the
    body's content scrolls under it and needs an edge to stop against. */
-.MPC-vaselc-head {
+.vas_167-head {
     flex: none;
     display: flex;
     align-items: flex-start;
@@ -101,16 +120,16 @@
     border-bottom: 1px solid var(--vaselc-border);
 }
 
-.MPC-vaselc-headText { min-width: 0; }
+.vas_167-headText { min-width: 0; }
 
-.MPC-vaselc-headTitle {
+.vas_167-headTitle {
     font-size: 18px;
     font-weight: 700;
     color: var(--vaselc-text);
     line-height: 1.2;
 }
 
-.MPC-vaselc-headSub {
+.vas_167-headSub {
     font-size: 12px;
     color: var(--vaselc-hdr-sub);
     margin-top: 5px;
@@ -118,12 +137,12 @@
     word-break: break-word;
 }
 
-.MPC-vaselc-headSub b {
+.vas_167-headSub b {
     color: var(--vaselc-text);
     font-weight: 700;
 }
 
-.MPC-vaselc-headPills {
+.vas_167-headPills {
     flex: none;
     display: flex;
     align-items: center;
@@ -134,7 +153,7 @@
 
 /* State pill: neutral "Expected" in draft, green "Lines Generated" once the
    order is completed. Metrics follow the overview panel's header pill. */
-.MPC-vaselc-badge {
+.vas_167-badge {
     flex: none;
     display: inline-flex;
     align-items: center;
@@ -149,7 +168,7 @@
     color: var(--vaselc-neutral-tx);
 }
 
-.MPC-vaselc-badge::before {
+.vas_167-badge::before {
     content: '';
     width: 8px;
     height: 8px;
@@ -158,7 +177,7 @@
     flex: none;
 }
 
-.MPC-vaselc-badge.is-generated {
+.vas_167-badge.is-generated {
     background: var(--vaselc-success-bg);
     color: var(--vaselc-success-tx);
 }
@@ -167,7 +186,7 @@
 
 /* White two-column card in the PO Overview pattern: vendor identity on the
    left behind a divider, labelled order fields two-across on the right. */
-.MPC-vaselc-hdrCard {
+.vas_167-hdrCard {
     display: grid;
     grid-template-columns: 40% 1fr;
     gap: 14px 26px;
@@ -178,13 +197,13 @@
     margin-bottom: 12px;
 }
 
-.MPC-vaselc-hdrColL {
+.vas_167-hdrColL {
     min-width: 0;
     border-right: 1px solid var(--vaselc-row-div);
     padding-right: 18px;
 }
 
-.MPC-vaselc-hdrColR {
+.vas_167-hdrColR {
     min-width: 0;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -192,9 +211,9 @@
     align-content: start;
 }
 
-.MPC-vaselc-hdrField { min-width: 0; }
+.vas_167-hdrField { min-width: 0; }
 
-.MPC-vaselc-fLabel {
+.vas_167-fLabel {
     font-size: 10.5px;
     font-weight: 700;
     letter-spacing: 0.4px;
@@ -203,7 +222,7 @@
     line-height: 1.3;
 }
 
-.MPC-vaselc-fVal {
+.vas_167-fVal {
     font-size: 12.5px;
     font-weight: 700;
     color: var(--vaselc-text);
@@ -212,7 +231,11 @@
     overflow-wrap: break-word;   /* a long vendor / type wraps instead of spilling */
 }
 
-.MPC-vaselc-vendName {
+/* A field value that opens its own record (the contract reference). */
+.vas_167-fVal.is-link { color: var(--vaselc-link); cursor: pointer; }
+.vas_167-fVal.is-link:hover { text-decoration: underline; }
+
+.vas_167-vendName {
     font-size: 14px;
     font-weight: 700;
     color: var(--vaselc-text);
@@ -221,7 +244,7 @@
     overflow-wrap: break-word;
 }
 
-.MPC-vaselc-vendContact {
+.vas_167-vendContact {
     display: flex;
     flex-wrap: wrap;
     gap: 5px 16px;
@@ -230,27 +253,27 @@
     margin-top: 6px;
 }
 
-.MPC-vaselc-contactBit { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
-.MPC-vaselc-contactBit .MPC-vaselc-ic { color: var(--vaselc-primary); }
+.vas_167-contactBit { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.vas_167-contactBit .vas_167-ic { color: var(--vaselc-primary); }
 
 /* Narrow panels: stack the two columns and drop the pills below the title. */
 @container (max-width: 460px) {
-    .MPC-vaselc-hdrCard { grid-template-columns: 1fr; }
-    .MPC-vaselc-hdrColL {
+    .vas_167-hdrCard { grid-template-columns: 1fr; }
+    .vas_167-hdrColL {
         border-right: none;
         padding-right: 0;
         border-bottom: 1px solid var(--vaselc-row-div);
         padding-bottom: 11px;
     }
     /* Two field columns are too cramped this narrow — back to a single stack. */
-    .MPC-vaselc-hdrColR { grid-template-columns: 1fr; }
-    .MPC-vaselc-head { flex-direction: column; }
-    .MPC-vaselc-headPills { justify-content: flex-start; }
+    .vas_167-hdrColR { grid-template-columns: 1fr; }
+    .vas_167-head { flex-direction: column; }
+    .vas_167-headPills { justify-content: flex-start; }
 }
 
 /* ---------------- Scrolling body ---------------- */
 
-.MPC-vaselc-body {
+.vas_167-body {
     flex: 1;
     min-height: 0;
     min-width: 0;
@@ -258,18 +281,18 @@
     padding: 14px 18px 20px;
 }
 
-.MPC-vaselc-body::-webkit-scrollbar { width: 9px; }
-.MPC-vaselc-body::-webkit-scrollbar-thumb {
+.vas_167-body::-webkit-scrollbar { width: 9px; }
+.vas_167-body::-webkit-scrollbar-thumb {
     background: rgba(15, 61, 97, 0.14);
     border-radius: 99px;
 }
 
-.MPC-vaselc-stack {
+.vas_167-stack {
     min-width: 0;
-    animation: MPC-vaselc-rise 0.28s ease both;
+    animation: vas_167-rise 0.28s ease both;
 }
 
-.MPC-vaselc-noRecord {
+.vas_167-noRecord {
     padding: 40px 18px;
     text-align: center;
     color: var(--vaselc-muted);
@@ -278,7 +301,7 @@
 
 /* ---------------- Notice strips / hints ---------------- */
 
-.MPC-vaselc-strip {
+.vas_167-strip {
     display: flex;
     align-items: flex-start;
     gap: 9px;
@@ -292,23 +315,11 @@
     line-height: 1.45;
 }
 
-.MPC-vaselc-strip .MPC-vaselc-ic { flex: none; margin-top: 1px; }
-.MPC-vaselc-strip.tone-warn .MPC-vaselc-ic { color: var(--vaselc-warn-tx); }
-.MPC-vaselc-strip.tone-risk .MPC-vaselc-ic { color: var(--vaselc-risk-tx); }
+.vas_167-strip .vas_167-ic { flex: none; margin-top: 1px; }
+.vas_167-strip.tone-warn .vas_167-ic { color: var(--vaselc-warn-tx); }
+.vas_167-strip.tone-risk .vas_167-ic { color: var(--vaselc-risk-tx); }
 
-.MPC-vaselc-hint {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    margin-top: 8px;
-    font-size: 11px;
-    color: var(--vaselc-sub);
-    line-height: 1.45;
-}
-
-.MPC-vaselc-hint .MPC-vaselc-ic { flex: none; margin-top: 1px; }
-
-.MPC-vaselc-ic {
+.vas_167-ic {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -316,7 +327,7 @@
 
 /* ---------------- Sub-caption row ---------------- */
 
-.MPC-vaselc-subcap {
+.vas_167-subcap {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -325,7 +336,7 @@
     margin: 0 0 9px;
 }
 
-.MPC-vaselc-cap {
+.vas_167-cap {
     display: flex;
     align-items: center;
     gap: 7px;
@@ -336,14 +347,14 @@
     color: var(--vaselc-link);
 }
 
-.MPC-vaselc-capHint {
+.vas_167-capHint {
     font-size: 11px;
     color: var(--vaselc-sub);
 }
 
 /* ---------------- Cost elements table ---------------- */
 
-.MPC-vaselc-table {
+.vas_167-table {
     background: var(--vaselc-white);
     border: 1px solid var(--vaselc-border);
     border-radius: var(--vaselc-radius);
@@ -353,7 +364,7 @@
 
 /* Three visual columns: identity | amount | actions. The panel is too narrow
    for the five stored attributes as separate columns. */
-.MPC-vaselc-row {
+.vas_167-row {
     display: grid;
     grid-template-columns: 1.6fr 1fr auto;
     align-items: center;
@@ -362,28 +373,28 @@
     min-width: 0;
 }
 
-.MPC-vaselc-row > span { min-width: 0; }
+.vas_167-row > span { min-width: 0; }
 
-.MPC-vaselc-rowHead {
+.vas_167-rowHead {
     background: var(--vaselc-faint);
     border-bottom: 1px solid var(--vaselc-border);
     font-size: 11.5px;
     color: var(--vaselc-muted);
 }
 
-.MPC-vaselc-rowBody {
+.vas_167-rowBody {
     font-size: 13px;
     border-bottom: 1px solid var(--vaselc-divider);
 }
 
-.MPC-vaselc-rowBody:hover { background: #FAFCFE; }
+.vas_167-rowBody:hover { background: #FAFCFE; }
 
-.MPC-vaselc-rowBody.is-editing {
+.vas_167-rowBody.is-editing {
     background: var(--vaselc-active);
     box-shadow: inset 3px 0 0 var(--vaselc-primary);
 }
 
-.MPC-vaselc-name {
+.vas_167-name {
     font-weight: 700;
     font-size: 13px;
     color: var(--vaselc-text);
@@ -393,7 +404,7 @@
     white-space: nowrap;
 }
 
-.MPC-vaselc-sub {
+.vas_167-sub {
     font-size: 10.5px;
     color: var(--vaselc-muted);
     margin-top: 2px;
@@ -402,11 +413,11 @@
     white-space: nowrap;
 }
 
-.MPC-vaselc-sub.is-warn { color: var(--vaselc-risk-tx); }
+.vas_167-sub.is-warn { color: var(--vaselc-risk-tx); }
 
-.MPC-vaselc-chipWrap { margin-top: 4px; }
+.vas_167-chipWrap { margin-top: 4px; }
 
-.MPC-vaselc-distChip {
+.vas_167-distChip {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -418,43 +429,47 @@
     white-space: nowrap;
 }
 
-.MPC-vaselc-dot {
+.vas_167-dot {
     width: 5px;
     height: 5px;
     border-radius: 50%;
     background: currentColor;
 }
 
-.MPC-vaselc-distChip.dist-qty   { background: var(--vaselc-qty-bg);     color: var(--vaselc-qty-tx); }
-.MPC-vaselc-distChip.dist-value { background: var(--vaselc-value-bg);   color: var(--vaselc-value-tx); }
-.MPC-vaselc-distChip.dist-equal { background: var(--vaselc-equal-bg);   color: var(--vaselc-equal-tx); }
-.MPC-vaselc-distChip.dist-volume{ background: var(--vaselc-volume-bg);  color: var(--vaselc-volume-tx); }
-.MPC-vaselc-distChip.dist-weight{ background: var(--vaselc-weight-bg);  color: var(--vaselc-weight-tx); }
-.MPC-vaselc-distChip.dist-other { background: var(--vaselc-neutral-bg); color: var(--vaselc-neutral-tx); }
+.vas_167-distChip.dist-qty   { background: var(--vaselc-qty-bg);     color: var(--vaselc-qty-tx); }
+.vas_167-distChip.dist-value { background: var(--vaselc-value-bg);   color: var(--vaselc-value-tx); }
+.vas_167-distChip.dist-equal { background: var(--vaselc-equal-bg);   color: var(--vaselc-equal-tx); }
+.vas_167-distChip.dist-volume{ background: var(--vaselc-volume-bg);  color: var(--vaselc-volume-tx); }
+.vas_167-distChip.dist-weight{ background: var(--vaselc-weight-bg);  color: var(--vaselc-weight-tx); }
+.vas_167-distChip.dist-other { background: var(--vaselc-neutral-bg); color: var(--vaselc-neutral-tx); }
 
-.MPC-vaselc-amt { text-align: right; }
+.vas_167-amt { text-align: right; }
 
-.MPC-vaselc-amtV {
+.vas_167-amtV {
     font-weight: 700;
     font-size: 13px;
     color: var(--vaselc-text);
 }
 
-.MPC-vaselc-amtV span {
+.vas_167-amtV span {
     margin-left: 3px;
     font-weight: 400;
     font-size: 10.5px;
     color: var(--vaselc-muted);
 }
 
-.MPC-vaselc-amt .MPC-vaselc-sub { white-space: nowrap; }
+.vas_167-amt .vas_167-sub { white-space: nowrap; }
 
-.ta-r { text-align: right; }
-.ta-c { text-align: center; }
+/* Scoped to the panel root. Unscoped, these two aligned EVERY element in the
+   application carrying a ta-r / ta-c class, not just this panel's cells — the
+   one genuinely global rule pair in the tab-panel styles. Every other panel
+   already qualifies the same utility with its own root. */
+.vas_167-root .ta-r { text-align: right; }
+.vas_167-root .ta-c { text-align: center; }
 
 /* ---------------- Row actions ---------------- */
 
-.MPC-vaselc-acts {
+.vas_167-acts {
     justify-self: end;
     display: flex;
     align-items: center;
@@ -463,7 +478,7 @@
 
 /* Icon hit target stays at least 32px tall for pointer accessibility while the
    painted button keeps the compact 26px look of the reference. */
-.MPC-vaselc-icBtn {
+.vas_167-icBtn {
     width: 32px;
     height: 32px;
     padding: 3px;
@@ -479,11 +494,11 @@
     font-family: inherit;
 }
 
-.MPC-vaselc-icBtn.is-edit:hover { background: var(--vaselc-info-bg); color: var(--vaselc-link); }
-.MPC-vaselc-icBtn.is-rm:hover   { background: var(--vaselc-risk-bg); color: var(--vaselc-risk-tx); }
-.MPC-vaselc-icBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 1px; }
+.vas_167-icBtn.is-edit:hover { background: var(--vaselc-info-bg); color: var(--vaselc-link); }
+.vas_167-icBtn.is-rm:hover   { background: var(--vaselc-risk-bg); color: var(--vaselc-risk-tx); }
+.vas_167-icBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 1px; }
 
-.MPC-vaselc-linesBtn {
+.vas_167-linesBtn {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -501,23 +516,25 @@
     cursor: pointer;
 }
 
-.MPC-vaselc-linesBtn:hover { background: #CDE9FF; }
-.MPC-vaselc-linesBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 1px; }
-.MPC-vaselc-linesBtn .MPC-vaselc-ic { transition: transform 0.2s ease; }
-.MPC-vaselc-linesBtn.is-open .MPC-vaselc-ic { transform: rotate(180deg); }
+.vas_167-linesBtn:hover { background: #CDE9FF; }
+.vas_167-linesBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 1px; }
+.vas_167-linesBtn .vas_167-ic { transition: transform 0.2s ease; }
+.vas_167-linesBtn.is-open .vas_167-ic { transform: rotate(180deg); }
 
 /* ---------------- Generated lines block ---------------- */
 
-.MPC-vaselc-linesWrap {
+/* White, not tinted: the drawer is part of the entry it hangs under, and a blue
+   fill read as a separate object stacked inside the table. */
+.vas_167-linesWrap {
     padding: 10px 12px 13px;
-    background: var(--vaselc-faint);
+    background: var(--vaselc-white);
     border-bottom: 1px solid var(--vaselc-divider);
-    animation: MPC-vaselc-rise 0.28s ease both;
+    animation: vas_167-rise 0.28s ease both;
 }
 
-.MPC-vaselc-linesWrap.is-closed { display: none; }
+.vas_167-linesWrap.is-closed { display: none; }
 
-.MPC-vaselc-linesCap {
+.vas_167-linesCap {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -529,20 +546,22 @@
     color: var(--vaselc-link);
 }
 
-.MPC-vaselc-linesEmpty {
+.vas_167-linesEmpty {
     padding: 6px 2px;
     font-size: 11.5px;
     color: var(--vaselc-muted);
 }
 
-.MPC-vaselc-lTable {
+/* Neutral card, like every other table surface in the panel — the blue frame
+   and blue header / footer bands went with the drawer's blue fill. */
+.vas_167-lTable {
     background: var(--vaselc-white);
-    border: 1px solid var(--vaselc-pale-bd);
+    border: 1px solid var(--vaselc-card-bd);
     border-radius: 10px;
     overflow: hidden;
 }
 
-.MPC-vaselc-lRow {
+.vas_167-lRow {
     display: grid;
     grid-template-columns: 1.9fr 1.1fr 0.55fr 1fr;
     align-items: center;
@@ -551,25 +570,34 @@
     min-width: 0;
 }
 
-.MPC-vaselc-lRow > span { min-width: 0; }
+.vas_167-lRow > span { min-width: 0; }
 
-.MPC-vaselc-lHead {
-    background: var(--vaselc-active);
-    border-bottom: 1px solid var(--vaselc-pale-bd);
+.vas_167-lHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--vaselc-card-bd);
     font-size: 10.5px;
     color: var(--vaselc-muted);
 }
 
-.MPC-vaselc-lBody {
+.vas_167-lBody {
     font-size: 12px;
     border-bottom: 1px solid var(--vaselc-divider);
 }
 
-.MPC-vaselc-lBody:last-child { border-bottom: none; }
-.MPC-vaselc-lBody:hover { background: #FAFCFE; }
-.MPC-vaselc-lBody .MPC-vaselc-name { font-size: 12px; }
+.vas_167-lBody:last-child { border-bottom: none; }
+.vas_167-lBody:hover { background: #FAFCFE; }
+.vas_167-lBody .vas_167-name { font-size: 12px; }
 
-.MPC-vaselc-base {
+/* Attribute Set Instance — an inline suffix to the product name on a generated
+   line, never a line of its own. */
+.vas_167-attr {
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--vaselc-sub);
+}
+
+.vas_167-base {
     font-size: 11px;
     color: var(--vaselc-sub);
     overflow: hidden;
@@ -577,29 +605,29 @@
     white-space: nowrap;
 }
 
-.MPC-vaselc-lFoot {
+.vas_167-lFoot {
     display: flex;
     justify-content: flex-end;
     gap: 14px;
     padding: 7px 11px;
-    background: var(--vaselc-active);
-    border-top: 1px solid var(--vaselc-pale-bd);
+    background: #F5F8FB;
+    border-top: 1px solid var(--vaselc-card-bd);
     font-size: 11.5px;
 }
 
-.MPC-vaselc-lFoot .MPC-vaselc-tf { color: var(--vaselc-sub); }
-.MPC-vaselc-lFoot .MPC-vaselc-tf b {
+.vas_167-lFoot .vas_167-tf { color: var(--vaselc-sub); }
+.vas_167-lFoot .vas_167-tf b {
     margin-left: 5px;
     color: var(--vaselc-text);
     font-weight: 700;
 }
 
 /* Reconciliation warning: the generated lines no longer sum to the entry. */
-.MPC-vaselc-tf.is-warn { color: var(--vaselc-risk-tx); font-weight: 700; }
+.vas_167-tf.is-warn { color: var(--vaselc-risk-tx); font-weight: 700; }
 
 /* ---------------- Table footer / empty ---------------- */
 
-.MPC-vaselc-foot {
+.vas_167-foot {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -611,37 +639,94 @@
     font-size: 12px;
 }
 
-.MPC-vaselc-foot .MPC-vaselc-tf { color: var(--vaselc-sub); }
-.MPC-vaselc-foot .MPC-vaselc-tf b {
+.vas_167-foot .vas_167-tf { color: var(--vaselc-sub); }
+.vas_167-foot .vas_167-tf b {
     margin-left: 5px;
     color: var(--vaselc-text);
     font-weight: 600;
 }
 
-.MPC-vaselc-grand {
+/* ---------------- Cost-table pager ---------------- */
+
+/* Closes the table card, under the totals footer, so the controls travel with
+   the table they page. Only rendered once there is a second page to reach. */
+.vas_167-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 7px 12px;
+    padding: 8px 13px;
+    background: var(--vaselc-faint);
+    border-top: 1px solid var(--vaselc-border);
+    font-size: 12px;
+    color: var(--vaselc-sub);
+}
+
+.vas_167-pgCtrls { display: inline-flex; align-items: center; gap: 7px; }
+.vas_167-pgPos   { color: var(--vaselc-text); font-weight: 700; }
+
+.vas_167-pgBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid var(--vaselc-border);
+    border-radius: 99px;
+    background: var(--vaselc-white);
+    padding: 4px 11px;
+    color: var(--vaselc-link);
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.vas_167-pgBtn:hover { background: var(--vaselc-active); border-color: var(--vaselc-pale-bd); }
+.vas_167-pgBtn .vas_167-ic { color: currentColor; }
+.vas_167-pgBtn.is-disabled {
+    opacity: .45;
+    cursor: default;
+    pointer-events: none;
+    color: var(--vaselc-muted);
+}
+
+[dir="rtl"] .vas_167-pgBtn .vas_167-ic svg { transform: scaleX(-1); }
+
+.vas_167-grand {
     font-size: 12.5px;
     font-weight: 700;
     color: var(--vaselc-text);
 }
 
-.MPC-vaselc-grand b {
+.vas_167-grand b {
     margin-left: 6px;
     font-size: 14px;
     color: var(--vaselc-primary);
 }
 
-.MPC-vaselc-empty {
+.vas_167-empty {
     padding: 15px 13px;
     text-align: center;
     font-size: 12px;
     color: var(--vaselc-muted);
 }
 
+/* The same message standing in for the whole Cost Elements section when the
+   order has no expected landed cost — it carries the surface the table would
+   have given it, since there is no table around it. */
+.vas_167-empty.is-standalone {
+    background: var(--vaselc-white);
+    border: 1px solid var(--vaselc-border);
+    border-radius: var(--vaselc-radius);
+    box-shadow: var(--vaselc-shadow);
+    padding: 18px 13px;
+}
+
 /* ---------------- Add / edit form ---------------- */
 
 /* Plain white card on the same border / radius tokens as every other surface
    in the PO Overview pattern — no tint, no dashed outline. */
-.MPC-vaselc-form {
+.vas_167-form {
     margin-top: 12px;
     padding: 13px 15px 15px;
     background: var(--vaselc-white);
@@ -649,7 +734,7 @@
     border-radius: var(--vaselc-card-radius);
 }
 
-.MPC-vaselc-formCap {
+.vas_167-formCap {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -662,18 +747,18 @@
 }
 
 /* Two columns — the usual four do not fit a 30% panel. */
-.MPC-vaselc-formGrid {
+.vas_167-formGrid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px 18px;
 }
 
 @container (max-width: 320px) {
-    .MPC-vaselc-formGrid { grid-template-columns: minmax(0, 1fr); }
+    .vas_167-formGrid { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Underline-only field: no boxed input, no rounded card input. */
-.MPC-vaselc-ff {
+.vas_167-ff {
     display: flex;
     align-items: flex-start;
     gap: 10px;
@@ -682,10 +767,10 @@
     min-width: 0;
 }
 
-.MPC-vaselc-ff:hover,
-.MPC-vaselc-ff:focus-within { border-bottom-color: var(--vaselc-primary); }
+.vas_167-ff:hover,
+.vas_167-ff:focus-within { border-bottom-color: var(--vaselc-primary); }
 
-.MPC-vaselc-ffBody {
+.vas_167-ffBody {
     flex: 1;
     min-width: 0;
     display: flex;
@@ -693,17 +778,17 @@
     gap: 5px;
 }
 
-.MPC-vaselc-ffBody label {
+.vas_167-ffBody label {
     font-size: 11.5px;
     color: var(--vaselc-sub);
 }
 
-.MPC-vaselc-req {
+.vas_167-req {
     margin-left: 2px;
     color: var(--vaselc-danger);
 }
 
-.MPC-vaselc-input {
+.vas_167-input {
     width: 100%;
     min-height: 18px;
     padding: 0;
@@ -719,13 +804,13 @@
     cursor: pointer;
 }
 
-input.MPC-vaselc-input { cursor: text; }
-.MPC-vaselc-input.is-num { text-align: right; }
-.MPC-vaselc-input::placeholder { color: #9F9F9F; font-weight: 400; }
+input.vas_167-input { cursor: text; }
+.vas_167-input.is-num { text-align: right; }
+.vas_167-input::placeholder { color: #9F9F9F; font-weight: 400; }
 
 /* Select caret, drawn on the field rather than boxing the control. */
-.MPC-vaselc-ffBody.is-select { position: relative; }
-.MPC-vaselc-ffBody.is-select::after {
+.vas_167-ffBody.is-select { position: relative; }
+.vas_167-ffBody.is-select::after {
     content: '';
     position: absolute;
     right: 2px;
@@ -738,7 +823,7 @@ input.MPC-vaselc-input { cursor: text; }
     pointer-events: none;
 }
 
-.MPC-vaselc-formFoot {
+.vas_167-formFoot {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -747,12 +832,12 @@ input.MPC-vaselc-input { cursor: text; }
     margin-top: 14px;
 }
 
-.MPC-vaselc-formNote {
+.vas_167-formNote {
     font-size: 11px;
     color: var(--vaselc-sub);
 }
 
-.MPC-vaselc-formErr {
+.vas_167-formErr {
     margin-top: 10px;
     padding: 7px 10px;
     border-radius: 8px;
@@ -763,7 +848,7 @@ input.MPC-vaselc-input { cursor: text; }
 }
 
 /* Capsule buttons: filled primary, white/bordered secondary. */
-.MPC-vaselc-btn {
+.vas_167-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -777,33 +862,33 @@ input.MPC-vaselc-input { cursor: text; }
     cursor: pointer;
 }
 
-.MPC-vaselc-btn.is-primary {
+.vas_167-btn.is-primary {
     border: none;
     background: var(--vaselc-action);
     color: #fff;
 }
 
-.MPC-vaselc-btn.is-primary:hover { background: #0069AE; }
+.vas_167-btn.is-primary:hover { background: #0069AE; }
 
-.MPC-vaselc-btn.is-primary:disabled,
-.MPC-vaselc-btn.is-primary:disabled:hover {
+.vas_167-btn.is-primary:disabled,
+.vas_167-btn.is-primary:disabled:hover {
     background: var(--vaselc-action);
     opacity: 0.45;
     cursor: not-allowed;
 }
 
-.MPC-vaselc-btn.is-ghost {
+.vas_167-btn.is-ghost {
     border: 1px solid var(--vaselc-action);
     background: #fff;
     color: var(--vaselc-primary);
 }
 
-.MPC-vaselc-btn.is-ghost:hover { background: var(--vaselc-faint); }
-.MPC-vaselc-btn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 2px; }
+.vas_167-btn.is-ghost:hover { background: var(--vaselc-faint); }
+.vas_167-btn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 2px; }
 
 /* ---------------- Toast ---------------- */
 
-.MPC-vaselc-toast {
+.vas_167-toast {
     position: absolute;
     left: 50%;
     bottom: 18px;
@@ -819,32 +904,32 @@ input.MPC-vaselc-input { cursor: text; }
     z-index: 1000;
 }
 
-.MPC-vaselc-toast.show { opacity: 1; transform: translate(-50%, 0); }
-.MPC-vaselc-toast.ok  { background: var(--vaselc-success-bg); color: var(--vaselc-success-tx); }
-.MPC-vaselc-toast.err { background: var(--vaselc-risk-bg);    color: var(--vaselc-risk-tx); }
+.vas_167-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.vas_167-toast.ok  { background: var(--vaselc-success-bg); color: var(--vaselc-success-tx); }
+.vas_167-toast.err { background: var(--vaselc-risk-bg);    color: var(--vaselc-risk-tx); }
 
 /* ---------------- Motion ---------------- */
 
-@keyframes MPC-vaselc-rise {
+@keyframes vas_167-rise {
     from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: none; }
 }
 
 /* ---------------- RTL ---------------- */
 
-.vis-rtl .MPC-vaselc-amt,
-[dir="rtl"] .MPC-vaselc-amt,
-.vis-rtl .ta-r,
-[dir="rtl"] .ta-r { text-align: left; }
+.vis-rtl .vas_167-amt,
+[dir="rtl"] .vas_167-amt,
+.vis-rtl .vas_167-root .ta-r,
+[dir="rtl"] .vas_167-root .ta-r { text-align: left; }
 
-.vis-rtl .MPC-vaselc-acts,
-[dir="rtl"] .MPC-vaselc-acts { justify-self: start; }
+.vis-rtl .vas_167-acts,
+[dir="rtl"] .vas_167-acts { justify-self: start; }
 
-.vis-rtl .MPC-vaselc-ffBody.is-select::after,
-[dir="rtl"] .MPC-vaselc-ffBody.is-select::after { right: auto; left: 2px; }
+.vis-rtl .vas_167-ffBody.is-select::after,
+[dir="rtl"] .vas_167-ffBody.is-select::after { right: auto; left: 2px; }
 
-.vis-rtl .MPC-vaselc-hdrColL,
-[dir="rtl"] .MPC-vaselc-hdrColL {
+.vis-rtl .vas_167-hdrColL,
+[dir="rtl"] .vas_167-hdrColL {
     border-right: none;
     border-left: 1px solid var(--vaselc-row-div);
     padding-right: 0;
@@ -852,6 +937,6 @@ input.MPC-vaselc-input { cursor: text; }
 }
 
 @container (max-width: 460px) {
-    .vis-rtl .MPC-vaselc-hdrColL,
-    [dir="rtl"] .MPC-vaselc-hdrColL { border-left: none; padding-left: 0; }
+    .vis-rtl .vas_167-hdrColL,
+    [dir="rtl"] .vas_167-hdrColL { border-left: none; padding-left: 0; }
 }

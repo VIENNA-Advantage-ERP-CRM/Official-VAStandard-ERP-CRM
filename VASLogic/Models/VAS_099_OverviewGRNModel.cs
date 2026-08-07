@@ -135,6 +135,32 @@
 ///                          what makes it one; the table id is matched with
 ///                          IN + UPPER so a differently-cased or duplicated
 ///                          dictionary entry still resolves.
+///   VAI163   2026-08-06  - RejectedQty (and AcceptedQty) no longer filter on
+///                          VA010_QualCheckMArk = 'Y'. That mark means the line
+///                          PASSED quality check, so asking for the SCRAPPED
+///                          quantity of the lines that passed returned nil by
+///                          definition and the Rejected card always read 0. Both
+///                          are summed over the receipt's confirmation lines, which
+///                          is already scoped correctly because the cards only
+///                          render when a quality plan applies at all.
+///                        - Quality applicability falls back from the LINE's
+///                          VA010_QualityPlan_ID to the PRODUCT's (BuildQcPlanExpr).
+///                          The line column is stamped by a callout that not every
+///                          line-creation path runs, so drafted receipts reported
+///                          "no quality check" and hid the whole Quality Product
+///                          section until completion.
+///                        - Line quantities (ReceivedQty, OrderedQty) and the header
+///                          ReceivedQty aggregate read in the ENTERED uom — the one
+///                          UOMName names — instead of the converted base-uom
+///                          MovementQty. ReceivedQtyBase carries the base figure the
+///                          amount is still computed from, and UnitRate is restated
+///                          per entered uom so Qty x Rate reconciles to Amount.
+///   VAI163   2026-08-06  The activity trail is handed to the panel newest-first,
+///                        as its summary and <returns> always said it was: the
+///                        trim sorted it that way and then reversed it back to
+///                        oldest-first, which buried the most recent event at the
+///                        bottom of the feed — and, since the feed paginates at 15
+///                        rows, on a later page entirely. Matches VAS_092.
 /// </summary>
 
 using System;
@@ -177,12 +203,6 @@ namespace VASLogic.Models
             bool hasCurrentCost = ColumnExists("M_InOutLine", "CurrentCostPrice");
             bool hasUnitPrice   = ColumnExists("M_InOutLine", "VA024_UnitPrice");
 
-            // Quality-check mark on the receipt confirmation line — the accepted /
-            // rejected quantities are only summed over lines carrying it.
-            bool hasQcMark = ColumnExists("M_InOutLineConfirm", "VA010_QualCheckMArk");
-            string qcConfirmFilter = hasQcMark
-                ? " AND COALESCE(lc.VA010_QualCheckMArk, 'N') = 'Y'"
-                : "";
 
             // "MM Receipt with Confirmation" document types are the ones that ask
             // for a ship/receipt or pick-QA confirmation. Both flags are core
@@ -197,10 +217,29 @@ namespace VASLogic.Models
             // an invoice-aware variant once the referenced invoice id is known, and
             // the received value is then recomputed from those lines.
             string rateExpr = BuildRateExpr(hasCurrentCost, hasUnitPrice);
-            // 1 when the line carries a quality plan, else 0.
-            string qcCountExpr = hasQualityPlan
-                ? "CASE WHEN l.VA010_QualityPlan_ID IS NOT NULL THEN 1 ELSE 0 END"
-                : "0";
+
+            // A quality check applies to a line when the LINE carries a quality
+            // plan or, failing that, when its PRODUCT is configured with one.
+            //
+            // The line-level column is stamped from the product as the line is
+            // created (see CommonController's Set_ValueNoCheck of
+            // VA010_QualityPlan_ID), but only on the paths that run that callout —
+            // a line created by Create Lines From, by import or by a process can
+            // reach a drafted receipt without it. Asking the line alone therefore
+            // reported "no quality check" on drafted receipts, which hid the whole
+            // Quality Product section and both QC snapshot cards until the receipt
+            // was completed. The product's own plan is the configuration and is
+            // there from the start.
+            bool hasProductPlan = ColumnExists("M_Product", "VA010_QualityPlan_ID");
+            string qcPlanExpr = BuildQcPlanExpr(hasQualityPlan, hasProductPlan, "l", "qcp");
+            // The product join the fallback needs; empty when it is not used.
+            string qcPlanJoin = hasProductPlan
+                ? "LEFT OUTER JOIN M_Product qcp ON (qcp.M_Product_ID = l.M_Product_ID)"
+                : "";
+            // 1 when a quality check applies to the line, else 0.
+            string qcCountExpr = (qcPlanExpr == null)
+                ? "0"
+                : "CASE WHEN " + qcPlanExpr + " IS NOT NULL THEN 1 ELSE 0 END";
 
             string sql = @"SELECT
                               io.M_InOut_ID,
@@ -270,28 +309,49 @@ namespace VASLogic.Models
                               cur.StdPrecision AS StdPrecision,
                               dt.Name          AS DocTypeName,
                               " + confirmDocExpr + @"                             AS IsConfirmationDocType,
+                              /* Accepted / rejected are summed over ALL of the
+                                 receipt's confirmation lines, NOT only over those
+                                 marked VA010_QualCheckMArk = 'Y'.
+
+                                 That mark means the line PASSED quality check
+                                 (see VAS_104_OverviewShipGRNConfirmationModel,
+                                 which reads it as QcPassCount). Filtering the
+                                 rejected sum by it asked for the scrapped quantity
+                                 of the lines that passed — which is nil by
+                                 definition, so the Rejected card always read 0.
+
+                                 Both cards only render when a quality plan applies
+                                 to the receipt at all (QcLineCount > 0), so the
+                                 scope is already right without the mark, and the
+                                 pair now reconciles against the same set of
+                                 confirmation lines. */
                               (SELECT NVL(SUM(NVL(lc.ConfirmedQty, 0)), 0)
                                  FROM M_InOutLineConfirm lc
                                 INNER JOIN M_InOutLine cl ON (cl.M_InOutLine_ID = lc.M_InOutLine_ID
                                                               AND cl.IsActive    = 'Y')
                                 WHERE cl.M_InOut_ID = io.M_InOut_ID
-                                  AND lc.IsActive   = 'Y'" + qcConfirmFilter + @")  AS AcceptedQty,
+                                  AND lc.IsActive   = 'Y')                      AS AcceptedQty,
                               (SELECT NVL(SUM(NVL(lc.ScrappedQty, 0)), 0)
                                  FROM M_InOutLineConfirm lc
                                 INNER JOIN M_InOutLine cl ON (cl.M_InOutLine_ID = lc.M_InOutLine_ID
                                                               AND cl.IsActive    = 'Y')
                                 WHERE cl.M_InOut_ID = io.M_InOut_ID
-                                  AND lc.IsActive   = 'Y'" + qcConfirmFilter + @")  AS RejectedQty,
+                                  AND lc.IsActive   = 'Y')                      AS RejectedQty,
                               (SELECT COUNT(*)
                                  FROM M_InOutLine l
                                 WHERE l.M_InOut_ID = io.M_InOut_ID
                                   AND l.IsActive   = 'Y')                       AS LineCount,
-                              (SELECT NVL(SUM(NVL(l.MovementQty, 0)), 0)
+                              /* Entered-uom quantity, on the same scale as the rows
+                                 the reader sees below the card. (Mixed uoms across
+                                 lines make any total approximate either way, but it
+                                 must at least agree with the figures on screen.) */
+                              (SELECT NVL(SUM(NVL(NULLIF(l.QtyEntered, 0), NVL(l.MovementQty, 0))), 0)
                                  FROM M_InOutLine l
                                 WHERE l.M_InOut_ID = io.M_InOut_ID
                                   AND l.IsActive   = 'Y')                       AS ReceivedQty,
                               (SELECT NVL(SUM(" + qcCountExpr + @"), 0)
                                  FROM M_InOutLine l
+                                 " + qcPlanJoin + @"
                                 WHERE l.M_InOut_ID = io.M_InOut_ID
                                   AND l.IsActive   = 'Y')                       AS QcLineCount,
                               (SELECT NVL(SUM(NVL(l.MovementQty, 0) * " + rateExpr + @"), 0)
@@ -429,7 +489,7 @@ namespace VASLogic.Models
 
             result.Lines = LoadLines(M_InOut_ID, referencedInvoiceId,
                                      result.StdPrecision, lineRateExpr, hasQualityPlan,
-                                     priceTaxIncluded);
+                                     hasProductPlan, priceTaxIncluded);
 
             // Keep the KPI card and the totals footer equal to the sum of the rows
             // on screen — the header aggregate above cannot see the invoice price.
@@ -470,6 +530,30 @@ namespace VASLogic.Models
             result.Activity = LoadActivity(M_InOut_ID, result.StatusCode);
 
             return result;
+        }
+
+        /// <summary>
+        /// Builds the SQL expression naming the quality plan that applies to a
+        /// receipt line: the line's own plan, else the product's configured one.
+        /// Either side is optional (the VA010 module may not be installed, and the
+        /// column may exist on one table and not the other), so whichever exists is
+        /// used and null comes back when neither does — the caller then treats
+        /// quality as never applicable.
+        /// </summary>
+        /// <param name="hasLinePlan">M_InOutLine.VA010_QualityPlan_ID exists.</param>
+        /// <param name="hasProductPlan">M_Product.VA010_QualityPlan_ID exists.</param>
+        /// <param name="lineAlias">Alias of M_InOutLine in the caller's SQL.</param>
+        /// <param name="productAlias">Alias of the M_Product join in the caller's SQL.</param>
+        /// <returns>An SQL expression, or null when neither column exists.</returns>
+        private string BuildQcPlanExpr(bool hasLinePlan, bool hasProductPlan,
+                                       string lineAlias, string productAlias)
+        {
+            string line    = hasLinePlan    ? lineAlias + ".VA010_QualityPlan_ID"    : null;
+            string product = hasProductPlan ? productAlias + ".VA010_QualityPlan_ID" : null;
+
+            if (line != null && product != null) return "COALESCE(" + line + ", " + product + ")";
+            if (line != null) return line;
+            return product;   // null when neither exists
         }
 
         /// <summary>
@@ -755,13 +839,18 @@ namespace VASLogic.Models
         /// <returns>Ordered list of line rows (may be empty).</returns>
         private List<GRNLineData> LoadLines(
             int M_InOut_ID, int C_Invoice_ID, int defaultPrecision, string rateExpr,
-            bool hasQualityPlan, bool taxIncluded)
+            bool hasQualityPlan, bool hasProductPlan, bool taxIncluded)
         {
             List<GRNLineData> lines = new List<GRNLineData>();
 
-            string qcCase = hasQualityPlan
-                ? "CASE WHEN l.VA010_QualityPlan_ID IS NOT NULL THEN 'Y' ELSE 'N' END"
-                : "'N'";
+            // Same rule as the header's QcLineCount: the line's own plan, else the
+            // product's configured one, so a drafted receipt whose lines were not
+            // stamped still reports quality as applicable. "p" is the M_Product
+            // join this query already carries.
+            string qcPlanExpr = BuildQcPlanExpr(hasQualityPlan, hasProductPlan, "l", "p");
+            string qcCase = (qcPlanExpr == null)
+                ? "'N'"
+                : "CASE WHEN " + qcPlanExpr + " IS NOT NULL THEN 'Y' ELSE 'N' END";
 
             // The tax that sits on this line's price: the referenced invoice line's
             // tax where the price came from the invoice, else the order line's.
@@ -779,14 +868,25 @@ namespace VASLogic.Models
                               l.Line,
                               l.Description     AS LineDescription,
                               l.M_Product_ID,
-                              NVL(l.MovementQty, 0) AS ReceivedQty,
+                              /* Quantities read in the line's ENTERED uom — the one
+                                 the row is labelled with (C_UOM_ID, joined as u
+                                 below). MovementQty is the converted BASE-uom
+                                 figure, so on any line entered in a different uom
+                                 (a Box of 12 Each) the row showed the base number
+                                 beside the entered unit name: 12 Box. The base
+                                 figure is still what the amount is computed from,
+                                 which is unchanged. */
+                              NVL(NULLIF(l.QtyEntered, 0), NVL(l.MovementQty, 0)) AS ReceivedQty,
+                              NVL(l.MovementQty, 0) AS ReceivedQtyBase,
                               p.Value           AS ProductCode,
                               p.Name            AS ProductName,
                               loc.Value         AS LocatorCode,
                               COALESCE(loc.LocatorCombination, loc.Bin, loc.Value) AS LocatorName,
                               u.Name            AS UOMName,
                               NVL(u.StdPrecision, 0) AS UOMPrecision,
-                              NVL(ol.QtyOrdered, 0)  AS OrderedQty,
+                              /* Ordered in the same (entered) scale as Received, so
+                                 the two columns are comparable down the row. */
+                              NVL(NULLIF(ol.QtyEntered, 0), NVL(ol.QtyOrdered, 0)) AS OrderedQty,
                               asi.Description   AS AttributeSetInstance,
                               " + taxRateExpr + @"                    AS TaxRate,
                               " + rateExpr + @"                       AS UnitRate,
@@ -824,6 +924,7 @@ namespace VASLogic.Models
                 ln.Description        = Util.GetValueOfString(r["LineDescription"]);
                 ln.M_Product_ID       = Util.GetValueOfInt(r["M_Product_ID"]);
                 ln.ReceivedQty        = Util.GetValueOfDecimal(r["ReceivedQty"]);
+                ln.ReceivedQtyBase    = Util.GetValueOfDecimal(r["ReceivedQtyBase"]);
                 ln.ProductCode        = Util.GetValueOfString(r["ProductCode"]);
                 ln.ProductName        = Util.GetValueOfString(r["ProductName"]);
                 ln.LocatorCode        = Util.GetValueOfString(r["LocatorCode"]);
@@ -847,6 +948,19 @@ namespace VASLogic.Models
                     decimal divisor = 1 + (ln.TaxRate / 100m);
                     ln.UnitRate  = ln.UnitRate  / divisor;
                     ln.LineValue = ln.LineValue / divisor;
+                }
+
+                // The Rate column is restated per ENTERED uom, so Qty x Rate
+                // reconciles to Amount on the row as shown. The stored price is per
+                // BASE uom (it multiplies MovementQty to give the line amount), so
+                // on a converted line the row otherwise read "2 Box x 50.00 =
+                // 1,200.00". Deriving it from the amount keeps every pricing path
+                // consistent — order price, referenced-invoice price and cost price
+                // alike — and is exactly the stored price when no conversion
+                // applies (QtyEntered == MovementQty).
+                if (ln.ReceivedQty != 0 && ln.ReceivedQtyBase != ln.ReceivedQty)
+                {
+                    ln.UnitRate = ln.LineValue / ln.ReceivedQty;
                 }
 
                 lines.Add(ln);
@@ -1113,18 +1227,28 @@ namespace VASLogic.Models
             LoadNoteActivity(M_InOut_ID, activity);
             LoadEmailActivity(M_InOut_ID, activity);
 
-            // Trim newest-first so a long-running receipt keeps its RECENT events,
-            // then hand the panel the survivors oldest-first: the trail reads the
-            // way the document actually happened (created -> updated -> completed
-            // -> posted), which is what a reader follows down the list.
+            // Newest first, and it STAYS that way — the most recent thing to happen
+            // to the receipt is the first row of the feed, matching the VAS_092
+            // Purchase Order overview and the section's own "Recent Activity"
+            // reading. The trim then keeps the recent events on a long-running
+            // receipt rather than the opening ones.
+            //
+            // (It used to be reversed back to oldest-first after the trim, on the
+            // reasoning that a trail should read the way the document happened.
+            // That buries today's event at the bottom of a long feed — and now that
+            // the feed pages at 15 rows, on a later page entirely.)
+            //
+            // The comparator is called with its arguments swapped, so the lifecycle
+            // rank inverts with the timestamp: two entries stamped at the very same
+            // moment put the LATER step on top, and "completed" can never be printed
+            // below the "created" it followed.
             activity.Sort(delegate (GRNActivityData a, GRNActivityData b)
             {
-                return CompareActivity(b, a);      // newest first, for the trim
+                return CompareActivity(b, a);
             });
             if (activity.Count > MAX_ENTRIES)
                 activity = activity.GetRange(0, MAX_ENTRIES);
 
-            activity.Reverse();                    // oldest first, ties preserved
             return activity;
         }
 
@@ -1134,6 +1258,10 @@ namespace VASLogic.Models
         /// and the document share a timestamp — fall back to the lifecycle rank,
         /// so "completed" can never be printed above the "created" it followed.
         /// An entry with no timestamp sorts to the very start.
+        ///
+        /// LoadActivity calls this with its arguments swapped to get the
+        /// newest-first order the feed is displayed in; the rank tie-break inverts
+        /// with it, which is what that order needs.
         /// </summary>
         private static int CompareActivity(GRNActivityData a, GRNActivityData b)
         {
@@ -1947,8 +2075,15 @@ namespace VASLogic.Models
             public string   UOMName          { get; set; }
             public int      UOMPrecision     { get; set; }
             public string   AttributeSetInstance { get; set; }   // M_AttributeSetInstance.Description (blank when none)
+            /// <summary>Ordered quantity in the line's ENTERED uom (the one UOMName names).</summary>
             public decimal  OrderedQty       { get; set; }
+            /// <summary>Received quantity in the line's ENTERED uom (M_InOutLine.QtyEntered).</summary>
             public decimal  ReceivedQty      { get; set; }
+            /// <summary>Received quantity in the product's BASE uom (M_InOutLine.MovementQty).
+            /// The amount is computed from this; it is carried so the panel can tell a
+            /// converted line from an unconverted one.</summary>
+            public decimal  ReceivedQtyBase  { get; set; }
+            /// <summary>Price per ENTERED uom, so Qty x Rate reconciles to LineValue.</summary>
             public decimal  UnitRate         { get; set; }   // net of tax
             public decimal  LineValue        { get; set; }   // net of tax
             /// <summary>The tax rate carried by the line's price (C_Tax.Rate, %).

@@ -185,6 +185,40 @@
 ///                        - E-mail rows carry the Cc / Bcc recipients
 ///                          (MailAttachment1.MailAddressCc / MailAddressBcc)
 ///                          alongside the To address.
+///   VAI163   2026-08-04  - Landed cost: each component now carries the DISPLAY
+///                          NAME of its distribution method, read from the
+///                          dictionary's reference list behind
+///                          C_ExpectedCost.LandedCostDistribution
+///                          (LoadDistributionNames), so the panel shows the value
+///                          the record screen shows instead of a label hard-coded
+///                          on the client.
+///                        - Quantities are reported in the entered (selected) UOM
+///                          throughout. The stat-strip totals sum
+///                          C_OrderLine.QtyEntered and convert the delivered
+///                          quantity with each line's entered / base ratio (they
+///                          summed the base-UOM QtyOrdered / QtyDelivered, so an
+///                          order keyed in a non-base UOM showed cards on a
+///                          different scale to its own line rows), and carry the
+///                          order's common UOM symbol / precision (QtyUOMSymbol,
+///                          QtyPrecision) when every item line shares one unit.
+///                        - A line's received quantity is now Σ
+///                          M_InOutLine.MovementQty converted with that ratio
+///                          instead of Σ M_InOutLine.QtyEntered: the receipt's
+///                          entered figure is in the RECEIPT line's UOM, so a PO
+///                          keyed in BOX and received in EA reported the EA count
+///                          against a BOX label.
+///   VAI163   2026-08-04  - Added GetWindowId: resolves an AD_Window_ID from a
+///                          window NAME for the panel's record-open path, so a
+///                          record whose screen is not its table's default zoom
+///                          target (the RFQ -> VAS_RFQ window) can be opened.
+///   VAI163   2026-08-05  - Generated From gained the MRP plan origin
+///                          (LoadPlanOrigin / VAMRP_PlanRun_ID): a PO raised by
+///                          a planning run named its plan nowhere, so it fell
+///                          through to the "Manual" chip. The id column is
+///                          looked for on C_Order then C_OrderLine and the plan
+///                          run's identifier column is chosen from whichever the
+///                          schema has, all AD_Column-guarded — a deployment
+///                          without VAMRP behaves exactly as before.
 /// </summary>
 
 using System;
@@ -478,6 +512,48 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// Resolves a window's AD_Window_ID from its name (AD_Window.Name) for the
+        /// panel's record-open path. A record whose screen is not the table's
+        /// default zoom target — the RFQ, which opens the VAS_RFQ window — is
+        /// opened by naming its window instead, and the name is only ever turned
+        /// into an id here, against the dictionary.
+        ///
+        /// Restricted to windows this tenant can see (AD_Client_ID 0 or its own),
+        /// preferring the tenant's own row over the system one. Whether the ROLE
+        /// may open it is the platform's call, made when the window is started.
+        /// </summary>
+        /// <param name="ctx">User context (client).</param>
+        /// <param name="windowName">Window name to resolve.</param>
+        /// <returns>The window id, or 0 when the name resolves to nothing.</returns>
+        public int GetWindowId(Ctx ctx, string windowName)
+        {
+            if (string.IsNullOrEmpty(windowName)) return 0;
+            try
+            {
+                string sql = @"SELECT w.AD_Window_ID
+                                 FROM AD_Window w
+                                WHERE w.Name        = @Name
+                                  AND w.IsActive    = 'Y'
+                                  AND w.AD_Client_ID IN (0, @AD_Client_ID)
+                                ORDER BY w.AD_Client_ID DESC";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@Name", windowName.Trim()),
+                    new SqlParameter("@AD_Client_ID", ctx == null ? 0 : ctx.GetAD_Client_ID())
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return 0;
+                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetWindowId (" + windowName + "): " + ex.Message);
+                return 0;
+            }
+        }
+
+        /// <summary>
         /// Determines the current progress stage (1..7) as the highest reached
         /// milestone. Stage 5 (Partial Delivered) is "reached" once any quantity
         /// has been received.
@@ -575,18 +651,40 @@ namespace VASLogic.Models
                 //  ever receive a QtyDelivered from a goods receipt; that keeps the
                 //  "fully received" determination correct without letting a non-
                 //  stocked item hold the card below 100%.
+                //
+                //  Quantities are reported in the line's ENTERED (selected) unit of
+                //  measure — C_OrderLine.QtyEntered — which is what the line rows
+                //  show. QtyOrdered / QtyDelivered are the converted base-UOM
+                //  figures, so on an order keyed in a non-base UOM (2 BOX = 24 EA)
+                //  the cards read 24 while every line read 2. The delivered figure
+                //  is converted onto the same scale with the line's own entered /
+                //  base ratio, so both halves of "received of ordered" agree.
+                //  MIN / MAX of the UOM symbol tell the caller whether the whole
+                //  order shares one unit (they match) or mixes several (they do
+                //  not) — a mixed order shows no unit label.
                 string sql = @"SELECT
                                   NVL(SUM(CASE WHEN p.ProductType = 'I'
-                                               THEN ol.QtyOrdered   ELSE 0 END), 0) AS TotalQtyOrdered,
+                                               THEN ol.QtyEntered   ELSE 0 END), 0) AS TotalQtyOrdered,
                                   NVL(SUM(CASE WHEN p.ProductType = 'I'
-                                               THEN ol.QtyDelivered ELSE 0 END), 0) AS TotalQtyDelivered,
+                                               THEN ol.QtyDelivered *
+                                                    CASE WHEN ol.QtyOrdered <> 0
+                                                         THEN ol.QtyEntered / ol.QtyOrdered
+                                                         ELSE 1 END
+                                               ELSE 0 END), 0) AS TotalQtyDelivered,
                                   SUM(CASE WHEN p.ProductType = 'I' AND p.IsStocked = 'Y'
                                            THEN 1 ELSE 0 END)  AS DeliverableLineCount,
                                   SUM(CASE WHEN p.ProductType = 'I' AND p.IsStocked = 'Y'
                                                 AND ol.QtyDelivered >= ol.QtyOrdered
-                                           THEN 1 ELSE 0 END)  AS FullyReceivedLineCount
+                                           THEN 1 ELSE 0 END)  AS FullyReceivedLineCount,
+                                  MIN(CASE WHEN p.ProductType = 'I'
+                                           THEN uom.UOMSymbol END) AS MinUOMSymbol,
+                                  MAX(CASE WHEN p.ProductType = 'I'
+                                           THEN uom.UOMSymbol END) AS MaxUOMSymbol,
+                                  MAX(CASE WHEN p.ProductType = 'I'
+                                           THEN uom.StdPrecision ELSE 0 END) AS QtyPrecision
                                FROM C_OrderLine ol
                                INNER JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
+                               LEFT OUTER JOIN C_UOM uom ON (uom.C_UOM_ID = ol.C_UOM_ID)
                               WHERE ol.C_Order_ID  = @C_Order_ID
                                 AND ol.IsActive    = 'Y'
                                 AND ol.QtyOrdered  > 0";
@@ -599,6 +697,13 @@ namespace VASLogic.Models
                 d.TotalQtyDelivered      = Util.GetValueOfDecimal(r["TotalQtyDelivered"]);
                 d.DeliverableLineCount   = Util.GetValueOfInt(r["DeliverableLineCount"]);
                 d.FullyReceivedLineCount = Util.GetValueOfInt(r["FullyReceivedLineCount"]);
+                d.QtyPrecision           = Util.GetValueOfInt(r["QtyPrecision"]);
+
+                // One unit for the whole order, or none at all: a mixed-UOM order
+                // must not label a summed figure with one line's unit.
+                string minUom = Util.GetValueOfString(r["MinUOMSymbol"]);
+                string maxUom = Util.GetValueOfString(r["MaxUOMSymbol"]);
+                d.QtyUOMSymbol = (minUom == maxUom) ? minUom : "";
             }
             catch (Exception ex)
             {
@@ -641,19 +746,26 @@ namespace VASLogic.Models
                               uom.StdPrecision  AS UOMPrecision,
                               asi.Description   AS AttributeSetInstance,
                               NVL(pl.PricePrecision, 2) AS PricePrecision,
-                              -- Received quantity in the line's ENTERED UOM, so it
-                              -- reads on the same scale as the ordered quantity
-                              -- (C_OrderLine.QtyEntered). M_InOutLine.QtyEntered is
-                              -- the receipt's own entered figure; QtyDelivered on the
-                              -- order line is the converted stocking quantity and
-                              -- would show a different unit.
-                              (SELECT NVL(SUM(NVL(iol.QtyEntered, iol.MovementQty)), 0)
+                              -- Received quantity in the ORDER LINE's entered UOM, so
+                              -- it reads on the same scale and carries the same unit
+                              -- label as the ordered quantity (C_OrderLine.QtyEntered).
+                              -- The receipt is summed in the common base UOM
+                              -- (M_InOutLine.MovementQty) and converted with the order
+                              -- line's own entered / base ratio: M_InOutLine.QtyEntered
+                              -- is the RECEIPT's entered figure, which is in the
+                              -- receipt line's own UOM and need not be the one the
+                              -- order was keyed in (a PO in BOX received in EA
+                              -- reported the EA count against a BOX label).
+                              (SELECT NVL(SUM(NVL(iol.MovementQty, 0)), 0)
                                  FROM M_InOutLine iol
                                  INNER JOIN M_InOut io ON (io.M_InOut_ID = iol.M_InOut_ID)
                                 WHERE iol.C_OrderLine_ID = ol.C_OrderLine_ID
                                   AND NVL(iol.IsActive, 'Y') = 'Y'
                                   AND NVL(io.IsActive, 'Y')  = 'Y'
-                                  AND io.DocStatus IN ('CO', 'CL')) AS QtyReceivedEntered
+                                  AND io.DocStatus IN ('CO', 'CL'))
+                              * CASE WHEN ol.QtyOrdered <> 0
+                                     THEN ol.QtyEntered / ol.QtyOrdered
+                                     ELSE 1 END                      AS QtyReceivedEntered
                            FROM C_OrderLine ol
                            LEFT OUTER JOIN M_Product   p   ON (ol.M_Product_ID = p.M_Product_ID)
                            LEFT OUTER JOIN C_Charge    ch  ON (ol.C_Charge_ID  = ch.C_Charge_ID)
@@ -943,6 +1055,9 @@ namespace VASLogic.Models
                     _log.Severe("LoadOrigins/BlanketOrder (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
                 }
             }
+
+            // --- MRP plan run (module-optional VAMRP_PlanRun_ID). ---
+            LoadPlanOrigin(C_Order_ID, d);
         }
 
         /// <summary>
@@ -1315,6 +1430,101 @@ namespace VASLogic.Models
         /// AD_Column dictionary. A DB issue degrades to "absent" (false) so a
         /// lookup failure never breaks the overview.
         /// </summary>
+        /// <summary>
+        /// Returns the first of the candidate columns that exists on the table, or
+        /// an empty string when the table has none of them. Used where an optional
+        /// module names the same concept differently across its revisions.
+        /// </summary>
+        private string FirstExistingColumn(string tableName, string[] candidates)
+        {
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                if (ColumnExists(tableName, candidates[i])) return candidates[i];
+            }
+            return "";
+        }
+
+        /// <summary>
+        /// Fills PlanRunId / PlanRunNo / PlanRunCount from the MRP plan run that
+        /// generated this order (VAMRP_PlanRun_ID), so a PO raised by a planning
+        /// run names its plan in the Generated From strip instead of reading
+        /// "Manual".
+        ///
+        /// VAMRP is an optional module and is not part of this solution, so the
+        /// tables are reached through plain SQL under AD_Column guards: the id
+        /// column is looked for on C_Order first and on C_OrderLine second (the
+        /// module stamps it in different places across revisions), and without
+        /// either this is a no-op that leaves the strip exactly as it was.
+        ///
+        /// Read in two independent steps, like the contract origin above: the id
+        /// comes from the order alone, so an unreadable VAMRP_PlanRun table cannot
+        /// suppress the chip — it just renders from the id.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected purchase order id.</param>
+        /// <param name="d">Overview payload being populated.</param>
+        private void LoadPlanOrigin(int C_Order_ID, PurchaseOrderOverviewData d)
+        {
+            bool onHeader = ColumnExists("C_Order", "VAMRP_PlanRun_ID");
+            bool onLine   = ColumnExists("C_OrderLine", "VAMRP_PlanRun_ID");
+            if (!onHeader && !onLine) return;
+
+            // --- Step 1: the plan run id(s) the order carries. ---
+            try
+            {
+                string sql = onHeader
+                    ? @"SELECT DISTINCT o.VAMRP_PlanRun_ID AS PlanRunId
+                          FROM C_Order o
+                         WHERE o.C_Order_ID = @C_Order_ID
+                           AND NVL(o.VAMRP_PlanRun_ID, 0) > 0"
+                    : @"SELECT DISTINCT ol.VAMRP_PlanRun_ID AS PlanRunId
+                          FROM C_OrderLine ol
+                         WHERE ol.C_Order_ID = @C_Order_ID
+                           AND NVL(ol.IsActive, 'Y') = 'Y'
+                           AND NVL(ol.VAMRP_PlanRun_ID, 0) > 0";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                d.PlanRunId    = Util.GetValueOfInt(ds.Tables[0].Rows[0]["PlanRunId"]);
+                // Several plan runs can feed one order when the id sits on the
+                // lines; the panel names the first and hints the rest with "+n".
+                d.PlanRunCount = ds.Tables[0].Rows.Count;
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadPlanOrigin/PlanRunId (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                return;
+            }
+
+            if (d.PlanRunId <= 0) return;
+
+            // --- Step 2: the plan run's human identifier, whichever column this
+            // revision of the module names it with. ---
+            try
+            {
+                string noCol = FirstExistingColumn("VAMRP_PlanRun", new string[]
+                {
+                    "DocumentNo", "Name", "Value", "Description"
+                });
+                if (string.IsNullOrEmpty(noCol)) return;
+
+                string sql = "SELECT pr." + noCol + @" AS PlanRunNo
+                                FROM VAMRP_PlanRun pr
+                               WHERE pr.VAMRP_PlanRun_ID = @VAMRP_PlanRun_ID";
+                SqlParameter[] p = new SqlParameter[]
+                {
+                    new SqlParameter("@VAMRP_PlanRun_ID", d.PlanRunId)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, p, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    d.PlanRunNo = Util.GetValueOfString(ds.Tables[0].Rows[0]["PlanRunNo"]);
+            }
+            catch (Exception ex)
+            {
+                // The number is a nicety; the chip still shows the id.
+                _log.Severe("LoadPlanOrigin/PlanRunNo (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
         private bool ColumnExists(string tableName, string columnName)
         {
             try
@@ -2051,8 +2261,21 @@ namespace VASLogic.Models
 
             LoadActualComponents(d.C_Order_ID, map);
 
+            // The distribution method's display name, read from the dictionary's
+            // own reference list for C_ExpectedCost.LandedCostDistribution — the
+            // panel must show what the record screen shows for the value stored on
+            // the row, never a label the client made up for the code.
+            Dictionary<string, string> distributionNames = LoadDistributionNames();
+
             foreach (LandedCostComponentData c in map.Values)
             {
+                string distName;
+                if (!string.IsNullOrEmpty(c.DistributionCode) &&
+                    distributionNames.TryGetValue(c.DistributionCode, out distName))
+                {
+                    c.DistributionName = distName;
+                }
+
                 // Variance + status only once an actual (invoice) exists.
                 if (c.IsInvoiced)
                 {
@@ -2103,6 +2326,47 @@ namespace VASLogic.Models
             d.InvoicedComponentCount = invoicedCount;
 
             return components;
+        }
+
+        /// <summary>
+        /// Reads the display names of the landed-cost distribution methods from
+        /// the dictionary: every AD_Ref_List entry of the reference behind
+        /// C_ExpectedCost.LandedCostDistribution, keyed by its stored value
+        /// (I / Q / W / V / L / C ...). The panel labels each component's method
+        /// with the name the dictionary carries for the value on the row, so a
+        /// renamed, translated or newly added method shows correctly instead of a
+        /// label hard-coded on the client. Degrades to an empty map (the client
+        /// then falls back to its own defaults) rather than failing the overview.
+        /// </summary>
+        private Dictionary<string, string> LoadDistributionNames()
+        {
+            Dictionary<string, string> map = new Dictionary<string, string>();
+            try
+            {
+                string sql = @"SELECT rl.Value AS Code, rl.Name AS Name
+                                 FROM AD_Ref_List rl
+                                WHERE NVL(rl.IsActive, 'Y') = 'Y'
+                                  AND rl.AD_Reference_ID = (SELECT c.AD_Reference_Value_ID
+                                                              FROM AD_Column c
+                                                             INNER JOIN AD_Table t
+                                                                    ON (t.AD_Table_ID = c.AD_Table_ID)
+                                                             WHERE t.TableName  = 'C_ExpectedCost'
+                                                               AND c.ColumnName = 'LandedCostDistribution')";
+                DataSet ds = DB.ExecuteDataset(sql, null, null);
+                if (ds == null || ds.Tables.Count == 0) return map;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    string code = Util.GetValueOfString(r["Code"]);
+                    if (!string.IsNullOrEmpty(code) && !map.ContainsKey(code))
+                        map[code] = Util.GetValueOfString(r["Name"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: the client falls back to its own method labels.
+                _log.Severe("LoadDistributionNames: " + ex.Message);
+            }
+            return map;
         }
 
         /// <summary>
@@ -2391,8 +2655,10 @@ namespace VASLogic.Models
             public decimal  QtyEntered     { get; set; }   // C_OrderLine.QtyEntered (entered UOM) — the displayed qty
             public decimal  QtyOrdered     { get; set; }
             public decimal  QtyDelivered   { get; set; }
-            /// <summary>Σ M_InOutLine.QtyEntered over completed receipts — the
-            /// received quantity on the same (entered) scale as QtyEntered.</summary>
+            /// <summary>Σ M_InOutLine.MovementQty over completed receipts, converted
+            /// with the line's entered / base ratio — the received quantity on the
+            /// same (entered) scale and unit as QtyEntered, whichever UOM the
+            /// receipt itself was keyed in.</summary>
             public decimal  QtyReceivedEntered { get; set; }
             public decimal  QtyInvoiced    { get; set; }
             public decimal  PriceActual    { get; set; }
@@ -2419,6 +2685,9 @@ namespace VASLogic.Models
             public string   ComponentName      { get; set; }   // cost element / charge name
             public string   SourceLabel        { get; set; }   // vendor / reference sub-label
             public string   DistributionCode   { get; set; }   // raw LandedCostDistribution (I/Q/W/V/L/C)
+            /// <summary>AD_Ref_List name of <see cref="DistributionCode"/> for
+            /// C_ExpectedCost.LandedCostDistribution — the label the panel shows.</summary>
+            public string   DistributionName   { get; set; }
             public decimal  ExpectedAmt        { get; set; }   // budgeted amount (0 if none)
             public decimal? ActualAmt          { get; set; }   // null = awaiting invoice
             public decimal? VarianceAmt        { get; set; }   // null until actualised
@@ -2546,8 +2815,18 @@ namespace VASLogic.Models
             public decimal   TaxAmt          { get; set; }   // SUM(C_OrderTax.TaxAmt)
 
             // Stat-strip aggregates
+            /// <summary>Σ C_OrderLine.QtyEntered over item lines — the ordered
+            /// quantity in the entered (selected) UOM, the scale the line rows
+            /// show.</summary>
             public decimal   TotalQtyOrdered        { get; set; }
+            /// <summary>Received quantity converted onto the same entered-UOM
+            /// scale as <see cref="TotalQtyOrdered"/>.</summary>
             public decimal   TotalQtyDelivered      { get; set; }
+            /// <summary>The unit both quantities are in, when every item line of
+            /// the order shares one UOM; empty on a mixed-UOM order.</summary>
+            public string    QtyUOMSymbol           { get; set; }
+            /// <summary>Decimal places for the entered-UOM quantities (C_UOM.StdPrecision).</summary>
+            public int       QtyPrecision           { get; set; }
             public decimal   TotalQtyInvoiced       { get; set; }
             public int       LineCount              { get; set; }
             public int       FullyReceivedLineCount { get; set; }
@@ -2562,6 +2841,10 @@ namespace VASLogic.Models
             public int       RequisitionCount     { get; set; }   // distinct requisitions
             public int       ContractMasterId     { get; set; }   // C_Order.VAS_ContractMaster_ID
             public string    ContractMasterNo     { get; set; }
+            // MRP plan run the order was generated by (VAMRP_PlanRun_ID).
+            public int       PlanRunId            { get; set; }
+            public string    PlanRunNo            { get; set; }
+            public int       PlanRunCount         { get; set; }   // distinct plan runs
             /// <summary>True when the requisition was reached through the RFQ
             /// (Requisition -> RFQ -> PO) rather than raised into the PO directly.</summary>
             public bool      IsRequisitionViaRfq  { get; set; }

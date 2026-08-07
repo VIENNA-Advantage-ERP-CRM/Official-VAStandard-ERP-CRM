@@ -196,6 +196,7 @@
 @import "../VAS_123_QuotationRightPanel.css";
 
 @import "../VAS_106_OverviewSalesOrder.css";
+@import "../VAS_189_ARInvoiceDetailPanel.css";
 @import "../VAS_156_CountedMTDWidget.css";
 @import "../VAS_157_VarianceLinesWidget.css";
 @import "../VAS_158_OpenCountSheetsWidget.css";
@@ -207,3 +208,22 @@
 @import "../VAS_164_StockSearchWidget.css";
 @import "../VAS_165_LocationWiseInventoryCountWidget.css";
 @import "../VAS_166_NewCycleCountWidget.css";
+@import "../VAS_178_NewMaterialIssueQuickAction.css";
+@import "../VAS_179_OpenMaterialIssuesWidget.css";
+@import "../VAS_180_IssuedMTDWidget.css";
+@import "../VAS_181_ProductionIssuesWidget.css";
+@import "../VAS_182_SparesConsumablesIssuesWidget.css";
+@import "../VAS_183_MaterialConsumptionWidget.css";
+@import "../VAS_184_HighValueUsageWidget.css";
+@import "../VAS_185_InventoryUseTrendWidget.css";
+@import "../VAS_186_ProductCategoryUsageWidget.css";
+@import "../VAS_187_RecentInventoryUseWidget.css";
+@import "../VAS_188_TopUsedProductsWidget.css";
+@import "../VAS_167_NewTransferQuickActionWidget.css";
+@import "../VAS_168_OpenTransfersWidget.css";
+@import "../VAS_169_UnderConfirmationWidget.css";
+@import "../VAS_170_CompletedTodayWidget.css";
+@import "../VAS_171_InitiatedMTDWidget.css";
+@import "../VAS_172_PendingTransferConfirmationWidget.css";
+@import "../VAS_173_TransfersByWarehouseWidget.css";
+@import "../VAS_174_TransferQueueWidget.css";
