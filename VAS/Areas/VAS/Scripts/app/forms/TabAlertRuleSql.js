@@ -37,6 +37,7 @@
         var $joinMultiSelect = $("<div class='vas-join-multiselect'>");
         var $sqlResultDiv = $("<div class='vas-sql-result-msg'>");
         var sqlPagingDiv = $("<div class='vas-sql-result-bottom'>");
+        var $sqlBtn = null;
         var $sqlGeneratorBtn = null;
         var $testSqlGeneratorBtn = null;
         var $testSqlBtn = null;
