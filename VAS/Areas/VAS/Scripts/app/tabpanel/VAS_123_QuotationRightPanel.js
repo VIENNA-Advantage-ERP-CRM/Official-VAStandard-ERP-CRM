@@ -927,6 +927,12 @@
             var orders    = state.generatedOrders || [];
             var docStatus = h.docStatus || '';
 
+            // §2.1a: also hide on voided records when no orders exist
+            if (!orders.length && docStatus === 'VO') {
+                container.innerHTML = '';
+                return;
+            }
+
             // Spec §2.1: hide entire section while Drafted/In Progress when no orders exist
             if (!orders.length && (docStatus === 'DR' || docStatus === 'IP')) {
                 container.innerHTML = '';
@@ -1009,9 +1015,16 @@
             var h = state.header;
             if (!h) { container.innerHTML = ''; return; }
 
-            var opp      = state.opportunity;
-            var oppId    = opp ? toNum(opp.vAS_Opportunity_ID || opp.VAS_Opportunity_ID) : 0;
-            var isLinked = (oppId > 0);
+            var docStatusOpp = h.docStatus || '';
+            var opp          = state.opportunity;
+            var oppId        = opp ? toNum(opp.vAS_Opportunity_ID || opp.VAS_Opportunity_ID) : 0;
+            var isLinked     = (oppId > 0);
+
+            // §2.2: hide when no linked opportunity and record is completed/closed/voided
+            if (!isLinked && (docStatusOpp === 'CO' || docStatusOpp === 'CL' || docStatusOpp === 'VO')) {
+                container.innerHTML = '';
+                return;
+            }
 
             var actionHtml = '';
             var bodyHtml;
@@ -1065,10 +1078,7 @@
                         '</div>' +
                     '</div>';
             } else {
-                actionHtml =
-                    '<button class="vas_123_qrp-sh-action" data-action="linkOpportunity">' +
-                        SVG_PLUS + esc(msg('VAS_123_LinkOpportunity')) +
-                    '</button>';
+                actionHtml = '';
                 bodyHtml = '<p class="vas_123_qrp-emptyline">' + esc(msg('VAS_123_OpportunityEmpty')) + '</p>';
             }
 
@@ -1099,12 +1109,13 @@
             var sym       = h.currencySymbol || '';
             var prec      = (h.currencyPrecision != null) ? parseInt(h.currencyPrecision, 10) : 2;
 
-            // Add line button is visible only while document is editable
-            var addBtnHtml = editable
-                ? '<button class="vas_123_qrp-sh-action" data-action="addLine">' +
-                      SVG_PLUS + esc(msg('VAS_123_AddLine')) +
-                  '</button>'
-                : '';
+            // §2.3: hide lines section when empty and record is closed/voided
+            if (!lines.length && (docStatus === 'CL' || docStatus === 'VO')) {
+                container.innerHTML = '';
+                return;
+            }
+
+            var addBtnHtml = '';
 
             var bodyHtml;
             if (!lines.length) {
@@ -1418,7 +1429,16 @@
             var h = state.header;
             if (!h) { container.innerHTML = ''; return; }
 
-            var allTasks = state.tasks || [];
+            var allTasks     = state.tasks || [];
+            var taskDocSt    = h.docStatus || '';
+            var taskEditable = (taskDocSt === 'DR' || taskDocSt === 'IP');
+
+            // §3.2: hide section when no tasks and record is not editable (CO/CL/VO)
+            if (!allTasks.length && !taskEditable) {
+                container.innerHTML = '';
+                return;
+            }
+
             var upcoming = [];
             var previous = [];
             for (var i = 0; i < allTasks.length; i++) {
@@ -1444,6 +1464,8 @@
                 '<button class="vas_123_qrp-sh-action" data-action="newTask">' +
                     SVG_PLUS + esc(msg('VAS_123_NewTask')) +
                 '</button>';
+            // Suppress entry point on non-editable records (CO/CL/VO)
+            if (!taskEditable) { newTaskBtnHtml = ''; }
 
             var bodyHtml;
             if (!listToShow.length) {
@@ -1516,9 +1538,17 @@
             var h = state.header;
             if (!h) { container.innerHTML = ''; return; }
 
-            var engData = state.engagement || { counts: { total: 0 }, items: [] };
-            var counts  = engData.counts || {};
-            var items   = Array.isArray(engData.items) ? engData.items : [];
+            var engData     = state.engagement || { counts: { total: 0 }, items: [] };
+            var counts      = engData.counts || {};
+            var items       = Array.isArray(engData.items) ? engData.items : [];
+            var engDocSt    = h.docStatus || '';
+            var engEditable = (engDocSt === 'DR' || engDocSt === 'IP');
+
+            // §3.3: hide engagement section when no items and record is not editable (CO/CL/VO)
+            if (!items.length && !engEditable) {
+                container.innerHTML = '';
+                return;
+            }
 
             // ── SVG icons (inline, no external dependency) ───────────────────
             var SVG_LIST      = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>';
@@ -2536,15 +2566,20 @@
             showModal(title, meta, bodyHtml, footHtml, false);
         }
 
-        // ── Action: Open converted/linked order record in platform viewer ─────
+        // ── Action: Open a Sales Order record in the platform window viewer ───
         function openOrderRecord(orderId) {
-            if (!orderId || !window.VIS) return;
-            if (VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
-                var q = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
-                    ? VIS.Query.prototype.getEqualQuery('C_Order_ID', orderId)
-                    : null;
-                VIS.viewManager.startWindow('VAS_SalesOrder', q);
-            }
+            if (!orderId || +orderId <= 0 || !window.VIS) return;
+            try {
+                var windowId = 0;
+                if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === 'function') {
+                    // isSOTrx = true → Sales Order window (not Purchase Order window)
+                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID('C_Order', 0, null, true) || 0;
+                }
+                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
+                    var zoomQuery = VIS.Query.prototype.getEqualQuery('C_Order_ID', +orderId);
+                    VIS.viewManager.startWindow(windowId, zoomQuery);
+                }
+            } catch (e) { }
         }
 
         // ── Instance method: Initialize — builds DOM and wires events ───────────

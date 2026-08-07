@@ -431,7 +431,7 @@
             var $panel = $('<section class="vas-obl-panel" aria-label="Invoice Lines and Summary"></section>');
 
             var $header = $('<header class="vas-obl-panel__header"></header>');
-            $header.append('<div><h2 class="vas-obl-panel__title">' + esc(lbl("VAS_107_OrderLinesSummary", "Order Lines & Summary")) + '</h2></div>');
+            $header.append('<div><h2 class="vas-obl-panel__title">' + esc(lbl("VAS_107_OrderLinesSummary", "Quotation Lines & Summary")) + '</h2></div>');
 
             var $actions = $('<div class="vas-obl-panel__actions"></div>');
             // Scan hidden for now (handler/markup kept so it can be re-enabled by
