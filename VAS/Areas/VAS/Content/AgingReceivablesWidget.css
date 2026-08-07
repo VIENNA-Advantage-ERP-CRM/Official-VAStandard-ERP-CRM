@@ -176,7 +176,7 @@
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    gap: 0.525em;
+    gap: 0.425em;
 }
 
 .vas-ar-loading {

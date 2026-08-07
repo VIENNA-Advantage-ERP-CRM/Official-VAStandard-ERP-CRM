@@ -1,8 +1,8 @@
-/************************************************************
+﻿/************************************************************
  * Module Name : VAS
  * Purpose     : Styles for the Internal Use / Material Issue Overview tab panel
- *               (VAS.VAS_102_OverviewInternalUse). All classes are MPC-prefixed
- *               (MPC-vasiu-*) and scoped under the panel root to avoid global
+ *               (VAS.VAS_102_OverviewInternalUse). All classes are panel-prefixed
+ *               (vas_102-*) and scoped under the panel root to avoid global
  *               collisions. Shares the Onfinity windows-and-panels em-anchored
  *               body language with VAS_100 / VAS_101 — Roboto, white surfaces,
  *               soft blue borders, KPI tiles with accent rails, pastel stepper,
@@ -15,9 +15,51 @@
  *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
  *                        columns with a divider between them (stacking to a
  *                        bottom rule when narrow), plus its RTL mirror.
+ *   VAI163   2026-07-29  Enlarged the panel title (.vas_102-hdrTitle
+ *                        1.25em -> 1.4em), matching VAS_099_OverviewGRN. Added
+ *                        the References card (.vas_102-refCard) and the status
+ *                        card caption (.vas_102-statSub) that carries the line
+ *                        count now the Partial / Short values are quantities.
+ *                        Dropped the segmented filter, the action buttons and the
+ *                        empty-table row — all three are gone from the panel.
+ *   VAI163   2026-07-29  Added the Notes card (.vas_102-textCard) and the
+ *                        Activity list (.vas_102-actList) with its tag tones,
+ *                        plus the purple tone the "posted" tag needs.
+ *   VAI163   2026-07-29  Added the line-item Attribute Set Instance sub-line
+ *                        (.vas_102-itAttr) and the issue-lines pager
+ *                        (.vas_102-pager), a sibling of the table so the
+ *                        controls stay put while the table scrolls.
+ *   VAI163   2026-07-29  References card reworked: icon-bubble entries
+ *                        (.vas_102-refItem / -refIco / -refTxt) that only
+ *                        render for links that exist, plus the "nothing linked"
+ *                        line (.vas_102-refEmpty) that replaces the old row of
+ *                        N/A cells.
+ *   VAI163   2026-07-31  Header aligned to the VAS_092 Purchase Order Overview
+ *                        standard: details card is 40%/1fr (was 1.4fr/1fr) and
+ *                        its field column (-hdrColR) is a two-across grid
+ *                        instead of a single tall stack, collapsing to one
+ *                        column under 460px. Field values wrap rather than
+ *                        ellipsis-truncate now that the column is narrower.
+ *   VAI163   2026-08-03  Activity e-mail rows: a recipient sub-line
+ *                        (.vas_102-actLead / -actSub) and a message body that
+ *                        opens on click (.vas_102-actRow.is-openable /
+ *                        -actCaret / -actBody / -actMeta). Only an openable row
+ *                        widens to a fourth column, so every other entry keeps
+ *                        the tag | what happened | when layout.
+ *   VAI163   2026-08-05  Added the Reference chip strip (.vas_102-genfrom /
+ *                        -gfLabel / -gfChips / -chip / -chipLabel / -chipVal /
+ *                        -chipPill), mirroring the VAS_092 Generated From
+ *                        strip, with a clickable .is-link variant and the
+ *                        record-open toast (.vas_102-toast). Locator cells
+ *                        ellipsise (.vas_102-itLoc) with the full name on a
+ *                        tooltip. The old References card rules (-refCard /
+ *                        -refItem / -refIco / -refTxt / -refEmpty) are no
+ *                        longer used by the panel.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vasiu- -> vas_102- so the panel's
+ *                        styles cannot collide with another panel's.
  ***********************************************************/
 
-.MPC-vasiu-root {
+.vas_102-root {
     /* Canonical palette */
     --iu-text:        #102C3F;
     --iu-muted:       #5F7283;
@@ -33,6 +75,7 @@
     --iu-success-bg:  #E9F6EE;  --iu-success-tx: #0B6B45;
     --iu-warning-bg:  #FFF6E2;  --iu-warning-tx: #9A6500;
     --iu-risk-bg:     #FCEFEF;  --iu-risk-tx:    #D14545;
+    --iu-purple-bg:   #EDE9FF;  --iu-purple-tx:  #5F4AA6;
     --iu-neutral-bg:  #EEF1F4;  --iu-neutral-tx: #5F7283;
 
     position: relative;
@@ -44,9 +87,9 @@
     box-sizing: border-box;
 }
 
-.MPC-vasiu-root * { box-sizing: border-box; }
+.vas_102-root * { box-sizing: border-box; }
 
-.MPC-vasiu-body {
+.vas_102-body {
     font-size: clamp(15px, 2.8cqi, 17px);
     padding: 1.125em 0.875em;
     display: flex;
@@ -54,7 +97,7 @@
     gap: 0.875em;
 }
 
-.MPC-vasiu-empty {
+.vas_102-empty {
     padding: 40px 18px;
     text-align: center;
     color: var(--iu-muted);
@@ -64,9 +107,9 @@
 /* ----------------------------------------------------------- */
 /*  Section + Section Header                                    */
 /* ----------------------------------------------------------- */
-.MPC-vasiu-sec { display: block; }
+.vas_102-sec { display: block; }
 
-.MPC-vasiu-secHead {
+.vas_102-secHead {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -74,7 +117,7 @@
     margin-bottom: 0.5em;
 }
 
-.MPC-vasiu-secTitle {
+.vas_102-secTitle {
     font-size: 1em;
     font-weight: 700;
     color: var(--iu-text);
@@ -83,7 +126,7 @@
     flex: 1 1 auto;
 }
 
-.MPC-vasiu-secSummary {
+.vas_102-secSummary {
     font-size: 0.75em;
     font-weight: 400;
     color: var(--iu-muted);
@@ -93,40 +136,40 @@
 /* ----------------------------------------------------------- */
 /*  Icon wrapper                                               */
 /* ----------------------------------------------------------- */
-.MPC-vasiu-ic { display: inline-flex; align-items: center; flex: none; }
-.MPC-vasiu-ic svg { display: block; }
+.vas_102-ic { display: inline-flex; align-items: center; flex: none; }
+.vas_102-ic svg { display: block; }
 
 /* ----------------------------------------------------------- */
 /*  Header — title strip                                        */
 /* ----------------------------------------------------------- */
-.MPC-vasiu-hdr {
+.vas_102-hdr {
     border-radius: 14px;
     padding: 0.875em 1em;
 }
 
-.MPC-vasiu-hdrTop {
+.vas_102-hdrTop {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.875em;
 }
 
-.MPC-vasiu-hdrTitleWrap { min-width: 0; }
+.vas_102-hdrTitleWrap { min-width: 0; }
 
-.MPC-vasiu-hdrTitle {
+.vas_102-hdrTitle {
     font-size: 1.25em;
     font-weight: 700;
     color: var(--iu-text);
     line-height: 1.2;
 }
 
-.MPC-vasiu-hdrSub {
+.vas_102-hdrSub {
     font-size: 0.75em;
     color: var(--iu-sub);
     margin-top: 0.3125em;
 }
 
-.MPC-vasiu-hdrPills {
+.vas_102-hdrPills {
     flex: none;
     display: flex;
     align-items: center;
@@ -135,7 +178,7 @@
     gap: 0.5em;
 }
 
-.MPC-vasiu-hdrPill {
+.vas_102-hdrPill {
     display: inline-flex;
     align-items: center;
     gap: 0.3125em;
@@ -147,15 +190,15 @@
     white-space: nowrap;
 }
 
-.MPC-vasiu-hdrPill.tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
-.MPC-vasiu-hdrPill.tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
-.MPC-vasiu-hdrPill.tone-warning { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
-.MPC-vasiu-hdrPill.tone-risk    { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
-.MPC-vasiu-hdrPill.tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
+.vas_102-hdrPill.tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
+.vas_102-hdrPill.tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.vas_102-hdrPill.tone-warning { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
+.vas_102-hdrPill.tone-risk    { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
+.vas_102-hdrPill.tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
 
-.MPC-vasiu-hdrPill .MPC-vasiu-ic { color: currentColor; }
+.vas_102-hdrPill .vas_102-ic { color: currentColor; }
 
-.MPC-vasiu-hdrDot {
+.vas_102-hdrDot {
     width: 0.5em;
     height: 0.5em;
     border-radius: 50%;
@@ -166,9 +209,12 @@
 /* ----------------------------------------------------------- */
 /*  Header — details card (warehouse | document)               */
 /* ----------------------------------------------------------- */
-.MPC-vasiu-hdrCard {
+/* Identity takes 40% of the card; the fields take the rest and run two across,
+   so short fields sit in rows instead of stacking into a tall column that
+   leaves the identity half empty. */
+.vas_102-hdrCard {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: 40% 1fr;
     gap: 0.875em 1.75em;
     border: 1px solid var(--iu-card-bd);
     border-radius: var(--iu-card-radius);
@@ -176,18 +222,19 @@
     padding: 0.875em 1em;
 }
 
-.MPC-vasiu-hdrColL { min-width: 0; border-right: 1px solid var(--iu-row-div); padding-right: 1.25em; }
+.vas_102-hdrColL { min-width: 0; border-right: 1px solid var(--iu-row-div); padding-right: 1.25em; }
 
-.MPC-vasiu-hdrColR {
+.vas_102-hdrColR {
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.625em;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75em 1.5em;
+    align-content: start;
 }
 
-.MPC-vasiu-hdrField { min-width: 0; }
+.vas_102-hdrField { min-width: 0; }
 
-.MPC-vasiu-fLabel {
+.vas_102-fLabel {
     font-size: 0.6875em;
     font-weight: 700;
     letter-spacing: .4px;
@@ -196,35 +243,36 @@
     line-height: 1.3;
 }
 
-.MPC-vasiu-fVal {
+.vas_102-fVal {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--iu-text);
     line-height: 1.35;
     margin-top: 0.125em;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
 }
-.MPC-vasiu-fVal.is-link { color: var(--iu-link); }
+.vas_102-fVal.is-link { color: var(--iu-link); }
 
 @container (max-width: 460px) {
-    .MPC-vasiu-hdrCard { grid-template-columns: 1fr; }
-    .MPC-vasiu-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--iu-row-div); padding-bottom: 0.75em; }
-    .MPC-vasiu-hdrTop  { flex-direction: column; }
-    .MPC-vasiu-hdrPills { justify-content: flex-start; }
+    .vas_102-hdrCard { grid-template-columns: 1fr; }
+    .vas_102-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--iu-row-div); padding-bottom: 0.75em; }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .vas_102-hdrColR { grid-template-columns: 1fr; }
+    .vas_102-hdrTop  { flex-direction: column; }
+    .vas_102-hdrPills { justify-content: flex-start; }
 }
 
 /* ----------------------------------------------------------- */
 /*  Warehouse identity                                          */
 /* ----------------------------------------------------------- */
-.MPC-vasiu-vendName {
+.vas_102-vendName {
     font-size: 0.9375em;
     font-weight: 700;
     color: var(--iu-text);
     margin-top: 0.1875em;
 }
 
-.MPC-vasiu-vendContact {
+.vas_102-vendContact {
     display: flex;
     flex-wrap: wrap;
     gap: 0.375em 1.125em;
@@ -232,19 +280,170 @@
     color: var(--iu-text);
     margin-top: 0.375em;
 }
-.MPC-vasiu-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
-.MPC-vasiu-contactBit .MPC-vasiu-ic { color: var(--iu-action); }
+.vas_102-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.vas_102-contactBit .vas_102-ic { color: var(--iu-action); }
+
+/* ----------------------------------------------------------- */
+/*  References card (work order / requisition links)            */
+/* ----------------------------------------------------------- */
+/* Each reference is an icon bubble + label + value. Only links that exist are
+   rendered, so the grid sizes itself to the real content instead of stretching
+   a row of empty cells across the panel. */
+/* ----------------------------------------------------------- */
+/*  Reference (source-document chip strip)                      */
+/* ----------------------------------------------------------- */
+/* Mirrors the Purchase Order overview's Generated From strip: a labelled row
+   of chips, each naming a source document and opening it on click. */
+.vas_102-genfrom {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em 0.875em;
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #F6FAF6;
+    padding: 0.625em 0.75em;
+}
+
+.vas_102-gfLabel {
+    flex: none;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--iu-muted);
+}
+
+.vas_102-gfChips {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    min-width: 0;
+}
+
+/* Chip: white pill with a leading (tinted) icon, grey label, dark value and an
+   optional trailing pill. */
+.vas_102-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    background: #fff;
+    border: 1px solid var(--iu-card-bd);
+    border-radius: 8px;
+    padding: 0.3125em 0.5625em;
+    font-size: 0.75em;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.vas_102-chip .vas_102-ic            { color: var(--iu-muted); }
+.vas_102-chip.ic-info    .vas_102-ic { color: var(--iu-info-tx); }
+.vas_102-chip.ic-success .vas_102-ic { color: var(--iu-success-tx); }
+.vas_102-chip.ic-warning .vas_102-ic { color: var(--iu-warning-tx); }
+.vas_102-chip.ic-purple  .vas_102-ic { color: var(--iu-purple-tx); }
+.vas_102-chip.ic-muted   .vas_102-ic { color: var(--iu-muted); }
+
+.vas_102-chipLabel { color: var(--iu-muted); }
+.vas_102-chipVal   { color: var(--iu-text); font-weight: 700; }
+
+/* Trailing pill on a chip (e.g. the work order's own reference). */
+.vas_102-chipPill {
+    margin-left: 0.0625em;
+    border-radius: 999px;
+    padding: 0.0625em 0.4375em;
+    font-size: 0.9167em;
+    font-weight: 700;
+    max-width: 14em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.vas_102-chipPill.tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
+.vas_102-chipPill.tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
+.vas_102-chipPill.tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+
+/* Clickable origin chip — opens the source record. */
+.vas_102-chip.is-link { cursor: pointer; }
+.vas_102-chip.is-link:hover {
+    border-color: var(--iu-action);
+    box-shadow: 0 0 0 1px var(--iu-action) inset;
+}
+.vas_102-chip.is-link > .vas_102-ic:last-child { color: var(--iu-action); }
+
+/* Record-open failure notice. */
+.vas_102-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 1.25em;
+    transform: translate(-50%, 0.75em);
+    max-width: 90%;
+    border-radius: 8px;
+    padding: 0.5em 0.875em;
+    font-size: 0.8125em;
+    color: #fff;
+    background: var(--iu-text);
+    opacity: 0;
+    transition: opacity .2s ease, transform .2s ease;
+    pointer-events: none;
+    z-index: 1000;
+}
+.vas_102-toast.err  { background: var(--iu-risk-tx); }
+.vas_102-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.vas_102-refCard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13em, 1fr));
+    gap: 0.875em 1.25em;
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+.vas_102-refCard.is-empty { display: block; }
+
+.vas_102-refItem {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas_102-refIco {
+    flex: none;
+    width: 1.875em;
+    height: 1.875em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--iu-info-bg);
+    color: var(--iu-info-tx);
+    margin-top: 0.0625em;
+}
+
+.vas_102-refTxt { min-width: 0; }
+.vas_102-refTxt .vas_102-fVal { white-space: nowrap; }
+
+/* Nothing linked: one explanatory line, not a wall of N/A. */
+.vas_102-refEmpty {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: 0.8125em;
+    color: var(--iu-muted);
+}
+.vas_102-refEmpty .vas_102-ic { color: var(--iu-muted); }
 
 /* ----------------------------------------------------------- */
 /*  Snapshot (KPI metric grid)                                  */
 /* ----------------------------------------------------------- */
-.MPC-vasiu-snap {
+.vas_102-snap {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 0.75em;
 }
 
-.MPC-vasiu-metric {
+.vas_102-metric {
     min-width: 0;
     border: 1px solid var(--iu-card-bd);
     border-left: 3px solid var(--iu-neutral-tx);
@@ -253,19 +452,19 @@
     padding: 0.75em 0.875em;
 }
 
-.MPC-vasiu-metric.tone-total   { border-left-color: var(--iu-info-tx); }
-.MPC-vasiu-metric.tone-issued  { border-left-color: var(--iu-success-tx); }
-.MPC-vasiu-metric.tone-lines   { border-left-color: var(--iu-neutral-tx); }
-.MPC-vasiu-metric.tone-pending { border-left-color: #E08A1E; }
+.vas_102-metric.tone-total   { border-left-color: var(--iu-info-tx); }
+.vas_102-metric.tone-issued  { border-left-color: var(--iu-success-tx); }
+.vas_102-metric.tone-lines   { border-left-color: var(--iu-neutral-tx); }
+.vas_102-metric.tone-pending { border-left-color: #E08A1E; }
 
-.MPC-vasiu-mHead {
+.vas_102-mHead {
     display: flex;
     align-items: center;
     gap: 0.375em;
     margin-bottom: 0.375em;
 }
 
-.MPC-vasiu-mLabel {
+.vas_102-mLabel {
     min-width: 0;
     font-size: 0.6875em;
     font-weight: 700;
@@ -277,12 +476,12 @@
     white-space: nowrap;
 }
 
-.MPC-vasiu-metric.tone-total   .MPC-vasiu-mHead .MPC-vasiu-ic { color: var(--iu-info-tx); }
-.MPC-vasiu-metric.tone-issued  .MPC-vasiu-mHead .MPC-vasiu-ic { color: var(--iu-success-tx); }
-.MPC-vasiu-metric.tone-lines   .MPC-vasiu-mHead .MPC-vasiu-ic { color: var(--iu-neutral-tx); }
-.MPC-vasiu-metric.tone-pending .MPC-vasiu-mHead .MPC-vasiu-ic { color: #E08A1E; }
+.vas_102-metric.tone-total   .vas_102-mHead .vas_102-ic { color: var(--iu-info-tx); }
+.vas_102-metric.tone-issued  .vas_102-mHead .vas_102-ic { color: var(--iu-success-tx); }
+.vas_102-metric.tone-lines   .vas_102-mHead .vas_102-ic { color: var(--iu-neutral-tx); }
+.vas_102-metric.tone-pending .vas_102-mHead .vas_102-ic { color: #E08A1E; }
 
-.MPC-vasiu-mVal {
+.vas_102-mVal {
     font-size: 1.25em;
     font-weight: 700;
     color: var(--iu-text);
@@ -291,10 +490,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.MPC-vasiu-metric.tone-issued  .MPC-vasiu-mVal { color: var(--iu-success-tx); }
-.MPC-vasiu-metric.tone-pending .MPC-vasiu-mVal { color: #9A6500; }
+.vas_102-metric.tone-issued  .vas_102-mVal { color: var(--iu-success-tx); }
+.vas_102-metric.tone-pending .vas_102-mVal { color: #9A6500; }
 
-.MPC-vasiu-mSub {
+.vas_102-mSub {
     font-size: 0.6875em;
     color: var(--iu-muted);
     margin-top: 0.25em;
@@ -304,53 +503,27 @@
 }
 
 @container (max-width: 620px) {
-    .MPC-vasiu-snap { grid-template-columns: repeat(2, 1fr); }
+    .vas_102-snap { grid-template-columns: repeat(2, 1fr); }
 }
 @container (max-width: 340px) {
-    .MPC-vasiu-snap { grid-template-columns: 1fr; }
+    .vas_102-snap { grid-template-columns: 1fr; }
 }
 
-/* ----------------------------------------------------------- */
-/*  Status summary cards (Full / Partial / Short / Lines)       */
-/* ----------------------------------------------------------- */
-.MPC-vasiu-status {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.75em;
-}
-
-.MPC-vasiu-statCard {
-    min-width: 0;
-    border: 1px solid var(--iu-card-bd);
-    border-radius: var(--iu-card-radius);
-    background: #FBFDFF;
-    padding: 0.625em 0.75em;
-    text-align: center;
-}
-.MPC-vasiu-statVal { font-size: 1.25em; font-weight: 700; line-height: 1.1; color: var(--iu-text); }
-.MPC-vasiu-statLbl { font-size: 0.6875em; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--iu-muted); margin-top: 0.25em; }
-
-.MPC-vasiu-statCard.tone-full    .MPC-vasiu-statVal { color: var(--iu-success-tx); }
-.MPC-vasiu-statCard.tone-partial .MPC-vasiu-statVal { color: #9A6500; }
-.MPC-vasiu-statCard.tone-short   .MPC-vasiu-statVal { color: var(--iu-risk-tx); }
-
-@container (max-width: 620px) {
-    .MPC-vasiu-status { grid-template-columns: repeat(2, 1fr); }
-}
-@container (max-width: 340px) {
-    .MPC-vasiu-status { grid-template-columns: 1fr; }
-}
+/* The Full / Partial / Short / Lines status cards (.vas_102-status /
+   -statCard / -statVal / -statLbl / -statSub) are gone with the row they
+   styled — the KPI snapshot and the per-row status tags already carry every
+   figure they showed. */
 
 /* ----------------------------------------------------------- */
 /*  Issue timeline (3-node stepper)                             */
 /* ----------------------------------------------------------- */
-.MPC-vasiu-stepper {
+.vas_102-stepper {
     display: flex;
     align-items: flex-start;
     gap: 0;
 }
 
-.MPC-vasiu-step {
+.vas_102-step {
     flex: 1 1 0;
     min-width: 0;
     display: flex;
@@ -358,25 +531,25 @@
     align-items: center;
 }
 
-.MPC-vasiu-stepRail {
+.vas_102-stepRail {
     display: flex;
     align-items: center;
     width: 100%;
 }
 
-.MPC-vasiu-stepLine {
+.vas_102-stepLine {
     flex: 1 1 auto;
     height: 2px;
     background: #D9E6F2;
 }
-.MPC-vasiu-step:first-child .MPC-vasiu-stepLine-l,
-.MPC-vasiu-step:last-child  .MPC-vasiu-stepLine-r { visibility: hidden; }
+.vas_102-step:first-child .vas_102-stepLine-l,
+.vas_102-step:last-child  .vas_102-stepLine-r { visibility: hidden; }
 
-.MPC-vasiu-step.is-done   .MPC-vasiu-stepLine-r,
-.MPC-vasiu-step.is-done   .MPC-vasiu-stepLine-l,
-.MPC-vasiu-step.is-active .MPC-vasiu-stepLine-l { background: #67B98A; }
+.vas_102-step.is-done   .vas_102-stepLine-r,
+.vas_102-step.is-done   .vas_102-stepLine-l,
+.vas_102-step.is-active .vas_102-stepLine-l { background: #67B98A; }
 
-.MPC-vasiu-stepDot {
+.vas_102-stepDot {
     flex: none;
     width: 2em;
     height: 2em;
@@ -391,72 +564,50 @@
     color: #8A99A8;
     border: 1.5px solid #DCE5EE;
 }
-.MPC-vasiu-stepDot .MPC-vasiu-ic { display: inline-flex; }
+.vas_102-stepDot .vas_102-ic { display: inline-flex; }
 
-.MPC-vasiu-step.is-done .MPC-vasiu-stepDot {
+.vas_102-step.is-done .vas_102-stepDot {
     background: #E4F3EC;
     color: #1F9D5B;
     border-color: #BFE6D2;
 }
-.MPC-vasiu-step.is-active .MPC-vasiu-stepDot {
+.vas_102-step.is-active .vas_102-stepDot {
     background: #fff;
     color: #E08A1E;
     border: 2px solid #F0A93D;
 }
 
-.MPC-vasiu-stepLabel {
+.vas_102-stepLabel {
     margin-top: 0.5em;
     text-align: center;
     padding: 0 0.25em;
     min-width: 0;
 }
 
-.MPC-vasiu-stepTitle {
+.vas_102-stepTitle {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--iu-text);
 }
 
-.MPC-vasiu-stepMeta {
+.vas_102-stepMeta {
     font-size: 0.6875em;
     color: var(--iu-muted);
     margin-top: 0.25em;
 }
-.MPC-vasiu-step.is-active .MPC-vasiu-stepMeta { color: #E08A1E; font-weight: 600; }
-
-/* ----------------------------------------------------------- */
-/*  Segmented filter (All lines / Pending only)                */
-/* ----------------------------------------------------------- */
-.MPC-vasiu-seg {
-    flex: none;
-    display: inline-flex;
-    border: 1px solid #BFE4FF;
-    border-radius: 999px;
-    overflow: hidden;
-}
-.MPC-vasiu-seg button {
-    border: none;
-    background: #fff;
-    color: var(--iu-link);
-    font-family: inherit;
-    font-size: 0.6875em;
-    font-weight: 700;
-    padding: 0.4375em 0.875em;
-    cursor: pointer;
-}
-.MPC-vasiu-seg button.on { background: var(--iu-info-bg); color: var(--iu-info-tx); }
+.vas_102-step.is-active .vas_102-stepMeta { color: #E08A1E; font-weight: 600; }
 
 /* ----------------------------------------------------------- */
 /*  Issue line table                                           */
 /* ----------------------------------------------------------- */
-.MPC-vasiu-table {
+.vas_102-table {
     border: 1px solid var(--iu-card-bd);
     border-radius: var(--iu-card-radius);
     background: #fff;
     overflow: hidden;
 }
 
-.MPC-vasiu-tRow {
+.vas_102-tRow {
     display: grid;
     align-items: center;
     gap: 0.625em;
@@ -464,7 +615,7 @@
     grid-template-columns: 2.2fr 1fr 0.7fr 0.9fr 0.9fr 0.9fr 1.1fr 0.9fr;
 }
 
-.MPC-vasiu-tHead {
+.vas_102-tHead {
     background: #F5F8FB;
     border-bottom: 1px solid var(--iu-card-bd);
     font-size: 0.6875em;
@@ -474,19 +625,19 @@
     color: var(--iu-muted);
 }
 
-.MPC-vasiu-tBody {
+.vas_102-tBody {
     border-bottom: 1px solid var(--iu-row-div);
     font-size: 0.8125em;
     color: var(--iu-text);
 }
-.MPC-vasiu-tBody:last-of-type { border-bottom: none; }
-.MPC-vasiu-tBody:hover { background: #FAFCFE; }
+.vas_102-tBody:last-of-type { border-bottom: none; }
+.vas_102-tBody:hover { background: #FAFCFE; }
 
-.MPC-vasiu-table .ta-r { text-align: right; justify-content: flex-end; }
-.MPC-vasiu-table .ta-c { text-align: center; justify-content: center; }
+.vas_102-table .ta-r { text-align: right; justify-content: flex-end; }
+.vas_102-table .ta-c { text-align: center; justify-content: center; }
 
-.MPC-vasiu-itItem { min-width: 0; }
-.MPC-vasiu-itName {
+.vas_102-itItem { min-width: 0; }
+.vas_102-itName {
     font-size: 1.0769em;
     font-weight: 700;
     color: var(--iu-text);
@@ -495,7 +646,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.MPC-vasiu-itSku {
+.vas_102-itSku {
     font-size: 0.9231em;
     color: var(--iu-muted);
     margin-top: 0.125em;
@@ -504,8 +655,29 @@
     white-space: nowrap;
 }
 
+/* Locator: a long locator combination is ellipsised rather than allowed to
+   stretch its grid track, so the row keeps the column widths every other row
+   uses. The full name is on the cell's title tooltip. min-width:0 is what lets
+   a grid item shrink below its content width at all. */
+.vas_102-itLoc {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Attribute set instance (lot / serial / attributes) */
+.vas_102-itAttr {
+    font-size: 0.9231em;
+    color: var(--iu-sub);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Status tag */
-.MPC-vasiu-tag {
+.vas_102-tag {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
@@ -515,20 +687,12 @@
     line-height: 1.3;
     white-space: nowrap;
 }
-.MPC-vasiu-tag.s-full    { background: var(--iu-success-bg); color: var(--iu-success-tx); }
-.MPC-vasiu-tag.s-partial { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
-.MPC-vasiu-tag.s-short   { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
-
-.MPC-vasiu-tEmpty {
-    padding: 1.25em 0.875em;
-    text-align: center;
-    font-size: 0.8125em;
-    color: var(--iu-muted);
-    border-bottom: 1px solid var(--iu-row-div);
-}
+.vas_102-tag.s-full    { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.vas_102-tag.s-partial { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
+.vas_102-tag.s-short   { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
 
 /* Totals footer */
-.MPC-vasiu-tFoot {
+.vas_102-tFoot {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -539,71 +703,207 @@
     border-top: 1px solid var(--iu-card-bd);
     font-size: 0.8125em;
 }
-.MPC-vasiu-tf { color: var(--iu-muted); }
-.MPC-vasiu-tf b { color: var(--iu-text); font-weight: 700; margin-left: 0.375em; }
-.MPC-vasiu-tf.is-grand { color: var(--iu-text); font-weight: 700; }
-.MPC-vasiu-tf.is-grand b { color: var(--iu-action); margin-left: 0.5em; font-size: 1.15em; }
+.vas_102-tf { color: var(--iu-muted); }
+.vas_102-tf b { color: var(--iu-text); font-weight: 700; margin-left: 0.375em; }
+.vas_102-tf.is-grand { color: var(--iu-text); font-weight: 700; }
+.vas_102-tf.is-grand b { color: var(--iu-action); margin-left: 0.5em; font-size: 1.15em; }
 
 @container (max-width: 720px) {
-    .MPC-vasiu-table { overflow-x: auto; }
-    .MPC-vasiu-tRow { min-width: 720px; }
+    .vas_102-table { overflow-x: auto; }
+    .vas_102-tRow { min-width: 720px; }
 }
 
 /* ----------------------------------------------------------- */
-/*  Actions (visual buttons)                                    */
+/*  Pager (issue lines)                                         */
 /* ----------------------------------------------------------- */
-.MPC-vasiu-actions {
+/* Deliberately a sibling of the table, not a child: the table scrolls
+   horizontally on narrow panels and the controls must stay put. */
+.vas_102-pager {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     flex-wrap: wrap;
-    gap: 0.625em;
-    padding-top: 0.125em;
+    gap: 0.5em 0.875em;
+    margin-top: 0.5em;
+    font-size: 0.75em;
+    color: var(--iu-muted);
 }
 
-.MPC-vasiu-btn {
+.vas_102-pgCtrls {
     display: inline-flex;
     align-items: center;
-    gap: 0.4375em;
-    height: 2.25em;
-    padding: 0 1.125em;
+    gap: 0.5em;
+}
+
+.vas_102-pgPos { color: var(--iu-text); font-weight: 700; }
+
+.vas_102-pgBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border: 1px solid var(--iu-card-bd);
     border-radius: 999px;
-    font-size: 0.8125em;
+    background: #fff;
+    padding: 0.3125em 0.75em;
+    color: var(--iu-action);
     font-weight: 700;
     line-height: 1;
     cursor: pointer;
     user-select: none;
+    white-space: nowrap;
 }
-.MPC-vasiu-btn .MPC-vasiu-ic { color: currentColor; }
-
-.MPC-vasiu-btn.btn-pri {
-    background: var(--iu-action);
-    border: 1px solid var(--iu-action);
-    color: #fff;
-}
-.MPC-vasiu-btn.btn-pri:hover { background: var(--iu-action-dk); border-color: var(--iu-action-dk); }
-
-.MPC-vasiu-btn.btn-sec {
-    background: #fff;
-    border: 1px solid var(--iu-action);
-    color: var(--iu-action);
-}
-.MPC-vasiu-btn.btn-sec:hover { background: var(--iu-info-bg); }
-
-.MPC-vasiu-btn.is-disabled {
-    background: #F1F4F7;
-    border-color: #DCE5EE;
-    color: #A6B2BD;
+.vas_102-pgBtn:hover { background: var(--iu-info-bg); border-color: var(--iu-action); }
+.vas_102-pgBtn .vas_102-ic { color: currentColor; }
+.vas_102-pgBtn.is-disabled {
+    opacity: .45;
     cursor: default;
     pointer-events: none;
+    color: var(--iu-muted);
+}
+
+/* ----------------------------------------------------------- */
+/*  Notes card (issue header description)                       */
+/* ----------------------------------------------------------- */
+.vas_102-textCard {
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    padding: 0.75em 1em;
+    font-size: 0.8125em;
+    color: var(--iu-sub);
+    line-height: 1.55;
+}
+.vas_102-textCard p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.vas_102-textCard p + p { margin-top: 0.5em; }
+
+/* ----------------------------------------------------------- */
+/*  Activity (audit trail)                                      */
+/* ----------------------------------------------------------- */
+.vas_102-actList {
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+/* tag | what happened | when · by whom */
+.vas_102-actRow {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.5625em 0.875em;
+    border-bottom: 1px solid var(--iu-row-div);
+    font-size: 0.8125em;
+}
+.vas_102-actRow:last-child { border-bottom: none; }
+.vas_102-actRow:hover { background: #FAFCFE; }
+
+.vas_102-actTag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    flex: none;
+    border-radius: 999px;
+    padding: 0.25em 0.625em;
+    font-size: 0.8462em; /* ~0.6875em against the body anchor */
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.vas_102-actTag .vas_102-ic { color: currentColor; }
+.vas_102-actTag.tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
+.vas_102-actTag.tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.vas_102-actTag.tone-warning { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
+.vas_102-actTag.tone-risk    { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
+.vas_102-actTag.tone-purple  { background: var(--iu-purple-bg);  color: var(--iu-purple-tx); }
+.vas_102-actTag.tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
+
+.vas_102-actTitle {
+    min-width: 0;
+    color: var(--iu-text);
+    overflow: hidden;
+}
+
+/* The headline (event sentence / note text / e-mail subject) and, for an
+   e-mail, the recipient beneath it. Each line clips on its own so the row
+   height stays predictable. */
+.vas_102-actLead,
+.vas_102-actSub {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_102-actSub {
+    font-size: 0.8462em; /* ~0.6875em against the body anchor */
+    color: var(--iu-muted);
+    margin-top: 0.125em;
+}
+
+.vas_102-actWhen {
+    flex: none;
+    text-align: right;
+    color: var(--iu-muted);
+    font-size: 0.9231em; /* ~0.75em against the body anchor */
+    white-space: nowrap;
+}
+
+/* An activity carrying a body (e-mail) opens on click — only those rows make
+   room for the caret, so every other row keeps the three-column layout. */
+.vas_102-actRow.is-openable {
+    grid-template-columns: auto 1fr auto auto;
+    cursor: pointer;
+}
+.vas_102-actRow.is-openable:hover { background: #F7FBFE; }
+
+.vas_102-actCaret {
+    display: inline-flex;
+    align-items: center;
+    color: var(--iu-muted);
+    transition: transform .15s ease;
+}
+.vas_102-actRow.is-open .vas_102-actCaret {
+    transform: rotate(90deg);
+    color: var(--iu-action);
+}
+
+/* The message body, revealed under its row. */
+.vas_102-actBody {
+    background: #F7FAFD;
+    border-bottom: 1px solid var(--iu-row-div);
+    padding: 0.625em 0.875em 0.75em 2.5em;
+    font-size: 0.8125em;
+    color: var(--iu-text);
+    line-height: 1.55;
+}
+.vas_102-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.vas_102-actMeta {
+    font-size: 0.8462em;
+    color: var(--iu-muted);
+    margin-bottom: 0.3125em;
+}
+
+/* Narrow panels: drop the timestamp onto its own line under the description.
+   The caret stays on the first line, beside the subject it opens. */
+@container (max-width: 460px) {
+    .vas_102-actRow { grid-template-columns: auto 1fr; }
+    .vas_102-actRow.is-openable { grid-template-columns: auto 1fr auto; }
+    .vas_102-actWhen { grid-column: 2; text-align: left; }
+    .vas_102-actRow.is-openable .vas_102-actCaret { grid-column: 3; grid-row: 1; }
 }
 
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
-[dir="rtl"] .MPC-vasiu-hdrColL { border-right: none; border-left: 1px solid var(--iu-row-div); padding-right: 0; padding-left: 1.25em; }
-[dir="rtl"] .MPC-vasiu-table .ta-r { text-align: left; justify-content: flex-start; }
-[dir="rtl"] .MPC-vasiu-tFoot { justify-content: flex-start; }
-[dir="rtl"] .MPC-vasiu-tf b { margin-left: 0; margin-right: 0.375em; }
-[dir="rtl"] .MPC-vasiu-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
-[dir="rtl"] .MPC-vasiu-actions { justify-content: flex-start; }
+[dir="rtl"] .vas_102-hdrColL { border-right: none; border-left: 1px solid var(--iu-row-div); padding-right: 0; padding-left: 1.25em; }
+[dir="rtl"] .vas_102-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_102-tFoot { justify-content: flex-start; }
+[dir="rtl"] .vas_102-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .vas_102-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .vas_102-actRow { text-align: right; }
+[dir="rtl"] .vas_102-actWhen { text-align: left; }
+[dir="rtl"] .vas_102-actBody { padding-left: 0.875em; padding-right: 2.5em; }
+[dir="rtl"] .vas_102-actCaret svg { transform: scaleX(-1); }
+[dir="rtl"] .vas_102-actRow.is-open .vas_102-actCaret { transform: rotate(-90deg); }
+[dir="rtl"] .vas_102-pgBtn .vas_102-ic svg { transform: scaleX(-1); }

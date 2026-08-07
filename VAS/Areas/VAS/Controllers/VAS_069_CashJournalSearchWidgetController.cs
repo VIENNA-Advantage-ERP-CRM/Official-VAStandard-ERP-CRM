@@ -17,7 +17,8 @@
  *     EndingBalance converted to functional currency (C_Cash carries
  *     its own C_Currency_ID; no conversion type column so NULL is
  *     passed -> default rate type). StdPrecision read from system.
- *   - C_CashBook is joined only to make the cashbook name searchable.
+ *   - C_CashBook is joined to make the cashbook name searchable and to return
+ *     it (CashBookName) for display on the result row.
  *   - Runs on Oracle and PostgreSQL.
  ***********************************************************/
 using CoreLibrary.DataBase;
@@ -105,6 +106,7 @@ namespace VAS.Areas.VAS.Controllers
             // The cash journal's partner lives on its lines (C_CashLine), so a line
             // vendor match is added via EXISTS using a second bound term (@Q2 = @Q1).
             string core = @"SELECT b.C_Cash_ID AS RecordId, b.DocumentNo AS DocumentNo, b.Name AS Title,
+                       cb.Name AS CashBookName,
                        COALESCE(currencyConvert(b.EndingBalance, b.C_Currency_ID, " + schemaCurrencyId + @", b.DateAcct, NULL, b.AD_Client_ID, b.AD_Org_ID), 0) AS Amount,
                        b.StatementDate AS DocDate, b.DocStatus AS DocStatus,
                        CASE WHEN LOWER(b.DocumentNo) = @QExact THEN 4
@@ -165,6 +167,7 @@ namespace VAS.Areas.VAS.Controllers
                         RecordId   = Util.GetValueOfInt(row["RecordId"]),
                         DocumentNo = docNo,
                         Title      = title,
+                        CashBookName = Util.GetValueOfString(row["CashBookName"]),
                         Amount     = Util.GetValueOfDecimal(row["Amount"]),
                         DocDate    = d.HasValue ? d.Value.ToString("yyyy-MM-dd") : "",
                         DocStatus  = Util.GetValueOfString(row["DocStatus"]),
@@ -205,6 +208,8 @@ namespace VAS.Areas.VAS.Controllers
             public int     RecordId   { get; set; }
             public string  DocumentNo { get; set; }
             public string  Title      { get; set; }
+            /// <summary>C_CashBook.Name of the journal's cash book (shown on the result row).</summary>
+            public string  CashBookName { get; set; }
             public decimal Amount     { get; set; }
             public string  DocDate    { get; set; }
             public string  DocStatus  { get; set; }

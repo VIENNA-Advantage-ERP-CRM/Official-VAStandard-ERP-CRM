@@ -12,6 +12,7 @@
  * AD_Message keys used (add via System Messages):
  *   VAS_069_Placeholder       => "Search cash journals by no., name, cashbook, description..."
  *   VAS_069_Kind              => "Cash Journal"
+ *   VAS_069_CashBook          => "Cash book"
  *   VAS_DocSearch_TypeToSearch=> "Type at least 2 characters to search"
  *   VAS_DocSearch_NoResults   => "No matching documents"
  *   VAS_DocSearch_Error       => "Search failed. Please try again."
@@ -25,6 +26,11 @@
         // ---- Per-widget configuration ----
         var ENDPOINT      = 'VAS/VAS_069_CashJournalSearchWidget/Search';
         var ZOOM_TABLE    = 'C_Cash';
+        // Zoom target when the widget is NOT hosted inside a window (windowNo < 0).
+        // The search payload already carries the resolved AD_Window_ID; these names
+        // are the fallback VAS.ZoomUtil resolves from if it ever comes back 0.
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_CashJournal';
+        var ZOOM_WINDOW_NAME_OLD = 'Cash Journal';
         var CHIP_CLASS    = 'cash';
         var PLACEHOLDER_K = 'VAS_069_Placeholder';
         var PLACEHOLDER_D = 'Search cash journals by no., name, cashbook, description...';
@@ -270,59 +276,74 @@
             $panel.find('.vas-dssrch-more').toggleClass('vas-dssrch-more-active', !!on);
         }
 
+        // Result row: a status-coloured accent bar down the left edge carries the
+        // document state at a glance, so the status badge itself stays quiet. Date,
+        // journal name and cash book share one meta line under the document number
+        // instead of being scattered over the row.
         function buildRow(item, label) {
             var hasZoom = item.RecordId > 0;
+            var tone = statusMeta(item.DocStatus).tone;
             return (
-                '<div class="vas-dssrch-row' + (hasZoom ? '' : ' vas-dssrch-nozoom') + '" data-id="' + VIS.Utility.Util.getValueOfInt(item.RecordId) + '">' +
-                    '<span class="vas-dssrch-chip vas-dssrch-chip-' + CHIP_CLASS + '">' + dsEsc(label) + '</span>' +
+                '<div class="vas-dssrch-row vas-dssrch-row-accent vas-dssrch-tone-' + tone +
+                        (hasZoom ? '' : ' vas-dssrch-nozoom') + '" data-id="' + VIS.Utility.Util.getValueOfInt(item.RecordId) + '">' +
+                    '<span class="vas-dssrch-accent" aria-hidden="true"></span>' +
                     '<div class="vas-dssrch-main">' +
                         '<div class="vas-dssrch-docline">' +
                             '<span class="vas-dssrch-docno">' + dsEsc(item.DocumentNo || '') + '</span>' +
                             statusPill(item.DocStatus) +
                         '</div>' +
-                        '<div class="vas-dssrch-title">' + dsEsc(item.Title || '') + '</div>' +
-                        invoiceTag(item.MatchedInvoiceNo) +
+                        metaLine(item, label) +
                     '</div>' +
                     '<div class="vas-dssrch-meta">' +
                         '<div class="vas-dssrch-amount">' + formatAmount(item.Amount) + '</div>' +
-                        '<div class="vas-dssrch-date">' + dsEsc(formatDate(item.DocDate)) + '</div>' +
                     '</div>' +
                 '</div>'
             );
         }
 
-        // The framework navigates IN-PLACE (no new window) only when the payload's
-        // ActionName equals the name of the window currently HOSTING this widget;
-        // otherwise it opens a new window. Resolve the host window name from the
-        // listener chain and pass it as ActionName.
-        function hostWindowName() {
-            try {
-                var l = $self.listener;
-                for (var i = 0; i < 6 && l; i++) {
-                    if (l.apanel && l.apanel.gridWindow && l.apanel.gridWindow.getName) {
-                        return l.apanel.gridWindow.getName();
-                    }
-                    if (l.gridWindow && l.gridWindow.getName) {
-                        return l.gridWindow.getName();
-                    }
-                    l = l.listener;
-                }
-            } catch (e) { }
-            return '';
+        // Kind pill first, then the record's own facts separated by dots. Anything
+        // the record does not carry is skipped rather than left as an empty gap.
+        function metaLine(item, label) {
+            var facts = [];
+            var date = formatDate(item.DocDate);
+            var title = String(item.Title || '');
+
+            /*if (date) { facts.push('<span class="vas-dssrch-mtext">' + dsEsc(date) + '</span>'); }*/
+            // Title falls back to the document number server-side - no point repeating it.
+            if (title && title !== String(item.DocumentNo || '')) {
+                facts.push('<span class="vas-dssrch-mtext">' + dsEsc(title) + '</span>');
+            }
+            if (item.CashBookName) { facts.push(cashBookFact(item.CashBookName)); }
+            if (item.MatchedInvoiceNo) { facts.push(invoiceFact(item.MatchedInvoiceNo)); }
+
+            return '<div class="vas-dssrch-metaline">' +
+                '<span class="vas-dssrch-kind vas-dssrch-kind-' + CHIP_CLASS + '">' + dsEsc(label) + '</span>' +
+                facts.join('<span class="vas-dssrch-sep" aria-hidden="true">&#183;</span>') +
+            '</div>';
         }
+
 
         function zoomTo(recordId) {
             if (!recordId) { return; }
             closePanel();
-            // Navigate the CURRENT window's grid to the clicked record (no new window).
             try {
-                $self.widgetFirevalueChanged({
-                    "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + recordId,
-                    "TabLayout": "Y",
-                    "TabIndex": "0",
-                    "ActionName": hostWindowName() || "VAS_CashJournal",
-                    "ActionType": "W"
-                });
+                if ($self.windowNo >= 0) {
+                    // Navigate the CURRENT window's grid to the clicked record (no new window).
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + recordId,
+                        "TabLayout": "Y",
+                        "TabIndex": "0"
+                    });
+                }
+                else {
+                    // Standalone dashboard - open the Cash Journal window on the record.
+                    // windowId already comes back with the search payload, so the util
+                    // normally has nothing left to resolve.
+                    VAS.ZoomUtil.zoomToRecord(ZOOM_TABLE + "_ID", recordId, windowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { windowId = id; }
+                        });
+                }
             } catch (e) { /* zoom is best-effort */ }
         }
 
@@ -352,17 +373,28 @@
             if (isNaN(d.getTime())) { return iso; }
             return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
         }
+        // The cash book the journal belongs to. Several journals share a document-no
+        // series and a name, so the cash book is what tells two hits apart.
+        function cashBookFact(name) {
+            return '<span class="vas-dssrch-mtext vas-dssrch-micon">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>' +
+                    '<path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>' +
+                '</svg>' +
+                dsEsc(name) +
+            '</span>';
+        }
+
         // Shown only when this result matched because of a LINKED invoice (not the
         // cash journal's own fields) - makes "invoice-driven" hits easy to identify.
-        function invoiceTag(invNo) {
-            if (!invNo) { return ''; }
-            return '<div class="vas-dssrch-invtag">' +
+        function invoiceFact(invNo) {
+            return '<span class="vas-dssrch-mtext vas-dssrch-micon vas-dssrch-minv">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
                     '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
                     '<polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>' +
                 '</svg>' +
                 dsEsc(msg('VAS_DocSearch_Invoice', 'Invoice') + ' ' + invNo) +
-            '</div>';
+            '</span>';
         }
 
         function statusPill(code) {

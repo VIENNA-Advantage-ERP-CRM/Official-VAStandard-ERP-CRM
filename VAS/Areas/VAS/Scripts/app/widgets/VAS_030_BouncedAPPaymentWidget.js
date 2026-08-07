@@ -7,6 +7,7 @@
  *  #  | Current Text                                      | Message Key
  * ----+---------------------------------------------------+------------------------------
  *  1  | Bounced                                           | VAS_030_MessageBounced
+ *  1b | Cheques Dishonored                                | VAS_030_MessageChequesDishonored
  *  2  | Need re-issue                                     | VAS_030_MessageNeedReissue
  *  3  | Loading                                           | VAS_030_MessageLoading
  *  4  | No Data                                           | VAS_030_MessageNoData
@@ -18,11 +19,11 @@
  * 10  | Payment No.                                       | VAS_030_MessagePaymentNo
  * 11  | Date                                              | VAS_Date
  * 12  | Vendor                                            | VAS_Vendor
- * 13  | Bank account                                      | VAS_BankAccount
+ * 13  | Bank Account                                      | VAS_BankAccount
  * 14  | Payment Currency                                  | VAS_PaymentCurrency
  * 15  | Amount                                            | VAS_Amount
- * 16  | Method                                            | VAS_Method
- * 17  | Status                                            | VAS_Status
+ * 16  | Payment Method                                    | VAS_Method
+ * 17  | Execution Status                                  | VAS_030_Status
  * 18  | Previous                                          | VAS_Previous
  * 19  | Next                                              | VAS_Next
  * ──────────────────────────────────────────────────────────────────────────────
@@ -148,11 +149,31 @@
                 )
             );
 
+            var $sub = $(
+                '<div class="vas-bounced-ap-payment-sub">'
+            ).text(
+                lbl(
+                    'VAS_030_MessageChequesDishonored',
+                    'Cheques Dishonored'
+                )
+            );
+
+            /* The title and its subtitle stack in a box of their own so the
+               icon stays centred against the pair rather than against the
+               title alone -- the header is a centred flex row. */
+            var $headerText = $(
+                '<div class="vas-bounced-ap-payment-header-text">'
+            );
+
+            $headerText
+                .append($title)
+                .append($sub);
+
             $iconBox.append($icon);
 
             $header
                 .append($iconBox)
-                .append($title);
+                .append($headerText);
 
             $body = $(
                 '<div class="vas-bounced-ap-payment-body">'
@@ -513,9 +534,14 @@
                 );
             }
 
-            if (isNaN(count) || count <= 0) {
-                setNoData();
-                return;
+            /*
+             * No bounced cheques is a real answer, not a failure, so the
+             * card keeps its normal layout and reads 0 instead of swapping
+             * in a "No Data" state. Only a load error still takes over the
+             * card.
+             */
+            if (isNaN(count) || count < 0) {
+                count = 0;
             }
 
             showState(false, '');
@@ -587,19 +613,6 @@
             if ($footer) {
                 $footer.toggle(!show);
             }
-        }
-
-        /**
-         * Shows no data state.
-         */
-        function setNoData() {
-            showState(
-                true,
-                lbl(
-                    'VAS_030_MessageNoData',
-                    'No Data'
-                )
-            );
         }
 
         /**
@@ -1533,18 +1546,20 @@
                 }
             }
 
+            /* The indicator always reads, down to "1 of 1" on an empty or
+               single-page list: blanking it left the two arrows framing a gap,
+               which looks like a pager that failed to load rather than one
+               with nowhere to go. Being disabled is what says that. */
             if ($pagerText) {
                 $pagerText.text(
-                    totalPages > 0
-                        ? pageNo +
-                        ' ' +
-                        lbl(
-                            'VAS_Of',
-                            'of'
-                        ) +
-                        ' ' +
-                        totalPages
-                        : ''
+                    pageNo +
+                    ' ' +
+                    lbl(
+                        'VAS_Of',
+                        'of'
+                    ) +
+                    ' ' +
+                    Math.max(1, totalPages)
                 );
             }
 
@@ -1731,7 +1746,7 @@
                 escapeHtml(
                     lbl(
                         'VAS_BankAccount',
-                        'Bank account'
+                        'Bank Account'
                     )
                 ) +
                 '</th>' +
@@ -1750,7 +1765,7 @@
                 escapeHtml(
                     lbl(
                         'VAS_Method',
-                        'Method'
+                        'Payment Method'
                     )
                 ) +
                 '</th>' +
@@ -1758,8 +1773,8 @@
                 '<th>' +
                 escapeHtml(
                     lbl(
-                        'VAS_Status',
-                        'Status'
+                        'VAS_030_Status',
+                        'Execution Status'
                     )
                 ) +
                 '</th>' +

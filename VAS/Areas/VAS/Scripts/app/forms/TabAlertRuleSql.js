@@ -24,6 +24,7 @@
         var sqlFlag = true;
         var filterIndex = null;
         var WhereCondition;
+        var isProcessing = false;
         var joinsArray, $filterCurrentDate, $filterDateList, isDynamic, txtYear, txtMonth, txtDay, txtIsInsert,
             txtIsUpdate, txtIsDelete, windowTabCtrl, FiledColumnCtrl, okBtn, lblBottomMsg, generatorPaging, sqlPaging;
         var joinTable;
@@ -337,8 +338,6 @@
             txtSqlOther = new VIS.Controls.VTextArea("OtherClause", false, false, true);
             sqlOtherWrap.append(OtherColCtrlWrap);
             OtherColCtrlWrap.append(txtSqlOther.getControl().css('font-size', '15px').attr('title', VIS.Msg.getMsg("VAS_SQLOtherText")).attr('placeholder', '').attr('data-placeholder', '').attr("autocomplete", "off")).append('<label>' + VIS.Msg.getMsg("VAS_OtherClause") + '</label>');
-
-
 
             $EventMainDiv.append('<div class="vas-windowtab"><label>' + VIS.Msg.getMsg("VAS_WindowTab") + '</label>'
                 + '<div id="WindowTab_' + $self.windowNo + '"  class="VIS-AMTD-formData VIS-AMTD-InputBtns input-group vas-input-wrap"></div>'
@@ -2121,15 +2120,17 @@
                                     $EventMainDiv.show();
                                 }
                             }
+                            $sqlBtn.trigger('click');
+                            $sqlResultDiv.show();
                             setBusy(false);
                         },
                         error: function (error) {
                             console.log(error);
+                            $sqlBtn.trigger('click');
+                            $sqlResultDiv.show();
                             setBusy(false);
                         }
                     });
-                    $sqlBtn.trigger('click');
-                    $sqlResultDiv.show();
 
                 } else if (event == 'E') {
                     $SQLMainDiv.hide();
@@ -2407,8 +2408,7 @@
                     txtIsInsert.setReadOnly(false);
                 }
             };
-
-            let isProcessing = false;
+            
             okBtn.on(VIS.Events.onClick, function () {
                 if (isProcessing) return; 
                 setBusy(true);
@@ -2483,10 +2483,13 @@
                 success: function (result) {
                     result = JSON.parse(result);
                     if (result == 'Saved Successfully') {
-                        setBusy(false);
                         lblBottomMsg.text('Saved Successfully');
-                        isProcessing = false;
                     }
+                    else {
+                        lblBottomMsg.text(result);
+                    }
+                    setBusy(false);
+                    isProcessing = false;
                 },
                 error: function (error) {
                     setBusy(false);
@@ -3921,6 +3924,7 @@
     VAS.TabAlertRuleSql.prototype.startPanel = function (windowNo, curTab) {
         this.windowNo = windowNo;
         this.curTab = curTab;
+        this.ParentId = curTab.linkValue;
         this.init();
     };
 

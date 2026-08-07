@@ -1,0 +1,2489 @@
+/********************************************************
+ * Module Name : VAS_123
+ * Purpose     : Sales Quotation Right Detail Panel — styles
+ * Prefix      : vas_123_qrp-
+ * Employee Code: VAI154
+ * Date        : 20-Jul-2026
+ ********************************************************/
+
+/* ============================================================
+   DESIGN TOKENS — scoped to .vas_123_qrp-shell so that the
+   modal overlay (a sibling of .vas_123_qrp-panel, not a
+   descendant) also inherits these custom properties.
+   ============================================================ */
+.vas_123_qrp-shell {
+    --qrp-primary:           #0083DA;
+    --qrp-action:            #1F83FF;
+    --qrp-action-hover:      #0069AE;
+    --qrp-ink:               #102C3F;
+    --qrp-text2:             #41576A;
+    --qrp-muted:             #5F7283;
+    --qrp-placeholder:       #9F9F9F;
+    --qrp-border:            #D9E2EB;
+    --qrp-divider:           #E2EAF1;
+    --qrp-pale:              #EAF8FF;
+    --qrp-pale-border:       #BFE4FF;
+    --qrp-faint:             #EEF6FF;
+    --qrp-secondary-surface: #FBFDFF;
+    --qrp-success:           #0B6B45;
+    --qrp-success-mid:       #20A464;
+    --qrp-success-btn:       #1AA06A;
+    --qrp-success-bg:        #E7F7EF;
+    --qrp-success-border:    #CFEAD9;
+    --qrp-danger:            #A33F3F;
+    --qrp-danger-strong:     #D14545;
+    --qrp-danger-btn:        #B23B3B;
+    --qrp-danger-bg:         #FCEFEF;
+    --qrp-danger-border:     #EDC8C8;
+    --qrp-warn:              #9A6500;
+    --qrp-warn-bg:           #FFF6E2;
+    --qrp-warn-border:       #EBD7A6;
+    --qrp-neutral-bg:        #F1F4F8;
+    --qrp-shadow:            0 10px 24px rgba(15, 61, 97, .06);
+}
+
+/* ============================================================
+   RULE 1 — PANEL WRAPPER
+   ============================================================ */
+.vas_123_qrp-panel {
+    container-type:   inline-size;
+    background:       #FFFFFF;
+    border:           1px solid var(--qrp-border);
+    border-radius:    16px;
+    box-shadow:       var(--qrp-shadow);
+    display:          flex;
+    flex-direction:   column;
+    overflow:         hidden;
+}
+
+/* ============================================================
+   RULE 2 — PANEL HEADER
+   ============================================================ */
+.vas_123_qrp-panelhead {
+    height:          56px;
+    flex:            none;
+    padding:         0 16px;
+    border-bottom:   1px solid var(--qrp-border);
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    font-size:       16px; /* px intentional — NOT under em anchor */
+}
+
+/* ============================================================
+   RULE 3 — PANEL BODY
+   ============================================================ */
+.vas_123_qrp-body {
+    flex:             1;
+    min-height:       0;
+    overflow-y:       auto;
+    overflow-x:       hidden;
+    padding:          1.125em .875em;
+    display:          flex;
+    flex-direction:   column;
+    gap:              .875em;
+    container-type:   inline-size;
+    --panel-anchor:   clamp(18px, 1vw, 20px);
+    font-size:        var(--panel-anchor);
+}
+
+/* ============================================================
+   RULE 4 — FORM-CONTROL RESET (scoped to body)
+   ============================================================ */
+.vas_123_qrp-body button,
+.vas_123_qrp-body input,
+.vas_123_qrp-body select,
+.vas_123_qrp-body textarea,
+.vas_123_qrp-body optgroup {
+    font-family: inherit;
+    font-size:   0.8em;
+    line-height: inherit;
+    /*color:       inherit;*/
+}
+
+/* ============================================================
+   BODY SECTIONS WRAPPER
+   ============================================================ */
+.vas_123_qrp-sections {
+    display:        flex;
+    flex-direction: column;
+    gap:            .875em;
+    min-height:     0;
+    flex:           1;
+}
+
+/* Suppress top margin on the very first section header */
+.vas_123_qrp-sections > :first-child .vas_123_qrp-sec-head,
+.vas_123_qrp-body > :first-child .vas_123_qrp-sec-head {
+    margin-top: 0;
+}
+
+/* ============================================================
+   PANEL HEADER ELEMENTS
+   ============================================================ */
+.vas_123_qrp-ph-title {
+    font-size:   1em;       /* relative to panelhead 16px → 16px */
+    font-weight: 700;
+    color:       var(--qrp-ink);
+    margin:      0;
+    white-space: nowrap;
+}
+
+.vas_123_qrp-ph-meta {
+    font-size:     .75em;
+    color:         var(--qrp-muted);
+    margin:        .125em 0 0;
+    white-space:   nowrap;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+}
+
+.vas_123_qrp-ph-close {
+    width:           32px;
+    height:          32px;
+    flex:            none;
+    border:          0;
+    background:      transparent;
+    border-radius:   8px;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    cursor:          pointer;
+    color:           #141414;
+}
+
+.vas_123_qrp-ph-close:hover {
+    background: var(--qrp-faint);
+}
+
+/* ============================================================
+   TWO-TIER CHIP SYSTEM
+   ============================================================ */
+.vas_123_qrp-chip {
+    display:      inline-flex;
+    align-items:  center;
+    gap:          .25em;
+    border-radius: 999px;
+    padding:      .3125em .625em;
+    font-size:    .6875em;
+    font-weight:  700;
+    line-height:  1;
+    white-space:  nowrap;
+}
+
+/* Chip tone modifiers */
+.vas_123_qrp-chip--neutral {
+    background:  var(--qrp-neutral-bg);
+    color:       var(--qrp-text2);
+    font-weight: 500;
+}
+
+.vas_123_qrp-chip--info {
+    background: var(--qrp-pale);
+    color:      var(--qrp-primary);
+}
+
+.vas_123_qrp-chip--success {
+    background: var(--qrp-success-bg);
+    color:      var(--qrp-success);
+}
+
+.vas_123_qrp-chip--warn {
+    background: var(--qrp-warn-bg);
+    color:      var(--qrp-warn);
+}
+
+.vas_123_qrp-chip--risk {
+    background: var(--qrp-danger-bg);
+    color:      var(--qrp-danger);
+}
+
+.vas_123_qrp-chip--violet {
+    background: #F3EEFF;
+    color:      #6B3FBA;
+}
+
+/* On-tint override — white background */
+.vas_123_qrp-chip--on-tint {
+    background: #FFFFFF;
+}
+
+/* ============================================================
+   BUTTONS (pill shape)
+   ============================================================ */
+.vas_123_qrp-btn {
+    display:         inline-flex;
+    align-items:     center;
+    gap:             .375em;
+    border-radius:   999px;
+    padding:         .5em .875em;
+    font-size:       .8125em;
+    font-weight:     400;
+    line-height:     1;
+    white-space:     nowrap;
+    cursor:          pointer;
+    border:          1px solid transparent;
+    text-decoration: none;
+}
+
+.vas_123_qrp-btn svg {
+    width:  1em;
+    height: 1em;
+    flex:   none;
+}
+
+/* Primary — action blue fill */
+.vas_123_qrp-btn--primary {
+    background: var(--qrp-action);
+    color:      #FFFFFF;
+    border-color: var(--qrp-action);
+}
+
+.vas_123_qrp-btn--primary:hover {
+    background:   var(--qrp-action-hover);
+    border-color: var(--qrp-action-hover);
+}
+
+/* Secondary — white with blue border */
+.vas_123_qrp-btn--secondary {
+    background:   #FFFFFF;
+    color:        var(--qrp-action);
+    border-color: var(--qrp-action);
+}
+
+.vas_123_qrp-btn--secondary:hover {
+    background: var(--qrp-faint);
+}
+
+/* Success — success-btn fill, white text */
+.vas_123_qrp-btn--success {
+    background:   var(--qrp-success-btn);
+    color:        #FFFFFF;
+    border-color: var(--qrp-success-btn);
+}
+
+.vas_123_qrp-btn--success:hover {
+    background:   var(--qrp-success);
+    border-color: var(--qrp-success);
+}
+
+/* Danger — white bg, danger border/text */
+.vas_123_qrp-btn--danger {
+    background:   #FFFFFF;
+    color:        var(--qrp-danger);
+    border-color: var(--qrp-danger);
+}
+
+.vas_123_qrp-btn--danger:hover {
+    background: var(--qrp-danger-bg);
+}
+
+/* Ghost — white bg, light border, muted text */
+.vas_123_qrp-btn--ghost {
+    background:   #FFFFFF;
+    color:        var(--qrp-muted);
+    border-color: var(--qrp-border);
+}
+
+.vas_123_qrp-btn--ghost:hover {
+    background: var(--qrp-neutral-bg);
+}
+
+/* Disabled state — applies to all variants */
+.vas_123_qrp-btn:disabled {
+    opacity: .45;
+    cursor:  not-allowed;
+}
+
+/* ============================================================
+   SECTION
+   ============================================================ */
+.vas_123_qrp-sec {
+    display:        flex;
+    flex-direction: column;
+}
+
+.vas_123_qrp-sec-head {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    gap:             .5em;
+    margin:          .5em 0 .5em;
+    padding-bottom:  .375em;
+    border-bottom:   1px solid var(--qrp-divider);
+}
+
+.vas_123_qrp-sh-title {
+    font-size:   1em;
+    font-weight: 700;
+    color:       var(--qrp-ink);
+    display:     flex;
+    align-items: center;
+    gap:         .375em;
+}
+
+.vas_123_qrp-sh-title svg {
+    width:  1.125em;
+    height: 1.125em;
+    flex:   none;
+    color:  var(--qrp-primary);
+}
+
+.vas_123_qrp-sh-right {
+    display:     flex;
+    align-items: center;
+    gap:         .5em;
+    flex:        none;
+}
+
+.vas_123_qrp-sh-sum {
+    font-size:   .75em;
+    font-weight: 400;
+    color:       var(--qrp-muted);
+}
+
+/* ============================================================
+   IDENTITY BLOCK
+   ============================================================ */
+.vas_123_qrp-identity {
+    display:        flex;
+    flex-direction: column;
+}
+
+.vas_123_qrp-id-top {
+    display:     flex;
+    align-items: flex-start;
+    gap:         .75em;
+}
+
+.vas_123_qrp-id-tile {
+    width:           2.5em;
+    height:          2.5em;
+    flex:            none;
+    border-radius:   10px;
+    background:      var(--qrp-pale);
+    color:           var(--qrp-primary);
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+}
+
+.vas_123_qrp-id-tile svg {
+    width:  1.375em;
+    height: 1.375em;
+}
+
+.vas_123_qrp-id-main {
+    min-width: 0;
+    flex:      1;
+}
+
+.vas_123_qrp-id-namerow {
+    display:     flex;
+    align-items: center;
+    gap:         .5em;
+    flex-wrap:   wrap;
+}
+
+.vas_123_qrp-id-name {
+    font-size:   1.125em;
+    font-weight: 700;
+    color:       var(--qrp-ink);
+}
+
+.vas_123_qrp-id-sub {
+    font-size:     .75em;
+    font-weight:   400;
+    color:         var(--qrp-muted);
+    margin-top:    .25em;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    white-space:   nowrap;
+}
+
+.vas_123_qrp-id-actions {
+    display:     flex;
+    align-items: center;
+    gap:         .5em;
+    flex-wrap:   wrap;
+    flex:        none;
+    margin-left: auto;
+    align-self:  flex-start;
+}
+
+/* ============================================================
+   METRIC GRID (4-col key facts)
+   ============================================================ */
+.vas_123_qrp-mgrid {
+    display:               grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap:            .875em;
+    row-gap:               .375em;
+}
+
+.vas_123_qrp-mgrid--4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.vas_123_qrp-mcell .vas_123_qrp-m-label {
+    font-size:   .6875em;
+    font-weight: 400;
+    color:       var(--qrp-muted);
+}
+
+.vas_123_qrp-mcell .vas_123_qrp-m-value {
+    font-size:     .8125em;
+    font-weight:   700;
+    color:         var(--qrp-ink);
+    margin-top:    .125em;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    white-space:   nowrap;
+}
+
+/* Metric value colour modifiers */
+.vas_123_qrp-m-value--success {
+    color: var(--qrp-success);
+}
+
+.vas_123_qrp-m-value--warn {
+    color: var(--qrp-warn);
+}
+
+.vas_123_qrp-m-value--risk {
+    color: var(--qrp-danger);
+}
+
+.vas_123_qrp-mcell .vas_123_qrp-m-meta {
+    font-size:     .6875em;
+    font-weight:   400;
+    color:         var(--qrp-muted);
+    margin-top:    .125em;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    white-space:   nowrap;
+}
+
+/* Metric meta colour+weight modifiers */
+.vas_123_qrp-m-meta--warn {
+    color:       var(--qrp-warn);
+    font-weight: 700;
+}
+
+.vas_123_qrp-m-meta--risk {
+    color:       var(--qrp-danger);
+    font-weight: 700;
+}
+
+/* ============================================================
+   NEXT MEETING CARD
+   ============================================================ */
+.vas_123_qrp-nextmeet {
+    border-radius: 14px;
+    border:        1px solid var(--qrp-pale-border);
+    background:    linear-gradient(180deg, #EEF8FF 0%, #FFFFFF 100%);
+    padding:       .75em .875em;
+}
+
+.vas_123_qrp-pcard-row {
+    display:     flex;
+    align-items: center;
+    gap:         .75em;
+}
+
+.vas_123_qrp-pc-main {
+    min-width: 0;
+    flex:      1;
+}
+
+.vas_123_qrp-pc-name {
+    font-size:     .875em;
+    font-weight:   700;
+    color:         var(--qrp-ink);
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    white-space:   nowrap;
+}
+
+.vas_123_qrp-pc-meta {
+    font-size:     .75em;
+    font-weight:   400;
+    color:         var(--qrp-muted);
+    margin-top:    .1875em;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    white-space:   nowrap;
+}
+
+.vas_123_qrp-pc-actions {
+    flex:        none;
+    display:     flex;
+    gap:         .5em;
+    align-items: center;
+}
+
+/* Event tile (circular icon container) */
+.vas_123_qrp-etile {
+    width:           2.25em;
+    height:          2.25em;
+    flex:            none;
+    border-radius:   999px;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+}
+
+.vas_123_qrp-etile svg {
+    width:  1.25em;
+    height: 1.25em;
+}
+
+.vas_123_qrp-etile--info {
+    background: var(--qrp-pale);
+    color:      var(--qrp-primary);
+}
+
+/* ============================================================
+   AVATAR STACK
+   ============================================================ */
+.vas_123_qrp-avatar {
+    width:           2.375em;
+    height:          2.375em;
+    flex:            none;
+    border-radius:   999px;
+    background:      #DFF1FF;
+    color:           #0F69AC;
+    border:          1px solid var(--qrp-pale-border);
+    display:         inline-flex;
+    align-items:     center;
+    justify-content: center;
+    font-size:       .75em;
+    font-weight:     700;
+    line-height:     1;
+}
+
+.vas_123_qrp-avstack {
+    display: flex;
+}
+
+.vas_123_qrp-avstack .vas_123_qrp-avatar {
+    border:      2px solid #fff;
+    margin-left: -.5em;
+}
+
+.vas_123_qrp-avstack .vas_123_qrp-avatar:first-child {
+    margin-left: 0;
+}
+
+/* ============================================================
+   STATUS CARD AND PIPELINE
+   ============================================================ */
+.vas_123_qrp-statuscard {
+    border-radius: 14px;
+    border:        1px solid var(--qrp-border);
+    background:    linear-gradient(180deg, #FBFDFF 0%, #FFFFFF 100%);
+    padding:       .75em .875em;
+}
+
+.vas_123_qrp-sc-foot {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    gap:             .5em;
+    flex-wrap:       wrap;
+    margin-top:      .75em;
+    padding-top:     .625em;
+    border-top:      1px solid var(--qrp-divider);
+}
+
+.vas_123_qrp-sc-meta {
+    font-size:   .75em;
+    font-weight: 400;
+    color:       var(--qrp-muted);
+    min-width:   0;
+}
+
+.vas_123_qrp-sc-actions {
+    display:     flex;
+    align-items: center;
+    gap:         .5em;
+    flex-wrap:   wrap;
+}
+
+/* Callout inside the status card sits below the pipeline */
+.vas_123_qrp-statuscard .vas_123_qrp-callout {
+    margin-top: .625em;
+}
+
+/* Pipeline track */
+.vas_123_qrp-pipe {
+    position: relative;
+    width:    100%;
+    padding:  .75em 0 .5em;
+}
+
+.vas_123_qrp-pipe-grid {
+    display: grid;
+}
+
+.vas_123_qrp-pipe-col {
+    position:        relative;
+    display:         flex;
+    flex-direction:  column;
+    align-items:     center;
+    min-width:       0;
+}
+
+/* Connector segment between circles */
+.vas_123_qrp-pipe-seg {
+    position:   absolute;
+    left:       50%;
+    right:      -50%;
+    top:        1em;
+    height:     2px;
+    transform:  translateY(-1px);
+    background: var(--qrp-divider);
+}
+
+.vas_123_qrp-pipe-seg--done {
+    background: var(--qrp-primary);
+}
+
+/* Step circle */
+.vas_123_qrp-pipe-circle {
+    position:        relative;
+    z-index:         1;
+    width:           2em;
+    height:          2em;
+    border-radius:   999px;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    background:      #fff;
+    border:          2px solid var(--qrp-border);
+}
+
+.vas_123_qrp-pipe-circle svg {
+    width:  1em;
+    height: 1em;
+    color:  #fff;
+}
+
+/* Completed step */
+.vas_123_qrp-pipe-circle--done {
+    background:   var(--qrp-primary);
+    border-color: var(--qrp-primary);
+}
+
+/* Active step — blue border + inner dot via ::after */
+.vas_123_qrp-pipe-circle--active {
+    border-color: var(--qrp-primary);
+}
+
+.vas_123_qrp-pipe-circle--active::after {
+    content:       '';
+    display:       block;
+    width:         .5em;
+    height:        .5em;
+    border-radius: 999px;
+    background:    var(--qrp-primary);
+}
+
+/* Blocked step */
+.vas_123_qrp-pipe-circle--blocked {
+    background:   var(--qrp-danger-strong);
+    border-color: var(--qrp-danger-strong);
+}
+
+/* Step label */
+.vas_123_qrp-pipe-label {
+    margin-top:    .5em;
+    width:         100%;
+    text-align:    center;
+    font-size:     .8125em;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    white-space:   nowrap;
+}
+
+.vas_123_qrp-pipe-label--done {
+    font-weight: 500;
+    color:       var(--qrp-primary);
+}
+
+.vas_123_qrp-pipe-label--active {
+    font-weight: 700;
+    color:       var(--qrp-primary);
+}
+
+.vas_123_qrp-pipe-label--pending {
+    font-weight: 400;
+    color:       #9AB0C0;
+}
+
+.vas_123_qrp-pipe-label--blocked {
+    font-weight: 700;
+    color:       var(--qrp-danger-strong);
+}
+
+/* ============================================================
+   CALLOUT (info/warn banner)
+   ============================================================ */
+.vas_123_qrp-callout {
+    border-radius: 10px;
+    border:        1px solid var(--qrp-pale-border);
+    background:    var(--qrp-pale);
+    padding:       .5em .75em;
+    display:       flex;
+    align-items:   flex-start;
+    gap:           .5em;
+}
+
+.vas_123_qrp-callout svg {
+    width:      1em;
+    height:     1em;
+    flex:       none;
+    color:      var(--qrp-primary);
+    margin-top: .125em;
+}
+
+.vas_123_qrp-callout .vas_123_qrp-co-text {
+    font-size:   .75em;
+    font-weight: 400;
+    color:       var(--qrp-text2);
+    line-height: 1.45;
+}
+
+.vas_123_qrp-co-text b {
+    color:       var(--qrp-ink);
+    font-weight: 700;
+}
+
+.vas_123_qrp-co-text a {
+    color:           var(--qrp-primary);
+    font-weight:     700;
+    text-decoration: none;
+    cursor:          pointer;
+}
+
+.vas_123_qrp-co-text a:hover {
+    text-decoration: underline;
+}
+
+/* Warning variant */
+.vas_123_qrp-callout--warn {
+    border-color: var(--qrp-warn-border);
+    background:   var(--qrp-warn-bg);
+}
+
+.vas_123_qrp-callout--warn svg {
+    color: var(--qrp-warn);
+}
+
+/* ============================================================
+   MODAL OVERLAY
+   ============================================================ */
+.vas_123_qrp-overlay {
+    position:        fixed;
+    inset:           0;
+    z-index:         9050;
+    display:         none;
+    align-items:     center;
+    justify-content: center;
+    padding:         20px;
+}
+
+.vas_123_qrp-overlay--open {
+    display: flex;
+}
+
+.vas_123_qrp-overlay__back {
+    position:   absolute;
+    inset:      0;
+    background: rgba(16, 44, 63, .38);
+}
+
+.vas_123_qrp-modal {
+    position:       relative;
+    width:          560px;
+    max-width:      100%;
+    max-height:     min(84vh, 720px);
+    overflow:       hidden;
+    background:     #fff;
+    border-radius:  16px;
+    box-shadow:     0 24px 64px rgba(15, 61, 97, .22);
+    display:        flex;
+    flex-direction: column;
+    font-size:      16px;
+}
+
+.vas_123_qrp-modal--wide {
+    width: 720px;
+}
+
+/* Modal header */
+.vas_123_qrp-mhead {
+    flex:            none;
+    padding:         14px 18px;
+    border-bottom:   1px solid var(--qrp-border);
+    display:         flex;
+    align-items:     flex-start;
+    justify-content: space-between;
+    gap:             12px;
+}
+
+.vas_123_qrp-mh-title {
+    font-size:   1em;
+    font-weight: 700;
+    color:       var(--qrp-ink);
+    margin:      0;
+}
+
+.vas_123_qrp-mh-meta {
+    font-size:  .75em;
+    color:      var(--qrp-muted);
+    margin:     2px 0 0;
+}
+
+/* Modal body */
+.vas_123_qrp-mbody {
+    flex:           1;
+    min-height:     0;
+    overflow-y:     auto;
+    padding:        16px 18px;
+    display:        flex;
+    flex-direction: column;
+    gap:            12px;
+    font-size:      16px;
+}
+
+/* Modal footer */
+.vas_123_qrp-mfoot {
+    flex:            none;
+    padding:         12px 18px;
+    border-top:      1px solid var(--qrp-border);
+    display:         flex;
+    justify-content: flex-end;
+    gap:             8px;
+    flex-wrap:       wrap;
+}
+
+/* ============================================================
+   FORM FIELDS (inside modal)
+   ============================================================ */
+.vas_123_qrp-fieldrow {
+    display:               grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap:                   14px;
+}
+
+.vas_123_qrp-field {
+    display:        flex;
+    flex-direction: column;
+    gap:            6px;
+}
+
+.vas_123_qrp-field--full {
+    grid-column: 1 / -1;
+}
+
+.vas_123_qrp-field label {
+    font-size: .75em;
+    color:     var(--qrp-muted);
+}
+
+.vas_123_qrp-field input,
+.vas_123_qrp-field select,
+.vas_123_qrp-field textarea {
+    border:        0;
+    border-bottom: 1px solid #D7D7D7;
+    background:    transparent;
+    padding:       8px 2px;
+    font:          inherit;
+    font-size:     .9375em;
+    color:         var(--qrp-ink);
+    outline:       0;
+    width:         100%;
+}
+
+.vas_123_qrp-field input:focus,
+.vas_123_qrp-field select:focus,
+.vas_123_qrp-field textarea:focus {
+    border-bottom-color: var(--qrp-primary);
+}
+
+.vas_123_qrp-field textarea {
+    resize:     vertical;
+    min-height: 64px;
+}
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+.vas_123_qrp-emptyline {
+    font-size:     .75em;
+    font-weight:   400;
+    color:         var(--qrp-muted);
+    background:    var(--qrp-secondary-surface);
+    border:        1px dashed var(--qrp-border);
+    border-radius: 10px;
+    padding:       .625em .75em;
+}
+
+/* ============================================================
+   LOADING SKELETON
+   ============================================================ */
+.vas_123_qrp-skel {
+    height:          1em;
+    background:      linear-gradient(90deg, #EEF1F5 0%, #F8F9FA 50%, #EEF1F5 100%);
+    background-size: 200% 100%;
+    border-radius:   4px;
+    animation:       vas_123_qrp_shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes vas_123_qrp_shimmer {
+    from {
+        background-position: 200% 0;
+    }
+    to {
+        background-position: -200% 0;
+    }
+}
+
+/* ============================================================
+   LOADING SKELETON MODIFIERS
+   ============================================================ */
+.vas_123_qrp-skel--label {
+    width:  60%;
+    height: .6875em;
+}
+
+.vas_123_qrp-skel--title {
+    width:  75%;
+    height: 1.125em;
+}
+
+.vas_123_qrp-skel--sub {
+    width:       55%;
+    height:      .75em;
+    margin-top:  .375em;
+}
+
+.vas_123_qrp-skel--row {
+    width:  100%;
+    height: 3.5em;
+}
+
+.vas_123_qrp-skel--block {
+    width:  100%;
+    height: 6em;
+}
+
+/* ============================================================
+   ERROR STATE
+   ============================================================ */
+.vas_123_qrp-error-block {
+    display:     flex;
+    align-items: flex-start;
+    gap:         .5em;
+    padding:     .625em .75em;
+    background:  var(--qrp-danger-bg);
+    border:      1px solid var(--qrp-danger-border);
+    border-radius: 10px;
+}
+
+.vas_123_qrp-error-icon {
+    flex:  none;
+    color: var(--qrp-danger);
+    width: 1em;
+    height: 1em;
+}
+
+.vas_123_qrp-error-icon svg {
+    width:  100%;
+    height: 100%;
+}
+
+.vas_123_qrp-error-msg {
+    font-size:   .75em;
+    font-weight: 400;
+    color:       var(--qrp-danger);
+    line-height: 1.45;
+    margin:      0;
+}
+
+/* ============================================================
+   MODAL CONFIRM DESCRIPTION
+   ============================================================ */
+.vas_123_qrp-mconfirm-desc {
+    font-size:   .9375em;
+    font-weight: 400;
+    color:       var(--qrp-text2);
+    line-height: 1.5;
+    margin:      0;
+}
+
+/* ============================================================
+   TOAST NOTIFICATION
+   ============================================================ */
+.vas_123_qrp-toast {
+    position:       fixed;
+    left:           50%;
+    bottom:         26px;
+    transform:      translateX(-50%) translateY(20px);
+    z-index:        9100;
+    background:     var(--qrp-ink);
+    color:          #fff;
+    font-size:      13px;
+    padding:        9px 16px;
+    border-radius:  999px;
+    opacity:        0;
+    pointer-events: none;
+    transition:     all .25s ease;
+}
+
+.vas_123_qrp-toast--show {
+    opacity:   1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ============================================================
+   CONTAINER QUERIES — RESPONSIVE
+   ============================================================ */
+
+/* Collapse 4-col metric grid to 2-col at ≤640 px container */
+@container (max-width: 640px) {
+    .vas_123_qrp-mgrid--4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Collapse grids further and stretch action buttons at ≤440 px */
+@container (max-width: 440px) {
+    .vas_123_qrp-mgrid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .vas_123_qrp-mgrid--4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .vas_123_qrp-id-actions .vas_123_qrp-btn {
+        flex:            1;
+        justify-content: center;
+    }
+}
+
+/* Collapse modal field-row and widen modal on small viewports */
+@media (max-width: 560px) {
+    .vas_123_qrp-fieldrow {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .vas_123_qrp-modal {
+        width: 100%;
+    }
+}
+
+/* ============================================================
+   PART 2 — ENTITY LIST
+   ============================================================ */
+.vas_123_qrp-elist {
+    display:        flex;
+    flex-direction: column;
+}
+
+.vas_123_qrp-erow {
+    display:       flex;
+    align-items:   flex-start;
+    gap:           .75em;
+    padding:       .625em 0;
+    border-bottom: 1px solid var(--qrp-divider);
+    cursor:        pointer;
+}
+
+/* Lines are now wrapped in lh-wrap so last-child targets the wrapper */
+.vas_123_qrp-lh-wrap:last-child .vas_123_qrp-erow {
+    border-bottom: 0;
+}
+
+.vas_123_qrp-erow:hover .vas_123_qrp-e-primary {
+    color: var(--qrp-primary);
+}
+
+/* Rectangular tile variant (8px radius) for entity-list rows */
+.vas_123_qrp-etile--rect {
+    border-radius: 8px;
+}
+
+/* Tile tone colour modifiers */
+.vas_123_qrp-etile--success {
+    background: var(--qrp-success-bg);
+    color:      var(--qrp-success);
+}
+
+.vas_123_qrp-etile--violet {
+    background: #F3EEFF;
+    color:      #6B3FBA;
+}
+
+.vas_123_qrp-etile--warn {
+    background: var(--qrp-warn-bg);
+    color:      var(--qrp-warn);
+}
+
+.vas_123_qrp-etile--risk {
+    background: var(--qrp-danger-bg);
+    color:      var(--qrp-danger-strong);
+}
+
+.vas_123_qrp-emain {
+    min-width: 0;
+    flex:      1;
+}
+
+.vas_123_qrp-e-titlerow {
+    display:     flex;
+    align-items: center;
+    gap:         .5em;
+    flex-wrap:   wrap;
+}
+
+.vas_123_qrp-e-primary {
+    font-size:     .875em;
+    font-weight:   700;
+    color:         var(--qrp-ink);
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    white-space:   nowrap;
+    min-width:     0;
+}
+
+.vas_123_qrp-e-meta {
+    font-size:     .75em;
+    font-weight:   400;
+    color:         var(--qrp-muted);
+    margin-top:    .1875em;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    white-space:   nowrap;
+}
+
+.vas_123_qrp-etrail {
+    flex:        none;
+    display:     flex;
+    /*align-items: center;*/
+    align-self:  center;
+    gap:         .75em;
+    margin-left: .75em;
+}
+
+.vas_123_qrp-e-value {
+    font-size:   .9375em;
+    font-weight: 700;
+    color:       var(--qrp-ink);
+}
+
+.vas_123_qrp-e-sub {
+    font-size:  .75em;
+    color:      var(--qrp-muted);
+    margin-top: .125em;
+}
+
+/* Entity summary row — sits below the entity list */
+.vas_123_qrp-esummary {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    gap:             .75em;
+    padding:         .625em 0;
+    border-top:      1px solid var(--qrp-border);
+}
+
+.vas_123_qrp-es-label {
+    font-size:   .8125em;
+    font-weight: 700;
+    color:       var(--qrp-ink);
+}
+
+.vas_123_qrp-es-total {
+    font-size:   1em;
+    font-weight: 700;
+    color:       var(--qrp-primary);
+}
+
+/* ============================================================
+   PART 2 — TOTALS BLOCK (Quotation lines)
+   ============================================================ */
+.vas_123_qrp-totals-block {
+    border-top:  1px solid var(--qrp-border);
+    padding-top: .5em;
+    margin-top:  .125em;
+}
+
+.vas_123_qrp-totrow {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    padding:         .25em 0;
+}
+
+.vas_123_qrp-t-label {
+    font-size:   .75em;
+    font-weight: 400;
+    color:       var(--qrp-muted);
+}
+
+.vas_123_qrp-t-value {
+    font-size:   .8125em;
+    font-weight: 700;
+    color:       var(--qrp-ink);
+}
+
+/* ============================================================
+   PART 2 — DETAIL CARD (Pricing & terms wrapper)
+   ============================================================ */
+.vas_123_qrp-dcard {
+    border-radius: 12px;
+    border:        1px solid var(--qrp-border);
+    background:    #FFFFFF;
+    padding:       .875em;
+}
+
+.vas_123_qrp-dcard .vas_123_qrp-mgrid {
+    row-gap: .625em;
+}
+
+/* ============================================================
+   PART 2 — PERSON CARDS (Customer & contact)
+   ============================================================ */
+.vas_123_qrp-pcard {
+    border-radius: 12px;
+    border:        1px solid var(--qrp-border);
+    background:    #FFFFFF;
+    padding:       .75em .875em;
+}
+
+.vas_123_qrp-pcard--tinted {
+    background: var(--qrp-secondary-surface);
+    cursor:     pointer;
+}
+
+.vas_123_qrp-pcard--tinted:hover .vas_123_qrp-pc-name {
+    color: var(--qrp-primary);
+}
+
+/* Stack of person cards in Customer & contact section */
+.vas_123_qrp-customer-stack {
+    display:        flex;
+    flex-direction: column;
+    gap:            .625em;
+}
+
+/* Contact initials avatar */
+.vas_123_qrp-contact-avatar {
+    width:           3em;
+    height:          3em;
+    flex:            none;
+    border-radius:   999px;
+    background:      #DFF1FF;
+    color:           #0F69AC;
+    border:          1px solid var(--qrp-pale-border);
+    display:         inline-flex;
+    align-items:     center;
+    justify-content: center;
+    font-size:       .75em;
+    font-weight:     700;
+    line-height:     1;
+}
+
+/* Icon button — Email / Call in the contact card */
+.vas_123_qrp-iconbtn {
+    width:           2em;
+    height:          2em;
+    flex:            none;
+    display:         inline-flex;
+    align-items:     center;
+    justify-content: center;
+    border-radius:   999px;
+    border:          1px solid var(--qrp-pale-border);
+    background:      #FFFFFF;
+    color:           var(--qrp-primary);
+    cursor:          pointer;
+}
+
+.vas_123_qrp-iconbtn:hover {
+    background: var(--qrp-pale);
+}
+
+.vas_123_qrp-iconbtn svg {
+    width:  1em;
+    height: 1em;
+}
+
+/* ============================================================
+   PART 2 — SECTION ACTION LINK (+ Link opportunity, + Add line)
+   ============================================================ */
+.vas_123_qrp-sh-action {
+    font-size:   .8125em;
+    font-weight: 400;
+    color:       var(--qrp-primary);
+    background:  none;
+    border:      0;
+    padding:     0;
+    cursor:      pointer;
+    display:     inline-flex;
+    align-items: center;
+    gap:         .25em;
+    line-height: 1;
+}
+
+.vas_123_qrp-sh-action:hover {
+    color: var(--qrp-action-hover);
+}
+
+.vas_123_qrp-sh-action svg {
+    width:  1em;
+    height: 1em;
+}
+
+/* ============================================================
+   PART 2 — COMPACT LIST (Link opportunity modal D2)
+   ============================================================ */
+.vas_123_qrp-clist {
+    display:        flex;
+    flex-direction: column;
+    border:         1px solid var(--qrp-divider);
+    border-radius:  12px;
+    overflow:       hidden;
+}
+
+.vas_123_qrp-crow {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    gap:             .75em;
+    padding:         .625em .75em;
+    border-bottom:   1px solid var(--qrp-divider);
+}
+
+.vas_123_qrp-crow:last-child {
+    border-bottom: 0;
+}
+
+.vas_123_qrp-cl-left {
+    min-width:      0;
+    display:        flex;
+    flex-direction: column;
+    gap:            .125em;
+}
+
+.vas_123_qrp-cl-primary {
+    font-size:     .875em;
+    font-weight:   700;
+    color:         var(--qrp-ink);
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    white-space:   nowrap;
+}
+
+.vas_123_qrp-cl-meta {
+    font-size:     .75em;
+    font-weight:   400;
+    color:         var(--qrp-muted);
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    white-space:   nowrap;
+}
+
+.vas_123_qrp-cl-right {
+    flex:        none;
+    display:     flex;
+    align-items: center;
+    gap:         .5em;
+}
+
+/* ============================================================
+   PART 3 — STAKEHOLDERS: compact list rows with avatar
+   ============================================================ */
+.vas_123_qrp-srow {
+    display:       flex;
+    align-items:   center;
+    gap:           .75em;
+    padding:       .625em .75em;
+    border-bottom: 1px solid var(--qrp-divider);
+    cursor:        pointer;
+}
+
+.vas_123_qrp-srow:last-child {
+    border-bottom: 0;
+}
+
+.vas_123_qrp-srow-left {
+    display:     flex;
+    align-items: center;
+    gap:         .625em;
+    min-width:   0;
+    flex:        1;
+}
+
+.vas_123_qrp-srow-right {
+    flex:        none;
+    display:     flex;
+    align-items: center;
+    gap:         .5em;
+}
+
+/* ============================================================
+   PART 3 — TASKS: task rows
+   ============================================================ */
+.vas_123_qrp-taskrow {
+    display:       flex;
+    align-items:   flex-start;
+    gap:           .625em;
+    padding:       .625em 0;
+    border-bottom: 1px solid var(--qrp-divider);
+    cursor:        pointer;
+}
+
+.vas_123_qrp-taskrow:last-child {
+    border-bottom: 0;
+}
+
+.vas_123_qrp-taskrow input[type=checkbox] {
+    width:         1em;
+    height:        1em;
+    margin:        .125em 0 0;
+    flex:          none;
+    accent-color:  var(--qrp-action);
+    cursor:        pointer;
+}
+
+.vas_123_qrp-task-main {
+    min-width: 0;
+    flex:      1;
+}
+
+.vas_123_qrp-task-title {
+    font-size:   .875em;
+    font-weight: 700;
+    color:       var(--qrp-ink);
+}
+
+.vas_123_qrp-task-title--done {
+    text-decoration: line-through;
+    color:           var(--qrp-muted);
+    font-weight:     400;
+}
+
+.vas_123_qrp-task-meta {
+    font-size:   .75em;
+    font-weight: 400;
+    color:       var(--qrp-muted);
+    margin-top:  .1875em;
+    display:     flex;
+    align-items: center;
+    gap:         .5em;
+    flex-wrap:   wrap;
+}
+
+.vas_123_qrp-task-overdue {
+    color:       var(--qrp-danger);
+    font-weight: 700;
+}
+
+/* ============================================================
+   PART 3 — SEGMENTED TOGGLE (Tasks tab switch)
+   ============================================================ */
+.vas_123_qrp-seg {
+    display:       inline-flex;
+    border:        1px solid var(--qrp-border);
+    border-radius: 999px;
+    overflow:      hidden;
+}
+
+.vas_123_qrp-seg-btn {
+    border:      0;
+    background:  #fff;
+    color:       var(--qrp-muted);
+    font-size:   .6875em;
+    font-weight: 500;
+    padding:     .375em .75em;
+    cursor:      pointer;
+    line-height: 1;
+}
+
+.vas_123_qrp-seg-btn--on {
+    background: var(--qrp-pale);
+    color:      var(--qrp-primary);
+    font-weight: 700;
+}
+
+/* ============================================================
+   PART 3 — CHANNEL FILTER STRIP (Engagement)
+   ============================================================ */
+.vas_123_qrp-chanstrip {
+    display:               grid;
+    grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+    gap:                   .375em;
+    margin-bottom:         .625em;
+}
+
+.vas_123_qrp-chan-btn {
+    border:          1px solid var(--qrp-border);
+    background:      #fff;
+    border-radius:   999px;
+    padding:         .375em .5em;
+    font-size:       .6875em;
+    font-weight:     500;
+    color:           var(--qrp-muted);
+    cursor:          pointer;
+    line-height:     1;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    gap:             .25em;
+    white-space:     nowrap;
+}
+
+.vas_123_qrp-chan-btn--on {
+    background:    var(--qrp-pale);
+    border-color:  var(--qrp-pale-border);
+    color:         var(--qrp-primary);
+    font-weight:   700;
+}
+
+/* ============================================================
+   PART 3 — TIMELINE (Engagement feed)
+   ============================================================ */
+.vas_123_qrp-tl {
+    display:        flex;
+    flex-direction: column;
+    gap:            .75em;
+}
+
+.vas_123_qrp-tl-entry {
+    display:     flex;
+    align-items: flex-start;
+    gap:         .75em;
+    cursor:      pointer;
+}
+
+.vas_123_qrp-tl-rail {
+    flex:            none;
+    display:         flex;
+    flex-direction:  column;
+    align-items:     center;
+    align-self:      stretch;
+}
+
+.vas_123_qrp-tl-dot {
+    width:         10px;
+    height:        10px;
+    border-radius: 999px;
+    background:    var(--qrp-action);
+    margin-top:    .375em;
+    flex:          none;
+}
+
+.vas_123_qrp-tl-trail {
+    margin-top: .25em;
+    width:      1px;
+    flex:       1;
+    min-height: 2.5em;
+    background: #D9E6F2;
+}
+
+.vas_123_qrp-tl-entry:last-child .vas_123_qrp-tl-trail {
+    display: none;
+}
+
+.vas_123_qrp-tl-card {
+    min-width:     0;
+    flex:          1;
+    border-radius: 12px;
+    border:        1px solid var(--qrp-border);
+    background:    #fff;
+    padding:       .625em .75em;
+}
+
+.vas_123_qrp-tl-entry:hover .vas_123_qrp-tl-card {
+    border-color: var(--qrp-pale-border);
+}
+
+.vas_123_qrp-tl-top {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    gap:             .5em;
+}
+
+.vas_123_qrp-tl-title {
+    font-size:     .875em;
+    font-weight:   700;
+    color:         var(--qrp-ink);
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    white-space:   nowrap;
+    min-width:     0;
+    display:       flex;
+    align-items:   center;
+    gap:           .375em;
+}
+
+.vas_123_qrp-tl-title svg {
+    width:  1em;
+    height: 1em;
+    flex:   none;
+    color:  var(--qrp-primary);
+}
+
+.vas_123_qrp-tl-meta {
+    font-size:     .75em;
+    font-weight:   400;
+    color:         var(--qrp-muted);
+    margin-top:    .375em;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    white-space:   nowrap;
+}
+
+.vas_123_qrp-tl-body {
+    font-size:             .75em;
+    font-weight:           400;
+    color:                 var(--qrp-text2);
+    margin-top:            .25em;
+    overflow:              hidden;
+    display:               -webkit-box;
+    -webkit-line-clamp:    2;
+    -webkit-box-orient:    vertical;
+}
+
+/* ============================================================
+   PART 3 — PAGER (Engagement pagination)
+   ============================================================ */
+.vas_123_qrp-pager {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    gap:             .5em;
+    padding-top:     .5em;
+}
+
+.vas_123_qrp-pg-info {
+    font-size:   .75em;
+    font-weight: 400;
+    color:       var(--qrp-muted);
+}
+
+.vas_123_qrp-pg-ctl {
+    display:     flex;
+    align-items: center;
+    gap:         .375em;
+}
+
+.vas_123_qrp-pg-ctl span {
+    font-size: .75em;
+    color:     var(--qrp-muted);
+}
+
+.vas_123_qrp-pgbtn {
+    width:           24px;
+    height:          24px;
+    flex:            none;
+    border-radius:   8px;
+    border:          1px solid var(--qrp-border);
+    background:      #fff;
+    color:           var(--qrp-primary);
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    cursor:          pointer;
+}
+
+.vas_123_qrp-pgbtn:disabled {
+    opacity: .4;
+    cursor:  not-allowed;
+}
+
+.vas_123_qrp-pgbtn svg {
+    width:  14px;
+    height: 14px;
+}
+
+/* ============================================================
+   PART 3 — NOTE COMPOSER (Engagement bottom)
+   ============================================================ */
+.vas_123_qrp-composer {
+    border:         1px solid var(--qrp-border);
+    border-radius:  12px;
+    background:     #fff;
+    padding:        .625em .75em;
+    display:        flex;
+    flex-direction: column;
+    gap:            .5em;
+    margin-top:     .75em;
+}
+
+.vas_123_qrp-composer textarea {
+    border:     0;
+    outline:    0;
+    resize:     vertical;
+    min-height: 3.25em;
+    width:      100%;
+    font-size:  .8125em;
+    color:      var(--qrp-ink);
+    background: transparent;
+}
+
+.vas_123_qrp-composer textarea::placeholder {
+    color: var(--qrp-placeholder);
+}
+
+.vas_123_qrp-cmp-foot {
+    display:         flex;
+    align-items:     center;
+    justify-content: flex-end;
+    gap:             .5em;
+}
+
+/* ============================================================
+   PART 3 — ASSIGNEE TYPEAHEAD (F1 Task form modal)
+   ============================================================ */
+.vas_123_qrp-assg-box {
+    position: relative;
+}
+
+.vas_123_qrp-assg-chips {
+    display:       flex;
+    gap:           6px;
+    flex-wrap:     wrap;
+    margin-bottom: 6px;
+    min-height:    1.5em;
+}
+
+.vas_123_qrp-achip {
+    display:     inline-flex;
+    align-items: center;
+    gap:         6px;
+    border-radius: 999px;
+    padding:     5px 10px;
+    background:  var(--qrp-pale);
+    border:      1px solid var(--qrp-pale-border);
+    color:       var(--qrp-primary);
+    font-size:   .6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas_123_qrp-achip button {
+    border:      0;
+    background:  none;
+    padding:     0;
+    cursor:      pointer;
+    color:       inherit;
+    display:     flex;
+}
+
+.vas_123_qrp-achip button svg {
+    width:  11px;
+    height: 11px;
+}
+
+.vas_123_qrp-suggest {
+    position:    absolute;
+    left:        0;
+    right:       0;
+    top:         100%;
+    margin-top:  4px;
+    z-index:     6;
+    display:     none;
+    background:  #fff;
+    border:      1px solid var(--qrp-border);
+    border-radius: 10px;
+    box-shadow:  0 12px 28px rgba(15, 61, 97, .14);
+    max-height:  200px;
+    overflow-y:  auto;
+}
+
+.vas_123_qrp-suggest--open {
+    display: block;
+}
+
+.vas_123_qrp-sugrow {
+    display:     flex;
+    align-items: center;
+    gap:         8px;
+    padding:     8px 10px;
+    cursor:      pointer;
+}
+
+.vas_123_qrp-sugrow:hover {
+    background: var(--qrp-faint);
+}
+
+.vas_123_qrp-sg-main {
+    min-width: 0;
+}
+
+.vas_123_qrp-sg-name {
+    display:     block;
+    font-size:   .8125em;
+    font-weight: 700;
+    color:       var(--qrp-ink);
+}
+
+.vas_123_qrp-sg-mail {
+    display:    block;
+    font-size:  .6875em;
+    color:      var(--qrp-muted);
+    margin-top: 1px;
+}
+
+.vas_123_qrp-sugempty {
+    padding:   10px 12px;
+    font-size: .75em;
+    color:     var(--qrp-muted);
+}
+
+/* ============================================================
+   PART 3 — PRIORITY PICK CHIPS (F1 Task form modal)
+   ============================================================ */
+.vas_123_qrp-chiprow {
+    display:   flex;
+    gap:       6px;
+    flex-wrap: wrap;
+}
+
+.vas_123_qrp-pick {
+    border:        1px solid var(--qrp-border);
+    background:    #fff;
+    border-radius: 999px;
+    padding:       6px 12px;
+    font-size:     .75em;
+    color:         var(--qrp-muted);
+    cursor:        pointer;
+    line-height:   1;
+}
+
+.vas_123_qrp-pick--on {
+    background:   var(--qrp-pale);
+    border-color: var(--qrp-pale-border);
+    color:        var(--qrp-primary);
+    font-weight:  700;
+}
+
+/* ============================================================
+   PART 3 — ENGAGEMENT SECTION ICON BADGE
+   ============================================================ */
+.vas_123_qrp-eng-icon-badge {
+    width:           1.875em;
+    height:          1.875em;
+    border-radius:   0.5em;
+    background:      var(--qrp-pale);
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    color:           var(--qrp-primary);
+    flex-shrink:     0;
+}
+
+/* ============================================================
+   PART 3 — ENGAGEMENT STAT STRIP
+   ============================================================ */
+.vas_123_qrp-eng-statstrip {
+    display:               grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap:                   0.5em;
+    margin-bottom:         1em;
+}
+
+.vas_123_qrp-eng-statcard {
+    background:    #FFFFFF;
+    border:        0.0625em solid var(--qrp-border);
+    border-radius: 0.75em;
+    padding:       0.75em 0.5em;
+    display:       flex;
+    flex-direction: column;
+    align-items:   center;
+    text-align:    center;
+}
+
+.vas_123_qrp-eng-statcard-icon {
+    color:         var(--qrp-primary);
+    margin-bottom: 0.25em;
+    line-height:   1;
+}
+
+.vas_123_qrp-eng-statcard-count {
+    font-size:   1.375em;
+    font-weight: 700;
+    color:       var(--qrp-ink);
+    line-height: 1.1;
+}
+
+.vas_123_qrp-eng-statcard-label {
+    font-size:      0.5625em;
+    font-weight:    700;
+    color:          var(--qrp-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top:     0.2em;
+}
+
+.vas_123_qrp-eng-statcard-sub {
+    font-size:  0.625em;
+    color:      var(--qrp-muted);
+    margin-top: 0.15em;
+}
+
+.vas_123_qrp-eng-statcard--clickable {
+    cursor:     pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.vas_123_qrp-eng-statcard--clickable:hover {
+    border-color: #25D366;
+    box-shadow:   0 0 0 0.125em rgba(37, 211, 102, 0.15);
+}
+
+.vas_123_qrp-eng-statcard--clickable .vas_123_qrp-eng-statcard-icon {
+    color: #25D366;
+}
+
+/* ============================================================
+   PART 3 — ENGAGEMENT TIMELINE BADGE / TS / META-BADGE
+   ============================================================ */
+.vas_123_qrp-eng-badge {
+    display:        inline-flex;
+    align-items:    center;
+    border-radius:  999px;
+    padding:        0.2em 0.55em;
+    font-size:      0.6875em;
+    font-weight:    700;
+    line-height:    1.4;
+    white-space:    nowrap;
+    flex:           none;
+}
+
+.vas_123_qrp-eng-dir-in,
+.vas_123_qrp-eng-dir-out {
+    display:       inline-flex;
+    align-items:   center;
+    border-radius: 999px;
+    padding:       0.15em 0.45em;
+    font-size:     0.625em;
+    font-weight:   700;
+    flex:          none;
+}
+
+.vas_123_qrp-eng-dir-in  { background: #DBEAFE; color: #1D4ED8; }
+.vas_123_qrp-eng-dir-out { background: #D1FAE5; color: #065F46; }
+
+.vas_123_qrp-eng-ts {
+    margin-left: auto;
+    font-size:   0.75em;
+    color:       var(--qrp-muted);
+    white-space: nowrap;
+    flex:        none;
+}
+
+.vas_123_qrp-eng-meta-badge {
+    display:     inline-flex;
+    align-items: center;
+    gap:         0.2em;
+    font-size:   0.75em;
+    color:       var(--qrp-muted);
+}
+
+.vas_123_qrp-tl-card--clickable {
+    cursor: pointer;
+}
+
+.vas_123_qrp-tl-card--clickable:hover {
+    border-color: var(--qrp-pale-border);
+    box-shadow:   0 0.125em 0.5em rgba(0, 131, 218, 0.1);
+}
+
+/* ============================================================
+   PART 3 — SPIN ANIMATION (meeting save button)
+   ============================================================ */
+@keyframes vas_123_spin {
+    to { transform: rotate(360deg); }
+}
+
+.vas_123_spin {
+    animation:      vas_123_spin 0.75s linear infinite;
+    display:        inline-block;
+    vertical-align: middle;
+}
+
+/* ============================================================
+   PART 3 — MEETING DETAIL MODAL
+   ============================================================ */
+.vas_123_qrp-mtg-subject {
+    font-size:     1.125em;
+    font-weight:   700;
+    color:         var(--qrp-ink);
+    margin-bottom: 0.25em;
+}
+
+.vas_123_qrp-mtg-meta {
+    font-size:     0.8125em;
+    color:         var(--qrp-muted);
+    margin-bottom: 1em;
+}
+
+.vas_123_qrp-mtg-field {
+    display:        flex;
+    flex-direction: column;
+    gap:            0.25em;
+    margin-bottom:  0.875em;
+}
+
+.vas_123_qrp-mtg-field-label {
+    font-size:   0.8125em;
+    font-weight: 600;
+    color:       var(--qrp-muted);
+}
+
+.vas_123_qrp-mtg-input {
+    width:         100%;
+    padding:       0.4375em 0.625em;
+    border:        0.0625em solid var(--qrp-border);
+    border-radius: 0.5em;
+    font-size:     0.875em;
+    color:         var(--qrp-ink);
+    background:    #fff;
+    box-sizing:    border-box;
+    transition:    border-color 0.15s;
+}
+
+.vas_123_qrp-mtg-input:focus {
+    outline:      none;
+    border-color: var(--qrp-primary);
+    box-shadow:   0 0 0 0.1875em rgba(0, 131, 218, 0.12);
+}
+
+.vas_123_qrp-mtg-textarea {
+    width:         100%;
+    padding:       0.4375em 0.625em;
+    border:        0.0625em solid var(--qrp-border);
+    border-radius: 0.5em;
+    font-size:     0.875em;
+    color:         var(--qrp-ink);
+    background:    #fff;
+    box-sizing:    border-box;
+    resize:        vertical;
+    min-height:    5em;
+    transition:    border-color 0.15s;
+}
+
+.vas_123_qrp-mtg-textarea:focus {
+    outline:      none;
+    border-color: var(--qrp-primary);
+    box-shadow:   0 0 0 0.1875em rgba(0, 131, 218, 0.12);
+}
+
+.vas_123_qrp-mtg-divider {
+    border:     none;
+    border-top: 0.0625em solid var(--qrp-border);
+    margin:     1.25em 0;
+}
+
+.vas_123_qrp-mtg-trans-head {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    margin-bottom:   0.5em;
+}
+
+.vas_123_qrp-mtg-trans-label {
+    display:     inline-flex;
+    align-items: center;
+    gap:         0.375em;
+    font-size:   0.875em;
+    color:       var(--qrp-ink);
+}
+
+.vas_123_qrp-mtg-trans-box {
+    border:        0.0625em solid var(--qrp-border);
+    border-radius: 0.5em;
+    padding:       0.75em 0.875em;
+    background:    var(--qrp-secondary-surface);
+    max-height:    14em;
+    overflow-y:    auto;
+    margin-bottom: 1em;
+}
+
+.vas_123_qrp-mtg-tline {
+    font-size:   0.8125em;
+    color:       var(--qrp-ink);
+    line-height: 1.5;
+}
+
+.vas_123_qrp-mtg-speaker {
+    color:       var(--qrp-primary);
+    font-weight: 600;
+}
+
+/* ============================================================
+   PART 3 — EMAIL DETAIL MODAL
+   ============================================================ */
+.vas_123_qrp-emd-top {
+    display:       flex;
+    align-items:   center;
+    gap:           0.625em;
+    margin-bottom: 0.75em;
+}
+
+.vas_123_qrp-emd-heading {
+    font-size:   1em;
+    font-weight: 700;
+    color:       var(--qrp-ink);
+    word-break:  break-word;
+}
+
+.vas_123_qrp-emd-quote {
+    font-size:     0.875em;
+    color:         var(--qrp-muted);
+    font-style:    italic;
+    background:    var(--qrp-secondary-surface);
+    border-left:   0.1875em solid var(--qrp-border);
+    padding:       0.5em 0.75em;
+    margin-bottom: 0.75em;
+    word-break:    break-word;
+}
+
+.vas_123_qrp-emd-meta {
+    width:           100%;
+    border-collapse: collapse;
+    margin-bottom:   1em;
+    font-size:       0.8125em;
+}
+
+.vas_123_qrp-emd-meta tr + tr td {
+    padding-top: 0.375em;
+}
+
+.vas_123_qrp-emd-meta-label {
+    font-weight:    600;
+    color:          var(--qrp-muted);
+    padding-right:  0.75em;
+    white-space:    nowrap;
+    vertical-align: top;
+}
+
+.vas_123_qrp-emd-meta-value {
+    color:          var(--qrp-ink);
+    padding-right:  1.25em;
+    vertical-align: top;
+    word-break:     break-all;
+}
+
+.vas_123_qrp-emd-body {
+    font-size:   0.875em;
+    color:       var(--qrp-ink);
+    line-height: 1.6;
+    word-break:  break-word;
+}
+
+/* ============================================================
+   PART 3 — WHATSAPP CONVERSATION MODAL
+   ============================================================ */
+.vas_123_qrp-wachat-contact {
+    display:       flex;
+    align-items:   center;
+    gap:           0.75em;
+    margin-bottom: 1em;
+}
+
+.vas_123_qrp-wachat-avatar {
+    width:           2.5em;
+    height:          2.5em;
+    border-radius:   999px;
+    background:      #25D366;
+    color:           #fff;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    flex:            none;
+}
+
+.vas_123_qrp-wachat-contact-name {
+    font-size:   0.9375em;
+    font-weight: 700;
+    color:       var(--qrp-ink);
+}
+
+.vas_123_qrp-wachat-contact-meta {
+    font-size: 0.75em;
+    color:     var(--qrp-muted);
+}
+
+.vas_123_qrp-wachat-bubbles {
+    display:        flex;
+    flex-direction: column;
+    gap:            0.5em;
+    max-height:     18em;
+    overflow-y:     auto;
+    margin-bottom:  0.75em;
+    padding-right:  0.25em;
+}
+
+.vas_123_qrp-wachat-bubble {
+    max-width:    72%;
+    padding:      0.5em 0.75em;
+    border-radius: 0.75em;
+    word-break:   break-word;
+}
+
+.vas_123_qrp-wachat-bubble--in {
+    align-self:  flex-start;
+    background:  #FFFFFF;
+    border:      0.0625em solid var(--qrp-border);
+}
+
+.vas_123_qrp-wachat-bubble--out {
+    align-self:  flex-end;
+    background:  #DCF8C6;
+    border:      0.0625em solid #b7e8a0;
+}
+
+.vas_123_qrp-wachat-text {
+    color:      var(--qrp-ink);
+    word-break: break-word;
+    font-size:  0.875em;
+}
+
+.vas_123_qrp-wachat-ts {
+    font-size:  0.75em;
+    color:      var(--qrp-muted);
+    text-align: right;
+    margin-top: 0.2em;
+}
+
+.vas_123_qrp-wachat-sendbox {
+    display: flex;
+    gap:     0.5em;
+    align-items: center;
+}
+
+.vas_123_qrp-wachat-input {
+    flex:          1;
+    border:        0.0625em solid var(--qrp-border);
+    border-radius: 0.5em;
+    padding:       0.4375em 0.625em;
+    font-size:     0.875em;
+    color:         var(--qrp-ink);
+    background:    #fff;
+    outline:       none;
+    transition:    border-color 0.15s;
+}
+
+.vas_123_qrp-wachat-input:focus {
+    border-color: var(--qrp-primary);
+}
+
+.vas_123_qrp-wachat-sendbtn {
+    width:           2.25em;
+    height:          2.25em;
+    border-radius:   999px;
+    border:          none;
+    background:      #25D366;
+    color:           #fff;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    cursor:          pointer;
+    flex:            none;
+    transition:      background 0.15s;
+}
+
+.vas_123_qrp-wachat-sendbtn:hover  { background: #1EBE5B; }
+.vas_123_qrp-wachat-sendbtn:active { background: #17A34A; }
+
+/* Small button modifier */
+.vas_123_qrp-btn--sm {
+    padding:   0.3em 0.6em;
+    font-size: 0.8125em;
+}
+
+/* ============================================================
+   PART 3 — WHATSAPP / CHAT THREAD (F3 modal)
+   ============================================================ */
+.vas_123_qrp-wa-thread {
+    display:        flex;
+    flex-direction: column;
+    gap:            8px;
+    background:     #F2F6F9;
+    border-radius:  12px;
+    padding:        12px;
+}
+
+.vas_123_qrp-wa-msg {
+    max-width:     78%;
+    border-radius: 10px;
+    padding:       8px 10px;
+    font-size:     .8125em;
+    color:         var(--qrp-ink);
+    box-shadow:    0 1px 1px rgba(15, 61, 97, .08);
+}
+
+.vas_123_qrp-wa-msg--in {
+    align-self: flex-start;
+    background: #FFFFFF;
+}
+
+.vas_123_qrp-wa-msg--out {
+    align-self: flex-end;
+    background: #DCF8C6;
+}
+
+.vas_123_qrp-wa-time {
+    font-size:  .6875em;
+    color:      var(--qrp-muted);
+    margin-top: 4px;
+    text-align: right;
+}
+
+/* ============================================================
+   PART 3 — MEETING TRANSCRIPT (F4 modal)
+   ============================================================ */
+.vas_123_qrp-transcript {
+    background:    var(--qrp-secondary-surface);
+    border:        1px solid var(--qrp-border);
+    border-radius: 10px;
+    padding:       10px 12px;
+    font-size:     .8125em;
+    color:         var(--qrp-text2);
+    line-height:   1.5;
+    white-space:   pre-wrap;
+}
+
+/* ============================================================
+   §9b — LINE CHANGE HISTORY (C_OrderLineHistory)
+   ============================================================ */
+
+/* Wrapper that holds the line card + its history drawer as siblings */
+.vas_123_qrp-lh-wrap {
+    display:        flex;
+    flex-direction: column;
+    border-bottom:  1px solid var(--qrp-divider);
+}
+.vas_123_qrp-lh-wrap:last-child {
+    border-bottom:  0;
+}
+/* Move border ownership from erow to wrap so drawer sits inside the border */
+.vas_123_qrp-lh-wrap .vas_123_qrp-erow {
+    border-bottom: 0;
+}
+
+/* History toggle button — clock icon in etrail, inline after the amount */
+.vas_123_qrp-lh-toggle {
+    display:         inline-flex;
+    align-items:     center;
+    justify-content: center;
+    width:           1.6em;
+    height:          1.6em;
+    border:          1px solid var(--qrp-border);
+    border-radius:   50%;
+    background:      transparent;
+    padding:         0;
+    font-family:     inherit;
+    line-height:     1;
+    color:           var(--qrp-muted);
+    cursor:          pointer;
+    transition:      color .15s, border-color .15s, background .15s;
+}
+.vas_123_qrp-lh-toggle:hover {
+    background:    var(--qrp-faint);
+    border-color:  var(--qrp-action);
+    color:         var(--qrp-action);
+}
+.vas_123_qrp-lh-toggle.is-open {
+    background:    var(--qrp-faint);
+    border-color:  var(--qrp-action);
+    color:         var(--qrp-action);
+}
+.vas_123_qrp-lh-toggle svg {
+    width:  .75em;
+    height: .75em;
+}
+
+/* History drawer — tinted, with left accent rail matching the brand colour */
+.vas_123_qrp-lh-drawer {
+    background:  #F7FAFD;
+    box-shadow:  inset 3px 0 0 var(--qrp-action);
+    padding:     0;
+}
+[dir="rtl"] .vas_123_qrp-lh-drawer {
+    box-shadow: inset -3px 0 0 var(--qrp-action);
+}
+
+/* Grid table inside the drawer — 6 columns: CHANGED ON, PRICE, QTY, DATE, AMT, RECV */
+.vas_123_qrp-lh-table {
+    display:    grid;
+    width:      100%;
+}
+.vas_123_qrp-lh-thead,
+.vas_123_qrp-lh-row {
+    display:               grid;
+    grid-template-columns: 1.6fr 1fr 0.8fr 1fr 1fr 1.1fr;
+    align-items:           center;
+    gap:                   .5em;
+    padding:               .375em .5em;
+    font-size:             .75em;
+}
+.vas_123_qrp-lh-thead {
+    font-size:     .6875em;
+    font-weight:   600;
+    color:         var(--qrp-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    border-bottom: 1px solid var(--qrp-divider);
+    background:    transparent;
+}
+.vas_123_qrp-lh-row {
+    color:         var(--qrp-text2);
+    border-bottom: 1px solid var(--qrp-divider);
+}
+.vas_123_qrp-lh-row:last-child {
+    border-bottom: 0;
+}
+.vas_123_qrp-lh-row:hover {
+    background: rgba(255, 255, 255, .7);
+}
+
+/* Timestamp cell */
+.vas_123_qrp-lh-when {
+    color:       var(--qrp-ink);
+    font-weight: 500;
+    overflow:    hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Received cell: progress bar + fraction text side by side */
+.vas_123_qrp-lh-recv {
+    display:     flex;
+    align-items: center;
+    gap:         .4em;
+    min-width:   0;
+}
+.vas_123_qrp-lh-bar {
+    flex:            0 0 2.5em;
+    height:          4px;
+    border-radius:   2px;
+    background:      var(--qrp-divider);
+    overflow:        hidden;
+    display:         block;
+}
+.vas_123_qrp-lh-bar i {
+    display:       block;
+    height:        100%;
+    border-radius: 2px;
+    background:    var(--qrp-action);
+    font-style:    normal;
+}

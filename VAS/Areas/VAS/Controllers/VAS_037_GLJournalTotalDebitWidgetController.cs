@@ -537,20 +537,10 @@ SELECT
     GL_Journal.AD_Org_ID,
     GL_Journal.C_AcctSchema_ID,
     GL_Journal.DateAcct
-
 FROM GL_Journal GL_Journal
-
 WHERE GL_Journal.PostingType = 'A'
-
 AND GL_Journal.IsActive = 'Y'
-
-AND GL_Journal.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)";
+";
 
             protectedJournalSql = MRole.GetDefault(ctx).AddAccessSQL(protectedJournalSql, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 

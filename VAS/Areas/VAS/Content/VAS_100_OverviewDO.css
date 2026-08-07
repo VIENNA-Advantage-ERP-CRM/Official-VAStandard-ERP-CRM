@@ -1,8 +1,8 @@
-/************************************************************
+﻿/************************************************************
  * Module Name : VAS
  * Purpose     : Styles for the Delivery Order (DO) Overview tab panel
- *               (VAS.VAS_100_OverviewDO). All classes are MPC-prefixed
- *               (MPC-vasdo-*) and scoped under the panel root to avoid global
+ *               (VAS.VAS_100_OverviewDO). All classes are panel-prefixed
+ *               (vas_100-*) and scoped under the panel root to avoid global
  *               collisions. Shares the Onfinity windows-and-panels em-anchored
  *               body language with VAS_099_OverviewGRN / VAS_092 — Roboto,
  *               white surfaces, soft blue borders, KPI tiles with accent rails,
@@ -14,9 +14,17 @@
  *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
  *                        columns with a divider between them (stacking to a
  *                        bottom rule when narrow), plus its RTL mirror.
+ *   VAI163   2026-07-31  Header aligned to the VAS_092 Purchase Order Overview
+ *                        standard: details card is 40%/1fr (was 1.4fr/1fr) and
+ *                        its field column (-hdrColR) is a two-across grid
+ *                        instead of a single tall stack, collapsing to one
+ *                        column under 460px. Field values wrap rather than
+ *                        ellipsis-truncate now that the column is narrower.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vasdo- -> vas_100- so the panel's
+ *                        styles cannot collide with another panel's.
  ***********************************************************/
 
-.MPC-vasdo-root {
+.vas_100-root {
     /* Canonical palette */
     --do-text:        #102C3F;
     --do-muted:       #5F7283;
@@ -44,9 +52,9 @@
     box-sizing: border-box;
 }
 
-.MPC-vasdo-root * { box-sizing: border-box; }
+.vas_100-root * { box-sizing: border-box; }
 
-.MPC-vasdo-body {
+.vas_100-body {
     font-size: clamp(15px, 2.8cqi, 17px);
     padding: 1.125em 0.875em;
     display: flex;
@@ -54,7 +62,7 @@
     gap: 0.875em;
 }
 
-.MPC-vasdo-empty {
+.vas_100-empty {
     padding: 40px 18px;
     text-align: center;
     color: var(--do-muted);
@@ -64,9 +72,9 @@
 /* ----------------------------------------------------------- */
 /*  Section + Section Header                                    */
 /* ----------------------------------------------------------- */
-.MPC-vasdo-sec { display: block; }
+.vas_100-sec { display: block; }
 
-.MPC-vasdo-secHead {
+.vas_100-secHead {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -74,7 +82,7 @@
     margin-bottom: 0.5em;
 }
 
-.MPC-vasdo-secTitle {
+.vas_100-secTitle {
     font-size: 1em;
     font-weight: 700;
     color: var(--do-text);
@@ -82,7 +90,7 @@
     line-height: 1.2;
 }
 
-.MPC-vasdo-secSummary {
+.vas_100-secSummary {
     font-size: 0.75em;
     font-weight: 400;
     color: var(--do-muted);
@@ -92,40 +100,40 @@
 /* ----------------------------------------------------------- */
 /*  Icon wrapper                                               */
 /* ----------------------------------------------------------- */
-.MPC-vasdo-ic { display: inline-flex; align-items: center; flex: none; }
-.MPC-vasdo-ic svg { display: block; }
+.vas_100-ic { display: inline-flex; align-items: center; flex: none; }
+.vas_100-ic svg { display: block; }
 
 /* ----------------------------------------------------------- */
 /*  Header — title strip                                        */
 /* ----------------------------------------------------------- */
-.MPC-vasdo-hdr {
+.vas_100-hdr {
     border-radius: 14px;
     padding: 0.875em 1em;
 }
 
-.MPC-vasdo-hdrTop {
+.vas_100-hdrTop {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.875em;
 }
 
-.MPC-vasdo-hdrTitleWrap { min-width: 0; }
+.vas_100-hdrTitleWrap { min-width: 0; }
 
-.MPC-vasdo-hdrTitle {
+.vas_100-hdrTitle {
     font-size: 1.25em;
     font-weight: 700;
     color: var(--do-text);
     line-height: 1.2;
 }
 
-.MPC-vasdo-hdrSub {
+.vas_100-hdrSub {
     font-size: 0.75em;
     color: var(--do-sub);
     margin-top: 0.3125em;
 }
 
-.MPC-vasdo-hdrPills {
+.vas_100-hdrPills {
     flex: none;
     display: flex;
     align-items: center;
@@ -134,7 +142,7 @@
     gap: 0.5em;
 }
 
-.MPC-vasdo-hdrPill {
+.vas_100-hdrPill {
     display: inline-flex;
     align-items: center;
     gap: 0.3125em;
@@ -146,16 +154,16 @@
     white-space: nowrap;
 }
 
-.MPC-vasdo-hdrPill.tone-info    { background: var(--do-info-bg);    color: var(--do-info-tx); }
-.MPC-vasdo-hdrPill.tone-success { background: var(--do-success-bg); color: var(--do-success-tx); }
-.MPC-vasdo-hdrPill.tone-warning { background: var(--do-warning-bg); color: var(--do-warning-tx); }
-.MPC-vasdo-hdrPill.tone-risk    { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
-.MPC-vasdo-hdrPill.tone-purple  { background: var(--do-purple-bg);  color: var(--do-purple-tx); }
-.MPC-vasdo-hdrPill.tone-neutral { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
+.vas_100-hdrPill.tone-info    { background: var(--do-info-bg);    color: var(--do-info-tx); }
+.vas_100-hdrPill.tone-success { background: var(--do-success-bg); color: var(--do-success-tx); }
+.vas_100-hdrPill.tone-warning { background: var(--do-warning-bg); color: var(--do-warning-tx); }
+.vas_100-hdrPill.tone-risk    { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
+.vas_100-hdrPill.tone-purple  { background: var(--do-purple-bg);  color: var(--do-purple-tx); }
+.vas_100-hdrPill.tone-neutral { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
 
-.MPC-vasdo-hdrPill .MPC-vasdo-ic { color: currentColor; }
+.vas_100-hdrPill .vas_100-ic { color: currentColor; }
 
-.MPC-vasdo-hdrDot {
+.vas_100-hdrDot {
     width: 0.5em;
     height: 0.5em;
     border-radius: 50%;
@@ -166,9 +174,12 @@
 /* ----------------------------------------------------------- */
 /*  Header — details card (customer | dispatch)                 */
 /* ----------------------------------------------------------- */
-.MPC-vasdo-hdrCard {
+/* Identity takes 40% of the card; the fields take the rest and run two across,
+   so short fields sit in rows instead of stacking into a tall column that
+   leaves the identity half empty. */
+.vas_100-hdrCard {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: 40% 1fr;
     gap: 0.875em 1.75em;
     border: 1px solid var(--do-card-bd);
     border-radius: var(--do-card-radius);
@@ -176,18 +187,19 @@
     padding: 0.875em 1em;
 }
 
-.MPC-vasdo-hdrColL { min-width: 0; border-right: 1px solid var(--do-row-div); padding-right: 1.25em; }
+.vas_100-hdrColL { min-width: 0; border-right: 1px solid var(--do-row-div); padding-right: 1.25em; }
 
-.MPC-vasdo-hdrColR {
+.vas_100-hdrColR {
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.625em;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75em 1.5em;
+    align-content: start;
 }
 
-.MPC-vasdo-hdrField { min-width: 0; }
+.vas_100-hdrField { min-width: 0; }
 
-.MPC-vasdo-fLabel {
+.vas_100-fLabel {
     font-size: 0.6875em;
     font-weight: 700;
     letter-spacing: .4px;
@@ -196,35 +208,36 @@
     line-height: 1.3;
 }
 
-.MPC-vasdo-fVal {
+.vas_100-fVal {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--do-text);
     line-height: 1.35;
     margin-top: 0.125em;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
 }
-.MPC-vasdo-fVal.is-link { color: var(--do-link); }
+.vas_100-fVal.is-link { color: var(--do-link); }
 
 @container (max-width: 460px) {
-    .MPC-vasdo-hdrCard { grid-template-columns: 1fr; }
-    .MPC-vasdo-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--do-row-div); padding-bottom: 0.75em; }
-    .MPC-vasdo-hdrTop  { flex-direction: column; }
-    .MPC-vasdo-hdrPills { justify-content: flex-start; }
+    .vas_100-hdrCard { grid-template-columns: 1fr; }
+    .vas_100-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--do-row-div); padding-bottom: 0.75em; }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .vas_100-hdrColR { grid-template-columns: 1fr; }
+    .vas_100-hdrTop  { flex-direction: column; }
+    .vas_100-hdrPills { justify-content: flex-start; }
 }
 
 /* ----------------------------------------------------------- */
 /*  Customer identity                                           */
 /* ----------------------------------------------------------- */
-.MPC-vasdo-vendName {
+.vas_100-vendName {
     font-size: 0.9375em;
     font-weight: 700;
     color: var(--do-text);
     margin-top: 0.1875em;
 }
 
-.MPC-vasdo-vendAddr {
+.vas_100-vendAddr {
     display: flex;
     align-items: flex-start;
     gap: 0.5em;
@@ -233,9 +246,9 @@
     line-height: 1.45;
     margin-top: 0.25em;
 }
-.MPC-vasdo-vendAddr .MPC-vasdo-ic { color: var(--do-muted); margin-top: 0.15em; }
+.vas_100-vendAddr .vas_100-ic { color: var(--do-muted); margin-top: 0.15em; }
 
-.MPC-vasdo-vendContact {
+.vas_100-vendContact {
     display: flex;
     flex-wrap: wrap;
     gap: 0.375em 1.125em;
@@ -243,19 +256,19 @@
     color: var(--do-text);
     margin-top: 0.375em;
 }
-.MPC-vasdo-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
-.MPC-vasdo-contactBit .MPC-vasdo-ic { color: var(--do-action); }
+.vas_100-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.vas_100-contactBit .vas_100-ic { color: var(--do-action); }
 
 /* ----------------------------------------------------------- */
 /*  Snapshot (metric grid)                                      */
 /* ----------------------------------------------------------- */
-.MPC-vasdo-snap {
+.vas_100-snap {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 0.75em;
 }
 
-.MPC-vasdo-metric {
+.vas_100-metric {
     min-width: 0;
     border: 1px solid var(--do-card-bd);
     border-left: 3px solid var(--do-neutral-tx);
@@ -264,19 +277,19 @@
     padding: 0.75em 0.875em;
 }
 
-.MPC-vasdo-metric.tone-total    { border-left-color: var(--do-info-tx); }
-.MPC-vasdo-metric.tone-lines    { border-left-color: var(--do-neutral-tx); }
-.MPC-vasdo-metric.tone-received { border-left-color: var(--do-success-tx); }
-.MPC-vasdo-metric.tone-order    { border-left-color: var(--do-purple-tx); }
+.vas_100-metric.tone-total    { border-left-color: var(--do-info-tx); }
+.vas_100-metric.tone-lines    { border-left-color: var(--do-neutral-tx); }
+.vas_100-metric.tone-received { border-left-color: var(--do-success-tx); }
+.vas_100-metric.tone-order    { border-left-color: var(--do-purple-tx); }
 
-.MPC-vasdo-mHead {
+.vas_100-mHead {
     display: flex;
     align-items: center;
     gap: 0.375em;
     margin-bottom: 0.375em;
 }
 
-.MPC-vasdo-mLabel {
+.vas_100-mLabel {
     min-width: 0;
     font-size: 0.6875em;
     font-weight: 700;
@@ -288,12 +301,12 @@
     white-space: nowrap;
 }
 
-.MPC-vasdo-metric.tone-total    .MPC-vasdo-mHead .MPC-vasdo-ic { color: var(--do-info-tx); }
-.MPC-vasdo-metric.tone-lines    .MPC-vasdo-mHead .MPC-vasdo-ic { color: var(--do-neutral-tx); }
-.MPC-vasdo-metric.tone-received .MPC-vasdo-mHead .MPC-vasdo-ic { color: var(--do-success-tx); }
-.MPC-vasdo-metric.tone-order    .MPC-vasdo-mHead .MPC-vasdo-ic { color: var(--do-purple-tx); }
+.vas_100-metric.tone-total    .vas_100-mHead .vas_100-ic { color: var(--do-info-tx); }
+.vas_100-metric.tone-lines    .vas_100-mHead .vas_100-ic { color: var(--do-neutral-tx); }
+.vas_100-metric.tone-received .vas_100-mHead .vas_100-ic { color: var(--do-success-tx); }
+.vas_100-metric.tone-order    .vas_100-mHead .vas_100-ic { color: var(--do-purple-tx); }
 
-.MPC-vasdo-mVal {
+.vas_100-mVal {
     font-size: 1.25em;
     font-weight: 700;
     color: var(--do-text);
@@ -303,7 +316,7 @@
     white-space: nowrap;
 }
 
-.MPC-vasdo-mSub {
+.vas_100-mSub {
     font-size: 0.6875em;
     color: var(--do-muted);
     margin-top: 0.25em;
@@ -313,22 +326,22 @@
 }
 
 @container (max-width: 620px) {
-    .MPC-vasdo-snap { grid-template-columns: repeat(2, 1fr); }
+    .vas_100-snap { grid-template-columns: repeat(2, 1fr); }
 }
 @container (max-width: 340px) {
-    .MPC-vasdo-snap { grid-template-columns: 1fr; }
+    .vas_100-snap { grid-template-columns: 1fr; }
 }
 
 /* ----------------------------------------------------------- */
 /*  Fulfilment lifecycle (horizontal stepper)                   */
 /* ----------------------------------------------------------- */
-.MPC-vasdo-stepper {
+.vas_100-stepper {
     display: flex;
     align-items: flex-start;
     gap: 0;
 }
 
-.MPC-vasdo-step {
+.vas_100-step {
     flex: 1 1 0;
     min-width: 0;
     display: flex;
@@ -336,25 +349,25 @@
     align-items: center;
 }
 
-.MPC-vasdo-stepRail {
+.vas_100-stepRail {
     display: flex;
     align-items: center;
     width: 100%;
 }
 
-.MPC-vasdo-stepLine {
+.vas_100-stepLine {
     flex: 1 1 auto;
     height: 2px;
     background: #D9E6F2;
 }
-.MPC-vasdo-step:first-child .MPC-vasdo-stepLine-l,
-.MPC-vasdo-step:last-child  .MPC-vasdo-stepLine-r { visibility: hidden; }
+.vas_100-step:first-child .vas_100-stepLine-l,
+.vas_100-step:last-child  .vas_100-stepLine-r { visibility: hidden; }
 
-.MPC-vasdo-step.is-done   .MPC-vasdo-stepLine-r,
-.MPC-vasdo-step.is-done   .MPC-vasdo-stepLine-l,
-.MPC-vasdo-step.is-active .MPC-vasdo-stepLine-l { background: #67B98A; }
+.vas_100-step.is-done   .vas_100-stepLine-r,
+.vas_100-step.is-done   .vas_100-stepLine-l,
+.vas_100-step.is-active .vas_100-stepLine-l { background: #67B98A; }
 
-.MPC-vasdo-stepDot {
+.vas_100-stepDot {
     flex: none;
     width: 2em;
     height: 2em;
@@ -369,50 +382,50 @@
     color: #8A99A8;
     border: 1.5px solid #DCE5EE;
 }
-.MPC-vasdo-stepDot .MPC-vasdo-ic { display: inline-flex; }
+.vas_100-stepDot .vas_100-ic { display: inline-flex; }
 
-.MPC-vasdo-step.is-done .MPC-vasdo-stepDot {
+.vas_100-step.is-done .vas_100-stepDot {
     background: #E4F3EC;
     color: #1F9D5B;
     border-color: #BFE6D2;
 }
-.MPC-vasdo-step.is-active .MPC-vasdo-stepDot {
+.vas_100-step.is-active .vas_100-stepDot {
     background: #fff;
     color: #E08A1E;
     border: 2px solid #F0A93D;
 }
 
-.MPC-vasdo-stepLabel {
+.vas_100-stepLabel {
     margin-top: 0.5em;
     text-align: center;
     padding: 0 0.25em;
     min-width: 0;
 }
 
-.MPC-vasdo-stepTitle {
+.vas_100-stepTitle {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--do-text);
 }
 
-.MPC-vasdo-stepMeta {
+.vas_100-stepMeta {
     font-size: 0.6875em;
     color: var(--do-muted);
     margin-top: 0.25em;
 }
-.MPC-vasdo-step.is-active .MPC-vasdo-stepMeta { color: #E08A1E; font-weight: 600; }
+.vas_100-step.is-active .vas_100-stepMeta { color: #E08A1E; font-weight: 600; }
 
 /* ----------------------------------------------------------- */
 /*  Delivery line table                                         */
 /* ----------------------------------------------------------- */
-.MPC-vasdo-table {
+.vas_100-table {
     border: 1px solid var(--do-card-bd);
     border-radius: var(--do-card-radius);
     background: #fff;
     overflow: hidden;
 }
 
-.MPC-vasdo-tRow {
+.vas_100-tRow {
     display: grid;
     align-items: center;
     gap: 0.625em;
@@ -420,7 +433,7 @@
     grid-template-columns: 2.6fr 0.7fr 0.9fr 1.1fr 1.1fr 0.9fr;
 }
 
-.MPC-vasdo-tHead {
+.vas_100-tHead {
     background: #F5F8FB;
     border-bottom: 1px solid var(--do-card-bd);
     font-size: 0.6875em;
@@ -430,19 +443,19 @@
     color: var(--do-muted);
 }
 
-.MPC-vasdo-tBody {
+.vas_100-tBody {
     border-bottom: 1px solid var(--do-row-div);
     font-size: 0.8125em;
     color: var(--do-text);
 }
-.MPC-vasdo-tBody:last-of-type { border-bottom: none; }
-.MPC-vasdo-tBody:hover { background: #FAFCFE; }
+.vas_100-tBody:last-of-type { border-bottom: none; }
+.vas_100-tBody:hover { background: #FAFCFE; }
 
-.MPC-vasdo-table .ta-r { text-align: right; justify-content: flex-end; }
-.MPC-vasdo-table .ta-c { text-align: center; justify-content: center; }
+.vas_100-table .ta-r { text-align: right; justify-content: flex-end; }
+.vas_100-table .ta-c { text-align: center; justify-content: center; }
 
-.MPC-vasdo-itItem { min-width: 0; }
-.MPC-vasdo-itName {
+.vas_100-itItem { min-width: 0; }
+.vas_100-itName {
     font-size: 1.0769em;
     font-weight: 700;
     color: var(--do-text);
@@ -451,7 +464,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.MPC-vasdo-itSku {
+.vas_100-itSku {
     font-size: 0.9231em;
     color: var(--do-muted);
     margin-top: 0.125em;
@@ -461,13 +474,13 @@
 }
 
 /* Delivered cell (mini bar + value) */
-.MPC-vasdo-recv {
+.vas_100-recv {
     display: inline-flex;
     align-items: center;
     gap: 0.5em;
     justify-content: flex-end;
 }
-.MPC-vasdo-recvBar {
+.vas_100-recvBar {
     width: 40px;
     height: 5px;
     border-radius: 999px;
@@ -475,16 +488,16 @@
     overflow: hidden;
     flex: none;
 }
-.MPC-vasdo-recvBar i { display: block; height: 100%; border-radius: 999px; }
-.MPC-vasdo-recv.full i { background: var(--do-success-tx); }
-.MPC-vasdo-recv.part i { background: var(--do-warning-tx); }
-.MPC-vasdo-recv.none i { background: #CBD5DF; }
-.MPC-vasdo-recv.full { color: var(--do-success-tx); font-weight: 500; }
-.MPC-vasdo-recv.part { color: var(--do-warning-tx); font-weight: 500; }
-.MPC-vasdo-recv.none { color: var(--do-muted); }
+.vas_100-recvBar i { display: block; height: 100%; border-radius: 999px; }
+.vas_100-recv.full i { background: var(--do-success-tx); }
+.vas_100-recv.part i { background: var(--do-warning-tx); }
+.vas_100-recv.none i { background: #CBD5DF; }
+.vas_100-recv.full { color: var(--do-success-tx); font-weight: 500; }
+.vas_100-recv.part { color: var(--do-warning-tx); font-weight: 500; }
+.vas_100-recv.none { color: var(--do-muted); }
 
 /* Status tag */
-.MPC-vasdo-tag {
+.vas_100-tag {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
@@ -494,12 +507,12 @@
     line-height: 1.3;
     white-space: nowrap;
 }
-.MPC-vasdo-tag.s-full  { background: var(--do-success-bg); color: var(--do-success-tx); }
-.MPC-vasdo-tag.s-part  { background: var(--do-warning-bg); color: var(--do-warning-tx); }
-.MPC-vasdo-tag.s-short { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
+.vas_100-tag.s-full  { background: var(--do-success-bg); color: var(--do-success-tx); }
+.vas_100-tag.s-part  { background: var(--do-warning-bg); color: var(--do-warning-tx); }
+.vas_100-tag.s-short { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
 
 /* Totals footer */
-.MPC-vasdo-tFoot {
+.vas_100-tFoot {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -510,20 +523,20 @@
     border-top: 1px solid var(--do-card-bd);
     font-size: 0.8125em;
 }
-.MPC-vasdo-tf { color: var(--do-muted); }
-.MPC-vasdo-tf b { color: var(--do-text); font-weight: 700; margin-left: 0.375em; }
-.MPC-vasdo-tf.is-grand { color: var(--do-text); font-weight: 700; }
-.MPC-vasdo-tf.is-grand b { color: var(--do-action); margin-left: 0.5em; font-size: 1.15em; }
+.vas_100-tf { color: var(--do-muted); }
+.vas_100-tf b { color: var(--do-text); font-weight: 700; margin-left: 0.375em; }
+.vas_100-tf.is-grand { color: var(--do-text); font-weight: 700; }
+.vas_100-tf.is-grand b { color: var(--do-action); margin-left: 0.5em; font-size: 1.15em; }
 
 @container (max-width: 620px) {
-    .MPC-vasdo-table { overflow-x: auto; }
-    .MPC-vasdo-tRow { min-width: 560px; }
+    .vas_100-table { overflow-x: auto; }
+    .vas_100-tRow { min-width: 560px; }
 }
 
 /* ----------------------------------------------------------- */
 /*  Actions (visual buttons)                                    */
 /* ----------------------------------------------------------- */
-.MPC-vasdo-actions {
+.vas_100-actions {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -532,7 +545,7 @@
     padding-top: 0.125em;
 }
 
-.MPC-vasdo-btn {
+.vas_100-btn {
     display: inline-flex;
     align-items: center;
     gap: 0.4375em;
@@ -545,24 +558,24 @@
     cursor: pointer;
     user-select: none;
 }
-.MPC-vasdo-btn .MPC-vasdo-ic { color: currentColor; }
+.vas_100-btn .vas_100-ic { color: currentColor; }
 
-.MPC-vasdo-btn.btn-pri {
+.vas_100-btn.btn-pri {
     background: var(--do-action);
     border: 1px solid var(--do-action);
     color: #fff;
 }
-.MPC-vasdo-btn.btn-pri:hover { background: var(--do-action-dk); border-color: var(--do-action-dk); }
+.vas_100-btn.btn-pri:hover { background: var(--do-action-dk); border-color: var(--do-action-dk); }
 
-.MPC-vasdo-btn.btn-sec {
+.vas_100-btn.btn-sec {
     background: #fff;
     border: 1px solid var(--do-action);
     color: var(--do-action);
 }
-.MPC-vasdo-btn.btn-sec:hover { background: var(--do-info-bg); }
+.vas_100-btn.btn-sec:hover { background: var(--do-info-bg); }
 
 /* Disabled visual state (e.g. Raise Invoice before completion) */
-.MPC-vasdo-btn.is-disabled {
+.vas_100-btn.is-disabled {
     background: #F1F4F7;
     border-color: #DCE5EE;
     color: #A6B2BD;
@@ -573,10 +586,10 @@
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
-[dir="rtl"] .MPC-vasdo-hdrColL { border-right: none; border-left: 1px solid var(--do-row-div); padding-right: 0; padding-left: 1.25em; }
-[dir="rtl"] .MPC-vasdo-table .ta-r { text-align: left; justify-content: flex-start; }
-[dir="rtl"] .MPC-vasdo-recv { justify-content: flex-start; }
-[dir="rtl"] .MPC-vasdo-tFoot { justify-content: flex-start; }
-[dir="rtl"] .MPC-vasdo-tf b { margin-left: 0; margin-right: 0.375em; }
-[dir="rtl"] .MPC-vasdo-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
-[dir="rtl"] .MPC-vasdo-actions { justify-content: flex-start; }
+[dir="rtl"] .vas_100-hdrColL { border-right: none; border-left: 1px solid var(--do-row-div); padding-right: 0; padding-left: 1.25em; }
+[dir="rtl"] .vas_100-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_100-recv { justify-content: flex-start; }
+[dir="rtl"] .vas_100-tFoot { justify-content: flex-start; }
+[dir="rtl"] .vas_100-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .vas_100-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .vas_100-actions { justify-content: flex-start; }

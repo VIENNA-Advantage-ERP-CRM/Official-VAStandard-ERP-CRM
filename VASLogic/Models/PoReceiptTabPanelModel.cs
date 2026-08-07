@@ -1312,7 +1312,7 @@ namespace VASLogic.Models
             int AD_Window_ID = 0;
             param[0] = new SqlParameter("@param", NewScreen);
             AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE IsActive = 'Y' AND Name=@param", param, null));
-            if (AD_Window_ID == 0)
+            if (AD_Window_ID == 0 && !string.IsNullOrEmpty(OldScreen))
             {
                 param[0] = new SqlParameter("@param", OldScreen);
                 AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE IsActive = 'Y' AND Name=@param", param, null));

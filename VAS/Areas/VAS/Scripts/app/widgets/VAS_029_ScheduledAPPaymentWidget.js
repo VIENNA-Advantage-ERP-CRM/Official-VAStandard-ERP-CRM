@@ -7,6 +7,7 @@
 * # | Current Text                         | Message Key
 * ----+--------------------------------------+--------------------------------
 * 1  | Due This Week                        | VAS_029_MessageScheduled
+* 1b | Payables Due this week               | VAS_029_MessagePayablesDueThisWeek
 * 2  | Scheduled for payment this week      | VAS_029_ScheduledForPaymentThisWeek
 * 3  | Loading                              | VAS_029_MessageLoading
 * 4  | No Data                              | VAS_029_MessageNoData
@@ -16,16 +17,13 @@
 * 8  | Showing                              | VAS_Showing
 * 9  | Of                                   | VAS_Of
 * 10  | Close                                | VAS_Close
-* 11  | Total due                            | VAS_029_MessageTotalDue
-* 12  | Vendors                              | VAS_029_MessageVendors
-* 13  | Payment methods                      | VAS_029_MessagePaymentMethods
 * 14  | Invoice No.                          | VIS_InvoiceNo
 * 15  | Invoice date                         | VIS_InvoiceDate
 * 16  | Vendor                               | VAS_029_MessageVendor
 * 17  | Due date                             | VIS_DueDate
 * 18  | Currency                             | VAS_PaymentCurrency
 * 19  | Amount                               | VAS_029_MessageAmount
-* 20  | Method                               | VAS_029_MessageMethod
+* 20  | Payment Method                       | VAS_029_MessageMethod
 * 21  | Previous                             | VAS_Previous
 * 22  | Next                                 | VAS_Next
 * 23  | Payments due this week               | VAS_029_MessagePaymentsDueThisWeek
@@ -60,10 +58,6 @@
         var $dialogBody = null;
         var $dialogTbody = null;
         var $dialogBusy = null;
-        var $summaryTotal = null;
-        var $summaryInvoices = null;
-        var $summaryVendors = null;
-        var $summaryMethods = null;
         var $pagerHelper = null;
         var $pagerPrev = null;
         var $pagerNext = null;
@@ -121,8 +115,19 @@
                 lbl('VAS_029_MessageScheduled', 'Due This Week')
             );
 
+            var $sub = $('<div class="vas-scheduled-ap-payment-sub">').text(
+                lbl('VAS_029_MessagePayablesDueThisWeek', 'Payables Due this week')
+            );
+
+            /* The title and its subtitle stack in a box of their own so the
+               icon stays centred against the pair rather than against the
+               title alone -- the header is a centred flex row. */
+            var $headerText = $('<div class="vas-scheduled-ap-payment-header-text">');
+
+            $headerText.append($title).append($sub);
+
             $iconBox.append($icon);
-            $header.append($iconBox).append($title);
+            $header.append($iconBox).append($headerText);
 
             $body = $('<div class="vas-scheduled-ap-payment-body">');
             $value = $('<div class="vas-scheduled-ap-payment-value">');
@@ -226,12 +231,13 @@
             }
 
             /*
-             * AP amounts are outflows and arrive negative, so only a
-             * missing or zero total means there is nothing to show.
+             * A week with nothing due is a real answer, not a failure, so
+             * the card keeps its normal layout and reads the zero amount
+             * (for example ID0.00) instead of swapping in a "No Data"
+             * state. Only a load error still takes over the card.
              */
-            if (isNaN(totalAmount) || totalAmount === 0) {
-                setNoData();
-                return;
+            if (isNaN(totalAmount)) {
+                totalAmount = 0;
             }
 
             showState(false, '');
@@ -496,7 +502,7 @@
             }
 
             renderRows(rows);
-            renderDialogSummary(data || {});
+            renderDialogSubtitle();
 
             var from = totalRecords === 0 ? 0 : (pageNo - 1) * pageSize;
             var to = Math.min(from + rows.length, totalRecords);
@@ -558,43 +564,21 @@
             updateAdaptivePageSize();
         }
 
-        function renderDialogSummary(data) {
-            var totalAmount = Number((lastData && (lastData.value || lastData.scheduledAmountThisWeek)) || 0);
-            var symbol = (lastData && (lastData.currencySymbol || lastData.symbol)) || '';
-            var vendorCount = Number((data && data.vendorCount) || 0);
-            var methodCount = Number((data && data.paymentMethodCount) || 0);
-
-            if ($summaryTotal) {
-                $summaryTotal.text(formatHeaderAmount(totalAmount, symbol, lastData && lastData.currencyISO));
+        /* Dialog subtitle: the scheduled date window only. The invoice count and the
+           total amount are deliberately NOT shown - the count is already in the pager
+           ("Showing 1-20 of 57") and the amount on the card itself. */
+        function renderDialogSubtitle() {
+            if (!$dialogSubtitle) {
+                return;
             }
 
-            if ($summaryInvoices) {
-                $summaryInvoices.text(totalRecords.toLocaleString(window.navigator.language));
+            var datePart = '';
+
+            if (lastData && lastData.dateFrom && lastData.dateTo) {
+                datePart = formatDate(lastData.dateFrom) + ' - ' + formatDate(lastData.dateTo);
             }
 
-            if ($summaryVendors) {
-                $summaryVendors.text(vendorCount.toLocaleString(window.navigator.language));
-            }
-
-            if ($summaryMethods) {
-                $summaryMethods.text(methodCount.toLocaleString(window.navigator.language));
-            }
-
-            if ($dialogSubtitle) {
-                var datePart = '';
-
-                if (lastData && lastData.dateFrom && lastData.dateTo) {
-                    datePart = formatDate(lastData.dateFrom) + ' - ' + formatDate(lastData.dateTo) + ' · ';
-                }
-
-                $dialogSubtitle.text(
-                    datePart +
-                    totalRecords.toLocaleString(window.navigator.language) + ' ' +
-                    lbl('VAS_029_MessageInvoices', 'invoices') +
-                    ' · ' +
-                    formatHeaderAmount(totalAmount, symbol, lastData && lastData.currencyISO)
-                );
-            }
+            $dialogSubtitle.text(datePart);
         }
 
         function updatePagerControls(from, to) {
@@ -613,8 +597,12 @@
                 }
             }
 
+            /* The indicator always reads, down to "1 of 1" on an empty or
+               single-page list: blanking it left the two arrows framing a gap,
+               which looks like a pager that failed to load rather than one
+               with nowhere to go. Being disabled is what says that. */
             if ($pagerText) {
-                $pagerText.text(totalPages > 0 ? (pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages) : '');
+                $pagerText.text(pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + Math.max(1, totalPages));
             }
 
             if ($pagerPrev) {
@@ -680,13 +668,6 @@
                 '</button>' +
                 '</div>' +
 
-                '<div class="vas-scheduled-ap-payment-dialog-summary">' +
-                '<div><span>' + escapeHtml(lbl('VAS_029_MessageTotalDue', 'Total due')) + '</span><strong class="vas-scheduled-ap-payment-summary-total">-</strong></div>' +
-                '<div><span>' + escapeHtml(lbl('VAS_029_MessageInvoices', 'Invoices')) + '</span><strong class="vas-scheduled-ap-payment-summary-invoices">-</strong></div>' +
-                '<div><span>' + escapeHtml(lbl('VAS_029_MessageVendors', 'Vendors')) + '</span><strong class="vas-scheduled-ap-payment-summary-vendors">-</strong></div>' +
-                '<div><span>' + escapeHtml(lbl('VAS_029_MessagePaymentMethods', 'Payment methods')) + '</span><strong class="vas-scheduled-ap-payment-summary-methods">-</strong></div>' +
-                '</div>' +
-
                 '<div class="vas-scheduled-ap-payment-dialog-body">' +
                 '<div class="vas-scheduled-ap-payment-dialog-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>' +
                 '<table class="vas-scheduled-ap-payment-dialog-table">' +
@@ -697,7 +678,7 @@
                 '<th class="vas-scheduled-ap-payment-th-vendor">' + escapeHtml(lbl('VAS_029_MessageVendor', 'Vendor')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-duedate">' + escapeHtml(lbl('VIS_DueDate', 'Due date')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-currency">' + escapeHtml(lbl('VAS_PaymentCurrency', 'Currency')) + '</th>' +
-                '<th class="vas-scheduled-ap-payment-th-method">' + escapeHtml(lbl('VAS_029_MessageMethod', 'Method')) + '</th>' +
+                '<th class="vas-scheduled-ap-payment-th-method">' + escapeHtml(lbl('VAS_029_MessageMethod', 'Payment Method')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-amount">' + escapeHtml(lbl('VAS_029_MessageAmount', 'Amount')) + '</th>' +
                 '</tr>' +
                 '</thead>' +
@@ -727,10 +708,6 @@
             $dialogBody = $dialog.find('.vas-scheduled-ap-payment-dialog-body');
             $dialogTbody = $dialog.find('.vas-scheduled-ap-payment-dialog-tbody');
             $dialogBusy = $dialog.find('.vas-scheduled-ap-payment-dialog-busy');
-            $summaryTotal = $dialog.find('.vas-scheduled-ap-payment-summary-total');
-            $summaryInvoices = $dialog.find('.vas-scheduled-ap-payment-summary-invoices');
-            $summaryVendors = $dialog.find('.vas-scheduled-ap-payment-summary-vendors');
-            $summaryMethods = $dialog.find('.vas-scheduled-ap-payment-summary-methods');
             $pagerHelper = $dialog.find('.vas-scheduled-ap-payment-pager-helper');
             $pagerPrev = $dialog.find('.vas-scheduled-ap-payment-pager-prev');
             $pagerNext = $dialog.find('.vas-scheduled-ap-payment-pager-next');
@@ -916,14 +893,6 @@
             }
         }
 
-        function setNoData() {
-            if ($description) {
-                $description.text('');
-            }
-
-            showState(true, lbl('VAS_029_MessageNoData', 'No Data'));
-        }
-
         this.refreshData = function () {
             rowsLoaded = false;
             rowsLoading = false;
@@ -962,10 +931,6 @@
             $dialogBody = null;
             $dialogTbody = null;
             $dialogBusy = null;
-            $summaryTotal = null;
-            $summaryInvoices = null;
-            $summaryVendors = null;
-            $summaryMethods = null;
             $pagerHelper = null;
             $pagerPrev = null;
             $pagerNext = null;

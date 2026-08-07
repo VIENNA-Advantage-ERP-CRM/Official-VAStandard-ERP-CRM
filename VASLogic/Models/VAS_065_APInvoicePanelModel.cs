@@ -184,6 +184,9 @@ namespace VASLogic.Models
             data.PostedName = GetListReferenceName(ctx, "C_Invoice", "Posted", data.Posted);
             data.Processed = Util.GetValueOfString(r["Processed"]) == "Y";
             data.IsApproved = Util.GetValueOfString(r["IsApproved"]) == "Y";
+            // Reversing a purchase invoice (ReverseCorrectIt) leaves the document on
+            // DocStatus 'RE'. The panel shows "Reversed" instead of "Completed" for it.
+            data.IsReversed = data.DocStatus == "RE";
             data.Created = Util.GetValueOfDateTime(r["Created"]);
             data.CreatedByName = Util.GetValueOfString(r["CreatedByName"]);
             data.Updated = Util.GetValueOfDateTime(r["Updated"]);
@@ -238,7 +241,7 @@ namespace VASLogic.Models
             // amount to the invoice currency on the allocation accounting date, using the
             // allocation conversion type and org, before summing.
             string sql = @"SELECT COALESCE(SUM(ABS(
-                                 currencyConvert(al.Amount, ah.C_Currency_ID, i.C_Currency_ID,
+                                 currencyConvert((al.Amount + al.writeoffamt+al.discountamt), ah.C_Currency_ID, i.C_Currency_ID,
                                                  ah.DateAcct, i.C_ConversionType_ID,
                                                  ah.AD_Client_ID, ah.AD_Org_ID))), 0)
                              FROM C_AllocationLine al
@@ -548,7 +551,7 @@ namespace VASLogic.Models
                               o.DocumentNo       AS OrderDocumentNo,
                               ol.QtyOrdered,
                               ol.PriceEntered    AS OrderPrice,
-                              (il.QtyEntered - COALESCE(iol.MovementQty, il.QtyEntered)) AS QuantityVariance,
+                              (ABS(il.QtyEntered) - COALESCE(ABS(iol.MovementQty), ABS(il.QtyEntered))) AS QuantityVariance,
                               (il.PriceEntered - COALESCE(ol.PriceEntered, il.PriceEntered)) AS PriceVariance
                            FROM C_InvoiceLine il
                            INNER JOIN M_Product pr   ON (il.M_Product_ID  = pr.M_Product_ID)
@@ -588,7 +591,11 @@ namespace VASLogic.Models
                 row.QuantityVariance = Util.GetValueOfDecimal(r["QuantityVariance"]);
                 gr.Rows.Add(row);
 
-                totalRecvQty += row.ReceivedQty;
+                // Quantities are compared as magnitudes: a reversal / credit-memo line
+                // carries a negative QtyEntered, and subtracting it from a positive
+                // receipt quantity would ADD the two instead of differencing them
+                // (200 received vs -184 invoiced must read 16, not 384).
+                totalRecvQty += Math.Abs(row.ReceivedQty);
                 totalQtyVar += Math.Abs(row.QuantityVariance);
                 if (Math.Abs(row.PriceVariance) > Math.Abs(maxPriceVar)) maxPriceVar = row.PriceVariance;
 
@@ -637,19 +644,21 @@ namespace VASLogic.Models
                                INNER JOIN AD_ClientInfo ci ON (i.AD_Client_ID = ci.AD_Client_ID)
                                INNER JOIN C_AcctSchema acs ON (ci.C_AcctSchema1_ID = acs.C_AcctSchema_ID)
                                INNER JOIN C_LandedCostAllocation lca ON (il.m_inoutline_id  = lca.m_inoutline_id
-                               and lca.m_product_id = il.m_product_id and lca.m_attributesetinstance_id = il.m_attributesetinstance_id)
+                               AND lca.m_product_id = il.m_product_id AND NVL(lca.m_attributesetinstance_id, 0) = NVL(il.m_attributesetinstance_id, 0))
                                INNER JOIN c_invoiceline lcail ON (lcail.c_invoiceline_id = lca.c_invoiceline_id and lcail.vas_islandedcost = 'Y')
                                INNER JOIN c_invoice lcaci ON (lcail.c_invoice_id = lcaci.c_invoice_id)
                                INNER JOIN M_Product pr ON (il.M_Product_ID = pr.M_Product_ID)
-                               INNER JOIN C_UOM uom ON (il.C_UOM_ID     = uom.C_UOM_ID)
+                               INNER JOIN C_UOM uom ON (il.C_UOM_ID = uom.C_UOM_ID)
                                WHERE il.C_Invoice_ID = @C_Invoice_ID
                                  AND il.IsActive = 'Y'
                                  AND il.M_Product_ID IS NOT NULL
                                ORDER BY il.Line";
 
-                DataSet ds = DB.ExecuteDataset(sql,
-                    new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);
-                if (ds == null || ds.Tables.Count == 0) return lc;
+                DataSet ds = DB.ExecuteDataset(sql, new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);
+                if (ds == null || ds.Tables.Count == 0)
+                {
+                    return lc;
+                }
 
                 decimal totPv = 0m, totLc = 0m, totIv = 0m;
                 // A single receipt line (M_InOutLine_ID) can receive landed cost from
@@ -2361,6 +2370,8 @@ namespace VASLogic.Models
             public string PostedName { get; set; }
             public bool Processed { get; set; }
             public bool IsApproved { get; set; }
+            /// <summary>Document was reversed (ReverseCorrectIt leaves DocStatus 'RE').</summary>
+            public bool IsReversed { get; set; }
             public DateTime? Created { get; set; }
             public string CreatedByName { get; set; }
             public DateTime? Updated { get; set; }

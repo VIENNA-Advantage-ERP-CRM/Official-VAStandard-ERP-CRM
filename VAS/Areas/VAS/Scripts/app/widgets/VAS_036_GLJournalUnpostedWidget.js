@@ -263,8 +263,10 @@
 
             var isDisposed = false;
 
-            var baseUrl =
-                VIS.Application.contextUrl;
+            var ZOOM_WINDOW_NAME_NEW = 'VAS_GLJournal';
+            var windowId = 0;
+
+            var baseUrl = VIS.Application.contextUrl;
 
             this.Initalize = function () {
                 createWidget();
@@ -643,82 +645,49 @@
                  * (opens the window). stopPropagation keeps the row's detail
                  * popup from also opening.
                  */
-                $dialogBody
-                    .off(
-                        "click.VAS036Zoom",
-                        ".VAS-glju-doc-zoom"
-                    )
-                    .on(
-                        "click.VAS036Zoom",
-                        ".VAS-glju-doc-zoom",
-                        function (event) {
-                            event.preventDefault();
-                            event.stopPropagation();
+                $dialogBody.off("click.VAS036Zoom", ".VAS-glju-doc-zoom").on(
+                    "click.VAS036Zoom", ".VAS-glju-doc-zoom", function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
 
-                            zoomToJournal(
-                                $(this).attr("data-journal-id")
-                            );
+                        zoomToJournal($(this).attr("data-journal-id"));
+                    }
+                );
+
+                $dialogBody.off("keydown.VAS036Zoom", ".VAS-glju-doc-zoom")
+                    .on("keydown.VAS036Zoom", ".VAS-glju-doc-zoom", function (event) {
+                        if (event.key !== "Enter" && event.key !== " ") {
+                            return;
                         }
-                    );
 
-                $dialogBody
-                    .off(
-                        "keydown.VAS036Zoom",
-                        ".VAS-glju-doc-zoom"
-                    )
-                    .on(
-                        "keydown.VAS036Zoom",
-                        ".VAS-glju-doc-zoom",
-                        function (event) {
-                            if (
-                                event.key !== "Enter" &&
-                                event.key !== " "
-                            ) {
-                                return;
-                            }
+                        event.preventDefault();
+                        event.stopPropagation();
 
-                            event.preventDefault();
-                            event.stopPropagation();
-
-                            zoomToJournal(
-                                $(this).attr("data-journal-id")
-                            );
-                        }
+                        zoomToJournal($(this).attr("data-journal-id"));
+                    }
                     );
 
                 /* Delegated on the dialog itself — the pager now renders in the footer,
                    outside the body element. */
-                $dialog
-                    .off(
-                        "click.VAS036DialogPager",
-                        ".VAS-glju-dialog-page"
-                    )
-                    .on(
-                        "click.VAS036DialogPager",
-                        ".VAS-glju-dialog-page",
-                        function (event) {
-                            event.preventDefault();
-                            event.stopPropagation();
+                $dialog.off("click.VAS036DialogPager", ".VAS-glju-dialog-page")
+                    .on("click.VAS036DialogPager", ".VAS-glju-dialog-page", function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
 
-                            var nextPage =
-                                $(this).hasClass(
-                                    "VAS-glju-dialog-prev"
-                                )
-                                    ? dialogPageNo - 1
-                                    : dialogPageNo + 1;
+                        var nextPage = $(this).hasClass("VAS-glju-dialog-prev") ? dialogPageNo - 1 : dialogPageNo + 1;
 
-                            if (
-                                nextPage < 1 ||
-                                nextPage === dialogPageNo ||
-                                nextPage > dialogTotalPages
-                            ) {
-                                return;
-                            }
-
-                            dialogPageNo = nextPage;
-                            dialogLoaded = false;
-                            loadDialogRows();
+                        if (
+                            nextPage < 1 ||
+                            nextPage === dialogPageNo ||
+                            nextPage > dialogTotalPages
+                        ) {
+                            return;
                         }
+
+                        dialogPageNo = nextPage;
+                        dialogLoaded = false;
+                        loadDialogRows();
+                    }
                     );
 
                 $(document).on(
@@ -1038,37 +1007,6 @@
                 });
             }
 
-            /*
-             * The framework navigates in-place (no new window) only when
-             * ActionName matches the window currently hosting this widget;
-             * otherwise it opens a new window. Resolve the host window name
-             * from the listener chain.
-             */
-            function hostWindowName() {
-                try {
-                    var l = $self.listener;
-
-                    for (var i = 0; i < 6 && l; i++) {
-                        if (
-                            l.apanel &&
-                            l.apanel.gridWindow &&
-                            l.apanel.gridWindow.getName
-                        ) {
-                            return l.apanel.gridWindow.getName();
-                        }
-
-                        if (l.gridWindow && l.gridWindow.getName) {
-                            return l.gridWindow.getName();
-                        }
-
-                        l = l.listener;
-                    }
-                }
-                catch (e) { }
-
-                return "";
-            }
-
             /* Zoom to the GL Journal record (opens the GL Journal window). The list
                dialog (and any open detail popup) is dismissed first — leaving a modal
                over the record the user just navigated to hides that record. */
@@ -1082,14 +1020,19 @@
                 closeDialog();
 
                 try {
-                    $self.widgetFirevalueChanged({
-                        "TabWhereClause":
-                            "GL_Journal.GL_Journal_ID=" + recordId,
-                        "TabLayout": "Y",
-                        "TabIndex": "0",
-                        "ActionName": hostWindowName() || "VAS_GLJournal",
-                        "ActionType": "W"
-                    });
+                    if ($self.windowNo >= 0) {
+                        $self.widgetFirevalueChanged({
+                            "TabWhereClause": "GL_Journal.GL_Journal_ID=" + recordId,
+                            "TabLayout": "Y",
+                            "TabIndex": "0"
+                        });
+                    }
+                    else {
+                        VAS.ZoomUtil.zoomToRecord("GL_Journal_ID", recordId, windowId, ZOOM_WINDOW_NAME_NEW, "")
+                            .done(function (id) {
+                                if (id > 0) { windowId = id; }
+                            });
+                    }
                 }
                 catch (e) { /* zoom is best-effort */ }
             }
@@ -1099,20 +1042,14 @@
                     return;
                 }
 
-                if (
-                    listRequest &&
-                    listRequest.readyState !== 4
-                ) {
+                if (listRequest && listRequest.readyState !== 4) {
                     listRequest.abort();
                 }
 
                 showDialogBusy(true);
 
                 listRequest = $.ajax({
-                    url:
-                        baseUrl +
-                        "VAS/VAS_041_GLJournalEntriesWidget/GetUnpostedEntries",
-
+                    url: baseUrl + "VAS/VAS_041_GLJournalEntriesWidget/GetUnpostedEntries",
                     type: "GET",
                     data: {
                         pageNo: dialogPageNo,
@@ -1120,16 +1057,9 @@
                     },
                     dataType: "json",
                     cache: false,
-
                     success: function (result) {
-                        var data =
-                            normalizeResponse(result);
-
-                        if (
-                            data &&
-                            !data.error &&
-                            data.success !== false
-                        ) {
+                        var data = normalizeResponse(result);
+                        if (data && !data.error && data.success !== false) {
                             renderDialog(data);
                             dialogLoaded = true;
                         }
