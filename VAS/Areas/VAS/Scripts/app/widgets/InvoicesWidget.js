@@ -117,6 +117,18 @@
         var ZOOM_WINDOW_NAME_NEW = 'VAS_ARInvoice';
         var windowId = 0;
 
+        /* Per-instance suffix for every element id this widget mints. The same widget
+           can sit on the home dashboard and on a screen landing page at once, but only
+           the home dashboard supplies an AD_UserHomeWidgetID - on a landing page it is
+           0/undefined, so both instances would build identical ids. Fall back to the
+           window number there, matching the sibling widgets. */
+        var uid = '';
+        function resolveUid() {
+            return (VIS.Utility.Util.getValueOfInt($self.AD_UserHomeWidgetID) !== 0)
+                ? $self.AD_UserHomeWidgetID
+                : $self.windowNo;
+        }
+
         var INVOICES = [];
         /* Columns match the header order: invoice, customer, due, status, amount. */
         var COL_TMPL = '1fr 1.4fr minmax(60px,0.8fr) minmax(80px,1.1fr) minmax(70px,0.9fr)';
@@ -177,6 +189,8 @@
 
         /* ── Initialize ── */
         this.Initalize = function () {
+            /* Resolved before the DOM is built - every id below is stamped with it. */
+            uid = resolveUid();
             createWidget();
             bindEvents();
             /* Two independent data sources: the attention list fills the table (with paging); the
@@ -331,7 +345,7 @@
                 '<span class="vas-inv-title">' + lbl("VAS_062_InvoicesNeedingAttention", 'Invoices needing your attention') + '</span>' +
                 '</div>' +
                 /* Right: open a new invoice on the same screen */
-                '<button type="button" id="vis-inv-newbtn-' + $self.AD_UserHomeWidgetID + '" class="vas-inv-newbtn">' +
+                '<button type="button" id="vis-inv-newbtn-' + uid + '" class="vas-inv-newbtn">' +
                 '<span class="vas-inv-newbtn-plus">+</span> ' + lbl("VAS_062_NewInvoice", 'New Invoice') +
                 '</button>' +
                 '</div>'
@@ -339,7 +353,7 @@
 
             /* Duplicate alert banner */
             $alertBanner = $(
-                '<div id="vis-inv-alert-' + $self.AD_UserHomeWidgetID + '" ' +
+                '<div id="vis-inv-alert-' + uid + '" ' +
                 'class="vas-inv-alert-banner" style="display:none;">' +
                 '<svg class="vas-inv-alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D78B10" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
                 '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>' +
@@ -349,7 +363,7 @@
                 '<div class="vis-inv-dup-title vas-inv-dup-title"></div>' +
                 '<div class="vis-inv-dup-sub vas-inv-dup-sub"></div>' +
                 '</div>' +
-                '<button type="button" id="vis-inv-review-' + $self.AD_UserHomeWidgetID + '" class="vas-inv-review-btn">' +
+                '<button type="button" id="vis-inv-review-' + uid + '" class="vas-inv-review-btn">' +
                 lbl("VAS_062_Review", 'Review') +
                 '</button>' +
                 '</div>'
@@ -370,7 +384,7 @@
             );
 
             /* Table body */
-            $tableBody = $('<div id="vis-inv-tbody-' + $self.AD_UserHomeWidgetID + '">');
+            $tableBody = $('<div id="vis-inv-tbody-' + uid + '">');
             renderRows();
 
             $tableWrap.append($tableHead).append($tableBody);
@@ -580,12 +594,12 @@
         function bindEvents() {
 
             /* Review — open the duplicate-invoice review dialog */
-            $root.on('click', '#vis-inv-review-' + $self.AD_UserHomeWidgetID, function () {
+            $root.on('click', '#vis-inv-review-' + uid, function () {
                 openReview();
             });
 
             /* New invoice */
-            $root.on('click', '#vis-inv-newbtn-' + $self.AD_UserHomeWidgetID, function () {
+            $root.on('click', '#vis-inv-newbtn-' + uid, function () {
                 onNewInvoice();
             });
 
