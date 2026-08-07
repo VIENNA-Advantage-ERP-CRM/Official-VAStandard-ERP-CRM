@@ -1668,10 +1668,14 @@ namespace VASLogic.Models
                     return result;
                 }
 
+                // The cash discount is a second settlement pool alongside the credit: it
+                // writes the target invoices down without consuming the credit note, so it
+                // is tracked separately from `remaining` and never reduces `applied`.
                 decimal applied = 0m, remaining = creditOpen;
+                decimal discApplied = 0m, remDisc = req.DiscountAmt > 0 ? req.DiscountAmt : 0m;
                 foreach (int openInvId in req.C_Invoice_IDs)
                 {
-                    if (remaining <= 0) break;
+                    if (remaining <= 0 && remDisc <= 0) break;
 
                     // Target invoice currency / client / org.
                     DataSet tds = DB.ExecuteDataset(
@@ -1698,8 +1702,13 @@ namespace VASLogic.Models
                         tOpenAlloc = MConversionRate.Convert(ctx, tOpen, tCur, allocCurrency, allocDate, allocConvType, tClient, tOrg);
                     }
 
-                    decimal use = Math.Min(tOpenAlloc, remaining);
-                    if (use <= 0) continue;
+                    // The discount settles this invoice exactly as the credit does, so the
+                    // two are spent together and capped at the invoice open: discount
+                    // first, credit for the rest. Sizing on the credit alone left the
+                    // discount with nothing to land on.
+                    decimal discUse = Math.Min(remDisc, tOpenAlloc);
+                    decimal use = Math.Min(remaining, tOpenAlloc - discUse);
+                    if (use <= 0 && discUse <= 0) continue;
 
                     // Open schedules of the target invoice. Loaded so each can be split BEFORE
                     // its allocation line; schedRemaining tracks the unallocated balance in the
@@ -1727,35 +1736,50 @@ namespace VASLogic.Models
                     // schedule before its line so every line references a schedule sized
                     // exactly to its portion (in the target invoice currency).
                     decimal srcRem = use;
+                    decimal discRem = discUse;
                     int schedIdx = 0;
-                    while (srcRem > 0 && schedIdx < schedObjs.Count)
+                    while ((srcRem > 0 || discRem > 0) && schedIdx < schedObjs.Count)
                     {
                         if (schedRemaining[schedIdx] <= 0) { schedIdx++; continue; }
-                        decimal portion = Math.Min(srcRem, schedRemaining[schedIdx]);
-                        bool fullConsume = portion >= schedRemaining[schedIdx] - (decimal)0.0001;
-                        decimal portionInv = portion;
+                        // Within a schedule the discount goes first and the credit takes the
+                        // rest of the due, so the pair never settles more than the schedule
+                        // is worth and no line is left over-applied.
+                        decimal discPortion = Math.Min(discRem, schedRemaining[schedIdx]);
+                        decimal portion = Math.Min(srcRem, schedRemaining[schedIdx] - discPortion);
+                        decimal settled = portion + discPortion;
+                        if (settled <= 0) break;
+                        bool fullConsume = settled >= schedRemaining[schedIdx] - (decimal)0.0001;
+                        // The schedule is resized to what the credit AND the discount settle
+                        // together - sizing it to the credit alone would leave the discounted
+                        // part sitting open on the remainder schedule.
+                        decimal settledInv = settled;
                         if (tCur != allocCurrency)
-                            portionInv = MConversionRate.Convert(ctx, portion, allocCurrency, tCur, allocDate, allocConvType, tClient, tOrg);
+                            settledInv = MConversionRate.Convert(ctx, settled, allocCurrency, tCur, allocDate, allocConvType, tClient, tOrg);
                         bool ok;
-                        int refSchedId = PrepareScheduleLine(ctx, schedObjs, schedIdx, portionInv, fullConsume, trx, result, out ok);
+                        int refSchedId = PrepareScheduleLine(ctx, schedObjs, schedIdx, settledInv, fullConsume, trx, result, out ok);
                         if (!ok) return result;
-                        if (!CreateCreditNoteAllocLines(ctx, hdr, cn.GetC_BPartner_ID(), openInvId, req.C_Invoice_ID, portion, refSchedId, trx, result))
+                        if (!CreateCreditNoteAllocLines(ctx, hdr, cn.GetC_BPartner_ID(), openInvId, req.C_Invoice_ID, portion, discPortion, refSchedId, trx, result))
                             return result;
-                        schedRemaining[schedIdx] -= portion;
+                        schedRemaining[schedIdx] -= settled;
                         srcRem -= portion;
+                        discRem -= discPortion;
                         if (schedRemaining[schedIdx] <= 0) schedIdx++;
                     }
-                    if (srcRem > 0)
+                    if (srcRem > 0 || discRem > 0)
                     {
-                        if (!CreateCreditNoteAllocLines(ctx, hdr, cn.GetC_BPartner_ID(), openInvId, req.C_Invoice_ID, srcRem, 0, trx, result))
+                        if (!CreateCreditNoteAllocLines(ctx, hdr, cn.GetC_BPartner_ID(), openInvId, req.C_Invoice_ID, srcRem, discRem, 0, trx, result))
                             return result;
                     }
 
                     applied += use;
                     remaining -= use;
+                    discApplied += discUse;
+                    remDisc -= discUse;
                 }
 
-                if (applied <= 0)
+                // A discount-only allocation still settles something, so it counts here -
+                // testing the credit alone would roll back a legitimate write-down.
+                if (applied <= 0 && discApplied <= 0)
                 {
                     result.Message = Msg.GetMsg(ctx, "VAS_065_NothingSelected");
                     trx.Rollback();
@@ -1950,12 +1974,22 @@ namespace VASLogic.Models
                 List<int> planSchedId = new List<int>();
                 List<decimal> planDue = new List<decimal>();
                 List<decimal> planAlloc = new List<decimal>();
+                List<decimal> planDisc = new List<decimal>();
                 if (schedDs != null && schedDs.Tables.Count > 0)
                 {
-                    decimal rem = payAmt;
+                    // The cash discount settles a schedule exactly as the cash does, so the
+                    // cascade has to spend both together. Planning on the pay amount alone
+                    // stopped at the first schedule the cash covered and then pushed the
+                    // whole discount onto it, taking that schedule past its due and turning
+                    // its OverUnderAmt negative on a positive payment.
+                    // Each schedule absorbs discount first and payment for the rest of its
+                    // due, and never more than its own due - so Amount + Discount <= DueAmt
+                    // on every line and the shortfall keeps the sign of the payment.
+                    decimal remPay = payAmt;
+                    decimal remDiscPlan = req.DiscountAmt > 0 ? req.DiscountAmt : 0;
                     foreach (DataRow sr in schedDs.Tables[0].Rows)
                     {
-                        if (rem <= 0) break;
+                        if (remPay <= 0 && remDiscPlan <= 0) break;
                         decimal due = Util.GetValueOfDecimal(sr["DueAmt"]);
                         // Schedule due amounts are stored in the invoice currency; express
                         // them in the payment currency so the cascade and the over/under
@@ -1965,12 +1999,19 @@ namespace VASLogic.Models
                             due = MConversionRate.Convert(ctx, due, invCurrency, payCurrency, txDate, convTypeId,
                                 inv.GetAD_Client_ID(), inv.GetAD_Org_ID());
                         }
-                        decimal alloc = Math.Min(rem, due);
-                        if (alloc <= 0) continue;
+                        // A credit-note schedule carries a negative due. The plan works in
+                        // magnitudes throughout; the return sign goes back on at set-time.
+                        due = Math.Abs(due);
+                        if (due <= 0) continue;
+                        decimal disc = Math.Min(remDiscPlan, due);
+                        decimal alloc = Math.Min(remPay, due - disc);
+                        if (alloc <= 0 && disc <= 0) continue;
                         planSchedId.Add(Util.GetValueOfInt(sr["C_InvoicePaySchedule_ID"]));
                         planDue.Add(due);
                         planAlloc.Add(alloc);
-                        rem -= alloc;
+                        planDisc.Add(disc);
+                        remPay -= alloc;
+                        remDiscPlan -= disc;
                     }
                 }
 
@@ -1982,8 +2023,11 @@ namespace VASLogic.Models
                     if (planSchedId.Count == 1)
                     {
                         payment.SetC_InvoicePaySchedule_ID(planSchedId[0]);
-                        // OverUnder = DueAmt - Amount - Discount (>0 underpayment, 0 when exact).
-                        decimal ou = planDue[0] - planAlloc[0] - req.DiscountAmt;
+                        // OverUnder = DueAmt - Amount - Discount (>0 underpayment, 0 when
+                        // exact). The discount the cascade actually placed on this schedule
+                        // is used, not the whole requested amount, so the shortfall can
+                        // never come out with the opposite sign to the payment.
+                        decimal ou = planDue[0] - planAlloc[0] - planDisc[0];
                         payment.SetOverUnderAmt(inv.IsReturnTrx() ? decimal.Negate(ou) : ou);
                         payment.SetIsOverUnderPayment(ou != 0);
                     }
@@ -2011,31 +2055,20 @@ namespace VASLogic.Models
 
                 if (planSchedId.Count > 1)
                 {
-                    // Cascade the cash discount across the schedules that actually have a
-                    // payment allocate entry (planSchedId), in order: each schedule absorbs
-                    // discount up to its due amount (a schedule's due is never less than the
-                    // discount applied to it) and any remainder carries to the next schedule.
-                    // Discount is never applied to a schedule with no payment entry, so any
-                    // leftover after the last covered schedule is simply not applied. Shares
-                    // are positive magnitudes (compared on absolute values, since credit-note
-                    // dues are negative); the credit-note sign is applied when the value is set
-                    // on the allocate line.
+                    // The cascade above already split both the cash and the discount across
+                    // these schedules, in due-date order: each schedule absorbs discount up
+                    // to its own due and the payment covers the rest of that due, with any
+                    // remainder carrying to the next schedule. Each line just writes back
+                    // its own planned share.
                     //   e.g. discount 20, schedule 1 due 100 -> 20 on schedule 1.
                     //        discount 20, schedule 1 due 15  -> 15 on schedule 1, 5 on the next.
-                    decimal[] discShare = new decimal[planSchedId.Count];
-                    decimal remDisc = req.DiscountAmt;
-                    for (int i = 0; i < planSchedId.Count && remDisc > 0; i++)
-                    {
-                        decimal share = Math.Min(remDisc, Math.Abs(planDue[i]));
-                        discShare[i] = share;
-                        remDisc -= share;
-                    }
-
+                    // Shares are positive magnitudes; the credit-note sign is applied when
+                    // the value is set on the allocate line.
                     for (int i = 0; i < planSchedId.Count; i++)
                     {
                         decimal due = planDue[i];
                         decimal alloc = planAlloc[i];
-                        decimal disc = discShare[i];
+                        decimal disc = planDisc[i];
 
                         MPaymentAllocate pa = new MPaymentAllocate(ctx, 0, trx);
                         pa.SetAD_Client_ID(payment.GetAD_Client_ID());
@@ -2046,8 +2079,11 @@ namespace VASLogic.Models
                         pa.SetAmount(inv.IsReturnTrx() ? decimal.Negate(alloc) : alloc);
                         pa.SetDiscountAmt(inv.IsReturnTrx() ? decimal.Negate(disc) : disc);
                         // Keep Amount + Discount + OverUnderAmt = InvoiceAmt balanced
-                        // (OverUnderAmt = the shortfall, 0 when the schedule is fully settled).
-                        pa.SetOverUnderAmt(inv.IsReturnTrx() ? decimal.Negate(due - alloc - disc) : (due - alloc - disc));
+                        // (OverUnderAmt = the shortfall, 0 when the schedule is fully
+                        // settled). Amount and Discount are capped at the due, so the
+                        // shortfall is never negative and always carries the sign of PayAmt.
+                        decimal ou = due - alloc - disc;
+                        pa.SetOverUnderAmt(inv.IsReturnTrx() ? decimal.Negate(ou) : ou);
                         pa.SetInvoiceAmt(pa.GetAmount() + pa.GetDiscountAmt() + pa.GetWriteOffAmt() + pa.GetOverUnderAmt());
                         if (!pa.Save(trx))
                         {
@@ -2279,12 +2315,23 @@ namespace VASLogic.Models
         /// settles) and a negative line on the credit note. Returns false on save failure.
         /// </summary>
         private bool CreateCreditNoteAllocLines(Ctx ctx, MAllocationHdr hdr, int C_BPartner_ID,
-            int targetInvoiceId, int creditNoteId, decimal amount, int C_InvoicePaySchedule_ID, Trx trx, AllocationResult result)
+            int targetInvoiceId, int creditNoteId, decimal amount, decimal discountAmt,
+            int C_InvoicePaySchedule_ID, Trx trx, AllocationResult result)
         {
-            MAllocationLine inLine = new MAllocationLine(hdr, amount, Env.ZERO, Env.ZERO, Env.ZERO);
+            if (amount == 0 && discountAmt == 0) return true;
+
+            // The invoice side carries the cash discount: it writes the invoice down next
+            // to the credit. The credit-note side carries the credit alone - a discount
+            // does not consume the credit note - so the two Amounts still net to zero and
+            // the allocation stays balanced.
+            MAllocationLine inLine = new MAllocationLine(hdr, amount, discountAmt, Env.ZERO, Env.ZERO);
             inLine.SetDocInfo(C_BPartner_ID, 0, targetInvoiceId);
             if (C_InvoicePaySchedule_ID > 0) inLine.SetC_InvoicePaySchedule_ID(C_InvoicePaySchedule_ID);
             if (!inLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return false; }
+
+            // A schedule settled purely by discount consumes no credit, so it gets no
+            // counter line - a zero-amount one would only clutter the allocation.
+            if (amount == 0) return true;
 
             MAllocationLine cnLine = new MAllocationLine(hdr, Decimal.Negate(amount), Env.ZERO, Env.ZERO, Env.ZERO);
             cnLine.SetDocInfo(C_BPartner_ID, 0, creditNoteId);
@@ -2647,6 +2694,10 @@ namespace VASLogic.Models
         {
             public int C_Invoice_ID { get; set; }   // the credit note
             public List<int> C_Invoice_IDs { get; set; }   // selected open invoices
+            /// <summary>Cash discount written off the selected invoices, in the
+            /// credit-note currency. Settles alongside the credit; it does not
+            /// consume the credit note.</summary>
+            public decimal DiscountAmt { get; set; }
         }
 
         public class RecordPaymentRequest
