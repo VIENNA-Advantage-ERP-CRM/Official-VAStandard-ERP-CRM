@@ -1,4 +1,4 @@
-/// <summary>
+﻿/// <summary>
 /// Module Name : VASLogic
 /// Purpose     : Internal Use / Material Issue Overview tab panel data (read
 ///               side). Returns header identity, warehouse, KPI aggregates
@@ -49,13 +49,33 @@
 ///                          AD_Column-guarded, so a schema without VA075 behaves
 ///                          exactly as before.
 ///                        - Added the line's Attribute Set Instance description.
+///   VAI163   2026-08-03  - Activity now includes the e-mails sent against the
+///                          issue (MailAttachment1 by AD_Table_ID = M_Inventory +
+///                          Record_ID): recipient (MailAddress), subject (Title),
+///                          body (TextMsg), when (Created) and who sent it
+///                          (CreatedBy). The body travels with the row so the
+///                          panel can reveal it on click without a second round
+///                          trip, and an HTML mail is flattened to plain text
+///                          (MailBodyToText) so the panel never has to render
+///                          markup. The feed cap rose to 50 so a well-mailed
+///                          issue does not push its own milestones off the trail.
+///   VAI163   2026-08-03  - The e-mail lookup no longer filters on
+///                          MailAttachment1.AttachmentType. That column's value
+///                          varies between installations, and requiring 'M' hid
+///                          mails that were really there. A row now counts as an
+///                          e-mail when it carries a recipient address, which is
+///                          what makes it one; the table id is matched with
+///                          IN + UPPER so a differently-cased or duplicated
+///                          dictionary entry still resolves.
 /// </summary>
 
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
@@ -779,7 +799,8 @@ namespace VASLogic.Models
         /// <summary>
         /// Builds the issue's audit trail: who created it, who last changed it and
         /// when, when it was completed and by whom, when it was posted, plus any
-        /// chat notes logged against it — merged newest-first and capped.
+        /// chat notes and e-mails logged against it — merged newest-first and
+        /// capped.
         ///
         /// Each source runs under its own guard so a DB-level problem with one
         /// degrades to a partial trail (logged) rather than breaking the overview.
@@ -789,12 +810,16 @@ namespace VASLogic.Models
         /// <returns>Activity rows ordered newest-first (may be empty).</returns>
         private List<InternalUseActivityData> LoadActivity(int M_Inventory_ID, string docStatus)
         {
-            const int MAX_ENTRIES = 15;
+            // An issue mailed out a dozen times would otherwise push its own
+            // milestones off the bottom of the trail, so the cap is a runaway
+            // guard rather than a headline count.
+            const int MAX_ENTRIES = 50;
 
             List<InternalUseActivityData> activity = new List<InternalUseActivityData>();
             LoadIssueMilestones(M_Inventory_ID, docStatus, activity);
             LoadPostingActivity(M_Inventory_ID, activity);
             LoadNoteActivity(M_Inventory_ID, activity);
+            LoadEmailActivity(M_Inventory_ID, activity);
 
             // Newest first; entries with no timestamp sink to the bottom.
             activity.Sort(delegate (InternalUseActivityData a, InternalUseActivityData b)
@@ -940,6 +965,149 @@ namespace VASLogic.Models
             }
         }
 
+        /// <summary>
+        /// Adds the e-mails sent against this issue (MailAttachment1, joined by
+        /// AD_Table_ID = M_Inventory + Record_ID = the issue id) as "email" rows:
+        /// recipient (MailAddress), subject (Title), body (TextMsg), when
+        /// (Created) and who sent it (CreatedBy).
+        ///
+        /// The body travels with the row so the panel can reveal it on click
+        /// without a second round trip.
+        /// </summary>
+        private void LoadEmailActivity(int M_Inventory_ID, List<InternalUseActivityData> list)
+        {
+            try
+            {
+                // A row is an e-mail when it has somewhere to go — a recipient on
+                // any of the address columns. AttachmentType is deliberately NOT
+                // filtered on: its value varies between installations, and a mail
+                // that carries an address is a mail whatever the column says.
+                // Rows with no recipient at all (a stored letter / inbound
+                // document) are the ones this leaves out.
+                //
+                // The table id is matched with IN + UPPER so a dictionary holding
+                // the name in another case, or more than one row for it, resolves
+                // instead of failing the statement.
+                string sql = @"SELECT ma.MailAddress,
+                                      ma.MailAddressCc,
+                                      ma.MailAddressBcc,
+                                      ma.MailAddressFrom,
+                                      ma.Title,
+                                      ma.TextMsg,
+                                      ma.Created,
+                                      ma.IsMailSent,
+                                      u.Name AS UserName
+                                 FROM MailAttachment1 ma
+                                 LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy)
+                                WHERE ma.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'M_INVENTORY')
+                                  AND ma.Record_ID          = @M_Inventory_ID
+                                  AND NVL(ma.IsActive, 'Y') = 'Y'
+                                  AND (NVL(TRIM(ma.MailAddress), '')     <> ''
+                                    OR NVL(TRIM(ma.MailAddressCc), '')   <> ''
+                                    OR NVL(TRIM(ma.MailAddressBcc), '')  <> '')
+                                ORDER BY ma.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    list.Add(new InternalUseActivityData
+                    {
+                        Type       = "email",
+                        // Text is the row's headline everywhere in this feed; for
+                        // an e-mail that is its subject.
+                        Text       = Util.GetValueOfString(r["Title"]),
+                        // Mails sent as HTML store their markup in TextMsg; the
+                        // panel shows a body as text, so it is flattened here.
+                        Body       = MailBodyToText(Util.GetValueOfString(r["TextMsg"])),
+                        MailTo     = Util.GetValueOfString(r["MailAddress"]),
+                        MailCc     = Util.GetValueOfString(r["MailAddressCc"]),
+                        MailBcc    = Util.GetValueOfString(r["MailAddressBcc"]),
+                        MailFrom   = Util.GetValueOfString(r["MailAddressFrom"]),
+                        IsMailSent = Util.GetValueOfString(r["IsMailSent"]) == "Y",
+                        UserName   = Util.GetValueOfString(r["UserName"]),
+                        Created    = Util.GetValueOfDateTime(r["Created"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: a schema without MailAttachment1 just shows no e-mails.
+                _log.Severe("LoadEmailActivity (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Cheap "is this markup" test — a real tag, not a stray '&lt;' in a
+        /// plain-text mail ("qty &lt; 10"), so a plain body is left untouched.
+        /// </summary>
+        private static readonly Regex HTML_BODY = new Regex(
+            @"<\s*/?\s*(html|body|head|br|p|div|table|thead|tbody|tr|td|th|span|a|img|b|i|u"
+            + @"|strong|em|ul|ol|li|h[1-6]|font|style|script)\b",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        /// <summary>
+        /// Renders a mail body (MailAttachment1.TextMsg) as readable plain text.
+        /// A mail sent as HTML stores its markup here, and the panel shows the
+        /// body as text — so without this the reader gets tags instead of a
+        /// message. Block-level markup becomes line breaks, table cells become
+        /// tabs, everything else is dropped and entities are decoded last, so
+        /// the browser still receives text it can safely escape: no markup is
+        /// ever handed to the panel. A body with no markup is returned as it
+        /// was stored.
+        /// </summary>
+        private static string MailBodyToText(string body)
+        {
+            if (string.IsNullOrEmpty(body)) return body;
+            if (!HTML_BODY.IsMatch(body)) return body;      // plain-text mail
+
+            try
+            {
+                string s = body;
+
+                // Head matter, styles and scripts carry no reading content.
+                s = Regex.Replace(s, @"<\s*(script|style|head)\b[^>]*>.*?<\s*/\s*\1\s*>", " ",
+                                  RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+                // Block boundaries become line breaks so paragraphs survive.
+                s = Regex.Replace(s, @"<\s*br\s*/?\s*>", "\n", RegexOptions.IgnoreCase);
+                s = Regex.Replace(s, @"<\s*/\s*(p|div|tr|li|h[1-6]|table|blockquote)\s*>", "\n",
+                                  RegexOptions.IgnoreCase);
+                // Opening tags too, so a <p> with no closing tag still breaks.
+                // 'tr' is deliberately absent — </tr> already ends the row, and
+                // breaking on both would leave a blank line between every row.
+                s = Regex.Replace(s, @"<\s*(p|div|li|h[1-6])\b[^>]*>", "\n",
+                                  RegexOptions.IgnoreCase);
+                // Cells read better separated than run together.
+                s = Regex.Replace(s, @"<\s*/\s*(td|th)\s*>", "\t", RegexOptions.IgnoreCase);
+
+                // Everything left is presentation.
+                s = Regex.Replace(s, @"<[^>]*>", string.Empty);
+
+                // Entities last, so an escaped &lt;b&gt; in the text was never
+                // treated as a tag above.
+                s = WebUtility.HtmlDecode(s);
+                s = s.Replace('\u00A0', ' ');               // nbsp reads as a space
+
+                // Normalise the whitespace the markup left behind.
+                s = s.Replace("\r\n", "\n").Replace('\r', '\n');
+                s = Regex.Replace(s, @"[^\S\n\t]+", " ");   // runs of spaces -> one
+                s = Regex.Replace(s, @"\t{2,}", "\t");
+                s = Regex.Replace(s, @"[ \t]*\n[ \t]*", "\n");   // incl. the last cell's tab
+                s = Regex.Replace(s, @"\n{3,}", "\n\n");    // at most one blank line
+
+                return s.Trim();
+            }
+            catch (Exception ex)
+            {
+                // Never lose the mail over a formatting failure — show it raw.
+                _log.Severe("MailBodyToText: " + ex.Message);
+                return body;
+            }
+        }
+
         /// <summary>The single-id parameter every child query takes.</summary>
         private SqlParameter[] InventoryParam(int M_Inventory_ID)
         {
@@ -1010,12 +1178,20 @@ namespace VASLogic.Models
         /// <summary>One entry in the issue's audit trail.</summary>
         public class InternalUseActivityData
         {
-            /// <summary>created | updated | completed | posted | note</summary>
+            /// <summary>created | updated | completed | posted | note | email</summary>
             public string    Type       { get; set; }
-            public string    UserName   { get; set; }
+            public string    UserName   { get; set; }   // actor / mail sender
             public DateTime? Created    { get; set; }
             public string    DocumentNo { get; set; }
-            public string    Text       { get; set; }   // note body
+            public string    Text       { get; set; }   // note body / e-mail subject
+
+            // E-mail (MailAttachment1) — the body is revealed on click.
+            public string    Body       { get; set; }   // TextMsg (flattened to text)
+            public string    MailTo     { get; set; }   // MailAddress
+            public string    MailCc     { get; set; }   // MailAddressCc
+            public string    MailBcc    { get; set; }   // MailAddressBcc
+            public string    MailFrom   { get; set; }   // MailAddressFrom
+            public bool      IsMailSent { get; set; }
         }
 
         /// <summary>A requisition the issue's lines were raised against.</summary>

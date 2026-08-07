@@ -27,6 +27,11 @@
         // ---- Per-widget configuration ----
         var ENDPOINT      = 'VAS/VAS_070_GLJournalSearchWidget/Search';
         var ZOOM_TABLE    = 'GL_Journal';
+        // Zoom target when the widget is NOT hosted inside a window (windowNo < 0).
+        // The search payload already carries the resolved AD_Window_ID; these names
+        // are the fallback VAS.ZoomUtil resolves from if it ever comes back 0.
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_GLJournal';
+        var ZOOM_WINDOW_NAME_OLD = 'GL Journal';
         var CHIP_CLASS    = 'gljournal';
         var PLACEHOLDER_K = 'VAS_070_Placeholder';
         var PLACEHOLDER_D = 'Search GL journals by Document No., Accounting Schema, Posting type, Ledger, Amount, Status';
@@ -330,15 +335,26 @@
         function zoomTo(recordId) {
             if (!recordId) { return; }
             closePanel();
-            // Navigate the CURRENT window's grid to the clicked record (no new window).
             try {
-                $self.widgetFirevalueChanged({
-                    "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + recordId,
-                    "TabLayout": "Y",
-                    "TabIndex": "0",
-                    "ActionName": hostWindowName() || "VAS_GLJournal",
-                    "ActionType": "W"
-                });
+                if ($self.windowNo >= 0) {
+                    // Navigate the CURRENT window's grid to the clicked record (no new window).
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + recordId,
+                        "TabLayout": "Y",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || ZOOM_WINDOW_NAME_NEW,
+                        "ActionType": "W"
+                    });
+                }
+                else {
+                    // Standalone dashboard - open the GL Journal window on the record.
+                    // windowId already comes back with the search payload, so the util
+                    // normally has nothing left to resolve.
+                    VAS.ZoomUtil.zoomToRecord(ZOOM_TABLE + "_ID", recordId, windowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { windowId = id; }
+                        });
+                }
             } catch (e) { /* zoom is best-effort */ }
         }
 

@@ -28,6 +28,11 @@
         // ---- Per-widget configuration ----
         var ENDPOINT      = 'VAS/VAS_067_APInvoiceSearchWidget/Search';
         var ZOOM_TABLE    = 'C_Invoice';
+        // Zoom target when the widget is NOT hosted inside a window (windowNo < 0).
+        // The search payload already carries the resolved AD_Window_ID; these names
+        // are the fallback VAS.ZoomUtil resolves from if it ever comes back 0.
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_APInvoice';
+        var ZOOM_WINDOW_NAME_OLD = 'Invoice (Vendor)';
         var CHIP_CLASS    = 'invoice';
         var PLACEHOLDER_K = 'VAS_067_Placeholder';
         var PLACEHOLDER_D = 'Search Invoices by Vendor, Document No., Reference No., Document Type, Amount, Status, Paid';
@@ -312,38 +317,24 @@
                 dsEsc(paid ? msg('VAS_067_Paid', 'Paid') : msg('VAS_067_Unpaid', 'Unpaid')) + '</span>';
         }
 
-        // The framework navigates IN-PLACE (no new window) only when the payload's
-        // ActionName equals the name of the window currently HOSTING this widget;
-        // otherwise it opens a new window. Resolve the host window name from the
-        // listener chain and pass it as ActionName.
-        function hostWindowName() {
-            try {
-                var l = $self.listener;
-                for (var i = 0; i < 6 && l; i++) {
-                    if (l.apanel && l.apanel.gridWindow && l.apanel.gridWindow.getName) {
-                        return l.apanel.gridWindow.getName();
-                    }
-                    if (l.gridWindow && l.gridWindow.getName) {
-                        return l.gridWindow.getName();
-                    }
-                    l = l.listener;
-                }
-            } catch (e) { }
-            return '';
-        }
-
         function zoomTo(recordId) {
             if (!recordId) { return; }
             closePanel();
-            // Navigate the CURRENT window's grid to the clicked record (no new window).
             try {
-                $self.widgetFirevalueChanged({
-                    "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + recordId,
-                    "TabLayout": "Y",
-                    "TabIndex": "0",
-                    "ActionName": hostWindowName() || "VAS_APInvoice",
-                    "ActionType": "W"
-                });
+                if ($self.windowNo >= 0) {
+                    // Navigate the CURRENT window's grid to the clicked record (no new window).
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": ZOOM_TABLE + "." + ZOOM_TABLE + "_ID=" + recordId,
+                        "TabLayout": "Y",
+                        "TabIndex": "0"
+                    });
+                }
+                else {
+                    VAS.ZoomUtil.zoomToRecord(ZOOM_TABLE + "_ID", recordId, windowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { windowId = id; }
+                        });
+                }
             } catch (e) { /* zoom is best-effort */ }
         }
 

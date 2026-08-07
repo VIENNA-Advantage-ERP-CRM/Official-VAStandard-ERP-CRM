@@ -78,6 +78,9 @@
         var hasMore = false;       /* server signalled another page exists */
         var loadingMore = false;   /* a next-page fetch is in flight */
 
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_ARReceipt';
+        var windowId = 0;
+
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
@@ -469,12 +472,20 @@
            window's first tab, filtered to the single record (single/form layout). ── */
         function zoomReceipt(cPaymentId) {
             if (!cPaymentId) return;
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": "C_Payment.C_Payment_ID=" + cPaymentId,
-                "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
-                "TabIndex": "0"
-            });
             closeSuggest();
+            if ($self.windowNo >= 0) {
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "C_Payment.C_Payment_ID=" + cPaymentId,
+                    "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                    "TabIndex": "0"
+                });
+            }
+            else {
+                VAS.ZoomUtil.zoomToRecord("C_Payment_ID", cPaymentId, windowId, ZOOM_WINDOW_NAME_NEW, "")
+                    .done(function (id) {
+                        if (id > 0) { windowId = id; }
+                    });
+            }
         }
 
         /* ── Refresh ── */

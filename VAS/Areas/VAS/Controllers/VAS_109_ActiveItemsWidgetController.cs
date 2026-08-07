@@ -63,11 +63,10 @@ namespace VAS.Controllers
             if (ctx == null) { return result; }
 
             string sql = @"
-                SELECT SUM(CASE WHEN Product.Discontinued IS NULL OR Product.Discontinued=N'N' THEN 1 ELSE 0 END) AS Active_Count,
+                SELECT SUM(CASE WHEN Product.IsActive=N'Y' THEN 1 ELSE 0 END) AS Active_Count,
                        SUM(CASE WHEN Product.Discontinued=N'Y' THEN 1 ELSE 0 END) AS Discontinued_Count
                 FROM M_Product Product
-                WHERE Product.IsActive=N'Y'
-                  AND Product.AD_Client_ID=@AD_Client_ID
+                WHERE Product.AD_Client_ID=@AD_Client_ID
                   AND Product.AD_Org_ID IN (0,COALESCE(NULLIF(@AD_Org_ID,0),Product.AD_Org_ID))";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(

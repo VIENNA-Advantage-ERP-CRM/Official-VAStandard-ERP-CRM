@@ -7,9 +7,9 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
- *  1  | Upcoming runs                        | VAS_031_MessageUpcomingRuns
+ *  1  | Upcoming Runs                        | VAS_031_MessageUpcomingRuns
  *  2  | Next 7 days                          | VAS_031_MessageNext7Days
- *  3  | invoice                              | VAS_031_MessageInvoice
+ *  3  | Invoice                              | VAS_031_MessageInvoice
  *  4  | invoices                             | VAS_031_MessageInvoices
  *  5  | Loading                              | VAS_031_MessageLoading
  *  6  | No Data                              | VAS_031_MessageNoData
@@ -38,7 +38,7 @@
  * 30  | Pre-filled for invoice               | VAS_031_MessagePrefilledForInvoice
  * 31  | Review and save.                     | VAS_031_MessageReviewAndSave
  * 32  | Saving                               | VAS_031_MessageSaving
- * 33  | Save payment                         | VAS_031_MessageSavePayment
+ * 33  | Save and Complete Payment            | VAS_031_MessageSavePayment
  * 34  | Cancel                               | VAS_Cancel
  * 35  | Close                                | VAS_Close
  * 36  | Could not load data                  | VAS_ErrorLoading
@@ -528,7 +528,7 @@
             return Number(count) === 1
                 ? lbl(
                     'VAS_031_MessageInvoice',
-                    'invoice'
+                    'Invoice'
                 )
                 : lbl(
                     'VAS_031_MessageInvoices',
@@ -1693,11 +1693,20 @@
 
         function ensurePopupLookups(
             currencyId,
+            adOrgId,
             callback
         ) {
+            /*
+             * Accepts the shorter call shapes (callback) and
+             * (currencyId, callback) as well.
+             */
             if (typeof currencyId === 'function') {
                 callback = currencyId;
                 currencyId = 0;
+                adOrgId = 0;
+            } else if (typeof adOrgId === 'function') {
+                callback = adOrgId;
+                adOrgId = 0;
             }
 
             if (popupLookups) {
@@ -1715,7 +1724,10 @@
                 cache: false,
                 data: {
                     currencyId:
-                        Number(currencyId || 0)
+                        Number(currencyId || 0),
+
+                    adOrgId:
+                        Number(adOrgId || 0)
                 },
 
                 success: function (response) {
@@ -1767,10 +1779,21 @@
             });
         }
 
-        function refreshPopupBankAccounts(
+        /*
+         * Bank accounts belong to an organization, so the list is reloaded
+         * whenever the currency or the organization of the selected invoice
+         * changes. adOrgId = 0 leaves the list unfiltered by organization.
+         */
+        function refreshOrgScopedLookups(
             currencyId,
+            adOrgId,
             callback
         ) {
+            if (typeof adOrgId === 'function') {
+                callback = adOrgId;
+                adOrgId = 0;
+            }
+
             $.ajax({
                 url:
                     VIS.Application.contextUrl +
@@ -1781,7 +1804,10 @@
                 cache: false,
                 data: {
                     currencyId:
-                        Number(currencyId || 0)
+                        Number(currencyId || 0),
+
+                    adOrgId:
+                        Number(adOrgId || 0)
                 },
 
                 success: function (response) {
@@ -1811,11 +1837,35 @@
                     popupLookups =
                         popupLookups || {};
 
+                    /* Every organization-scoped list is replaced, not just the
+                       bank accounts: document types and payment methods are
+                       filtered by AD_Org on the server too. */
                     popupLookups.bankAccounts =
                         $.isArray(
                             data.bankAccounts
                         )
                             ? data.bankAccounts
+                            : [];
+
+                    popupLookups.documentTypes =
+                        $.isArray(
+                            data.documentTypes
+                        )
+                            ? data.documentTypes
+                            : [];
+
+                    popupLookups.docTypes =
+                        $.isArray(
+                            data.docTypes
+                        )
+                            ? data.docTypes
+                            : popupLookups.documentTypes;
+
+                    popupLookups.paymentMethods =
+                        $.isArray(
+                            data.paymentMethods
+                        )
+                            ? data.paymentMethods
                             : [];
 
                     callback(true);
@@ -1877,6 +1927,107 @@
                     false
                 )
             );
+        }
+
+        /* Document types are filtered by the invoice organization server-side,
+           so the dropdown is rebuilt from the refreshed list. */
+        function updatePopupDocTypeField() {
+            var documentTypes;
+            var selectedDocTypeId;
+            var validDocTypeId;
+
+            if (
+                !$payDialogGrid ||
+                !getPayField('docTypeId').length
+            ) {
+                return;
+            }
+
+            documentTypes =
+                getLookupAny([
+                    'documentTypes',
+                    'docTypes'
+                ]);
+
+            selectedDocTypeId = Number(
+                getPayField('docTypeId').val() || 0
+            );
+
+            validDocTypeId =
+                getValidLookupValue(
+                    documentTypes,
+                    selectedDocTypeId
+                );
+
+            if (!validDocTypeId) {
+                validDocTypeId =
+                    getFirstPositiveLookupValue(
+                        documentTypes
+                    );
+            }
+
+            getPayField('docTypeId').replaceWith(
+                selectHtml(
+                    'docTypeId',
+                    documentTypes,
+                    validDocTypeId,
+                    false
+                )
+            );
+        }
+
+        /* Payment methods are filtered by the invoice organization server-side.
+           replaceWith() drops the element, so the change handler that toggles the
+           cheque fields has to be re-bound and re-evaluated afterwards. */
+        function updatePopupPaymentMethodField() {
+            var paymentMethods;
+            var selectedPaymentMethodId;
+            var validPaymentMethodId;
+
+            if (
+                !$payDialogGrid ||
+                !getPayField('paymentMethodId').length
+            ) {
+                return;
+            }
+
+            paymentMethods =
+                getLookup('paymentMethods');
+
+            selectedPaymentMethodId = Number(
+                getPayField('paymentMethodId').val() || 0
+            );
+
+            validPaymentMethodId =
+                getValidLookupValue(
+                    paymentMethods,
+                    selectedPaymentMethodId
+                );
+
+            getPayField('paymentMethodId').replaceWith(
+                selectHtml(
+                    'paymentMethodId',
+                    paymentMethods,
+                    validPaymentMethodId,
+                    false
+                )
+            );
+
+            bindPaymentMethodChange();
+            updateCheckFieldsVisibility();
+        }
+
+        /* Single place the paymentMethodId change wiring lives, so the initial
+           render and every rebuild bind exactly the same handler. */
+        function bindPaymentMethodChange() {
+            getPayField('paymentMethodId')
+                .off('change.vasPaymentMethod')
+                .on(
+                    'change.vasPaymentMethod',
+                    function () {
+                        updateCheckFieldsVisibility();
+                    }
+                );
         }
 
         function renderInvoiceRows(rows) {
@@ -2016,6 +2167,9 @@
         }
 
         function selectInvoiceRow(row) {
+            var rowOrgId;
+            var rowCurrencyId;
+
             selectedInvoiceRow = row;
 
             renderInvoiceRows(invoiceRows);
@@ -2025,6 +2179,50 @@
             setPayDialogBusy(
                 false,
                 false
+            );
+
+            /*
+             * Bank accounts, document types and payment methods are all scoped
+             * to an organization. The organization comes from the selected
+             * invoice (the popup shows it read-only and the backend rejects a
+             * mismatch), so those lists are reloaded for that organization and
+             * only their dropdowns are rebuilt. Invoices of one run can belong
+             * to different organizations, hence the reload on every row
+             * selection.
+             */
+            rowOrgId = Number(
+                firstPositiveValue(
+                    row && row.adOrgId,
+                    row && row.organizationId
+                ) || 0
+            );
+
+            if (rowOrgId <= 0) {
+                return;
+            }
+
+            rowCurrencyId = Number(
+                firstPositiveValue(
+                    row && row.currencyId,
+                    row && row.cCurrencyId
+                ) || 0
+            );
+
+            refreshOrgScopedLookups(
+                rowCurrencyId,
+                rowOrgId,
+                function (loaded) {
+                    if (
+                        !loaded ||
+                        selectedInvoiceRow !== row
+                    ) {
+                        return;
+                    }
+
+                    updatePopupBankAccountField();
+                    updatePopupDocTypeField();
+                    updatePopupPaymentMethodField();
+                }
             );
         }
 
@@ -2928,6 +3126,17 @@
 
             paymentMethodId = 0;
 
+            /* Field order (two per grid row, top to bottom):
+                 Organization      | Document Type
+                 Bank Account      | Vendor
+                 Invoice           | Transaction Date
+                 Payment Currency  | Currency Type
+                 Payment Method    | Payment Amount
+                 Discount Amount   | Write Off Amount
+                 Check No.         | Check Date          (both hidden unless the
+                                                          payment method is a cheque)
+                 Description                             (full width, editable)
+            */
             html =
                 fieldHtml(
                     lbl(
@@ -2947,30 +3156,14 @@
 
                 fieldHtml(
                     lbl(
-                        'VAS_031_MessageVendor',
-                        'Vendor'
+                        'VAS_031_MessageDocumentType',
+                        'Document Type'
                     ),
 
                     selectHtml(
-                        'vendorId',
-                        vendors,
-                        vendorId,
-                        true
-                    ),
-
-                    true
-                ) +
-
-                fieldHtml(
-                    lbl(
-                        'VAS_PaymentCurrency',
-                        'Currency'
-                    ),
-
-                    selectHtml(
-                        'currencyId',
-                        currencies,
-                        currencyId,
+                        'docTypeId',
+                        documentTypes,
+                        docTypeId,
                         false
                     ),
 
@@ -2991,6 +3184,43 @@
                     ),
 
                     false
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageVendor',
+                        'Vendor'
+                    ),
+
+                    selectHtml(
+                        'vendorId',
+                        vendors,
+                        vendorId,
+                        true
+                    ),
+
+                    true
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageInvoice',
+                        'Invoice'
+                    ),
+
+                    inputHtml(
+                        'invoiceDocumentNo',
+                        'text',
+                        firstValue(
+                            row.invoiceDocumentNo,
+                            row.documentNo,
+                            ''
+                        ),
+                        null,
+                        true
+                    ),
+
+                    true
                 ) +
 
                 fieldHtml(
@@ -3018,14 +3248,14 @@
 
                 fieldHtml(
                     lbl(
-                        'VAS_031_MessageCurrencyType',
-                        'Currency Type'
+                        'VAS_PaymentCurrency',
+                        'Currency'
                     ),
 
                     selectHtml(
-                        'conversionTypeId',
-                        conversionTypes,
-                        conversionTypeId,
+                        'currencyId',
+                        currencies,
+                        currencyId,
                         false
                     ),
 
@@ -3034,14 +3264,14 @@
 
                 fieldHtml(
                     lbl(
-                        'VAS_031_MessageDocumentType',
-                        'Document Type'
+                        'VAS_031_MessageCurrencyType',
+                        'Currency Type'
                     ),
 
                     selectHtml(
-                        'docTypeId',
-                        documentTypes,
-                        docTypeId,
+                        'conversionTypeId',
+                        conversionTypes,
+                        conversionTypeId,
                         false
                     ),
 
@@ -3062,6 +3292,30 @@
                     ),
 
                     false
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessagePaymentAmount',
+                        'Payment Amount'
+                    ),
+
+                    inputHtml(
+                        'payAmt',
+                        'number',
+                        normalizeNumber(
+                            firstValue(
+                                row.payAmt,
+                                row.openAmount,
+                                row.amount,
+                                0
+                            )
+                        ),
+                        '0.01',
+                        false
+                    ),
+
+                    true
                 ) +
 
                 fieldHtml(
@@ -3148,51 +3402,9 @@
                     'data-check-field="true" style="display:none;"'
                 ) +
 
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessagePaymentAmount',
-                        'Payment Amount'
-                    ),
-
-                    inputHtml(
-                        'payAmt',
-                        'number',
-                        normalizeNumber(
-                            firstValue(
-                                row.payAmt,
-                                row.openAmount,
-                                row.amount,
-                                0
-                            )
-                        ),
-                        '0.01',
-                        false
-                    ),
-
-                    true
-                ) +
-
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessageInvoice',
-                        'Invoice'
-                    ),
-
-                    inputHtml(
-                        'invoiceDocumentNo',
-                        'text',
-                        firstValue(
-                            row.invoiceDocumentNo,
-                            row.documentNo,
-                            ''
-                        ),
-                        null,
-                        true
-                    ),
-
-                    true
-                ) +
-
+                /* Description is user-editable: it is posted as paymentDescription
+                   and written to C_Payment.Description on save, so it is neither
+                   read-only nor flagged as prefilled. */
                 fieldHtml(
                     lbl(
                         'Description',
@@ -3208,24 +3420,17 @@
                             ''
                         ),
                         null,
-                        true
+                        false
                     ),
 
-                    true,
+                    false,
                     'data-full-span="true"'
                 );
 
             $payDialogGrid.html(html);
             bindDatePickers();
 
-            getPayField('paymentMethodId')
-                .off('change.vasPaymentMethod')
-                .on(
-                    'change.vasPaymentMethod',
-                    function () {
-                        updateCheckFieldsVisibility();
-                    }
-                );
+            bindPaymentMethodChange();
 
             getPayField('currencyId')
                 .off('change.vasCurrencyConvert')
@@ -3236,8 +3441,13 @@
                             $(this).val() || 0
                         );
 
-                        refreshPopupBankAccounts(
+                        var selectedOrgId = Number(
+                            getPayField('adOrgId').val() || 0
+                        );
+
+                        refreshOrgScopedLookups(
                             selectedCurrencyId,
+                            selectedOrgId,
                             function (loaded) {
                                 if (!loaded) {
                                     return;
@@ -4414,7 +4624,7 @@
             ).text(
                 lbl(
                     'VAS_031_MessageUpcomingRuns',
-                    'Upcoming runs'
+                    'Upcoming Runs'
                 )
             );
 

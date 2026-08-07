@@ -396,7 +396,7 @@
     /* Viewport-anchored (the overlay lives on <body>, outside the widget), same
        basis as the widget card so it scales at any resolution; every size below
        is in em off this anchor. */
-    font-size: clamp(0.9rem, 1.6vw, 2.2rem);
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0117), 24px);
     position: fixed;
     inset: 0;
     background: rgba(16, 44, 63, 0.32);

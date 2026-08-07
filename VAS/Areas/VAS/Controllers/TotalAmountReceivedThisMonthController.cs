@@ -223,10 +223,10 @@ namespace VIS.Controllers
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Payment_Currency_Symbol,
                        CASE WHEN Payment.IsAllocated = 'Y' THEN 'Y' ELSE 'N' END AS Is_Allocated
                 FROM C_Payment Payment
-                INNER JOIN C_BPartner BPartner ON (Payment.C_BPartner_ID=BPartner.C_BPartner_ID)
-                LEFT OUTER JOIN C_BankAccount BankAccount ON (Payment.C_BankAccount_ID=BankAccount.C_BankAccount_ID)
-                LEFT OUTER JOIN C_Bank Bank ON (BankAccount.C_Bank_ID=Bank.C_Bank_ID)
+                INNER JOIN C_BankAccount BankAccount ON (Payment.C_BankAccount_ID=BankAccount.C_BankAccount_ID)
+                INNER JOIN C_Bank Bank ON (BankAccount.C_Bank_ID=Bank.C_Bank_ID)
                 INNER JOIN C_Currency Currency ON (Payment.C_Currency_ID=Currency.C_Currency_ID)
+                LEFT JOIN C_BPartner BPartner ON (Payment.C_BPartner_ID=BPartner.C_BPartner_ID)
                 WHERE Payment.IsReceipt = 'Y'
                   AND Payment.IsActive = 'Y'
                   AND Payment.DocStatus IN ('CO', 'CL')

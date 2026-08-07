@@ -254,6 +254,14 @@
             return label('VAS_StatusCompleted', 'Completed');
         }
 
+        function salesOrderStatusLabel(order) {
+            var ordered = Number(order.QuantityOrdered || 0);
+            var delivered = Number(order.QuantityDelivered || 0);
+            if (ordered > 0 && delivered >= ordered) { return label('VAS_StatusDelivered', 'Delivered'); }
+            if (delivered > 0 && delivered < ordered) { return label('VAS_StatusPartial', 'Partially Delivered'); }
+            return documentStatusLabel(order.DocumentStatus);
+        }
+
         // Review #6: the status reads Active for every product unless the product
         // is flagged Discontinued (controller sends Status 'D').
         function productStatusLabel() {
@@ -580,6 +588,8 @@
         function renderProductDialog() {
             var overview = productDetail.Overview;
             var status = productStatusLabel();
+            var isItem = overview.ProductType === 'I';
+            var uomDisplay = overview.UomName ? overview.UomName.toUpperCase() : '';
 
             $dialogTitle.text(overview.ProductName);
             $dialogBadge.text(overview.ProductCode || '').toggle(!!overview.ProductCode);
@@ -588,7 +598,7 @@
                 overview.ProductCode,
                 productTypeLabel(overview.ProductType),
                 overview.CategoryName,
-                overview.UomName ? label('VAS_UnitOfMeasure', 'UoM') + ' - ' + overview.UomName : ''
+                uomDisplay ? label('VAS_UnitOfMeasure', 'UoM') + ' - ' + uomDisplay : ''
             ].filter(function (value) { return value; }).map(function (value) {
                 return '<span class="MPC-product-search-chip">' + escapeHtml(value) + '</span>';
             }).join('');
@@ -609,28 +619,39 @@
                 ? '<img class="MPC-product-search-hero-img" src="' + escapeHtml(imageUrl) + '" alt="">'
                 : icon('product');
 
+            var statsContent = '';
+            if (isItem) {
+                statsContent += statTile(label('VAS_OnHandQty', 'On Hand Qty'), formatCompactQty(productDetail.OnHandQty), '');
+                statsContent += statTile(label('VAS_StockValue', 'Stock Value'), formatCompactAmount(productDetail.StockValue, productDetail.CurrencySymbol, productDetail.CurrencyIso), '');
+                statsContent += statTile(label('VAS_ReorderPoint', 'Reorder Pt'), formatQty(productDetail.ReorderPoint), 'is-warning');
+            }
+            statsContent += statTile(label('Status', 'Status'), status, productDetail.Status === 'D' ? 'is-warning' : 'is-success');
+
             var hero = '<section class="MPC-product-search-hero">' +
                 '<span class="MPC-product-search-hero-icon' + (overview.ImageUrl ? ' has-image' : '') + '">' + heroIconContent + '</span>' +
                 '<div class="MPC-product-search-hero-main">' +
                     '<div class="MPC-product-search-hero-name">' + escapeHtml(overview.ProductName) + '</div>' +
                     '<div class="MPC-product-search-chips">' + chips + '</div>' +
                 '</div>' +
-                '<div class="MPC-product-search-stats">' +
-                    statTile(label('VAS_OnHandQty', 'On Hand Qty'), formatCompactQty(productDetail.OnHandQty), '') +
-                    statTile(label('VAS_StockValue', 'Stock Value'), formatCompactAmount(productDetail.StockValue, productDetail.CurrencySymbol, productDetail.CurrencyIso), '') +
-                    statTile(label('VAS_ReorderPoint', 'Reorder Pt'), formatQty(productDetail.ReorderPoint), 'is-warning') +
-                    statTile(label('Status', 'Status'), status, productDetail.Status === 'D' ? 'is-warning' : 'is-success') +
-                '</div>' +
+                '<div class="MPC-product-search-stats">' + statsContent + '</div>' +
             '</section>';
 
-            var tabs = [
+            var allTabList = [
                 ['overview', label('VAS_Overview', 'Overview')],
                 ['stock', label('VAS_Stock', 'Stock')],
                 ['purchaseOrders', label('VAS_PurchaseOrders', 'Purchase Orders')],
                 ['salesOrders', label('VAS_SalesOrders', 'Sales Orders')],
                 ['movements', label('VAS_Movements', 'Movements')],
                 ['requisitions', label('VAS_Requisitions', 'Requisitions')]
-            ].map(function (tab) {
+            ];
+
+            if (!isItem) {
+                allTabList = allTabList.filter(function (tab) {
+                    return tab[0] !== 'stock' && tab[0] !== 'movements';
+                });
+            }
+
+            var tabs = allTabList.map(function (tab) {
                 return '<button type="button" class="MPC-product-search-tab' + (activeTab === tab[0] ? ' is-active' : '') + '" data-tab="' + tab[0] + '">' + escapeHtml(tab[1]) + '</button>';
             }).join('');
 
@@ -681,20 +702,27 @@
 
         function renderOverview() {
             var overview = productDetail.Overview;
+            var isItem = overview.ProductType === 'I';
+            var uomUpper = overview.UomName ? overview.UomName.toUpperCase() : '-';
+
             var fields = [
                 [label('VAS_ProductCode', 'Product Code'), overview.ProductCode],
                 [label('Name', 'Name'), overview.ProductName],
                 [label('UPC', 'UPC'), overview.UPC],
                 [label('VAS_ProductType', 'Type'), productTypeLabel(overview.ProductType)],
                 [label('VAS_ProductCategory', 'Product Category'), overview.CategoryName],
-                [label('VAS_UnitOfMeasure', 'Unit of Measure'), overview.UomName],
-                [label('VAS_PreferredSupplier', 'Preferred Supplier'), productDetail.PreferredSupplier],
-                [label('VAS_OnHandQty', 'On Hand Qty'), formatQty(productDetail.OnHandQty), true],
-                [label('VAS_StockValue', 'Stock Value'), formatBaseAmount(productDetail.StockValue), true],
-                [label('VAS_ReorderPoint', 'Reorder Point'), formatQty(productDetail.ReorderPoint)],
-                [label('Status', 'Status'), productStatusLabel()],
-                [label('VAS_DiscontinuedFrom', 'Discontinued From'), formatDate(overview.DiscontinuedFrom)]
+                [label('VAS_UnitOfMeasure', 'Unit of Measure'), uomUpper]
             ];
+
+            if (isItem) {
+                fields.push([label('VAS_PreferredSupplier', 'Preferred Supplier'), productDetail.PreferredSupplier]);
+                fields.push([label('VAS_OnHandQty', 'On Hand Qty'), formatQty(productDetail.OnHandQty), true]);
+                fields.push([label('VAS_StockValue', 'Stock Value'), formatBaseAmount(productDetail.StockValue), true]);
+                fields.push([label('VAS_ReorderPoint', 'Reorder Point'), formatQty(productDetail.ReorderPoint)]);
+            }
+
+            fields.push([label('Status', 'Status'), productStatusLabel()]);
+            fields.push([label('VAS_DiscontinuedFrom', 'Discontinued From'), formatDate(overview.DiscontinuedFrom)]);
 
             return '<div class="MPC-product-search-form-grid">' + fields.map(function (field) {
                 var value = field[1] || '-';
@@ -745,7 +773,7 @@
                     formatQty(order.QuantityOrdered),
                     formatQty(order.QuantityDelivered),
                     formatAmount(order.LineNetAmount, order.CurrencySymbol, order.CurrencyIso, order.StdPrecision),
-                    isSales ? documentStatusLabel(order.DocumentStatus) : purchaseOrderStatusLabel(order)
+                    isSales ? salesOrderStatusLabel(order) : purchaseOrderStatusLabel(order)
                 ];
             });
 

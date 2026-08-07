@@ -288,6 +288,11 @@
     display: flex;
 }
 
+/* The card surface is a translucent gradient (white -> rgba(255,255,255,0.6)),
+   so the pager strip must NOT paint its own fill: an opaque swatch here reads
+   as a mismatched band against the see-through bottom of the card. Only the
+   separator line is drawn, exactly as on VAS_031's card footer - #fbfdff
+   belongs to the DIALOG footer there, which sits on an opaque white card. */
 .vas-recent-ap-payments-footer {
     flex: 0 0 auto;
     min-width: 0;
@@ -298,7 +303,7 @@
     gap: 0.5em;
     padding: 0.75em 0 0;
     border-top: 1px solid #d9e2eb;
-    background: #fbfdff;
+    background: transparent;
     overflow: hidden;
 }
 
@@ -309,6 +314,9 @@
     --v-c-font-family: "NoirPro-Regular", sans-serif;
 }
 
+    /* nowrap alone let a heading wider than its fixed-width column spill and
+       get cut mid-word by the wrapper. Clipping it here trims it with an
+       ellipsis instead; the full text is on the cell's `title` for hover. */
     .vas-recent-ap-payments-table th {
         position: sticky;
         top: 0;
@@ -324,6 +332,8 @@
         text-align: left;
         text-transform: capitalize;
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .vas-recent-ap-payments-table td {
@@ -359,7 +369,7 @@
 }
 
 .vas-recent-ap-payments-value {
-    width: 14%;
+    width: 13%;
     color: #60748a;
     --v-c-font-family: 'NoirPro-Regular', sans-serif;
     font-family: var(--v-c-font-family);
@@ -385,7 +395,7 @@ td.vas-recent-ap-payments-vendor {
 }
 
 .vas-recent-ap-payments-status-col {
-    width: 10%;
+    width: 11%;
 }
 
 .vas-recent-ap-payments-amount {
@@ -419,6 +429,29 @@ td.vas-recent-ap-payments-amount {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* Value (document number) zoom link. Rendered as an <a> with no href, so the
+   link affordance has to be declared: action blue, underline on hover, and a
+   focus ring for keyboard use. The colour overrides the muted tone the
+   .vas-recent-ap-payments-value cell sets. */
+.vas-recent-ap-payments-doclink {
+    color: #0083da;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+    .vas-recent-ap-payments-doclink:hover,
+    .vas-recent-ap-payments-doclink:focus {
+        color: #0069b0;
+        text-decoration: underline;
+    }
+
+    .vas-recent-ap-payments-doclink:focus-visible {
+        outline: 2px solid rgba(0, 131, 218, 0.45);
+        outline-offset: 2px;
+        border-radius: 2px;
+    }
 
 .vas-recent-ap-payments-method {
     display: inline-flex;

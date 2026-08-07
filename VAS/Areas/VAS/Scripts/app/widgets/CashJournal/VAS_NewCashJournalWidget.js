@@ -62,6 +62,14 @@
         var $btn;
         var widgetID = 0;
 
+        /* Fallback target when the widget is NOT hosted inside a window
+           (windowNo < 0): there is no host to put into new-record mode, so the
+           Cash Journal window is opened through VAS.ZoomUtil instead. The
+           resolved AD_Window_ID is kept for the next click. */
+        var zoomWindowId = 0;
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_CashJournal';
+        var ZOOM_WINDOW_NAME_OLD = 'Cash Journal';
+
         /* ------------------------------------------------------------ */
         /* Lifecycle                                                    */
         /* ------------------------------------------------------------ */
@@ -125,15 +133,28 @@
             e.preventDefault();
             e.stopPropagation();
             try {
-                /* Standard new-mode descriptor used across VAS quick-action
-                   widgets. The host frame registers via addChangeListener and
-                   opens the Cash Journal window in new-record mode. A cash
-                   journal carries no IsSoTrx flag. */
-                var windowParam = {
-                    "IsTabInNewMode": "true",
-                    "TabIndex": "0"
-                };
-                $self.widgetFirevalueChanged(windowParam);
+                if ($self.windowNo >= 0) {
+                    /* Standard new-mode descriptor used across VAS quick-action
+                       widgets. The host frame registers via addChangeListener and
+                       opens the Cash Journal window in new-record mode. A cash
+                       journal carries no IsSoTrx flag. */
+                    var windowParam = {
+                        "IsTabInNewMode": "true",
+                        "TabIndex": "0"
+                    };
+                    $self.widgetFirevalueChanged(windowParam);
+                }
+                else {
+                    /* Standalone dashboard - no host window to switch into new mode,
+                       so open the Cash Journal window itself. Record_ID 0 means
+                       "open the window, do not position it on a record". */
+                    VAS.ZoomUtil.zoomToRecord("C_Cash_ID", 0, zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (windowId) {
+                            if (windowId > 0) {
+                                zoomWindowId = windowId;
+                            }
+                        });
+                }
             }
             catch (err) {
                 if (window.console) {

@@ -12,8 +12,8 @@
  *  3  | Vendor                               | VAS_032_MessageVendor
  *  4  | Document Number                      | VAS_032_MessageValueDocumentNumber
  *  5  | Method                               | VAS_032_MessageMethod
- *  6  | Bank Account Name                    | VAS_032_MessageBankAccountName
- *  7  | Status                               | VAS_032_MessageStatus
+ *  6  | Bank Account                         | VAS_032_MessageBankAccountName
+ *  7  | Execution Status                     | VAS_032_MessageStatus
  *  8  | Amount                               | VAS_032_MessageAmount
  *  9  | Loading                              | VAS_032_MessageLoading
  * 10  | No Data                              | VAS_032_MessageNoData
@@ -44,6 +44,12 @@
         this.windowNo;
         this.AD_UserHomeWidgetID;
 
+        var $self = this;
+        /* AD_Window_ID the Value hyperlink zooms to; sent by GetRecentAPPayments.
+           If it arrives as 0, VAS.ZoomUtil falls back to these window names. */
+        var zoomWindowId = 0;
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_APPayment';
+        var ZOOM_WINDOW_NAME_OLD = 'Payment';
         var $root = $('<div class="vas-recent-ap-payments-root">');
         var $card;
         var $banner;
@@ -259,6 +265,7 @@
 
 
         function renderData(data) {
+
             paymentsData = $.isArray(data.payments)
                 ? $.grep(data.payments, function (payment) {
                     var amount = Number(payment.amount || 0);
@@ -423,14 +430,19 @@
             var $thead = $('<thead>');
             var $headerRow = $('<tr>');
 
+            /* The table is fixed-layout on percentage widths, so a long heading
+               ("Execution Status") cannot widen its column - it used to spill
+               and get cut off mid-word by the wrapper. Each heading now trims
+               with an ellipsis and carries its full text in `title`, the same
+               hover contract the body cells already use. */
             $headerRow
-                .append($('<th class="vas-recent-ap-payments-date">').text(lbl('VAS_032_MessageDate', 'Account Date')))
-                .append($('<th class="vas-recent-ap-payments-value">').text(lbl('VAS_032_MessageValueDocumentNumber', 'Document Number')))
-                .append($('<th class="vas-recent-ap-payments-vendor">').text(lbl('VAS_032_MessageVendor', 'Vendor')))
-                .append($('<th class="vas-recent-ap-payments-method-col">').text(lbl('VAS_032_MessageMethod', 'Method')))
-                .append($('<th class="vas-recent-ap-payments-bank-account">').text(lbl('VAS_032_MessageBankAccountName', 'Bank Account Name')))
-                .append($('<th class="vas-recent-ap-payments-status-col">').text(lbl('VAS_032_MessageStatus', 'Status')))
-                .append($('<th class="vas-recent-ap-payments-amount">').text(lbl('VAS_032_MessageAmount', 'Amount')));
+                .append(buildHeaderCell('vas-recent-ap-payments-date', lbl('VAS_032_MessageDate', 'Account Date')))
+                .append(buildHeaderCell('vas-recent-ap-payments-value', lbl('VAS_032_MessageValueDocumentNumber', 'Document Number')))
+                .append(buildHeaderCell('vas-recent-ap-payments-vendor', lbl('VAS_032_MessageVendor', 'Vendor')))
+                .append(buildHeaderCell('vas-recent-ap-payments-method-col', lbl('VAS_032_MessageMethod', 'Method')))
+                .append(buildHeaderCell('vas-recent-ap-payments-bank-account', lbl('VAS_032_MessageBankAccountName', 'Bank Account')))
+                .append(buildHeaderCell('vas-recent-ap-payments-status-col', lbl('VAS_032_MessageStatus', 'Execution Status')))
+                .append(buildHeaderCell('vas-recent-ap-payments-amount', lbl('VAS_032_MessageAmount', 'Amount')));
 
             $thead.append($headerRow);
             $table.append($thead);
@@ -458,8 +470,8 @@
                 $showingText.text(
                     count > 0
                         ? lbl('VAS_Showing', 'Showing') + ' ' +
-                          startIndex + '–' + endIndex + ' ' +
-                          lbl('VAS_Of', 'of') + ' ' + count
+                        startIndex + '–' + endIndex + ' ' +
+                        lbl('VAS_Of', 'of') + ' ' + count
                         : ''
                 );
             }
@@ -479,6 +491,13 @@
             if ($pagerNext) {
                 $pagerNext.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
             }
+        }
+
+        function buildHeaderCell(className, text) {
+            return $('<th>')
+                .addClass(className)
+                .attr('title', text)
+                .text(text);
         }
 
         function createPaymentRow(payment) {
@@ -504,9 +523,7 @@
                         .text(formatDate(payment.paymentDate))))
 
                 .append($('<td class="vas-recent-ap-payments-value">')
-                    .append($('<span class="vas-recent-ap-payments-cell-text">')
-                        .attr('title', documentNo)
-                        .text(documentNo)))
+                    .append(buildValueCell(payment, documentNo)))
 
                 .append($('<td class="vas-recent-ap-payments-vendor">')
                     .append($('<span class="vas-recent-ap-payments-cell-text">')
@@ -526,6 +543,7 @@
                 .append($('<td class="vas-recent-ap-payments-status-col">')
                     .append($('<span class="vas-recent-ap-payments-status">')
                         .addClass(statusClass)
+                        .attr('title', statusText)
                         .text(statusText)))
 
                 .append($('<td class="vas-recent-ap-payments-amount">')
@@ -549,6 +567,87 @@
 
         function getDocumentNo(payment) {
             return payment.value || payment.documentNo || payment.referenceNo || '';
+        }
+
+        function getPaymentId(payment) {
+            if (!payment) {
+                return 0;
+            }
+
+            var id = Number(
+                payment.paymentId ||
+                payment.cPaymentId ||
+                payment.C_Payment_ID ||
+                0
+            );
+
+            return (isNaN(id) || id <= 0) ? 0 : id;
+        }
+
+        /* The Value (document number) cell is a zoom link: it navigates to the
+           C_Payment record rather than opening this widget's detail dialog, so the
+           handlers stopPropagation() to keep the row's own click from firing too.
+           A row whose id cannot be resolved degrades to plain text - no dead link. */
+        function buildValueCell(payment, documentNo) {
+            var paymentId = getPaymentId(payment);
+
+            if (!documentNo || paymentId <= 0) {
+                return $('<span class="vas-recent-ap-payments-cell-text">')
+                    .attr('title', documentNo)
+                    .text(documentNo);
+            }
+
+            var $link = $('<a class="vas-recent-ap-payments-cell-text vas-recent-ap-payments-doclink" role="link" tabindex="0">')
+                .attr('title', documentNo)
+                .text(documentNo);
+
+            $link.on('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                zoomToPayment(paymentId);
+            });
+
+            /* An <a> without href gets no implicit key activation. */
+            $link.on('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    zoomToPayment(paymentId);
+                }
+            });
+
+            return $link;
+        }
+
+        function zoomToPayment(paymentId) {
+            if (!paymentId) {
+                return;
+            }
+
+            /* The detail dialog is modal over the widget - close it so the zoomed
+               record is not left hidden behind it. */
+            closeDialog();
+
+            try {
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        'TabWhereClause': 'C_Payment_ID = ' + paymentId,
+                        'TabLayout': 'Y', /* 'N' Grid, 'Y' Single, 'C' Card */
+                        'TabIndex': '0'
+                    });
+                }
+                else {
+                    /* zoomWindowId comes from GetRecentAPPayments; when it is 0 the shared
+                       helper resolves the window from its name before zooming. */
+                    VAS.ZoomUtil.zoomToRecord('C_Payment_ID', paymentId, zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (windowId) {
+                            if (windowId > 0) {
+                                zoomWindowId = windowId;
+                            }
+                        });
+                }
+            }
+            catch (e) { /* zoom is best-effort */ }
         }
 
         function last4(accountNo) {
@@ -653,9 +752,9 @@
                 fieldHtml(lbl('VAS_032_MessagePaymentDate', 'Payment date'), escapeHtml(formatDate(payment.paymentDate))) +
                 fieldHtml(lbl('VAS_032_MessageValueDocumentNumber', 'Value (Document Number)'), '<span class="vas-recent-ap-payments-dialog-mono">' + escapeHtml(documentNo) + '</span>', null, documentNo) +
                 fieldHtml(lbl('VAS_032_MessageVendor', 'Vendor'), '<strong>' + escapeHtml(vendorName) + '</strong>', null, vendorName) +
-                fieldHtml(lbl('VAS_032_MessagePaymentMethod', 'Payment method'), escapeHtml(methodName), null, methodName) +
-                fieldHtml(lbl('VAS_032_MessageBankAccountName', 'Bank Account Name'), escapeHtml(bankAccountText), null, bankAccountText) +
-                fieldHtml(lbl('VAS_032_MessageStatus', 'Status'), '<span class="vas-recent-ap-payments-status ' + statusClass + '">' + escapeHtml(statusText) + '</span>') +
+                fieldHtml(lbl('VAS_032_MessagePaymentMethod', 'Payment Method'), escapeHtml(methodName), null, methodName) +
+                fieldHtml(lbl('VAS_032_MessageBankAccountName', 'Bank Account'), escapeHtml(bankAccountText), null, bankAccountText) +
+                fieldHtml(lbl('VAS_032_MessageStatus', 'Execution Status'), '<span class="vas-recent-ap-payments-status ' + statusClass + '">' + escapeHtml(statusText) + '</span>') +
                 fieldHtml(lbl('VAS_032_MessageAmount', 'Amount'), '<span class="vas-recent-ap-payments-dialog-amount">' + escapeHtml(amountText) + '</span>', 'vas-recent-ap-payments-dialog-amount-field', amountText);
 
             if (currencyText) {
@@ -1531,6 +1630,20 @@
     };
 
     VAS.VAS_032_RecentAPPaymentsWidget.prototype.widgetSizeChange = function (height, width) {
+    };
+
+    /* Zoom channel. The host frame registers itself via addChangeListener() and
+       acts on the descriptor passed to widgetFirevalueChanged() - here, to
+       navigate to the clicked C_Payment record. Same surface as
+       VAS_068_APPaymentSearchWidget. */
+    VAS.VAS_032_RecentAPPaymentsWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
+    };
+
+    VAS.VAS_032_RecentAPPaymentsWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener && typeof this.listener.widgetFirevalueChanged === 'function') {
+            this.listener.widgetFirevalueChanged(value);
+        }
     };
 
     VAS.VAS_032_RecentAPPaymentsWidget.prototype.refreshWidget = function () {

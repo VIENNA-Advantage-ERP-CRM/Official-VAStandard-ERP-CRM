@@ -211,7 +211,7 @@ namespace VAS.Controllers
                                 name = Util.GetValueOfString(dr["ProductName"]),
                                 code = Util.GetValueOfString(dr["ProductCode"]),
                                 category = Util.GetValueOfString(dr["CategoryName"]),
-                                uom = !string.IsNullOrEmpty(uomSymbol) ? uomSymbol : uomName,
+                                uom = !string.IsNullOrEmpty(uomName) ? uomName : uomSymbol,
                                 isActive = "Y".Equals(Util.GetValueOfString(dr["IsActive"]), StringComparison.OrdinalIgnoreCase),
                                 attributes = new List<ProductAttribute>(),
                                 seenChips = new HashSet<string>()

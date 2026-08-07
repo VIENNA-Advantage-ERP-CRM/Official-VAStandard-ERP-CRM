@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name : VAS
  * Purpose     : Styles for the Sales Order Overview tab panel
  *               (VAS.VAS_106_OverviewSalesOrder). All classes are
@@ -9,6 +9,12 @@
  *               em anchor so sizes scale with the panel width.
  * Chronological development:
  *   VAI163   2026-07-08  Created
+ *   VAI163   2026-07-31  Header aligned to the VAS_092 Purchase Order Overview
+ *                        standard: details card is 40%/1fr (was 1.4fr/1fr) and
+ *                        its field column (-hdrColR) is a two-across grid
+ *                        instead of a single tall stack, collapsing to one
+ *                        column under 460px. Field values wrap rather than
+ *                        ellipsis-truncate now that the column is narrower.
  ***********************************************************/
 
 .MPC-vaso-root {
@@ -122,20 +128,30 @@
 /* ----------------------------------------------------------- */
 /*  Customer identity card                                      */
 /* ----------------------------------------------------------- */
+/* Identity takes 40% of the card; the fields take the rest and run two across,
+   so short fields sit in rows instead of stacking into a tall column that
+   leaves the identity half empty. */
 .MPC-vaso-hdrCard {
-    display: grid; grid-template-columns: 1.4fr 1fr; gap: 0.875em 1.75em;
+    display: grid; grid-template-columns: 40% 1fr; gap: 0.875em 1.75em;
     border: 1px solid var(--vaso-card-bd); border-radius: var(--vaso-card-radius);
     background: #fff; padding: 0.875em 1em;
 }
 .MPC-vaso-hdrColL { min-width: 0; border-right: 1px solid var(--vaso-row-div); padding-right: 1.25em; }
-.MPC-vaso-hdrColR { min-width: 0; display: flex; flex-direction: column; gap: 0.5em; }
+.MPC-vaso-hdrColR {
+    min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75em 1.5em; align-content: start;
+}
 .MPC-vaso-hdrField { min-width: 0; }
 
 .MPC-vaso-fLabel {
     font-size: 0.6875em; font-weight: 700; letter-spacing: .4px;
     text-transform: uppercase; color: var(--vaso-muted); line-height: 1.3;
 }
-.MPC-vaso-fVal { font-size: 0.8125em; font-weight: 500; color: var(--vaso-text); line-height: 1.35; margin-top: 0.125em; }
+.MPC-vaso-fVal {
+    font-size: 0.8125em; font-weight: 700; color: var(--vaso-text);
+    line-height: 1.35; margin-top: 0.125em;
+    overflow-wrap: break-word;   /* a long value wraps instead of spilling */
+}
 
 .MPC-vaso-custName { font-size: 0.9375em; font-weight: 700; color: var(--vaso-text); margin: 0.25em 0; }
 .MPC-vaso-custAddr {
@@ -153,6 +169,8 @@
 @container (max-width: 460px) {
     .MPC-vaso-hdrCard { grid-template-columns: 1fr; }
     .MPC-vaso-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--vaso-row-div); padding-bottom: 0.75em; }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .MPC-vaso-hdrColR { grid-template-columns: 1fr; }
     .MPC-vaso-hdrTop  { flex-direction: column; }
     .MPC-vaso-hdrPills { justify-content: flex-start; }
 }

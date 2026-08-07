@@ -148,8 +148,8 @@ SELECT
     GL_Journal.CreatedBy
 FROM GL_Journal GL_Journal
 WHERE GL_Journal.IsActive = 'Y'
-AND GL_Journal.AD_Client_ID =
-@PendingClientID
+AND NVL(GL_JournalBatch_ID, 0) = 0 
+AND GL_Journal.AD_Client_ID = @PendingClientID
 AND GL_Journal.DocStatus IN ('DR','IP','AP','NA')";
 
                 protectedJournalSql = MRole.GetDefault(ctx).AddAccessSQL(
