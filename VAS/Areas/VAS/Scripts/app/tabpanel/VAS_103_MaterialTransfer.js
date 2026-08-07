@@ -29,6 +29,9 @@
  *                        for both actions. The record id cannot answer it: a
  *                        copied row carries the source record's key until saved.
  *                        Ported from VAS_092.
+ *   VAI163   2026-08-07  Emits the vas_103-prefixed modifier classes the
+ *                        stylesheet now uses, the runtime-built ones included
+ *                        ("vas_103-tone-" + tone).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -340,7 +343,7 @@
 
         function headerPill(label, tone, icon, withDot) {
             var $p = $('<span class="vas_103-hdrPill"></span>')
-                .addClass("tone-" + (tone || "neutral"));
+                .addClass("vas_103-tone-" + (tone || "neutral"));
             if (icon) $p.append(svgIcon(icon));
             if (withDot) $p.append($('<span class="vas_103-hdrDot"></span>'));
             $p.append($('<span></span>').text(label));
@@ -351,7 +354,7 @@
             var $f = $('<div class="vas_103-hdrField"></div>');
             $f.append($('<div class="vas_103-fLabel"></div>').text(label));
             var $v = $('<div class="vas_103-fVal"></div>').text(value);
-            if (link) $v.addClass("is-link");
+            if (link) $v.addClass("vas_103-is-link");
             $f.append($v);
             return $f;
         }
@@ -400,8 +403,8 @@
 
         function originChip(label, linked) {
             var $c = $('<span class="vas_103-originChip"></span>')
-                .toggleClass("is-linked", !!linked)
-                .toggleClass("is-muted", !linked);
+                .toggleClass("vas_103-is-linked", !!linked)
+                .toggleClass("vas_103-is-muted", !linked);
             $c.append(svgIcon("link"));
             $c.append($('<span class="vas_103-originLbl"></span>').text(label));
             $c.append($('<span class="vas_103-originState"></span>').text(
@@ -435,7 +438,7 @@
         }
 
         function metricCard(tone, icon, label, value, sub) {
-            var $c = $('<div class="vas_103-metric"></div>').addClass("tone-" + tone);
+            var $c = $('<div class="vas_103-metric"></div>').addClass("vas_103-tone-" + tone);
 
             var $head = $('<div class="vas_103-mHead"></div>');
             $head.append(svgIcon(icon));
@@ -469,12 +472,12 @@
                 var s = stages[i];
                 var stateCls, metaText;
                 if (s.done) {
-                    stateCls = "is-done";
+                    stateCls = "vas_103-is-done";
                     metaText = (i === 4)
                         ? VIS.Msg.getMsg("VAS_103_Posted")
                         : (formatDate(s.date) || VIS.Msg.getMsg("VAS_103_Done"));
                 } else if (i === activeIdx + 1) {
-                    stateCls = "is-active";
+                    stateCls = "vas_103-is-active";
                     metaText = VIS.Msg.getMsg("VAS_103_Pending");
                 } else {
                     stateCls = "is-pending";
@@ -528,9 +531,9 @@
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_103_FromLocator")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_103_ToLocator")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_103_UOM")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_103_Quantity")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_103_Value")));
-            $head.append($('<span class="ta-c"></span>').text(VIS.Msg.getMsg("VAS_103_Source")));
+            $head.append($('<span class="vas_103-ta-r"></span>').text(VIS.Msg.getMsg("VAS_103_Quantity")));
+            $head.append($('<span class="vas_103-ta-r"></span>').text(VIS.Msg.getMsg("VAS_103_Value")));
+            $head.append($('<span class="vas_103-ta-c"></span>').text(VIS.Msg.getMsg("VAS_103_Source")));
             $tbl.append($head);
 
             var breakdown = { req: 0, prod: 0, manual: 0 };
@@ -562,7 +565,7 @@
             $qty.append($('<b></b>').text(formatNumber(totQty, 0)));
             $foot.append($qty);
 
-            var $val = $('<span class="vas_103-tf is-grand"></span>');
+            var $val = $('<span class="vas_103-tf vas_103-is-grand"></span>');
             $val.append(document.createTextNode(VIS.Msg.getMsg("VAS_103_TotalValue")));
             $val.append($('<b></b>').text(formatAmount(totVal, cur, data.StdPrecision)));
             $foot.append($val);
@@ -598,17 +601,17 @@
             $tr.append($('<span></span>').text(na(ln.UOMName)));
 
             // Quantity
-            $tr.append($('<span class="ta-r"></span>').text(formatNumber(+ln.MovementQty || 0, prec)));
+            $tr.append($('<span class="vas_103-ta-r"></span>').text(formatNumber(+ln.MovementQty || 0, prec)));
 
             // Value
-            $tr.append($('<span class="ta-r"></span>').text(
+            $tr.append($('<span class="vas_103-ta-r"></span>').text(
                 formatAmount(+ln.LineValue || 0, cur, data.StdPrecision)));
 
             // Source badge
             var srcKey = origin === "req" ? "VAS_103_Requisition"
                        : (origin === "prod" ? "VAS_103_ProductionOrder" : "VAS_103_Manual");
-            var $q = $('<span class="ta-c"></span>');
-            $q.append($('<span class="vas_103-tag"></span>').addClass("s-" + origin)
+            var $q = $('<span class="vas_103-ta-c"></span>');
+            $q.append($('<span class="vas_103-tag"></span>').addClass("vas_103-s-" + origin)
                 .text(VIS.Msg.getMsg(srcKey)));
             $tr.append($q);
 
@@ -630,8 +633,8 @@
         }
 
         function actionButton(icon, label, kind, disabled) {
-            var $b = $('<span class="vas_103-btn"></span>').addClass("btn-" + (kind || "sec"));
-            if (disabled) $b.addClass("is-disabled");
+            var $b = $('<span class="vas_103-btn"></span>').addClass("vas_103-btn-" + (kind || "sec"));
+            if (disabled) $b.addClass("vas_103-is-disabled");
             $b.append(svgIcon(icon));
             $b.append($('<span></span>').text(label));
             return $b;

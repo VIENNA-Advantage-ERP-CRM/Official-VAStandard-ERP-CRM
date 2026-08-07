@@ -181,6 +181,9 @@
  *                        - Activity follows VAS_092: a wrapping flex row with the
  *                          timestamp held right by margin-left:auto, and the pager
  *                          inside the list card.
+ *   VAI163   2026-08-07  Emits the vas_099-prefixed modifier classes the
+ *                        stylesheet now uses, the runtime-built ones included
+ *                        ("vas_099-tone-" + tone).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -300,7 +303,7 @@
         // Delegated once on the root, so it survives every re-render: an origin
         // chip or a document row opens the record it points at.
         function bindEvents() {
-            $root.on("click", ".vas_099-chip.is-link, .is-link[data-open-table]", function (e) {
+            $root.on("click", ".vas_099-chip.vas_099-is-link, .vas_099-is-link[data-open-table]", function (e) {
                 e.preventDefault();
                 openRecord($(this).attr("data-open-table"), $(this).attr("data-open-id"),
                     $(this).attr("data-open-sotrx") === "Y");
@@ -668,10 +671,10 @@
         // with an optional trailing status pill. When a table + record id is
         // supplied the chip becomes a link that opens that record.
         function originChip(icon, label, value, $statusPill, iconTone, tableName, recordId, isSOTrx) {
-            var $chip = $('<span class="vas_099-chip"></span>').addClass("ic-" + (iconTone || "muted"));
+            var $chip = $('<span class="vas_099-chip"></span>').addClass("vas_099-ic-" + (iconTone || "muted"));
             var isLink = tableName && recordId && +recordId > 0;
             if (isLink) {
-                $chip.addClass("is-link")
+                $chip.addClass("vas_099-is-link")
                     .attr("data-open-table", tableName)
                     .attr("data-open-id", recordId);
                 if (isSOTrx) $chip.attr("data-open-sotrx", "Y");
@@ -692,7 +695,7 @@
         // a leading dot (status).
         function headerPill(label, tone, icon, withDot) {
             var $p = $('<span class="vas_099-hdrPill"></span>')
-                .addClass("tone-" + (tone || "neutral"));
+                .addClass("vas_099-tone-" + (tone || "neutral"));
             if (icon) $p.append(svgIcon(icon));
             if (withDot) $p.append($('<span class="vas_099-hdrDot"></span>'));
             $p.append($('<span></span>').text(label));
@@ -705,7 +708,7 @@
             var $f = $('<div class="vas_099-hdrField"></div>');
             $f.append($('<div class="vas_099-fLabel"></div>').text(label));
             var $v = $('<div class="vas_099-fVal"></div>').text(value);
-            if (link) $v.addClass("is-link");
+            if (link) $v.addClass("vas_099-is-link");
             $f.append($v);
             return $f;
         }
@@ -726,7 +729,7 @@
             var $snap = $('<section class="vas_099-snap"></section>');
             // With the two quality cards in play the grid runs three-up, so the six
             // cards form two even rows instead of a 4 + 2 orphan.
-            if (qc) $snap.addClass("has-qc");
+            if (qc) $snap.addClass("vas_099-has-qc");
             var cur = currencyToken();
 
             // Received value.
@@ -770,7 +773,7 @@
         // Metric card: colour-accented left border (via tone class), a header
         // (icon + label), a large value and a caption.
         function metricCard(tone, icon, label, value, sub) {
-            var $c = $('<div class="vas_099-metric"></div>').addClass("tone-" + tone);
+            var $c = $('<div class="vas_099-metric"></div>').addClass("vas_099-tone-" + tone);
 
             // Label, value and caption each clip to a single line inside the card,
             // so a long figure (the Received quantity / received value above all)
@@ -852,13 +855,13 @@
 
                 var stateCls, metaText;
                 if (i === activeIdx) {
-                    stateCls = "is-active";
+                    stateCls = "vas_099-is-active";
                     metaText = stageDate || VIS.Msg.getMsg("VAS_099_Done");
                 } else if (s.done) {
-                    stateCls = "is-done";
+                    stateCls = "vas_099-is-done";
                     metaText = stageDate || VIS.Msg.getMsg("VAS_099_Done");
                 } else {
-                    stateCls = "is-pending";
+                    stateCls = "vas_099-is-pending";
                     metaText = VIS.Msg.getMsg("VAS_099_Pending");
                 }
 
@@ -926,24 +929,24 @@
             // address the material table's own columns without also catching
             // theirs — they share .vas_099-tRow but not its column meanings.
             var $tbl = $('<div class="vas_099-table vas_099-matTable"></div>');
-            if (!showQuality) $tbl.addClass("no-quality");
+            if (!showQuality) $tbl.addClass("vas_099-no-quality");
 
             // Header row
             var $head = $('<div class="vas_099-tRow vas_099-tHead"></div>');
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_099_Item")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_099_UOM")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_099_Ordered")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_099_Received")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_099_Rate")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_099_Amount")));
+            $head.append($('<span class="vas_099-ta-r"></span>').text(VIS.Msg.getMsg("VAS_099_Ordered")));
+            $head.append($('<span class="vas_099-ta-r"></span>').text(VIS.Msg.getMsg("VAS_099_Received")));
+            $head.append($('<span class="vas_099-ta-r"></span>').text(VIS.Msg.getMsg("VAS_099_Rate")));
+            $head.append($('<span class="vas_099-ta-r"></span>').text(VIS.Msg.getMsg("VAS_099_Amount")));
             if (showQuality) {
-                $head.append($('<span class="ta-c"></span>').text(VIS.Msg.getMsg("VAS_099_Quality")));
+                $head.append($('<span class="vas_099-ta-c"></span>').text(VIS.Msg.getMsg("VAS_099_Quality")));
             }
             $tbl.append($head);
 
             // Totals footer — always the whole receipt, never just the page.
             var $foot = $('<div class="vas_099-tFoot"></div>');
-            var $bit = $('<span class="vas_099-tf is-grand"></span>');
+            var $bit = $('<span class="vas_099-tf vas_099-is-grand"></span>');
             $bit.append(document.createTextNode(VIS.Msg.getMsg("VAS_099_TotalReceivedValue")));
             $bit.append($('<b></b>').text(formatAmount(+data.ReceivedValue || 0, cur, data.StdPrecision)));
             $foot.append($bit);
@@ -1017,7 +1020,7 @@
             $b.append($('<span></span>').text(label));
             if (icon === "chevRight") $b.append(svgIcon(icon));
             if (disabled) {
-                $b.addClass("is-disabled");
+                $b.addClass("vas_099-is-disabled");
             } else {
                 $b.on("click", handler);
             }
@@ -1073,7 +1076,7 @@
             $tr.append($('<span></span>').text(na(ln.UOMName)));
 
             // Ordered
-            $tr.append($('<span class="ta-r"></span>').text(formatNumber(+ln.OrderedQty || 0, prec)));
+            $tr.append($('<span class="vas_099-ta-r"></span>').text(formatNumber(+ln.OrderedQty || 0, prec)));
 
             // Received — the figure on its own line so it lands on the same
             // baseline and right edge as Ordered, with the progress bar stacked
@@ -1081,8 +1084,8 @@
             var ordered = +ln.OrderedQty || 0;
             var received = +ln.ReceivedQty || 0;
             var pct = ordered > 0 ? Math.min(100, Math.round((received / ordered) * 100)) : (received > 0 ? 100 : 0);
-            var recvState = ordered > 0 && received >= ordered ? "full" : (received > 0 ? "part" : "none");
-            var $recv = $('<span class="vas_099-recv ta-r"></span>').addClass(recvState);
+            var recvState = ordered > 0 && received >= ordered ? "vas_099-full" : (received > 0 ? "vas_099-part" : "vas_099-none");
+            var $recv = $('<span class="vas_099-recv vas_099-ta-r"></span>').addClass(recvState);
             $recv.append($('<span class="vas_099-recvVal"></span>').text(formatNumber(received, prec)));
             var $bar = $('<span class="vas_099-recvBar"><i></i></span>');
             $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
@@ -1098,24 +1101,24 @@
 
             // Rate — per the entered uom, so Qty x Rate reconciles to Amount on the
             // row as shown (the model restates it for a converted line).
-            $tr.append($('<span class="ta-r"></span>').text(
+            $tr.append($('<span class="vas_099-ta-r"></span>').text(
                 formatAmount(+ln.UnitRate || 0, cur, data.StdPrecision))
                 .attr("title", formatAmount(+ln.UnitRate || 0, cur, data.StdPrecision) +
                     (ln.UOMName ? " / " + ln.UOMName : "")));
 
             // Amount
-            $tr.append($('<span class="ta-r"></span>').text(
+            $tr.append($('<span class="vas_099-ta-r"></span>').text(
                 formatAmount(+ln.LineValue || 0, cur, data.StdPrecision)));
 
             // Quality marker — omitted entirely when no line on this receipt has a
             // quality check applicable (the column itself is not rendered then).
             if (showQuality) {
-                var $q = $('<span class="ta-c"></span>');
+                var $q = $('<span class="vas_099-ta-c"></span>');
                 if (ln.QualityApplicable) {
-                    $q.append($('<span class="vas_099-tag q-on"></span>')
+                    $q.append($('<span class="vas_099-tag vas_099-q-on"></span>')
                         .text(VIS.Msg.getMsg("VAS_099_Applicable")));
                 } else {
-                    $q.append($('<span class="vas_099-tag q-off"></span>')
+                    $q.append($('<span class="vas_099-tag vas_099-q-off"></span>')
                         .text(VIS.Msg.getMsg("VAS_099_NotApplicable")));
                 }
                 $tr.append($q);
@@ -1129,9 +1132,9 @@
         // QC result code -> { key, fallback, tone }. "N" is a parameter that has
         // not been inspected yet, not a failure.
         var QC_STATUS_MAP = {
-            "P": { key: "VAS_099_Passed",  fallback: "Passed",  tone: "q-pass" },
-            "F": { key: "VAS_099_Failed",  fallback: "Failed",  tone: "q-fail" },
-            "N": { key: "VAS_099_Pending", fallback: "Pending", tone: "q-wait" }
+            "P": { key: "VAS_099_Passed",  fallback: "Passed",  tone: "vas_099-q-pass" },
+            "F": { key: "VAS_099_Failed",  fallback: "Failed",  tone: "vas_099-q-fail" },
+            "N": { key: "VAS_099_Pending", fallback: "Pending", tone: "vas_099-q-wait" }
         };
 
         // The quality parameters configured against each product on the receipt —
@@ -1164,12 +1167,12 @@
             var $head = $('<div class="vas_099-tRow vas_099-tHead"></div>');
             $head.append($('<span></span>').text(msg("VAS_099_Product", "Product")));
             $head.append($('<span></span>').text(msg("VAS_099_Parameter", "Parameter")));
-            $head.append($('<span class="ta-r"></span>').text(msg("VAS_099_ToVerify", "To Verify")));
+            $head.append($('<span class="vas_099-ta-r"></span>').text(msg("VAS_099_ToVerify", "To Verify")));
             $head.append($('<span></span>').text(msg("VAS_099_AcceptableValue", "Acceptable")));
             $head.append($('<span></span>').text(msg("VAS_099_ActualValue", "Actual")));
             $head.append($('<span></span>').text(msg("VAS_099_QADate", "QA Date")));
-            $head.append($('<span class="ta-c"></span>').text(msg("VAS_099_Status", "Status")));
-            $head.append($('<span class="ta-c"></span>').text(msg("VAS_099_Confirmation", "Confirmation")));
+            $head.append($('<span class="vas_099-ta-c"></span>').text(msg("VAS_099_Status", "Status")));
+            $head.append($('<span class="vas_099-ta-c"></span>').text(msg("VAS_099_Confirmation", "Confirmation")));
             $tbl.append($head);
 
             for (var i = 0; i < rows.length; i++) {
@@ -1204,7 +1207,7 @@
             $tr.append($param);
 
             // Quantity to verify.
-            $tr.append($('<span class="ta-r"></span>').text(formatNumber(+q.QuantityToVerify || 0, 0)));
+            $tr.append($('<span class="vas_099-ta-r"></span>').text(formatNumber(+q.QuantityToVerify || 0, 0)));
 
             // Acceptable / actual value.
             $tr.append($('<span></span>').text(na(q.AcceptableValue)));
@@ -1215,14 +1218,14 @@
 
             // Verdict.
             var st = QC_STATUS_MAP[q.StatusCode] || QC_STATUS_MAP["N"];
-            var $status = $('<span class="ta-c"></span>');
+            var $status = $('<span class="vas_099-ta-c"></span>');
             $status.append($('<span class="vas_099-tag"></span>')
                 .addClass(st.tone).text(msg(st.key, st.fallback)));
             $tr.append($status);
 
             // Confirmation — Yes when the receipt uses a document type that asks
             // for a confirmation ("MM Receipt with Confirmation").
-            $tr.append($('<span class="ta-c"></span>').text(
+            $tr.append($('<span class="vas_099-ta-c"></span>').text(
                 data.IsConfirmationDocType ? msg("VAS_099_Yes", "Yes") : msg("VAS_099_No", "No")));
 
             return $tr;
@@ -1247,7 +1250,7 @@
             $h.append($('<span></span>').text(msg("VAS_099_Document", "Document")));
             $h.append($('<span></span>').text(msg("VAS_099_DocDate", "Date")));
             $h.append($('<span></span>').text(msg("VAS_099_DocStatus", "Status")));
-            $h.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_099_Amount")));
+            $h.append($('<span class="vas_099-ta-r"></span>').text(VIS.Msg.getMsg("VAS_099_Amount")));
             $tbl.append($h);
 
             for (var i = 0; i < rows.length; i++) {
@@ -1277,7 +1280,7 @@
 
             var canOpen = d.TableName && +d.RecordId > 0;
             if (canOpen) {
-                $tr.addClass("is-link")
+                $tr.addClass("vas_099-is-link")
                     .attr("data-open-table", d.TableName)
                     .attr("data-open-id", d.RecordId);
             }
@@ -1318,10 +1321,10 @@
 
             var st = statusMeta(d.DocStatus);
             $tr.append($('<span></span>').append(
-                $('<span class="vas_099-tag"></span>').addClass("s-" + st.tone).text(st.label)));
+                $('<span class="vas_099-tag"></span>').addClass("vas_099-s-" + st.tone).text(st.label)));
 
             // A confirmation has no amount of its own.
-            var $amt = $('<span class="ta-r"></span>');
+            var $amt = $('<span class="vas_099-ta-r"></span>');
             $amt.text((d.Amount === null || d.Amount === undefined)
                 ? "—"
                 : formatAmount(+d.Amount || 0, currencyToken(), data.StdPrecision));
@@ -1418,7 +1421,7 @@
 
             var $row = $('<div class="vas_099-actRow"></div>');
 
-            var $tag = $('<span class="vas_099-actTag"></span>').addClass("tone-" + meta.tone);
+            var $tag = $('<span class="vas_099-actTag"></span>').addClass("vas_099-tone-" + meta.tone);
             $tag.append(svgIcon(meta.icon));
             $tag.append($('<span></span>').text(msg(meta.tagKey, meta.tagText)));
             $row.append($tag);
@@ -1456,14 +1459,14 @@
 
             // Rows carrying a body are clickable; the caret shows the state.
             if (hasActivityBody(a)) {
-                $row.addClass("is-openable");
+                $row.addClass("vas_099-is-openable");
                 $row.attr("title", msg("VAS_099_ShowMailBody", "Click to read the message"));
                 $row.append($('<span class="vas_099-actCaret"></span>').append(svgIcon("chevRight")));
                 $row.on("click", function () {
                     var $panel = $row.next(".vas_099-actBody");
                     if (!$panel.length) return;
-                    var nowOpen = !$row.hasClass("is-open");
-                    $row.toggleClass("is-open", nowOpen)
+                    var nowOpen = !$row.hasClass("vas_099-is-open");
+                    $row.toggleClass("vas_099-is-open", nowOpen)
                         .attr("title", nowOpen ? msg("VAS_099_HideMailBody", "Click to hide the message")
                                                : msg("VAS_099_ShowMailBody", "Click to read the message"));
                     $panel.toggle(nowOpen);
@@ -1595,13 +1598,13 @@
         }
 
         function actionButton(icon, label, kind) {
-            var $b = $('<span class="vas_099-btn"></span>').addClass("btn-" + (kind || "sec"));
+            var $b = $('<span class="vas_099-btn"></span>').addClass("vas_099-btn-" + (kind || "sec"));
             $b.append(svgIcon(icon));
             $b.append($('<span></span>').text(label));
             return $b;
         }
 
-        function disableBtn($b) { $b.addClass("is-disabled"); }
+        function disableBtn($b) { $b.addClass("vas_099-is-disabled"); }
 
         // A button that cannot run, but says so. `is-disabled` sets
         // pointer-events:none, which also swallows the tooltip and the click — so a
@@ -1610,7 +1613,7 @@
         // reader both on hover and on click. It carries no action handler, so it
         // stays as unable to run as `is-disabled` is.
         function blockBtn($b, why) {
-            $b.addClass("is-blocked").attr("title", why);
+            $b.addClass("vas_099-is-blocked").attr("title", why);
             $b.on("click", function () { toast(why, true); });
         }
 
@@ -1619,8 +1622,8 @@
         // `extra` carries an action's own parameters (the invoice dialog's document
         // type / reference); the record id is always sent.
         function runAction($btn, endpoint, failMsg, extra, onDone) {
-            if ($btn.hasClass("is-disabled") || $btn.hasClass("is-busy")) return;
-            $btn.addClass("is-busy");
+            if ($btn.hasClass("vas_099-is-disabled") || $btn.hasClass("vas_099-is-busy")) return;
+            $btn.addClass("vas_099-is-busy");
             showBusy(true);
 
             var payload = { M_InOut_ID: $self.record_ID };
@@ -1637,7 +1640,7 @@
                 data: payload,
                 success: function (raw) {
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    $btn.removeClass("is-busy");
+                    $btn.removeClass("vas_099-is-busy");
                     // A caller that returns true from onDone has shown the refusal
                     // itself (the invoice dialog puts it in the form), so it is not
                     // repeated as a toast behind the dialog.
@@ -1658,7 +1661,7 @@
                     }
                 },
                 error: function () {
-                    $btn.removeClass("is-busy");
+                    $btn.removeClass("vas_099-is-busy");
                     showBusy(false);
                     if (onDone) onDone(null);
                     toast(failMsg, true);
@@ -1690,7 +1693,7 @@
         // offered are the ones the receipt qualifies for (fetched with the
         // receipt's own default already selected).
         function openInvoiceDialog($btn) {
-            if ($btn.hasClass("is-disabled") || $btn.hasClass("is-busy")) return;
+            if ($btn.hasClass("vas_099-is-disabled") || $btn.hasClass("vas_099-is-busy")) return;
 
             showBusy(true);
             $.ajax({
@@ -1781,9 +1784,9 @@
             $card.append($body);
 
             var $foot = $('<div class="vas_099-modalFoot"></div>');
-            var $cancel = $('<span class="vas_099-btn btn-sec"></span>')
+            var $cancel = $('<span class="vas_099-btn vas_099-btn-sec"></span>')
                 .append($('<span></span>').text(msg("VAS_099_Cancel", "Cancel")));
-            var $create = $('<span class="vas_099-btn btn-pri"></span>')
+            var $create = $('<span class="vas_099-btn vas_099-btn-pri"></span>')
                 .append($('<span></span>').text(msg("VAS_099_CreateInvoice", "Create Invoice")));
             $foot.append($cancel).append($create);
             $card.append($foot);
@@ -1819,7 +1822,7 @@
                 // The dialog stays up until the server answers, then closes only
                 // when an invoice was actually created — a refusal is shown in
                 // place, with the values still filled in.
-                $create.addClass("is-busy");
+                $create.addClass("vas_099-is-busy");
                 runAction($btn, "GenerateInvoice",
                     msg("VAS_099_InvoiceFailed", "Could not generate the invoice."),
                     {
@@ -1828,7 +1831,7 @@
                         GenerateCharges: $charges.is(":checked")
                     },
                     function (res) {
-                        $create.removeClass("is-busy");
+                        $create.removeClass("vas_099-is-busy");
                         if (res && res.success) {
                             // Closed here so the success toast — which names the
                             // generated invoice — is the thing left on screen.
@@ -1849,11 +1852,11 @@
         // Lightweight self-contained toast.
         function toast(message, isError) {
             var $t = $('<div class="vas_099-toast"></div>')
-                .addClass(isError ? "err" : "ok").text(message);
+                .addClass(isError ? "vas_099-err" : "vas_099-ok").text(message);
             $root.append($t);
-            setTimeout(function () { $t.addClass("show"); }, 10);
+            setTimeout(function () { $t.addClass("vas_099-show"); }, 10);
             setTimeout(function () {
-                $t.removeClass("show");
+                $t.removeClass("vas_099-show");
                 setTimeout(function () { $t.remove(); }, 300);
             }, 3600);
         }

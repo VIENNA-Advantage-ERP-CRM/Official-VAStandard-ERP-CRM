@@ -125,6 +125,11 @@
  *   VAI163   2026-08-06  The pager now also serves the Recent Activity feed. Inside
  *                        the activity list it drops its top border, since the row
  *                        above it already draws the list's divider.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare
+ *                        (.is-link, .ta-r, .show, .tone-*, .ic-*) now carry the
+ *                        vas_092- prefix too. Sharing a name with a base-theme
+ *                        rule meant the base design won and repainted the
+ *                        panel; scoping them to the panel ends that.
  ***********************************************************/
 
 .vas_092-root {
@@ -250,12 +255,12 @@
     white-space: nowrap;
 }
 
-.vas_092-pill.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
-.vas_092-pill.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
-.vas_092-pill.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
-.vas_092-pill.tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
-.vas_092-pill.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
-.vas_092-pill.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
+.vas_092-pill.vas_092-tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
+.vas_092-pill.vas_092-tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
+.vas_092-pill.vas_092-tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
+.vas_092-pill.vas_092-tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
+.vas_092-pill.vas_092-tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
+.vas_092-pill.vas_092-tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
 
 /* ----------------------------------------------------------- */
 /*  Header — title strip                                        */
@@ -311,12 +316,12 @@
     white-space: nowrap;
 }
 
-.vas_092-hdrPill.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
-.vas_092-hdrPill.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
-.vas_092-hdrPill.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
-.vas_092-hdrPill.tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
-.vas_092-hdrPill.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
-.vas_092-hdrPill.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
+.vas_092-hdrPill.vas_092-tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
+.vas_092-hdrPill.vas_092-tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
+.vas_092-hdrPill.vas_092-tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
+.vas_092-hdrPill.vas_092-tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
+.vas_092-hdrPill.vas_092-tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
+.vas_092-hdrPill.vas_092-tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
 
 .vas_092-hdrPill .vas_092-ic { color: currentColor; }
 
@@ -476,11 +481,11 @@
 }
 
 .vas_092-chip .vas_092-ic          { color: var(--vaspo-muted); }
-.vas_092-chip.ic-info    .vas_092-ic { color: var(--vaspo-info-tx); }
-.vas_092-chip.ic-success .vas_092-ic { color: var(--vaspo-success-tx); }
-.vas_092-chip.ic-warning .vas_092-ic { color: var(--vaspo-warning-tx); }
-.vas_092-chip.ic-purple  .vas_092-ic { color: var(--vaspo-purple-tx); }
-.vas_092-chip.ic-muted   .vas_092-ic { color: var(--vaspo-muted); }
+.vas_092-chip.vas_092-ic-info    .vas_092-ic { color: var(--vaspo-info-tx); }
+.vas_092-chip.vas_092-ic-success .vas_092-ic { color: var(--vaspo-success-tx); }
+.vas_092-chip.vas_092-ic-warning .vas_092-ic { color: var(--vaspo-warning-tx); }
+.vas_092-chip.vas_092-ic-purple  .vas_092-ic { color: var(--vaspo-purple-tx); }
+.vas_092-chip.vas_092-ic-muted   .vas_092-ic { color: var(--vaspo-muted); }
 
 .vas_092-chipLabel { flex: none; color: var(--vaspo-muted); }
 .vas_092-chipVal   {
@@ -493,13 +498,13 @@
 .vas_092-chip .vas_092-pill { margin-left: 0.0625em; }
 
 /* Clickable origin chip — opens the source record. */
-.vas_092-chip.is-link { cursor: pointer; }
-.vas_092-chip.is-link:hover {
+.vas_092-chip.vas_092-is-link { cursor: pointer; }
+.vas_092-chip.vas_092-is-link:hover {
     border-color: var(--vaspo-action);
     box-shadow: 0 0 0 1px var(--vaspo-action) inset;
 }
-.vas_092-chip.is-link .arrowUpRight,
-.vas_092-chip.is-link > .vas_092-ic:last-child { color: var(--vaspo-action); }
+.vas_092-chip.vas_092-is-link .vas_092-arrowUpRight,
+.vas_092-chip.vas_092-is-link > .vas_092-ic:last-child { color: var(--vaspo-action); }
 
 /* ----------------------------------------------------------- */
 /*  Snapshot (metric grid)                                      */
@@ -520,10 +525,10 @@
     padding: 0.75em 0.875em;
 }
 
-.vas_092-metric.tone-total    { border-left-color: var(--vaspo-info-tx); }
-.vas_092-metric.tone-delivery { border-left-color: var(--vaspo-purple-tx); }
-.vas_092-metric.tone-lines    { border-left-color: var(--vaspo-success-tx); }
-.vas_092-metric.tone-received { border-left-color: #E08A1E; }
+.vas_092-metric.vas_092-tone-total    { border-left-color: var(--vaspo-info-tx); }
+.vas_092-metric.vas_092-tone-delivery { border-left-color: var(--vaspo-purple-tx); }
+.vas_092-metric.vas_092-tone-lines    { border-left-color: var(--vaspo-success-tx); }
+.vas_092-metric.vas_092-tone-received { border-left-color: #E08A1E; }
 
 .vas_092-mHead {
     display: flex;
@@ -544,10 +549,10 @@
     white-space: nowrap;
 }
 
-.vas_092-metric.tone-total    .vas_092-mHead .vas_092-ic { color: var(--vaspo-info-tx); }
-.vas_092-metric.tone-delivery .vas_092-mHead .vas_092-ic { color: var(--vaspo-purple-tx); }
-.vas_092-metric.tone-lines    .vas_092-mHead .vas_092-ic { color: var(--vaspo-success-tx); }
-.vas_092-metric.tone-received .vas_092-mHead .vas_092-ic { color: #E08A1E; }
+.vas_092-metric.vas_092-tone-total    .vas_092-mHead .vas_092-ic { color: var(--vaspo-info-tx); }
+.vas_092-metric.vas_092-tone-delivery .vas_092-mHead .vas_092-ic { color: var(--vaspo-purple-tx); }
+.vas_092-metric.vas_092-tone-lines    .vas_092-mHead .vas_092-ic { color: var(--vaspo-success-tx); }
+.vas_092-metric.vas_092-tone-received .vas_092-mHead .vas_092-ic { color: #E08A1E; }
 
 .vas_092-mVal {
     font-size: 1.25em;
@@ -634,9 +639,9 @@
 .vas_092-step:last-child  .vas_092-stepLine-r { visibility: hidden; }
 
 /* A segment is "filled" once its leading circle is reached. */
-.vas_092-step.is-done   .vas_092-stepLine-r,
-.vas_092-step.is-done   .vas_092-stepLine-l,
-.vas_092-step.is-active .vas_092-stepLine-l { background: #67B98A; }
+.vas_092-step.vas_092-is-done   .vas_092-stepLine-r,
+.vas_092-step.vas_092-is-done   .vas_092-stepLine-l,
+.vas_092-step.vas_092-is-active .vas_092-stepLine-l { background: #67B98A; }
 
 .vas_092-stepDot {
     flex: none;
@@ -655,12 +660,12 @@
 }
 .vas_092-stepDot .vas_092-ic { display: inline-flex; }
 
-.vas_092-step.is-done .vas_092-stepDot {
+.vas_092-step.vas_092-is-done .vas_092-stepDot {
     background: #E4F3EC;
     color: #1F9D5B;
     border-color: #BFE6D2;
 }
-.vas_092-step.is-active .vas_092-stepDot {
+.vas_092-step.vas_092-is-active .vas_092-stepDot {
     background: #fff;
     color: #E08A1E;
     border: 2px solid #F0A93D;
@@ -692,7 +697,7 @@
     margin-top: 0.25em;
     overflow-wrap: anywhere;
 }
-.vas_092-step.is-active .vas_092-stepMeta { color: #E08A1E; font-weight: 600; }
+.vas_092-step.vas_092-is-active .vas_092-stepMeta { color: #E08A1E; font-weight: 600; }
 
 /* ----------------------------------------------------------- */
 /*  Bottom (Notes stacked above Activity)                       */
@@ -744,11 +749,11 @@
 .vas_092-actTag .vas_092-ic { color: currentColor; }
 .vas_092-actTag .vas_092-ic svg { width: 0.9375em; height: 0.9375em; }
 
-.vas_092-actTag.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
-.vas_092-actTag.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
-.vas_092-actTag.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
-.vas_092-actTag.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
-.vas_092-actTag.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
+.vas_092-actTag.vas_092-tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
+.vas_092-actTag.vas_092-tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
+.vas_092-actTag.vas_092-tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
+.vas_092-actTag.vas_092-tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
+.vas_092-actTag.vas_092-tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
 
 .vas_092-actTitle {
     flex: 1 1 auto;
@@ -774,8 +779,8 @@
 }
 
 /* An activity carrying a body (e-mail) opens on click. */
-.vas_092-actRow.is-openable { cursor: pointer; }
-.vas_092-actRow.is-openable:hover { background: #F7FBFE; }
+.vas_092-actRow.vas_092-is-openable { cursor: pointer; }
+.vas_092-actRow.vas_092-is-openable:hover { background: #F7FBFE; }
 
 .vas_092-actCaret {
     flex: none;
@@ -784,7 +789,7 @@
     color: var(--vaspo-muted);
     transition: transform .15s ease;
 }
-.vas_092-actRow.is-open .vas_092-actCaret {
+.vas_092-actRow.vas_092-is-open .vas_092-actCaret {
     transform: rotate(90deg);
     color: var(--vaspo-action);
 }
@@ -807,7 +812,7 @@
 
 [dir="rtl"] .vas_092-actBody { padding-left: 0.875em; padding-right: 2.5em; }
 [dir="rtl"] .vas_092-actCaret svg { transform: scaleX(-1); }
-[dir="rtl"] .vas_092-actRow.is-open .vas_092-actCaret { transform: rotate(-90deg); }
+[dir="rtl"] .vas_092-actRow.vas_092-is-open .vas_092-actCaret { transform: rotate(-90deg); }
 
 .vas_092-actWhen {
     flex: none;
@@ -888,12 +893,12 @@
    figure would sit off the shared baseline. */
 .vas_092-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .vas_092-tHead > span,
-.vas_092-tRow > span.ta-r,
-.vas_092-tRow > span.ta-c { white-space: nowrap; }
+.vas_092-tRow > span.vas_092-ta-r,
+.vas_092-tRow > span.vas_092-ta-c { white-space: nowrap; }
 
 /* Tabular figures so the numeric columns line up digit for digit instead of
    drifting with proportional glyph widths. */
-.vas_092-table .ta-r,
+.vas_092-table .vas_092-ta-r,
 .vas_092-recvVal { font-variant-numeric: tabular-nums; }
 
 /* A pill in a table cell (distribution method, document status) still hugs its
@@ -957,7 +962,7 @@
     cursor: pointer;
 }
 .vas_092-histBtn:hover { background: var(--vaspo-info-bg); border-color: var(--vaspo-action); }
-.vas_092-histBtn.is-open {
+.vas_092-histBtn.vas_092-is-open {
     background: var(--vaspo-info-bg);
     border-color: var(--vaspo-action);
     color: var(--vaspo-action);
@@ -1031,14 +1036,14 @@
 .vas_092-docTxt { min-width: 0; flex: 1; }
 
 /* A whole document row is clickable — the open arrow tints on hover. */
-.vas_092-tBody.is-link { cursor: pointer; }
-.vas_092-tBody.is-link:hover { background: #F2F8FD; }
-.vas_092-tBody.is-link .vas_092-docItem > .vas_092-ic:last-child {
+.vas_092-tBody.vas_092-is-link { cursor: pointer; }
+.vas_092-tBody.vas_092-is-link:hover { background: #F2F8FD; }
+.vas_092-tBody.vas_092-is-link .vas_092-docItem > .vas_092-ic:last-child {
     color: var(--vaspo-muted);
     flex: none;
 }
-.vas_092-tBody.is-link:hover .vas_092-docItem > .vas_092-ic:last-child,
-.vas_092-tBody.is-link:hover .vas_092-itName { color: var(--vaspo-action); }
+.vas_092-tBody.vas_092-is-link:hover .vas_092-docItem > .vas_092-ic:last-child,
+.vas_092-tBody.vas_092-is-link:hover .vas_092-itName { color: var(--vaspo-action); }
 
 .vas_092-tHead {
     background: #F5F8FB;
@@ -1058,8 +1063,8 @@
 .vas_092-tBody:last-of-type { border-bottom: none; }
 .vas_092-tBody:hover { background: #FAFCFE; }
 
-.vas_092-table .ta-r { text-align: right; justify-content: flex-end; }
-.vas_092-table .ta-c { text-align: center; justify-content: center; }
+.vas_092-table .vas_092-ta-r { text-align: right; justify-content: flex-end; }
+.vas_092-table .vas_092-ta-c { text-align: center; justify-content: center; }
 
 /* Item / component identity cell */
 .vas_092-itItem { min-width: 0; }
@@ -1125,17 +1130,17 @@
     flex: none;
 }
 .vas_092-recvBar i { display: block; height: 100%; border-radius: 999px; }
-.vas_092-recv.full i { background: var(--vaspo-success-tx); }
-.vas_092-recv.part i { background: var(--vaspo-warning-tx); }
-.vas_092-recv.none i { background: #CBD5DF; }
-.vas_092-recv.full { color: var(--vaspo-success-tx); font-weight: 500; }
-.vas_092-recv.part { color: var(--vaspo-warning-tx); font-weight: 500; }
-.vas_092-recv.none { color: var(--vaspo-muted); }
+.vas_092-recv.vas_092-full i { background: var(--vaspo-success-tx); }
+.vas_092-recv.vas_092-part i { background: var(--vaspo-warning-tx); }
+.vas_092-recv.vas_092-none i { background: #CBD5DF; }
+.vas_092-recv.vas_092-full { color: var(--vaspo-success-tx); font-weight: 500; }
+.vas_092-recv.vas_092-part { color: var(--vaspo-warning-tx); font-weight: 500; }
+.vas_092-recv.vas_092-none { color: var(--vaspo-muted); }
 
 /* Landed-cost cells */
 .vas_092-ldExp { font-weight: 700; color: var(--vaspo-text); }
 .vas_092-ldAct .vas_092-ldAmt { font-weight: 700; color: var(--vaspo-text); }
-.vas_092-ldAct.is-pending .vas_092-ldAmt { color: var(--vaspo-muted); font-weight: 500; }
+.vas_092-ldAct.vas_092-is-pending .vas_092-ldAmt { color: var(--vaspo-muted); font-weight: 500; }
 .vas_092-ldFlag {
     display: block;
     margin-top: 0.125em;
@@ -1144,17 +1149,17 @@
     letter-spacing: .3px;
     text-transform: uppercase;
 }
-.vas_092-ldFlag.inv { color: var(--vaspo-success-tx); }
-.vas_092-ldFlag.wait {
+.vas_092-ldFlag.vas_092-inv { color: var(--vaspo-success-tx); }
+.vas_092-ldFlag.vas_092-wait {
     color: var(--vaspo-muted);
     font-weight: 600;
     letter-spacing: 0;
     text-transform: none;
 }
 .vas_092-ldVar { font-weight: 700; }
-.vas_092-ldVar.over  { color: var(--vaspo-risk-tx); }
-.vas_092-ldVar.under { color: var(--vaspo-success-tx); }
-.vas_092-ldVar.flat  { color: var(--vaspo-muted); font-weight: 500; }
+.vas_092-ldVar.vas_092-over  { color: var(--vaspo-risk-tx); }
+.vas_092-ldVar.vas_092-under { color: var(--vaspo-success-tx); }
+.vas_092-ldVar.vas_092-flat  { color: var(--vaspo-muted); font-weight: 500; }
 
 /* Per-line distribution breakdown (under a landed-cost component row) */
 .vas_092-ldDist {
@@ -1201,10 +1206,10 @@
 }
 .vas_092-tf { color: var(--vaspo-muted); }
 .vas_092-tf b { color: var(--vaspo-text); font-weight: 700; margin-left: 0.375em; }
-.vas_092-tf b.warn { color: var(--vaspo-warning-tx); }
-.vas_092-tf.is-grand { color: var(--vaspo-text); font-weight: 700; }
-.vas_092-tf.is-grand b { color: var(--vaspo-action); margin-left: 0.5em; font-size: 1.15em; }
-.vas_092-ldFoot .vas_092-lf.is-grand { margin-left: auto; }
+.vas_092-tf b.vas_092-warn { color: var(--vaspo-warning-tx); }
+.vas_092-tf.vas_092-is-grand { color: var(--vaspo-text); font-weight: 700; }
+.vas_092-tf.vas_092-is-grand b { color: var(--vaspo-action); margin-left: 0.5em; font-size: 1.15em; }
+.vas_092-ldFoot .vas_092-lf.vas_092-is-grand { margin-left: auto; }
 
 /* ----------------------------------------------------------- */
 /*  Methodology note (quiet caption)                            */
@@ -1258,8 +1263,8 @@
     transition: opacity .25s ease, transform .25s ease;
     pointer-events: none;
 }
-.vas_092-toast.show { opacity: 1; transform: translate(-50%, 0); }
-.vas_092-toast.err  { background: #B23636; }
+.vas_092-toast.vas_092-show { opacity: 1; transform: translate(-50%, 0); }
+.vas_092-toast.vas_092-err  { background: #B23636; }
 
 /* ----------------------------------------------------------- */
 /*  Line-items pager (Showing a–b of N · prev / page / next)    */
@@ -1339,9 +1344,9 @@
 /* ----------------------------------------------------------- */
 [dir="rtl"] .vas_092-budgetAmt { margin-left: 0; margin-right: auto; }
 [dir="rtl"] .vas_092-hdrColL { border-right: none; border-left: 1px solid var(--vaspo-row-div); padding-right: 0; padding-left: 1.25em; }
-[dir="rtl"] .vas_092-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_092-table .vas_092-ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .vas_092-recv { align-items: flex-start; }
 [dir="rtl"] .vas_092-tFoot { justify-content: flex-start; }
 [dir="rtl"] .vas_092-tf b { margin-left: 0; margin-right: 0.375em; }
-[dir="rtl"] .vas_092-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
-[dir="rtl"] .vas_092-ldFoot .vas_092-lf.is-grand { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .vas_092-tf.vas_092-is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .vas_092-ldFoot .vas_092-lf.vas_092-is-grand { margin-left: 0; margin-right: auto; }

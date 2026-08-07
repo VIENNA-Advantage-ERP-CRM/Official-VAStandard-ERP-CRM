@@ -24,6 +24,9 @@
  *                        for both actions. The record id cannot answer it: a
  *                        copied row carries the source record's key until saved.
  *                        Ported from VAS_092.
+ *   VAI163   2026-08-07  Emits the vas_100-prefixed modifier classes the
+ *                        stylesheet now uses, the runtime-built ones included
+ *                        ("vas_100-tone-" + tone).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -329,7 +332,7 @@
 
         function headerPill(label, tone, icon, withDot) {
             var $p = $('<span class="vas_100-hdrPill"></span>')
-                .addClass("tone-" + (tone || "neutral"));
+                .addClass("vas_100-tone-" + (tone || "neutral"));
             if (icon) $p.append(svgIcon(icon));
             if (withDot) $p.append($('<span class="vas_100-hdrDot"></span>'));
             $p.append($('<span></span>').text(label));
@@ -340,7 +343,7 @@
             var $f = $('<div class="vas_100-hdrField"></div>');
             $f.append($('<div class="vas_100-fLabel"></div>').text(label));
             var $v = $('<div class="vas_100-fVal"></div>').text(value);
-            if (link) $v.addClass("is-link");
+            if (link) $v.addClass("vas_100-is-link");
             $f.append($v);
             return $f;
         }
@@ -383,7 +386,7 @@
         }
 
         function metricCard(tone, icon, label, value, sub) {
-            var $c = $('<div class="vas_100-metric"></div>').addClass("tone-" + tone);
+            var $c = $('<div class="vas_100-metric"></div>').addClass("vas_100-tone-" + tone);
 
             var $head = $('<div class="vas_100-mHead"></div>');
             $head.append(svgIcon(icon));
@@ -428,15 +431,15 @@
             for (var i = 0; i < stageKeys.length; i++) {
                 var stateCls, metaText, done;
                 if (i < reached) {
-                    stateCls = "is-done"; done = true;
+                    stateCls = "vas_100-is-done"; done = true;
                     metaText = VIS.Msg.getMsg("VAS_100_Done");
                 } else if (i === reached) {
                     // The final stage, once reached on a completed DO, reads done.
                     if (completed && i === stageKeys.length - 1) {
-                        stateCls = "is-done"; done = true;
+                        stateCls = "vas_100-is-done"; done = true;
                         metaText = formatDate(data.MovementDate) || VIS.Msg.getMsg("VAS_100_Done");
                     } else {
-                        stateCls = "is-active"; done = false;
+                        stateCls = "vas_100-is-active"; done = false;
                         metaText = VIS.Msg.getMsg("VAS_100_Current");
                     }
                 } else {
@@ -490,10 +493,10 @@
             var $head = $('<div class="vas_100-tRow vas_100-tHead"></div>');
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_100_Item")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_100_UOM")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_100_Ordered")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_100_Delivered")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_100_LineValue")));
-            $head.append($('<span class="ta-c"></span>').text(VIS.Msg.getMsg("VAS_100_Status")));
+            $head.append($('<span class="vas_100-ta-r"></span>').text(VIS.Msg.getMsg("VAS_100_Ordered")));
+            $head.append($('<span class="vas_100-ta-r"></span>').text(VIS.Msg.getMsg("VAS_100_Delivered")));
+            $head.append($('<span class="vas_100-ta-r"></span>').text(VIS.Msg.getMsg("VAS_100_LineValue")));
+            $head.append($('<span class="vas_100-ta-c"></span>').text(VIS.Msg.getMsg("VAS_100_Status")));
             $tbl.append($head);
 
             for (var i = 0; i < lines.length; i++) {
@@ -502,7 +505,7 @@
 
             // Totals footer
             var $foot = $('<div class="vas_100-tFoot"></div>');
-            var $bit = $('<span class="vas_100-tf is-grand"></span>');
+            var $bit = $('<span class="vas_100-tf vas_100-is-grand"></span>');
             $bit.append(document.createTextNode(VIS.Msg.getMsg("VAS_100_TotalDeliveryValue")));
             $bit.append($('<b></b>').text(formatAmount(+data.DeliveryValue || 0, cur, data.StdPrecision)));
             $foot.append($bit);
@@ -533,14 +536,14 @@
             $tr.append($('<span></span>').text(na(ln.UOMName)));
 
             // Ordered
-            $tr.append($('<span class="ta-r"></span>').text(formatNumber(+ln.OrderedQty || 0, prec)));
+            $tr.append($('<span class="vas_100-ta-r"></span>').text(formatNumber(+ln.OrderedQty || 0, prec)));
 
             // Delivered (mini bar + delivered qty)
             var ordered = +ln.OrderedQty || 0;
             var delivered = +ln.DeliveredQty || 0;
             var pct = ordered > 0 ? Math.min(100, Math.round((delivered / ordered) * 100)) : (delivered > 0 ? 100 : 0);
-            var recvState = ordered > 0 && delivered >= ordered ? "full" : (delivered > 0 ? "part" : "none");
-            var $recv = $('<span class="vas_100-recv ta-r"></span>').addClass(recvState);
+            var recvState = ordered > 0 && delivered >= ordered ? "vas_100-full" : (delivered > 0 ? "vas_100-part" : "vas_100-none");
+            var $recv = $('<span class="vas_100-recv vas_100-ta-r"></span>').addClass(recvState);
             var $bar = $('<span class="vas_100-recvBar"><i></i></span>');
             $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
             $recv.append($bar);
@@ -548,15 +551,15 @@
             $tr.append($recv);
 
             // Line value
-            $tr.append($('<span class="ta-r"></span>').text(
+            $tr.append($('<span class="vas_100-ta-r"></span>').text(
                 formatAmount(+ln.LineValue || 0, cur, data.StdPrecision)));
 
             // Status tag: Full / Partial / Short
-            var $q = $('<span class="ta-c"></span>');
+            var $q = $('<span class="vas_100-ta-c"></span>');
             var tagCls, tagKey;
-            if (ordered > 0 && delivered >= ordered) { tagCls = "s-full"; tagKey = "VAS_100_Full"; }
-            else if (delivered > 0)                  { tagCls = "s-part"; tagKey = "VAS_100_Partial"; }
-            else                                     { tagCls = "s-short"; tagKey = "VAS_100_Short"; }
+            if (ordered > 0 && delivered >= ordered) { tagCls = "vas_100-s-full"; tagKey = "VAS_100_Full"; }
+            else if (delivered > 0)                  { tagCls = "vas_100-s-part"; tagKey = "VAS_100_Partial"; }
+            else                                     { tagCls = "vas_100-s-short"; tagKey = "VAS_100_Short"; }
             $q.append($('<span class="vas_100-tag"></span>').addClass(tagCls)
                 .text(VIS.Msg.getMsg(tagKey)));
             $tr.append($q);
@@ -580,8 +583,8 @@
         }
 
         function actionButton(icon, label, kind, disabled) {
-            var $b = $('<span class="vas_100-btn"></span>').addClass("btn-" + (kind || "sec"));
-            if (disabled) $b.addClass("is-disabled");
+            var $b = $('<span class="vas_100-btn"></span>').addClass("vas_100-btn-" + (kind || "sec"));
+            if (disabled) $b.addClass("vas_100-is-disabled");
             $b.append(svgIcon(icon));
             $b.append($('<span></span>').text(label));
             return $b;

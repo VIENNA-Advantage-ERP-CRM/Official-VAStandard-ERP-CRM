@@ -124,9 +124,9 @@ namespace VAS.Models
                 COALESCE(cur.StdPrecision, 2) AS CurrencyPrecision,
                 o.Updated AS LastDocumentActionDate,
                 COALESCE(o.CustomerReference, o.POReference, N'') AS CustomerReference,
-                (SELECT MIN(so.C_Order_ID) FROM C_Order so WHERE so.Ref_Order_ID = o.C_Order_ID AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y' AND so.IsSalesQuotation = 'N') AS ConvertedOrder_ID,
-                (SELECT MIN(so.DocumentNo) FROM C_Order so WHERE so.Ref_Order_ID = o.C_Order_ID AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y' AND so.IsSalesQuotation = 'N') AS ConvertedOrderNo,
-                (SELECT MIN(so.DateOrdered) FROM C_Order so WHERE so.Ref_Order_ID = o.C_Order_ID AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y' AND so.IsSalesQuotation = 'N') AS ConvertedOrderDate
+                (SELECT MIN(so.C_Order_ID) FROM C_Order so WHERE (so.Ref_Order_ID = o.C_Order_ID OR so.C_Order_ID = o.Ref_Order_ID) AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y' AND COALESCE(so.IsSalesQuotation,'N') = 'N' AND COALESCE(so.IsBlanketTrx,'N') = 'N' AND COALESCE(so.IsReturnTrx,'N') = 'N') AS ConvertedOrder_ID,
+                (SELECT MIN(so.DocumentNo) FROM C_Order so WHERE (so.Ref_Order_ID = o.C_Order_ID OR so.C_Order_ID = o.Ref_Order_ID) AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y' AND COALESCE(so.IsSalesQuotation,'N') = 'N' AND COALESCE(so.IsBlanketTrx,'N') = 'N' AND COALESCE(so.IsReturnTrx,'N') = 'N') AS ConvertedOrderNo,
+                (SELECT MIN(so.DateOrdered) FROM C_Order so WHERE (so.Ref_Order_ID = o.C_Order_ID OR so.C_Order_ID = o.Ref_Order_ID) AND so.IsActive = 'Y' AND so.IsSOTrx = 'Y' AND COALESCE(so.IsSalesQuotation,'N') = 'N' AND COALESCE(so.IsBlanketTrx,'N') = 'N' AND COALESCE(so.IsReturnTrx,'N') = 'N') AS ConvertedOrderDate
                 FROM C_Order o
                 INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = o.C_BPartner_ID)
                 LEFT OUTER JOIN AD_User ct ON (ct.AD_User_ID = o.AD_User_ID)
@@ -560,9 +560,11 @@ namespace VAS.Models
                 string newBaseSql = @"SELECT MIN(so.C_Order_ID) AS new_order_id,
                     MIN(so.DocumentNo) AS new_order_no
                     FROM C_Order so
-                    WHERE so.Ref_Order_ID = @orderId
+                    WHERE (so.Ref_Order_ID = @orderId OR so.C_Order_ID = (SELECT q.Ref_Order_ID FROM C_Order q WHERE q.C_Order_ID = @orderId AND q.IsActive = 'Y'))
                     AND so.IsActive = 'Y'
-                    AND so.IsSalesQuotation = 'N'
+                    AND COALESCE(so.IsSalesQuotation,'N') = 'N'
+                    AND COALESCE(so.IsBlanketTrx,'N') = 'N'
+                    AND COALESCE(so.IsReturnTrx,'N') = 'N'
                     AND so.IsSOTrx = 'Y'";
 
                 string newAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -679,9 +681,11 @@ namespace VAS.Models
                 so.Ref_Order_ID AS Ref_Order_ID,
                 so.Updated AS Updated
                 FROM C_Order so
-                WHERE so.Ref_Order_ID = @orderId
+                WHERE (so.Ref_Order_ID = @orderId OR so.C_Order_ID = (SELECT q.Ref_Order_ID FROM C_Order q WHERE q.C_Order_ID = @orderId AND q.IsActive = 'Y'))
                 AND so.IsSOTrx = 'Y'
-                AND so.IsSalesQuotation = 'N'
+                AND COALESCE(so.IsSalesQuotation,'N') = 'N'
+                AND COALESCE(so.IsBlanketTrx,'N') = 'N'
+                AND COALESCE(so.IsReturnTrx,'N') = 'N'
                 AND so.IsActive = 'Y'
                 ORDER BY so.Created DESC";
 
@@ -2230,7 +2234,7 @@ namespace VAS.Models
                 sb.Append("       a.Location AS Location,");
                 sb.Append("       a.MeetingUrl AS MeetingUrl,");
                 sb.Append("       SUBSTR(a.Comments, 1, 4000) AS Comments,");
-                sb.Append("       COALESCE(SUBSTR(a.AttendeeInfo, 1, 4000), TO_CHAR(a.AD_User_ID)) AS AttendeeInfo,");
+                sb.Append("       COALESCE(SUBSTR(a.AttendeeInfo, 1, 4000), CAST(a.AD_User_ID AS VARCHAR)) AS AttendeeInfo,");
                 sb.Append("       SUBSTR(atr.Transcript, 1, 4000) AS Transcript");
                 sb.Append("  FROM AppointmentsInfo a");
                 sb.Append("  LEFT OUTER JOIN AppointmentTranscript atr ON (atr.AppointmentsInfo_ID = a.AppointmentsInfo_ID)");

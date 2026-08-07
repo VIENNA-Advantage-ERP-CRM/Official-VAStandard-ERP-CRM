@@ -26,6 +26,9 @@
  *                        for both actions. The record id cannot answer it: a
  *                        copied row carries the source record's key until saved.
  *                        Ported from VAS_092.
+ *   VAI163   2026-08-07  Emits the vas_101-prefixed modifier classes the
+ *                        stylesheet now uses, the runtime-built ones included
+ *                        ("vas_101-tone-" + tone).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -302,7 +305,7 @@
 
         function headerPill(label, tone, icon, withDot) {
             var $p = $('<span class="vas_101-hdrPill"></span>')
-                .addClass("tone-" + (tone || "neutral"));
+                .addClass("vas_101-tone-" + (tone || "neutral"));
             if (icon) $p.append(svgIcon(icon));
             if (withDot) $p.append($('<span class="vas_101-hdrDot"></span>'));
             $p.append($('<span></span>').text(label));
@@ -313,7 +316,7 @@
             var $f = $('<div class="vas_101-hdrField"></div>');
             $f.append($('<div class="vas_101-fLabel"></div>').text(label));
             var $v = $('<div class="vas_101-fVal"></div>').text(value);
-            if (link) $v.addClass("is-link");
+            if (link) $v.addClass("vas_101-is-link");
             $f.append($v);
             return $f;
         }
@@ -355,7 +358,7 @@
         }
 
         function metricCard(tone, icon, label, value, sub) {
-            var $c = $('<div class="vas_101-metric"></div>').addClass("tone-" + tone);
+            var $c = $('<div class="vas_101-metric"></div>').addClass("vas_101-tone-" + tone);
 
             var $head = $('<div class="vas_101-mHead"></div>');
             $head.append(svgIcon(icon));
@@ -379,7 +382,7 @@
         }
 
         function statusCard(label, value, tone) {
-            var $c = $('<div class="vas_101-statCard"></div>').addClass("tone-" + tone);
+            var $c = $('<div class="vas_101-statCard"></div>').addClass("vas_101-tone-" + tone);
             $c.append($('<div class="vas_101-statVal"></div>').text(value + ""));
             $c.append($('<div class="vas_101-statLbl"></div>').text(label));
             return $c;
@@ -405,12 +408,12 @@
                 var s = stages[i];
                 var stateCls, metaText;
                 if (s.done) {
-                    stateCls = "is-done";
+                    stateCls = "vas_101-is-done";
                     metaText = (i === 2)
                         ? VIS.Msg.getMsg("VAS_101_Posted")
                         : (formatDate(s.date) || VIS.Msg.getMsg("VAS_101_Done"));
                 } else if (i === activeIdx + 1) {
-                    stateCls = "is-active";
+                    stateCls = "vas_101-is-active";
                     metaText = VIS.Msg.getMsg("VAS_101_Pending");
                 } else {
                     stateCls = "is-pending";
@@ -451,9 +454,9 @@
             // Segmented filter: All lines | Variances only.
             var $seg = $('<span class="vas_101-seg"></span>');
             var $btnAll = $('<button type="button"></button>')
-                .text(VIS.Msg.getMsg("VAS_101_AllLines")).toggleClass("on", !variancesOnly);
+                .text(VIS.Msg.getMsg("VAS_101_AllLines")).toggleClass("vas_101-on", !variancesOnly);
             var $btnVar = $('<button type="button"></button>')
-                .text(VIS.Msg.getMsg("VAS_101_VariancesOnly")).toggleClass("on", variancesOnly);
+                .text(VIS.Msg.getMsg("VAS_101_VariancesOnly")).toggleClass("vas_101-on", variancesOnly);
             $btnAll.on("click", function () { if (variancesOnly) { variancesOnly = false; refreshTable($btnAll, $btnVar); } });
             $btnVar.on("click", function () { if (!variancesOnly) { variancesOnly = true; refreshTable($btnAll, $btnVar); } });
             $seg.append($btnAll).append($btnVar);
@@ -468,8 +471,8 @@
         }
 
         function refreshTable($btnAll, $btnVar) {
-            $btnAll.toggleClass("on", !variancesOnly);
-            $btnVar.toggleClass("on", variancesOnly);
+            $btnAll.toggleClass("vas_101-on", !variancesOnly);
+            $btnVar.toggleClass("vas_101-on", variancesOnly);
             if (!$linesTable) return;
             var $fresh = buildLinesTable();
             $linesTable.replaceWith($fresh);
@@ -485,11 +488,11 @@
             var $head = $('<div class="vas_101-tRow vas_101-tHead"></div>');
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_101_Item")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_101_UOM")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_101_SystemQty")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_101_CountedQty")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_101_Variance")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_101_Value")));
-            $head.append($('<span class="ta-c"></span>').text(VIS.Msg.getMsg("VAS_101_Status")));
+            $head.append($('<span class="vas_101-ta-r"></span>').text(VIS.Msg.getMsg("VAS_101_SystemQty")));
+            $head.append($('<span class="vas_101-ta-r"></span>').text(VIS.Msg.getMsg("VAS_101_CountedQty")));
+            $head.append($('<span class="vas_101-ta-r"></span>').text(VIS.Msg.getMsg("VAS_101_Variance")));
+            $head.append($('<span class="vas_101-ta-r"></span>').text(VIS.Msg.getMsg("VAS_101_Value")));
+            $head.append($('<span class="vas_101-ta-c"></span>').text(VIS.Msg.getMsg("VAS_101_Status")));
             $tbl.append($head);
 
             var shown = 0;
@@ -508,7 +511,7 @@
 
             // Totals footer
             var $foot = $('<div class="vas_101-tFoot"></div>');
-            var $bit = $('<span class="vas_101-tf is-grand"></span>');
+            var $bit = $('<span class="vas_101-tf vas_101-is-grand"></span>');
             $bit.append(document.createTextNode(VIS.Msg.getMsg("VAS_101_TotalCountedValue")));
             $bit.append($('<b></b>').text(formatAmount(+data.TotalValue || 0, cur, data.StdPrecision)));
             $foot.append($bit);
@@ -539,24 +542,24 @@
             $tr.append($('<span></span>').text(na(ln.UOMName)));
 
             // System (book) qty
-            $tr.append($('<span class="ta-r"></span>').text(formatNumber(+ln.SystemQty || 0, prec)));
+            $tr.append($('<span class="vas_101-ta-r"></span>').text(formatNumber(+ln.SystemQty || 0, prec)));
 
             // Counted qty
-            $tr.append($('<span class="ta-r"></span>').text(formatNumber(+ln.CountedQty || 0, prec)));
+            $tr.append($('<span class="vas_101-ta-r"></span>').text(formatNumber(+ln.CountedQty || 0, prec)));
 
             // Variance (signed, colored)
             var vTone = variance < 0 ? "short" : (variance > 0 ? "excess" : "match");
-            $tr.append($('<span class="ta-r vas_101-var"></span>').addClass(vTone)
+            $tr.append($('<span class="vas_101-ta-r vas_101-var"></span>').addClass("vas_101-" + vTone)
                 .text(signedNumber(variance, prec)));
 
             // Value
-            $tr.append($('<span class="ta-r"></span>').text(
+            $tr.append($('<span class="vas_101-ta-r"></span>').text(
                 formatAmount(+ln.LineValue || 0, cur, data.StdPrecision)));
 
             // Status tag
             var tagKey = variance < 0 ? "VAS_101_Short" : (variance > 0 ? "VAS_101_Excess" : "VAS_101_Match");
-            var $q = $('<span class="ta-c"></span>');
-            $q.append($('<span class="vas_101-tag"></span>').addClass("s-" + vTone)
+            var $q = $('<span class="vas_101-ta-c"></span>');
+            $q.append($('<span class="vas_101-tag"></span>').addClass("vas_101-s-" + vTone)
                 .text(VIS.Msg.getMsg(tagKey)));
             $tr.append($q);
 
@@ -578,8 +581,8 @@
         }
 
         function actionButton(icon, label, kind, disabled) {
-            var $b = $('<span class="vas_101-btn"></span>').addClass("btn-" + (kind || "sec"));
-            if (disabled) $b.addClass("is-disabled");
+            var $b = $('<span class="vas_101-btn"></span>').addClass("vas_101-btn-" + (kind || "sec"));
+            if (disabled) $b.addClass("vas_101-is-disabled");
             $b.append(svgIcon(icon));
             $b.append($('<span></span>').text(label));
             return $b;

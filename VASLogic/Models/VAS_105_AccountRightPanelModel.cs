@@ -537,6 +537,7 @@ namespace VAS.Models
                 sb.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
                 sb.Append(" WHERE vo.IsActive = 'Y'");
                 sb.Append("   AND (vo.C_BPartner_ID = @bPartnerId OR vo.Ref_BPartner_ID = @bPartnerId2)");
+                sb.Append("   AND vo.VAS_OppStage NOT IN ('16', '17')");
 
                 string baseSql = sb.ToString();
                 string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -606,6 +607,7 @@ namespace VAS.Models
             response.items = new List<dynamic>();
 
             int adClientId = ctx.GetAD_Client_ID();
+            string lang    = ctx.GetAD_Language();
 
             try
             {
@@ -628,12 +630,25 @@ namespace VAS.Models
                     var sbCC = new StringBuilder();
                     sbCC.Append("SELECT ct.C_Contract_ID AS id,");
                     sbCC.Append("       ct.DocumentNo AS contract_no,");
-                    sbCC.Append("       ct.Description AS name,");
+                    sbCC.Append("       ct.Description AS ct_description,");
                     sbCC.Append("       ct.ContractType AS type_code,");
                     sbCC.Append("       TO_CHAR(ct.StartDate,'YYYY-MM-DD') AS start_date,");
                     sbCC.Append("       TO_CHAR(ct.EndDate,'YYYY-MM-DD') AS end_date,");
                     sbCC.Append("       ct.Processed AS status_code,");
                     sbCC.Append("       ct.RenewalType AS renewal_code,");
+                    sbCC.Append("       (SELECT COALESCE(trl.Name, r.Name)");
+                    sbCC.Append("          FROM AD_Ref_List r");
+                    sbCC.Append("          LEFT OUTER JOIN AD_Ref_List_Trl trl ON (trl.AD_Ref_List_ID = r.AD_Ref_List_ID");
+                    sbCC.Append("               AND trl.IsActive = 'Y' AND trl.AD_Language = @ctLang)");
+                    sbCC.Append("         WHERE r.IsActive = 'Y'");
+                    sbCC.Append("           AND r.Value = ct.RenewalType");
+                    sbCC.Append("           AND r.AD_Reference_ID IN (SELECT col.AD_Reference_Value_ID");
+                    sbCC.Append("                                        FROM AD_Column col");
+                    sbCC.Append("                                       INNER JOIN AD_Table tbl ON (tbl.AD_Table_ID = col.AD_Table_ID");
+                    sbCC.Append("                                            AND tbl.TableName = 'C_Contract'");
+                    sbCC.Append("                                            AND tbl.IsActive = 'Y')");
+                    sbCC.Append("                                       WHERE col.ColumnName = 'RenewalType'");
+                    sbCC.Append("                                         AND col.IsActive = 'Y')) AS renewal_name,");
                     // COALESCE ensures the raw amount is shown when no conversion rate exists
                     sbCC.Append("       COALESCE(CURRENCYCONVERT(ct.GrandTotal, ct.C_Currency_ID, cs.C_Currency_ID,");
                     sbCC.Append("           COALESCE(ct.StartDate, CURRENT_DATE), NULL,");
@@ -649,21 +664,26 @@ namespace VAS.Models
                         sbCC.ToString(), "ct", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                     accessCC += " ORDER BY ct.StartDate DESC";
 
-                    var paramsCC = new SqlParameter[] { new SqlParameter("@bPartnerIdCC", bPartnerId) };
+                    var paramsCC = new SqlParameter[] {
+                        new SqlParameter("@bPartnerIdCC", bPartnerId),
+                        new SqlParameter("@ctLang",       lang)
+                    };
                     DataSet dsCC = DB.ExecuteDataset(accessCC, paramsCC, null);
                     if (dsCC != null && dsCC.Tables.Count > 0)
                     {
                         foreach (DataRow row in dsCC.Tables[0].Rows)
                         {
                             dynamic item = new ExpandoObject();
-                            item.id         = Util.GetValueOfInt(row["id"]);
-                            item.contractNo = Util.GetValueOfString(row["contract_no"]);
-                            item.name       = Util.GetValueOfString(row["name"]);
-                            item.typeCode   = Util.GetValueOfString(row["type_code"]);
-                            item.startDate  = Util.GetValueOfString(row["start_date"]);
-                            item.endDate    = Util.GetValueOfString(row["end_date"]);
-                            item.statusCode = Util.GetValueOfString(row["status_code"]);
+                            item.id          = Util.GetValueOfInt(row["id"]);
+                            item.contractNo  = Util.GetValueOfString(row["contract_no"]);
+                            item.name        = "";  // C_Contract: DocumentNo is the display title; use fallback in JS
+                            item.description = Util.GetValueOfString(row["ct_description"]);
+                            item.typeCode    = Util.GetValueOfString(row["type_code"]);
+                            item.startDate   = Util.GetValueOfString(row["start_date"]);
+                            item.endDate     = Util.GetValueOfString(row["end_date"]);
+                            item.statusCode  = Util.GetValueOfString(row["status_code"]);
                             item.renewalCode = Util.GetValueOfString(row["renewal_code"]);
+                            item.renewalName = row["renewal_name"] != DBNull.Value ? Util.GetValueOfString(row["renewal_name"]) : "";
                             item.value       = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
                             item.productName = Util.GetValueOfString(row["product_name"]);
                             item.source      = "CC";
@@ -688,6 +708,19 @@ namespace VAS.Models
                     sbVM.Append("       TO_CHAR(vm.EndDate,'YYYY-MM-DD') AS end_date,");
                     sbVM.Append("       vm.VAS_Status AS status_code,");
                     sbVM.Append("       vm.RenewalType AS renewal_code,");
+                    sbVM.Append("       (SELECT COALESCE(trl.Name, r.Name)");
+                    sbVM.Append("          FROM AD_Ref_List r");
+                    sbVM.Append("          LEFT OUTER JOIN AD_Ref_List_Trl trl ON (trl.AD_Ref_List_ID = r.AD_Ref_List_ID");
+                    sbVM.Append("               AND trl.IsActive = 'Y' AND trl.AD_Language = @vmLang)");
+                    sbVM.Append("         WHERE r.IsActive = 'Y'");
+                    sbVM.Append("           AND r.Value = vm.RenewalType");
+                    sbVM.Append("           AND r.AD_Reference_ID IN (SELECT col.AD_Reference_Value_ID");
+                    sbVM.Append("                                        FROM AD_Column col");
+                    sbVM.Append("                                       INNER JOIN AD_Table tbl ON (tbl.AD_Table_ID = col.AD_Table_ID");
+                    sbVM.Append("                                            AND tbl.TableName = 'VAS_ContractMaster'");
+                    sbVM.Append("                                            AND tbl.IsActive = 'Y')");
+                    sbVM.Append("                                       WHERE col.ColumnName = 'RenewalType'");
+                    sbVM.Append("                                         AND col.IsActive = 'Y')) AS renewal_name,");
                     // COALESCE ensures the raw amount is shown when no conversion rate exists
                     sbVM.Append("       COALESCE(CURRENCYCONVERT(vm.VAS_ContractAmount, vm.C_Currency_ID, cs.C_Currency_ID,");
                     sbVM.Append("           COALESCE(vm.StartDate, CURRENT_DATE), NULL,");
@@ -701,21 +734,26 @@ namespace VAS.Models
                         sbVM.ToString(), "vm", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                     accessVM += " ORDER BY vm.StartDate DESC";
 
-                    var paramsVM = new SqlParameter[] { new SqlParameter("@bPartnerIdVM", bPartnerId) };
+                    var paramsVM = new SqlParameter[] {
+                        new SqlParameter("@bPartnerIdVM", bPartnerId),
+                        new SqlParameter("@vmLang",       lang)
+                    };
                     DataSet dsVM = DB.ExecuteDataset(accessVM, paramsVM, null);
                     if (dsVM != null && dsVM.Tables.Count > 0)
                     {
                         foreach (DataRow row in dsVM.Tables[0].Rows)
                         {
                             dynamic item = new ExpandoObject();
-                            item.id         = Util.GetValueOfInt(row["id"]);
-                            item.contractNo = Util.GetValueOfString(row["contract_no"]);
-                            item.name       = Util.GetValueOfString(row["name"]);
-                            item.typeCode   = Util.GetValueOfString(row["type_code"]);
-                            item.startDate  = Util.GetValueOfString(row["start_date"]);
-                            item.endDate    = Util.GetValueOfString(row["end_date"]);
-                            item.statusCode = Util.GetValueOfString(row["status_code"]);
+                            item.id          = Util.GetValueOfInt(row["id"]);
+                            item.contractNo  = Util.GetValueOfString(row["contract_no"]);
+                            item.name        = Util.GetValueOfString(row["name"]);
+                            item.description = "";  // VAS_ContractMaster has no Description column; VAS_ContractSummary is used as name
+                            item.typeCode    = Util.GetValueOfString(row["type_code"]);
+                            item.startDate   = Util.GetValueOfString(row["start_date"]);
+                            item.endDate     = Util.GetValueOfString(row["end_date"]);
+                            item.statusCode  = Util.GetValueOfString(row["status_code"]);
                             item.renewalCode = Util.GetValueOfString(row["renewal_code"]);
+                            item.renewalName = row["renewal_name"] != DBNull.Value ? Util.GetValueOfString(row["renewal_name"]) : "";
                             item.value       = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
                             item.productName = "";
                             item.source      = "VM";
@@ -1011,7 +1049,8 @@ namespace VAS.Models
                 cntSb.Append("SELECT COUNT(*) FROM C_Order o");
                 cntSb.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = o.AD_Client_ID)");
                 cntSb.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
-                cntSb.Append(" WHERE o.IsActive = 'Y' AND o.IsSOTrx = 'Y' AND o.DocStatus IN ('CO','CL') AND o.C_BPartner_ID = @bPartnerId");
+                cntSb.Append(" WHERE o.IsActive = 'Y' AND o.IsSOTrx = 'Y' AND o.C_BPartner_ID = @bPartnerId");
+                cntSb.Append("   AND COALESCE(o.IsSalesQuotation,'N') = 'N' AND COALESCE(o.IsBlanketTrx,'N') = 'N' AND COALESCE(o.IsReturnTrx,'N') = 'N'");
                 string cntAccessSql = MRole.GetDefault(ctx).AddAccessSQL(cntSb.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                 object cntResult = DB.ExecuteScalar(cntAccessSql, new SqlParameter[] { new SqlParameter("@bPartnerId", bPartnerId) }, null);
                 response.total = cntResult != null && cntResult != DBNull.Value ? Util.GetValueOfInt(cntResult) : 0;
@@ -1026,7 +1065,8 @@ namespace VAS.Models
                 sb.Append("  FROM C_Order o");
                 sb.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = o.AD_Client_ID)");
                 sb.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
-                sb.Append(" WHERE o.IsActive = 'Y' AND o.IsSOTrx = 'Y' AND o.DocStatus IN ('CO','CL') AND o.C_BPartner_ID = @bPartnerId");
+                sb.Append(" WHERE o.IsActive = 'Y' AND o.IsSOTrx = 'Y' AND o.C_BPartner_ID = @bPartnerId");
+                sb.Append("   AND COALESCE(o.IsSalesQuotation,'N') = 'N' AND COALESCE(o.IsBlanketTrx,'N') = 'N' AND COALESCE(o.IsReturnTrx,'N') = 'N'");
 
                 string baseSql = sb.ToString();
                 string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -1169,6 +1209,8 @@ namespace VAS.Models
                 sb.Append("           TO_CHAR(i.DueDate,'YYYY-MM-DD')) AS due_date,");
                 sb.Append("       CURRENCYCONVERT(i.GrandTotal, i.C_Currency_ID, cs.C_Currency_ID,");
                 sb.Append("           i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID) AS amount,");
+                sb.Append("       COALESCE(CURRENCYCONVERT(i.PaidAmt, i.C_Currency_ID, cs.C_Currency_ID,");
+                sb.Append("           i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS paid_amt,");
                 sb.Append("       CASE WHEN i.IsPaid = 'Y' THEN 'Paid'");
                 sb.Append("            WHEN COALESCE(");
                 sb.Append("                     (SELECT MIN(ps.DueDate) FROM C_InvoicePaySchedule ps");
@@ -1207,7 +1249,8 @@ namespace VAS.Models
                         item.dueDate = Util.GetValueOfString(row["due_date"]);
                         item.amount = row["amount"] != DBNull.Value
                             ? Convert.ToDecimal(row["amount"]) : 0m;
-                        item.paid = 0m;
+                        item.paid = row["paid_amt"] != DBNull.Value
+                            ? Convert.ToDecimal(row["paid_amt"]) : 0m;
                         item.payStatus = Util.GetValueOfString(row["pay_status"]);
                         items.Add(item);
                     }
@@ -2113,7 +2156,7 @@ namespace VAS.Models
                 sb.Append("       a.Location AS Location,");
                 sb.Append("       a.MeetingUrl AS MeetingUrl,");
                 sb.Append("       SUBSTR(a.Comments, 1, 4000) AS Comments,");
-                sb.Append("       COALESCE(SUBSTR(a.AttendeeInfo, 1, 4000), TO_CHAR(a.AD_User_ID)) AS AttendeeInfo,");
+                sb.Append("       COALESCE(SUBSTR(a.AttendeeInfo, 1, 4000), CAST(a.AD_User_ID AS VARCHAR)) AS AttendeeInfo,");
                 sb.Append("       SUBSTR(atr.Transcript, 1, 4000) AS Transcript");
                 sb.Append("  FROM AppointmentsInfo a");
                 sb.Append("  LEFT OUTER JOIN AppointmentTranscript atr ON (atr.AppointmentsInfo_ID = a.AppointmentsInfo_ID)");
@@ -2150,37 +2193,53 @@ namespace VAS.Models
                     var attendeeRaw = Util.GetValueOfString(row["AttendeeInfo"]);
                     if (!string.IsNullOrEmpty(attendeeRaw))
                     {
-                        var ids = new List<string>();
-                        foreach (var s in attendeeRaw.Split(','))
+                        // AttendeeInfo uses semicolons or commas as delimiters
+                        var numericIds    = new List<string>();
+                        var literalNames  = new List<string>();
+                        var separators    = new char[] { ';', ',' };
+                        foreach (var s in attendeeRaw.Split(separators))
                         {
                             var t = s.Trim();
-                            bool isNum = true;
-                            foreach (char c in t) { if (!char.IsDigit(c)) { isNum = false; break; } }
-                            if (!string.IsNullOrEmpty(t) && isNum && !ids.Contains(t)) ids.Add(t);
+                            if (string.IsNullOrEmpty(t)) continue;
+                            int parsed;
+                            if (int.TryParse(t, out parsed))
+                            {
+                                if (!numericIds.Contains(t)) numericIds.Add(t);
+                            }
+                            else
+                            {
+                                // Store the raw token as a display name
+                                if (!literalNames.Contains(t)) literalNames.Add(t);
+                            }
                         }
-                        if (ids.Count > 0)
+
+                        var resolvedNames = new List<string>(literalNames);
+
+                        // Look up names for numeric IDs from AD_User
+                        if (numericIds.Count > 0)
                         {
-                            var paramNames = new List<string>();
+                            var paramNames    = new List<string>();
                             var nameParamList = new List<SqlParameter>();
-                            for (int idx = 0; idx < ids.Count; idx++)
+                            for (int idx = 0; idx < numericIds.Count; idx++)
                             {
                                 paramNames.Add("@uid" + idx);
-                                int uid; int.TryParse(ids[idx], out uid);
+                                int uid; int.TryParse(numericIds[idx], out uid);
                                 nameParamList.Add(new SqlParameter("@uid" + idx, uid));
                             }
                             string namesSql = "SELECT Name FROM AD_User WHERE IsActive = 'Y' AND AD_User_ID IN (" + string.Join(",", paramNames) + ") ORDER BY Name";
-                            DataSet nameDs = DB.ExecuteDataset(namesSql, nameParamList.ToArray(), null);
+                            DataSet nameDs  = DB.ExecuteDataset(namesSql, nameParamList.ToArray(), null);
                             if (nameDs != null && nameDs.Tables.Count > 0)
                             {
-                                var names = new List<string>();
                                 foreach (DataRow nr in nameDs.Tables[0].Rows)
                                 {
                                     var n = Util.GetValueOfString(nr["Name"]);
-                                    if (!string.IsNullOrEmpty(n)) names.Add(n);
+                                    if (!string.IsNullOrEmpty(n)) resolvedNames.Add(n);
                                 }
-                                response.attendees = string.Join(", ", names);
                             }
                         }
+
+                        if (resolvedNames.Count > 0)
+                            response.attendees = string.Join(", ", resolvedNames);
                     }
                 }
             }

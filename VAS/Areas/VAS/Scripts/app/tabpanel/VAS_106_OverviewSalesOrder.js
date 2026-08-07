@@ -33,6 +33,9 @@
  *                        here, modelled on VAS_099. A feed that fits on one page
  *                        shows no controls, and the section's count badge keeps
  *                        counting the whole feed. Ported from VAS_092.
+ *   VAI163   2026-08-07  Emits the vas_106-prefixed modifier classes the
+ *                        stylesheet now uses, the runtime-built ones included
+ *                        ("vas_106-tone-" + tone).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -345,7 +348,7 @@
         }
 
         function headerPill(label, tone, icon, withDot) {
-            var $p = $('<span class="vas_106-hdrPill"></span>').addClass("tone-" + (tone || "neutral"));
+            var $p = $('<span class="vas_106-hdrPill"></span>').addClass("vas_106-tone-" + (tone || "neutral"));
             if (icon) $p.append(svgIcon(icon));
             if (withDot) $p.append($('<span class="vas_106-hdrDot"></span>'));
             $p.append($('<span></span>').text(label));
@@ -456,9 +459,9 @@
         }
 
         function originChip(icon, label, value, $statusPill, iconTone, tableName, recordId) {
-            var $chip = $('<span class="vas_106-chip"></span>').addClass("ic-" + (iconTone || "muted"));
+            var $chip = $('<span class="vas_106-chip"></span>').addClass("vas_106-ic-" + (iconTone || "muted"));
             if (tableName && recordId) {
-                $chip.addClass("is-link").attr("data-open-table", tableName).attr("data-open-id", recordId);
+                $chip.addClass("vas_106-is-link").attr("data-open-table", tableName).attr("data-open-id", recordId);
             }
             $chip.append(svgIcon(icon));
             $chip.append($('<span class="vas_106-chipLabel"></span>').text(label));
@@ -487,7 +490,7 @@
             var $actions = $('<div class="vas_106-cvActions"></div>');
 
             // Complete Sales Order (wired).
-            var $complete = $('<button class="vas_106-btn primary" data-act="complete"></button>');
+            var $complete = $('<button class="vas_106-btn vas_106-primary" data-act="complete"></button>');
             $complete.append(svgIcon("checkCircle"));
             if (completed) {
                 $complete.append($('<span></span>').text(getMsg("VAS_106_SalesOrderCompleted", "Sales Order Completed")));
@@ -502,14 +505,14 @@
 
             // Create Delivery (enabled from pending stock; generation wired later).
             var pendingToDeliver = readiness().pending > 0 || hasUndelivered();
-            var $delivery = $('<button class="vas_106-btn secondary" data-act="delivery"></button>');
+            var $delivery = $('<button class="vas_106-btn vas_106-secondary" data-act="delivery"></button>');
             $delivery.append(svgIcon("truck"));
             $delivery.append($('<span></span>').text(getMsg("VAS_106_CreateDelivery", "Create Delivery")));
             $delivery.prop("disabled", !completed || !pendingToDeliver);
             $actions.append($delivery);
 
             // Create Invoice (enabled while not fully invoiced; generation wired later).
-            var $invoice = $('<button class="vas_106-btn secondary" data-act="invoice"></button>');
+            var $invoice = $('<button class="vas_106-btn vas_106-secondary" data-act="invoice"></button>');
             $invoice.append(svgIcon("fileText"));
             $invoice.append($('<span></span>').text(getMsg("VAS_106_CreateInvoice", "Create Invoice")));
             $invoice.prop("disabled", !completed || invoiced().fully);
@@ -564,7 +567,7 @@
         }
 
         function metricCard(tone, icon, label, value, sub, pct) {
-            var $c = $('<div class="vas_106-metric"></div>').addClass("tone-" + tone);
+            var $c = $('<div class="vas_106-metric"></div>').addClass("vas_106-tone-" + tone);
             var $head = $('<div class="vas_106-mHead"></div>');
             $head.append(svgIcon(icon));
             $head.append($('<span class="vas_106-mLabel"></span>').text(label));
@@ -624,8 +627,8 @@
             for (var i = 0; i < stages.length; i++) {
                 var s = stages[i];
                 var stateCls, metaText;
-                if (i === active && !s.done) { stateCls = "is-active"; metaText = getMsg("VAS_106_InProgress", "In progress"); }
-                else if (s.done) { stateCls = "is-done"; metaText = formatDate(s.date) || s.meta || getMsg("VAS_106_Done", "Done"); }
+                if (i === active && !s.done) { stateCls = "vas_106-is-active"; metaText = getMsg("VAS_106_InProgress", "In progress"); }
+                else if (s.done) { stateCls = "vas_106-is-done"; metaText = formatDate(s.date) || s.meta || getMsg("VAS_106_Done", "Done"); }
                 else { stateCls = "is-pending"; metaText = s.meta || getMsg("VAS_106_Pending", "Pending"); }
                 $tl.append(stepEntry(i + 1, getMsg(s.key, s.label), metaText, s.done, stateCls));
             }
@@ -635,7 +638,7 @@
 
         function postBadge(posted) {
             var $b = $('<span class="vas_106-postBadge"></span>');
-            if (posted) $b.addClass("posted").text(getMsg("VAS_106_Posted", "Posted"));
+            if (posted) $b.addClass("vas_106-posted").text(getMsg("VAS_106_Posted", "Posted"));
             else $b.text(getMsg("VAS_106_NotPosted", "Not Posted"));
             return $b;
         }
@@ -690,12 +693,12 @@
             var $tbl = $('<div class="vas_106-table vas_106-linesTable"></div>');
             var $h = $('<div class="vas_106-tRow vas_106-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_106_ProductService", "Product / Service")));
-            $h.append($('<span class="ta-c"></span>').text(getMsg("VAS_106_Qty", "Qty")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_106_UnitPrice", "Unit price")));
-            $h.append($('<span class="ta-c"></span>').text(getMsg("VAS_106_Disc", "Disc")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_106_LineTotal", "Line total")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_106_Delivered", "Delivered")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_106_Contract", "Contract")));
+            $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_Qty", "Qty")));
+            $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_UnitPrice", "Unit price")));
+            $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_Disc", "Disc")));
+            $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_LineTotal", "Line total")));
+            $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_Delivered", "Delivered")));
+            $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_Contract", "Contract")));
             $tbl.append($h);
 
             for (var i = 0; i < lines.length; i++) {
@@ -741,23 +744,23 @@
             $tr.append($item);
 
             var uomP = +ln.UOMPrecision || 0;
-            $tr.append($('<span class="ta-c"></span>').text(formatNumber(+ln.QtyOrdered || 0, uomP)));
-            $tr.append($('<span class="ta-r"></span>').text(formatAmount(+ln.PriceActual || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
-            $tr.append($('<span class="ta-c"></span>').text((+ln.Discount ? formatNumber(+ln.Discount, 0) + "%" : "—")));
-            $tr.append($('<span class="ta-r"></span>').text(formatAmount(+ln.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
+            $tr.append($('<span class="vas_106-ta-c"></span>').text(formatNumber(+ln.QtyOrdered || 0, uomP)));
+            $tr.append($('<span class="vas_106-ta-r"></span>').text(formatAmount(+ln.PriceActual || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
+            $tr.append($('<span class="vas_106-ta-c"></span>').text((+ln.Discount ? formatNumber(+ln.Discount, 0) + "%" : "—")));
+            $tr.append($('<span class="vas_106-ta-r"></span>').text(formatAmount(+ln.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
 
             // Delivered — stockable lines only; service / charge show a dash.
             if (ln.LineType === "product") {
                 var ordered = +ln.QtyOrdered || 0, delivered = +ln.QtyDelivered || 0;
                 var pct = ordered > 0 ? Math.round(delivered / ordered * 100) : 0;
-                var $prog = $('<span class="vas_106-prog ta-r"></span>').addClass(ln.DeliveredState || "none");
+                var $prog = $('<span class="vas_106-prog vas_106-ta-r"></span>').addClass("vas_106-" + (ln.DeliveredState || "none"));
                 var $bar = $('<span class="vas_106-progBar"><i></i></span>');
                 $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
                 $prog.append($bar);
                 $prog.append(document.createTextNode(formatNumber(delivered, uomP) + "/" + formatNumber(ordered, uomP)));
                 $tr.append($prog);
             } else {
-                $tr.append($('<span class="ta-r vas_106-naDash"></span>').text("—"));
+                $tr.append($('<span class="vas_106-ta-r vas_106-naDash"></span>').text("—"));
             }
 
             // Contract — service / charge only.
@@ -768,7 +771,7 @@
         // Contract cell: created contract chip, or a toggle for service/charge,
         // or a muted dash for product lines.
         function buildContractCell(ln) {
-            var $cell = $('<span class="ta-r"></span>');
+            var $cell = $('<span class="vas_106-ta-r"></span>');
             var isServiceCharge = (ln.LineType === "service" || ln.LineType === "charge");
 
             if (!isServiceCharge) {
@@ -779,8 +782,8 @@
             var $lc = $('<span class="vas_106-lineContract"></span>');
             if (ln.C_Contract_ID > 0) {
                 // Already contracted — locked toggle + link chip.
-                $lc.append($('<span class="vas_106-switch on locked"></span>'));
-                var $link = $('<a class="vas_106-ctrLink show" href="#"></a>')
+                $lc.append($('<span class="vas_106-switch vas_106-on vas_106-locked"></span>'));
+                var $link = $('<a class="vas_106-ctrLink vas_106-show" href="#"></a>')
                     .attr("data-open-table", "C_Contract").attr("data-open-id", ln.C_Contract_ID);
                 $link.append(svgIcon("doc"));
                 $link.append($('<span class="vas_106-ctrNo"></span>').text(ln.ContractNo || ("#" + ln.C_Contract_ID)));
@@ -788,7 +791,7 @@
                 $lc.append($link);
             } else {
                 var $sw = $('<span class="vas_106-switch" role="switch"></span>').attr("data-line", ln.C_OrderLine_ID);
-                if (ln.IsContractFlag) $sw.addClass("on").attr("aria-checked", "true"); else $sw.attr("aria-checked", "false");
+                if (ln.IsContractFlag) $sw.addClass("vas_106-on").attr("aria-checked", "true"); else $sw.attr("aria-checked", "false");
                 $lc.append($sw);
                 $lc.append($('<span class="vas_106-swLabel"></span>').text(getMsg("VAS_106_Contract", "Contract")));
             }
@@ -804,7 +807,7 @@
 
             var open = isCompleted() && ln.IsContractFlag;
             var $form = $('<div class="vas_106-contractForm"></div>').attr("data-line", ln.C_OrderLine_ID);
-            if (open) $form.addClass("open");
+            if (open) $form.addClass("vas_106-open");
 
             $form.append($('<div class="vas_106-cfCap"></div>')
                 .append(svgIcon("doc"))
@@ -832,7 +835,7 @@
 
             var $foot = $('<div class="vas_106-cfFoot"></div>');
             $foot.append($('<span class="vas_106-cfNote"></span>').text(getMsg("VAS_106_FillRequired", "Fill the required fields (*) to create the contract")));
-            var $btn = $('<button type="button" class="vas_106-btn primary sm vas_106-cfCreate" data-line="' + ln.C_OrderLine_ID + '" disabled></button>');
+            var $btn = $('<button type="button" class="vas_106-btn vas_106-primary vas_106-sm vas_106-cfCreate" data-line="' + ln.C_OrderLine_ID + '" disabled></button>');
             $btn.append(svgIcon("plus"));
             $btn.append($('<span></span>').text(getMsg("VAS_106_CreateContract", "Create Contract")));
             $foot.append($btn);
@@ -846,7 +849,7 @@
             var $ff = $('<div class="vas_106-ff"></div>');
             var $content = $('<div class="vas_106-ffContent"></div>');
             var $lbl = $('<label></label>').text(label);
-            if (required) { $lbl.addClass("req"); $lbl.append($('<span></span>').text("*")); }
+            if (required) { $lbl.addClass("vas_106-req"); $lbl.append($('<span></span>').text("*")); }
             $content.append($lbl);
             $ff.append($content);
             return $ff;
@@ -855,7 +858,7 @@
         function numField(label, cls, placeholder) {
             var $ff = fieldWrap(label, false);
             $ff.find(".vas_106-ffContent").append(
-                $('<input type="text" class="vas_106-ffInput num ' + cls + '">').attr("placeholder", placeholder));
+                $('<input type="text" class="vas_106-ffInput vas_106-num ' + cls + '">').attr("placeholder", placeholder));
             return $ff;
         }
 
@@ -869,7 +872,7 @@
 
         function totalBit(label, value, isGrand) {
             var $bit = $('<span class="vas_106-tf"></span>');
-            if (isGrand) $bit.addClass("is-grand");
+            if (isGrand) $bit.addClass("vas_106-is-grand");
             $bit.append(document.createTextNode(label));
             $bit.append($('<b></b>').text(value));
             return $bit;
@@ -890,9 +893,9 @@
             var $h = $('<div class="vas_106-tRow vas_106-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_106_Item", "Item")));
             $h.append($('<span></span>').text(getMsg("VAS_106_Warehouse", "Warehouse")));
-            $h.append($('<span class="ta-c"></span>').text(getMsg("VAS_106_PendingToDeliver", "Pending to Deliver")));
-            $h.append($('<span class="ta-c"></span>').text(getMsg("VAS_106_OnHand", "On Hand")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_106_Readiness", "Readiness")));
+            $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_PendingToDeliver", "Pending to Deliver")));
+            $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_OnHand", "On Hand")));
+            $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_Readiness", "Readiness")));
             $tbl.append($h);
 
             for (var i = 0; i < rows.length; i++) $tbl.append(buildReadinessRow(rows[i]));
@@ -912,16 +915,16 @@
             if (rd.ProductValue) $item.append($('<div class="vas_106-itSku"></div>').text(getMsg("VAS_106_SKU", "SKU") + " " + rd.ProductValue));
             $tr.append($item);
             $tr.append($('<span></span>').text(rd.WarehouseName || "—"));
-            $tr.append($('<span class="ta-c"></span>').text(formatNumber(+rd.PendingQty || 0, 0)));
-            $tr.append($('<span class="ta-c"></span>').text(formatNumber(+rd.QtyOnHand || 0, 0)));
+            $tr.append($('<span class="vas_106-ta-c"></span>').text(formatNumber(+rd.PendingQty || 0, 0)));
+            $tr.append($('<span class="vas_106-ta-c"></span>').text(formatNumber(+rd.QtyOnHand || 0, 0)));
 
             var tag, tone, dot = true;
-            if (rd.Readiness === "ready") { tag = getMsg("VAS_106_FullyDelivered", "Fully delivered"); tone = "ready"; }
-            else if (rd.Readiness === "instock") { tag = getMsg("VAS_106_Ready", "Ready to ship"); tone = "ready"; }
-            else if (rd.Readiness === "short") { tag = getMsg("VAS_106_ShortBy", "Short by") + " " + formatNumber((+rd.PendingQty || 0) - (+rd.QtyOnHand || 0), 0); tone = "short"; }
-            else { tag = getMsg("VAS_106_Awaited", "Awaited"); tone = "awaited"; }
+            if (rd.Readiness === "ready") { tag = getMsg("VAS_106_FullyDelivered", "Fully delivered"); tone = "vas_106-ready"; }
+            else if (rd.Readiness === "instock") { tag = getMsg("VAS_106_Ready", "Ready to ship"); tone = "vas_106-ready"; }
+            else if (rd.Readiness === "short") { tag = getMsg("VAS_106_ShortBy", "Short by") + " " + formatNumber((+rd.PendingQty || 0) - (+rd.QtyOnHand || 0), 0); tone = "vas_106-short"; }
+            else { tag = getMsg("VAS_106_Awaited", "Awaited"); tone = "vas_106-awaited"; }
 
-            var $rt = $('<span class="ta-r"></span>');
+            var $rt = $('<span class="vas_106-ta-r"></span>');
             var $pill = $('<span class="vas_106-rdTag"></span>').addClass(tone);
             if (dot) $pill.append($('<span class="vas_106-rdDot"></span>'));
             $pill.append($('<span></span>').text(tag));
@@ -944,13 +947,13 @@
             $h.append($('<span></span>').text(getMsg("VAS_106_Delivery", "Delivery")));
             $h.append($('<span></span>').text(getMsg("VAS_106_Warehouse", "Warehouse")));
             $h.append($('<span></span>').text(getMsg("VAS_106_Tracking", "Tracking")));
-            $h.append($('<span class="ta-c"></span>').text(getMsg("VAS_106_Items", "Items")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_106_Status", "Status")));
+            $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_Items", "Items")));
+            $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_Status", "Status")));
             $tbl.append($h);
 
             for (var i = 0; i < rows.length; i++) {
                 var dv = rows[i];
-                var $tr = $('<div class="vas_106-tRow vas_106-tBody is-link"></div>')
+                var $tr = $('<div class="vas_106-tRow vas_106-tBody vas_106-is-link"></div>')
                     .attr("data-open-table", "M_InOut").attr("data-open-id", dv.M_InOut_ID);
                 var $item = $('<span class="vas_106-itItem"></span>');
                 $item.append($('<div class="vas_106-itName"></div>').text(dv.DocumentNo || ""));
@@ -959,8 +962,8 @@
                 $tr.append($item);
                 $tr.append($('<span></span>').text(dv.WarehouseName || "—"));
                 $tr.append($('<span></span>').text(dv.TrackingNo || "—"));
-                $tr.append($('<span class="ta-c"></span>').text(dv.LineCount || 0));
-                $tr.append($('<span class="ta-r"></span>').append(docStatusPill(dv.DocStatus)));
+                $tr.append($('<span class="vas_106-ta-c"></span>').text(dv.LineCount || 0));
+                $tr.append($('<span class="vas_106-ta-r"></span>').append(docStatusPill(dv.DocStatus)));
                 $tbl.append($tr);
             }
             $wrap.append($tbl);
@@ -979,21 +982,21 @@
             var $h = $('<div class="vas_106-tRow vas_106-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_106_Invoice", "Invoice")));
             $h.append($('<span></span>').text(getMsg("VAS_106_Issued", "Issued")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_106_Amount", "Amount")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_106_Status", "Status")));
+            $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_Amount", "Amount")));
+            $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_Status", "Status")));
             $tbl.append($h);
 
             var iv = invoiced();
             for (var i = 0; i < rows.length; i++) {
                 var r = rows[i];
-                var $tr = $('<div class="vas_106-tRow vas_106-tBody is-link"></div>')
+                var $tr = $('<div class="vas_106-tRow vas_106-tBody vas_106-is-link"></div>')
                     .attr("data-open-table", "C_Invoice").attr("data-open-id", r.C_Invoice_ID);
                 $tr.append($('<span class="vas_106-itName"></span>').text(r.DocumentNo || ""));
                 $tr.append($('<span></span>').text(formatDate(r.DateInvoiced) || "—"));
-                $tr.append($('<span class="ta-r"></span>').text(formatAmount(+r.GrandTotal || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
-                var stTone = r.IsPaid ? "approved" : "sent";
+                $tr.append($('<span class="vas_106-ta-r"></span>').text(formatAmount(+r.GrandTotal || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
+                var stTone = r.IsPaid ? "vas_106-approved" : "vas_106-sent";
                 var stLabel = r.IsPaid ? getMsg("VAS_106_PaidTag", "Paid") : getMsg("VAS_106_UnpaidTag", "Unpaid");
-                $tr.append($('<span class="ta-r"></span>').append(tagPill(stLabel, stTone)));
+                $tr.append($('<span class="vas_106-ta-r"></span>').append(tagPill(stLabel, stTone)));
                 $tbl.append($tr);
             }
 
@@ -1079,7 +1082,7 @@
             if (icon === "chevLeft") $b.append(svgIcon(icon));
             $b.append($('<span></span>').text(label));
             if (icon === "chevRight") $b.append(svgIcon(icon));
-            if (disabled) $b.addClass("is-disabled");
+            if (disabled) $b.addClass("vas_106-is-disabled");
             else $b.on("click", handler);
             return $b;
         }
@@ -1087,7 +1090,7 @@
         function activityRow(a) {
             var meta = ACT_TYPES[a.EventType] || ACT_TYPES.Updated;
             var $row = $('<div class="vas_106-actRow"></div>');
-            var $badge = $('<span class="vas_106-actBadge"></span>').addClass("tone-" + meta.tone);
+            var $badge = $('<span class="vas_106-actBadge"></span>').addClass("vas_106-tone-" + meta.tone);
             $badge.append(svgIcon(meta.icon));
             $badge.append($('<span></span>').text(getMsg("VAS_106_Act" + a.EventType, meta.label)));
             $row.append($badge);
@@ -1138,7 +1141,7 @@
         // ----------------------------------------------------------------- //
 
         function pill(label, tone) {
-            return $('<span class="vas_106-pill"></span>').addClass("tone-" + (tone || "neutral")).text(label);
+            return $('<span class="vas_106-pill"></span>').addClass("vas_106-tone-" + (tone || "neutral")).text(label);
         }
 
         function tagPill(label, tone) {
@@ -1150,13 +1153,13 @@
 
         function docStatusPill(docStatus) {
             var map = {
-                "CO": { tone: "approved", label: getMsg("VAS_106_Completed", "Completed") },
-                "CL": { tone: "approved", label: getMsg("VAS_106_Closed", "Closed") },
-                "DR": { tone: "draft",    label: getMsg("VAS_106_Draft", "Draft") },
-                "IP": { tone: "partial",  label: getMsg("VAS_106_InProgressShort", "In Progress") },
-                "IN": { tone: "partial",  label: getMsg("VAS_106_InTransit", "Scheduled") }
+                "CO": { tone: "vas_106-approved", label: getMsg("VAS_106_Completed", "Completed") },
+                "CL": { tone: "vas_106-approved", label: getMsg("VAS_106_Closed", "Closed") },
+                "DR": { tone: "vas_106-draft",    label: getMsg("VAS_106_Draft", "Draft") },
+                "IP": { tone: "vas_106-partial",  label: getMsg("VAS_106_InProgressShort", "In Progress") },
+                "IN": { tone: "vas_106-partial",  label: getMsg("VAS_106_InTransit", "Scheduled") }
             };
-            var m = map[docStatus] || { tone: "draft", label: docStatus || "—" };
+            var m = map[docStatus] || { tone: "vas_106-draft", label: docStatus || "—" };
             return tagPill(m.label, m.tone);
         }
 
@@ -1168,19 +1171,19 @@
             // Section collapse.
             $root.on("click", ".vas_106-dsecHead", function () {
                 var $sec = $(this).closest(".vas_106-dsec");
-                var collapsed = $sec.toggleClass("collapsed").hasClass("collapsed");
+                var collapsed = $sec.toggleClass("vas_106-collapsed").hasClass("vas_106-collapsed");
                 $(this).attr("aria-expanded", collapsed ? "false" : "true");
             });
 
             // Contract toggle (service / charge lines, before a contract exists).
-            $root.on("click", ".vas_106-switch:not(.locked)", function () {
+            $root.on("click", ".vas_106-switch:not(.vas_106-locked)", function () {
                 var lineId = $(this).attr("data-line");
-                var on = $(this).toggleClass("on").hasClass("on");
+                var on = $(this).toggleClass("vas_106-on").hasClass("vas_106-on");
                 $(this).attr("aria-checked", on ? "true" : "false");
                 var $form = $root.find('.vas_106-contractForm[data-line="' + lineId + '"]');
                 if (!$form.length) return;
-                if (isCompleted() && on) { $form.addClass("open"); validateContractForm($form); }
-                else if (!on) { $form.removeClass("open"); }
+                if (isCompleted() && on) { $form.addClass("vas_106-open"); validateContractForm($form); }
+                else if (!on) { $form.removeClass("vas_106-open"); }
             });
 
             // Contract form validation.
@@ -1205,7 +1208,7 @@
             });
 
             // Open linked records.
-            $root.on("click", ".is-link[data-open-table], .vas_106-chip.is-link, .vas_106-ctrLink", function (e) {
+            $root.on("click", ".vas_106-is-link[data-open-table], .vas_106-chip.vas_106-is-link, .vas_106-ctrLink", function (e) {
                 e.preventDefault();
                 openRecord($(this).attr("data-open-table"), $(this).attr("data-open-id"));
             });
@@ -1218,9 +1221,9 @@
                 if (!v || v === "0") ok = false;
             });
             var $btn = $form.find(".vas_106-cfCreate");
-            if (!$btn.hasClass("done")) $btn.prop("disabled", !ok);
+            if (!$btn.hasClass("vas_106-done")) $btn.prop("disabled", !ok);
             var $note = $form.find(".vas_106-cfNote");
-            if (!$btn.hasClass("done"))
+            if (!$btn.hasClass("vas_106-done"))
                 $note.text(ok ? getMsg("VAS_106_ReadyToCreate", "Ready — click Create Contract")
                               : getMsg("VAS_106_FillRequired", "Fill the required fields (*) to create the contract"));
         }
@@ -1271,7 +1274,7 @@
                     if (res && res.Success) {
                         // Lock the form, then reload so the contract chip appears.
                         $form.find(".vas_106-ffInput").prop("disabled", true);
-                        $btn.addClass("done");
+                        $btn.addClass("vas_106-done");
                         $btn.html("").append(svgIcon("check")).append($('<span></span>')
                             .text(getMsg("VAS_106_ContractCreated", "Contract Created")));
                         $form.find(".vas_106-cfNote").text(
@@ -1316,10 +1319,10 @@
 
         // Lightweight self-contained toast (no dependency on a host toast API).
         function toast(message, isError) {
-            var $t = $('<div class="vas_106-toast"></div>').addClass(isError ? "err" : "ok").text(message);
+            var $t = $('<div class="vas_106-toast"></div>').addClass(isError ? "vas_106-err" : "vas_106-ok").text(message);
             $root.append($t);
-            setTimeout(function () { $t.addClass("show"); }, 10);
-            setTimeout(function () { $t.removeClass("show"); setTimeout(function () { $t.remove(); }, 300); }, 3200);
+            setTimeout(function () { $t.addClass("vas_106-show"); }, 10);
+            setTimeout(function () { $t.removeClass("vas_106-show"); setTimeout(function () { $t.remove(); }, 300); }, 3200);
         }
 
         // ----------------------------------------------------------------- //

@@ -87,6 +87,8 @@
  *                        the activity feed page independently. A feed that fits on
  *                        one page shows no controls, and the section header keeps
  *                        counting the whole feed. Ported from VAS_092.
+ *   VAI163   2026-08-07  Emits the vas_098-prefixed modifier classes the
+ *                        stylesheet now uses.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -190,28 +192,28 @@
         // ---- Code maps: status/priority codes -> message key + tone. Labels
         //      are looked up through VIS.Msg (AD_Message VAS_098_*) at render. ---- //
         var STATUS_MAP = {
-            "DR": { key: "Draft",       tone: "draft"     },
-            "IP": { key: "InProgress",  tone: "partial"   },
-            "AP": { key: "Approved",    tone: "approved"  },
-            "CO": { key: "Completed",   tone: "approved"  },
-            "CL": { key: "Closed",      tone: "sent"      },
-            "VO": { key: "Voided",      tone: "cancelled" },
-            "RE": { key: "Reversed",    tone: "cancelled" },
-            "WC": { key: "WaitingConfirmation", tone: "partial" },
-            "WP": { key: "WaitingPayment",      tone: "partial" },
-            "IN": { key: "Invalid",     tone: "cancelled" },
-            "NA": { key: "NotApproved", tone: "cancelled" }
+            "DR": { key: "Draft",       tone: "vas_098-draft"     },
+            "IP": { key: "InProgress",  tone: "vas_098-partial"   },
+            "AP": { key: "Approved",    tone: "vas_098-approved"  },
+            "CO": { key: "Completed",   tone: "vas_098-approved"  },
+            "CL": { key: "Closed",      tone: "vas_098-sent"      },
+            "VO": { key: "Voided",      tone: "vas_098-cancelled" },
+            "RE": { key: "Reversed",    tone: "vas_098-cancelled" },
+            "WC": { key: "WaitingConfirmation", tone: "vas_098-partial" },
+            "WP": { key: "WaitingPayment",      tone: "vas_098-partial" },
+            "IN": { key: "Invalid",     tone: "vas_098-cancelled" },
+            "NA": { key: "NotApproved", tone: "vas_098-cancelled" }
         };
         // Tones match the colours the requisition window itself uses for the
         // PriorityRule field: urgent red, high orange, medium blue, low green,
         // minor grey. Urgent and High used to share one tone, and Low shared grey
         // with Minor, so the badge disagreed with the screen.
         var PRIORITY_MAP = {
-            "1": { key: "UrgentPriority", tone: "urgent" },
-            "3": { key: "HighPriority",   tone: "high"   },
-            "5": { key: "MediumPriority", tone: "med"    },
-            "7": { key: "LowPriority",    tone: "low"    },
-            "9": { key: "MinorPriority",  tone: "minor"  }
+            "1": { key: "UrgentPriority", tone: "vas_098-urgent" },
+            "3": { key: "HighPriority",   tone: "vas_098-high"   },
+            "5": { key: "MediumPriority", tone: "vas_098-med"    },
+            "7": { key: "LowPriority",    tone: "vas_098-low"    },
+            "9": { key: "MinorPriority",  tone: "vas_098-minor"  }
         };
 
         this.init = function () {
@@ -317,22 +319,22 @@
         function statusMeta() {
             var m = STATUS_MAP[data.StatusCode];
             if (m) return { label: msg(m.key), tone: m.tone };
-            return { label: data.StatusCode || msg("NA"), tone: "draft" };
+            return { label: data.StatusCode || msg("NA"), tone: "vas_098-draft" };
         }
 
         // Posting status of the record (M_Requisition.Posted). Anything other than
         // 'Y' is "not posted"; 'E' is a posting error and is called out as such.
         function postedMeta() {
-            if (data.Posted) return { label: msg("Posted", "Posted"), tone: "approved" };
+            if (data.Posted) return { label: msg("Posted", "Posted"), tone: "vas_098-approved" };
             if (data.PostedCode === "E")
-                return { label: msg("PostingError", "Posting Error"), tone: "cancelled" };
-            return { label: msg("NotPosted", "Not Posted"), tone: "draft" };
+                return { label: msg("PostingError", "Posting Error"), tone: "vas_098-cancelled" };
+            return { label: msg("NotPosted", "Not Posted"), tone: "vas_098-draft" };
         }
 
         function priorityMeta() {
             var m = PRIORITY_MAP[data.PriorityCode];
             if (m) return { label: msg(m.key), tone: m.tone };
-            return { label: msg("NormalPriority"), tone: "med" };
+            return { label: msg("NormalPriority"), tone: "vas_098-med" };
         }
 
         function procurementType() {
@@ -340,7 +342,7 @@
         }
 
         function tag(label, tone) {
-            var $t = $('<span class="vas_098-tag"></span>').addClass(tone || "draft");
+            var $t = $('<span class="vas_098-tag"></span>').addClass(tone || "vas_098-draft");
             $t.append($('<span class="vas_098-dot"></span>'));
             $t.append(document.createTextNode(label));
             return $t;
@@ -373,7 +375,7 @@
             $pills.append(priorityPill(pm));
             if (data.SourceWarehouseName) {
                 // origin / procurement-type chip (design shows a chip here)
-                $pills.append(tag(procurementType(), "mwo"));
+                $pills.append(tag(procurementType(), "vas_098-mwo"));
             }
             $pills.append(tag(st.label, st.tone));
             // Posting status of the record, beside the document status.
@@ -509,15 +511,15 @@
             // "Create" verb has been dropped from each. New message keys are used
             // so the old seeded ConvertTo* / CreateRFQ text does not resurface.
             var $actions = $('<div class="vas_098-cvactions"></div>');
-            $actions.append(convertBtn(msg("MaterialTransfer", "Material Transfer"), "transfer", "primary",
+            $actions.append(convertBtn(msg("MaterialTransfer", "Material Transfer"), "transfer", "vas_098-primary",
                 canConvert, "ConvertToMaterialTransfer",
                 msg("ConfirmMaterialTransfer",
                     "Create a material transfer from this requisition?")));
-            $actions.append(convertBtn(msg("RFQ", "RFQ"), "rfq", "secondary",
+            $actions.append(convertBtn(msg("RFQ", "RFQ"), "rfq", "vas_098-secondary",
                 canAct, "CreateRFQ",
                 msg("ConfirmCreateRFQ",
                     "Create an RFQ from this requisition?")));
-            $actions.append(convertBtn(msg("PurchaseOrder", "Purchase Order"), "external", "secondary",
+            $actions.append(convertBtn(msg("PurchaseOrder", "Purchase Order"), "external", "vas_098-secondary",
                 canConvert, "ConvertToPurchaseOrder",
                 msg("ConfirmConvertToPO",
                     "Create the purchase order(s) for this requisition?")));
@@ -585,11 +587,11 @@
         // Lightweight self-contained toast.
         function toast(message, isError) {
             var $t = $('<div class="vas_098-toast"></div>')
-                .addClass(isError ? "err" : "ok").text(message);
+                .addClass(isError ? "vas_098-err" : "vas_098-ok").text(message);
             $root.append($t);
-            setTimeout(function () { $t.addClass("show"); }, 10);
+            setTimeout(function () { $t.addClass("vas_098-show"); }, 10);
             setTimeout(function () {
-                $t.removeClass("show");
+                $t.removeClass("vas_098-show");
                 setTimeout(function () { $t.remove(); }, 300);
             }, 4200);
         }
@@ -600,24 +602,24 @@
             var $strip = $('<div class="vas_098-stats"></div>');
 
             // Estimated value (breach-aware)
-            var $s1 = statCard(data.IsBudgetBreach ? "breach" : "a-blue", msg("EstimatedValue"));
+            var $s1 = statCard(data.IsBudgetBreach ? "vas_098-breach" : "vas_098-a-blue", msg("EstimatedValue"));
             var $v1 = $('<div class="vas_098-sval"></div>').text(money(data.EstimatedValue));
             if (data.IsBudgetBreach) {
                 $v1.append($('<span class="vas_098-breachic"></span>')
                     .attr("title", msg("BudgetBreached")).append(svgIcon("warn")));
             }
             $s1.append($v1);
-            $s1.append(statSub(budgetSubText(), data.IsBudgetBreach ? "breach" : ""));
+            $s1.append(statSub(budgetSubText(), data.IsBudgetBreach ? "vas_098-breach" : ""));
             $strip.append($s1);
 
             // Required by
-            var $s2 = statCard("a-violet", msg("RequiredBy"));
+            var $s2 = statCard("vas_098-a-violet", msg("RequiredBy"));
             $s2.append($('<div class="vas_098-sval"></div>').text(formatDate(data.DateRequired) || msg("NA")));
             $s2.append(statSub(requiredSubText(), ""));
             $strip.append($s2);
 
             // Line items
-            var $s3 = statCard("a-green", msg("LineItems"));
+            var $s3 = statCard("vas_098-a-green", msg("LineItems"));
             $s3.append($('<div class="vas_098-sval"></div>').text((data.LineCount || 0) + " " + msg("Lines")));
             $s3.append(statSub(formatNumber(data.RequestedUnits) + " " + msg("UnitsRequested"), ""));
             $strip.append($s3);
@@ -625,7 +627,7 @@
             // Source availability — on-hand stock at the source warehouse. Shows a
             // real quantity (0 included) whenever a source warehouse is configured;
             // only external procurement, which has no source warehouse, reads N/A.
-            var $s4 = statCard("a-amber", msg("SourceAvailability"));
+            var $s4 = statCard("vas_098-a-amber", msg("SourceAvailability"));
             if (data.HasSourceData) {
                 $s4.append($('<div class="vas_098-sval"></div>')
                     .text(formatNumber(data.SourceStockOnHand || 0)));
@@ -694,12 +696,12 @@
             var closed     = data.IsClosed;
 
             return [
-                { key: "c1", label: msg("Drafted"),      done: true,       sub: formatDateShort(data.Created) },
-                { key: "c2", label: msg("Submitted"),    done: submitted,  sub: formatDateShort(data.CompletedDate) },
-                { key: "c3", label: msg("Completed"),    done: completed,  sub: formatDateShort(data.CompletedDate) },
-                { key: "c4", label: msg("Converted"),    done: converted,  sub: formatDateShort(data.ConvertedDate) },
-                { key: "c5", label: msg("InFulfilment"), done: fulfilment, sub: formatDateShort(data.FulfilmentDate) },
-                { key: "c6", label: msg("Closed"),       done: closed,     sub: formatDateShort(data.ClosedDate) }
+                { key: "vas_098-c1", label: msg("Drafted"),      done: true,       sub: formatDateShort(data.Created) },
+                { key: "vas_098-c2", label: msg("Submitted"),    done: submitted,  sub: formatDateShort(data.CompletedDate) },
+                { key: "vas_098-c3", label: msg("Completed"),    done: completed,  sub: formatDateShort(data.CompletedDate) },
+                { key: "vas_098-c4", label: msg("Converted"),    done: converted,  sub: formatDateShort(data.ConvertedDate) },
+                { key: "vas_098-c5", label: msg("InFulfilment"), done: fulfilment, sub: formatDateShort(data.FulfilmentDate) },
+                { key: "vas_098-c6", label: msg("Closed"),       done: closed,     sub: formatDateShort(data.ClosedDate) }
             ];
         }
 
@@ -727,16 +729,16 @@
             for (var s = 0; s < stages.length; s++) {
                 var stg = stages[s];
                 var stateCls, sub, showCheck;
-                if (s + 1 < current) { stateCls = "done";    showCheck = true;  sub = stg.sub || ""; }
-                else if (s + 1 === current) { stateCls = "active"; showCheck = false; sub = activeSub(stg, current); }
-                else { stateCls = "pending"; showCheck = false; sub = msg("Pending"); }
+                if (s + 1 < current) { stateCls = "vas_098-done";    showCheck = true;  sub = stg.sub || ""; }
+                else if (s + 1 === current) { stateCls = "vas_098-active"; showCheck = false; sub = activeSub(stg, current); }
+                else { stateCls = "vas_098-pending"; showCheck = false; sub = msg("Pending"); }
                 $stepper.append(stepEntry(s + 1, stg, stateCls, showCheck, sub));
             }
             $body.append($stepper);
         }
 
         function activeSub(stg, current) {
-            if (stg.key === "c3") return msg("ReadyToConvert");
+            if (stg.key === "vas_098-c3") return msg("ReadyToConvert");
             if (stg.sub) return stg.sub;
             return msg("InProgressSub");
         }
@@ -788,10 +790,10 @@
             var $head = $('<div class="vas_098-itrow vas_098-ithead"></div>');
             $head.append($('<span></span>').text(msg("Item")));
             $head.append($('<span></span>').text(msg("UOM", "UOM")));
-            $head.append($('<span class="ta-c"></span>').text(msg("Qty")));
-            $head.append($('<span class="ta-r"></span>').text(msg("SourceStock")));
-            $head.append($('<span class="ta-r"></span>').text(msg("UnitCost")));
-            $head.append($('<span class="ta-r"></span>').text(msg("EstTotal")));
+            $head.append($('<span class="vas_098-ta-c"></span>').text(msg("Qty")));
+            $head.append($('<span class="vas_098-ta-r"></span>').text(msg("SourceStock")));
+            $head.append($('<span class="vas_098-ta-r"></span>').text(msg("UnitCost")));
+            $head.append($('<span class="vas_098-ta-r"></span>').text(msg("EstTotal")));
             $items.append($head);
 
             if (!lines.length) {
@@ -863,7 +865,7 @@
             if (icon === "chevLeft") $b.append(svgIcon(icon));
             $b.append($('<span></span>').text(label));
             if (icon === "chevRight") $b.append(svgIcon(icon));
-            if (disabled) $b.addClass("is-disabled");
+            if (disabled) $b.addClass("vas_098-is-disabled");
             else $b.on("click", handler);
             return $b;
         }
@@ -894,12 +896,12 @@
             else $uom.append($('<span class="vas_098-na"></span>').text(msg("NA")));
             $r.append($uom);
 
-            $r.append($('<span class="ta-c"></span>').text(formatNumber(ln.RequestedQty, ln.UOMPrecision)));
+            $r.append($('<span class="vas_098-ta-c"></span>').text(formatNumber(ln.RequestedQty, ln.UOMPrecision)));
 
             $r.append(sourceCell(ln));
 
-            $r.append($('<span class="ta-r"></span>').text(money(ln.UnitPrice)));
-            $r.append($('<span class="ta-r"></span>').text(money(ln.LineAmount)));
+            $r.append($('<span class="vas_098-ta-r"></span>').text(money(ln.UnitPrice)));
+            $r.append($('<span class="vas_098-ta-r"></span>').text(money(ln.LineAmount)));
             return $r;
         }
 
@@ -907,7 +909,7 @@
         // the requested quantity. N/A only when the requisition has no source
         // warehouse at all — with one configured, no stock reads as 0, not N/A.
         function sourceCell(ln) {
-            var $c = $('<span class="ta-r"></span>');
+            var $c = $('<span class="vas_098-ta-r"></span>');
             if (!ln.HasSourceData) {
                 $c.append($('<span class="vas_098-na"></span>').text(msg("NA")));
                 return $c;
@@ -915,7 +917,7 @@
             var req = +ln.RequestedQty || 0;
             var onHand = +ln.SourceQtyOnHand || 0;
             var pct = req > 0 ? Math.round((onHand / req) * 100) : (onHand > 0 ? 100 : 0);
-            var cls = (req > 0 && onHand >= req) ? "full" : "short";
+            var cls = (req > 0 && onHand >= req) ? "vas_098-full" : "vas_098-short";
             var $src = $('<span class="vas_098-src"></span>').addClass(cls);
             $src.attr("title", msg("OnHandAtSource", "on hand") +
                 (data.SourceWarehouseName ? " · " + data.SourceWarehouseName : ""));
@@ -950,15 +952,15 @@
         // ---- Activity ---- //
 
         var ACT_BADGE = {
-            create:  { cls: "create",  key: "ActCreated" },
-            status:  { cls: "status",  key: "ActStatus"  },
-            submit:  { cls: "submit",  key: "ActSubmit"  },
-            link:    { cls: "link",    key: "ActLinked"  },
-            comment: { cls: "comment", key: "ActComment" },
+            create:  { cls: "vas_098-create",  key: "ActCreated" },
+            status:  { cls: "vas_098-status",  key: "ActStatus"  },
+            submit:  { cls: "vas_098-submit",  key: "ActSubmit"  },
+            link:    { cls: "vas_098-link",    key: "ActLinked"  },
+            comment: { cls: "vas_098-comment", key: "ActComment" },
             // Downstream lifecycle documents.
-            po:          { cls: "po",  key: "ActPO",          fallback: "PO"  },
-            grn:         { cls: "grn", key: "ActGRN",         fallback: "GRN" },
-            grncomplete: { cls: "grn", key: "ActGRNComplete", fallback: "GRN" }
+            po:          { cls: "vas_098-po",  key: "ActPO",          fallback: "PO"  },
+            grn:         { cls: "vas_098-grn", key: "ActGRN",         fallback: "GRN" },
+            grncomplete: { cls: "vas_098-grn", key: "ActGRNComplete", fallback: "GRN" }
         };
 
         // Maximum activity rows shown per page; the feed paginates beyond this.

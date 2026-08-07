@@ -23,6 +23,11 @@
  *                        ellipsis-truncate now that the column is narrower.
  *   VAI163   2026-08-05  Class prefix renamed MPC-vasmt- -> vas_103- so the panel's
  *                        styles cannot collide with another panel's.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare
+ *                        (.is-link, .ta-r, .tone-*, .s-*, .btn-*) now carry the
+ *                        vas_103- prefix too. Sharing a name with a base-theme
+ *                        rule meant the base design won and repainted the
+ *                        panel; scoping them to the panel ends that.
  ***********************************************************/
 
 .vas_103-root {
@@ -164,11 +169,11 @@
     white-space: nowrap;
 }
 
-.vas_103-hdrPill.tone-info    { background: var(--mt-info-bg);    color: var(--mt-info-tx); }
-.vas_103-hdrPill.tone-success { background: var(--mt-success-bg); color: var(--mt-success-tx); }
-.vas_103-hdrPill.tone-warning { background: var(--mt-warning-bg); color: var(--mt-warning-tx); }
-.vas_103-hdrPill.tone-risk    { background: var(--mt-risk-bg);    color: var(--mt-risk-tx); }
-.vas_103-hdrPill.tone-neutral { background: var(--mt-neutral-bg); color: var(--mt-neutral-tx); }
+.vas_103-hdrPill.vas_103-tone-info    { background: var(--mt-info-bg);    color: var(--mt-info-tx); }
+.vas_103-hdrPill.vas_103-tone-success { background: var(--mt-success-bg); color: var(--mt-success-tx); }
+.vas_103-hdrPill.vas_103-tone-warning { background: var(--mt-warning-bg); color: var(--mt-warning-tx); }
+.vas_103-hdrPill.vas_103-tone-risk    { background: var(--mt-risk-bg);    color: var(--mt-risk-tx); }
+.vas_103-hdrPill.vas_103-tone-neutral { background: var(--mt-neutral-bg); color: var(--mt-neutral-tx); }
 
 .vas_103-hdrPill .vas_103-ic { color: currentColor; }
 
@@ -225,7 +230,7 @@
     margin-top: 0.125em;
     overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
 }
-.vas_103-fVal.is-link { color: var(--mt-link); }
+.vas_103-fVal.vas_103-is-link { color: var(--mt-link); }
 
 @container (max-width: 460px) {
     .vas_103-hdrCard { grid-template-columns: 1fr; }
@@ -341,12 +346,12 @@
     font-size: 0.75em;
     border: 1px solid var(--mt-card-bd);
 }
-.vas_103-originChip.is-linked {
+.vas_103-originChip.vas_103-is-linked {
     background: var(--mt-info-bg);
     border-color: #BFE4FF;
     color: var(--mt-info-tx);
 }
-.vas_103-originChip.is-muted {
+.vas_103-originChip.vas_103-is-muted {
     background: #F4F6F8;
     color: var(--mt-muted);
 }
@@ -378,10 +383,10 @@
     padding: 0.75em 0.875em;
 }
 
-.vas_103-metric.tone-lines   { border-left-color: var(--mt-neutral-tx); }
-.vas_103-metric.tone-qty     { border-left-color: var(--mt-info-tx); }
-.vas_103-metric.tone-value   { border-left-color: #E08A1E; }
-.vas_103-metric.tone-confirm { border-left-color: var(--mt-success-tx); }
+.vas_103-metric.vas_103-tone-lines   { border-left-color: var(--mt-neutral-tx); }
+.vas_103-metric.vas_103-tone-qty     { border-left-color: var(--mt-info-tx); }
+.vas_103-metric.vas_103-tone-value   { border-left-color: #E08A1E; }
+.vas_103-metric.vas_103-tone-confirm { border-left-color: var(--mt-success-tx); }
 
 .vas_103-mHead {
     display: flex;
@@ -402,10 +407,10 @@
     white-space: nowrap;
 }
 
-.vas_103-metric.tone-lines   .vas_103-mHead .vas_103-ic { color: var(--mt-neutral-tx); }
-.vas_103-metric.tone-qty     .vas_103-mHead .vas_103-ic { color: var(--mt-info-tx); }
-.vas_103-metric.tone-value   .vas_103-mHead .vas_103-ic { color: #E08A1E; }
-.vas_103-metric.tone-confirm .vas_103-mHead .vas_103-ic { color: var(--mt-success-tx); }
+.vas_103-metric.vas_103-tone-lines   .vas_103-mHead .vas_103-ic { color: var(--mt-neutral-tx); }
+.vas_103-metric.vas_103-tone-qty     .vas_103-mHead .vas_103-ic { color: var(--mt-info-tx); }
+.vas_103-metric.vas_103-tone-value   .vas_103-mHead .vas_103-ic { color: #E08A1E; }
+.vas_103-metric.vas_103-tone-confirm .vas_103-mHead .vas_103-ic { color: var(--mt-success-tx); }
 
 .vas_103-mVal {
     font-size: 1.25em;
@@ -416,8 +421,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.vas_103-metric.tone-value   .vas_103-mVal { color: #9A6500; }
-.vas_103-metric.tone-confirm .vas_103-mVal { color: var(--mt-success-tx); }
+.vas_103-metric.vas_103-tone-value   .vas_103-mVal { color: #9A6500; }
+.vas_103-metric.vas_103-tone-confirm .vas_103-mVal { color: var(--mt-success-tx); }
 
 .vas_103-mSub {
     font-size: 0.6875em;
@@ -466,9 +471,9 @@
 .vas_103-step:first-child .vas_103-stepLine-l,
 .vas_103-step:last-child  .vas_103-stepLine-r { visibility: hidden; }
 
-.vas_103-step.is-done   .vas_103-stepLine-r,
-.vas_103-step.is-done   .vas_103-stepLine-l,
-.vas_103-step.is-active .vas_103-stepLine-l { background: #67B98A; }
+.vas_103-step.vas_103-is-done   .vas_103-stepLine-r,
+.vas_103-step.vas_103-is-done   .vas_103-stepLine-l,
+.vas_103-step.vas_103-is-active .vas_103-stepLine-l { background: #67B98A; }
 
 .vas_103-stepDot {
     flex: none;
@@ -487,12 +492,12 @@
 }
 .vas_103-stepDot .vas_103-ic { display: inline-flex; }
 
-.vas_103-step.is-done .vas_103-stepDot {
+.vas_103-step.vas_103-is-done .vas_103-stepDot {
     background: #E4F3EC;
     color: #1F9D5B;
     border-color: #BFE6D2;
 }
-.vas_103-step.is-active .vas_103-stepDot {
+.vas_103-step.vas_103-is-active .vas_103-stepDot {
     background: #fff;
     color: #E08A1E;
     border: 2px solid #F0A93D;
@@ -516,7 +521,7 @@
     color: var(--mt-muted);
     margin-top: 0.25em;
 }
-.vas_103-step.is-active .vas_103-stepMeta { color: #E08A1E; font-weight: 600; }
+.vas_103-step.vas_103-is-active .vas_103-stepMeta { color: #E08A1E; font-weight: 600; }
 
 /* ----------------------------------------------------------- */
 /*  Transfer line table                                        */
@@ -554,8 +559,8 @@
 .vas_103-tBody:last-of-type { border-bottom: none; }
 .vas_103-tBody:hover { background: #FAFCFE; }
 
-.vas_103-table .ta-r { text-align: right; justify-content: flex-end; }
-.vas_103-table .ta-c { text-align: center; justify-content: center; }
+.vas_103-table .vas_103-ta-r { text-align: right; justify-content: flex-end; }
+.vas_103-table .vas_103-ta-c { text-align: center; justify-content: center; }
 
 .vas_103-itItem { min-width: 0; }
 .vas_103-itName {
@@ -587,9 +592,9 @@
     line-height: 1.3;
     white-space: nowrap;
 }
-.vas_103-tag.s-req    { background: var(--mt-info-bg);    color: var(--mt-info-tx); }
-.vas_103-tag.s-prod   { background: var(--mt-warning-bg); color: var(--mt-warning-tx); }
-.vas_103-tag.s-manual { background: var(--mt-neutral-bg); color: var(--mt-neutral-tx); }
+.vas_103-tag.vas_103-s-req    { background: var(--mt-info-bg);    color: var(--mt-info-tx); }
+.vas_103-tag.vas_103-s-prod   { background: var(--mt-warning-bg); color: var(--mt-warning-tx); }
+.vas_103-tag.vas_103-s-manual { background: var(--mt-neutral-bg); color: var(--mt-neutral-tx); }
 
 .vas_103-tEmpty {
     padding: 1.25em 0.875em;
@@ -613,8 +618,8 @@
 }
 .vas_103-tf { color: var(--mt-muted); margin-right: auto; }
 .vas_103-tf b { color: var(--mt-text); font-weight: 700; margin-left: 0.375em; }
-.vas_103-tf.is-grand { color: var(--mt-text); font-weight: 700; margin-right: 0; }
-.vas_103-tf.is-grand b { color: var(--mt-action); margin-left: 0.5em; font-size: 1.15em; }
+.vas_103-tf.vas_103-is-grand { color: var(--mt-text); font-weight: 700; margin-right: 0; }
+.vas_103-tf.vas_103-is-grand b { color: var(--mt-action); margin-left: 0.5em; font-size: 1.15em; }
 
 @container (max-width: 720px) {
     .vas_103-table { overflow-x: auto; }
@@ -650,21 +655,21 @@
 }
 .vas_103-btn .vas_103-ic { color: currentColor; }
 
-.vas_103-btn.btn-pri {
+.vas_103-btn.vas_103-btn-pri {
     background: var(--mt-action);
     border: 1px solid var(--mt-action);
     color: #fff;
 }
-.vas_103-btn.btn-pri:hover { background: var(--mt-action-dk); border-color: var(--mt-action-dk); }
+.vas_103-btn.vas_103-btn-pri:hover { background: var(--mt-action-dk); border-color: var(--mt-action-dk); }
 
-.vas_103-btn.btn-sec {
+.vas_103-btn.vas_103-btn-sec {
     background: #fff;
     border: 1px solid var(--mt-action);
     color: var(--mt-action);
 }
-.vas_103-btn.btn-sec:hover { background: var(--mt-info-bg); }
+.vas_103-btn.vas_103-btn-sec:hover { background: var(--mt-info-bg); }
 
-.vas_103-btn.is-disabled {
+.vas_103-btn.vas_103-is-disabled {
     background: #F1F4F7;
     border-color: #DCE5EE;
     color: #A6B2BD;
@@ -676,11 +681,11 @@
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
 [dir="rtl"] .vas_103-hdrColL { border-right: none; border-left: 1px solid var(--mt-row-div); padding-right: 0; padding-left: 1.25em; }
-[dir="rtl"] .vas_103-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_103-table .vas_103-ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .vas_103-tFoot { justify-content: flex-start; }
 [dir="rtl"] .vas_103-tf { margin-right: 0; margin-left: auto; }
 [dir="rtl"] .vas_103-tf b { margin-left: 0; margin-right: 0.375em; }
-[dir="rtl"] .vas_103-tf.is-grand { margin-left: 0; }
-[dir="rtl"] .vas_103-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .vas_103-tf.vas_103-is-grand { margin-left: 0; }
+[dir="rtl"] .vas_103-tf.vas_103-is-grand b { margin-left: 0; margin-right: 0.5em; }
 [dir="rtl"] .vas_103-actions { justify-content: flex-start; }
 [dir="rtl"] .vas_103-routeArrow .vas_103-ic { transform: scaleX(-1); }
