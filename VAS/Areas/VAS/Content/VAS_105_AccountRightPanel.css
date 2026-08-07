@@ -448,40 +448,69 @@
 /* ===== Stage tags ===== */
 .vas_105_acct-stage {
     font-size: 0.75em;
+    font-weight: 600;
     padding: 0.1875em 0.5625em;
     border-radius: 0.375em;
     display: inline-block;
+    white-space: nowrap;
 }
 
+/* Named stage colors */
+.vas_105_acct-stage--prospecting {
+    background: #DBEAFE;
+    color: #1E40AF;
+}
+.vas_105_acct-stage--qualification {
+    background: #CCFBF1;
+    color: #0F766E;
+}
+.vas_105_acct-stage--discovery {
+    background: #E0E7FF;
+    color: #0c6d58;
+}
 .vas_105_acct-stage--proposal {
-    background: #FAEEDA;
-    color: #9A6500;
+    background: #FEF3C7;
+    color: #92400E;
 }
-
-.vas_105_acct-stage--qualified {
-    background: #EAF6EF;
-    color: #0B6B45;
+.vas_105_acct-stage--negotiation {
+    background: #F3F0FF;
+    color: #4510f8;
 }
-
+.vas_105_acct-stage--followup {
+    background: #CFFAFE;
+    color: #0E7490;
+}
 .vas_105_acct-stage--won {
     background: #CCEFDD;
     color: #0C5D38;
 }
-
-.vas_105_acct-stage--negotiation {
-    background: #F3F0FF;
-    color: #5F4AA6;
+.vas_105_acct-stage--closed {
+    background: #D1FAE5;
+    color: #065F46;
 }
-
 .vas_105_acct-stage--lost {
     background: #E1E1E1;
     color: #505050;
 }
-
 .vas_105_acct-stage--hold {
-    background: #FAEEDA;
-    color: #9A6500;
+    background: #FFEDD5;
+    color: #9A3412;
 }
+/* Legacy alias kept for any existing references */
+.vas_105_acct-stage--qualified {
+    background: #CCFBF1;
+    color: #0F766E;
+}
+
+/* Hash-cycle fallback colors for unrecognised stage names */
+.vas_105_acct-stage--c1 { background: #FFE4E6; color: #9F1239; }
+.vas_105_acct-stage--c2 { background: #DBEAFE; color: #1E40AF; }
+.vas_105_acct-stage--c3 { background: #CCFBF1; color: #0F766E; }
+.vas_105_acct-stage--c4 { background: #EDE9FE; color: #5B21B6; }
+.vas_105_acct-stage--c5 { background: #FEF3C7; color: #92400E; }
+.vas_105_acct-stage--c6 { background: #CFFAFE; color: #0E7490; }
+.vas_105_acct-stage--c7 { background: #FCE7F3; color: #9D174D; }
+.vas_105_acct-stage--c8 { background: #ECFCCB; color: #3F6212; }
 
 /* ===== Ticket row ===== */
 .vas_105_acct-tickrow {
@@ -578,6 +607,84 @@
 .vas_105_acct-ctstatus--expired {
     background: #FAD7D7;
     color: #8F2D2D;
+}
+
+/* Contract source type badge — red-outlined pill (no fill) */
+.vas_105_acct-ctsource {
+    font-size: 0.625em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 0.125em 0.5em;
+    border-radius: 0.25em;
+    display: inline-block;
+    border: 0.09375em solid #C0392B;
+    color: #C0392B;
+    background: transparent;
+    white-space: nowrap;
+}
+
+/* ===== Section pagination bar (Opps / Contracts) ===== */
+.vas_105_acct-secpager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.75em;
+    padding: 0.4375em 0.875em;
+    /*background: var(--acct-pale-blue);*/
+    border-radius: 0.5em;
+}
+
+.vas_105_acct-secpager__info {
+    font-size: 0.8125em;
+    color: var(--acct-text-2);
+}
+
+.vas_105_acct-secpager__info b {
+    color: var(--acct-text);
+}
+
+.vas_105_acct-secpager__nav {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+}
+
+.vas_105_acct-secpager__page {
+    font-size: 0.8125em;
+    color: var(--acct-text-2);
+    min-width: 3.5em;
+    text-align: center;
+}
+
+.vas_105_acct-secpager__page b {
+    color: var(--acct-text);
+}
+
+.vas_105_acct-secpager__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    padding: 0;
+    border: 0.0625em solid var(--acct-pale-border);
+    border-radius: 0.375em;
+    background: #fff;
+    cursor: pointer;
+    color: var(--acct-text-2);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    line-height: 1;
+}
+
+.vas_105_acct-secpager__btn:hover:not(:disabled) {
+    background: #fff;
+    color: var(--acct-primary);
+    border-color: var(--acct-primary);
+}
+
+.vas_105_acct-secpager__btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 /* ===== Section icon tile ===== */
@@ -1623,6 +1730,90 @@
 }
 
 /* ── Meeting detail modal ────────────────────────────────────── */
+
+/* Hero: badge + subject title */
+.vas_105_mtg-hero {
+    display:     flex;
+    align-items: center;
+    gap:         0.625em;
+    margin-bottom: 0.875em;
+}
+
+.vas_105_mtg-badge {
+    font-size:      0.6875em;
+    font-weight:    700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding:        0.25em 0.625em;
+    border-radius:  0.375em;
+    background:     #EDE9FF;
+    color:          #5F4AA6;
+    flex-shrink:    0;
+    white-space:    nowrap;
+}
+
+.vas_105_mtg-title {
+    font-size:   1.0625em;
+    font-weight: 700;
+    color:       var(--acct-text);
+}
+
+/* Info grid: 2 rows × 2 cols */
+.vas_105_mtg-infogrid {
+    border:        0.0625em solid var(--acct-border);
+    border-radius: 0.5em;
+    overflow:      hidden;
+    margin-bottom: 0.875em;
+}
+
+.vas_105_mtg-infogrid__row {
+    display:       grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 0.0625em solid var(--acct-divider);
+}
+
+.vas_105_mtg-infogrid__row:last-child {
+    border-bottom: none;
+}
+
+.vas_105_mtg-infogrid__cell {
+    display:     flex;
+    align-items: baseline;
+    gap:         0.75em;
+    padding:     0.5em 0.875em;
+    border-right: 0.0625em solid var(--acct-divider);
+}
+
+.vas_105_mtg-infogrid__cell:last-child {
+    border-right: none;
+}
+
+.vas_105_mtg-info-lbl {
+    font-size:  0.8125em;
+    color:      var(--acct-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas_105_mtg-info-val {
+    font-size:   0.875em;
+    font-weight: 600;
+    color:       var(--acct-text);
+}
+
+/* Plain-text comments block */
+.vas_105_mtg-notes {
+    font-size:     0.875em;
+    color:         var(--acct-text);
+    line-height:   1.65;
+    margin-bottom: 0.875em;
+    padding:       0.75em 0.875em;
+    background:    #F8FAFC;
+    border:        0.0625em solid var(--acct-border);
+    border-radius: 0.5em;
+}
+
+/* Legacy — kept so old cached HTML doesn't break */
 .vas_105_mtg-subject {
     font-size:     1.125em;
     font-weight:   700;
