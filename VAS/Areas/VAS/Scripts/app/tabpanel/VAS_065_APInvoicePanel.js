@@ -1343,7 +1343,8 @@
             void $scrim[0].offsetWidth;
             $scrim.addClass("open");
 
-            $scrim.on("click", function (e) { if (e.target === $scrim[0]) closeModal(); });
+            // A click on the scrim deliberately does nothing: the payment form holds
+            // typed-in amounts, so the modal only closes through Cancel or the X.
             $(document).on("keydown.vasApinvModal", function (e) {
                 if (e.key === "Escape") closeModal();
             });
@@ -2351,7 +2352,7 @@
         function showSuccess(title, message, recapRows) {
             if (!$scrim) return;
             // The document changed -> refresh the panel when the modal is closed
-            // (Done button, X, Esc or scrim click all funnel through closeModal).
+            // (Done button, X, Cancel or Esc all funnel through closeModal).
             panelDirty = true;
             $scrim.find(".js-form").hide();
             // Use flex (not .show()'s display:block) so the success body can scroll.
