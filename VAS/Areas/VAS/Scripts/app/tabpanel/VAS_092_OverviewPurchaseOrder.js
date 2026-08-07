@@ -242,6 +242,9 @@
  *                          at all, and the section summary keeps counting the whole
  *                          feed rather than the page. The page resets with the rest
  *                          of the per-record view state on a record change / clear.
+ *   VAI163   2026-08-07  Emits the vas_092-prefixed modifier classes the
+ *                        stylesheet now uses, the runtime-built ones included
+ *                        ("vas_092-tone-" + tone).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -687,7 +690,7 @@
         // Status pill (tinted). tone: info | success | warning | risk | neutral | purple
         function pill(label, tone) {
             return $('<span class="vas_092-pill"></span>')
-                .addClass("tone-" + (tone || "neutral"))
+                .addClass("vas_092-tone-" + (tone || "neutral"))
                 .text(label);
         }
 
@@ -813,7 +816,7 @@
 
         function headerPill(label, tone, icon, withDot) {
             var $p = $('<span class="vas_092-hdrPill"></span>')
-                .addClass("tone-" + (tone || "neutral"));
+                .addClass("vas_092-tone-" + (tone || "neutral"));
             if (icon) $p.append(svgIcon(icon));
             if (withDot) $p.append($('<span class="vas_092-hdrDot"></span>'));
             $p.append($('<span></span>').text(label));
@@ -939,10 +942,10 @@
         // value, with an optional trailing status pill. When a table + record id
         // is supplied the chip becomes a link that opens that record.
         function originChip(icon, label, value, $statusPill, iconTone, tableName, recordId, isSOTrx) {
-            var $chip = $('<span class="vas_092-chip"></span>').addClass("ic-" + (iconTone || "muted"));
+            var $chip = $('<span class="vas_092-chip"></span>').addClass("vas_092-ic-" + (iconTone || "muted"));
             var isLink = tableName && recordId && +recordId > 0;
             if (isLink) {
-                $chip.addClass("is-link")
+                $chip.addClass("vas_092-is-link")
                     .attr("data-open-table", tableName)
                     .attr("data-open-id", recordId);
                 // Sales-transaction records (e.g. the originating Sales Order in
@@ -1005,7 +1008,7 @@
         }
 
         function metricCard(tone, icon, label, value, sub, pct) {
-            var $c = $('<div class="vas_092-metric"></div>').addClass("tone-" + tone);
+            var $c = $('<div class="vas_092-metric"></div>').addClass("vas_092-tone-" + tone);
 
             // Label, value and caption each clip to a single line inside the card,
             // so a long figure (the Received pair "delivered / ordered UOM" above
@@ -1077,11 +1080,11 @@
                 // that has not yet been reached.
                 var stateCls, statusText;
                 if (s.done) {
-                    stateCls = "is-done"; statusText = getMsg("VAS_092_Completed");
+                    stateCls = "vas_092-is-done"; statusText = getMsg("VAS_092_Completed");
                 } else if (s.active) {
-                    stateCls = "is-active"; statusText = getMsg("VAS_092_InProgress");
+                    stateCls = "vas_092-is-active"; statusText = getMsg("VAS_092_InProgress");
                 } else {
-                    stateCls = "is-pending"; statusText = getMsg("VAS_092_Pending");
+                    stateCls = "vas_092-is-pending"; statusText = getMsg("VAS_092_Pending");
                 }
 
                 var dateText = formatDate(s.date);
@@ -1165,7 +1168,7 @@
                 var $tbl = $('<div class="vas_092-table vas_092-budgetTable"></div>');
                 var $h = $('<div class="vas_092-tRow vas_092-tHead"></div>');
                 $h.append($('<span></span>').text(getMsg("VAS_092_Item")));
-                $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_OverBudgetBy")));
+                $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_OverBudgetBy")));
                 $tbl.append($h);
 
                 for (var j = 0; j < lineBreaches.length; j++) {
@@ -1179,7 +1182,7 @@
                         .text(getMsg("VAS_092_Line") + " " + ln.Line));
                     $tr.append($item);
 
-                    $tr.append($('<span class="ta-r vas_092-budgetOver"></span>').text(
+                    $tr.append($('<span class="vas_092-ta-r vas_092-budgetOver"></span>').text(
                         formatAmount(+ln.BudgetViolationAmount || 0, data.CurSymbol,
                             data.ISO_Code, data.StdPrecision)));
                     $tbl.append($tr);
@@ -1234,11 +1237,11 @@
             // and against the totals footer beneath them.
             var $head = $('<div class="vas_092-tRow vas_092-tHead"></div>');
             $head.append($('<span></span>').text(getMsg("VAS_092_Item")));
-            $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
-            $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Qty")));
+            $head.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
+            $head.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Qty")));
             $head.append($('<span></span>').text(getMsg("VAS_092_ExpDelivery")));
-            $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
-            $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Received")));
+            $head.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
+            $head.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Received")));
             // Trailing action column (per-line history toggle) — deliberately
             // unlabelled; the button carries its own tooltip.
             $head.append($('<span></span>'));
@@ -1355,7 +1358,7 @@
             }
             $tr.append($item);
 
-            $tr.append($('<span class="ta-r"></span>').text(formatAmount(
+            $tr.append($('<span class="vas_092-ta-r"></span>').text(formatAmount(
                 +ln.PriceActual || 0, data.CurSymbol, data.ISO_Code,
                 ln.PricePrecision != null ? ln.PricePrecision : data.StdPrecision)));
 
@@ -1363,7 +1366,7 @@
             // (C_OrderLine.QtyEntered), labelled with that unit.
             var qtyText = formatNumber(+ln.QtyEntered || 0, +ln.UOMPrecision || 0);
             if (ln.UOMSymbol) qtyText += " " + ln.UOMSymbol;
-            $tr.append($('<span class="ta-r"></span>').text(qtyText));
+            $tr.append($('<span class="vas_092-ta-r"></span>').text(qtyText));
 
             // Delivery and receipt only mean something for a stockable item. A
             // charge line, or a Service / Resource / Expense product, is never
@@ -1378,7 +1381,7 @@
             }
             $tr.append($exp);
 
-            $tr.append($('<span class="ta-r"></span>').text(formatAmount(
+            $tr.append($('<span class="vas_092-ta-r"></span>').text(formatAmount(
                 +ln.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
 
             // Received — the figure on its own line with the progress bar stacked
@@ -1387,13 +1390,13 @@
             // inward by an inline bar. It is the quantity received in the line's
             // ENTERED UOM, the same scale and unit the Qty cell shows; the tooltip
             // spells the pair out in full.
-            var $recv = $('<span class="vas_092-recv ta-r"></span>');
+            var $recv = $('<span class="vas_092-recv vas_092-ta-r"></span>');
             if (deliverable) {
                 var ordered  = +ln.QtyEntered || 0;
                 var received = +ln.QtyReceivedEntered || 0;
                 var prec = +ln.UOMPrecision || 0;
                 var pct = ordered > 0 ? Math.round((received / ordered) * 100) : 0;
-                $recv.addClass(ln.RecvState || "none");
+                $recv.addClass("vas_092-" + (ln.RecvState || "none"));
                 $recv.append($('<span class="vas_092-recvVal"></span>')
                     .text(formatNumber(received, prec)));
                 var $bar = $('<span class="vas_092-recvBar"><i></i></span>');
@@ -1428,14 +1431,14 @@
                 .attr("title", histToggleLabel(open, hist.length))
                 .attr("aria-label", histToggleLabel(open, hist.length));
             $b.append(svgIcon("history"));
-            if (open) $b.addClass("is-open");
+            if (open) $b.addClass("vas_092-is-open");
 
             $b.on("click", function (e) {
                 e.preventDefault();
                 e.stopPropagation();
                 var nowOpen = !lineHistOpen[ln.C_OrderLine_ID];
                 lineHistOpen[ln.C_OrderLine_ID] = nowOpen;
-                $b.toggleClass("is-open", nowOpen)
+                $b.toggleClass("vas_092-is-open", nowOpen)
                   .attr("aria-expanded", nowOpen ? "true" : "false")
                   .attr("title", histToggleLabel(nowOpen, hist.length))
                   .attr("aria-label", histToggleLabel(nowOpen, hist.length));
@@ -1467,13 +1470,13 @@
 
             var $h = $('<div class="vas_092-tRow vas_092-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_092_ChangedOn")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Qty")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Qty")));
             $h.append($('<span></span>').text(getMsg("VAS_092_ExpDelivery")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
             // Who made the change, in the track the line's Received bar occupies —
             // right-aligned like that column so the two sit directly in line.
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_UpdatedBy")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_UpdatedBy")));
             $tbl.append($h);
 
             for (var i = 0; i < rows.length; i++) {
@@ -1496,26 +1499,26 @@
             }
             $r.append($when);
 
-            $r.append($('<span class="ta-r"></span>').text(formatAmount(
+            $r.append($('<span class="vas_092-ta-r"></span>').text(formatAmount(
                 +h.PriceActual || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
 
             var qty = formatNumber(+h.QtyEntered || 0, +h.UOMPrecision || 0);
             if (h.UOMSymbol) qty += " " + h.UOMSymbol;
-            $r.append($('<span class="ta-r"></span>').text(qty));
+            $r.append($('<span class="vas_092-ta-r"></span>').text(qty));
 
             // Same gate as the line above it: a charge / service line is never
             // goods-received, so a promised date is meaningless on any version.
             $r.append($('<span></span>').text(
                 isDeliverableLine(ln) ? formatDate(h.DatePromised) : ""));
 
-            $r.append($('<span class="ta-r"></span>').text(formatAmount(
+            $r.append($('<span class="vas_092-ta-r"></span>').text(formatAmount(
                 +h.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
 
             // Who changed the line (C_OrderLineHistory.UpdatedBy). A snapshot
             // written by a background/platform process can carry no resolvable
             // user; the cell is then left blank.
             var by = h.UpdatedByName || "";
-            $r.append($('<span class="vas_092-lhBy ta-r"></span>')
+            $r.append($('<span class="vas_092-lhBy vas_092-ta-r"></span>')
                 .text(by).attr("title", by));
 
             return $r;
@@ -1538,7 +1541,7 @@
 
         function buildTotalBit(label, value, isGrand) {
             var $bit = $('<span class="vas_092-tf"></span>');
-            if (isGrand) $bit.addClass("is-grand");
+            if (isGrand) $bit.addClass("vas_092-is-grand");
             $bit.append(document.createTextNode(label));
             $bit.append($('<b></b>').text(value));
             return $bit;
@@ -1577,9 +1580,9 @@
             var $h = $('<div class="vas_092-tRow vas_092-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_092_Item")));
             $h.append($('<span></span>').text(getMsg("VAS_092_ChangedOn")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Qty")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Qty")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
             // Last column, same position the per-line history drawer puts it in.
             $h.append($('<span></span>').text(getMsg("VAS_092_UpdatedBy")));
             $tbl.append($h);
@@ -1629,10 +1632,10 @@
             // with its unit exactly as the line rows and the drawer show it.
             var histQty = formatNumber(+h.QtyEntered || 0, +h.UOMPrecision || 0);
             if (h.UOMSymbol) histQty += " " + h.UOMSymbol;
-            $tr.append($('<span class="ta-r"></span>').text(histQty));
-            $tr.append($('<span class="ta-r"></span>').text(formatAmount(
+            $tr.append($('<span class="vas_092-ta-r"></span>').text(histQty));
+            $tr.append($('<span class="vas_092-ta-r"></span>').text(formatAmount(
                 +h.PriceActual || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
-            $tr.append($('<span class="ta-r"></span>').text(formatAmount(
+            $tr.append($('<span class="vas_092-ta-r"></span>').text(formatAmount(
                 +h.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
             // Who changed the line; a platform/background snapshot leaves no
             // resolvable user, and the cell is then blank.
@@ -1681,7 +1684,7 @@
             $h.append($('<span></span>').text(getMsg("VAS_092_Document")));
             $h.append($('<span></span>').text(getMsg("VAS_092_DocDate")));
             $h.append($('<span></span>').text(getMsg("VAS_092_DocStatus")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Amount")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Amount")));
             $tbl.append($h);
 
             for (var i = 0; i < rows.length; i++) {
@@ -1712,7 +1715,7 @@
 
             var canOpen = d.TableName && +d.RecordId > 0;
             if (canOpen) {
-                $tr.addClass("is-link")
+                $tr.addClass("vas_092-is-link")
                     .attr("data-open-table", d.TableName)
                     .attr("data-open-id", d.RecordId);
             }
@@ -1750,7 +1753,7 @@
 
             // Amount: invoices show the grand total; GRNs show the total
             // received value (received qty × order-line price).
-            var $amt = $('<span class="ta-r"></span>');
+            var $amt = $('<span class="vas_092-ta-r"></span>');
             if (d.Amount !== null && d.Amount !== undefined) {
                 $amt.text(formatAmount(+d.Amount || 0, data.CurSymbol,
                     data.ISO_Code, data.StdPrecision));
@@ -1832,11 +1835,11 @@
                 .attr("title", getMsg("VAS_092_TipComponent")));
             $h.append($('<span></span>').text(getMsg("VAS_092_DistributionMethod")));
                 //.attr("title", getMsg("VAS_092_TipMethod")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Expected"))
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Expected"))
                 .attr("title", getMsg("VAS_092_TipExpected")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Actual"))
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Actual"))
                 .attr("title", getMsg("VAS_092_TipActual")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Variance"))
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Variance"))
                 .attr("title", getMsg("VAS_092_TipVariance")));
             $tbl.append($h);
 
@@ -1928,11 +1931,11 @@
                 .attr("title", method + " — " + getMsg("VAS_092_TipMethod"))
                 .append(pill(method, methodTone(c.DistributionCode))));
 
-            $tr.append($('<span class="ta-r vas_092-ldExp"></span>')
+            $tr.append($('<span class="vas_092-ta-r vas_092-ldExp"></span>')
                 .attr("title", getMsg("VAS_092_TipExpected"))
                 .text(formatAmount(+c.ExpectedAmt || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
 
-            var $act = $('<span class="ta-r vas_092-ldAct"></span>');
+            var $act = $('<span class="vas_092-ta-r vas_092-ldAct"></span>');
             if (c.IsInvoiced) {
                 // The tooltip names the invoice the actual came from, so the figure
                 // can be traced without leaving the panel.
@@ -1946,13 +1949,13 @@
                     : getMsg("VAS_092_TipActual"));
                 $act.append($('<span class="vas_092-ldAmt"></span>').text(
                     formatAmount(+c.ActualAmt || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
-                $act.append($('<span class="vas_092-ldFlag inv"></span>')
+                $act.append($('<span class="vas_092-ldFlag vas_092-inv"></span>')
                     .text(getMsg("VAS_092_Invoiced")));
             } else {
-                $act.addClass("is-pending");
+                $act.addClass("vas_092-is-pending");
                 $act.attr("title", getMsg("VAS_092_TipAwaiting"));
                 $act.append($('<span class="vas_092-ldAmt"></span>').text(""));
-                $act.append($('<span class="vas_092-ldFlag wait"></span>')
+                $act.append($('<span class="vas_092-ldFlag vas_092-wait"></span>')
                     .text(getMsg("VAS_092_AwaitingInvoice")));
             }
             $tr.append($act);
@@ -1982,21 +1985,21 @@
         }
 
         function buildVarianceCell(c) {
-            var $v = $('<span class="ta-r vas_092-ldVar"></span>');
+            var $v = $('<span class="vas_092-ta-r vas_092-ldVar"></span>');
             var amt = formatAmount(Math.abs(+c.VarianceAmt || 0),
                 data.CurSymbol, data.ISO_Code, data.StdPrecision);
             // The sign is easy to misread, so the tooltip spells the direction out.
             if (c.VarianceStatus === "over") {
-                $v.addClass("over").text("+" + amt)
+                $v.addClass("vas_092-over").text("+" + amt)
                   .attr("title", getMsg("VAS_092_TipOver") + " " + amt);
             } else if (c.VarianceStatus === "under") {
-                $v.addClass("under").text("−" + amt)
+                $v.addClass("vas_092-under").text("−" + amt)
                   .attr("title", getMsg("VAS_092_TipUnder") + " " + amt);
             } else if (c.VarianceStatus === "on_budget") {
-                $v.addClass("flat").text(getMsg("VAS_092_OnBudget"))
+                $v.addClass("vas_092-flat").text(getMsg("VAS_092_OnBudget"))
                   .attr("title", getMsg("VAS_092_TipOnBudget"));
             } else {
-                $v.addClass("flat").text("")
+                $v.addClass("vas_092-flat").text("")
                   .attr("title", getMsg("VAS_092_TipVariance"));
             }
             return $v;
@@ -2021,10 +2024,10 @@
 
         function buildLandedTotal(label, value, isGrand, isWarn) {
             var $bit = $('<span class="vas_092-tf vas_092-lf"></span>');
-            if (isGrand) $bit.addClass("is-grand");
+            if (isGrand) $bit.addClass("vas_092-is-grand");
             $bit.append(document.createTextNode(label));
             var $b = $('<b></b>').text(value);
-            if (isWarn) $b.addClass("warn");
+            if (isWarn) $b.addClass("vas_092-warn");
             $bit.append($b);
             return $bit;
         }
@@ -2215,15 +2218,15 @@
 
             // Rows carrying a body are clickable; the caret shows the state.
             if (hasActivityBody(a)) {
-                $row.addClass("is-openable");
+                $row.addClass("vas_092-is-openable");
                 $row.attr("title", getMsg("VAS_092_ShowMailBody"));
                 var $caret = $('<span class="vas_092-actCaret"></span>').append(svgIcon("chevRight"));
                 $row.append($caret);
                 $row.on("click", function () {
                     var $panel = $row.next(".vas_092-actBody");
                     if (!$panel.length) return;
-                    var nowOpen = !$row.hasClass("is-open");
-                    $row.toggleClass("is-open", nowOpen)
+                    var nowOpen = !$row.hasClass("vas_092-is-open");
+                    $row.toggleClass("vas_092-is-open", nowOpen)
                         .attr("title", nowOpen ? getMsg("VAS_092_HideMailBody")
                                                : getMsg("VAS_092_ShowMailBody"));
                     $panel.toggle(nowOpen);
@@ -2289,7 +2292,7 @@
         }
 
         function activityTag(meta) {
-            var $t = $('<span class="vas_092-actTag"></span>').addClass("tone-" + meta.tone);
+            var $t = $('<span class="vas_092-actTag"></span>').addClass("vas_092-tone-" + meta.tone);
             if (meta.icon) $t.append(svgIcon(meta.icon));
             $t.append($('<span></span>').text(getMsg(meta.tagKey)));
             return $t;
@@ -2319,7 +2322,7 @@
 
         function bindEvents() {
             // Open a linked origin record from a Generated From chip.
-            $root.on("click", ".vas_092-chip.is-link, .is-link[data-open-table]", function (e) {
+            $root.on("click", ".vas_092-chip.vas_092-is-link, .vas_092-is-link[data-open-table]", function (e) {
                 e.preventDefault();
                 openRecord($(this).attr("data-open-table"), $(this).attr("data-open-id"),
                     $(this).attr("data-open-sotrx") === "Y");
@@ -2424,10 +2427,10 @@
         }
 
         function toast(message, isError) {
-            var $t = $('<div class="vas_092-toast"></div>').addClass(isError ? "err" : "ok").text(message);
+            var $t = $('<div class="vas_092-toast"></div>').addClass(isError ? "vas_092-err" : "vas_092-ok").text(message);
             $root.append($t);
-            setTimeout(function () { $t.addClass("show"); }, 10);
-            setTimeout(function () { $t.removeClass("show"); setTimeout(function () { $t.remove(); }, 300); }, 3200);
+            setTimeout(function () { $t.addClass("vas_092-show"); }, 10);
+            setTimeout(function () { $t.removeClass("vas_092-show"); setTimeout(function () { $t.remove(); }, 300); }, 3200);
         }
 
         // ----------------------------------------------------------------- //

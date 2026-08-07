@@ -23,6 +23,12 @@
  *                        ellipsis-truncate now that the column is narrower.
  *   VAI163   2026-08-05  Class prefix renamed MPC-vasic- -> vas_101- so the panel's
  *                        styles cannot collide with another panel's.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare
+ *                        (.is-link, .ta-r, .on, .tone-*, .s-*, .btn-*) now
+ *                        carry the vas_101- prefix too. Sharing a name with a
+ *                        base-theme rule meant the base design won and
+ *                        repainted the panel; scoping them to the panel ends
+ *                        that.
  ***********************************************************/
 
 .vas_101-root {
@@ -155,11 +161,11 @@
     white-space: nowrap;
 }
 
-.vas_101-hdrPill.tone-info    { background: var(--ic-info-bg);    color: var(--ic-info-tx); }
-.vas_101-hdrPill.tone-success { background: var(--ic-success-bg); color: var(--ic-success-tx); }
-.vas_101-hdrPill.tone-warning { background: var(--ic-warning-bg); color: var(--ic-warning-tx); }
-.vas_101-hdrPill.tone-risk    { background: var(--ic-risk-bg);    color: var(--ic-risk-tx); }
-.vas_101-hdrPill.tone-neutral { background: var(--ic-neutral-bg); color: var(--ic-neutral-tx); }
+.vas_101-hdrPill.vas_101-tone-info    { background: var(--ic-info-bg);    color: var(--ic-info-tx); }
+.vas_101-hdrPill.vas_101-tone-success { background: var(--ic-success-bg); color: var(--ic-success-tx); }
+.vas_101-hdrPill.vas_101-tone-warning { background: var(--ic-warning-bg); color: var(--ic-warning-tx); }
+.vas_101-hdrPill.vas_101-tone-risk    { background: var(--ic-risk-bg);    color: var(--ic-risk-tx); }
+.vas_101-hdrPill.vas_101-tone-neutral { background: var(--ic-neutral-bg); color: var(--ic-neutral-tx); }
 
 .vas_101-hdrPill .vas_101-ic { color: currentColor; }
 
@@ -216,7 +222,7 @@
     margin-top: 0.125em;
     overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
 }
-.vas_101-fVal.is-link { color: var(--ic-link); }
+.vas_101-fVal.vas_101-is-link { color: var(--ic-link); }
 
 @container (max-width: 460px) {
     .vas_101-hdrCard { grid-template-columns: 1fr; }
@@ -266,11 +272,11 @@
     padding: 0.75em 0.875em;
 }
 
-.vas_101-metric.tone-total    { border-left-color: var(--ic-info-tx); }
-.vas_101-metric.tone-short    { border-left-color: var(--ic-risk-tx); }
-.vas_101-metric.tone-excess   { border-left-color: #E08A1E; }
-.vas_101-metric.tone-variance { border-left-color: #E08A1E; }
-.vas_101-metric.tone-lines    { border-left-color: var(--ic-neutral-tx); }
+.vas_101-metric.vas_101-tone-total    { border-left-color: var(--ic-info-tx); }
+.vas_101-metric.vas_101-tone-short    { border-left-color: var(--ic-risk-tx); }
+.vas_101-metric.vas_101-tone-excess   { border-left-color: #E08A1E; }
+.vas_101-metric.vas_101-tone-variance { border-left-color: #E08A1E; }
+.vas_101-metric.vas_101-tone-lines    { border-left-color: var(--ic-neutral-tx); }
 
 .vas_101-mHead {
     display: flex;
@@ -291,11 +297,11 @@
     white-space: nowrap;
 }
 
-.vas_101-metric.tone-total    .vas_101-mHead .vas_101-ic { color: var(--ic-info-tx); }
-.vas_101-metric.tone-short    .vas_101-mHead .vas_101-ic { color: var(--ic-risk-tx); }
-.vas_101-metric.tone-excess   .vas_101-mHead .vas_101-ic { color: #E08A1E; }
-.vas_101-metric.tone-variance .vas_101-mHead .vas_101-ic { color: #E08A1E; }
-.vas_101-metric.tone-lines    .vas_101-mHead .vas_101-ic { color: var(--ic-neutral-tx); }
+.vas_101-metric.vas_101-tone-total    .vas_101-mHead .vas_101-ic { color: var(--ic-info-tx); }
+.vas_101-metric.vas_101-tone-short    .vas_101-mHead .vas_101-ic { color: var(--ic-risk-tx); }
+.vas_101-metric.vas_101-tone-excess   .vas_101-mHead .vas_101-ic { color: #E08A1E; }
+.vas_101-metric.vas_101-tone-variance .vas_101-mHead .vas_101-ic { color: #E08A1E; }
+.vas_101-metric.vas_101-tone-lines    .vas_101-mHead .vas_101-ic { color: var(--ic-neutral-tx); }
 
 .vas_101-mVal {
     font-size: 1.25em;
@@ -306,8 +312,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.vas_101-metric.tone-short  .vas_101-mVal { color: var(--ic-risk-tx); }
-.vas_101-metric.tone-excess .vas_101-mVal { color: #9A6500; }
+.vas_101-metric.vas_101-tone-short  .vas_101-mVal { color: var(--ic-risk-tx); }
+.vas_101-metric.vas_101-tone-excess .vas_101-mVal { color: #9A6500; }
 
 .vas_101-mSub {
     font-size: 0.6875em;
@@ -345,9 +351,9 @@
 .vas_101-statVal { font-size: 1.25em; font-weight: 700; line-height: 1.1; color: var(--ic-text); }
 .vas_101-statLbl { font-size: 0.6875em; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--ic-muted); margin-top: 0.25em; }
 
-.vas_101-statCard.tone-match  .vas_101-statVal { color: var(--ic-success-tx); }
-.vas_101-statCard.tone-short  .vas_101-statVal { color: var(--ic-risk-tx); }
-.vas_101-statCard.tone-excess .vas_101-statVal { color: #9A6500; }
+.vas_101-statCard.vas_101-tone-match  .vas_101-statVal { color: var(--ic-success-tx); }
+.vas_101-statCard.vas_101-tone-short  .vas_101-statVal { color: var(--ic-risk-tx); }
+.vas_101-statCard.vas_101-tone-excess .vas_101-statVal { color: #9A6500; }
 
 @container (max-width: 620px) {
     .vas_101-status { grid-template-columns: repeat(2, 1fr); }
@@ -387,9 +393,9 @@
 .vas_101-step:first-child .vas_101-stepLine-l,
 .vas_101-step:last-child  .vas_101-stepLine-r { visibility: hidden; }
 
-.vas_101-step.is-done   .vas_101-stepLine-r,
-.vas_101-step.is-done   .vas_101-stepLine-l,
-.vas_101-step.is-active .vas_101-stepLine-l { background: #67B98A; }
+.vas_101-step.vas_101-is-done   .vas_101-stepLine-r,
+.vas_101-step.vas_101-is-done   .vas_101-stepLine-l,
+.vas_101-step.vas_101-is-active .vas_101-stepLine-l { background: #67B98A; }
 
 .vas_101-stepDot {
     flex: none;
@@ -408,12 +414,12 @@
 }
 .vas_101-stepDot .vas_101-ic { display: inline-flex; }
 
-.vas_101-step.is-done .vas_101-stepDot {
+.vas_101-step.vas_101-is-done .vas_101-stepDot {
     background: #E4F3EC;
     color: #1F9D5B;
     border-color: #BFE6D2;
 }
-.vas_101-step.is-active .vas_101-stepDot {
+.vas_101-step.vas_101-is-active .vas_101-stepDot {
     background: #fff;
     color: #E08A1E;
     border: 2px solid #F0A93D;
@@ -437,7 +443,7 @@
     color: var(--ic-muted);
     margin-top: 0.25em;
 }
-.vas_101-step.is-active .vas_101-stepMeta { color: #E08A1E; font-weight: 600; }
+.vas_101-step.vas_101-is-active .vas_101-stepMeta { color: #E08A1E; font-weight: 600; }
 
 /* ----------------------------------------------------------- */
 /*  Segmented filter (All lines / Variances only)              */
@@ -459,7 +465,7 @@
     padding: 0.4375em 0.875em;
     cursor: pointer;
 }
-.vas_101-seg button.on { background: var(--ic-info-bg); color: var(--ic-info-tx); }
+.vas_101-seg button.vas_101-on { background: var(--ic-info-bg); color: var(--ic-info-tx); }
 
 /* ----------------------------------------------------------- */
 /*  Count line table                                           */
@@ -497,8 +503,8 @@
 .vas_101-tBody:last-of-type { border-bottom: none; }
 .vas_101-tBody:hover { background: #FAFCFE; }
 
-.vas_101-table .ta-r { text-align: right; justify-content: flex-end; }
-.vas_101-table .ta-c { text-align: center; justify-content: center; }
+.vas_101-table .vas_101-ta-r { text-align: right; justify-content: flex-end; }
+.vas_101-table .vas_101-ta-c { text-align: center; justify-content: center; }
 
 .vas_101-itItem { min-width: 0; }
 .vas_101-itName {
@@ -521,9 +527,9 @@
 
 /* Signed variance cell */
 .vas_101-var { font-weight: 700; }
-.vas_101-var.short  { color: var(--ic-risk-tx); }
-.vas_101-var.excess { color: #9A6500; }
-.vas_101-var.match  { color: var(--ic-muted); font-weight: 500; }
+.vas_101-var.vas_101-short  { color: var(--ic-risk-tx); }
+.vas_101-var.vas_101-excess { color: #9A6500; }
+.vas_101-var.vas_101-match  { color: var(--ic-muted); font-weight: 500; }
 
 /* Status tag */
 .vas_101-tag {
@@ -536,9 +542,9 @@
     line-height: 1.3;
     white-space: nowrap;
 }
-.vas_101-tag.s-match  { background: var(--ic-success-bg); color: var(--ic-success-tx); }
-.vas_101-tag.s-short  { background: var(--ic-risk-bg);    color: var(--ic-risk-tx); }
-.vas_101-tag.s-excess { background: var(--ic-warning-bg); color: var(--ic-warning-tx); }
+.vas_101-tag.vas_101-s-match  { background: var(--ic-success-bg); color: var(--ic-success-tx); }
+.vas_101-tag.vas_101-s-short  { background: var(--ic-risk-bg);    color: var(--ic-risk-tx); }
+.vas_101-tag.vas_101-s-excess { background: var(--ic-warning-bg); color: var(--ic-warning-tx); }
 
 .vas_101-tEmpty {
     padding: 1.25em 0.875em;
@@ -562,8 +568,8 @@
 }
 .vas_101-tf { color: var(--ic-muted); }
 .vas_101-tf b { color: var(--ic-text); font-weight: 700; margin-left: 0.375em; }
-.vas_101-tf.is-grand { color: var(--ic-text); font-weight: 700; }
-.vas_101-tf.is-grand b { color: var(--ic-action); margin-left: 0.5em; font-size: 1.15em; }
+.vas_101-tf.vas_101-is-grand { color: var(--ic-text); font-weight: 700; }
+.vas_101-tf.vas_101-is-grand b { color: var(--ic-action); margin-left: 0.5em; font-size: 1.15em; }
 
 @container (max-width: 620px) {
     .vas_101-table { overflow-x: auto; }
@@ -597,21 +603,21 @@
 }
 .vas_101-btn .vas_101-ic { color: currentColor; }
 
-.vas_101-btn.btn-pri {
+.vas_101-btn.vas_101-btn-pri {
     background: var(--ic-action);
     border: 1px solid var(--ic-action);
     color: #fff;
 }
-.vas_101-btn.btn-pri:hover { background: var(--ic-action-dk); border-color: var(--ic-action-dk); }
+.vas_101-btn.vas_101-btn-pri:hover { background: var(--ic-action-dk); border-color: var(--ic-action-dk); }
 
-.vas_101-btn.btn-sec {
+.vas_101-btn.vas_101-btn-sec {
     background: #fff;
     border: 1px solid var(--ic-action);
     color: var(--ic-action);
 }
-.vas_101-btn.btn-sec:hover { background: var(--ic-info-bg); }
+.vas_101-btn.vas_101-btn-sec:hover { background: var(--ic-info-bg); }
 
-.vas_101-btn.is-disabled {
+.vas_101-btn.vas_101-is-disabled {
     background: #F1F4F7;
     border-color: #DCE5EE;
     color: #A6B2BD;
@@ -623,8 +629,8 @@
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
 [dir="rtl"] .vas_101-hdrColL { border-right: none; border-left: 1px solid var(--ic-row-div); padding-right: 0; padding-left: 1.25em; }
-[dir="rtl"] .vas_101-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_101-table .vas_101-ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .vas_101-tFoot { justify-content: flex-start; }
 [dir="rtl"] .vas_101-tf b { margin-left: 0; margin-right: 0.375em; }
-[dir="rtl"] .vas_101-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .vas_101-tf.vas_101-is-grand b { margin-left: 0; margin-right: 0.5em; }
 [dir="rtl"] .vas_101-actions { justify-content: flex-start; }

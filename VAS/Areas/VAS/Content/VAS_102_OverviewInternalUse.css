@@ -57,6 +57,12 @@
  *                        longer used by the panel.
  *   VAI163   2026-08-05  Class prefix renamed MPC-vasiu- -> vas_102- so the panel's
  *                        styles cannot collide with another panel's.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare
+ *                        (.is-link, .ta-r, .show, .tone-*, .ic-*, .s-*) now
+ *                        carry the vas_102- prefix too. Sharing a name with a
+ *                        base-theme rule meant the base design won and
+ *                        repainted the panel; scoping them to the panel ends
+ *                        that.
  ***********************************************************/
 
 .vas_102-root {
@@ -190,11 +196,11 @@
     white-space: nowrap;
 }
 
-.vas_102-hdrPill.tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
-.vas_102-hdrPill.tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
-.vas_102-hdrPill.tone-warning { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
-.vas_102-hdrPill.tone-risk    { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
-.vas_102-hdrPill.tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
+.vas_102-hdrPill.vas_102-tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
+.vas_102-hdrPill.vas_102-tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.vas_102-hdrPill.vas_102-tone-warning { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
+.vas_102-hdrPill.vas_102-tone-risk    { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
+.vas_102-hdrPill.vas_102-tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
 
 .vas_102-hdrPill .vas_102-ic { color: currentColor; }
 
@@ -251,7 +257,7 @@
     margin-top: 0.125em;
     overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
 }
-.vas_102-fVal.is-link { color: var(--iu-link); }
+.vas_102-fVal.vas_102-is-link { color: var(--iu-link); }
 
 @container (max-width: 460px) {
     .vas_102-hdrCard { grid-template-columns: 1fr; }
@@ -338,11 +344,11 @@
 }
 
 .vas_102-chip .vas_102-ic            { color: var(--iu-muted); }
-.vas_102-chip.ic-info    .vas_102-ic { color: var(--iu-info-tx); }
-.vas_102-chip.ic-success .vas_102-ic { color: var(--iu-success-tx); }
-.vas_102-chip.ic-warning .vas_102-ic { color: var(--iu-warning-tx); }
-.vas_102-chip.ic-purple  .vas_102-ic { color: var(--iu-purple-tx); }
-.vas_102-chip.ic-muted   .vas_102-ic { color: var(--iu-muted); }
+.vas_102-chip.vas_102-ic-info    .vas_102-ic { color: var(--iu-info-tx); }
+.vas_102-chip.vas_102-ic-success .vas_102-ic { color: var(--iu-success-tx); }
+.vas_102-chip.vas_102-ic-warning .vas_102-ic { color: var(--iu-warning-tx); }
+.vas_102-chip.vas_102-ic-purple  .vas_102-ic { color: var(--iu-purple-tx); }
+.vas_102-chip.vas_102-ic-muted   .vas_102-ic { color: var(--iu-muted); }
 
 .vas_102-chipLabel { color: var(--iu-muted); }
 .vas_102-chipVal   { color: var(--iu-text); font-weight: 700; }
@@ -358,17 +364,17 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.vas_102-chipPill.tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
-.vas_102-chipPill.tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
-.vas_102-chipPill.tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.vas_102-chipPill.vas_102-tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
+.vas_102-chipPill.vas_102-tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
+.vas_102-chipPill.vas_102-tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
 
 /* Clickable origin chip — opens the source record. */
-.vas_102-chip.is-link { cursor: pointer; }
-.vas_102-chip.is-link:hover {
+.vas_102-chip.vas_102-is-link { cursor: pointer; }
+.vas_102-chip.vas_102-is-link:hover {
     border-color: var(--iu-action);
     box-shadow: 0 0 0 1px var(--iu-action) inset;
 }
-.vas_102-chip.is-link > .vas_102-ic:last-child { color: var(--iu-action); }
+.vas_102-chip.vas_102-is-link > .vas_102-ic:last-child { color: var(--iu-action); }
 
 /* Record-open failure notice. */
 .vas_102-toast {
@@ -387,8 +393,8 @@
     pointer-events: none;
     z-index: 1000;
 }
-.vas_102-toast.err  { background: var(--iu-risk-tx); }
-.vas_102-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.vas_102-toast.vas_102-err  { background: var(--iu-risk-tx); }
+.vas_102-toast.vas_102-show { opacity: 1; transform: translate(-50%, 0); }
 
 .vas_102-refCard {
     display: grid;
@@ -399,7 +405,7 @@
     background: #fff;
     padding: 0.875em 1em;
 }
-.vas_102-refCard.is-empty { display: block; }
+.vas_102-refCard.vas_102-is-empty { display: block; }
 
 .vas_102-refItem {
     display: flex;
@@ -452,10 +458,10 @@
     padding: 0.75em 0.875em;
 }
 
-.vas_102-metric.tone-total   { border-left-color: var(--iu-info-tx); }
-.vas_102-metric.tone-issued  { border-left-color: var(--iu-success-tx); }
-.vas_102-metric.tone-lines   { border-left-color: var(--iu-neutral-tx); }
-.vas_102-metric.tone-pending { border-left-color: #E08A1E; }
+.vas_102-metric.vas_102-tone-total   { border-left-color: var(--iu-info-tx); }
+.vas_102-metric.vas_102-tone-issued  { border-left-color: var(--iu-success-tx); }
+.vas_102-metric.vas_102-tone-lines   { border-left-color: var(--iu-neutral-tx); }
+.vas_102-metric.vas_102-tone-pending { border-left-color: #E08A1E; }
 
 .vas_102-mHead {
     display: flex;
@@ -476,10 +482,10 @@
     white-space: nowrap;
 }
 
-.vas_102-metric.tone-total   .vas_102-mHead .vas_102-ic { color: var(--iu-info-tx); }
-.vas_102-metric.tone-issued  .vas_102-mHead .vas_102-ic { color: var(--iu-success-tx); }
-.vas_102-metric.tone-lines   .vas_102-mHead .vas_102-ic { color: var(--iu-neutral-tx); }
-.vas_102-metric.tone-pending .vas_102-mHead .vas_102-ic { color: #E08A1E; }
+.vas_102-metric.vas_102-tone-total   .vas_102-mHead .vas_102-ic { color: var(--iu-info-tx); }
+.vas_102-metric.vas_102-tone-issued  .vas_102-mHead .vas_102-ic { color: var(--iu-success-tx); }
+.vas_102-metric.vas_102-tone-lines   .vas_102-mHead .vas_102-ic { color: var(--iu-neutral-tx); }
+.vas_102-metric.vas_102-tone-pending .vas_102-mHead .vas_102-ic { color: #E08A1E; }
 
 .vas_102-mVal {
     font-size: 1.25em;
@@ -490,8 +496,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.vas_102-metric.tone-issued  .vas_102-mVal { color: var(--iu-success-tx); }
-.vas_102-metric.tone-pending .vas_102-mVal { color: #9A6500; }
+.vas_102-metric.vas_102-tone-issued  .vas_102-mVal { color: var(--iu-success-tx); }
+.vas_102-metric.vas_102-tone-pending .vas_102-mVal { color: #9A6500; }
 
 .vas_102-mSub {
     font-size: 0.6875em;
@@ -545,9 +551,9 @@
 .vas_102-step:first-child .vas_102-stepLine-l,
 .vas_102-step:last-child  .vas_102-stepLine-r { visibility: hidden; }
 
-.vas_102-step.is-done   .vas_102-stepLine-r,
-.vas_102-step.is-done   .vas_102-stepLine-l,
-.vas_102-step.is-active .vas_102-stepLine-l { background: #67B98A; }
+.vas_102-step.vas_102-is-done   .vas_102-stepLine-r,
+.vas_102-step.vas_102-is-done   .vas_102-stepLine-l,
+.vas_102-step.vas_102-is-active .vas_102-stepLine-l { background: #67B98A; }
 
 .vas_102-stepDot {
     flex: none;
@@ -566,12 +572,12 @@
 }
 .vas_102-stepDot .vas_102-ic { display: inline-flex; }
 
-.vas_102-step.is-done .vas_102-stepDot {
+.vas_102-step.vas_102-is-done .vas_102-stepDot {
     background: #E4F3EC;
     color: #1F9D5B;
     border-color: #BFE6D2;
 }
-.vas_102-step.is-active .vas_102-stepDot {
+.vas_102-step.vas_102-is-active .vas_102-stepDot {
     background: #fff;
     color: #E08A1E;
     border: 2px solid #F0A93D;
@@ -595,7 +601,7 @@
     color: var(--iu-muted);
     margin-top: 0.25em;
 }
-.vas_102-step.is-active .vas_102-stepMeta { color: #E08A1E; font-weight: 600; }
+.vas_102-step.vas_102-is-active .vas_102-stepMeta { color: #E08A1E; font-weight: 600; }
 
 /* ----------------------------------------------------------- */
 /*  Issue line table                                           */
@@ -633,8 +639,8 @@
 .vas_102-tBody:last-of-type { border-bottom: none; }
 .vas_102-tBody:hover { background: #FAFCFE; }
 
-.vas_102-table .ta-r { text-align: right; justify-content: flex-end; }
-.vas_102-table .ta-c { text-align: center; justify-content: center; }
+.vas_102-table .vas_102-ta-r { text-align: right; justify-content: flex-end; }
+.vas_102-table .vas_102-ta-c { text-align: center; justify-content: center; }
 
 .vas_102-itItem { min-width: 0; }
 .vas_102-itName {
@@ -687,9 +693,9 @@
     line-height: 1.3;
     white-space: nowrap;
 }
-.vas_102-tag.s-full    { background: var(--iu-success-bg); color: var(--iu-success-tx); }
-.vas_102-tag.s-partial { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
-.vas_102-tag.s-short   { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
+.vas_102-tag.vas_102-s-full    { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.vas_102-tag.vas_102-s-partial { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
+.vas_102-tag.vas_102-s-short   { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
 
 /* Totals footer */
 .vas_102-tFoot {
@@ -705,8 +711,8 @@
 }
 .vas_102-tf { color: var(--iu-muted); }
 .vas_102-tf b { color: var(--iu-text); font-weight: 700; margin-left: 0.375em; }
-.vas_102-tf.is-grand { color: var(--iu-text); font-weight: 700; }
-.vas_102-tf.is-grand b { color: var(--iu-action); margin-left: 0.5em; font-size: 1.15em; }
+.vas_102-tf.vas_102-is-grand { color: var(--iu-text); font-weight: 700; }
+.vas_102-tf.vas_102-is-grand b { color: var(--iu-action); margin-left: 0.5em; font-size: 1.15em; }
 
 @container (max-width: 720px) {
     .vas_102-table { overflow-x: auto; }
@@ -754,7 +760,7 @@
 }
 .vas_102-pgBtn:hover { background: var(--iu-info-bg); border-color: var(--iu-action); }
 .vas_102-pgBtn .vas_102-ic { color: currentColor; }
-.vas_102-pgBtn.is-disabled {
+.vas_102-pgBtn.vas_102-is-disabled {
     opacity: .45;
     cursor: default;
     pointer-events: none;
@@ -812,12 +818,12 @@
     white-space: nowrap;
 }
 .vas_102-actTag .vas_102-ic { color: currentColor; }
-.vas_102-actTag.tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
-.vas_102-actTag.tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
-.vas_102-actTag.tone-warning { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
-.vas_102-actTag.tone-risk    { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
-.vas_102-actTag.tone-purple  { background: var(--iu-purple-bg);  color: var(--iu-purple-tx); }
-.vas_102-actTag.tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
+.vas_102-actTag.vas_102-tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
+.vas_102-actTag.vas_102-tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.vas_102-actTag.vas_102-tone-warning { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
+.vas_102-actTag.vas_102-tone-risk    { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
+.vas_102-actTag.vas_102-tone-purple  { background: var(--iu-purple-bg);  color: var(--iu-purple-tx); }
+.vas_102-actTag.vas_102-tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
 
 .vas_102-actTitle {
     min-width: 0;
@@ -851,11 +857,11 @@
 
 /* An activity carrying a body (e-mail) opens on click — only those rows make
    room for the caret, so every other row keeps the three-column layout. */
-.vas_102-actRow.is-openable {
+.vas_102-actRow.vas_102-is-openable {
     grid-template-columns: auto 1fr auto auto;
     cursor: pointer;
 }
-.vas_102-actRow.is-openable:hover { background: #F7FBFE; }
+.vas_102-actRow.vas_102-is-openable:hover { background: #F7FBFE; }
 
 .vas_102-actCaret {
     display: inline-flex;
@@ -863,7 +869,7 @@
     color: var(--iu-muted);
     transition: transform .15s ease;
 }
-.vas_102-actRow.is-open .vas_102-actCaret {
+.vas_102-actRow.vas_102-is-open .vas_102-actCaret {
     transform: rotate(90deg);
     color: var(--iu-action);
 }
@@ -888,22 +894,22 @@
    The caret stays on the first line, beside the subject it opens. */
 @container (max-width: 460px) {
     .vas_102-actRow { grid-template-columns: auto 1fr; }
-    .vas_102-actRow.is-openable { grid-template-columns: auto 1fr auto; }
+    .vas_102-actRow.vas_102-is-openable { grid-template-columns: auto 1fr auto; }
     .vas_102-actWhen { grid-column: 2; text-align: left; }
-    .vas_102-actRow.is-openable .vas_102-actCaret { grid-column: 3; grid-row: 1; }
+    .vas_102-actRow.vas_102-is-openable .vas_102-actCaret { grid-column: 3; grid-row: 1; }
 }
 
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
 [dir="rtl"] .vas_102-hdrColL { border-right: none; border-left: 1px solid var(--iu-row-div); padding-right: 0; padding-left: 1.25em; }
-[dir="rtl"] .vas_102-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_102-table .vas_102-ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .vas_102-tFoot { justify-content: flex-start; }
 [dir="rtl"] .vas_102-tf b { margin-left: 0; margin-right: 0.375em; }
-[dir="rtl"] .vas_102-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .vas_102-tf.vas_102-is-grand b { margin-left: 0; margin-right: 0.5em; }
 [dir="rtl"] .vas_102-actRow { text-align: right; }
 [dir="rtl"] .vas_102-actWhen { text-align: left; }
 [dir="rtl"] .vas_102-actBody { padding-left: 0.875em; padding-right: 2.5em; }
 [dir="rtl"] .vas_102-actCaret svg { transform: scaleX(-1); }
-[dir="rtl"] .vas_102-actRow.is-open .vas_102-actCaret { transform: rotate(-90deg); }
+[dir="rtl"] .vas_102-actRow.vas_102-is-open .vas_102-actCaret { transform: rotate(-90deg); }
 [dir="rtl"] .vas_102-pgBtn .vas_102-ic svg { transform: scaleX(-1); }

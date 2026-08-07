@@ -122,6 +122,9 @@
  *                        feed page independently. A feed that fits on one page shows
  *                        no controls, and the section summary keeps counting the
  *                        whole feed. Ported from VAS_092.
+ *   VAI163   2026-08-07  Emits the vas_102-prefixed modifier classes the
+ *                        stylesheet now uses, the runtime-built ones included
+ *                        ("vas_102-tone-" + tone).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -471,7 +474,7 @@
 
         function headerPill(label, tone, icon, withDot) {
             var $p = $('<span class="vas_102-hdrPill"></span>')
-                .addClass("tone-" + (tone || "neutral"));
+                .addClass("vas_102-tone-" + (tone || "neutral"));
             if (icon) $p.append(svgIcon(icon));
             if (withDot) $p.append($('<span class="vas_102-hdrDot"></span>'));
             $p.append($('<span></span>').text(label));
@@ -482,7 +485,7 @@
             var $f = $('<div class="vas_102-hdrField"></div>');
             $f.append($('<div class="vas_102-fLabel"></div>').text(label));
             var $v = $('<div class="vas_102-fVal"></div>').text(value);
-            if (link) $v.addClass("is-link");
+            if (link) $v.addClass("vas_102-is-link");
             $f.append($v);
             return $f;
         }
@@ -585,11 +588,11 @@
         // that opens that record, marked with a trailing arrow.
         function originChip(icon, label, value, $statusPill, iconTone, tableName, recordId, tooltip) {
             var $chip = $('<span class="vas_102-chip"></span>')
-                .addClass("ic-" + (iconTone || "muted"));
+                .addClass("vas_102-ic-" + (iconTone || "muted"));
 
             var isLink = tableName && recordId && +recordId > 0;
             if (isLink) {
-                $chip.addClass("is-link")
+                $chip.addClass("vas_102-is-link")
                     .attr("data-open-table", tableName)
                     .attr("data-open-id", recordId);
             }
@@ -605,7 +608,7 @@
 
         function chipPill(text, tone) {
             return $('<span class="vas_102-chipPill"></span>')
-                .addClass("tone-" + (tone || "neutral")).text(text);
+                .addClass("vas_102-tone-" + (tone || "neutral")).text(text);
         }
 
         // The work order the issue services. As with requisitions, several can
@@ -655,7 +658,7 @@
         }
 
         function metricCard(tone, icon, label, value, sub) {
-            var $c = $('<div class="vas_102-metric"></div>').addClass("tone-" + tone);
+            var $c = $('<div class="vas_102-metric"></div>').addClass("vas_102-tone-" + tone);
 
             var $head = $('<div class="vas_102-mHead"></div>');
             $head.append(svgIcon(icon));
@@ -699,14 +702,14 @@
                 var s = stages[i];
                 var stateCls, metaText;
                 if (s.done) {
-                    stateCls = "is-done";
+                    stateCls = "vas_102-is-done";
                     // A done stage with no stamp (e.g. completed outside the
                     // workflow engine) still reads as done.
                     metaText = formatDate(s.date) ||
                         (i === 2 ? VIS.Msg.getMsg("VAS_102_Posted")
                                  : VIS.Msg.getMsg("VAS_102_Done"));
                 } else if (i === activeIdx + 1) {
-                    stateCls = "is-active";
+                    stateCls = "vas_102-is-active";
                     metaText = VIS.Msg.getMsg("VAS_102_Pending");
                 } else {
                     stateCls = "is-pending";
@@ -754,16 +757,16 @@
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_102_Item")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_102_Locator")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_102_UOM")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_102_Requested")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_102_Issued")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_102_Available")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_102_Value")));
-            $head.append($('<span class="ta-c"></span>').text(VIS.Msg.getMsg("VAS_102_Status")));
+            $head.append($('<span class="vas_102-ta-r"></span>').text(VIS.Msg.getMsg("VAS_102_Requested")));
+            $head.append($('<span class="vas_102-ta-r"></span>').text(VIS.Msg.getMsg("VAS_102_Issued")));
+            $head.append($('<span class="vas_102-ta-r"></span>').text(VIS.Msg.getMsg("VAS_102_Available")));
+            $head.append($('<span class="vas_102-ta-r"></span>').text(VIS.Msg.getMsg("VAS_102_Value")));
+            $head.append($('<span class="vas_102-ta-c"></span>').text(VIS.Msg.getMsg("VAS_102_Status")));
             $tbl.append($head);
 
             // Totals footer — always the whole issue, never just the page.
             var $foot = $('<div class="vas_102-tFoot"></div>');
-            var $bit = $('<span class="vas_102-tf is-grand"></span>');
+            var $bit = $('<span class="vas_102-tf vas_102-is-grand"></span>');
             $bit.append(document.createTextNode(VIS.Msg.getMsg("VAS_102_TotalIssuedValue")));
             $bit.append($('<b></b>').text(formatAmount(+data.TotalValue || 0, cur, data.StdPrecision)));
             $foot.append($bit);
@@ -838,7 +841,7 @@
             $b.append($('<span></span>').text(label));
             if (icon === "chevRight") $b.append(svgIcon(icon));
             if (disabled) {
-                $b.addClass("is-disabled");
+                $b.addClass("vas_102-is-disabled");
             } else {
                 $b.on("click", handler);
             }
@@ -885,23 +888,23 @@
             $tr.append($('<span></span>').text(na(ln.UOMName)));
 
             // Requested
-            $tr.append($('<span class="ta-r"></span>').text(formatNumber(+ln.RequestedQty || 0, prec)));
+            $tr.append($('<span class="vas_102-ta-r"></span>').text(formatNumber(+ln.RequestedQty || 0, prec)));
 
             // Issued
-            $tr.append($('<span class="ta-r"></span>').text(formatNumber(+ln.IssuedQty || 0, prec)));
+            $tr.append($('<span class="vas_102-ta-r"></span>').text(formatNumber(+ln.IssuedQty || 0, prec)));
 
             // Available
-            $tr.append($('<span class="ta-r"></span>').text(formatNumber(+ln.AvailableQty || 0, prec)));
+            $tr.append($('<span class="vas_102-ta-r"></span>').text(formatNumber(+ln.AvailableQty || 0, prec)));
 
             // Value
-            $tr.append($('<span class="ta-r"></span>').text(
+            $tr.append($('<span class="vas_102-ta-r"></span>').text(
                 formatAmount(+ln.LineValue || 0, cur, data.StdPrecision)));
 
             // Status tag
             var tagKey = st === "full" ? "VAS_102_Full"
                        : (st === "partial" ? "VAS_102_Partial" : "VAS_102_Short");
-            var $q = $('<span class="ta-c"></span>');
-            $q.append($('<span class="vas_102-tag"></span>').addClass("s-" + st)
+            var $q = $('<span class="vas_102-ta-c"></span>');
+            $q.append($('<span class="vas_102-tag"></span>').addClass("vas_102-s-" + st)
                 .text(VIS.Msg.getMsg(tagKey)));
             $tr.append($q);
 
@@ -1013,7 +1016,7 @@
 
             var $row = $('<div class="vas_102-actRow"></div>');
 
-            var $tag = $('<span class="vas_102-actTag"></span>').addClass("tone-" + meta.tone);
+            var $tag = $('<span class="vas_102-actTag"></span>').addClass("vas_102-tone-" + meta.tone);
             $tag.append(svgIcon(meta.icon));
             $tag.append($('<span></span>').text(msg(meta.tagKey, meta.tagText)));
             $row.append($tag);
@@ -1050,14 +1053,14 @@
 
             // Rows carrying a body are clickable; the caret shows the state.
             if (hasActivityBody(a)) {
-                $row.addClass("is-openable");
+                $row.addClass("vas_102-is-openable");
                 $row.attr("title", msg("VAS_102_ShowMailBody", "Click to read the message"));
                 $row.append($('<span class="vas_102-actCaret"></span>').append(svgIcon("chevRight")));
                 $row.on("click", function () {
                     var $panel = $row.next(".vas_102-actBody");
                     if (!$panel.length) return;
-                    var nowOpen = !$row.hasClass("is-open");
-                    $row.toggleClass("is-open", nowOpen)
+                    var nowOpen = !$row.hasClass("vas_102-is-open");
+                    $row.toggleClass("vas_102-is-open", nowOpen)
                         .attr("title", nowOpen ? msg("VAS_102_HideMailBody", "Click to hide the message")
                                                : msg("VAS_102_ShowMailBody", "Click to read the message"));
                     $panel.toggle(nowOpen);
@@ -1145,7 +1148,7 @@
         // Delegated, so chips rebuilt on every render stay clickable without
         // being re-bound.
         function bindEvents() {
-            $root.on("click", ".vas_102-chip.is-link, .is-link[data-open-table]", function (e) {
+            $root.on("click", ".vas_102-chip.vas_102-is-link, .vas_102-is-link[data-open-table]", function (e) {
                 e.preventDefault();
                 openRecord($(this).attr("data-open-table"), $(this).attr("data-open-id"));
             });
@@ -1220,11 +1223,11 @@
 
         function toast(message, isError) {
             var $t = $('<div class="vas_102-toast"></div>')
-                .addClass(isError ? "err" : "ok").text(message);
+                .addClass(isError ? "vas_102-err" : "vas_102-ok").text(message);
             $root.append($t);
-            setTimeout(function () { $t.addClass("show"); }, 10);
+            setTimeout(function () { $t.addClass("vas_102-show"); }, 10);
             setTimeout(function () {
-                $t.removeClass("show");
+                $t.removeClass("vas_102-show");
                 setTimeout(function () { $t.remove(); }, 300);
             }, 3200);
         }

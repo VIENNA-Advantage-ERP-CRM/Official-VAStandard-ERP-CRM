@@ -29,6 +29,9 @@
  *                        for both actions. The record id cannot answer it: a
  *                        copied row carries the source record's key until saved.
  *                        Ported from VAS_092.
+ *   VAI163   2026-08-07  Emits the vas_104-prefixed modifier classes the
+ *                        stylesheet now uses, the runtime-built ones included
+ *                        ("vas_104-tone-" + tone).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -181,7 +184,7 @@
         function render() {
             $body.empty();
             // Panel-level modifier: hides .qc-only when quality does not apply.
-            $root.toggleClass("no-quality", !qualityMode());
+            $root.toggleClass("vas_104-no-quality", !qualityMode());
 
             if (!data || !data.M_InOutConfirm_ID) {
                 $body.hide();
@@ -360,7 +363,7 @@
 
         function headerPill(label, tone, icon, withDot) {
             var $p = $('<span class="vas_104-hdrPill"></span>')
-                .addClass("tone-" + (tone || "neutral"));
+                .addClass("vas_104-tone-" + (tone || "neutral"));
             if (icon) $p.append(svgIcon(icon));
             if (withDot) $p.append($('<span class="vas_104-hdrDot"></span>'));
             $p.append($('<span></span>').text(label));
@@ -371,7 +374,7 @@
             var $f = $('<div class="vas_104-hdrField"></div>');
             $f.append($('<div class="vas_104-fLabel"></div>').text(label));
             var $v = $('<div class="vas_104-fVal"></div>').text(value);
-            if (link && value !== VIS.Msg.getMsg("VAS_104_NA")) $v.addClass("is-link");
+            if (link && value !== VIS.Msg.getMsg("VAS_104_NA")) $v.addClass("vas_104-is-link");
             $f.append($v);
             return $f;
         }
@@ -418,8 +421,8 @@
         }
 
         function metricCard(tone, icon, label, value, sub, qcOnly) {
-            var $c = $('<div class="vas_104-metric"></div>').addClass("tone-" + tone);
-            if (qcOnly) $c.addClass("qc-only");
+            var $c = $('<div class="vas_104-metric"></div>').addClass("vas_104-tone-" + tone);
+            if (qcOnly) $c.addClass("vas_104-qc-only");
 
             var $head = $('<div class="vas_104-mHead"></div>');
             $head.append(svgIcon(icon));
@@ -460,12 +463,12 @@
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_104_Item")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_104_Locator")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_104_UOM")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_104_Target")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_104_Confirmed")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_104_Difference")));
-            $head.append($('<span class="ta-r"></span>').text(VIS.Msg.getMsg("VAS_104_Scrapped")));
-            $head.append($('<span class="ta-c qc-only"></span>').text(VIS.Msg.getMsg("VAS_104_QCMark")));
-            $head.append($('<span class="ta-c"></span>').text(VIS.Msg.getMsg("VAS_104_Status")));
+            $head.append($('<span class="vas_104-ta-r"></span>').text(VIS.Msg.getMsg("VAS_104_Target")));
+            $head.append($('<span class="vas_104-ta-r"></span>').text(VIS.Msg.getMsg("VAS_104_Confirmed")));
+            $head.append($('<span class="vas_104-ta-r"></span>').text(VIS.Msg.getMsg("VAS_104_Difference")));
+            $head.append($('<span class="vas_104-ta-r"></span>').text(VIS.Msg.getMsg("VAS_104_Scrapped")));
+            $head.append($('<span class="vas_104-ta-c vas_104-qc-only"></span>').text(VIS.Msg.getMsg("VAS_104_QCMark")));
+            $head.append($('<span class="vas_104-ta-c"></span>').text(VIS.Msg.getMsg("VAS_104_Status")));
             $tbl.append($head);
 
             var totTarget = 0, totConfirmed = 0, totDiff = 0, totScrap = 0;
@@ -492,7 +495,7 @@
 
         function footBit(label, value, grand) {
             var $b = $('<span class="vas_104-tf"></span>');
-            if (grand) $b.addClass("is-grand");
+            if (grand) $b.addClass("vas_104-is-grand");
             $b.append(document.createTextNode(label));
             $b.append($('<b></b>').text(value));
             return $b;
@@ -521,28 +524,28 @@
             $tr.append($('<span></span>').text(na(ln.UOMName)));
 
             // Target
-            $tr.append($('<span class="ta-r"></span>').text(formatNumber(+ln.TargetQty || 0, prec)));
+            $tr.append($('<span class="vas_104-ta-r"></span>').text(formatNumber(+ln.TargetQty || 0, prec)));
 
             // Confirmed
-            $tr.append($('<span class="ta-r"></span>').text(formatNumber(+ln.ConfirmedQty || 0, prec)));
+            $tr.append($('<span class="vas_104-ta-r"></span>').text(formatNumber(+ln.ConfirmedQty || 0, prec)));
 
             // Difference (signed; negative red, zero neutral)
             var diff = +ln.DifferenceQty || 0;
-            var diffTone = diff < 0 ? "neg" : (diff > 0 ? "pos" : "zero");
-            $tr.append($('<span class="ta-r vas_104-diff"></span>').addClass(diffTone)
+            var diffTone = diff < 0 ? "vas_104-neg" : (diff > 0 ? "vas_104-pos" : "vas_104-zero");
+            $tr.append($('<span class="vas_104-ta-r vas_104-diff"></span>').addClass(diffTone)
                 .text(signedNumber(diff, prec)));
 
             // Scrapped (red when > 0)
             var scrap = +ln.ScrappedQty || 0;
-            $tr.append($('<span class="ta-r vas_104-scrap"></span>').toggleClass("has", scrap > 0)
+            $tr.append($('<span class="vas_104-ta-r vas_104-scrap"></span>').toggleClass("vas_104-has", scrap > 0)
                 .text(formatNumber(scrap, prec)));
 
             // QC mark (qc-only) — Pass / Fail chip when quality applies to the line.
-            var $qc = $('<span class="ta-c qc-only"></span>');
+            var $qc = $('<span class="vas_104-ta-c vas_104-qc-only"></span>');
             if (ln.QualityApplicable) {
                 var pass = ln.QcMark === "Y";
                 $qc.append($('<span class="vas_104-tag"></span>')
-                    .addClass(pass ? "s-pass" : "s-fail")
+                    .addClass(pass ? "vas_104-s-pass" : "vas_104-s-fail")
                     .text(pass ? VIS.Msg.getMsg("VAS_104_Pass") : VIS.Msg.getMsg("VAS_104_Fail")));
             } else {
                 $qc.append($('<span class="vas_104-dash"></span>').text("—"));
@@ -554,8 +557,8 @@
             var stKey = st === "cleared" ? "VAS_104_Cleared"
                       : (st === "partial" ? "VAS_104_Partial"
                       : (st === "hold" ? "VAS_104_Hold" : "VAS_104_Pending"));
-            var $q = $('<span class="ta-c"></span>');
-            $q.append($('<span class="vas_104-tag"></span>').addClass("s-" + st)
+            var $q = $('<span class="vas_104-ta-c"></span>');
+            $q.append($('<span class="vas_104-tag"></span>').addClass("vas_104-s-" + st)
                 .text(VIS.Msg.getMsg(stKey)));
             $tr.append($q);
 
@@ -579,8 +582,8 @@
         }
 
         function actionButton(icon, label, kind, disabled) {
-            var $b = $('<span class="vas_104-btn"></span>').addClass("btn-" + (kind || "sec"));
-            if (disabled) $b.addClass("is-disabled");
+            var $b = $('<span class="vas_104-btn"></span>').addClass("vas_104-btn-" + (kind || "sec"));
+            if (disabled) $b.addClass("vas_104-is-disabled");
             $b.append(svgIcon(icon));
             $b.append($('<span></span>').text(label));
             return $b;

@@ -45,6 +45,11 @@
  *                        ellipsis-truncate now that the column is narrower.
  *   VAI163   2026-08-05  Class prefix renamed MPC-vasrq- -> vas_098- so the panel's
  *                        styles cannot collide with another panel's.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare
+ *                        (.a-green, .ta-r, .primary) now carry the vas_098-
+ *                        prefix too. Sharing a name with a base-theme rule
+ *                        meant the base design won and repainted the panel;
+ *                        scoping them to the panel ends that.
  ***********************************************************/
 
 .vas_098-root {
@@ -88,12 +93,12 @@
 .vas_098-tag { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:4px 9px;
     font-size:11px; font-weight:700; line-height:1; white-space:nowrap }
 .vas_098-tag .vas_098-dot { width:6px; height:6px; border-radius:50% }
-.vas_098-tag.sent{background:var(--rq-sent-bg);color:var(--rq-sent-tx)} .vas_098-tag.sent .vas_098-dot{background:var(--rq-sent-tx)}
-.vas_098-tag.approved{background:var(--rq-success-bg);color:var(--rq-success-tx)} .vas_098-tag.approved .vas_098-dot{background:var(--rq-success-tx)}
-.vas_098-tag.draft{background:var(--rq-draft-bg);color:var(--rq-draft-tx)} .vas_098-tag.draft .vas_098-dot{background:var(--rq-draft-tx)}
-.vas_098-tag.partial{background:var(--rq-warn-bg);color:var(--rq-warn-tx)} .vas_098-tag.partial .vas_098-dot{background:var(--rq-warn-tx)}
-.vas_098-tag.cancelled{background:var(--rq-danger-bg);color:var(--rq-danger-tx)} .vas_098-tag.cancelled .vas_098-dot{background:var(--rq-danger-tx)}
-.vas_098-tag.mwo{background:#EFEAFF;color:#5F4AA6} .vas_098-tag.mwo .vas_098-dot{background:#5F4AA6}
+.vas_098-tag.vas_098-sent{background:var(--rq-sent-bg);color:var(--rq-sent-tx)} .vas_098-tag.vas_098-sent .vas_098-dot{background:var(--rq-sent-tx)}
+.vas_098-tag.vas_098-approved{background:var(--rq-success-bg);color:var(--rq-success-tx)} .vas_098-tag.vas_098-approved .vas_098-dot{background:var(--rq-success-tx)}
+.vas_098-tag.vas_098-draft{background:var(--rq-draft-bg);color:var(--rq-draft-tx)} .vas_098-tag.vas_098-draft .vas_098-dot{background:var(--rq-draft-tx)}
+.vas_098-tag.vas_098-partial{background:var(--rq-warn-bg);color:var(--rq-warn-tx)} .vas_098-tag.vas_098-partial .vas_098-dot{background:var(--rq-warn-tx)}
+.vas_098-tag.vas_098-cancelled{background:var(--rq-danger-bg);color:var(--rq-danger-tx)} .vas_098-tag.vas_098-cancelled .vas_098-dot{background:var(--rq-danger-tx)}
+.vas_098-tag.vas_098-mwo{background:#EFEAFF;color:#5F4AA6} .vas_098-tag.vas_098-mwo .vas_098-dot{background:#5F4AA6}
 
 .vas_098-ic { display:inline-flex; align-items:center; flex:none }
 .vas_098-ic svg { display:block }
@@ -102,11 +107,11 @@
 /* Tones mirror the colours the requisition window uses for PriorityRule:
    urgent red, high orange, medium blue, low green, minor grey. */
 .vas_098-prio { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:5px 11px; font-size:12px; font-weight:700; line-height:1 }
-.vas_098-prio.urgent{background:#FAD7D7;color:#B44045}
-.vas_098-prio.high{background:#FCE3D2;color:#A8430F}
-.vas_098-prio.med{background:#E4F0FF;color:#0E5DA8}
-.vas_098-prio.low{background:#CCEFDD;color:#0C5D38}
-.vas_098-prio.minor{background:#E9EDF1;color:#5A6B79}
+.vas_098-prio.vas_098-urgent{background:#FAD7D7;color:#B44045}
+.vas_098-prio.vas_098-high{background:#FCE3D2;color:#A8430F}
+.vas_098-prio.vas_098-med{background:#E4F0FF;color:#0E5DA8}
+.vas_098-prio.vas_098-low{background:#CCEFDD;color:#0C5D38}
+.vas_098-prio.vas_098-minor{background:#E9EDF1;color:#5A6B79}
 
 /* ---------- Header — title strip ---------- */
 /* Untinted strip carrying the title + subtitle and the priority / type /
@@ -160,10 +165,10 @@
 .vas_098-cvactions { display:flex; gap:9px; flex:0 1 auto; flex-wrap:wrap; justify-content:flex-end; min-width:0 }
 .vas_098-btn { height:34px; padding:0 15px; border-radius:999px; font-size:13px; font-weight:500; font-family:inherit;
     cursor:pointer; display:inline-flex; align-items:center; gap:7px; white-space:nowrap; max-width:100% }
-.vas_098-btn.primary { background:var(--rq-action); color:#fff; border:none }
-.vas_098-btn.primary:hover:not(:disabled) { background:#0069AE }
-.vas_098-btn.secondary { background:#fff; color:var(--rq-primary); border:1px solid var(--rq-action) }
-.vas_098-btn.secondary:hover:not(:disabled) { background:var(--rq-faint-blue) }
+.vas_098-btn.vas_098-primary { background:var(--rq-action); color:#fff; border:none }
+.vas_098-btn.vas_098-primary:hover:not(:disabled) { background:#0069AE }
+.vas_098-btn.vas_098-secondary { background:#fff; color:var(--rq-primary); border:1px solid var(--rq-action) }
+.vas_098-btn.vas_098-secondary:hover:not(:disabled) { background:var(--rq-faint-blue) }
 .vas_098-btn:disabled { opacity:.45; cursor:not-allowed }
 
 /* ---------- Stat strip ---------- */
@@ -171,17 +176,17 @@
 .vas_098-stat { position:relative; background:rgba(255,255,255,0.85); border:1px solid var(--rq-border);
     border-radius:11px; padding:10px 13px 10px 15px; overflow:hidden; min-width:0 }
 .vas_098-stat::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px }
-.vas_098-stat.a-blue::before { background:var(--rq-action) }
-.vas_098-stat.a-violet::before { background:#8B7CFF }
-.vas_098-stat.a-green::before { background:#20A464 }
-.vas_098-stat.a-amber::before { background:#D78B10 }
-.vas_098-stat.breach { background:linear-gradient(180deg,#FFF1F0,#FFF9F9) }
-.vas_098-stat.breach::before { background:var(--rq-danger) }
+.vas_098-stat.vas_098-a-blue::before { background:var(--rq-action) }
+.vas_098-stat.vas_098-a-violet::before { background:#8B7CFF }
+.vas_098-stat.vas_098-a-green::before { background:#20A464 }
+.vas_098-stat.vas_098-a-amber::before { background:#D78B10 }
+.vas_098-stat.vas_098-breach { background:linear-gradient(180deg,#FFF1F0,#FFF9F9) }
+.vas_098-stat.vas_098-breach::before { background:var(--rq-danger) }
 .vas_098-scap { font-size:10.5px; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted) }
 .vas_098-sval { font-size:19px; font-weight:700; color:var(--rq-text); margin-top:5px; line-height:1.1;
     display:flex; align-items:center; gap:7px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .vas_098-ssub { font-size:11.5px; color:var(--rq-text-2); margin-top:3px }
-.vas_098-ssub.breach { color:#A33F3F; font-weight:700 }
+.vas_098-ssub.vas_098-breach { color:#A33F3F; font-weight:700 }
 .vas_098-breachic { color:var(--rq-danger); display:flex }
 
 /* ---------- Section head ---------- */
@@ -194,23 +199,23 @@
     padding:15px 12px 11px; box-shadow:var(--rq-widget-shadow); margin-bottom:14px }
 .vas_098-step { flex:1; position:relative; display:flex; flex-direction:column; align-items:center; text-align:center;
     padding:0 2px; --nb:#E7ECF1; --nf:#5A6B79; --ln:#E1EAF2 }
-.vas_098-step.c1{--nb:#E4E9EF;--nf:#5A6B79}
-.vas_098-step.c2{--nb:#D6F0E2;--nf:#0C5D38}
-.vas_098-step.c3{--nb:#D6EBFF;--nf:#0E5DA8}
-.vas_098-step.c4{--nb:#E8E1FF;--nf:#5F4AA6}
-.vas_098-step.c5{--nb:#FCE6C9;--nf:#9A6500}
-.vas_098-step.c6{--nb:#D4F1EC;--nf:#0B7A6B}
+.vas_098-step.vas_098-c1{--nb:#E4E9EF;--nf:#5A6B79}
+.vas_098-step.vas_098-c2{--nb:#D6F0E2;--nf:#0C5D38}
+.vas_098-step.vas_098-c3{--nb:#D6EBFF;--nf:#0E5DA8}
+.vas_098-step.vas_098-c4{--nb:#E8E1FF;--nf:#5F4AA6}
+.vas_098-step.vas_098-c5{--nb:#FCE6C9;--nf:#9A6500}
+.vas_098-step.vas_098-c6{--nb:#D4F1EC;--nf:#0B7A6B}
 .vas_098-step::before { content:''; position:absolute; top:11px; left:-50%; width:100%; height:3px; background:var(--ln); z-index:1 }
 .vas_098-step:first-child::before { display:none }
-.vas_098-step.done::before, .vas_098-step.active::before { background:#9ED1FF }
+.vas_098-step.vas_098-done::before, .vas_098-step.vas_098-active::before { background:#9ED1FF }
 .vas_098-node { width:24px; height:24px; border-radius:50%; z-index:2; display:flex; align-items:center; justify-content:center;
     font-size:11px; font-weight:700; background:var(--nb); color:var(--nf) }
-.vas_098-step.active .vas_098-node { border:2px solid var(--nf); box-shadow:0 0 0 4px rgba(15,61,97,0.06) }
-.vas_098-step.pending .vas_098-node { opacity:.8 }
+.vas_098-step.vas_098-active .vas_098-node { border:2px solid var(--nf); box-shadow:0 0 0 4px rgba(15,61,97,0.06) }
+.vas_098-step.vas_098-pending .vas_098-node { opacity:.8 }
 .vas_098-slabel { margin-top:9px; font-size:11.5px; font-weight:500; color:var(--rq-text-2); line-height:1.2 }
-.vas_098-step.done .vas_098-slabel, .vas_098-step.active .vas_098-slabel { color:var(--rq-text); font-weight:700 }
+.vas_098-step.vas_098-done .vas_098-slabel, .vas_098-step.vas_098-active .vas_098-slabel { color:var(--rq-text); font-weight:700 }
 .vas_098-ssub2 { margin-top:2px; font-size:10.5px; color:var(--rq-text-muted) }
-.vas_098-step.active .vas_098-ssub2 { color:var(--nf); font-weight:700 }
+.vas_098-step.vas_098-active .vas_098-ssub2 { color:var(--nf); font-weight:700 }
 
 /* ---------- Lower region (Items / Activity / Notes, stacked) ---------- */
 /* Replaced the Items / Activity / Notes tab bar: all three are sections down the
@@ -236,15 +241,15 @@
 /* Attribute Set Instance sub-line (lot / serial / size ...). */
 .vas_098-itattr { font-size:11px; color:var(--rq-text-2); margin-top:1px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.vas_098-items .ta-r { text-align:right } .vas_098-items .ta-c { text-align:center }
+.vas_098-items .vas_098-ta-r { text-align:right } .vas_098-items .vas_098-ta-c { text-align:center }
 /* Unit of measure cell (replaced the product-category chip). */
 .vas_098-uom { display:inline-block; font-size:12.5px; color:var(--rq-text);
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .vas_098-src { display:inline-flex; align-items:center; gap:6px; justify-content:flex-end; font-size:12.5px }
 .vas_098-src .vas_098-bar { width:40px; height:5px; border-radius:99px; background:#E7EEF4; overflow:hidden; flex:none }
 .vas_098-src .vas_098-bar i { display:block; height:100%; border-radius:99px }
-.vas_098-src.full i { background:var(--rq-success-tx) } .vas_098-src.short i { background:var(--rq-warn-tx) }
-.vas_098-src.full { color:var(--rq-success-tx); font-weight:500 } .vas_098-src.short { color:var(--rq-warn-tx); font-weight:500 }
+.vas_098-src.vas_098-full i { background:var(--rq-success-tx) } .vas_098-src.vas_098-short i { background:var(--rq-warn-tx) }
+.vas_098-src.vas_098-full { color:var(--rq-success-tx); font-weight:500 } .vas_098-src.vas_098-short { color:var(--rq-warn-tx); font-weight:500 }
 .vas_098-itfoot { display:flex; align-items:center; justify-content:flex-end; gap:22px; flex-wrap:wrap; padding:10px 16px;
     background:var(--rq-faint-blue); border-top:1px solid var(--rq-border); font-size:13px }
 .vas_098-tf { color:var(--rq-text-2) } .vas_098-tf b { color:var(--rq-text); font-weight:600; margin-left:6px }
@@ -263,21 +268,21 @@
     border-radius:999px; background:#fff; padding:5px 12px; color:var(--rq-primary);
     font-weight:700; line-height:1; cursor:pointer; user-select:none; white-space:nowrap }
 .vas_098-pgBtn:hover { background:var(--rq-faint-blue); border-color:var(--rq-action) }
-.vas_098-pgBtn.is-disabled { opacity:.45; cursor:default; pointer-events:none; color:var(--rq-text-muted) }
+.vas_098-pgBtn.vas_098-is-disabled { opacity:.45; cursor:default; pointer-events:none; color:var(--rq-text-muted) }
 
 /* ---------- Activity ---------- */
 .vas_098-panelcard { background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px; padding:8px 18px; box-shadow:var(--rq-widget-shadow) }
 .vas_098-actrow { display:flex; align-items:flex-start; gap:10px; padding:9px 0 }
 .vas_098-actrow + .vas_098-actrow { border-top:1px solid var(--rq-divider) }
 .vas_098-actbadge { display:inline-flex; align-items:center; gap:5px; border-radius:8px; padding:4px 8px; font-size:10.5px; font-weight:700; flex:none }
-.vas_098-actbadge.create { background:#EEF3F8; color:#5A6B79 }
-.vas_098-actbadge.submit { background:#E8F2FC; color:#0E5DA8 }
-.vas_098-actbadge.status { background:#E4F5EC; color:#0C5D38 }
-.vas_098-actbadge.comment { background:#EFEAFF; color:#5F4AA6 }
-.vas_098-actbadge.link { background:#E0F2F1; color:#0B7A6B }
+.vas_098-actbadge.vas_098-create { background:#EEF3F8; color:#5A6B79 }
+.vas_098-actbadge.vas_098-submit { background:#E8F2FC; color:#0E5DA8 }
+.vas_098-actbadge.vas_098-status { background:#E4F5EC; color:#0C5D38 }
+.vas_098-actbadge.vas_098-comment { background:#EFEAFF; color:#5F4AA6 }
+.vas_098-actbadge.vas_098-link { background:#E0F2F1; color:#0B7A6B }
 /* Downstream lifecycle documents. */
-.vas_098-actbadge.po  { background:#E4F0FF; color:#0E5DA8 }
-.vas_098-actbadge.grn { background:#CCEFDD; color:#0C5D38 }
+.vas_098-actbadge.vas_098-po  { background:#E4F0FF; color:#0E5DA8 }
+.vas_098-actbadge.vas_098-grn { background:#CCEFDD; color:#0C5D38 }
 .vas_098-actmain { flex:1; min-width:0 }
 .vas_098-atwrap { display:flex; justify-content:space-between; gap:12px; align-items:baseline }
 .vas_098-at { font-size:13.5px; color:var(--rq-text) }
@@ -297,9 +302,9 @@
     opacity:0; z-index:1000; pointer-events:none;
     transition:opacity .25s ease, transform .25s ease;
 }
-.vas_098-toast.show { opacity:1; transform:translate(-50%, 0) }
-.vas_098-toast.err  { background:#B23636 }
-.vas_098-toast.ok   { background:#0C5D38 }
+.vas_098-toast.vas_098-show { opacity:1; transform:translate(-50%, 0) }
+.vas_098-toast.vas_098-err  { background:#B23636 }
+.vas_098-toast.vas_098-ok   { background:#0C5D38 }
 
 /* Disabled convert buttons still need to read as deliberately unavailable. */
 .vas_098-btn:disabled { opacity:.45; cursor:default }
