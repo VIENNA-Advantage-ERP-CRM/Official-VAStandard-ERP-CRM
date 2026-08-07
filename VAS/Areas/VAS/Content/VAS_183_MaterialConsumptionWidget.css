@@ -1,0 +1,624 @@
+/* VAS_183_MaterialConsumptionWidget Stylesheet (3x2 Summary & Breakdown Widget) */
+
+.vas-mcw-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas-mcw-root,
+    .vas-mcw-root * {
+        box-sizing: border-box;
+    }
+
+.vas-mcw-card {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
+    font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: left;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    backdrop-filter: blur(10px);
+    padding: .875em;
+    overflow: hidden;
+}
+
+/* Header Section */
+.vas-mcw-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    flex: 0 0 auto;
+    margin-bottom: .625em;
+}
+
+.vas-mcw-head-left {
+    display: flex;
+    align-items: center;
+    gap: .625em;
+    min-width: 0;
+}
+
+.vas-mcw-ico {
+    width: 2em;
+    height: 2em;
+    border-radius: 10px;
+    background: rgba(0, 131, 218, .10);
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+    .vas-mcw-ico svg {
+        width: 1.15em;
+        height: 1.15em;
+    }
+
+.vas-mcw-title {
+    font-size: .85em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-mcw-sub {
+    font-size: .6875em;
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.2;
+}
+
+.vas-mcw-controls {
+    display: flex;
+    align-items: center;
+    gap: .375em;
+    flex: 0 0 auto;
+}
+
+.vas-mcw-pill-btn {
+    font-family: inherit;
+    font-size: .6875em;
+    font-weight: 500;
+    color: #5F7283;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    padding: .375em .625em;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: .35em;
+    outline: none;
+}
+
+    .vas-mcw-pill-btn:hover {
+        border-color: #0083DA;
+        color: #0083DA;
+    }
+
+/* Body Section */
+.vas-mcw-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .375em;
+    overflow: hidden;
+}
+
+.vas-mcw-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    padding: .45em .625em;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: background 150ms ease;
+}
+
+    .vas-mcw-row:hover {
+        background: rgba(31, 131, 255, .05);
+    }
+
+.vas-mcw-row-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .25em;
+}
+
+.vas-mcw-row-label {
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-mcw-bar-track {
+    width: 100%;
+    height: .36em;
+    border-radius: 999px;
+    background: rgba(16, 44, 63, .06);
+    overflow: hidden;
+}
+
+.vas-mcw-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: #0083DA;
+    transition: width 300ms ease;
+}
+
+.vas-mcw-row-right {
+    flex: 0 0 auto;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: .15em;
+}
+
+.vas-mcw-row-qty {
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-mcw-row-val {
+    font-size: .6875em;
+    color: #748494;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Footer Section */
+.vas-mcw-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #EDF2F6;
+    padding-top: .45em;
+    margin-top: .35em;
+    flex: 0 0 auto;
+}
+
+.vas-mcw-foot-helper {
+    font-size: .75em;
+    color: #748494;
+}
+
+.vas-mcw-pager {
+    display: flex;
+    align-items: center;
+    gap: .4em;
+    font-size: .75em;
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas-mcw-pager-btn {
+    width: 1.6em;
+    height: 1.6em;
+    border: 1px solid #E4EDF4;
+    border-radius: .4em;
+    background: rgba(255, 255, 255, 0.9);
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+    .vas-mcw-pager-btn:hover:not(:disabled) {
+        background: #EEF6FF;
+        color: #0083DA;
+        box-shadow: inset 0 0 0 1px #0083DA;
+        outline: none;
+    }
+
+    .vas-mcw-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-mcw-empty {
+    padding: 2em 1em;
+    text-align: center;
+    color: #748494;
+    font-size: .75em;
+}
+
+.vas-mcw-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .62);
+    border-radius: 14px;
+    z-index: 5;
+}
+
+.vas-mcw-hidden {
+    display: none !important;
+}
+
+/* Locator Detail Modal */
+.vas-mcw-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 30, 48, .45);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1em;
+}
+
+/* Built to the Global VA Design & Dynamic System Standards:
+   - the card is the single fluid root anchor (clamp), every descendant sizes in em from it
+   - no hardcoded px dimensions or fixed font sizes on any child
+   - height follows content: the table always renders a full page of rows (short pages padded),
+     so the popup is exactly one page tall and never resizes while paging
+   - row hover uses an inset ring so it is not clipped by overflow:hidden */
+.vas-mcw-modal-card {
+    /* Root anchor for the whole popup. */
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(14px, 1.2vw, 22px);
+    width: clamp(340px, 85vw, 1400px);
+    height: auto;
+    max-height: clamp(420px, 85vh, 900px);
+    background: #fff;
+    border-radius: .75em;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 .9em 2.2em rgba(15, 61, 97, 0.18);
+    overflow: hidden;
+}
+
+.vas-mcw-modal-head {
+    flex: 0 0 auto;
+    min-height: 2.75em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    padding: .5em 1em;
+    border-bottom: 1px solid #1F83FF;
+}
+
+.vas-mcw-modal-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    min-width: 0;
+}
+
+.vas-mcw-modal-title {
+    font-size: .82em;
+    font-weight: 400;
+    color: #141414;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-mcw-modal-badge {
+    background: #DFF1FF;
+    color: #106AB0;
+    font-size: .6em;
+    font-weight: 500;
+    padding: .2em .7em;
+    border-radius: 999px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.vas-mcw-modal-close {
+    flex: 0 0 auto;
+    width: 1.45em;
+    height: 1.45em;
+    border: 0;
+    background: transparent;
+    border-radius: .35em;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #141414;
+}
+
+    .vas-mcw-modal-close svg {
+        width: .82em;
+        height: .82em;
+    }
+
+    .vas-mcw-modal-close:hover {
+        background: #EEF6FF;
+        color: #0083DA;
+        box-shadow: inset 0 0 0 1px #0083DA;
+        outline: none;
+    }
+
+.vas-mcw-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 1em;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: .5em;
+}
+
+.vas-mcw-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: .75em;
+    flex: 0 0 auto;
+}
+
+.vas-mcw-summary-field {
+    padding: .35em 0 .25em;
+    border-bottom: 1px solid #D7D7D7;
+    min-width: 0;
+}
+
+.vas-mcw-field-lbl {
+    font-size: .6em;
+    color: #748494;
+    margin-bottom: .25em;
+}
+
+.vas-mcw-field-val {
+    font-size: .7em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-mcw-table-head-title {
+    font-size: .68em;
+    font-weight: 700;
+    color: #000;
+    margin-bottom: .25em;
+    flex: 0 0 auto;
+}
+
+.vas-mcw-mini-table {
+    width: 100%;
+    /* separate + zero spacing keeps the td borders while letting the hover ring paint on <tr> */
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    flex: 0 0 auto;
+}
+
+    .vas-mcw-mini-table th {
+        font-size: .58em;
+        font-weight: 500;
+        color: #748494;
+        text-transform: capitalize;
+        padding: .5em .6em;
+        text-align: left;
+        border-bottom: 1px solid #EDF2F6;
+        white-space: nowrap;
+    }
+
+        .vas-mcw-mini-table th:nth-child(2) {
+            text-align: right;
+        }
+
+    .vas-mcw-mini-table td {
+        font-size: .64em;
+        color: #102C3F;
+        padding: .5em .55em;
+        border-bottom: 1px solid #EDF2F6;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        /* Uniform row height so filler rows are indistinguishable in size from real ones. */
+        height: 2.2em;
+        vertical-align: middle;
+    }
+
+        .vas-mcw-mini-table td:nth-child(2) {
+            text-align: right;
+            font-weight: 700;
+        }
+
+    .vas-mcw-mini-table tbody tr {
+        border-radius: 8px;
+        outline: none;
+    }
+
+        .vas-mcw-mini-table tbody tr:hover {
+            box-shadow: inset 0 0 0 1px #0083DA;
+        }
+
+            .vas-mcw-mini-table tbody tr:hover td {
+                background: #F5FBFF;
+            }
+
+    /* Spacer rows that keep a short page the same height as a full one. Not interactive. */
+    .vas-mcw-mini-table tbody tr.vas-mcw-m-filler:hover {
+        box-shadow: none;
+    }
+
+        .vas-mcw-mini-table tbody tr.vas-mcw-m-filler:hover td {
+            background: transparent;
+        }
+
+    .vas-mcw-mini-table tbody tr.vas-mcw-m-filler td {
+        border-bottom-color: #F5F8FA;
+    }
+
+.vas-mcw-item-col {
+    font-weight: 700;
+}
+
+.vas-mcw-attr-col {
+    font-size: .9em;
+    color: #748494;
+}
+
+/* Modal footer + pager sizing (the widget body reuses .vas-mcw-pager at its own scale). */
+.vas-mcw-modal-foot {
+    flex: 0 0 auto;
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    border-top: 1px solid #EDF2F6;
+    padding-top: .4em;
+}
+
+.vas-mcw-modal-helper {
+    font-size: .62em;
+    color: #748494;
+}
+
+.vas-mcw-modal-foot .vas-mcw-pager {
+    font-size: .68em;
+}
+
+.vas-mcw-modal-foot .vas-mcw-m-pager-txt {
+    min-width: 6.5em;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Loading / empty state cell */
+.vas-mcw-m-msgcell {
+    text-align: center;
+    color: #748494;
+    white-space: normal;
+}
+
+
+/* Standard Modal / Popup Rules */
+.vas-modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0, 0, 0, 0.45) !important;
+    backdrop-filter: blur(4px) !important;
+    z-index: 10000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 16px !important;
+}
+
+.vas-modal-card {
+    background: #ffffff !important;
+    border-radius: 12px !important;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2) !important;
+    width: 90% !important;
+    max-width: 680px !important;
+    max-height: 85vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    font-family: Roboto, Arial, sans-serif !important;
+    font-size: 13px !important;
+    color: #102C3F !important;
+}
+
+.vas-modal-head {
+    padding: 14px 18px !important;
+    border-bottom: 1px solid #E2EAF1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #F8FAFC !important;
+}
+
+.vas-modal-title {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: #102C3F !important;
+    margin: 0 !important;
+}
+
+.vas-modal-close {
+    background: none !important;
+    border: none !important;
+    font-size: 22px !important;
+    line-height: 1 !important;
+    color: #5F7283 !important;
+    cursor: pointer !important;
+}
+
+.vas-modal-close:hover {
+    color: #102C3F !important;
+}
+
+.vas-modal-body {
+    padding: 16px 18px !important;
+    overflow-y: auto !important;
+    flex: 1 1 auto !important;
+}
+
+.vas-modal-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 0 !important;
+}
+
+.vas-modal-table th {
+    padding: 10px 12px !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    color: #41576A !important;
+    text-transform: uppercase !important;
+    border-bottom: 1px solid #C5D2DD !important;
+    background: #FFFFFF !important;
+    text-align: left !important;
+}
+
+.vas-modal-table td {
+    padding: 10px 12px !important;
+    font-size: 12px !important;
+    color: #102C3F !important;
+    border-bottom: 1px solid #E2EAF1 !important;
+}
+
+.vas-modal-foot {
+    padding: 12px 18px !important;
+    border-top: 1px solid #D9E2EB !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    background: #F8FAFC !important;
+    font-size: 12px !important;
+    color: #5F7283 !important;
+}
