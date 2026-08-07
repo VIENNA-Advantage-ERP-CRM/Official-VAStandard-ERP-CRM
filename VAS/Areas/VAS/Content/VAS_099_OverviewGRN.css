@@ -97,6 +97,12 @@
  *                        is-disabled look without pointer-events:none, so a button
  *                        that cannot run can still carry the reason on hover and
  *                        answer a click with it.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare
+ *                        (.is-link, .ta-r, .show, .tone-*, .ic-*, .s-*, .btn-*)
+ *                        now carry the vas_099- prefix too. Sharing a name with
+ *                        a base-theme rule meant the base design won and
+ *                        repainted the panel; scoping them to the panel ends
+ *                        that.
  ***********************************************************/
 
 .vas_099-root {
@@ -236,12 +242,12 @@
     white-space: nowrap;
 }
 
-.vas_099-hdrPill.tone-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
-.vas_099-hdrPill.tone-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
-.vas_099-hdrPill.tone-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
-.vas_099-hdrPill.tone-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
-.vas_099-hdrPill.tone-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
-.vas_099-hdrPill.tone-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
+.vas_099-hdrPill.vas_099-tone-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
+.vas_099-hdrPill.vas_099-tone-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
+.vas_099-hdrPill.vas_099-tone-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.vas_099-hdrPill.vas_099-tone-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
+.vas_099-hdrPill.vas_099-tone-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
+.vas_099-hdrPill.vas_099-tone-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
 
 .vas_099-hdrPill .vas_099-ic { color: currentColor; }
 
@@ -298,7 +304,7 @@
     margin-top: 0.125em;
     overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
 }
-.vas_099-fVal.is-link { color: var(--grn-link); }
+.vas_099-fVal.vas_099-is-link { color: var(--grn-link); }
 
 /* Narrow panels: stack the two columns and drop the pills below the title. */
 @container (max-width: 460px) {
@@ -402,11 +408,11 @@
 }
 
 .vas_099-chip .vas_099-ic            { color: var(--grn-muted); }
-.vas_099-chip.ic-info    .vas_099-ic { color: var(--grn-info-tx); }
-.vas_099-chip.ic-success .vas_099-ic { color: var(--grn-success-tx); }
-.vas_099-chip.ic-warning .vas_099-ic { color: var(--grn-warning-tx); }
-.vas_099-chip.ic-purple  .vas_099-ic { color: var(--grn-purple-tx); }
-.vas_099-chip.ic-muted   .vas_099-ic { color: var(--grn-muted); }
+.vas_099-chip.vas_099-ic-info    .vas_099-ic { color: var(--grn-info-tx); }
+.vas_099-chip.vas_099-ic-success .vas_099-ic { color: var(--grn-success-tx); }
+.vas_099-chip.vas_099-ic-warning .vas_099-ic { color: var(--grn-warning-tx); }
+.vas_099-chip.vas_099-ic-purple  .vas_099-ic { color: var(--grn-purple-tx); }
+.vas_099-chip.vas_099-ic-muted   .vas_099-ic { color: var(--grn-muted); }
 
 .vas_099-chipLabel { flex: none; color: var(--grn-muted); }
 .vas_099-chipVal   {
@@ -418,12 +424,12 @@
 }
 
 /* Clickable origin chip — opens the source record. */
-.vas_099-chip.is-link { cursor: pointer; }
-.vas_099-chip.is-link:hover {
+.vas_099-chip.vas_099-is-link { cursor: pointer; }
+.vas_099-chip.vas_099-is-link:hover {
     border-color: var(--grn-action);
     box-shadow: 0 0 0 1px var(--grn-action) inset;
 }
-.vas_099-chip.is-link > .vas_099-ic:last-child { color: var(--grn-action); }
+.vas_099-chip.vas_099-is-link > .vas_099-ic:last-child { color: var(--grn-action); }
 
 /* The References card (.vas_099-refCard) was dropped with the section it styled —
    every field it carried is already on screen as a Generated From chip or a
@@ -449,12 +455,12 @@
     padding: 0.75em 0.875em;
 }
 
-.vas_099-metric.tone-total    { border-left-color: var(--grn-info-tx); }
-.vas_099-metric.tone-lines    { border-left-color: var(--grn-neutral-tx); }
-.vas_099-metric.tone-received { border-left-color: var(--grn-success-tx); }
-.vas_099-metric.tone-quality  { border-left-color: #E08A1E; }
-.vas_099-metric.tone-accepted { border-left-color: var(--grn-success-tx); }
-.vas_099-metric.tone-rejected { border-left-color: var(--grn-risk-tx); }
+.vas_099-metric.vas_099-tone-total    { border-left-color: var(--grn-info-tx); }
+.vas_099-metric.vas_099-tone-lines    { border-left-color: var(--grn-neutral-tx); }
+.vas_099-metric.vas_099-tone-received { border-left-color: var(--grn-success-tx); }
+.vas_099-metric.vas_099-tone-quality  { border-left-color: #E08A1E; }
+.vas_099-metric.vas_099-tone-accepted { border-left-color: var(--grn-success-tx); }
+.vas_099-metric.vas_099-tone-rejected { border-left-color: var(--grn-risk-tx); }
 
 .vas_099-mHead {
     display: flex;
@@ -475,15 +481,15 @@
     white-space: nowrap;
 }
 
-.vas_099-metric.tone-total    .vas_099-mHead .vas_099-ic { color: var(--grn-info-tx); }
-.vas_099-metric.tone-lines    .vas_099-mHead .vas_099-ic { color: var(--grn-neutral-tx); }
-.vas_099-metric.tone-received .vas_099-mHead .vas_099-ic { color: var(--grn-success-tx); }
-.vas_099-metric.tone-quality  .vas_099-mHead .vas_099-ic { color: #E08A1E; }
-.vas_099-metric.tone-accepted .vas_099-mHead .vas_099-ic { color: var(--grn-success-tx); }
-.vas_099-metric.tone-rejected .vas_099-mHead .vas_099-ic { color: var(--grn-risk-tx); }
+.vas_099-metric.vas_099-tone-total    .vas_099-mHead .vas_099-ic { color: var(--grn-info-tx); }
+.vas_099-metric.vas_099-tone-lines    .vas_099-mHead .vas_099-ic { color: var(--grn-neutral-tx); }
+.vas_099-metric.vas_099-tone-received .vas_099-mHead .vas_099-ic { color: var(--grn-success-tx); }
+.vas_099-metric.vas_099-tone-quality  .vas_099-mHead .vas_099-ic { color: #E08A1E; }
+.vas_099-metric.vas_099-tone-accepted .vas_099-mHead .vas_099-ic { color: var(--grn-success-tx); }
+.vas_099-metric.vas_099-tone-rejected .vas_099-mHead .vas_099-ic { color: var(--grn-risk-tx); }
 
-.vas_099-metric.tone-accepted .vas_099-mVal { color: var(--grn-success-tx); }
-.vas_099-metric.tone-rejected .vas_099-mVal { color: var(--grn-risk-tx); }
+.vas_099-metric.vas_099-tone-accepted .vas_099-mVal { color: var(--grn-success-tx); }
+.vas_099-metric.vas_099-tone-rejected .vas_099-mVal { color: var(--grn-risk-tx); }
 
 .vas_099-mVal {
     font-size: 1.25em;
@@ -506,7 +512,7 @@
 
 /* With the Accepted / Rejected cards present there are six tiles — three-up keeps
    them in two even rows instead of leaving two orphans on a second row. */
-.vas_099-snap.has-qc { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.vas_099-snap.vas_099-has-qc { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 /* Narrow panels: 2-up, then single-column.
 
@@ -519,11 +525,11 @@
    a crushed 4-up one. The wide rows only from 700px. */
 @container (max-width: 700px) {
     .vas_099-snap,
-    .vas_099-snap.has-qc { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .vas_099-snap.vas_099-has-qc { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container (max-width: 340px) {
     .vas_099-snap,
-    .vas_099-snap.has-qc { grid-template-columns: minmax(0, 1fr); }
+    .vas_099-snap.vas_099-has-qc { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ----------------------------------------------------------- */
@@ -557,9 +563,9 @@
 .vas_099-step:first-child .vas_099-stepLine-l,
 .vas_099-step:last-child  .vas_099-stepLine-r { visibility: hidden; }
 
-.vas_099-step.is-done   .vas_099-stepLine-r,
-.vas_099-step.is-done   .vas_099-stepLine-l,
-.vas_099-step.is-active .vas_099-stepLine-l { background: #67B98A; }
+.vas_099-step.vas_099-is-done   .vas_099-stepLine-r,
+.vas_099-step.vas_099-is-done   .vas_099-stepLine-l,
+.vas_099-step.vas_099-is-active .vas_099-stepLine-l { background: #67B98A; }
 
 .vas_099-stepDot {
     flex: none;
@@ -578,12 +584,12 @@
 }
 .vas_099-stepDot .vas_099-ic { display: inline-flex; }
 
-.vas_099-step.is-done .vas_099-stepDot {
+.vas_099-step.vas_099-is-done .vas_099-stepDot {
     background: #E4F3EC;
     color: #1F9D5B;
     border-color: #BFE6D2;
 }
-.vas_099-step.is-active .vas_099-stepDot {
+.vas_099-step.vas_099-is-active .vas_099-stepDot {
     background: #E4F3EC;
     color: #1F9D5B;
     border: 2px solid #67B98A;
@@ -615,7 +621,7 @@
     margin-top: 0.25em;
     overflow-wrap: anywhere;
 }
-.vas_099-step.is-pending .vas_099-stepMeta { color: var(--grn-warning-tx); }
+.vas_099-step.vas_099-is-pending .vas_099-stepMeta { color: var(--grn-warning-tx); }
 
 /* ----------------------------------------------------------- */
 /*  Material table                                              */
@@ -648,7 +654,7 @@
 
 /* No line on the receipt has a quality check applicable — the Quality column is
    not rendered, so the grid runs six columns wide. */
-.vas_099-table.no-quality .vas_099-tRow {
+.vas_099-table.vas_099-no-quality .vas_099-tRow {
     grid-template-columns:
         minmax(0, 2.4fr) minmax(0, 0.85fr) minmax(0, 0.8fr) minmax(0, 1fr)
         minmax(0, 0.9fr) minmax(0, 1fr);
@@ -676,8 +682,8 @@
    both are unharmed by the clip. */
 .vas_099-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .vas_099-tHead > span,
-.vas_099-tRow > span.ta-r,
-.vas_099-tRow > span.ta-c { white-space: nowrap; }
+.vas_099-tRow > span.vas_099-ta-r,
+.vas_099-tRow > span.vas_099-ta-c { white-space: nowrap; }
 
 .vas_099-tHead {
     background: #F5F8FB;
@@ -697,12 +703,12 @@
 .vas_099-tBody:last-of-type { border-bottom: none; }
 .vas_099-tBody:hover { background: #FAFCFE; }
 
-.vas_099-table .ta-r { text-align: right; justify-content: flex-end; }
-.vas_099-table .ta-c { text-align: center; justify-content: center; }
+.vas_099-table .vas_099-ta-r { text-align: right; justify-content: flex-end; }
+.vas_099-table .vas_099-ta-c { text-align: center; justify-content: center; }
 
 /* Tabular figures so the quantity / amount columns line up digit for digit
    instead of drifting with proportional glyph widths. */
-.vas_099-table .ta-r,
+.vas_099-table .vas_099-ta-r,
 .vas_099-recvVal { font-variant-numeric: tabular-nums; }
 
 .vas_099-itItem { min-width: 0; }
@@ -762,12 +768,12 @@
     flex: none;
 }
 .vas_099-recvBar i { display: block; height: 100%; border-radius: 999px; }
-.vas_099-recv.full i { background: var(--grn-success-tx); }
-.vas_099-recv.part i { background: var(--grn-warning-tx); }
-.vas_099-recv.none i { background: #CBD5DF; }
-.vas_099-recv.full { color: var(--grn-success-tx); font-weight: 500; }
-.vas_099-recv.part { color: var(--grn-warning-tx); font-weight: 500; }
-.vas_099-recv.none { color: var(--grn-muted); }
+.vas_099-recv.vas_099-full i { background: var(--grn-success-tx); }
+.vas_099-recv.vas_099-part i { background: var(--grn-warning-tx); }
+.vas_099-recv.vas_099-none i { background: #CBD5DF; }
+.vas_099-recv.vas_099-full { color: var(--grn-success-tx); font-weight: 500; }
+.vas_099-recv.vas_099-part { color: var(--grn-warning-tx); font-weight: 500; }
+.vas_099-recv.vas_099-none { color: var(--grn-muted); }
 
 /* Quality tag */
 .vas_099-tag {
@@ -780,22 +786,22 @@
     line-height: 1.3;
     white-space: nowrap;
 }
-.vas_099-tag.q-on  { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
-.vas_099-tag.q-off { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
+.vas_099-tag.vas_099-q-on  { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.vas_099-tag.vas_099-q-off { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
 
 /* Quality Product verdict tags. */
-.vas_099-tag.q-pass { background: var(--grn-success-bg); color: var(--grn-success-tx); }
-.vas_099-tag.q-fail { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
-.vas_099-tag.q-wait { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.vas_099-tag.vas_099-q-pass { background: var(--grn-success-bg); color: var(--grn-success-tx); }
+.vas_099-tag.vas_099-q-fail { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
+.vas_099-tag.vas_099-q-wait { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
 
 /* Document-status tags in the Documents table — same tones as the header pill,
    so one document status reads the same wherever it appears. */
-.vas_099-tag.s-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
-.vas_099-tag.s-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
-.vas_099-tag.s-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
-.vas_099-tag.s-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
-.vas_099-tag.s-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
-.vas_099-tag.s-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
+.vas_099-tag.vas_099-s-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
+.vas_099-tag.vas_099-s-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
+.vas_099-tag.vas_099-s-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.vas_099-tag.vas_099-s-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
+.vas_099-tag.vas_099-s-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
+.vas_099-tag.vas_099-s-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
 
 /* ----------------------------------------------------------- */
 /*  Documents table                                             */
@@ -818,14 +824,14 @@
 .vas_099-docTxt { min-width: 0; flex: 1; }
 
 /* A whole document row is clickable — the open arrow tints on hover. */
-.vas_099-tBody.is-link { cursor: pointer; }
-.vas_099-tBody.is-link:hover { background: #F2F8FD; }
-.vas_099-tBody.is-link .vas_099-docItem > .vas_099-ic:last-child {
+.vas_099-tBody.vas_099-is-link { cursor: pointer; }
+.vas_099-tBody.vas_099-is-link:hover { background: #F2F8FD; }
+.vas_099-tBody.vas_099-is-link .vas_099-docItem > .vas_099-ic:last-child {
     color: var(--grn-muted);
     flex: none;
 }
-.vas_099-tBody.is-link:hover .vas_099-docItem > .vas_099-ic:last-child,
-.vas_099-tBody.is-link:hover .vas_099-itName { color: var(--grn-action); }
+.vas_099-tBody.vas_099-is-link:hover .vas_099-docItem > .vas_099-ic:last-child,
+.vas_099-tBody.vas_099-is-link:hover .vas_099-itName { color: var(--grn-action); }
 
 /* ----------------------------------------------------------- */
 /*  Quality Product table                                       */
@@ -876,11 +882,11 @@
     font-size: 0.8125em;
     min-width: 560px;
 }
-.vas_099-table.no-quality .vas_099-tFoot { min-width: 480px; }
+.vas_099-table.vas_099-no-quality .vas_099-tFoot { min-width: 480px; }
 .vas_099-tf { color: var(--grn-muted); }
 .vas_099-tf b { color: var(--grn-text); font-weight: 700; margin-left: 0.375em; }
-.vas_099-tf.is-grand { color: var(--grn-text); font-weight: 700; }
-.vas_099-tf.is-grand b { color: var(--grn-action); margin-left: 0.5em; font-size: 1.15em; }
+.vas_099-tf.vas_099-is-grand { color: var(--grn-text); font-weight: 700; }
+.vas_099-tf.vas_099-is-grand b { color: var(--grn-action); margin-left: 0.5em; font-size: 1.15em; }
 
 /* The table's horizontal scroll and the row min-widths are unconditional (see
    the .vas_099-table rule above) — there is no breakpoint at which columns
@@ -927,7 +933,7 @@
 }
 .vas_099-pgBtn:hover { background: var(--grn-info-bg); border-color: var(--grn-action); }
 .vas_099-pgBtn .vas_099-ic { color: currentColor; }
-.vas_099-pgBtn.is-disabled {
+.vas_099-pgBtn.vas_099-is-disabled {
     opacity: .45;
     cursor: default;
     pointer-events: none;
@@ -990,12 +996,12 @@
     white-space: nowrap;
 }
 .vas_099-actTag .vas_099-ic { color: currentColor; }
-.vas_099-actTag.tone-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
-.vas_099-actTag.tone-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
-.vas_099-actTag.tone-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
-.vas_099-actTag.tone-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
-.vas_099-actTag.tone-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
-.vas_099-actTag.tone-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
+.vas_099-actTag.vas_099-tone-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
+.vas_099-actTag.vas_099-tone-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
+.vas_099-actTag.vas_099-tone-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.vas_099-actTag.vas_099-tone-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
+.vas_099-actTag.vas_099-tone-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
+.vas_099-actTag.vas_099-tone-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
 
 .vas_099-actTitle {
     flex: 1 1 auto;
@@ -1031,8 +1037,8 @@
 }
 
 /* An activity carrying a body (e-mail) opens on click. */
-.vas_099-actRow.is-openable { cursor: pointer; }
-.vas_099-actRow.is-openable:hover { background: #F7FBFE; }
+.vas_099-actRow.vas_099-is-openable { cursor: pointer; }
+.vas_099-actRow.vas_099-is-openable:hover { background: #F7FBFE; }
 
 .vas_099-actCaret {
     display: inline-flex;
@@ -1040,7 +1046,7 @@
     color: var(--grn-muted);
     transition: transform .15s ease;
 }
-.vas_099-actRow.is-open .vas_099-actCaret {
+.vas_099-actRow.vas_099-is-open .vas_099-actCaret {
     transform: rotate(90deg);
     color: var(--grn-action);
 }
@@ -1104,22 +1110,22 @@
 }
 .vas_099-btn .vas_099-ic { color: currentColor; }
 
-.vas_099-btn.btn-pri {
+.vas_099-btn.vas_099-btn-pri {
     background: var(--grn-action);
     border: 1px solid var(--grn-action);
     color: #fff;
 }
-.vas_099-btn.btn-pri:hover { background: var(--grn-action-dk); border-color: var(--grn-action-dk); }
+.vas_099-btn.vas_099-btn-pri:hover { background: var(--grn-action-dk); border-color: var(--grn-action-dk); }
 
-.vas_099-btn.btn-sec {
+.vas_099-btn.vas_099-btn-sec {
     background: #fff;
     border: 1px solid var(--grn-action);
     color: var(--grn-action);
 }
-.vas_099-btn.btn-sec:hover { background: var(--grn-info-bg); }
+.vas_099-btn.vas_099-btn-sec:hover { background: var(--grn-info-bg); }
 
 /* Disabled / in-flight action buttons. */
-.vas_099-btn.is-disabled {
+.vas_099-btn.vas_099-is-disabled {
     opacity: .45;
     cursor: default;
     pointer-events: none;
@@ -1127,13 +1133,13 @@
 /* Same look as is-disabled, but the pointer still reaches it — so the button can
    carry a tooltip and answer a click with the reason it cannot run. Without this
    a greyed button is mute: pointer-events:none swallows both. */
-.vas_099-btn.is-blocked {
+.vas_099-btn.vas_099-is-blocked {
     opacity: .45;
     cursor: not-allowed;
 }
-.vas_099-btn.is-blocked:hover { background: #fff; }
-.vas_099-btn.btn-pri.is-blocked:hover { background: var(--grn-action); }
-.vas_099-btn.is-busy {
+.vas_099-btn.vas_099-is-blocked:hover { background: #fff; }
+.vas_099-btn.vas_099-btn-pri.vas_099-is-blocked:hover { background: var(--grn-action); }
+.vas_099-btn.vas_099-is-busy {
     opacity: .7;
     cursor: default;
     pointer-events: none;
@@ -1272,23 +1278,23 @@
     transition: opacity .25s ease, transform .25s ease;
     pointer-events: none;
 }
-.vas_099-toast.show { opacity: 1; transform: translate(-50%, 0); }
-.vas_099-toast.err  { background: #B23636; }
-.vas_099-toast.ok   { background: #0C5D38; }
+.vas_099-toast.vas_099-show { opacity: 1; transform: translate(-50%, 0); }
+.vas_099-toast.vas_099-err  { background: #B23636; }
+.vas_099-toast.vas_099-ok   { background: #0C5D38; }
 
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
 [dir="rtl"] .vas_099-hdrColL { border-right: none; border-left: 1px solid var(--grn-row-div); padding-right: 0; padding-left: 1.25em; }
-[dir="rtl"] .vas_099-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_099-table .vas_099-ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .vas_099-recv { align-items: flex-start; }
 [dir="rtl"] .vas_099-actRow { text-align: right; }
 [dir="rtl"] .vas_099-actWhen { text-align: left; }
 [dir="rtl"] .vas_099-actBody { padding-left: 0.875em; padding-right: 2.5em; }
 [dir="rtl"] .vas_099-actCaret svg { transform: scaleX(-1); }
-[dir="rtl"] .vas_099-actRow.is-open .vas_099-actCaret { transform: rotate(-90deg); }
+[dir="rtl"] .vas_099-actRow.vas_099-is-open .vas_099-actCaret { transform: rotate(-90deg); }
 [dir="rtl"] .vas_099-pgBtn .vas_099-ic svg { transform: scaleX(-1); }
 [dir="rtl"] .vas_099-tFoot { justify-content: flex-start; }
 [dir="rtl"] .vas_099-tf b { margin-left: 0; margin-right: 0.375em; }
-[dir="rtl"] .vas_099-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .vas_099-tf.vas_099-is-grand b { margin-left: 0; margin-right: 0.5em; }
 [dir="rtl"] .vas_099-actions { justify-content: flex-start; }
