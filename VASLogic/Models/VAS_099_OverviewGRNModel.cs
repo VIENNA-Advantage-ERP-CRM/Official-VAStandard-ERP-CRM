@@ -155,6 +155,56 @@
 ///                          MovementQty. ReceivedQtyBase carries the base figure the
 ///                          amount is still computed from, and UnitRate is restated
 ///                          per entered uom so Qty x Rate reconciles to Amount.
+///   VAI163   2026-08-10  Three Oracle / drafted-stage corrections:
+///                        - Material lines came back EMPTY for every receipt with
+///                          a referenced invoice. The invoice-aware rate and tax
+///                          expressions bound @C_Invoice_ID five times against one
+///                          parameter, and the app's Oracle layer never sets
+///                          BindByName — ODP.NET binds by POSITION, so a name
+///                          occurring more often than the parameter list raises
+///                          ORA-01008 before a row is read. The invoice id is now
+///                          written into those expressions as a literal, leaving
+///                          @M_InOut_ID as the statement's single placeholder, and
+///                          LoadLines is guarded like every other loader so a
+///                          refused statement is logged rather than silent.
+///                        - No e-mail ever reached the activity trail: the
+///                          recipient filter compared addresses against '', which
+///                          on Oracle IS NULL, so the condition was UNKNOWN for
+///                          every row and excluded the whole table. It is an
+///                          IS NOT NULL test now.
+///                        - Quality parameters are visible on a DRAFTED receipt.
+///                          VA010_ShipConfParameters rows only exist once the
+///                          receipt is completed and its confirmation raised, so
+///                          with none recorded the parameters the quality plan
+///                          assigns (VA010_AssgndParameters, with the quantity to
+///                          verify derived from VA010_CheckingQty exactly as
+///                          MInOutConfirm.CreateParameters derives it) are
+///                          returned instead, flagged IsPlanned and Pending.
+///   VAI163   2026-08-10  Snapshot additions for the six-card summary:
+///                        - IsShipConfirmDocType (C_DocType.IsShipConfirm alone,
+///                          not the ship-OR-pickQA reading IsConfirmationDocType
+///                          carries) — the Confirmation Check card.
+///                        - DifferenceQty, summed from M_InOutLineConfirm the same
+///                          way Accepted (ConfirmedQty) and Scrapped are.
+///                        - QaParamLineCount: how many receipt lines carry a
+///                          product with QA parameters defined, counted off the
+///                          inspection rows already loaded.
+///   VAI163   2026-08-10  - Rate and Amount are read off the SOURCE DOCUMENT in the
+///                          unit the row is labelled with: C_OrderLine (or, for a
+///                          receipt priced from one, C_InvoiceLine) PriceEntered,
+///                          claimed only when the receipt line is booked in that
+///                          same C_UOM_ID. Every other expression here prices from
+///                          PriceActual, the price per the product's BASE unit, and
+///                          "base qty x base price" only equals the order's own line
+///                          amount while those two are in step — on a converted line
+///                          where they are not, the Amount column reported a figure
+///                          belonging to the other unit. The base derivation remains
+///                          the fallback for a receipt with no such price.
+///                        - OrderedQty is converted onto the receipt's scale when the
+///                          order was keyed in a different unit, so the Ordered and
+///                          Received columns under one unit label are comparable.
+///                        - The activity cap rose from 50 to 200, matching VAS_092:
+///                          the panel pages the feed, so a low cap only truncated it.
 ///   VAI163   2026-08-06  The activity trail is handed to the panel newest-first,
 ///                        as its summary and <returns> always said it was: the
 ///                        trim sorted it that way and then reversed it back to
@@ -211,6 +261,24 @@ namespace VASLogic.Models
             bool hasShipConfirm   = ColumnExists("C_DocType", "IsShipConfirm");
             bool hasPickQAConfirm = ColumnExists("C_DocType", "IsPickQAConfirm");
             string confirmDocExpr = BuildConfirmDocExpr(hasShipConfirm, hasPickQAConfirm);
+
+            // The snapshot's Confirmation Check card reads IsShipConfirm ALONE —
+            // "does this document type ask for a receipt confirmation" — where
+            // confirmDocExpr above answers the broader "does it ask for any
+            // confirmation at all" (ship OR pick/QA).
+            string shipConfirmExpr = hasShipConfirm ? "COALESCE(dt.IsShipConfirm, 'N')" : "'N'";
+
+            // M_InOutLineConfirm.DifferenceQty — target less confirmed, the gap the
+            // Difference Quantity card reports. Guarded like everything else here so
+            // an older confirmation schema degrades to zero rather than failing.
+            string differenceQtyExpr = ColumnExists("M_InOutLineConfirm", "DifferenceQty")
+                ? @"(SELECT NVL(SUM(NVL(lc.DifferenceQty, 0)), 0)
+                       FROM M_InOutLineConfirm lc
+                      INNER JOIN M_InOutLine cl ON (cl.M_InOutLine_ID = lc.M_InOutLine_ID
+                                                    AND cl.IsActive    = 'Y')
+                      WHERE cl.M_InOut_ID = io.M_InOut_ID
+                        AND lc.IsActive   = 'Y')"
+                : "0";
 
             // COALESCE(ol.PriceActual, [l.CurrentCostPrice], [l.VA024_UnitPrice], 0).
             // The header aggregate keeps this order-based form; the line query gets
@@ -309,6 +377,8 @@ namespace VASLogic.Models
                               cur.StdPrecision AS StdPrecision,
                               dt.Name          AS DocTypeName,
                               " + confirmDocExpr + @"                             AS IsConfirmationDocType,
+                              " + shipConfirmExpr + @"                            AS IsShipConfirm,
+                              " + differenceQtyExpr + @"                          AS DifferenceQty,
                               /* Accepted / rejected are summed over ALL of the
                                  receipt's confirmation lines, NOT only over those
                                  marked VA010_QualCheckMArk = 'Y'.
@@ -464,11 +534,14 @@ namespace VASLogic.Models
             result.ReceivedValue = Util.GetValueOfDecimal(r["ReceivedValue"]);
             result.AcceptedQty   = Util.GetValueOfDecimal(r["AcceptedQty"]);
             result.RejectedQty   = Util.GetValueOfDecimal(r["RejectedQty"]);
+            result.DifferenceQty = Util.GetValueOfDecimal(r["DifferenceQty"]);
 
             // ----- Document type / confirmation -----
             result.DocTypeName           = Util.GetValueOfString(r["DocTypeName"]);
             result.IsConfirmationDocType =
                 Util.GetValueOfString(r["IsConfirmationDocType"]) == "Y";
+            result.IsShipConfirmDocType  =
+                Util.GetValueOfString(r["IsShipConfirm"]) == "Y";
 
             // ----- Material lines -----
             // A receipt raised against an AP invoice prices its lines from that
@@ -478,7 +551,7 @@ namespace VASLogic.Models
             // (C_InvoiceLine.M_InOutLine_ID) or through the parent purchase order,
             // and only the first of those was previously priced from.
             string lineRateExpr = referencedInvoiceId > 0
-                ? BuildInvoiceRateExpr(hasCurrentCost, hasUnitPrice)
+                ? BuildInvoiceRateExpr(referencedInvoiceId, hasCurrentCost, hasUnitPrice)
                 : rateExpr;
             // A price that came from the referenced invoice follows THAT document's
             // price list, not the order's.
@@ -502,6 +575,12 @@ namespace VASLogic.Models
 
             // ----- Quality inspection parameters (VA010) -----
             result.QualityParams = LoadQualityParams(M_InOut_ID);
+            // How many of the receipt's lines carry QA parameters at all — the
+            // Confirmation Check card's sub-label. Counted off the rows just
+            // loaded rather than re-queried: those rows already answer "this
+            // product has parameters defined", whether they were recorded against
+            // a confirmation or read from the plan on a drafted receipt.
+            result.QaParamLineCount = CountQaParamLines(result.QualityParams);
 
             // ----- When the receipt was actually completed / posted -----
             // The completion moment is the workflow's DocComplete stamp. The
@@ -585,16 +664,29 @@ namespace VASLogic.Models
         /// Both are scalar subqueries, never joins: a product billed on more than
         /// one invoice line would otherwise multiply the receipt's rows. MAX picks
         /// one deterministic price when that happens.
+        ///
+        /// The invoice id is written into the statement as a literal rather than
+        /// bound. The expression is embedded TWICE by the caller (UnitRate and
+        /// LineValue), so a bind name here occurs four times in one statement —
+        /// and the app's Oracle layer never sets BindByName, so ODP.NET binds by
+        /// POSITION and a name appearing more often than the parameter list
+        /// throws ORA-01008 ("not all variables bound") before a row is read.
+        /// That is what emptied the panel's Material Lines section on every
+        /// receipt that has a referenced invoice. The value is an int the model
+        /// read out of C_Invoice itself, so no user text reaches the statement.
         /// </summary>
-        private string BuildInvoiceRateExpr(bool hasCurrentCost, bool hasUnitPrice)
+        /// <param name="C_Invoice_ID">Referenced AP invoice id (already validated
+        /// as an id by the reference-invoice lookup).</param>
+        private string BuildInvoiceRateExpr(int C_Invoice_ID, bool hasCurrentCost, bool hasUnitPrice)
         {
+            string invoiceId = C_Invoice_ID.ToString();
             StringBuilder sb = new StringBuilder();
             sb.Append("COALESCE((SELECT MAX(ivl.PriceActual) FROM C_InvoiceLine ivl");
-            sb.Append(" WHERE ivl.C_Invoice_ID = @C_Invoice_ID");
+            sb.Append(" WHERE ivl.C_Invoice_ID = ").Append(invoiceId);
             sb.Append(" AND ivl.M_InOutLine_ID = l.M_InOutLine_ID");
             sb.Append(" AND ivl.IsActive = 'Y')");
             sb.Append(", (SELECT MAX(ivl.PriceActual) FROM C_InvoiceLine ivl");
-            sb.Append(" WHERE ivl.C_Invoice_ID = @C_Invoice_ID");
+            sb.Append(" WHERE ivl.C_Invoice_ID = ").Append(invoiceId);
             sb.Append(" AND ivl.M_Product_ID = l.M_Product_ID");
             sb.Append(" AND ivl.IsActive = 'Y')");
             sb.Append(", ol.PriceActual");
@@ -855,13 +947,41 @@ namespace VASLogic.Models
             // The tax that sits on this line's price: the referenced invoice line's
             // tax where the price came from the invoice, else the order line's.
             // Scalar subquery, never a join — for the same reason the rate is one.
+            // The invoice id is a literal here too; see BuildInvoiceRateExpr for
+            // why nothing in this statement may be bound more than once.
             string taxRateExpr = (C_Invoice_ID > 0)
                 ? @"COALESCE((SELECT MAX(t2.Rate) FROM C_InvoiceLine ivl2
                                INNER JOIN C_Tax t2 ON (t2.C_Tax_ID = ivl2.C_Tax_ID)
-                               WHERE ivl2.C_Invoice_ID  = @C_Invoice_ID
+                               WHERE ivl2.C_Invoice_ID  = " + C_Invoice_ID + @"
                                  AND ivl2.M_InOutLine_ID = l.M_InOutLine_ID
                                  AND ivl2.IsActive       = 'Y'), ordtax.Rate, 0)"
                 : "COALESCE(ordtax.Rate, 0)";
+
+            // The price the SOURCE DOCUMENT was written with, per its own entered
+            // unit — C_InvoiceLine / C_OrderLine.PriceEntered. PriceActual, which
+            // every other expression here uses, is the price per the product's
+            // BASE unit; multiplying it by the base quantity is only equal to the
+            // document's own line amount while the two are in step, and on a line
+            // whose unit was converted they are not always. Reading PriceEntered
+            // takes the amount straight off the purchase order instead of
+            // re-deriving it.
+            //
+            // Only claimed when the receipt line is booked in the SAME unit the
+            // source line was priced in (C_UOM_ID equal) — otherwise the figure
+            // would be a price per some other unit, which is the very fault this
+            // is fixing. NULL when there is no such price, and the caller then
+            // keeps the base-unit derivation.
+            //
+            // Scalar subquery with a literal invoice id, never a join or a bind,
+            // for the reasons on BuildInvoiceRateExpr.
+            string enteredRateExpr = (C_Invoice_ID > 0)
+                ? @"COALESCE((SELECT MAX(ivl3.PriceEntered) FROM C_InvoiceLine ivl3
+                               WHERE ivl3.C_Invoice_ID    = " + C_Invoice_ID + @"
+                                 AND ivl3.M_InOutLine_ID  = l.M_InOutLine_ID
+                                 AND ivl3.C_UOM_ID        = l.C_UOM_ID
+                                 AND ivl3.IsActive        = 'Y'),
+                              CASE WHEN ol.C_UOM_ID = l.C_UOM_ID THEN ol.PriceEntered END)"
+                : "CASE WHEN ol.C_UOM_ID = l.C_UOM_ID THEN ol.PriceEntered END";
 
             string sql = @"SELECT
                               l.M_InOutLine_ID,
@@ -885,8 +1005,16 @@ namespace VASLogic.Models
                               u.Name            AS UOMName,
                               NVL(u.StdPrecision, 0) AS UOMPrecision,
                               /* Ordered in the same (entered) scale as Received, so
-                                 the two columns are comparable down the row. */
+                                 the two columns are comparable down the row. The
+                                 order's own entered figure is only on that scale
+                                 while the two documents share a unit, so the
+                                 base-unit figure travels with it and the caller
+                                 converts when they do not. */
                               NVL(NULLIF(ol.QtyEntered, 0), NVL(ol.QtyOrdered, 0)) AS OrderedQty,
+                              NVL(ol.QtyOrdered, 0) AS OrderedQtyBase,
+                              NVL(ol.C_UOM_ID, 0)   AS OrderUOM,
+                              NVL(l.C_UOM_ID, 0)    AS LineUOM,
+                              " + enteredRateExpr + @" AS EnteredRate,
                               asi.Description   AS AttributeSetInstance,
                               " + taxRateExpr + @"                    AS TaxRate,
                               " + rateExpr + @"                       AS UnitRate,
@@ -904,15 +1032,24 @@ namespace VASLogic.Models
                              AND l.IsActive   = 'Y'
                            ORDER BY l.Line";
 
-            // @C_Invoice_ID only appears in the invoice-aware rate expression —
-            // binding a parameter the statement never references is an error on
-            // Oracle, so it is added only when the SQL actually contains it.
-            List<SqlParameter> param = new List<SqlParameter>();
-            param.Add(new SqlParameter("@M_InOut_ID", M_InOut_ID));
-            if (sql.IndexOf("@C_Invoice_ID", StringComparison.OrdinalIgnoreCase) >= 0)
-                param.Add(new SqlParameter("@C_Invoice_ID", C_Invoice_ID));
-
-            DataSet ds = DB.ExecuteDataset(sql, param.ToArray(), null);
+            // @M_InOut_ID is the ONLY placeholder in this statement, and it occurs
+            // exactly once — which is what positional binding needs (see
+            // BuildInvoiceRateExpr). The referenced invoice id travels inside the
+            // rate / tax expressions as a literal instead of a second bind.
+            DataSet ds;
+            try
+            {
+                ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
+            }
+            catch (Exception ex)
+            {
+                // Every other loader in this model is guarded; this one was not,
+                // so a statement the database refused took the whole overview
+                // down with it (or, where the data layer swallows it, emptied the
+                // Material Lines section with nothing said anywhere).
+                _log.Severe("LoadLines (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
+                return lines;
+            }
             if (ds == null || ds.Tables.Count == 0)
                 return lines;
 
@@ -938,11 +1075,35 @@ namespace VASLogic.Models
                 ln.TaxRate            = Util.GetValueOfDecimal(r["TaxRate"]);
                 ln.QualityApplicable  = Util.GetValueOfString(r["QualityApplicable"]) == "Y";
 
-                // On a tax-inclusive price list PriceActual already carries the
-                // tax, so the Rate column was reporting a gross figure and the
-                // Amount / Received Value that follow from it were gross too. The
-                // tax is divided back out here, once, so every figure the panel
-                // shows is the product price. A line with no tax is untouched.
+                int orderUom = Util.GetValueOfInt(r["OrderUOM"]);
+                int lineUom  = Util.GetValueOfInt(r["LineUOM"]);
+
+                // Rate and Amount in the unit the row is LABELLED with.
+                //
+                // The source document already holds that price — C_OrderLine /
+                // C_InvoiceLine.PriceEntered is the price per the unit the line was
+                // keyed in. Everything below it derives from PriceActual, the price
+                // per the product's BASE unit, and "base quantity x base price" only
+                // equals the order's own line amount while those two are in step.
+                // On a converted line where they are not, the Amount column showed a
+                // figure belonging to the other unit — a Box line priced as if the
+                // rate were per Box but multiplied by the Each quantity. Taking the
+                // price off the purchase order (or, where the receipt is priced from
+                // one, the invoice) puts Qty x Rate = Amount back on the selected
+                // unit and equal to what the order says.
+                decimal enteredRate = Util.GetValueOfDecimal(r["EnteredRate"]);
+                bool pricedFromSource = enteredRate != 0 && ln.ReceivedQty != 0;
+                if (pricedFromSource)
+                {
+                    ln.UnitRate  = enteredRate;
+                    ln.LineValue = enteredRate * ln.ReceivedQty;
+                }
+
+                // On a tax-inclusive price list the price already carries the tax,
+                // so the Rate column was reporting a gross figure and the Amount /
+                // Received Value that follow from it were gross too. The tax is
+                // divided back out here, once, so every figure the panel shows is
+                // the product price. A line with no tax is untouched.
                 if (taxIncluded && ln.TaxRate > 0)
                 {
                     decimal divisor = 1 + (ln.TaxRate / 100m);
@@ -950,17 +1111,29 @@ namespace VASLogic.Models
                     ln.LineValue = ln.LineValue / divisor;
                 }
 
-                // The Rate column is restated per ENTERED uom, so Qty x Rate
-                // reconciles to Amount on the row as shown. The stored price is per
-                // BASE uom (it multiplies MovementQty to give the line amount), so
-                // on a converted line the row otherwise read "2 Box x 50.00 =
-                // 1,200.00". Deriving it from the amount keeps every pricing path
-                // consistent — order price, referenced-invoice price and cost price
-                // alike — and is exactly the stored price when no conversion
-                // applies (QtyEntered == MovementQty).
-                if (ln.ReceivedQty != 0 && ln.ReceivedQtyBase != ln.ReceivedQty)
+                // No price in the line's own unit to be had (a receipt with no
+                // order behind it, priced from a cost column, or booked in a unit
+                // the order was not priced in). The amount is then still the base
+                // computation, so the Rate column is restated per ENTERED uom to
+                // keep Qty x Rate reconciling to it: the stored price multiplies
+                // MovementQty, so on a converted line the row otherwise read
+                // "2 Box x 50.00 = 1,200.00".
+                if (!pricedFromSource
+                    && ln.ReceivedQty != 0 && ln.ReceivedQtyBase != ln.ReceivedQty)
                 {
                     ln.UnitRate = ln.LineValue / ln.ReceivedQty;
+                }
+
+                // Ordered is printed beside Received under one unit label, so it has
+                // to be on the receipt's scale. C_OrderLine.QtyEntered is in the
+                // ORDER's unit; when the two documents disagree the base quantity is
+                // converted with this line's own entered/base ratio instead, which is
+                // the only ratio either document actually states.
+                if (orderUom > 0 && lineUom > 0 && orderUom != lineUom
+                    && ln.ReceivedQtyBase != 0 && ln.ReceivedQty != 0)
+                {
+                    decimal orderedBase = Util.GetValueOfDecimal(r["OrderedQtyBase"]);
+                    ln.OrderedQty = orderedBase * (ln.ReceivedQty / ln.ReceivedQtyBase);
                 }
 
                 lines.Add(ln);
@@ -983,6 +1156,17 @@ namespace VASLogic.Models
         /// joined in SQL — a non-numeric value would abort the query on a numeric
         /// cast — so the ids are parsed in managed code and resolved to names in
         /// one follow-up lookup.
+        ///
+        /// Those inspection records only come into existence when the receipt is
+        /// completed: MInOutConfirm.CreateConfirmation raises the confirmation and
+        /// CreateParameters writes one VA010_ShipConfParameters row per assigned
+        /// parameter. A DRAFTED receipt therefore has none, which left the whole
+        /// Quality Product section empty on exactly the receipts a reviewer is
+        /// looking at. When nothing has been recorded yet the parameters the
+        /// quality PLAN defines are returned instead — the same rows the
+        /// confirmation will raise, marked <see cref="GRNQualityParamData.IsPlanned"/>
+        /// and Pending, so the panel can say it is showing what is expected rather
+        /// than what was found.
         /// </summary>
         /// <param name="M_InOut_ID">Owning goods receipt id.</param>
         /// <returns>Ordered list of inspection rows (empty when VA010 is absent).</returns>
@@ -990,14 +1174,15 @@ namespace VASLogic.Models
         {
             List<GRNQualityParamData> rows = new List<GRNQualityParamData>();
 
-            if (!TableExists("VA010_ShipConfParameters")) return rows;
-
             // Display columns differ between VA010 revisions — probe for the one
             // this schema actually has, exactly as the QA Holds widget does.
             string paramNameCol = FindDisplayColumn("VA010_TestParameter",
                 new string[] { "VA010_TestPrmtrName", "Name", "Description", "Value" });
             string valueNameCol = FindDisplayColumn("VA010_TestPrmtrList",
                 new string[] { "VA010_ParameterValue", "Name", "Description", "Value" });
+
+            if (!TableExists("VA010_ShipConfParameters"))
+                return LoadPlannedQualityParams(M_InOut_ID, paramNameCol, valueNameCol);
 
             string paramNameExpr = !string.IsNullOrEmpty(paramNameCol)
                 ? "tp." + paramNameCol : "CAST(NULL AS VARCHAR(255))";
@@ -1091,7 +1276,322 @@ namespace VASLogic.Models
                 return new List<GRNQualityParamData>();
             }
 
+            // Nothing recorded — the receipt has not been confirmed yet. Show what
+            // the plan says WILL be inspected rather than an empty section.
+            if (rows.Count == 0)
+                return LoadPlannedQualityParams(M_InOut_ID, paramNameCol, valueNameCol);
+
             return rows;
+        }
+
+        /// <summary>
+        /// Builds the quality-inspection rows a receipt is going to be checked
+        /// against, read from its quality PLAN instead of from inspection records
+        /// that do not exist yet. This is what the Quality Product section shows
+        /// while the receipt is drafted.
+        ///
+        /// It reproduces what MInOutConfirm.CreateParameters will write when the
+        /// receipt is completed:
+        ///   - the plan that applies to a line is the LINE's VA010_QualityPlan_ID,
+        ///     falling back to the PRODUCT's (the line column is only stamped by
+        ///     the callout, which not every line-creation path runs);
+        ///   - one row per VA010_AssgndParameters entry of that plan, carrying its
+        ///     test parameter and its acceptable value;
+        ///   - the quantity to verify is the plan's VA010_CheckingQty percentage
+        ///     for the band the line quantity falls in (100% when no band matches
+        ///     or the table is absent), rounded away from zero, never zero and
+        ///     never more than the line quantity.
+        /// No actual value has been entered against any of them, so every row is
+        /// Pending.
+        ///
+        /// Every VA010 table and column is dictionary-guarded: without the quality
+        /// module — or on a revision that stores its names elsewhere — this
+        /// returns nothing and the panel omits the section exactly as before.
+        /// </summary>
+        /// <param name="M_InOut_ID">Owning goods receipt id.</param>
+        /// <param name="paramNameCol">Display column on VA010_TestParameter ("" when none).</param>
+        /// <param name="valueNameCol">Display column on VA010_TestPrmtrList ("" when none).</param>
+        /// <returns>Ordered list of expected inspection rows (may be empty).</returns>
+        private List<GRNQualityParamData> LoadPlannedQualityParams(
+            int M_InOut_ID, string paramNameCol, string valueNameCol)
+        {
+            List<GRNQualityParamData> rows = new List<GRNQualityParamData>();
+            if (!TableExists("VA010_AssgndParameters")) return rows;
+
+            try
+            {
+                // Which plan applies to each line, and how much of it arrives.
+                List<PlannedQcLine> lines = LoadQcPlanLines(M_InOut_ID);
+                if (lines.Count == 0) return rows;
+
+                List<int> planIds = new List<int>();
+                foreach (PlannedQcLine ln in lines)
+                {
+                    if (ln.QualityPlanId > 0 && !planIds.Contains(ln.QualityPlanId))
+                        planIds.Add(ln.QualityPlanId);
+                }
+                if (planIds.Count == 0) return rows;
+
+                Dictionary<int, List<PlannedQcParam>> byPlan =
+                    LoadAssignedParameters(planIds, paramNameCol, valueNameCol);
+                if (byPlan.Count == 0) return rows;
+
+                Dictionary<int, List<QcCheckingBand>> bandsByPlan = LoadCheckingBands(planIds);
+
+                foreach (PlannedQcLine ln in lines)
+                {
+                    List<PlannedQcParam> plan;
+                    if (ln.QualityPlanId <= 0 || !byPlan.TryGetValue(ln.QualityPlanId, out plan))
+                        continue;
+
+                    decimal toVerify = QuantityToVerify(ln.Qty, ln.QualityPlanId, bandsByPlan);
+
+                    foreach (PlannedQcParam pp in plan)
+                    {
+                        rows.Add(new GRNQualityParamData
+                        {
+                            LineNo            = ln.LineNo,
+                            M_Product_ID      = ln.M_Product_ID,
+                            ProductCode       = ln.ProductCode,
+                            ProductName       = ln.ProductName,
+                            ParameterName     = pp.ParameterName,
+                            QuantityToVerify  = toVerify,
+                            AcceptableValueId = pp.AcceptableValueId,
+                            AcceptableValue   = pp.AcceptableValue,
+                            ActualValueId     = 0,
+                            StatusCode        = "N",   // nothing inspected yet
+                            IsPlanned         = true
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadPlannedQualityParams (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
+                return new List<GRNQualityParamData>();
+            }
+
+            return rows;
+        }
+
+        /// <summary>One receipt line, with the quality plan that applies to it.</summary>
+        private class PlannedQcLine
+        {
+            public int     LineNo        { get; set; }
+            public int     M_Product_ID  { get; set; }
+            public string  ProductCode   { get; set; }
+            public string  ProductName   { get; set; }
+            public decimal Qty           { get; set; }   // entered uom, as the panel shows it
+            public int     QualityPlanId { get; set; }
+        }
+
+        /// <summary>One test parameter assigned to a quality plan.</summary>
+        private class PlannedQcParam
+        {
+            public string ParameterName     { get; set; }
+            public int    AcceptableValueId { get; set; }
+            public string AcceptableValue   { get; set; }
+        }
+
+        /// <summary>One VA010_CheckingQty band: verify Pct% of a quantity in [From, To].</summary>
+        private class QcCheckingBand
+        {
+            public decimal QtyFrom { get; set; }
+            public decimal QtyTo   { get; set; }   // 0 = open ended
+            public decimal Pct     { get; set; }
+        }
+
+        /// <summary>
+        /// The receipt's lines with the quality plan each one resolves to — the
+        /// line's own, else its product's. Returns an empty list when neither
+        /// column exists (the quality module is not installed).
+        /// </summary>
+        private List<PlannedQcLine> LoadQcPlanLines(int M_InOut_ID)
+        {
+            List<PlannedQcLine> lines = new List<PlannedQcLine>();
+
+            string planExpr = BuildQcPlanExpr(
+                ColumnExists("M_InOutLine", "VA010_QualityPlan_ID"),
+                ColumnExists("M_Product", "VA010_QualityPlan_ID"),
+                "l", "p");
+            if (planExpr == null) return lines;
+
+            string sql = @"SELECT l.Line          AS LineNo,
+                                  l.M_Product_ID,
+                                  p.Value         AS ProductCode,
+                                  p.Name          AS ProductName,
+                                  NVL(NULLIF(l.QtyEntered, 0), NVL(l.MovementQty, 0)) AS Qty,
+                                  " + planExpr + @" AS QualityPlanId
+                             FROM M_InOutLine l
+                             LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = l.M_Product_ID)
+                            WHERE l.M_InOut_ID = @M_InOut_ID
+                              AND l.IsActive   = 'Y'
+                            ORDER BY l.Line";
+
+            DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
+            if (ds == null || ds.Tables.Count == 0) return lines;
+
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                lines.Add(new PlannedQcLine
+                {
+                    LineNo        = Util.GetValueOfInt(r["LineNo"]),
+                    M_Product_ID  = Util.GetValueOfInt(r["M_Product_ID"]),
+                    ProductCode   = Util.GetValueOfString(r["ProductCode"]),
+                    ProductName   = Util.GetValueOfString(r["ProductName"]),
+                    Qty           = Util.GetValueOfDecimal(r["Qty"]),
+                    QualityPlanId = Util.GetValueOfInt(r["QualityPlanId"])
+                });
+            }
+            return lines;
+        }
+
+        /// <summary>
+        /// The test parameters assigned to each of the given quality plans
+        /// (VA010_AssgndParameters), keyed by plan id and ordered by parameter
+        /// name. The plan ids are inlined — they are integers read out of the
+        /// database, and a bind name may occur only once per statement here (see
+        /// <see cref="BuildInvoiceRateExpr"/>).
+        /// </summary>
+        private Dictionary<int, List<PlannedQcParam>> LoadAssignedParameters(
+            List<int> planIds, string paramNameCol, string valueNameCol)
+        {
+            Dictionary<int, List<PlannedQcParam>> byPlan =
+                new Dictionary<int, List<PlannedQcParam>>();
+
+            // The test-parameter link is a later VA010 addition (the platform's own
+            // CreateParameters writes it only when it is there), so it is guarded.
+            bool hasTestParam = ColumnExists("VA010_AssgndParameters", "VA010_TestParameter_ID");
+
+            string paramNameExpr = (hasTestParam && !string.IsNullOrEmpty(paramNameCol))
+                ? "tp." + paramNameCol : "CAST(NULL AS VARCHAR(255))";
+            string paramJoin = (hasTestParam && !string.IsNullOrEmpty(paramNameCol))
+                ? @"LEFT OUTER JOIN VA010_TestParameter tp
+                            ON (tp.VA010_TestParameter_ID = ap.VA010_TestParameter_ID
+                                AND tp.IsActive = 'Y')"
+                : "";
+
+            string acceptExpr = !string.IsNullOrEmpty(valueNameCol)
+                ? "acc." + valueNameCol : "CAST(NULL AS VARCHAR(255))";
+            string acceptJoin = !string.IsNullOrEmpty(valueNameCol)
+                ? @"LEFT OUTER JOIN VA010_TestPrmtrList acc
+                            ON (acc.VA010_TestPrmtrList_ID = ap.VA010_TestPrmtrList_ID
+                                AND acc.IsActive = 'Y')"
+                : "";
+
+            string sql = @"SELECT ap.VA010_QualityPlan_ID   AS QualityPlanId,
+                                  ap.VA010_TestPrmtrList_ID AS AcceptableValueId,
+                                  " + paramNameExpr + @"    AS ParameterName,
+                                  " + acceptExpr + @"       AS AcceptableValue
+                             FROM VA010_AssgndParameters ap
+                             " + paramJoin + @"
+                             " + acceptJoin + @"
+                            WHERE ap.IsActive = 'Y'
+                              AND ap.VA010_QualityPlan_ID IN (" + JoinIds(planIds) + @")
+                            ORDER BY ap.VA010_QualityPlan_ID, " + paramNameExpr;
+
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds == null || ds.Tables.Count == 0) return byPlan;
+
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                int planId = Util.GetValueOfInt(r["QualityPlanId"]);
+                if (!byPlan.ContainsKey(planId)) byPlan[planId] = new List<PlannedQcParam>();
+                byPlan[planId].Add(new PlannedQcParam
+                {
+                    ParameterName     = Util.GetValueOfString(r["ParameterName"]),
+                    AcceptableValueId = Util.GetValueOfInt(r["AcceptableValueId"]),
+                    AcceptableValue   = Util.GetValueOfString(r["AcceptableValue"])
+                });
+            }
+            return byPlan;
+        }
+
+        /// <summary>
+        /// The VA010_CheckingQty bands of the given plans, keyed by plan id. An
+        /// absent table yields an empty map, which the caller reads as "verify
+        /// everything" — the same default CreateParameters applies.
+        /// </summary>
+        private Dictionary<int, List<QcCheckingBand>> LoadCheckingBands(List<int> planIds)
+        {
+            Dictionary<int, List<QcCheckingBand>> byPlan =
+                new Dictionary<int, List<QcCheckingBand>>();
+            if (!TableExists("VA010_CheckingQty")) return byPlan;
+
+            try
+            {
+                string sql = @"SELECT VA010_QualityPlan_ID            AS QualityPlanId,
+                                      NVL(VA010_PercentQtyToVerify,0) AS Pct,
+                                      NVL(VA010_ReceiptQtyFrom,0)     AS QtyFrom,
+                                      NVL(VA010_ReceiptQtyTo,0)       AS QtyTo
+                                 FROM VA010_CheckingQty
+                                WHERE IsActive = 'Y'
+                                  AND VA010_QualityPlan_ID IN (" + JoinIds(planIds) + ")";
+
+                DataSet ds = DB.ExecuteDataset(sql, null, null);
+                if (ds == null || ds.Tables.Count == 0) return byPlan;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    int planId = Util.GetValueOfInt(r["QualityPlanId"]);
+                    if (!byPlan.ContainsKey(planId)) byPlan[planId] = new List<QcCheckingBand>();
+                    byPlan[planId].Add(new QcCheckingBand
+                    {
+                        Pct     = Util.GetValueOfDecimal(r["Pct"]),
+                        QtyFrom = Util.GetValueOfDecimal(r["QtyFrom"]),
+                        QtyTo   = Util.GetValueOfDecimal(r["QtyTo"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: without the bands every line verifies in full.
+                _log.Severe("LoadCheckingBands: " + ex.Message);
+            }
+            return byPlan;
+        }
+
+        /// <summary>
+        /// How much of a line quantity the plan asks to be verified — the same
+        /// arithmetic MInOutConfirm.CreateParameters performs, so the drafted
+        /// receipt shows the figure the confirmation will actually record: the
+        /// matching band's percentage (100% when none matches), rounded away from
+        /// zero, never zero and never above the line quantity.
+        /// </summary>
+        private decimal QuantityToVerify(decimal qty, int planId,
+                                         Dictionary<int, List<QcCheckingBand>> bandsByPlan)
+        {
+            decimal pct = 100;
+            List<QcCheckingBand> bands;
+            if (bandsByPlan.TryGetValue(planId, out bands))
+            {
+                foreach (QcCheckingBand b in bands)
+                {
+                    // An open-ended band (To = 0) covers everything from its floor.
+                    if (qty >= b.QtyFrom && (b.QtyTo == 0 || qty <= b.QtyTo))
+                    {
+                        pct = b.Pct;
+                        break;
+                    }
+                }
+            }
+
+            decimal toVerify = Math.Round(qty * pct / 100m, MidpointRounding.AwayFromZero);
+            if (toVerify == 0)   toVerify = qty;
+            if (toVerify > qty)  toVerify = qty;
+            return toVerify;
+        }
+
+        /// <summary>
+        /// Renders a list of ids as a comma-separated SQL list. Only ever called
+        /// with integers the model read out of the database, so nothing typed by a
+        /// user reaches the statement.
+        /// </summary>
+        private static string JoinIds(List<int> ids)
+        {
+            string[] parts = new string[ids.Count];
+            for (int i = 0; i < ids.Count; i++) parts[i] = ids[i].ToString();
+            return string.Join(",", parts);
         }
 
         /// <summary>
@@ -1140,6 +1640,21 @@ namespace VASLogic.Models
             {
                 _log.Severe("ResolveActualValueNames: " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// The number of DISTINCT receipt lines the given inspection rows belong
+        /// to — i.e. how many lines carry a product with QA parameters defined.
+        /// Several parameters against one line count once.
+        /// </summary>
+        private int CountQaParamLines(List<GRNQualityParamData> rows)
+        {
+            List<int> seen = new List<int>();
+            foreach (GRNQualityParamData q in rows)
+            {
+                if (!seen.Contains(q.LineNo)) seen.Add(q.LineNo);
+            }
+            return seen.Count;
         }
 
         /// <summary>
@@ -1214,10 +1729,13 @@ namespace VASLogic.Models
         /// <returns>Activity rows ordered newest-first (may be empty).</returns>
         private List<GRNActivityData> LoadActivity(int M_InOut_ID, string docStatus)
         {
-            // A receipt mailed out a dozen times would otherwise push its own
-            // milestones off the bottom of the trail, so the cap is a runaway
-            // guard rather than a headline count.
-            const int MAX_ENTRIES = 50;
+            // A runaway guard, not a headline count — the panel pages the feed at
+            // 15 rows, so the cap is only there to stop a pathological record from
+            // serialising without bound. It matches the VAS_092 Purchase Order
+            // trail's 200: at 50 a receipt that had been mailed out repeatedly ran
+            // out of feed after four pages, and the milestones it was capped in
+            // favour of were the ones the reader had come for.
+            const int MAX_ENTRIES = 200;
 
             List<GRNActivityData> activity = new List<GRNActivityData>();
             LoadReceiptMilestones(M_InOut_ID, docStatus, activity);
@@ -1668,6 +2186,13 @@ namespace VASLogic.Models
                 // Rows with no recipient at all (a stored letter / inbound
                 // document) are the ones this leaves out.
                 //
+                // The test is IS NOT NULL, never a comparison against ''. On
+                // Oracle the empty string IS NULL, so the earlier
+                // "NVL(TRIM(ma.MailAddress), '') <> ''" compared every address
+                // against NULL and evaluated to UNKNOWN for EVERY row, recipient
+                // or not — the filter excluded the whole table and no e-mail has
+                // ever reached the panel's activity trail on an Oracle database.
+                //
                 // The table id is matched with IN + UPPER so a dictionary holding
                 // the name in another case, or more than one row for it, resolves
                 // instead of failing the statement.
@@ -1687,9 +2212,9 @@ namespace VASLogic.Models
                                         WHERE UPPER(t.TableName) = 'M_INOUT')
                                   AND ma.Record_ID          = @M_InOut_ID
                                   AND NVL(ma.IsActive, 'Y') = 'Y'
-                                  AND (NVL(TRIM(ma.MailAddress), '')     <> ''
-                                    OR NVL(TRIM(ma.MailAddressCc), '')   <> ''
-                                    OR NVL(TRIM(ma.MailAddressBcc), '')  <> '')
+                                  AND (ma.MailAddress    IS NOT NULL
+                                    OR ma.MailAddressCc  IS NOT NULL
+                                    OR ma.MailAddressBcc IS NOT NULL)
                                 ORDER BY ma.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
@@ -2131,6 +2656,10 @@ namespace VASLogic.Models
             public DateTime? QAQCDate         { get; set; }
             public string   Remark            { get; set; }
             public string   StatusCode        { get; set; }   // P = passed, F = failed, N = pending
+            /// <summary>True when the row comes from the quality PLAN rather than
+            /// from a recorded inspection — i.e. what the confirmation is going to
+            /// check, shown while the receipt is still drafted. Always Pending.</summary>
+            public bool     IsPlanned         { get; set; }
         }
 
         /// <summary>
@@ -2214,15 +2743,22 @@ namespace VASLogic.Models
 
             // Document type / confirmation
             public string    DocTypeName           { get; set; }
-            public bool      IsConfirmationDocType { get; set; }   // "MM Receipt with Confirmation"
+            public bool      IsConfirmationDocType { get; set; }   // ship OR pick/QA confirmation
+            /// <summary>C_DocType.IsShipConfirm alone — what the snapshot's
+            /// Confirmation Check card reports.</summary>
+            public bool      IsShipConfirmDocType  { get; set; }
 
             // KPI aggregates
             public int       LineCount        { get; set; }
             public decimal   ReceivedQty      { get; set; }
             public int       QcLineCount      { get; set; }
             public decimal   ReceivedValue    { get; set; }
-            public decimal   AcceptedQty      { get; set; }   // passed QC (ConfirmedQty)
-            public decimal   RejectedQty      { get; set; }   // failed QC (ScrappedQty)
+            public decimal   AcceptedQty      { get; set; }   // M_InOutLineConfirm.ConfirmedQty
+            public decimal   RejectedQty      { get; set; }   // M_InOutLineConfirm.ScrappedQty
+            public decimal   DifferenceQty    { get; set; }   // M_InOutLineConfirm.DifferenceQty
+            /// <summary>Receipt lines whose product has QA parameters defined —
+            /// the Confirmation Check card's sub-label.</summary>
+            public int       QaParamLineCount { get; set; }
 
             // Collections
             public List<GRNLineData> Lines    { get; set; }
