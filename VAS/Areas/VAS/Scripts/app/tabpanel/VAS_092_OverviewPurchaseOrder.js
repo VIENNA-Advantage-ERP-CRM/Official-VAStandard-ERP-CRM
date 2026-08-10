@@ -245,6 +245,20 @@
  *   VAI163   2026-08-07  Emits the vas_092-prefixed modifier classes the
  *                        stylesheet now uses, the runtime-built ones included
  *                        ("vas_092-tone-" + tone).
+ *   VAI163   2026-08-07  New Record could still leave the previous order on the
+ *                        panel, for two reasons the 2026-08-05 insert guard does
+ *                        not cover. refreshPanelData can run BEFORE GridTable
+ *                        raises its insert flag, so isTabInserting() asked at
+ *                        that instant answers "no" and the panel loads the row
+ *                        just left; and the reply of a fetch already on the wire
+ *                        landed AFTER the clear and repainted it (visible mainly
+ *                        the first time, when that fetch is the slow one).
+ *                        refreshPanelData now goes through scheduleFetch, which
+ *                        holds REFRESH_DELAY_MS and re-asks isTabInserting(),
+ *                        and every fetch carries a token (fetchToken) that a
+ *                        clear or a newer fetch invalidates — a reply holding a
+ *                        stale token is dropped instead of rendering.
+ *                        Ported from VAS_106.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -311,6 +325,23 @@
         // on screen. Used to tell a real record change from the stream of
         // data-status events the tab fires while a record is being edited.
         var shownRecordId = 0;
+
+        // How long refreshPanelData holds before it actually fetches.
+        // On New Record / Copy Record the framework can call refreshPanelData
+        // BEFORE GridTable raises its insert flag, so isTabInserting() asked at
+        // that instant still answers "no" and the panel would load the record
+        // the user has just moved off. Asking again after this pause gets the
+        // truth. It also collapses a burst of arrow-key row changes into one
+        // request instead of one per row.
+        var REFRESH_DELAY_MS = 150;
+        // Raised by every fetch, every scheduled fetch and every clear. A reply
+        // carrying a token that is no longer the current one belongs to a record
+        // the panel has already moved off, so it is dropped instead of painting.
+        // This is what stops a slow FIRST response from landing on top of the
+        // empty panel that New Record had already cleared — the delay above
+        // cannot do it, because the response can arrive at any time.
+        var fetchToken = 0;
+        var pendingFetch = null;    // timer handle of a scheduled fetch, if any
 
         // Some AD_Message keys may not be seeded yet; fall back to a readable
         // English default so the panel never renders raw keys.
@@ -548,7 +579,47 @@
             $busy[0].style.visibility = show ? "visible" : "hidden";
         }
 
+        // Drops whatever the panel was loading: cancels a fetch still waiting on
+        // its delay and invalidates the token of one already on the wire, so
+        // neither can paint over what the caller is about to put on screen.
+        function invalidateFetch() {
+            fetchToken++;
+            if (pendingFetch) {
+                clearTimeout(pendingFetch);
+                pendingFetch = null;
+            }
+        }
+
+        // Same thing, reachable from dispose so a timer cannot outlive the panel.
+        this.abortPendingFetch = invalidateFetch;
+
+        // Waits REFRESH_DELAY_MS, re-asks the tab whether it is inserting, and
+        // only then fetches. See REFRESH_DELAY_MS for why the wait is needed.
+        this.scheduleFetch = function (recordID) {
+            invalidateFetch();
+            var token = fetchToken;
+            // Claim the record now, not when the timer fires: shownRecordId means
+            // "showing or loading", and leaving it stale through the wait would
+            // let the data-status listener fire a second fetch for the same row.
+            shownRecordId = +recordID || 0;
+            // Feedback while we hold — clear()/fetchData() own it from here.
+            showBusy(true);
+            pendingFetch = setTimeout(function () {
+                pendingFetch = null;
+                if (token !== fetchToken) return;   // superseded while waiting
+                // The insert flag may only have been raised during the wait.
+                if (isTabInserting($self.curTab)) {
+                    $self.record_ID = 0;
+                    $self.clear();
+                    return;
+                }
+                $self.fetchData(recordID);
+            }, REFRESH_DELAY_MS);
+        };
+
         this.fetchData = function (recordID) {
+            invalidateFetch();
+            var token = fetchToken;
             shownRecordId = +recordID || 0;
             showBusy(true);
             $.ajax({
@@ -557,6 +628,10 @@
                 dataType: "json",
                 data: { C_Order_ID: recordID },
                 success: function (raw) {
+                    // Reply for a record the panel has already left (a New
+                    // Record cleared it, or a newer row was selected). Whoever
+                    // superseded us owns the busy indicator now, so leave it be.
+                    if (token !== fetchToken) return;
                     var parsed = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     data = parsed;
                     // Reset per-record view state so a newly selected order starts
@@ -570,6 +645,7 @@
                     showBusy(false);
                 },
                 error: function (err) {
+                    if (token !== fetchToken) return;
                     console.log(err);
                     showBusy(false);
                 }
@@ -580,6 +656,7 @@
         // per-record view state goes with it, so the next order never inherits the
         // page, the open history drawers or the expanded sections of the last one.
         this.clear = function () {
+            invalidateFetch();
             data = null;
             shownRecordId = 0;
             linesPage = 1;
@@ -588,6 +665,7 @@
             lcPage = 1;
             activityPage = 1;
             render();
+            showBusy(false);
         };
 
         // The framework notifies a tab panel when the selected record changes
@@ -1928,7 +2006,7 @@
             // inside its track and the cell's tooltip carries the full name.
             var method = methodLabel(c);
             $tr.append($('<span class="vas_092-ldMethod"></span>')
-                .attr("title", method + " — " + getMsg("VAS_092_TipMethod"))
+              //  .attr("title", method + " — " + getMsg("VAS_092_TipMethod"))
                 .append(pill(method, methodTone(c.DistributionCode))));
 
             $tr.append($('<span class="vas_092-ta-r vas_092-ldExp"></span>')
@@ -2598,7 +2676,9 @@
         }
         this.record_ID = recordID;
         this.selectedRow = selectedRow;
-        this.fetchData(recordID);
+        // Held rather than fetched outright: the insert flag is not always up
+        // yet when we get here, so scheduleFetch asks once more before loading.
+        this.scheduleFetch(recordID);
     };
 
     /* Set width as per window width */
@@ -2608,6 +2688,11 @@
 
     /* Release variables from memory */
     VAS.VAS_092_OverviewPurchaseOrder.prototype.dispose = function () {
+        // Kill any held fetch first — its timer would otherwise fire against a
+        // panel whose curTab has just been nulled out below.
+        if (typeof this.abortPendingFetch === "function") {
+            try { this.abortPendingFetch(); } catch (e) { }
+        }
         if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
             try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
         }

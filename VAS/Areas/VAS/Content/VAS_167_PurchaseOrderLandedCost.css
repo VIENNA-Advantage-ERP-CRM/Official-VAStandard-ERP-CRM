@@ -53,6 +53,13 @@
  *                        vas_167- prefix too. Sharing a name with a base-theme
  *                        rule meant the base design won and repainted the
  *                        panel; scoping them to the panel ends that.
+ *   VAI163   2026-08-07  The title strip is no longer frozen over the body. The
+ *                        scroll moved from .vas_167-body up to .vas_167-root, so
+ *                        the panel scrolls as one piece and .vas_167-head travels
+ *                        with the details it introduces; the body is now
+ *                        `flex: 1 0 auto` (grows with its content, still fills the
+ *                        panel when short) and the scrollbar styling followed the
+ *                        scroll to .vas_167-root.
  ***********************************************************/
 
 .vas_167-root {
@@ -94,9 +101,16 @@
 
     position: relative;
     height: 100%;
-    /* Header fixed, body scrolls: the panel itself never scrolls. */
+    /* The PANEL scrolls, as one piece: the title strip travels with the order's
+       details rather than staying pinned over them. Reading the card means
+       reading the strip's PO number too, and freezing the strip cost the body
+       that much height on every screen without ever being asked to. */
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
+    /* Kept: where the host lays this panel out as a flex item, min-height: 0 is
+       what lets it shrink to the available height instead of growing to its
+       content — without it the scroll above never engages. */
     min-height: 0;
     min-width: 0;
     background: var(--vaselc-white);
@@ -111,9 +125,9 @@
 /* ---------------- Header — title strip ---------------- */
 
 /* Untinted title strip in the PO Overview pattern: title + sub-line on the
-   left, tinted state pills on the right. Unlike that panel's strip this one
-   stays fixed above the scrolling body, so it keeps a hairline rule — the
-   body's content scrolls under it and needs an edge to stop against. */
+   left, tinted state pills on the right. It scrolls away with the body it
+   introduces; the hairline rule stays, now separating the title from the
+   details card rather than marking a frozen edge. */
 .vas_167-head {
     flex: none;
     display: flex;
@@ -278,16 +292,17 @@
 
 /* ---------------- Scrolling body ---------------- */
 
+/* Grows with its content and never shrinks below it — the scroll belongs to
+   .vas_167-root now. `flex: 1 0 auto` still claims the free space when the
+   content is short, so the white surface fills the panel as it always did. */
 .vas_167-body {
-    flex: 1;
-    min-height: 0;
+    flex: 1 0 auto;
     min-width: 0;
-    overflow-y: auto;
     padding: 14px 18px 20px;
 }
 
-.vas_167-body::-webkit-scrollbar { width: 9px; }
-.vas_167-body::-webkit-scrollbar-thumb {
+.vas_167-root::-webkit-scrollbar { width: 9px; }
+.vas_167-root::-webkit-scrollbar-thumb {
     background: rgba(15, 61, 97, 0.14);
     border-radius: 99px;
 }
