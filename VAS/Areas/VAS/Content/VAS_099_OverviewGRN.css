@@ -103,6 +103,17 @@
  *                        a base-theme rule meant the base design won and
  *                        repainted the panel; scoping them to the panel ends
  *                        that.
+ *   VAI163   2026-08-10  Quality parameters moved out of a section of their own
+ *                        and under the material line they belong to: added the
+ *                        drawer (.vas_099-qpDrawer, carrying the rows' min-width
+ *                        so its tint runs the full scrolled width), its six-column
+ *                        mini table (.vas_099-qpMini / -qpMiniRow / -qpMiniHead),
+ *                        the "expected on confirmation" note (.vas_099-qpNote) and
+ *                        the expand caret (.vas_099-qpToggle, rotating 90deg when
+ *                        open). The Quality column's Applicable / Non-Applicable
+ *                        pills gave way to a tick / cross (.vas_099-qMark). The
+ *                        eight-column .vas_099-qpTable and the .vas_099-qpEmpty
+ *                        placeholder went with the section they styled.
  ***********************************************************/
 
 .vas_099-root {
@@ -786,10 +797,10 @@
     line-height: 1.3;
     white-space: nowrap;
 }
-.vas_099-tag.vas_099-q-on  { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
-.vas_099-tag.vas_099-q-off { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
+/* (The Quality column's Applicable / Non-Applicable pills that used to live here
+   are gone — that column now carries a tick or a cross, .vas_099-qMark below.) */
 
-/* Quality Product verdict tags. */
+/* Quality parameter verdict tags. */
 .vas_099-tag.vas_099-q-pass { background: var(--grn-success-bg); color: var(--grn-success-tx); }
 .vas_099-tag.vas_099-q-fail { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
 .vas_099-tag.vas_099-q-wait { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
@@ -834,17 +845,93 @@
 .vas_099-tBody.vas_099-is-link:hover .vas_099-itName { color: var(--grn-action); }
 
 /* ----------------------------------------------------------- */
-/*  Quality Product table                                       */
+/*  Quality parameters (drawer under a material line)           */
 /* ----------------------------------------------------------- */
-/* Product | Parameter | To Verify | Acceptable | Actual | QA Date | Status |
-   Confirmation. Reuses the material table's frame, rows and header. */
-.vas_099-qpTable .vas_099-tRow {
-    grid-template-columns:
-        minmax(0, 1.8fr) minmax(0, 1.5fr) minmax(0, 0.8fr) minmax(0, 1fr)
-        minmax(0, 1fr)   minmax(0, 1fr)   minmax(0, 0.9fr) minmax(0, 1fr);
-    /* Eight columns need more room before they start crushing. */
-    min-width: 720px;
+/* Opened by the caret beside a product name; a sibling of the line row, not a
+   child, because the row is a seven-track grid and a child would become an
+   eighth column. It carries the rows' min-width so that when the table is
+   scrolled sideways the drawer's tint runs the full width of the rows around
+   it rather than stopping at the edge of the visible box — the same reason the
+   totals footer carries it. */
+.vas_099-qpDrawer {
+    min-width: 560px;
+    padding: 0 0.875em 0.75em 2.25em;   /* indented under the product name */
+    background: #FAFCFE;
+    border-bottom: 1px solid var(--grn-row-div);
 }
+.vas_099-table.vas_099-no-quality .vas_099-qpDrawer { min-width: 480px; }
+
+/* "Expected on confirmation" — these are the plan's checks, not results. */
+.vas_099-qpNote {
+    padding: 0.5em 0 0.375em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--grn-muted);
+}
+
+.vas_099-qpMini {
+    border: 1px solid var(--grn-card-bd);
+    border-radius: var(--grn-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+/* Parameter | To Verify | Acceptable | Actual Value | QA Date | Status. */
+.vas_099-qpMiniRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.5em 0.75em;
+    grid-template-columns:
+        minmax(0, 1.6fr) minmax(0, 0.8fr) minmax(0, 1fr)
+        minmax(0, 1fr)   minmax(0, 1fr)   minmax(0, 0.9fr);
+    font-size: 0.8125em;
+    color: var(--grn-text);
+    border-bottom: 1px solid var(--grn-row-div);
+}
+.vas_099-qpMiniRow:last-child { border-bottom: none; }
+.vas_099-qpMiniRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.vas_099-qpMiniHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--grn-card-bd);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--grn-muted);
+    white-space: nowrap;
+}
+
+/* Caret beside a product that has parameters to open. Sits on the name line, so
+   it must not stretch it: fixed box, vertically centred with the text. */
+.vas_099-qpToggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25em;
+    height: 1.25em;
+    margin-right: 0.25em;
+    vertical-align: -0.2em;
+    border-radius: 4px;
+    color: var(--grn-muted);
+    cursor: pointer;
+    transition: transform .12s ease;
+}
+.vas_099-qpToggle:hover { background: var(--grn-info-bg); color: var(--grn-action); }
+.vas_099-qpToggle.vas_099-is-open { transform: rotate(90deg); color: var(--grn-action); }
+
+/* Material table's Quality column: a tick or a cross, not the word. */
+.vas_099-qMark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+.vas_099-qMark.vas_099-q-on  { color: var(--grn-success-tx); }
+.vas_099-qMark.vas_099-q-off { color: var(--grn-muted); }
 
 .vas_099-qpName {
     font-size: 1.0769em; /* ~0.875em against the body anchor */
@@ -854,17 +941,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-/* A quality check applies but no parameters have been recorded yet. */
-.vas_099-qpEmpty {
-    border: 1px dashed var(--grn-card-bd);
-    border-radius: var(--grn-card-radius);
-    background: #fff;
-    padding: 0.875em 1em;
-    font-size: 0.8125em;
-    color: var(--grn-muted);
-    text-align: center;
 }
 
 /* Totals footer. It carries the rows' min-width so that when the table is
@@ -1292,6 +1368,10 @@
 [dir="rtl"] .vas_099-actWhen { text-align: left; }
 [dir="rtl"] .vas_099-actBody { padding-left: 0.875em; padding-right: 2.5em; }
 [dir="rtl"] .vas_099-actCaret svg { transform: scaleX(-1); }
+[dir="rtl"] .vas_099-qpToggle svg { transform: scaleX(-1); }
+[dir="rtl"] .vas_099-qpToggle { margin-right: 0; margin-left: 0.25em; }
+[dir="rtl"] .vas_099-qpToggle.vas_099-is-open { transform: rotate(-90deg); }
+[dir="rtl"] .vas_099-qpDrawer { padding-left: 0.875em; padding-right: 2.25em; }
 [dir="rtl"] .vas_099-actRow.vas_099-is-open .vas_099-actCaret { transform: rotate(-90deg); }
 [dir="rtl"] .vas_099-pgBtn .vas_099-ic svg { transform: scaleX(-1); }
 [dir="rtl"] .vas_099-tFoot { justify-content: flex-start; }

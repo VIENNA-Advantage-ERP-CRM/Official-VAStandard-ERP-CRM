@@ -184,6 +184,68 @@
  *   VAI163   2026-08-07  Emits the vas_099-prefixed modifier classes the
  *                        stylesheet now uses, the runtime-built ones included
  *                        ("vas_099-tone-" + tone).
+ *   VAI163   2026-08-10  New Record / Copy Record could still leave the previous
+ *                        receipt on the panel, for two reasons the 2026-08-05
+ *                        insert guard does not cover. refreshPanelData can run
+ *                        BEFORE GridTable raises its insert flag, so
+ *                        isTabInserting() asked at that instant answers "no" and
+ *                        the panel loads the row just left; and the reply of a
+ *                        fetch already on the wire landed AFTER the clear and
+ *                        repainted it (visible mainly the first time the screen
+ *                        is opened, when that fetch is the slow one).
+ *                        refreshPanelData now goes through scheduleFetch, which
+ *                        holds REFRESH_DELAY_MS and re-asks isTabInserting(), and
+ *                        every fetch carries a token (fetchToken) that a clear or
+ *                        a newer fetch invalidates — a reply holding a stale token
+ *                        is dropped instead of rendering. clear() also drops the
+ *                        busy indicator, which a discarded reply used to strand.
+ *                        Ported from VAS_092.
+ *   VAI163   2026-08-10  Quality Product renders in the drafted stage too: the
+ *                        parameters the quality plan defines are shown as Pending
+ *                        before any confirmation exists (model side), and the
+ *                        section says they are expected rather than recorded.
+ *   VAI163   2026-08-10  - Material Lines is dropped entirely on a receipt with no
+ *                          lines, instead of drawing an empty frame. The
+ *                          placeholder existed to tell "no lines" apart from "the
+ *                          lines failed to load"; the model now catches and logs
+ *                          that failure, so it only stated the obvious.
+ *                        - Generated From no longer carries a Reference Invoice
+ *                          chip — the Documents section lists every invoice raised
+ *                          against the receipt, with date, status and amount. A
+ *                          receipt whose only origin is that invoice drops the
+ *                          strip rather than claiming Manual.
+ *                        - Quality Product rows carry their whole inspection as a
+ *                          hover tooltip (one labelled line per column, blanks
+ *                          omitted), and each clipped cell repeats its own value,
+ *                          so nothing in an eight-column table is unreadable.
+ *   VAI163   2026-08-10  Snapshot reworked to six cards, and the quality
+ *                        parameters moved inside Material Lines:
+ *                        - Card 4 is Confirmation Check, reading the document
+ *                          type's own IsShipConfirm (Applicable / Non-Applicable)
+ *                          with "Product QA Parameters: n" — the receipt lines
+ *                          whose product has parameters defined — underneath.
+ *                        - Cards 5 and 6 are Accepted Quantity (ConfirmedQty) and
+ *                          Difference Quantity (DifferenceQty) with "Scrapped
+ *                          Quantity: n" (ScrappedQty) under the latter. Both are
+ *                          shown only when the receipt is one that gets confirmed
+ *                          at all, so the grid runs 4-up or 3-up x 2, never a
+ *                          4 + 2 orphan row.
+ *                        - The standalone Quality Product section is gone. Each
+ *                          material line whose product HAS parameters carries an
+ *                          expand caret beside the product name and opens them in
+ *                          a drawer below the row (Parameter, To Verify,
+ *                          Acceptable, Actual Value, QA Date, Status), collapsed
+ *                          by default; a line without parameters carries no caret.
+ *                          Open drawers are keyed by M_InOutLine_ID so they
+ *                          survive a pager repaint, and reset with the record.
+ *                        - The Quality column shows a tick / cross rather than
+ *                          "Applicable" / "Non-Applicable", which ellipsised to
+ *                          the same few characters as each other in a
+ *                          seven-column table. The word stays as the cell's
+ *                          tooltip and aria-label.
+ *                        - To Verify is right-aligned: it is a quantity, and it
+ *                          reads against the line's own Received / Ordered
+ *                          figures directly above it.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -256,14 +318,18 @@
             }
 
             if (inserting || rid <= 0) {
-                // New (unsaved) record — nothing to show against it.
-                if ($self.record_ID) {
+                // New (unsaved) record — nothing to show against it. Asked of
+                // shownRecordId rather than record_ID: a fetch still in flight
+                // has already claimed the former, so a New Record raised while
+                // the first (slow) request is on the wire still clears — and
+                // invalidates the reply that would otherwise repaint it.
+                if (shownRecordId || data) {
                     $self.record_ID = 0;
                     $self.clear();
                 }
                 return;
             }
-            if (rid !== $self.record_ID) {
+            if (rid !== shownRecordId) {
                 $self.record_ID = rid;
                 $self.fetchData(rid);
             }
@@ -285,6 +351,32 @@
         var LINES_PER_PAGE = 25;
         var linesPage = 0;
         var activityPage = 0;   // current Activity page (0-based, like linesPage)
+        // Which material lines have their quality-parameter drawer open, keyed by
+        // M_InOutLine_ID. Survives a pager repaint — paging away from a line and
+        // back keeps what the reader opened — and is cleared per record.
+        var lineQpOpen = {};
+
+        // The M_InOut_ID the panel is currently showing OR loading. 0 = nothing.
+        // Distinct from record_ID, which the host sets: this one is claimed the
+        // moment a fetch is scheduled, so a New Record raised mid-flight can tell
+        // that there is something to clear.
+        var shownRecordId = 0;
+
+        // How long refreshPanelData holds before it actually fetches.
+        // On New Record / Copy Record the framework can call refreshPanelData
+        // BEFORE GridTable raises its insert flag, so isTabInserting() asked at
+        // that instant still answers "no" and the panel would load the record the
+        // user has just moved off. Asking again after this pause gets the truth.
+        // It also collapses a burst of arrow-key row changes into one request.
+        var REFRESH_DELAY_MS = 150;
+        // Raised by every fetch, every scheduled fetch and every clear. A reply
+        // carrying a token that is no longer the current one belongs to a record
+        // the panel has already moved off, so it is dropped instead of painting.
+        // This is what stops a slow FIRST response from landing on top of the
+        // empty panel New Record had already cleared — the delay above cannot do
+        // it, because the response can arrive at any time.
+        var fetchToken = 0;
+        var pendingFetch = null;    // timer handle of a scheduled fetch, if any
 
         this.init = function () {
             $root = $('<div class="vas_099-root"></div>');
@@ -349,7 +441,48 @@
             $busy[0].style.visibility = show ? "visible" : "hidden";
         }
 
+        // Drops whatever the panel was loading: cancels a fetch still waiting on
+        // its delay and invalidates the token of one already on the wire, so
+        // neither can paint over what the caller is about to put on screen.
+        function invalidateFetch() {
+            fetchToken++;
+            if (pendingFetch) {
+                clearTimeout(pendingFetch);
+                pendingFetch = null;
+            }
+        }
+
+        // Same thing, reachable from dispose so a timer cannot outlive the panel.
+        this.abortPendingFetch = invalidateFetch;
+
+        // Waits REFRESH_DELAY_MS, re-asks the tab whether it is inserting, and
+        // only then fetches. See REFRESH_DELAY_MS for why the wait is needed.
+        this.scheduleFetch = function (recordID) {
+            invalidateFetch();
+            var token = fetchToken;
+            // Claim the record now, not when the timer fires: shownRecordId means
+            // "showing or loading", and leaving it stale through the wait would
+            // let the data-status listener fire a second fetch for the same row.
+            shownRecordId = +recordID || 0;
+            // Feedback while we hold — clear()/fetchData() own it from here.
+            showBusy(true);
+            pendingFetch = setTimeout(function () {
+                pendingFetch = null;
+                if (token !== fetchToken) return;   // superseded while waiting
+                // The insert flag may only have been raised during the wait.
+                if (isTabInserting($self.curTab)) {
+                    $self.record_ID = 0;
+                    $self.clear();
+                    return;
+                }
+                $self.fetchData(recordID);
+            }, REFRESH_DELAY_MS);
+        };
+
         this.fetchData = function (recordID) {
+            invalidateFetch();
+            var token = fetchToken;
+            shownRecordId = +recordID || 0;
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_099_OverviewGRN/GetGRNOverview",
@@ -357,25 +490,43 @@
                 dataType: "json",
                 data: { M_InOut_ID: recordID },
                 success: function (raw) {
+                    // Reply for a record the panel has already left (a New Record
+                    // cleared it, or a newer row was selected). Whoever superseded
+                    // us owns the busy indicator now, so leave it be.
+                    if (token !== fetchToken) return;
                     var parsed = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     data = parsed;
+                    // Per-record view state, so a newly selected receipt starts on
+                    // the first page with every quality drawer shut.
                     linesPage = 0;
                     activityPage = 0;
+                    lineQpOpen = {};
                     render();
                     showBusy(false);
                 },
                 error: function (err) {
+                    if (token !== fetchToken) return;
                     console.log(err);
                     showBusy(false);
                 }
             });
         };
 
+        // Empties the panel back to its "no goods receipt selected" state, and
+        // drops any fetch that was still on its way to it — without that, the
+        // reply of the request in flight repaints the record New Record / Copy
+        // Record has just cleared.
         this.clear = function () {
+            invalidateFetch();
             data = null;
+            shownRecordId = 0;
             linesPage = 0;
             activityPage = 0;
+            lineQpOpen = {};
             render();
+            // A discarded reply never reaches its own showBusy(false), so the
+            // spinner would otherwise sit on the empty panel for good.
+            showBusy(false);
         };
 
         function render() {
@@ -409,12 +560,16 @@
             // purchase order, reference invoice and sales order as clickable chips
             // in Generated From, and the rest in the header card. The section only
             // repeated them as dead N/A text.
+            // The quality parameters no longer form a section of their own: each
+            // material line opens the ones defined against its own product, so
+            // they are indexed by line before the lines are drawn.
+            indexQualityParams();
+
             drawSection("header",   renderHeader);
             drawSection("linked",   renderLinked);
             drawSection("snapshot", renderSnapshot);
             drawSection("timeline", renderTimeline);
             drawSection("lines",    renderLines);
-            drawSection("quality",  renderQualityProducts);
             drawSection("documents", renderDocuments);
             drawSection("notes",    renderNotes);
             drawSection("activity", renderActivity);
@@ -430,10 +585,31 @@
             }
         }
 
-        // True when a quality check applies anywhere on this receipt — the two QC
-        // snapshot cards and the whole Quality Product section hang off this.
-        function qualityApplicable() {
-            return (data && (data.QcLineCount || 0) > 0);
+        // True when the receipt's document type asks for a receipt confirmation
+        // (C_DocType.IsShipConfirm) — the Confirmation Check card and the two
+        // confirmation-quantity cards beside it hang off this.
+        function confirmationApplicable() {
+            return !!(data && data.IsShipConfirmDocType);
+        }
+
+        // The receipt's quality parameters grouped by the receipt LINE they belong
+        // to, so each material line can open its own. Built once per render.
+        var qpByLine = {};
+
+        function indexQualityParams() {
+            qpByLine = {};
+            var rows = (data && data.QualityParams) || [];
+            for (var i = 0; i < rows.length; i++) {
+                var key = rows[i].LineNo || 0;
+                if (!qpByLine[key]) qpByLine[key] = [];
+                qpByLine[key].push(rows[i]);
+            }
+        }
+
+        // The parameters defined against one material line (empty when none — that
+        // line then carries no expander).
+        function qualityParamsFor(ln) {
+            return (ln && qpByLine[ln.Line]) || [];
         }
 
         // ----------------------------------------------------------------- //
@@ -618,11 +794,16 @@
         // ---------- Generated From (chip strip) ---------- //
 
         // The source documents this receipt was generated from — the purchase
-        // order it was raised against, the AP invoice it was created with
-        // reference to, and the originating sales order on a drop shipment. Only
-        // origins that actually exist are shown, each a clickable chip that opens
-        // the source record; "Manual" is the fallback for a receipt entered
-        // directly, so it only appears when every origin came back empty.
+        // order it was raised against and the originating sales order on a drop
+        // shipment. Only origins that actually exist are shown, each a clickable
+        // chip that opens the source record; "Manual" is the fallback for a
+        // receipt entered directly, so it only appears when the receipt has no
+        // origin at all.
+        //
+        // The AP invoice is an origin but not a chip: the Documents section
+        // already lists it. A receipt whose ONLY origin is that invoice therefore
+        // has nothing to put in the strip — the strip is dropped rather than
+        // labelling it Manual, which it is not.
         function renderLinked() {
             var $strip = $('<section class="vas_099-genfrom"></section>');
             $strip.append($('<span class="vas_099-gfLabel"></span>')
@@ -640,14 +821,11 @@
                 any = true;
             }
 
-            // Reference Invoice — the AP invoice this receipt was raised with
-            // reference to (or that was raised from it).
-            if (data.ReferenceInvoice || data.ReferenceInvoiceId > 0) {
-                $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_099_ReferenceInvoice"),
-                    data.ReferenceInvoice || ("#" + data.ReferenceInvoiceId),
-                    null, "purple", "C_Invoice", data.ReferenceInvoiceId, false));
-                any = true;
-            }
+            // The AP invoice is deliberately NOT a chip here. Every invoice raised
+            // against the receipt is already a row of the Documents section below,
+            // where it carries its date, status and amount and opens the same way —
+            // a chip repeating one of them adds a second, thinner answer to a
+            // question already answered.
 
             // Sales Order — the originating order on a drop shipment. Opened as a
             // sales transaction so the framework resolves the Sales Order window.
@@ -659,6 +837,9 @@
             }
 
             if (!any) {
+                // An invoice-only origin is a real origin, shown in Documents —
+                // so there is nothing to add here and nothing to call Manual.
+                if (data.ReferenceInvoice || data.ReferenceInvoiceId > 0) return;
                 $chips.append(originChip("pencil", msg("VAS_099_Manual", "Manual"),
                     null, null, "info", null, 0));
             }
@@ -724,12 +905,18 @@
         // ---------- Snapshot (metric grid) ---------- //
 
         function renderSnapshot() {
-            var qc = qualityApplicable();
+            // The confirmation cards hang off the document type's own
+            // IsShipConfirm flag — "this receipt is going to be confirmed", which
+            // is what makes a confirmed / difference / scrapped quantity a
+            // meaningful thing to report. (It is NOT the same question as "does a
+            // quality check apply to a line", which drives the Quality column and
+            // the per-line parameters below.)
+            var confirms = confirmationApplicable();
 
             var $snap = $('<section class="vas_099-snap"></section>');
-            // With the two quality cards in play the grid runs three-up, so the six
-            // cards form two even rows instead of a 4 + 2 orphan.
-            if (qc) $snap.addClass("vas_099-has-qc");
+            // With the two confirmation cards in play the grid runs three-up, so
+            // the six cards form two even rows instead of a 4 + 2 orphan.
+            if (confirms) $snap.addClass("vas_099-has-qc");
             var cur = currencyToken();
 
             // Received value.
@@ -747,24 +934,37 @@
                 formatNumber(+data.ReceivedQty || 0, 0),
                 VIS.Msg.getMsg("VAS_099_Units")));
 
-            // Quality check applicability (Applicable when any QC line exists).
-            $snap.append(metricCard("quality", "clipboardCheck", VIS.Msg.getMsg("VAS_099_QualityCheck"),
-                qc ? VIS.Msg.getMsg("VAS_099_Applicable") : VIS.Msg.getMsg("VAS_099_NotApplicable"),
-                qc ? ((data.QcLineCount || 0) + " " + VIS.Msg.getMsg("VAS_099_QCLines")) : ""));
+            // Confirmation Check — whether this receipt's document type asks for a
+            // receipt confirmation, with the number of its lines that carry QA
+            // parameters underneath. The two answer different questions: a receipt
+            // can be confirmable with no QA parameters on any product, and a
+            // drafted one can have parameters waiting with no confirmation yet.
+            $snap.append(metricCard("quality", "clipboardCheck",
+                msg("VAS_099_ConfirmationCheck", "Confirmation Check"),
+                confirms ? msg("VAS_099_Applicable", "Applicable")
+                         : msg("VAS_099_NonApplicable", "Non-Applicable"),
+                msg("VAS_099_ProductQAParameters", "Product QA Parameters") + ": " +
+                    (data.QaParamLineCount || 0)));
 
-            // Quality inspection outcome — only meaningful, and only shown, when a
-            // quality check applies to this receipt. The quantities come from the
-            // receipt confirmation lines: ConfirmedQty passed, ScrappedQty failed.
-            if (qc) {
+            // The confirmation quantities, straight from the receipt's
+            // confirmation lines. Only shown when the receipt is one that gets
+            // confirmed at all — on any other document type they are structurally
+            // zero and would read as a finding rather than an absence.
+            if (confirms) {
                 $snap.append(metricCard("accepted", "checkCircle",
-                    msg("VAS_099_AcceptedQty", "Accepted Qty"),
+                    msg("VAS_099_AcceptedQty", "Accepted Quantity"),
                     formatNumber(+data.AcceptedQty || 0, 0),
-                    msg("VAS_099_UnitsPassedQC", "units passed QC")));
+                    msg("VAS_099_UnitsConfirmed", "units confirmed")));
 
+                // Difference is target less confirmed — what did not arrive as
+                // expected. Scrapped rides underneath it: it is the part of that
+                // gap the confirmation explicitly wrote off, so the two read
+                // together.
                 $snap.append(metricCard("rejected", "xCircle",
-                    msg("VAS_099_RejectedQty", "Rejected Qty"),
-                    formatNumber(+data.RejectedQty || 0, 0),
-                    msg("VAS_099_UnitsFailedQC", "units failed QC")));
+                    msg("VAS_099_DifferenceQty", "Difference Quantity"),
+                    formatNumber(+data.DifferenceQty || 0, 0),
+                    msg("VAS_099_ScrappedQty", "Scrapped Quantity") + ": " +
+                        formatNumber(+data.RejectedQty || 0, 0)));
             }
 
             $body.append($snap);
@@ -901,21 +1101,19 @@
             var lines = (data && data.Lines) || [];
             var cur = currencyToken();
 
+            // No lines on the receipt, no section. The empty state this replaces
+            // was there to distinguish "no lines" from "the lines section failed
+            // to draw" — a receipt whose lines were dropped by a refused query
+            // looked identical to one that has none. That failure is now caught
+            // and logged on the server (LoadLines), so the placeholder only ever
+            // told a reader something they can see for themselves: a receipt with
+            // nothing on it carries an empty frame at the top of the panel.
+            if (!lines.length) return;
+
             var $sec = section(msg("VAS_099_MaterialLines", "Material Lines"), {
                 summary: (data.LineCount || 0) + " " + msg("VAS_099_Items", "items") + " · " +
                     formatNumber(+data.ReceivedQty || 0, 0) + " " + msg("VAS_099_Units", "units")
             });
-
-            // The section always renders, even with nothing to put in it. It used
-            // to return before drawing anything, so a receipt whose lines did not
-            // come back was indistinguishable from one that has no lines section at
-            // all — the reader saw the panel jump from the timeline to the
-            // documents with no explanation. An empty receipt now says so.
-            if (!lines.length) {
-                $sec.append($('<div class="vas_099-qpEmpty"></div>')
-                    .text(msg("VAS_099_NoLines", "No lines have been recorded on this receipt yet.")));
-                return;
-            }
 
             // The Quality column is only meaningful when a quality check actually
             // applies to something on this receipt — with none, the column (header
@@ -971,9 +1169,15 @@
                 var start = linesPage * LINES_PER_PAGE;
                 var end = Math.min(lines.length, start + LINES_PER_PAGE);
 
-                $tbl.find(".vas_099-tBody").remove();
+                $tbl.find(".vas_099-tBody, .vas_099-qpDrawer").remove();
                 for (var i = start; i < end; i++) {
                     $foot.before(buildLineRow(lines[i], cur, showQuality));
+                    // The line's quality parameters, collapsed under it. A sibling
+                    // of the row rather than a child: the row is a CSS grid of
+                    // seven tracks and anything inside it would become an eighth
+                    // column.
+                    var $drawer = buildQualityDrawer(lines[i]);
+                    if ($drawer) $foot.before($drawer);
                 }
 
                 buildPager($pager, linesPage, pageCount, lines.length, start, end,
@@ -1027,6 +1231,15 @@
             return $b;
         }
 
+        // Rotates the caret and swaps the affordance's tooltip to what the NEXT
+        // click will do.
+        function setQpToggleState($toggle, open) {
+            $toggle.toggleClass("vas_099-is-open", open)
+                .attr("title", open
+                    ? msg("VAS_099_HideQualityParams", "Hide quality parameters")
+                    : msg("VAS_099_ShowQualityParams", "Show quality parameters"));
+        }
+
         function buildLineRow(ln, cur, showQuality) {
             var $tr = $('<div class="vas_099-tRow vas_099-tBody"></div>');
 
@@ -1035,6 +1248,26 @@
             // as the locator below, and it leaves the layout untouched.
             var $item = $('<span class="vas_099-itItem"></span>');
             var $name = $('<div class="vas_099-itName"></div>');
+
+            // Expander, only on a product that actually has parameters to show —
+            // a caret against a line with nothing under it is a promise the click
+            // cannot keep. Its state is held per line id so a pager repaint (or a
+            // move to another page and back) keeps what the reader opened.
+            var qParams = qualityParamsFor(ln);
+            if (qParams.length) {
+                var $toggle = $('<span class="vas_099-qpToggle"></span>')
+                    .append(svgIcon("chevRight"));
+                setQpToggleState($toggle, !!lineQpOpen[ln.M_InOutLine_ID]);
+                $toggle.on("click", function (e) {
+                    e.stopPropagation();
+                    var nowOpen = !lineQpOpen[ln.M_InOutLine_ID];
+                    lineQpOpen[ln.M_InOutLine_ID] = nowOpen;
+                    setQpToggleState($toggle, nowOpen);
+                    $tr.next(".vas_099-qpDrawer").toggle(nowOpen);
+                });
+                $name.append($toggle);
+            }
+
             $name.append($('<span></span>').text(na(ln.ProductName)));
 
             // Attribute Set Instance (size / lot / serial ...) reads as part of
@@ -1112,15 +1345,21 @@
 
             // Quality marker — omitted entirely when no line on this receipt has a
             // quality check applicable (the column itself is not rendered then).
+            //
+            // A tick or a cross rather than the words: the column is one of seven
+            // in a side panel, and "Applicable" / "Non-Applicable" are long enough
+            // that they ellipsised to the same few characters as each other. The
+            // word still travels as the cell's tooltip, so the mark is never the
+            // only statement of what it means.
             if (showQuality) {
-                var $q = $('<span class="vas_099-ta-c"></span>');
-                if (ln.QualityApplicable) {
-                    $q.append($('<span class="vas_099-tag vas_099-q-on"></span>')
-                        .text(VIS.Msg.getMsg("VAS_099_Applicable")));
-                } else {
-                    $q.append($('<span class="vas_099-tag vas_099-q-off"></span>')
-                        .text(VIS.Msg.getMsg("VAS_099_NotApplicable")));
-                }
+                var qOn = !!ln.QualityApplicable;
+                var qWord = qOn ? msg("VAS_099_Applicable", "Applicable")
+                                : msg("VAS_099_NonApplicable", "Non-Applicable");
+                var $q = $('<span class="vas_099-ta-c"></span>').attr("title", qWord);
+                $q.append($('<span class="vas_099-qMark"></span>')
+                    .addClass(qOn ? "vas_099-q-on" : "vas_099-q-off")
+                    .attr("aria-label", qWord)
+                    .append(svgIcon(qOn ? "check" : "cross")));
                 $tr.append($q);
             }
 
@@ -1137,68 +1376,84 @@
             "N": { key: "VAS_099_Pending", fallback: "Pending", tone: "vas_099-q-wait" }
         };
 
-        // The quality parameters configured against each product on the receipt —
-        // colour, size, grade or whatever the quality plan defines — with the
-        // acceptable value, the inspected value and the resulting verdict. Rendered
-        // whenever a quality check applies; when it does not, the section is absent
-        // entirely.
-        function renderQualityProducts() {
-            if (!qualityApplicable()) return;
+        // The quality parameters defined against ONE material line's product —
+        // colour, size, grade or whatever the quality plan names — with the
+        // acceptable value, the inspected value and the resulting verdict.
+        //
+        // These used to be a section of their own at the bottom of the panel,
+        // listing every parameter of every product with the product repeated down
+        // a Product column. Reading one product's checks meant finding its rows in
+        // that list and holding the line they belong to in your head. They now
+        // open under the line itself, collapsed until asked for, so the parameters
+        // and the quantity they apply to are read together.
+        //
+        // Returns null for a line with no parameters — that line carries no
+        // expander either.
+        function buildQualityDrawer(ln) {
+            var rows = qualityParamsFor(ln);
+            if (!rows.length) return null;
 
-            var rows = (data && data.QualityParams) || [];
+            var open = !!lineQpOpen[ln.M_InOutLine_ID];
+            var $drawer = $('<div class="vas_099-qpDrawer"></div>');
+            if (!open) $drawer.hide();
 
-            var $sec = section(msg("VAS_099_QualityProduct", "Quality Product"), {
-                summary: rows.length
-                    ? rows.length + " " + msg("VAS_099_Parameters", "parameters")
-                    : ""
-            });
-
-            // A quality check applies but nothing has been recorded yet — say so
-            // rather than showing an empty frame.
-            if (!rows.length) {
-                $sec.append($('<div class="vas_099-qpEmpty"></div>')
-                    .text(msg("VAS_099_NoQualityParams",
-                              "No quality parameters have been recorded for this receipt yet.")));
-                return;
+            // Nothing has been inspected yet — these are the checks the
+            // confirmation is going to raise, read from the plan. Said once, above
+            // the table, rather than left for the reader to infer from a column of
+            // Pending tags.
+            var planned = true;
+            for (var p = 0; p < rows.length; p++) {
+                if (!rows[p].IsPlanned) { planned = false; break; }
+            }
+            if (planned) {
+                $drawer.append($('<div class="vas_099-qpNote"></div>')
+                    .text(msg("VAS_099_QualityExpected",
+                              "Expected on confirmation — nothing inspected yet.")));
             }
 
-            var $tbl = $('<div class="vas_099-table vas_099-qpTable"></div>');
+            var $tbl = $('<div class="vas_099-qpMini"></div>');
 
-            var $head = $('<div class="vas_099-tRow vas_099-tHead"></div>');
-            $head.append($('<span></span>').text(msg("VAS_099_Product", "Product")));
+            var $head = $('<div class="vas_099-qpMiniRow vas_099-qpMiniHead"></div>');
             $head.append($('<span></span>').text(msg("VAS_099_Parameter", "Parameter")));
-            $head.append($('<span class="vas_099-ta-r"></span>').text(msg("VAS_099_ToVerify", "To Verify")));
+            // Right-aligned: it is a quantity, and it reads against the line's own
+            // Received / Ordered figures directly above it.
+            $head.append($('<span class="vas_099-ta-r"></span>')
+                .text(msg("VAS_099_ToVerify", "To Verify")));
             $head.append($('<span></span>').text(msg("VAS_099_AcceptableValue", "Acceptable")));
-            $head.append($('<span></span>').text(msg("VAS_099_ActualValue", "Actual")));
+            $head.append($('<span></span>').text(msg("VAS_099_ActualValue", "Actual Value")));
             $head.append($('<span></span>').text(msg("VAS_099_QADate", "QA Date")));
             $head.append($('<span class="vas_099-ta-c"></span>').text(msg("VAS_099_Status", "Status")));
-            $head.append($('<span class="vas_099-ta-c"></span>').text(msg("VAS_099_Confirmation", "Confirmation")));
             $tbl.append($head);
 
             for (var i = 0; i < rows.length; i++) {
                 $tbl.append(buildQualityRow(rows[i]));
             }
 
-            $sec.append($tbl);
+            $drawer.append($tbl);
+            return $drawer;
         }
 
         function buildQualityRow(q) {
-            var $tr = $('<div class="vas_099-tRow vas_099-tBody"></div>');
+            var $tr = $('<div class="vas_099-qpMiniRow"></div>');
 
-            // Product (name + search key), with the full name on hover since the
-            // cell ellipsises.
-            var $prod = $('<span class="vas_099-itItem"></span>');
-            var pname = na(q.ProductName);
-            $prod.append($('<div class="vas_099-itName"></div>').text(pname).attr("title", pname));
-            if (q.ProductCode) {
-                $prod.append($('<div class="vas_099-itSku"></div>').text(q.ProductCode));
-            }
-            $tr.append($prod);
+            var st = QC_STATUS_MAP[q.StatusCode] || QC_STATUS_MAP["N"];
+            var statusText = msg(st.key, st.fallback);
+
+            // Six columns inside a side panel's table: every cell here ellipsises,
+            // and a parameter name or a value-list entry is exactly the kind of
+            // text that runs past it. The whole row therefore carries the full set
+            // as its tooltip — hovering anywhere on it reads out every parameter of
+            // that inspection, label by label — and the cells most likely to be
+            // clipped repeat their own value on top of it, so a pointer resting on
+            // one column answers for that column first.
+            $tr.attr("title", qualityRowTooltip(q, statusText));
 
             // Parameter (Colour / Size / Grade ...), with the QA remark beneath it
             // when one was entered.
             var $param = $('<span class="vas_099-itItem"></span>');
-            $param.append($('<div class="vas_099-qpName"></div>').text(na(q.ParameterName)));
+            var paramName = na(q.ParameterName);
+            $param.append($('<div class="vas_099-qpName"></div>')
+                .text(paramName).attr("title", paramName));
             var remark = (q.Remark || "").trim();
             if (remark) {
                 $param.append($('<div class="vas_099-itSku"></div>')
@@ -1207,28 +1462,52 @@
             $tr.append($param);
 
             // Quantity to verify.
-            $tr.append($('<span class="vas_099-ta-r"></span>').text(formatNumber(+q.QuantityToVerify || 0, 0)));
+            var toVerify = formatNumber(+q.QuantityToVerify || 0, 0);
+            $tr.append($('<span class="vas_099-ta-r"></span>')
+                .text(toVerify).attr("title", toVerify));
 
             // Acceptable / actual value.
-            $tr.append($('<span></span>').text(na(q.AcceptableValue)));
-            $tr.append($('<span></span>').text(na(q.ActualValue)));
+            $tr.append($('<span></span>')
+                .text(na(q.AcceptableValue)).attr("title", na(q.AcceptableValue)));
+            $tr.append($('<span></span>')
+                .text(na(q.ActualValue)).attr("title", na(q.ActualValue)));
 
             // QA / QC date.
-            $tr.append($('<span></span>').text(na(formatDate(q.QAQCDate))));
+            var qaDate = na(formatDate(q.QAQCDate));
+            $tr.append($('<span></span>').text(qaDate).attr("title", qaDate));
 
             // Verdict.
-            var st = QC_STATUS_MAP[q.StatusCode] || QC_STATUS_MAP["N"];
             var $status = $('<span class="vas_099-ta-c"></span>');
             $status.append($('<span class="vas_099-tag"></span>')
-                .addClass(st.tone).text(msg(st.key, st.fallback)));
+                .addClass(st.tone).text(statusText));
             $tr.append($status);
 
-            // Confirmation — Yes when the receipt uses a document type that asks
-            // for a confirmation ("MM Receipt with Confirmation").
-            $tr.append($('<span class="vas_099-ta-c"></span>').text(
-                data.IsConfirmationDocType ? msg("VAS_099_Yes", "Yes") : msg("VAS_099_No", "No")));
-
             return $tr;
+        }
+
+        // Every column of one inspection row, one labelled line each, for the
+        // row's hover tooltip. Blank fields are left out rather than printed as
+        // "Label: N/A" — a tooltip that exists to recover clipped text should not
+        // be padded with the absence of it.
+        function qualityRowTooltip(q, statusText) {
+            var bits = [];
+            appendTipLine(bits, msg("VAS_099_Parameter", "Parameter"), q.ParameterName);
+            appendTipLine(bits, msg("VAS_099_ToVerify", "To Verify"),
+                formatNumber(+q.QuantityToVerify || 0, 0));
+            appendTipLine(bits, msg("VAS_099_AcceptableValue", "Acceptable"), q.AcceptableValue);
+            appendTipLine(bits, msg("VAS_099_ActualValue", "Actual Value"), q.ActualValue);
+            appendTipLine(bits, msg("VAS_099_QADate", "QA Date"), formatDate(q.QAQCDate));
+            appendTipLine(bits, msg("VAS_099_Status", "Status"), statusText);
+            appendTipLine(bits, msg("VAS_099_Remark", "Remark"), q.Remark);
+            return bits.join("\n");
+        }
+
+        // "Label: value suffix", skipped entirely when the value is blank.
+        function appendTipLine(bits, label, value, suffix) {
+            var text = (value === null || value === undefined) ? "" : String(value).trim();
+            if (!text) return;
+            if (suffix) text += " " + suffix;
+            bits.push(label + ": " + text);
         }
 
         // ---------- Documents (raised against this receipt) ---------- //
@@ -1883,7 +2162,10 @@
             chevUp:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>',
             doc:      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>',
             printer:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>',
-            arrowUpRight: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>'
+            arrowUpRight: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>',
+            // Bare tick / cross for the material table's Quality column. Weighted
+            // to match "check" so the two marks read as a pair down the column.
+            cross:    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>'
         };
 
         // Returns a span wrapping the named inline SVG (innerHTML so the browser
@@ -2018,7 +2300,9 @@
         }
         this.record_ID = recordID;
         this.selectedRow = selectedRow;
-        this.fetchData(recordID);
+        // Held rather than fetched outright: the insert flag is not always up
+        // yet when we get here, so scheduleFetch asks once more before loading.
+        this.scheduleFetch(recordID);
     };
 
     /* Set width as per window width */
@@ -2028,6 +2312,11 @@
 
     /* Release variables from memory */
     VAS.VAS_099_OverviewGRN.prototype.dispose = function () {
+        // Kill any held fetch first — its timer would otherwise fire against a
+        // panel whose curTab has just been nulled out below.
+        if (typeof this.abortPendingFetch === "function") {
+            try { this.abortPendingFetch(); } catch (e) { }
+        }
         if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
             try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
         }

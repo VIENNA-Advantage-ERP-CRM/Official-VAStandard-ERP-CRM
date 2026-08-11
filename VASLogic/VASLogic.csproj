@@ -156,6 +156,7 @@
     <Compile Include="Models\VAS_167_PurchaseOrderLandedCostModel.cs" />
     <Compile Include="Models\VAS_098_PurchaseRequisitionModel.cs" />
     <Compile Include="Models\VAS_099_OverviewGRNModel.cs" />
+    <Compile Include="Models\VAS_190_ProductOverviewRightPanelModel.cs" />
     <Compile Include="Models\VAS_100_OverviewDOModel.cs" />
     <Compile Include="Models\VAS_101_OverviewInventoryCountModel.cs" />
     <Compile Include="Models\VAS_102_OverviewInternalUseModel.cs" />
