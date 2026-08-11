@@ -125,6 +125,18 @@
  *   VAI163   2026-08-07  Emits the vas_102-prefixed modifier classes the
  *                        stylesheet now uses, the runtime-built ones included
  *                        ("vas_102-tone-" + tone).
+ *   VAI163   2026-08-11  The Reference strip gains a Project chip, drawn when the
+ *                        issue carries C_Project_ID: the project's search key on
+ *                        the chip, its name on the tooltip, and a click opens the
+ *                        project record through the same openRecord() zoom path
+ *                        as every other chip. An issue raised against a project
+ *                        and nothing else used to read "Manual Issue". The header
+ *                        pill reads "Project" for that origin (ORIGIN_MAP).
+ *   VAI163   2026-08-11  The Production Order chip opens VAMFG_ProductionOrder
+ *                        and the Project chip VAS_Project, both named in
+ *                        WINDOW_NAME_BY_TABLE. Neither table's zoom target
+ *                        resolves to a window, so both fell through to the
+ *                        "Cannot open" toast on every click.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -391,6 +403,7 @@
             "WORKORDER":   { key: "VAS_102_WorkOrder",      def: "Work Order" },
             "PRODUCTION":  { key: "VAS_102_ProductionOrder", def: "Production Order" },
             "REQUISITION": { key: "VAS_102_Requisition",     def: "Requisition" },
+            "PROJECT":     { key: "VAS_102_Project",         def: "Project" },
             "MANUAL":      { key: "VAS_102_ManualIssue",     def: "Manual Issue" }
         };
 
@@ -554,6 +567,17 @@
                 any = true;
             }
 
+            // The project the issue was raised for (M_Inventory.C_Project_ID).
+            // Its search key identifies it on the chip and its name sits on the
+            // tooltip, the way the requisition's detail does. An issue carrying
+            // only a project used to read "Manual Issue".
+            if (data.C_Project_ID > 0) {
+                $chips.append(originChip("folder",
+                    msg("VAS_102_Project", "Project"), projectLabel(), null,
+                    "purple", "C_Project", data.C_Project_ID, projectTooltip()));
+                any = true;
+            }
+
             if (!any) {
                 $chips.append(originChip("pencil",
                     msg("VAS_102_ManualIssue", "Manual Issue"), null, null,
@@ -617,6 +641,21 @@
             if (!data || !data.WorkOrderNo) return "";
             var extra = (data.WorkOrderCount || 0) - 1;
             return extra > 0 ? (data.WorkOrderNo + " +" + extra) : data.WorkOrderNo;
+        }
+
+        // The project chip's value: the project's search key, falling back to its
+        // name when the key is blank, so the chip is never a bare label.
+        function projectLabel() {
+            if (!data) return "";
+            return (data.ProjectNo || "").trim() || (data.ProjectName || "").trim();
+        }
+
+        // The project's name, for the chip's tooltip — the strip itself lists the
+        // identifier, as it does for every other document.
+        function projectTooltip() {
+            var name = (data && data.ProjectName || "").trim();
+            if (!name || name === projectLabel()) return "";
+            return msg("VAS_102_Project", "Project") + ": " + name;
         }
 
         // The production order the issue consumed material for, counted the same
@@ -1159,8 +1198,16 @@
         // falls through to the table's zoom target, which is what VA075_WorkOrder
         // relies on — that module ships its own window and is not part of this
         // solution, so its name cannot be hard-coded here.
+        //
+        // VAMFG_M_WorkOrder and C_Project are named because their zoom target
+        // does not resolve: the production order chip reported "Cannot open"
+        // on every click, which is what that fallback failing looks like.
+        // Any further screen that needs naming belongs here — nothing else has
+        // to change.
         var WINDOW_NAME_BY_TABLE = {
-            "M_Requisition": "VAS_Requisition"
+            "M_Requisition":     "VAS_Requisition",
+            "VAMFG_M_WorkOrder": "VAMFG_ProductionOrder",
+            "C_Project":         "VAS_Project"
         };
 
         // Window name -> AD_Window_ID, resolved once per name and remembered for
@@ -1253,7 +1300,8 @@
             tag:      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 2.6a2 2 0 0 0-1.4-.6H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.2 8.2a2 2 0 0 0 2.8 0l7.2-7.2a2 2 0 0 0 0-2.8Z"/><circle cx="6.5" cy="6.5" r="1.5"/></svg>',
             link:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
             arrowUpRight: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>',
-            factory:  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20V9l6 4V9l6 4V9l6 4v7Z"/><path d="M2 20h20"/><path d="M7 20v-4"/><path d="M12 20v-4"/><path d="M17 20v-4"/></svg>'
+            factory:  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20V9l6 4V9l6 4V9l6 4v7Z"/><path d="M2 20h20"/><path d="M7 20v-4"/><path d="M12 20v-4"/><path d="M17 20v-4"/></svg>',
+            folder:   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2Z"/></svg>'
         };
 
         function svgIcon(name) {
