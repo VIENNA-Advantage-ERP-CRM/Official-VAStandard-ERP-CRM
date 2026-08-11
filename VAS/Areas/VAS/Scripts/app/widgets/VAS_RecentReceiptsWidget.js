@@ -13,6 +13,13 @@
  *           + drill-down modal). All sizes in `em` per CLAUDE.md.
  * Backend - VAS_RecentReceiptsController.GetRecentReceipts  (paged list)
  *           VAS_RecentReceiptsController.GetReceiptAllocations (modal)
+ *           VAS_RecentReceiptsController.GetPaymentPrintInfo (print process)
+ * Print   - The modal's Print button is shown ONLY when the VAS_ARReceipt window
+ *           has an AD_Process_ID linked on its tab index 0 (table C_Payment) —
+ *           that process is the report VIS.APrint runs. GetPaymentPrintInfo is
+ *           probed once per widget load with C_Payment_ID 0 (the process/table
+ *           ids are window-level, identical for every receipt); an unconfigured
+ *           screen simply has no Print button.
  *
  * ── Labels / Message Keys (VAS_ prefix) ───────────────────────────────
  *  #  | Current Text                              | Message Key
@@ -123,6 +130,15 @@
            reused by the Print button to fetch print info and drive APrint. */
         var currentPaymentId = 0;
         var printBusy = false;
+
+        /* Print availability. The Print button only exists when the VAS_ARReceipt
+           window has an AD_Process_ID linked on its tab index 0 (the C_Payment
+           tab) — that process IS the report APrint runs, so without it the button
+           would have nothing to do. Both ids are window-level, not per receipt, so
+           they are resolved once per widget load and reused by every print click;
+           the button stays hidden until the probe confirms a process. */
+        var printProcessId = 0;
+        var printTableId = 0;
 
         /* Zoom targets. Ids start at 0 and are resolved from the window NAME on
            first use by VAS.ZoomUtil (ids differ per environment, names do not);
@@ -484,13 +500,64 @@
             printBusy = false;
         }
 
-        /* Print: fetch AD_Process_ID + AD_Table_ID for the current receipt
-           and hand off to VIS.APrint. The modal busy overlay stays on for
-           the whole life of the action — through the AJAX round-trip and the
-           startPdf() call — so the user gets feedback until the PDF is
-           ready. The busy state is cleared in one of three ways, whichever
-           fires first: the APrint callback, a safety timer (so a non-
-           callback APrint build still releases the UI), or the next
+        /* ── Print ──────────────────────────────────────────────────────
+           GetPaymentPrintInfo resolves the report from AD_Tab: the process
+           linked on tab index 0 of the VAS_ARReceipt window, for table
+           C_Payment. It returns AD_Process_ID 0 when that tab has none, and
+           the button is then never shown — printing is offered only when the
+           screen is actually configured for it.
+
+           The probe runs once with C_Payment_ID 0 (the ids are window-level,
+           the same for every receipt), so a print click needs no round-trip:
+           it goes straight to VIS.APrint with the cached ids and the modal's
+           current receipt. */
+        function isPrintAvailable() {
+            return printProcessId > 0 && printTableId > 0;
+        }
+
+        /* Reveals the button only for a configured screen. Called after the
+           probe answers; until then the button stays as rendered — hidden. */
+        function applyPrintVisibility() {
+            if (!$dialogPrint) { return; }
+
+            if (isPrintAvailable()) {
+                $dialogPrint.show();
+            }
+            else {
+                $dialogPrint.hide();
+            }
+        }
+
+        function loadPrintAvailability() {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_RecentReceipts/GetPaymentPrintInfo',
+                type: 'GET',
+                cache: false,
+                data: { C_Payment_ID: 0 },
+                success: function (res) {
+                    var data = typeof res === 'string' ? JSON.parse(res) : res;
+                    if (data && typeof data === 'string') { data = JSON.parse(data); }
+
+                    printProcessId = Number(pick(data, "AD_Process_ID", "aD_Process_ID") || pick(data, "ad_process_id", "adProcessId") || 0);
+                    printTableId = Number(pick(data, "AD_Table_ID", "aD_Table_ID") || pick(data, "ad_table_id", "adTableId") || 0);
+
+                    applyPrintVisibility();
+                },
+                error: function () {
+                    /* Unreachable endpoint is treated as "not configured" — no
+                       button rather than one that fails on click. */
+                    printProcessId = 0;
+                    printTableId = 0;
+                    applyPrintVisibility();
+                }
+            });
+        }
+
+        /* The modal busy overlay stays on for the whole life of the print
+           action — through the startPdf() call — so the user gets feedback
+           until the PDF is ready. The busy state is cleared in one of three
+           ways, whichever fires first: the APrint callback, a safety timer (so
+           a non-callback APrint build still releases the UI), or the next
            print/modal-close cycle. */
         function clearPrintBusy() {
             printBusy = false;
@@ -500,62 +567,36 @@
 
         function printReceipt() {
             if (printBusy || !currentPaymentId) { return; }
+            if (!isPrintAvailable()) { return; }
             if (!window.VIS || typeof VIS.APrint !== "function") { return; }
 
             printBusy = true;
             showDialogBusy(true);
             if ($dialogPrint) { $dialogPrint.prop("disabled", true); }
 
-            $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_RecentReceipts/GetPaymentPrintInfo',
-                type: 'GET',
-                cache: false,
-                data: { C_Payment_ID: currentPaymentId },
-                success: function (res) {
-                    var data = typeof res === 'string' ? JSON.parse(res) : res;
-                    if (data && typeof data === 'string') { data = JSON.parse(data); }
+            var widgetWindowNo = widgetSelf && widgetSelf.windowNo ? widgetSelf.windowNo : 0;
 
-                    var processId = Number(pick(data, "AD_Process_ID", "aD_Process_ID") || pick(data, "ad_process_id", "adProcessId") || 0);
-                    var tableId = Number(pick(data, "AD_Table_ID", "aD_Table_ID") || pick(data, "ad_table_id", "adTableId") || 0);
-                    var recordId = Number(pick(data, "Record_ID", "record_ID") || pick(data, "record_id", "recordId") || currentPaymentId);
+            /* Safety timer — if APrint's startPdf doesn't honour the
+               completion callback (older builds), the busy overlay still
+               releases after a worst-case wait. */
+            var safetyTimer = setTimeout(clearPrintBusy, 30000);
 
-                    if (processId <= 0 || tableId <= 0 || recordId <= 0) {
-                        clearPrintBusy();
-                        if (window.VIS && VIS.ADialog) {
-                            VIS.ADialog.info(lbl("VAS_PrintProcessNotFound", "Print process not configured for Payment."));
-                        }
-                        return;
-                    }
-
-                    var widgetWindowNo = widgetSelf && widgetSelf.windowNo ? widgetSelf.windowNo : 0;
-
-                    /* Safety timer — if APrint's startPdf doesn't honour the
-                       completion callback (older builds), the busy overlay
-                       still releases after a worst-case wait. */
-                    var safetyTimer = setTimeout(clearPrintBusy, 30000);
-
-                    /* Signature: new VIS.APrint(AD_Process_ID, AD_Table_ID,
-                       Record_ID, windowNo, null). startPdf(cb) opens the
-                       generated PDF in a new tab; cb runs once the pipeline
-                       returns control. */
-                    var prin = new VIS.APrint(processId, tableId, recordId, widgetWindowNo, null);
-                    try {
-                        prin.startPdf(function () {
-                            clearTimeout(safetyTimer);
-                            clearPrintBusy();
-                        });
-                    }
-                    catch (e) {
-                        /* Older APrint may not accept a callback — fall
-                           back to no-arg invocation and rely on the safety
-                           timer to release the overlay. */
-                        try { prin.startPdf(); } catch (e2) { /* swallow */ }
-                    }
-                },
-                error: function () {
+            /* Signature: new VIS.APrint(AD_Process_ID, AD_Table_ID, Record_ID,
+               windowNo, null). startPdf(cb) opens the generated PDF in a new
+               tab; cb runs once the pipeline returns control. */
+            var prin = new VIS.APrint(printProcessId, printTableId, currentPaymentId, widgetWindowNo, null);
+            try {
+                prin.startPdf(function () {
+                    clearTimeout(safetyTimer);
                     clearPrintBusy();
-                }
-            });
+                });
+            }
+            catch (e) {
+                /* Older APrint may not accept a callback — fall back to no-arg
+                   invocation and rely on the safety timer to release the
+                   overlay. */
+                try { prin.startPdf(); } catch (e2) { /* swallow */ }
+            }
         }
 
         function loadAllocations(paymentId) {
@@ -820,7 +861,9 @@
                 '</div>' +
                 '</div>' +
                 '<div class="vas-rr-dialog-actions">' +
-                '<button type="button" class="vas-rr-dialog-print" aria-label="' + escapeHtml(lbl("VAS_Print", "Print")) + '">' +
+                /* Hidden until the AD_Tab probe confirms a print process is
+                   linked on tab index 0 of VAS_ARReceipt (see loadPrintAvailability). */
+                '<button type="button" class="vas-rr-dialog-print" style="display:none;" aria-label="' + escapeHtml(lbl("VAS_Print", "Print")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
                 '<polyline points="6 9 6 2 18 2 18 9"/>' +
                 '<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>' +
@@ -861,6 +904,10 @@
                 e.stopPropagation();
                 printReceipt();
             });
+
+            /* Ask once whether this screen is configured for printing; the
+               button reveals itself only if it is. */
+            loadPrintAvailability();
 
             /* Allocation No. hyperlink → zoom to the allocation record.
                Delegated on the container because the allocation table is
