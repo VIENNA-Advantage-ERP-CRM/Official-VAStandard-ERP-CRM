@@ -25,6 +25,9 @@
  *  3  | unsegmented                        | VAS_141_Unsegmented
  *  4  | Segment                            | VAS_141_SegmentLink
  *  5  | of                                 | VAS_141_Of
+ * 5a  | Showing                            | VAS_141_Showing
+ * 5b  | Previous page                      | VAS_141_PrevPage
+ * 5c  | Next page                          | VAS_141_NextPage
  *  6  | Nothing here right now.            | VAS_141_NothingHere
  *  7  | No customers.                      | VAS_141_NoCustomers
  *  8  | No target lists are configured.    | VAS_141_NoTargetLists
@@ -50,8 +53,7 @@
 ; (function (VAS, $) {
 
     var CUSTOMER_WINDOW_NAME = 'Business Partner';
-    var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
-    var SEG_COLORS = ['#0083DA', '#5F4AA6', '#0B6B45', '#D78B10', '#A4441C', '#3FA9F5', '#41617A'];
+    var SEG_COLORS = ['#0083DA', '#5F4AA6', '#0B6B45', '#D78B10', '#A33F3F', '#106AB0', '#41576A'];
 
     function ensureDashInlineSizeVar($el) {
         if (window.__vasDashInlineSizeObserver) { return; }
@@ -111,23 +113,25 @@
             if (!isFinite(n)) { n = 0; }
             return Math.round(n).toLocaleString(window.navigator.language);
         }
-        function usesIndian(iso) { return INDIAN_NUMBERING_CURRENCIES.indexOf(String(iso || '').toUpperCase()) >= 0; }
+        // Standard precision of the supplied base-currency descriptor, falling back to
+        // the session context when the endpoint did not send one.
+        function precisionOf(cur) {
+            var p = Number(cur && cur.precision);
+            if (!isNaN(p) && p >= 0) { return p; }
+            if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                p = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+            return !isNaN(p) && p >= 0 ? p : 0;
+        }
+        // Compact money against the base (accounting-schema) currency the endpoint
+        // reported. VIS.Util.formatCompactAmount supplies the scaled magnitude at the
+        // system-configured precision; the sign is composed before the symbol here.
         function formatMoney(value, cur) {
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
-            var sign = n < 0 ? '-' : '', abs = Math.abs(n);
+            var sign = n < 0 ? '-' : '';
+            var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            var body;
-            if (cur && usesIndian(cur.iso)) {
-                if (abs >= 10000000) { body = (abs / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr'; }
-                else if (abs >= 100000) { body = (abs / 100000).toFixed(2).replace(/\.?0+$/, '') + ' Lakh'; }
-                else if (abs >= 1000) { body = (abs / 1000).toFixed(1).replace(/\.?0+$/, '') + 'K'; }
-                else { body = abs.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 }); }
-            } else {
-                if (abs >= 1000000) { body = (abs / 1000000).toFixed(1).replace(/\.?0+$/, '') + 'M'; }
-                else if (abs >= 1000) { body = (abs / 1000).toFixed(1).replace(/\.?0+$/, '') + 'K'; }
-                else { body = abs.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 }); }
-            }
-            return sign + symbol + body;
+            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
         }
         var AVATAR_COLORS = ['#1F83FF', '#5F4AA6', '#0B6B45', '#D78B10', '#0083DA', '#A33F3F'];
         function avatarColor(text) {
@@ -225,12 +229,18 @@
             // occupies the first tracks and leaves the rest empty (no stretching).
             var html = '<div class="vas141-seglist" style="grid-template-rows: repeat(' + segPageSize + ', minmax(0, 1fr))">' + rows + '</div>';
             if (pages > 1) {
+                /* Footer pager (dashboard-widgets.md §"Widget Footer Pager"):
+                   helper left, compact prev · "N of M" · next right. */
                 var from = start + 1, to = start + slice.length;
-                var lbl = from + '–' + to + ' ' + label('VAS_141_Of', 'of') + ' ' + formatCount(total);
+                var segOf = label('VAS_141_Of', 'of');
+                var segHelper = label('VAS_141_Showing', 'Showing') + ' ' + from + '–' + to + ' ' + segOf + ' ' + formatCount(total);
                 html += '<div class="vas141-wpager">' +
-                    '<button type="button" class="vas141-wpgbtn" data-segdir="prev" ' + (segPage <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas141-wpglabel">' + escapeHtml(lbl) + '</span>' +
-                    '<button type="button" class="vas141-wpgbtn" data-segdir="next" ' + (segPage >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
+                    '<span class="vas141-wpglabel">' + escapeHtml(segHelper) + '</span>' +
+                    '<span class="vas141-wpgctl">' +
+                        '<button type="button" class="vas141-wpgbtn" data-segdir="prev" aria-label="' + escapeHtml(label('VAS_141_PrevPage', 'Previous page')) + '" ' + (segPage <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
+                        '<span class="vas141-wpgtext">' + escapeHtml((segPage + 1) + ' ' + segOf + ' ' + pages) + '</span>' +
+                        '<button type="button" class="vas141-wpgbtn" data-segdir="next" aria-label="' + escapeHtml(label('VAS_141_NextPage', 'Next page')) + '" ' + (segPage >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
+                    '</span>' +
                 '</div>';
             }
             $body.html(html);
@@ -305,16 +315,19 @@
             var start = listOffset + 1, end = listOffset + items.length;
             var pages = Math.max(1, Math.ceil(listTotal / LIST_PAGE));
             var current = Math.floor(listOffset / LIST_PAGE);
-            var lbl = start + '–' + end + ' ' + label('VAS_141_Of', 'of') + ' ' + formatCount(listTotal);
-            if (pages > 1) {
-                $listPager.html(
-                    '<button type="button" class="vas141-pgbtn" data-dir="prev" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas141-pglabel">' + escapeHtml(lbl) + '</span>' +
-                    '<button type="button" class="vas141-pgbtn" data-dir="next" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>'
-                );
-            } else {
-                $listPager.html('<span></span><span class="vas141-pglabel">' + escapeHtml(lbl) + '</span><span></span>');
-            }
+            /* Footer pager (dashboard-widgets.md §"Widget Footer Pager"): helper
+               left, compact prev · "N of M" · next right. The control stays put
+               on a single page with both arrows disabled. */
+            var of = label('VAS_141_Of', 'of');
+            var helper = label('VAS_141_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
+            $listPager.html(
+                '<span class="vas141-pglabel">' + escapeHtml(helper) + '</span>' +
+                '<span class="vas141-pgctl">' +
+                    '<button type="button" class="vas141-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_141_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
+                    '<span class="vas141-pgtext">' + escapeHtml((current + 1) + ' ' + of + ' ' + pages) + '</span>' +
+                    '<button type="button" class="vas141-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_141_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
+                '</span>'
+            );
         }
         function turnPage(direction) {
             var next = listOffset + (direction === 'next' ? LIST_PAGE : -LIST_PAGE);

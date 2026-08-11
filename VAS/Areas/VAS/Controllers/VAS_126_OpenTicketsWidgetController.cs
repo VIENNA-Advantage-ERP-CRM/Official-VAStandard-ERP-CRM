@@ -53,12 +53,20 @@ namespace VAS.Controllers
         /// </summary>
         private static readonly int[] KeyClientGroupIds = new int[0];
 
+        // Display tiers. The client colours these three by name (violet / amber /
+        // info); any other label falls back to its neutral tag.
+        private const string TierPlatinum = "Platinum";
+        private const string TierGold = "Gold";
+        private const string TierSilver = "Silver";
+
         /// <summary>
-        /// Optional configured mapping from C_BPartner.Rating to a display tier
-        /// (Platinum/Gold/Silver) for the triage list Tier column. Intentionally
-        /// EMPTY: the schema does not prove Rating's stored codes, so an unmapped
-        /// rating shows the raw code as a neutral tag rather than a guessed tier
-        /// name (matching VAS_122). Populate per tenant, e.g. { "A", "Platinum" }.
+        /// Optional OVERRIDE of the tier label per Rating code. Intentionally EMPTY,
+        /// and normally stays that way: the query now resolves the tag from the
+        /// tenant's own application dictionary (AD_Column('Rating') -> AD_Ref_List,
+        /// translated via AD_Ref_List_Trl), so no hard-coded table is needed and no
+        /// rating is ever labelled by guesswork. Populate this only to force different
+        /// wording than the reference list carries. Entries here win over the
+        /// reference-list name. Same contract as VAS_120.
         /// </summary>
         private static readonly Dictionary<string, string> CustomerTierByRating =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -223,15 +231,17 @@ namespace VAS.Controllers
                     SELECT bp.C_BPartner_ID AS Customer_Id,
                            bp.Name AS Customer_Name,
                            COALESCE(c.Contact_Name, N'') AS Contact,
-                           COALESCE(grp.Name, N'') AS Segment,
+                           COALESCE(seg.Segment_Name, N'') AS Segment,
+                           COALESCE(seg.Segment_Count, 0) AS Segment_Count,
                            COALESCE(owner.Name, N'') AS Rep,
                            bp.Rating AS Tier_Code,
+                           COALESCE(RatingTrl.Name, RatingList.Name, N'') AS Tier_Name,
                            COALESCE(bp.ActualLifeTimeValue, 0) AS Cust_Value
                     FROM C_BPartner bp
                     INNER JOIN OpenTicketCustomers otc ON (otc.C_BPartner_ID=bp.C_BPartner_ID)
                     LEFT OUTER JOIN RankedContacts c ON (c.C_BPartner_ID=bp.C_BPartner_ID AND c.RN=1)
-                    LEFT OUTER JOIN C_BP_Group grp ON (grp.C_BP_Group_ID=bp.C_BP_Group_ID AND grp.AD_Client_ID=bp.AD_Client_ID AND grp.IsActive = 'Y')
-                    LEFT OUTER JOIN AD_User owner ON (owner.AD_User_ID=bp.SalesRep_ID AND owner.AD_Client_ID=bp.AD_Client_ID AND owner.IsActive = 'Y')
+                    LEFT OUTER JOIN CustomerSegment seg ON (seg.C_BPartner_ID=bp.C_BPartner_ID)
+                    LEFT OUTER JOIN AD_User owner ON (owner.AD_User_ID=bp.SalesRep_ID AND owner.AD_Client_ID=bp.AD_Client_ID AND owner.IsActive = 'Y')" + RatingLabelJoins + @"
                     WHERE bp.IsActive = 'Y'
                       AND bp.IsCustomer = 'Y'
                       AND bp.AD_Client_ID = @Client_ID";
@@ -252,6 +262,9 @@ namespace VAS.Controllers
                     OpenTicketCustomers AS (
                         " + openTicketCustomersSql + @"
                     ),
+                    CustomerSegment AS (
+                        " + CustomerSegmentCte + @"
+                    ),
                     CustomerRows AS (
                         " + customerRowsSql + @"
                     )
@@ -259,8 +272,10 @@ namespace VAS.Controllers
                            cr.Customer_Name,
                            cr.Contact,
                            cr.Segment,
+                           cr.Segment_Count,
                            cr.Rep,
                            cr.Tier_Code,
+                           cr.Tier_Name,
                            cr.Cust_Value,
                            COUNT(1) OVER () AS Total_Customers
                     FROM CustomerRows cr
@@ -278,7 +293,8 @@ namespace VAS.Controllers
                         sql,
                         new SqlParameter[]
                         {
-                            new SqlParameter("@Client_ID", ctx.GetAD_Client_ID())
+                            new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
+                            new SqlParameter("@AD_Language", SqlDbType.NVarChar) { Value = GetLanguage(ctx) }
                         }
                     );
 
@@ -286,15 +302,17 @@ namespace VAS.Controllers
                     {
                         total = Util.GetValueOfInt(dr["Total_Customers"]);
                         string tierCode = Util.GetValueOfString(dr["Tier_Code"]);
+                        string tierName = Util.GetValueOfString(dr["Tier_Name"]);
                         items.Add(new
                         {
                             customerId = Util.GetValueOfInt(dr["Customer_Id"]),
                             customerName = Util.GetValueOfString(dr["Customer_Name"]),
                             contact = Util.GetValueOfString(dr["Contact"]),
                             segment = Util.GetValueOfString(dr["Segment"]),
+                            segmentCount = Util.GetValueOfInt(dr["Segment_Count"]),
                             rep = Util.GetValueOfString(dr["Rep"]),
                             tierCode = tierCode,
-                            tier = MapTier(tierCode),
+                            tier = MapTier(tierCode, tierName),
                             value = Util.GetValueOfDecimal(dr["Cust_Value"])
                         });
                     }
@@ -359,10 +377,14 @@ namespace VAS.Controllers
                 int clientId = ctx.GetAD_Client_ID();
                 SchemaCurrency currency = GetSchemaCurrency(ctx);
 
+                // Order follows first textual appearance in profileSql (Oracle binds
+                // positionally): @Client_ID and @BP_ID inside the RankedContacts CTE,
+                // then @AD_Language in the rating-label joins of the profile body.
                 SqlParameter[] keyParams = new SqlParameter[]
                 {
                     new SqlParameter("@Client_ID", clientId),
-                    new SqlParameter("@BP_ID", C_BPartner_ID)
+                    new SqlParameter("@BP_ID", C_BPartner_ID),
+                    new SqlParameter("@AD_Language", SqlDbType.NVarChar) { Value = GetLanguage(ctx) }
                 };
 
                 // 1. Profile (contact/title/email, segment, owner, tier, value, group).
@@ -383,25 +405,28 @@ namespace VAS.Controllers
                     SELECT bp.Name AS Customer_Name,
                            COALESCE(c.Contact_Name, N'') AS Contact_Name,
                            COALESCE(c.Contact_Email, bp.EMail, N'') AS Contact_Email,
-                           COALESCE(grp.Name, N'') AS Segment,
+                           COALESCE(seg.Segment_Name, N'') AS Segment,
+                           COALESCE(seg.Segment_Count, 0) AS Segment_Count,
                            COALESCE(owner.Name, N'') AS Rep,
                            bp.Rating AS Tier_Code,
+                           COALESCE(RatingTrl.Name, RatingList.Name, N'') AS Tier_Name,
                            COALESCE(bp.ActualLifeTimeValue, 0) AS Cust_Value,
-                           COALESCE(bp.C_BP_Group_ID, 0) AS Group_Id
+                           COALESCE(bp.C_BP_Group_ID, 0) AS Group_Id,
+                           " + ProfileCompletionExpr + @" AS Onb_Progress
                     FROM C_BPartner bp
                     LEFT OUTER JOIN RankedContacts c ON (c.RN=1)
-                    LEFT OUTER JOIN C_BP_Group grp ON (grp.C_BP_Group_ID=bp.C_BP_Group_ID AND grp.AD_Client_ID=bp.AD_Client_ID AND grp.IsActive = 'Y')
-                    LEFT OUTER JOIN AD_User owner ON (owner.AD_User_ID=bp.SalesRep_ID AND owner.AD_Client_ID=bp.AD_Client_ID AND owner.IsActive = 'Y')
+                    LEFT OUTER JOIN CustomerSegment seg ON (seg.C_BPartner_ID=bp.C_BPartner_ID)
+                    LEFT OUTER JOIN AD_User owner ON (owner.AD_User_ID=bp.SalesRep_ID AND owner.AD_Client_ID=bp.AD_Client_ID AND owner.IsActive = 'Y')" + RatingLabelJoins + @"
                     WHERE bp.C_BPartner_ID = @BP_ID
                       AND bp.IsActive = 'Y'
                       AND bp.AD_Client_ID = @Client_ID";
                 profileBodySql = MRole.GetDefault(ctx).AddAccessSQL(profileBodySql, "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                string profileSql = "WITH RankedContacts AS (" + rankedContactsSql + ") " + profileBodySql;
+                string profileSql = "WITH RankedContacts AS (" + rankedContactsSql + "), CustomerSegment AS (" + CustomerSegmentCte + ") " + profileBodySql;
 
                 string customerName = null;
-                string contactName = "", contactTitle = "", contactEmail = "", segment = "", rep = "", tierCode = "";
+                string contactName = "", contactTitle = "", contactEmail = "", segment = "", rep = "", tierCode = "", tierName = "";
                 decimal custValue = 0;
-                int groupId = 0;
+                int groupId = 0, segmentCount = 0, onboardingPercent = 0;
 
                 IDataReader dr = null;
                 try
@@ -413,10 +438,13 @@ namespace VAS.Controllers
                         contactName = Util.GetValueOfString(dr["Contact_Name"]);
                         contactEmail = Util.GetValueOfString(dr["Contact_Email"]);
                         segment = Util.GetValueOfString(dr["Segment"]);
+                        segmentCount = Util.GetValueOfInt(dr["Segment_Count"]);
                         rep = Util.GetValueOfString(dr["Rep"]);
                         tierCode = Util.GetValueOfString(dr["Tier_Code"]);
+                        tierName = Util.GetValueOfString(dr["Tier_Name"]);
                         custValue = Util.GetValueOfDecimal(dr["Cust_Value"]);
                         groupId = Util.GetValueOfInt(dr["Group_Id"]);
+                        onboardingPercent = Util.GetValueOfInt(dr["Onb_Progress"]);
                     }
                 }
                 finally
@@ -434,8 +462,9 @@ namespace VAS.Controllers
                 // 2. Open ticket count for this customer.
                 int openTickets = CountOpenTickets(ctx, C_BPartner_ID);
 
-                // 3. Active (non-opportunity) project count.
-                int projects = CountActiveProjects(ctx, C_BPartner_ID);
+                // 3. Active (non-opportunity) projects: count + the first project name.
+                string projectName;
+                int projects = GetActiveProjects(ctx, C_BPartner_ID, out projectName);
 
                 // 4. Open-pipeline value + count.
                 decimal pipelineValue = 0;
@@ -458,9 +487,10 @@ namespace VAS.Controllers
                     contactTitle = contactTitle,
                     contactEmail = contactEmail,
                     segment = segment,
+                    segmentCount = segmentCount,
                     rep = rep,
                     tierCode = tierCode,
-                    tier = MapTier(tierCode),
+                    tier = MapTier(tierCode, tierName),
                     isKeyClient = isKeyClient,
                     value = custValue,
                     currency_symbol = currency.Symbol,
@@ -468,14 +498,17 @@ namespace VAS.Controllers
                     std_precision = currency.StdPrecision,
                     openTickets = openTickets,
                     projects = projects,
+                    projectName = projectName,
                     pipelineValue = pipelineValue,
                     pipelineCount = pipelineCount,
                     overdueAmount = overdueAmount,
                     overdueInvoiceCount = overdueInvoiceCount,
                     overdueDays = overdueDays,
                     overdueInvoice = overdueInvoice,
-                    // No onboarding-status column in the schema; the UI shows a dash.
-                    onboarding = (string)null
+                    // Onboarding completion for this customer, 0..100. Same scoring
+                    // rule as the VAS_136 donut and the VAS_137 "profile incomplete"
+                    // reason, so the detail panel agrees with both.
+                    onboardingPercent = onboardingPercent
                 };
 
                 return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
@@ -632,18 +665,62 @@ namespace VAS.Controllers
             return ReadInt(sql, ctx, bpId, "Cnt");
         }
 
-        /// <summary>Active non-opportunity project count for one customer.</summary>
-        private int CountActiveProjects(Ctx ctx, int bpId)
+        /// <summary>
+        /// Active delivery projects for one customer: how many, and the name of the
+        /// first (alphabetically) so the detail panel can name the project rather than
+        /// only counting it. C_Project is joined on C_BPartner_ID, per the supplied
+        /// query.
+        ///
+        /// The 'DR'/'IP' exclusion is retained: in this deployment those are
+        /// pipeline/opportunity stages rather than delivery projects, as documented on
+        /// VAS_135_ActiveProjectsWidget, which counts the same population. Dropping it
+        /// here would put opportunities in the Projects fact and disagree with that
+        /// widget - e.g. Devcast Inc has 7 C_Project rows of which only 1 is a delivery
+        /// project, and Himalayan Foods has 3 of which none are.
+        ///
+        /// MIN(Name) rather than a string aggregate: STRING_AGG / LISTAGG differ across
+        /// the SQL Server, Oracle and PostgreSQL targets. The count travels alongside
+        /// so the client can render "Name +N".
+        /// </summary>
+        /// <param name="ctx">Authenticated request context.</param>
+        /// <param name="bpId">Customer to inspect.</param>
+        /// <param name="projectName">First project name; empty when there are none.</param>
+        /// <returns>Active delivery project count.</returns>
+        private int GetActiveProjects(Ctx ctx, int bpId, out string projectName)
         {
+            projectName = "";
+
             string sql = @"
-                SELECT COUNT(1) AS Cnt
+                SELECT COUNT(1) AS Cnt,
+                       MIN(p.Name) AS First_Name
                 FROM C_Project p
                 WHERE p.IsActive = 'Y'
                   AND p.AD_Client_ID = @Client_ID
                   AND p.C_BPartner_ID = @BP_ID
                   AND (p.VAS_ProjectStatus IS NULL OR p.VAS_ProjectStatus NOT IN ('DR', 'IP'))";
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            return ReadInt(sql, ctx, bpId, "Cnt");
+
+            int count = 0;
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@BP_ID", bpId)
+                });
+                if (dr != null && dr.Read())
+                {
+                    count = Util.GetValueOfInt(dr["Cnt"]);
+                    projectName = Util.GetValueOfString(dr["First_Name"]);
+                }
+            }
+            finally
+            {
+                CloseReader(dr);
+            }
+
+            return count;
         }
 
         /// <summary>Open-pipeline value (base currency) + count for one customer.</summary>
@@ -818,16 +895,143 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Maps a raw C_BPartner.Rating code to a display tier via the approved
-        /// configuration; null when unmapped (the client then shows the raw code as
-        /// a neutral tag rather than a guessed tier name).
+        /// Resolves the display tier for one row. An explicit tenant mapping in
+        /// CustomerTierByRating wins when present; otherwise the tenant's own
+        /// AD_Ref_List label for the Rating code (already translated by the query) is
+        /// used. Returns null when the rating is unset or carries no list entry, so the
+        /// UI shows no tag and an unknown rating is never labelled. Identical rule to
+        /// VAS_120 so the same customer reads the same tier in both widgets.
         /// </summary>
-        private string MapTier(string ratingCode)
+        /// <param name="ratingCode">Stored Rating value (may be null/empty).</param>
+        /// <param name="ratingName">AD_Ref_List/Trl name for that code (may be empty).</param>
+        /// <returns>The configured tier, else the folded star tier, else the
+        /// reference-list label, else null.</returns>
+        private string MapTier(string ratingCode, string ratingName)
         {
             if (string.IsNullOrEmpty(ratingCode)) { return null; }
+
+            // An explicit per-tenant override always wins.
             string tier;
-            return CustomerTierByRating.TryGetValue(ratingCode, out tier) ? tier : null;
+            if (CustomerTierByRating.TryGetValue(ratingCode, out tier)) { return tier; }
+
+            // Star-rating lists (the stock _Rating reference labels its entries
+            // "-", "*", "**", ...) are folded onto the three display tiers per the
+            // approved business rule: 3+ stars Platinum, 2 Gold, 1 Silver. Reading
+            // the star COUNT off the label keeps this independent of the stored
+            // Value codes, which differ between tenants.
+            int stars = CountRatingStars(ratingName);
+            if (stars >= 3) { return TierPlatinum; }
+            if (stars == 2) { return TierGold; }
+            if (stars == 1) { return TierSilver; }
+
+            // Not a star list: fall back to the tenant's own label (e.g. "Preferred").
+            // The zero-star entry is "not rated", so it -- like a blank label -- draws
+            // no tag; an unknown rating is still never named.
+            if (string.IsNullOrWhiteSpace(ratingName)) { return null; }
+
+            string trimmed = ratingName.Trim();
+            return trimmed == "-" ? null : trimmed;
         }
+
+        /// <summary>
+        /// Counts star glyphs in a rating label. Both the ASCII asterisk used by the
+        /// stock reference data and the unicode star some tenants store are counted,
+        /// so the fold works whichever form the dictionary holds.
+        /// </summary>
+        /// <param name="ratingName">Reference-list label (may be null/empty).</param>
+        /// <returns>Number of star glyphs; 0 when the label carries none.</returns>
+        private static int CountRatingStars(string ratingName)
+        {
+            if (string.IsNullOrEmpty(ratingName)) { return 0; }
+
+            int stars = 0;
+            foreach (char character in ratingName)
+            {
+                // U+2605 BLACK STAR and U+2606 WHITE STAR alongside the ASCII
+                // asterisk, so the count works whichever glyph the list uses.
+                if (character == '*' || character == '★' || character == '☆')
+                {
+                    stars++;
+                }
+            }
+
+            return stars;
+        }
+
+        /// <summary>
+        /// Customer segment = the marketing target list the customer belongs to.
+        /// C_TargetList holds the membership rows and C_MasterTargetList carries the
+        /// segment name ("West Region Prospect", ...); C_CampaignTargetList is what
+        /// points a campaign at those same master lists.
+        ///
+        /// The membership is joined on C_TargetList.C_BPartner_ID only, per the
+        /// supplied join path. NOTE: C_TargetList also carries Ref_BPartner_ID, and the
+        /// two are mutually exclusive - a row populates one or the other. Rows that use
+        /// Ref_BPartner_ID therefore resolve to no segment here (2 of the 11 active
+        /// rows in the reference tenant: Fortec Web Solutions, H&T Company). Widen the
+        /// join to COALESCE(tl.C_BPartner_ID, tl.Ref_BPartner_ID) if those should count.
+        ///
+        /// A customer can sit in several segments. Rather than a non-portable string
+        /// aggregate (STRING_AGG / LISTAGG differ across the SQL Server, Oracle and
+        /// PostgreSQL targets), this returns the alphabetically first segment plus the
+        /// total count, and the client renders "First segment +N" - so extra segments
+        /// are surfaced rather than silently dropped.
+        ///
+        /// Secondary source: NOT MRole-filtered, matching the contacts lookup in
+        /// VAS_122 - the customers themselves are already access-filtered by the query
+        /// this CTE is joined into. IsActive and AD_Client_ID are kept for tenancy.
+        /// </summary>
+        private const string CustomerSegmentCte = @"
+            SELECT tl.C_BPartner_ID AS C_BPartner_ID,
+                   MIN(mtl.Name) AS Segment_Name,
+                   COUNT(DISTINCT mtl.C_MasterTargetList_ID) AS Segment_Count
+            FROM C_TargetList tl
+            INNER JOIN C_MasterTargetList mtl ON (mtl.C_MasterTargetList_ID=tl.C_MasterTargetList_ID AND mtl.AD_Client_ID=tl.AD_Client_ID AND mtl.IsActive = 'Y')
+            WHERE tl.IsActive = 'Y'
+              AND tl.AD_Client_ID = @Client_ID
+              AND tl.C_BPartner_ID IS NOT NULL
+            GROUP BY tl.C_BPartner_ID";
+
+        /// <summary>
+        /// Onboarding / profile completion % (0..100), correlated to the outer
+        /// C_BPartner alias "bp". Scored 20 points per profile section that holds data
+        /// - the customer itself, a location (C_BPartner_Location), a contact
+        /// (AD_User), a bank account (C_BP_BankAccount) and a customer accounting
+        /// record (FRPT_BP_Customer_Acct). Each DISTINCT 20 line contributes its 20
+        /// only when that section exists, so the sum is a multiple of 20 up to 100.
+        /// There is no VAS_ProfileCompletion column. Identical rule to VAS_136 and
+        /// VAS_137, so the same customer reads the same percentage everywhere.
+        /// Portable across Oracle and PostgreSQL.
+        /// </summary>
+        private const string ProfileCompletionExpr = @"COALESCE((
+                        SELECT SUM(t.Cnt)
+                        FROM (
+                            SELECT DISTINCT 20 AS Cnt FROM C_BPartner
+                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM C_BPartner_Location bpl WHERE bpl.C_BPartner_ID = bp.C_BPartner_ID
+                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM AD_User bpu WHERE bpu.C_BPartner_ID = bp.C_BPartner_ID
+                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM C_BP_BankAccount bpb WHERE bpb.C_BPartner_ID = bp.C_BPartner_ID
+                            UNION ALL SELECT DISTINCT 20 AS Cnt FROM FRPT_BP_Customer_Acct bpc WHERE bpc.C_BPartner_ID = bp.C_BPartner_ID
+                        ) t
+                    ), 0)";
+
+        /// <summary>Session language for the AD_Ref_List_Trl join, falling back to en_US.</summary>
+        private string GetLanguage(Ctx ctx)
+        {
+            string language = ctx == null ? string.Empty : ctx.GetAD_Language();
+            return string.IsNullOrEmpty(language) ? "en_US" : language;
+        }
+
+        /// <summary>
+        /// Dictionary joins that resolve C_BPartner.Rating to its tenant label:
+        /// AD_Table -> AD_Column('Rating') -> AD_Ref_List, translated through
+        /// AD_Ref_List_Trl when the session language has an entry. Written against the
+        /// alias "bp". Requires an @AD_Language parameter on the query.
+        /// </summary>
+        private const string RatingLabelJoins = @"
+                    LEFT OUTER JOIN AD_Table BPartnerTable ON (BPartnerTable.TableName = 'C_BPartner')
+                    LEFT OUTER JOIN AD_Column RatingColumn ON (RatingColumn.AD_Table_ID = BPartnerTable.AD_Table_ID AND RatingColumn.ColumnName = 'Rating' AND RatingColumn.IsActive = 'Y')
+                    LEFT OUTER JOIN AD_Ref_List RatingList ON (RatingList.AD_Reference_ID = RatingColumn.AD_Reference_Value_ID AND RatingList.Value = bp.Rating AND RatingList.IsActive = 'Y')
+                    LEFT OUTER JOIN AD_Ref_List_Trl RatingTrl ON (RatingTrl.AD_Ref_List_ID = RatingList.AD_Ref_List_ID AND RatingTrl.AD_Language = @AD_Language)";
 
         /// <summary>
         /// Reads the tenant accounting currency (symbol, ISO, precision) for the

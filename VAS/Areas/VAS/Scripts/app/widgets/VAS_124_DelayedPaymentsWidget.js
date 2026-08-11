@@ -45,10 +45,6 @@
         write();
     }
 
-    // Currencies of Indian-numbering countries get Indian digit grouping and
-    // Lakh/Crore compact notation; all others get international grouping and K/M/B/T.
-    var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
-
     var CUSTOMER_WINDOW_NAME = 'Business Partner';
 
     VAS.VAS_124_DelayedPaymentsWidget = function () {
@@ -69,7 +65,7 @@
         }
 
         function usesIndianNumbering(isoCode) {
-            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+            return VIS.Util.usesIndianNumbering(isoCode);
         }
 
         function currencyLocale(isoCode) {
@@ -85,32 +81,16 @@
             return !isNaN(precision) && precision >= 0 ? precision : 0;
         }
 
-        function trimTrailingZeros(text) {
-            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
-        }
-
-        // Compact currency amount (e.g. ₹3.42 Cr / $34.2M / -$5.3T). The sign sits
-        // BEFORE the currency symbol and compaction is on the absolute value.
-        function formatCompactAmount(value, symbol, isoCode) {
+        // Compact currency amount (e.g. ₹3.42Cr / $34.2M / -$5.3T). The magnitude comes
+        // from VIS.Util.formatCompactAmount, which scales against the base
+        // (accounting-schema) currency's numbering system and renders at the
+        // system-configured standard precision; the sign sits BEFORE the symbol.
+        function formatCompactAmount(value, symbol, isoCode, precision) {
             var number = Number(value || 0);
             if (!isFinite(number)) { number = 0; }
             var sign = number < 0 ? '-' : '';
-            var abs = Math.abs(number);
             var currency = symbol || isoCode || '';
-            var compact;
-            if (usesIndianNumbering(isoCode)) {
-                if (abs >= 10000000) { compact = trimTrailingZeros((abs / 10000000).toFixed(2)) + ' Cr'; }
-                else if (abs >= 100000) { compact = trimTrailingZeros((abs / 100000).toFixed(2)) + ' Lakh'; }
-                else if (abs >= 1000) { compact = trimTrailingZeros((abs / 1000).toFixed(1)) + 'K'; }
-                else { compact = abs.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 }); }
-            } else {
-                if (abs >= 1000000000000) { compact = trimTrailingZeros((abs / 1000000000000).toFixed(1)) + 'T'; }
-                else if (abs >= 1000000000) { compact = trimTrailingZeros((abs / 1000000000).toFixed(1)) + 'B'; }
-                else if (abs >= 1000000) { compact = trimTrailingZeros((abs / 1000000).toFixed(1)) + 'M'; }
-                else if (abs >= 1000) { compact = trimTrailingZeros((abs / 1000).toFixed(1)) + 'K'; }
-                else { compact = abs.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 }); }
-            }
-            return sign + currency + compact;
+            return sign + currency + VIS.Util.formatCompactAmount(number, isoCode, getPrecision(precision));
         }
 
         // Full, precise currency amount for the value tooltip.
@@ -163,7 +143,7 @@
         }
 
         function renderMetric(data) {
-            var compact = formatCompactAmount(data.overdue_amount, data.currency_symbol, data.currency_iso);
+            var compact = formatCompactAmount(data.overdue_amount, data.currency_symbol, data.currency_iso, data.std_precision);
             var full = formatFullAmount(data.overdue_amount, data.currency_symbol, data.currency_iso, data.std_precision);
             var countText = overdueCountText(data.overdue_customer_count);
 
@@ -222,9 +202,16 @@
                         currency: { symbol: data.currency_symbol || '', iso: data.currency_iso || '', precision: data.std_precision }
                     };
                 },
+                // One row per customer in arrears, so the modal's count reconciles with
+                // the "N clients overdue" sub-line on the tile.
                 mapRow: function (item, cur, h) {
                     var days = Number(item.overdueDays || 0);
-                    var meta = [item.invoice, h.formatCount(days) + 'd ' + label('VAS_124_Overdue', 'overdue')].filter(function (p) { return p; }).join(' · ');
+                    var invoices = Number(item.invoiceCount || 0);
+                    var invoiceWord = invoices === 1 ? label('VAS_124_Invoice', 'invoice') : label('VAS_124_Invoices', 'invoices');
+                    var meta = [
+                        invoices > 0 ? h.formatCount(invoices) + ' ' + invoiceWord : '',
+                        h.formatCount(days) + 'd ' + label('VAS_124_Overdue', 'overdue')
+                    ].filter(function (p) { return p; }).join(' · ');
                     return { bpId: item.customerId, title: item.customerName, meta: meta, valueText: h.formatMoney(item.overdueAmt, cur), valueTone: 'danger' };
                 },
                 navigate: zoomToCustomer

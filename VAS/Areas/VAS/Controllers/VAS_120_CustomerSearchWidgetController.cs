@@ -1,4 +1,4 @@
-/******************************************************
+﻿/******************************************************
  * Module Name    : VAS
  * Purpose        : Customers module Customer Search widget endpoint
  * chronological  : Development
@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -30,8 +31,16 @@ namespace VAS.Controllers
     ///               access; per the CTE rule it is applied only to the main
     ///               physical table (C_BPartner), never to the CTE aliases or the
     ///               secondary AD_User / C_BP_Group joins.
+    ///               The row quick actions post back here too: SaveAppointment and
+    ///               SaveTask both write AppointmentsInfo through MAppointmentsInfo
+    ///               (IsTask 'N' / 'Y' per Prompt_Instructions "Appointments &amp;
+    ///               Tasks"); the third action, Log activity, reuses the shared
+    ///               VAS_126_OpenTicketsWidget/SaveActivityLog endpoint so every
+    ///               widget logs interactions to the one R_Request store.
     /// Chronological development:
     ///   VAI052      2026-07-20 Created
+    ///   VAI052      2026-08-07 Added SaveAppointment / SaveTask for the search-row
+    ///                          quick-action popups.
     /// </summary>
     public class VAS_120_CustomerSearchWidgetController : Controller
     {
@@ -44,14 +53,21 @@ namespace VAS.Controllers
         // client debounces and enforces the same floor; this is the backstop.
         private const int MinSearchLength = 2;
 
+        // Display tiers. The client colours these three by name (violet / amber /
+        // info); any other label falls back to its neutral tag.
+        private const string TierPlatinum = "Platinum";
+        private const string TierGold = "Gold";
+        private const string TierSilver = "Silver";
+
         /// <summary>
-        /// Tier tag is only shown when the tenant has an explicit, approved mapping
-        /// from C_BPartner.Rating to Platinum/Gold/Silver. The supplied application
-        /// dictionary proves Rating is a list column but does NOT prove its stored
-        /// codes, so this map is intentionally EMPTY: an unmapped rating yields a
-        /// null tier and the UI shows no tag. Never label an unknown rating.
-        /// Populate only after checking the target tenant's dictionary, e.g.
-        /// { "A", "Platinum" }, { "B", "Gold" }, { "C", "Silver" }.
+        /// Optional OVERRIDE of the tier label per Rating code. Intentionally EMPTY,
+        /// and normally stays that way: since 2026-08-07 the query resolves the tag
+        /// from the tenant's own application dictionary (AD_Column('Rating') ->
+        /// AD_Ref_List, translated via AD_Ref_List_Trl), so no hard-coded table is
+        /// needed and no rating is ever labelled by guesswork. Populate this only to
+        /// force different wording than the reference list carries, e.g. to render
+        /// list entries "A"/"B"/"C" as { "A", "Platinum" }, { "B", "Gold" },
+        /// { "C", "Silver" }. Entries here win over the reference-list name.
         /// </summary>
         private static readonly Dictionary<string, string> CustomerTierByRating =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -88,6 +104,276 @@ namespace VAS.Controllers
             }
         }
 
+        /* ── Row quick actions ────────────────────────────────────────────────
+         * Both endpoints answer the plain, single-encoded { success } / { error }
+         * shape the popups expect (SearchCustomers above is double-encoded for its
+         * own historical client contract - the JS parser tolerates both).
+         * ------------------------------------------------------------------- */
+
+        // Longest subject stored for an appointment or task. Trimming here keeps an
+        // over-long paste from failing the save at the database.
+        private const int MaxSubjectLength = 255;
+
+        // A quick-scheduled appointment is a half-hour slot; the user lengthens it
+        // in the calendar when it needs to be longer.
+        private const int DefaultAppointmentMinutes = 30;
+
+        // Start time used when a date is picked but the time is left empty.
+        private const int DefaultAppointmentHour = 9;
+
+        // Upper bound for the "Due" offset the New task popup sends, in days.
+        private const int MaxTaskDueDays = 365;
+
+        /// <summary>
+        /// Creates a calendar appointment for one customer ("Schedule" quick action).
+        /// Persisted through the MAppointmentsInfo M-class - never a raw INSERT - as
+        /// AppointmentsInfo with IsTask='N'. That table carries no C_BPartner_ID, so
+        /// the customer is linked polymorphically through AD_Table_ID + Record_ID,
+        /// the same way the account panel records a meeting.
+        /// </summary>
+        /// <param name="C_BPartner_ID">Customer the appointment belongs to.</param>
+        /// <param name="title">Appointment subject.</param>
+        /// <param name="date">Start date as the ISO yyyy-MM-dd the date input posts.</param>
+        /// <param name="time">Optional start time as the ISO HH:mm the time input posts.</param>
+        /// <returns>JSON { success, AppointmentsInfo_ID } or { error }.</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        [ValidateInput(false)]
+        public JsonResult SaveAppointment(int C_BPartner_ID, string title, string date, string time)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Json(new
+                {
+                    error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            if (C_BPartner_ID <= 0)
+            {
+                return Json(new
+                {
+                    error = Msg.GetMsg(ctx, "VAS_120_InvalidCustomer") ?? "Invalid customer."
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            title = (title ?? "").Trim();
+            if (title.Length == 0)
+            {
+                return Json(new
+                {
+                    error = Msg.GetMsg(ctx, "VAS_120_TitleRequired") ?? "Please enter a title."
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            DateTime startDate;
+            if (!TryParseStart(date, time, out startDate))
+            {
+                return Json(new
+                {
+                    error = Msg.GetMsg(ctx, "VAS_120_DateRequired") ?? "Please pick a date."
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            try
+            {
+                MAppointmentsInfo appointment = new MAppointmentsInfo(ctx, 0, null);
+                appointment.SetIsTask(false);
+                appointment.SetSubject(Truncate(title, MaxSubjectLength));
+                appointment.SetStartDate(startDate);
+                appointment.SetEndDate(startDate.AddMinutes(DefaultAppointmentMinutes));
+                ApplyOwnerAndCustomer(ctx, appointment, C_BPartner_ID);
+
+                if (!appointment.Save())
+                {
+                    return Json(new
+                    {
+                        error = SaveErrorMessage(ctx, "VAS_120_ScheduleSaveFailed", "Could not schedule the appointment.")
+                    }, JsonRequestBehavior.AllowGet);
+                }
+
+                return Json(new { success = true, AppointmentsInfo_ID = appointment.Get_ID() }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_120_CustomerSearchWidget.SaveAppointment", ex);
+                return Json(new { error = ex.Message }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        /// <summary>
+        /// Creates a to-do for one customer ("Create task" quick action). Tasks share
+        /// the AppointmentsInfo table with appointments and are discriminated by
+        /// IsTask='Y'; the due date lives in EndDate, the column the task readers
+        /// project as DueDate. Written through the M-class, never a raw INSERT.
+        /// </summary>
+        /// <param name="C_BPartner_ID">Customer the task belongs to.</param>
+        /// <param name="subject">What needs to happen.</param>
+        /// <param name="dueDays">Whole days from today; the popup offers 0/1/3/7.</param>
+        /// <returns>JSON { success, AppointmentsInfo_ID } or { error }.</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        [ValidateInput(false)]
+        public JsonResult SaveTask(int C_BPartner_ID, string subject, int dueDays)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Json(new
+                {
+                    error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            if (C_BPartner_ID <= 0)
+            {
+                return Json(new
+                {
+                    error = Msg.GetMsg(ctx, "VAS_120_InvalidCustomer") ?? "Invalid customer."
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            subject = (subject ?? "").Trim();
+            if (subject.Length == 0)
+            {
+                return Json(new
+                {
+                    error = Msg.GetMsg(ctx, "VAS_120_TaskRequired") ?? "Please enter a task."
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            if (dueDays < 0) { dueDays = 0; }
+            if (dueDays > MaxTaskDueDays) { dueDays = MaxTaskDueDays; }
+
+            try
+            {
+                // The popup sends a relative offset rather than a date, so the due
+                // day is resolved here: a browser in another time zone still stores
+                // the day the user picked. End of that day, so a task due "Today"
+                // is not already overdue.
+                DateTime dueDate = DateTime.Today.AddDays(dueDays).AddDays(1).AddMinutes(-1);
+
+                MAppointmentsInfo task = new MAppointmentsInfo(ctx, 0, null);
+                task.SetIsTask(true);
+                task.SetSubject(Truncate(subject, MaxSubjectLength));
+                task.SetStartDate(DateTime.Now);
+                task.SetEndDate(dueDate);
+                task.SetTaskStatus(0);
+                ApplyOwnerAndCustomer(ctx, task, C_BPartner_ID);
+
+                if (!task.Save())
+                {
+                    return Json(new
+                    {
+                        error = SaveErrorMessage(ctx, "VAS_120_TaskSaveFailed", "Could not add the task.")
+                    }, JsonRequestBehavior.AllowGet);
+                }
+
+                return Json(new { success = true, AppointmentsInfo_ID = task.Get_ID() }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_120_CustomerSearchWidget.SaveTask", ex);
+                return Json(new { error = ex.Message }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        /// <summary>
+        /// Applies the defaults shared by a quick-created appointment and task: the
+        /// logged-in user owns it, it starts open, and it points at the customer
+        /// through AD_Table_ID + Record_ID (AppointmentsInfo has no C_BPartner_ID).
+        /// </summary>
+        /// <param name="ctx">Authenticated request context.</param>
+        /// <param name="entry">The unsaved appointment/task.</param>
+        /// <param name="bPartnerId">Customer to attach it to.</param>
+        private void ApplyOwnerAndCustomer(Ctx ctx, MAppointmentsInfo entry, int bPartnerId)
+        {
+            entry.SetAD_User_ID(ctx.GetAD_User_ID());
+            entry.SetIsClosed(false);
+            entry.SetIsPrivate(false);
+            entry.SetIsRead(true);
+
+            int bPartnerTableId = MTable.Get_Table_ID("C_BPartner");
+            if (bPartnerTableId > 0)
+            {
+                entry.SetAD_Table_ID(bPartnerTableId);
+            }
+            entry.SetRecord_ID(bPartnerId);
+
+            if (entry.GetAD_Org_ID() == 0)
+            {
+                entry.SetAD_Org_ID(ctx.GetAD_Org_ID());
+            }
+        }
+
+        /// <summary>
+        /// Combines the ISO date and optional ISO time the browser's date/time inputs
+        /// post (yyyy-MM-dd and HH:mm) into one start instant. Parsing is exact and
+        /// invariant-culture, so the stored value never depends on the server's
+        /// regional settings.
+        /// </summary>
+        /// <param name="date">Date part; required.</param>
+        /// <param name="time">Time part; optional, defaults to the morning hour.</param>
+        /// <param name="startDate">Parsed start instant on success.</param>
+        /// <returns>False when the date is missing or unparseable.</returns>
+        private static bool TryParseStart(string date, string time, out DateTime startDate)
+        {
+            startDate = DateTime.MinValue;
+
+            DateTime day;
+            if (!DateTime.TryParseExact((date ?? "").Trim(), "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out day))
+            {
+                return false;
+            }
+
+            TimeSpan timeOfDay = TimeSpan.FromHours(DefaultAppointmentHour);
+
+            string trimmedTime = (time ?? "").Trim();
+            if (trimmedTime.Length > 0)
+            {
+                DateTime parsedTime;
+                // Some browsers include seconds; accept both shapes.
+                if (DateTime.TryParseExact(trimmedTime, new[] { "HH:mm", "HH:mm:ss" },
+                        CultureInfo.InvariantCulture, DateTimeStyles.None, out parsedTime))
+                {
+                    timeOfDay = parsedTime.TimeOfDay;
+                }
+            }
+
+            startDate = day.Add(timeOfDay);
+            return true;
+        }
+
+        /// <summary>
+        /// Message for a failed M-class save: the framework's own validation text
+        /// when it captured one, else the widget's generic fallback.
+        /// </summary>
+        private static string SaveErrorMessage(Ctx ctx, string messageKey, string fallback)
+        {
+            ValueNamePair frameworkError = VLogger.RetrieveError();
+            if (frameworkError != null && !string.IsNullOrEmpty(frameworkError.GetName()))
+            {
+                return frameworkError.GetName();
+            }
+
+            return Msg.GetMsg(ctx, messageKey) ?? fallback;
+        }
+
+        /// <summary>
+        /// Caps a value at the column's stored length.
+        /// </summary>
+        private static string Truncate(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length <= maxLength) { return value; }
+            return value.Substring(0, maxLength);
+        }
+
         /// <summary>
         /// Builds the autosuggest rows and total count for the given search text.
         /// </summary>
@@ -101,7 +387,9 @@ namespace VAS.Controllers
             {
                 Rows = new List<CustomerSearchRow>(),
                 Total = 0,
-                MinLength = MinSearchLength
+                MinLength = MinSearchLength,
+                // Cached by MTable, so this is a dictionary lookup rather than a query.
+                BPartnerTableId = MTable.Get_Table_ID("C_BPartner")
             };
 
             if (ctx == null) { return result; }
@@ -116,6 +404,7 @@ namespace VAS.Controllers
             string upperText = searchText.ToUpperInvariant();
             string likeValue = "%" + upperText + "%";
             string prefixValue = upperText + "%";
+            string language = GetLanguage(ctx);
 
             // Shared CTE (ranked primary contact + secured customer_search body).
             // MRole is applied to the main physical table alias "bp" only.
@@ -132,7 +421,8 @@ namespace VAS.Controllers
                        CustomerSearch.Segment,
                        CustomerSearch.Owner_Id,
                        CustomerSearch.Rep,
-                       CustomerSearch.Tier_Code
+                       CustomerSearch.Tier_Code,
+                       CustomerSearch.Tier_Name
                 FROM CustomerSearch
                 ORDER BY CustomerSearch.Relevance_Rank,
                          CustomerSearch.Name,
@@ -148,11 +438,12 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(suggestSql, BuildSearchParameters(clientId, orgId, likeValue, upperText, prefixValue, maxRows));
+                dr = DB.ExecuteReader(suggestSql, BuildSearchParameters(clientId, orgId, likeValue, upperText, prefixValue, language, maxRows));
                 while (dr != null && dr.Read())
                 {
                     string tierCode = Util.GetValueOfString(dr["Tier_Code"]);
-                    string tier = MapTier(tierCode);
+                    string tierName = Util.GetValueOfString(dr["Tier_Name"]);
+                    string tier = MapTier(tierCode, tierName);
                     result.Rows.Add(new CustomerSearchRow
                     {
                         Id = Util.GetValueOfInt(dr["Id"]),
@@ -183,7 +474,7 @@ namespace VAS.Controllers
             {
                 // The count query does not reference @Max_Rows, so it is bound with
                 // the shared predicate parameters only (no unused bind).
-                countReader = DB.ExecuteReader(countSql, BuildSearchParameters(clientId, orgId, likeValue, upperText, prefixValue, null));
+                countReader = DB.ExecuteReader(countSql, BuildSearchParameters(clientId, orgId, likeValue, upperText, prefixValue, language, null));
                 if (countReader != null && countReader.Read())
                 {
                     result.Total = Util.GetValueOfInt(countReader["Total_Count"]);
@@ -205,6 +496,13 @@ namespace VAS.Controllers
         /// a relevance rank; MRole record/tenant access is injected on the main
         /// physical table (alias "bp") only, per the CTE MRole rule.
         /// </summary>
+        /// The tier tag is resolved from the application dictionary rather than a
+        /// hard-coded table: AD_Table -> AD_Column('Rating') -> AD_Ref_List gives the
+        /// tenant's own label for the stored Rating code, translated through
+        /// AD_Ref_List_Trl when the session language has an entry. A customer whose
+        /// Rating is null, inactive or absent from the list yields an empty
+        /// Tier_Name and the UI shows no tag - an unknown rating is still never
+        /// labelled (2026-08-07).
         /// <param name="ctx">Request context supplying the role for AddAccessSQL.</param>
         /// <returns>The two-CTE prologue string (no trailing outer SELECT).</returns>
         private string BuildCustomerSearchCte(Ctx ctx)
@@ -240,6 +538,7 @@ namespace VAS.Controllers
                        owner.AD_User_ID AS Owner_Id,
                        COALESCE(owner.Name, N'') AS Rep,
                        bp.Rating AS Tier_Code,
+                       COALESCE(RatingTrl.Name, RatingList.Name, N'') AS Tier_Name,
                        CASE
                            WHEN UPPER(COALESCE(bp.Name, N'')) = @Search_Exact THEN 0
                            WHEN UPPER(COALESCE(bp.Value, N'')) = @Search_Exact THEN 1
@@ -251,10 +550,13 @@ namespace VAS.Controllers
                 LEFT OUTER JOIN C_BP_Group grp ON (grp.C_BP_Group_ID = bp.C_BP_Group_ID AND grp.AD_Client_ID = bp.AD_Client_ID AND grp.IsActive = 'Y')
                 LEFT OUTER JOIN RankedContacts c ON (c.C_BPartner_ID = bp.C_BPartner_ID AND c.RN = 1)
                 LEFT OUTER JOIN AD_User owner ON (owner.AD_User_ID = bp.SalesRep_ID AND owner.AD_Client_ID = bp.AD_Client_ID AND owner.IsActive = 'Y')
+                LEFT OUTER JOIN AD_Table BPartnerTable ON (BPartnerTable.TableName = 'C_BPartner')
+                LEFT OUTER JOIN AD_Column RatingColumn ON (RatingColumn.AD_Table_ID = BPartnerTable.AD_Table_ID AND RatingColumn.ColumnName = 'Rating' AND RatingColumn.IsActive = 'Y')
+                LEFT OUTER JOIN AD_Ref_List RatingList ON (RatingList.AD_Reference_ID = RatingColumn.AD_Reference_Value_ID AND RatingList.Value = bp.Rating AND RatingList.IsActive = 'Y')
+                LEFT OUTER JOIN AD_Ref_List_Trl RatingTrl ON (RatingTrl.AD_Ref_List_ID = RatingList.AD_Ref_List_ID AND RatingTrl.AD_Language = @AD_Language)
                 WHERE bp.IsActive = 'Y'
                   AND bp.IsCustomer = 'Y'
                   AND bp.AD_Client_ID = @Client_ID
-                  AND bp.AD_Org_ID IN (0, COALESCE(NULLIF(@Org_ID, 0), bp.AD_Org_ID))
                   AND (
                       UPPER(COALESCE(bp.Name, N'')) LIKE @Search_Like
                       OR UPPER(COALESCE(bp.Value, N'')) LIKE @Search_Like
@@ -284,7 +586,7 @@ namespace VAS.Controllers
         /// Fresh parameter array for one command execution (a SqlParameter cannot be
         /// shared across two commands, so each query builds its own).
         /// </summary>
-        private SqlParameter[] BuildSearchParameters(int clientId, int orgId, string likeValue, string exactValue, string prefixValue, int? maxRows)
+        private SqlParameter[] BuildSearchParameters(int clientId, int orgId, string likeValue, string exactValue, string prefixValue, string language, int? maxRows)
         {
             List<SqlParameter> parameters = new List<SqlParameter>
             {
@@ -292,7 +594,10 @@ namespace VAS.Controllers
                 new SqlParameter("@Org_ID", orgId),
                 new SqlParameter("@Search_Like", SqlDbType.NVarChar) { Value = likeValue },
                 new SqlParameter("@Search_Exact", SqlDbType.NVarChar) { Value = exactValue },
-                new SqlParameter("@Search_Prefix", SqlDbType.NVarChar) { Value = prefixValue }
+                new SqlParameter("@Search_Prefix", SqlDbType.NVarChar) { Value = prefixValue },
+                // Bound by both queries: the CTE (shared by suggest + count) joins
+                // AD_Ref_List_Trl on it to translate the tier label.
+                new SqlParameter("@AD_Language", SqlDbType.NVarChar) { Value = language }
             };
 
             // @Max_Rows only for the suggest fetch; the count query omits it.
@@ -305,16 +610,76 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Maps a raw C_BPartner.Rating code to a display tier using the approved
-        /// configuration. Returns null for any unmapped code so the UI shows no tag.
+        /// Resolves the display tier for one row. An explicit tenant mapping in
+        /// CustomerTierByRating wins when present; otherwise the tenant's own
+        /// AD_Ref_List label for the Rating code (already translated by the query)
+        /// is used. Returns null when the rating is unset or carries no list entry,
+        /// so the UI shows no tag and an unknown rating is never labelled.
         /// </summary>
         /// <param name="ratingCode">Stored Rating value (may be null/empty).</param>
-        /// <returns>Platinum/Gold/Silver when mapped; otherwise null.</returns>
-        private string MapTier(string ratingCode)
+        /// <param name="ratingName">AD_Ref_List/Trl name for that code (may be empty).</param>
+        /// <returns>The configured tier, else the folded star tier, else the
+        /// reference-list label, else null.</returns>
+        private string MapTier(string ratingCode, string ratingName)
         {
             if (string.IsNullOrEmpty(ratingCode)) { return null; }
+
+            // An explicit per-tenant override always wins.
             string tier;
-            return CustomerTierByRating.TryGetValue(ratingCode, out tier) ? tier : null;
+            if (CustomerTierByRating.TryGetValue(ratingCode, out tier)) { return tier; }
+
+            // Star-rating lists (the stock _Rating reference labels its entries
+            // "-", "*", "**", ...) are folded onto the three display tiers per the
+            // approved business rule: 3+ stars Platinum, 2 Gold, 1 Silver. Reading
+            // the star COUNT off the label keeps this independent of the stored
+            // Value codes, which differ between tenants.
+            int stars = CountRatingStars(ratingName);
+            if (stars >= 3) { return TierPlatinum; }
+            if (stars == 2) { return TierGold; }
+            if (stars == 1) { return TierSilver; }
+
+            // Not a star list: fall back to the tenant's own label (e.g.
+            // "Preferred"). The zero-star entry is "not rated", so it -- like a
+            // blank label -- draws no tag; an unknown rating is still never named.
+            if (string.IsNullOrWhiteSpace(ratingName)) { return null; }
+
+            string trimmed = ratingName.Trim();
+            return trimmed == "-" ? null : trimmed;
+        }
+
+        /// <summary>
+        /// Counts star glyphs in a rating label. Both the ASCII asterisk used by the
+        /// stock reference data and the unicode star some tenants store are counted,
+        /// so the fold works whichever form the dictionary holds.
+        /// </summary>
+        /// <param name="ratingName">Reference-list label (may be null/empty).</param>
+        /// <returns>Number of star glyphs; 0 when the label carries none.</returns>
+        private static int CountRatingStars(string ratingName)
+        {
+            if (string.IsNullOrEmpty(ratingName)) { return 0; }
+
+            int stars = 0;
+            foreach (char character in ratingName)
+            {
+                // U+2605 BLACK STAR and U+2606 WHITE STAR alongside the ASCII
+                // asterisk, so the count works whichever glyph the list uses.
+                if (character == '*' || character == '★' || character == '☆')
+                {
+                    stars++;
+                }
+            }
+
+            return stars;
+        }
+
+        /// <summary>
+        /// Session language for the AD_Ref_List_Trl join, falling back to en_US.
+        /// </summary>
+        private string GetLanguage(Ctx ctx)
+        {
+            string language = ctx == null ? string.Empty : ctx.GetAD_Language();
+
+            return string.IsNullOrWhiteSpace(language) ? "en_US" : language;
         }
 
         private void CloseReader(IDataReader reader)
@@ -336,6 +701,15 @@ namespace VAS.Controllers
             public List<CustomerSearchRow> Rows { get; set; }
             public int Total { get; set; }
             public int MinLength { get; set; }
+
+            /// <summary>
+            /// AD_Table_ID of C_BPartner. The row quick actions hand this to the
+            /// standard platform forms (VIS.AppointmentsForm / VIS.Email) as the
+            /// record's table context. A dashboard widget - unlike a tab panel - has no
+            /// framework-supplied table_ID, so it is resolved here and travels with the
+            /// rows the actions sit on.
+            /// </summary>
+            public int BPartnerTableId { get; set; }
         }
 
         private class CustomerSearchRow
