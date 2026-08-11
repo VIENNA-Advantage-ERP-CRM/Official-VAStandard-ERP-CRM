@@ -115,6 +115,7 @@ import "../app/tabpanel/VAS_092_OverviewPurchaseOrder.js";
 import "../app/tabpanel/VAS_123_QuotationRightPanel.js";
 import "../app/tabpanel/VAS_098_PurchaseRequisition.js";
 import "../app/tabpanel/VAS_099_OverviewGRN.js";
+import "../app/tabpanel/VAS_190_ProductOverviewRightPanel.js";
 import "../app/tabpanel/VAS_100_OverviewDO.js";
 import "../app/tabpanel/VAS_101_OverviewInventoryCount.js";
 import "../app/tabpanel/VAS_102_OverviewInternalUse.js";

@@ -100,6 +100,36 @@
 ///                          ProductionOrderCount) via LoadProductionOrder. It
 ///                          used to be written into WorkOrderNo, which made the
 ///                          panel label a production order "Work Order".
+///   VAI163   2026-08-11  - The e-mail lookup's "has a recipient" filter tested
+///                          NVL(TRIM(addr), '') &lt;&gt; '', which on Oracle compares
+///                          against NULL (the empty string IS NULL there) and is
+///                          UNKNOWN for every row — so the Activity feed showed
+///                          no e-mails at all on an Oracle deployment. It now
+///                          tests against a space, which is non-null on Oracle
+///                          and still blank-equal to '' on SQL Server.
+///                        - The activity cap rose from 50 to 200. The panel pages
+///                          the feed 15 rows at a time, so entries beyond the cap
+///                          are unreachable rather than just further down.
+///   VAI163   2026-08-11  - Requested quantity on a line raised from a VA075 work
+///                          order now reads the work order's own spare part /
+///                          service row (VA075_WorkOrderComponent.Quantity, via
+///                          M_InventoryLine.VA075_WorkOrderComponent_ID) instead
+///                          of the requisition / keyed fallback, which on such a
+///                          line mirrors the ISSUED quantity — the row read
+///                          "requested == issued" however little was issued.
+///                          LoadWorkOrderComponentQtys, AD_Column-guarded.
+///                        - Added the project the issue was raised for
+///                          (M_Inventory.C_Project_ID → C_Project value / name).
+///                          An issue linked to a project and nothing else was
+///                          classified MANUAL and read "Manual Issue"; the origin
+///                          now falls to PROJECT before MANUAL and the panel draws
+///                          a Project chip that opens the project record. The
+///                          column is guarded, so an install without C_Project_ID
+///                          on M_Inventory behaves exactly as before.
+///                        - GetWindowId matches AD_Window.Name case-insensitively.
+///                          An exact match turned a differently-cased dictionary
+///                          entry into a silent "no such window", which the panel
+///                          can only report as a "Cannot open" toast.
 /// </summary>
 
 using System;
@@ -142,11 +172,24 @@ namespace VASLogic.Models
             bool hasUnitPrice   = ColumnExists("M_InventoryLine", "VA024_UnitPrice");
             bool hasWorkOrder   = ColumnExists("M_InventoryLine", "VAMFG_M_WorkOrder_ID");
             bool hasAsi         = ColumnExists("M_InventoryLine", "M_AttributeSetInstance_ID");
+            // The project the issue was raised for. Guarded like every other
+            // optional column: an install without it simply never gets a Project
+            // origin, exactly as before.
+            bool hasProject     = ColumnExists("M_Inventory", "C_Project_ID");
 
             // COALESCE([l.CurrentCostPrice], [l.VA024_UnitPrice], 0)
             string rateExpr = BuildRateExpr(hasCurrentCost, hasUnitPrice);
             // Manufacturing work-order id (schema-aware) used to classify origin.
             string woExpr = hasWorkOrder ? "l.VAMFG_M_WorkOrder_ID" : "NULL";
+
+            // Project columns, only referenced when M_Inventory actually carries
+            // C_Project_ID — the join itself has to disappear with the column.
+            string projIdExpr    = hasProject ? "inv.C_Project_ID" : "NULL";
+            string projValueExpr = hasProject ? "pj.Value"         : "CAST(NULL AS VARCHAR(255))";
+            string projNameExpr  = hasProject ? "pj.Name"          : "CAST(NULL AS VARCHAR(255))";
+            string projJoin      = hasProject
+                ? "LEFT OUTER JOIN C_Project pj ON (pj.C_Project_ID = inv.C_Project_ID)"
+                : "";
 
             // Requested quantity: what was asked for on the requisition the line
             // came from — not what the issue line itself carries. QtyEntered on an
@@ -170,6 +213,9 @@ namespace VASLogic.Models
                               inv.Updated      AS UpdatedDate,
                               wh.Name          AS WarehouseName,
                               creator.Name     AS IssuedBy,
+                              " + projIdExpr    + @" AS ProjectID,
+                              " + projValueExpr + @" AS ProjectValue,
+                              " + projNameExpr  + @" AS ProjectName,
                               (SELECT COUNT(*)
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
@@ -208,6 +254,7 @@ namespace VASLogic.Models
                             FROM M_Inventory inv
                             LEFT OUTER JOIN M_Warehouse wh   ON (inv.M_Warehouse_ID = wh.M_Warehouse_ID)
                             LEFT OUTER JOIN AD_User creator  ON (inv.CreatedBy      = creator.AD_User_ID)
+                            " + projJoin + @"
                             WHERE inv.M_Inventory_ID = @M_Inventory_ID
                               AND inv.IsActive       = 'Y'
                               AND COALESCE(inv.IsInternalUse, 'N') = 'Y'";
@@ -249,16 +296,28 @@ namespace VASLogic.Models
             result.NotFullCount = Util.GetValueOfInt(r["NotFullCount"]);
             result.NotFullQty   = Util.GetValueOfDecimal(r["NotFullQty"]);
 
+            // ----- Project (M_Inventory.C_Project_ID) -----
+            // Read before the origin is classified: an issue raised against a
+            // project but against no other document used to read "Manual Issue".
+            // The project's search key identifies it on the chip; its name rides
+            // along for the tooltip.
+            result.C_Project_ID = Util.GetValueOfInt(r["ProjectID"]);
+            result.ProjectNo    = Util.GetValueOfString(r["ProjectValue"]);
+            result.ProjectName  = Util.GetValueOfString(r["ProjectName"]);
+            result.HasProject   = result.C_Project_ID > 0;
+
             // ----- Origin: derived from the linked source ids on the lines -----
             // A VA075 service work order wins, then a manufacturing work order,
-            // then a requisition; only an issue linked to nothing is manual.
+            // then a requisition, then the project the issue was raised for; only
+            // an issue linked to nothing at all is manual.
             LoadVA075WorkOrder(M_Inventory_ID, result);
             result.HasWorkOrder   = !string.IsNullOrEmpty(result.WorkOrderNo)
                                     || Util.GetValueOfInt(r["SampleWorkOrderID"]) > 0;
             result.HasRequisition = Util.GetValueOfInt(r["SampleRequisitionLineID"]) > 0;
             result.OriginCode     = !string.IsNullOrEmpty(result.WorkOrderNo) ? "WORKORDER"
                                   : (Util.GetValueOfInt(r["SampleWorkOrderID"]) > 0 ? "PRODUCTION"
-                                  : (result.HasRequisition ? "REQUISITION" : "MANUAL"));
+                                  : (result.HasRequisition ? "REQUISITION"
+                                  : (result.HasProject ? "PROJECT" : "MANUAL")));
 
             // Issued value is expressed in the accounting currency; the panel
             // renders INR (₹) with standard 2-dp precision.
@@ -441,9 +500,13 @@ namespace VASLogic.Models
             if (string.IsNullOrEmpty(windowName)) return 0;
             try
             {
+                // UPPER on both sides: the name is a dictionary entry keyed in by
+                // hand, and a case difference must not read as "no such window" —
+                // that failure is silent, and the panel's chip degrades to a
+                // "Cannot open" toast rather than saying why.
                 string sql = @"SELECT w.AD_Window_ID
                                  FROM AD_Window w
-                                WHERE w.Name         = @Name
+                                WHERE UPPER(w.Name)  = UPPER(@Name)
                                   AND w.IsActive     = 'Y'
                                   AND w.AD_Client_ID IN (0, @AD_Client_ID)
                                 ORDER BY w.AD_Client_ID DESC";
@@ -569,6 +632,11 @@ namespace VASLogic.Models
             Dictionary<int, decimal> lineCosts = LoadLineCosts(M_Inventory_ID);
             Dictionary<int, decimal> whCosts   = LoadWarehouseCosts(M_Inventory_ID, M_Warehouse_ID);
 
+            // What the VA075 work order asked for, per line — the quantity on the
+            // spare part / service row the line came from. It outranks both other
+            // sources below: an issue raised from a work order was requested THERE.
+            Dictionary<int, decimal> woReqQtys = LoadWorkOrderComponentQtys(M_Inventory_ID);
+
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 InternalUseLineData ln = new InternalUseLineData();
@@ -597,10 +665,21 @@ namespace VASLogic.Models
                 ln.IssuedQty    = qtyEntered != 0 ? qtyEntered : qtyBase;
                 ln.AvailableQty = Util.GetValueOfDecimal(r["AvailableQtyBase"]) * perBase;
 
-                // Requested: the requisition asked in base UOM, so it converts
-                // like the rest. A line with no requisition falls back to what
-                // was keyed, which is already in the selected UOM.
-                if (r["ReqQtyBase"] != DBNull.Value)
+                // Requested, in order of authority:
+                //
+                //  1. The VA075 work order's spare part / service row, when the
+                //     line was raised from one. That row IS the request, so it
+                //     wins — the issue line's own QtyEntered mirrors what was
+                //     issued and would report "requested == issued". It is already
+                //     on the selected-UOM scale, so it is taken as it stands.
+                //  2. The requisition line, which asked in base UOM and so
+                //     converts like the rest.
+                //  3. What was keyed on the line (a manual issue), already in the
+                //     selected UOM.
+                decimal woReqQty;
+                if (woReqQtys.TryGetValue(ln.M_InventoryLine_ID, out woReqQty))
+                    ln.RequestedQty = woReqQty;
+                else if (r["ReqQtyBase"] != DBNull.Value)
                     ln.RequestedQty = Util.GetValueOfDecimal(r["ReqQtyBase"]) * perBase;
                 else
                     ln.RequestedQty = ln.IssuedQty;
@@ -830,6 +909,62 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// The quantity the VA075 work order asked for, per issue line: the
+        /// Quantity on the spare part / service row the line was raised from
+        /// (work order > task details > spare parts / services tab), keyed by
+        /// M_InventoryLine_ID.
+        ///
+        /// The link is M_InventoryLine.VA075_WorkOrderComponent_ID — the spare
+        /// part row itself, not just the work order — so a line that only carries
+        /// VA075_WorkOrder_ID is absent from the result and keeps the requisition
+        /// / keyed-quantity fallback.
+        ///
+        /// No UOM conversion is applied. The component quantity is on the same
+        /// scale as M_InventoryLine.QtyEntered (the issue line is generated from
+        /// the component, and MInventory writes QtyEntered straight back into
+        /// VA075_WorkOrderComponent.Quantity on completion), which is the SELECTED
+        /// UOM the panel reports every line quantity in.
+        ///
+        /// AD_Column-guarded and try/caught: without the VA075 module this is a
+        /// pair of dictionary reads and an empty result.
+        /// </summary>
+        /// <param name="M_Inventory_ID">Owning internal-use issue id.</param>
+        /// <returns>M_InventoryLine_ID -> requested quantity (may be empty).</returns>
+        private Dictionary<int, decimal> LoadWorkOrderComponentQtys(int M_Inventory_ID)
+        {
+            Dictionary<int, decimal> qtys = new Dictionary<int, decimal>();
+            if (!ColumnExists("M_InventoryLine", "VA075_WorkOrderComponent_ID")) return qtys;
+            if (!ColumnExists("VA075_WorkOrderComponent", "Quantity")) return qtys;
+
+            try
+            {
+                string sql = @"SELECT l.M_InventoryLine_ID,
+                                      NVL(c.Quantity, 0) AS ReqQty
+                                 FROM M_InventoryLine l
+                                INNER JOIN VA075_WorkOrderComponent c
+                                        ON (c.VA075_WorkOrderComponent_ID = l.VA075_WorkOrderComponent_ID)
+                                WHERE l.M_Inventory_ID = @M_Inventory_ID
+                                  AND l.IsActive       = 'Y'
+                                  AND NVL(l.VA075_WorkOrderComponent_ID, 0) > 0";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return qtys;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    int lineId = Util.GetValueOfInt(r["M_InventoryLine_ID"]);
+                    if (lineId > 0) qtys[lineId] = Util.GetValueOfDecimal(r["ReqQty"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: the lines keep the requisition / keyed quantity.
+                _log.Severe("LoadWorkOrderComponentQtys (M_Inventory_ID="
+                            + M_Inventory_ID + "): " + ex.Message);
+            }
+            return qtys;
+        }
+
+        /// <summary>
         /// Returns the first of the candidate columns that exists on the table, or
         /// an empty string when the table has none of them.
         /// </summary>
@@ -1053,10 +1188,11 @@ namespace VASLogic.Models
         /// <returns>Activity rows ordered newest-first (may be empty).</returns>
         private List<InternalUseActivityData> LoadActivity(int M_Inventory_ID, string docStatus)
         {
-            // An issue mailed out a dozen times would otherwise push its own
-            // milestones off the bottom of the trail, so the cap is a runaway
-            // guard rather than a headline count.
-            const int MAX_ENTRIES = 50;
+            // Purely a runaway guard, not a headline count: the panel pages the
+            // feed 15 rows at a time, so anything the cap cuts is silently
+            // unreachable rather than merely further down. It sits high enough
+            // that a normally mailed issue never reaches it.
+            const int MAX_ENTRIES = 200;
 
             List<InternalUseActivityData> activity = new List<InternalUseActivityData>();
             LoadIssueMilestones(M_Inventory_ID, docStatus, activity);
@@ -1238,6 +1374,14 @@ namespace VASLogic.Models
                 // Rows with no recipient at all (a stored letter / inbound
                 // document) are the ones this leaves out.
                 //
+                // "Has an address" is tested against a SPACE, not against ''.
+                // Oracle stores the empty string as NULL, so NVL(TRIM(x), '')
+                // yields NULL and `<> ''` compares against NULL — the predicate
+                // is UNKNOWN for every row, including the ones that DO carry an
+                // address, and the query returned no mails at all. Comparing to
+                // ' ' keeps the NVL fallback non-null on Oracle, and SQL Server
+                // blank-pads the comparison so an empty address still fails it.
+                //
                 // The table id is matched with IN + UPPER so a dictionary holding
                 // the name in another case, or more than one row for it, resolves
                 // instead of failing the statement.
@@ -1257,9 +1401,9 @@ namespace VASLogic.Models
                                         WHERE UPPER(t.TableName) = 'M_INVENTORY')
                                   AND ma.Record_ID          = @M_Inventory_ID
                                   AND NVL(ma.IsActive, 'Y') = 'Y'
-                                  AND (NVL(TRIM(ma.MailAddress), '')     <> ''
-                                    OR NVL(TRIM(ma.MailAddressCc), '')   <> ''
-                                    OR NVL(TRIM(ma.MailAddressBcc), '')  <> '')
+                                  AND (NVL(TRIM(ma.MailAddress), ' ')     <> ' '
+                                    OR NVL(TRIM(ma.MailAddressCc), ' ')   <> ' '
+                                    OR NVL(TRIM(ma.MailAddressBcc), ' ')  <> ' ')
                                 ORDER BY ma.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
@@ -1490,9 +1634,11 @@ namespace VASLogic.Models
             public DateTime? PostedDate     { get; set; }
 
             // Origin (derived from the linked source ids on the lines)
-            public string    OriginCode     { get; set; }   // PRODUCTION | REQUISITION | MANUAL
+            // WORKORDER | PRODUCTION | REQUISITION | PROJECT | MANUAL
+            public string    OriginCode     { get; set; }
             public bool      HasWorkOrder   { get; set; }
             public bool      HasRequisition { get; set; }
+            public bool      HasProject     { get; set; }
 
             // Reference documents (References section)
             public int       M_Requisition_ID { get; set; }  // first linked requisition (chip target)
@@ -1513,6 +1659,12 @@ namespace VASLogic.Models
             public string    ProductionOrderNo    { get; set; }
             public int       VAMFG_M_WorkOrder_ID { get; set; }
             public int       ProductionOrderCount { get; set; }
+
+            // Project (M_Inventory.C_Project_ID) — the chip's target, its search
+            // key as the chip value and its name for the tooltip.
+            public int       C_Project_ID { get; set; }
+            public string    ProjectNo    { get; set; }   // C_Project.Value
+            public string    ProjectName  { get; set; }   // C_Project.Name
 
             // Currency
             public int       StdPrecision   { get; set; }
