@@ -2150,7 +2150,8 @@ namespace VASLogic.Models
                              CASE WHEN cd.DocBaseType IN ('ARC','APC') THEN - cs.DueAmt
                              ELSE cs.DueAmt END AS DueAmt,
                              ci.DocumentNo,cb.Name,pm.VA009_Name,cy.ISO_Code,CASE WHEN cy.Cursymbol IS NOT NULL THEN cy.Cursymbol ELSE cy.ISO_Code END AS Symbol,
-                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Invoice' AS WindowType,cd.IsExpenseInvoice AS IsExInv
+                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Invoice' AS WindowType,cd.IsExpenseInvoice AS IsExInv,
+                             cd.Name AS DocTypeName
                              FROM C_InvoicePaySchedule cs
                              INNER JOIN C_Invoice ci ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
@@ -2237,7 +2238,8 @@ namespace VASLogic.Models
                              SELECT DISTINCT co.C_Order_ID AS Record_ID,ps.DueDate,
                              ps.DueAmt AS DueAmt,
                              co.DocumentNo,cb.Name,pm.VA009_Name,cy.ISO_Code,CASE WHEN cy.Cursymbol IS NOT NULL THEN cy.Cursymbol ELSE cy.ISO_Code END AS Symbol,
-                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Order' AS WindowType,'N' AS IsExInv
+                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Order' AS WindowType,'N' AS IsExInv,
+                             dt.Name AS DocTypeName
                              FROM VA009_OrderPaySchedule ps
                              INNER JOIN C_Order co ON (ps.C_Order_ID = co.C_Order_ID)
                              INNER JOIN C_Doctype dt ON (dt.C_Doctype_ID = co.C_Doctype_ID)
@@ -2344,6 +2346,8 @@ namespace VASLogic.Models
                     obj.PayMethod = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA009_Name"]);
                     obj.ISO_Code = Util.GetValueOfString(ds.Tables[0].Rows[i]["ISO_Code"]);
                     obj.windowType = Util.GetValueOfString(ds.Tables[0].Rows[i]["WindowType"]);
+                    //Document type name of the underlying transaction (AR/AP invoice, credit memo, sales/purchase order, ...)
+                    obj.DocTypeName = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocTypeName"]);
                     if (Util.GetValueOfString(ds.Tables[0].Rows[i]["WindowType"]) == "Order")
                     {
                         obj.Window_ID = OrderWinId;
@@ -3372,6 +3376,8 @@ namespace VASLogic.Models
         public string ISO_Code { get; set; }
         public string PayMethod { get; set; }
         public string windowType { get; set; }
+        /// <summary>Name of the transaction's document type (C_DocType.Name).</summary>
+        public string DocTypeName { get; set; }
 
     }
 
