@@ -55,7 +55,7 @@
     display: grid;
     place-items: center;
     background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
-    border: 1px solid #E8F2FB;                  /* px */
+    border: 1px solid #BFE4FF;                  /* px */
     color: #0083DA;
 }
 
@@ -315,7 +315,7 @@
 }
 
     .vas136-close:hover {
-        background: #F2F6FA;
+        background: #F1F4F8;
     }
 
     .vas136-close svg {
@@ -403,7 +403,7 @@
     flex-shrink: 0;
 }
 
-.vas136-tag-ok { background: #D9F2E5; color: #0B6B45; }
+.vas136-tag-ok { background: #E7F7EF; color: #0B6B45; }
 .vas136-tag-info { background: #DFF1FF; color: #0E5DA8; }
 .vas136-tag-warn { background: #FCEBD3; color: #9A6500; }
 .vas136-tag-neutral { background: #EEF2F6; color: #5F7283; }
@@ -415,40 +415,73 @@
     background: #FBFDFF;
 }
 
+/* Footer pager — dashboard-widgets.md §"Widget Footer Pager": two zones, the
+   result-range helper on the left and a compact prev · "N of M" · next control
+   on the right. 2026-08-06: replaced the centred solid-blue 34px circles with
+   the shared 24px rounded-square buttons / 14px chevrons from §Pager Buttons.
+   Sizes stay px — this pager is modal chrome, like the rest of this panel. */
 .vas136-pager {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 14px;                                  /* px */
 }
 
 .vas136-pglabel {
-    font-size: 13px;                            /* px */
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 12px;                            /* px */
     color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas136-pgctl {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;                                   /* px */
+    flex-shrink: 0;
+}
+
+.vas136-pgtext {
+    min-width: 48px;                            /* px */
+    text-align: center;
+    font-size: 13px;                            /* px */
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .vas136-pgbtn {
-    width: 34px;
-    height: 34px;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-    border: none;
-    background: #1F83FF;
-    color: #FFFFFF;
+    width: 24px;                                /* px */
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 6px;                         /* px */
+    background: #FBFDFF;
+    color: #0083DA;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(31, 131, 255, 0.28);
 }
 
+    .vas136-pgbtn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
     .vas136-pgbtn:disabled {
-        background: #C7D6E2;
-        box-shadow: none;
+        color: #B8C6D2;
         cursor: default;
     }
 
     .vas136-pgbtn svg {
-        width: 15px;
-        height: 15px;
+        width: 14px;                            /* px */
+        height: 14px;
+        stroke: currentColor;
     }
 
 /* ── Customer detail popup ────────────────────────────────────────────────── */
@@ -544,7 +577,7 @@
 }
 
     .vas136-btn-primary:hover {
-        background: #1675E6;
+        background: #1F83FF;
     }
 
 .vas136-id {
