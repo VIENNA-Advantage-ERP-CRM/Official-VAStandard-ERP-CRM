@@ -307,6 +307,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_167_PurchaseOrderLandedCostController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_098_PurchaseRequisitionController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_099_OverviewGRNController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_190_ProductOverviewRightPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_100_OverviewDOController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_101_OverviewInventoryCountController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_102_OverviewInternalUseController.cs" />
@@ -416,6 +417,7 @@
     <Content Include="Areas\VAS\Content\VAS_167_PurchaseOrderLandedCost.css" />
     <Content Include="Areas\VAS\Content\VAS_098_PurchaseRequisition.css" />
     <Content Include="Areas\VAS\Content\VAS_099_OverviewGRN.css" />
+    <Content Include="Areas\VAS\Content\VAS_190_ProductOverviewRightPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_100_OverviewDO.css" />
     <Content Include="Areas\VAS\Content\VAS_101_OverviewInventoryCount.css" />
     <Content Include="Areas\VAS\Content\VAS_102_OverviewInternalUse.css" />
@@ -457,6 +459,7 @@
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_167_PurchaseOrderLandedCost.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_098_PurchaseRequisition.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_099_OverviewGRN.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_190_ProductOverviewRightPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_100_OverviewDO.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_101_OverviewInventoryCount.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_102_OverviewInternalUse.js" />
