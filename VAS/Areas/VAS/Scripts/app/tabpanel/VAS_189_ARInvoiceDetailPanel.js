@@ -2999,8 +2999,7 @@
 
             // Description - optional free text carried onto every generated invoice.
             var $descInput = $('<textarea id="' + CLS + 'rec-desc" class="' + CLS + 'rec-textarea js-desc" rows="2" maxlength="255"></textarea>')
-                .attr("placeholder", lbl("VAS_189_DescriptionPlaceholder",
-                    "Note shown on every generated invoice — e.g. Monthly retainer, contract CT-4471"))
+                .attr("placeholder", lbl("VAS_189_DescriptionPlaceholder"," "))
                 .val(stateR.description);
             var $descCard = recFieldCard("b", RSVG.lines,
                 lbl("VAS_189_Description", "Description"), false, CLS + "rec-desc");

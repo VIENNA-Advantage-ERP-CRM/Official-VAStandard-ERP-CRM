@@ -39,6 +39,11 @@ namespace VAS.Controllers
     ///               physical table C_InvoicePaySchedule only.
     /// Chronological development:
     ///   VAI052      2026-07-22 Created
+    ///   VAI052      2026-08-10 GetRows now returns one row per customer in arrears
+    ///                          (invoice count, worst days overdue, summed outstanding)
+    ///                          instead of one row per payment-schedule instalment, so
+    ///                          the list length matches the overdue customer count the
+    ///                          KPI tile and summary header already report
     /// </summary>
     public class VAS_138_DelayedPaymentsListWidgetController : Controller
     {
@@ -214,10 +219,14 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Overdue schedule rows, ranked by outstanding amount (desc), then oldest due
-        /// date, then invoice number, then id (stable paging). The outstanding is
-        /// converted to the tenant accounting currency so every row shares one currency
-        /// and the sort is meaningful.
+        /// One row per CUSTOMER in arrears - not per payment-schedule instalment - so
+        /// the list length and its "total" equal the distinct overdue customer count
+        /// the KPI tile and the summary header report. Each row aggregates that
+        /// customer's overdue AR invoices: how many invoices are overdue, the worst
+        /// (oldest) overdue due date, and the summed outstanding. Ranked by outstanding
+        /// (desc), then oldest due date, then name, then id (stable paging). The
+        /// outstanding is converted to the tenant accounting currency so every row
+        /// shares one currency and the sort is meaningful.
         /// </summary>
         /// <param name="offset">Zero-based paging offset.</param>
         /// <param name="limit">Page size; 7 for the widget, up to 25 for the full list.</param>
@@ -238,19 +247,16 @@ namespace VAS.Controllers
 
             try
             {
-                // Per-row projection over the shared overdue population. MRole on "ips".
+                // Instalment-level projection over the shared overdue population; it is
+                // rolled up to one row per customer below. MRole on "ips". No ORDER BY
+                // here - AddAccessSQL splices its predicate ahead of the first ORDER BY
+                // it finds, so the sort must live in the outer query.
                 string overdueRowsSql = @"
-                    SELECT ips.C_InvoicePaySchedule_ID AS Payment_Schedule_Id,
-                           i.C_Invoice_ID AS Invoice_Id,
-                           bp.C_BPartner_ID AS Customer_Id,
+                    SELECT bp.C_BPartner_ID AS Customer_Id,
                            bp.Name AS Customer_Name,
-                           i.DocumentNo AS Invoice_No,
+                           i.C_Invoice_ID AS Invoice_Id,
                            ips.DueDate AS Due_Date,
-                           " + TodayDateExpr() + @" AS As_Of_Date,
-                           ROUND(" + BaseAmtExpr + @", sc.Std_Precision) AS Overdue_Amt,
-                           sc.Cur_Symbol AS Cur_Symbol,
-                           sc.ISO_Code AS ISO_Code,
-                           sc.Std_Precision AS Std_Precision
+                           ROUND(" + BaseAmtExpr + @", sc.Std_Precision) AS Overdue_Amt
                     " + OverdueFromWhere();
                 overdueRowsSql = MRole.GetDefault(ctx).AddAccessSQL(overdueRowsSql, "ips", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -260,24 +266,32 @@ namespace VAS.Controllers
                     ),
                     overdue_rows AS (
                         " + overdueRowsSql + @"
+                    ),
+                    by_customer AS (
+                        SELECT orr.Customer_Id AS Customer_Id,
+                               orr.Customer_Name AS Customer_Name,
+                               COUNT(DISTINCT orr.Invoice_Id) AS Invoice_Count,
+                               MIN(orr.Due_Date) AS Oldest_Due_Date,
+                               SUM(orr.Overdue_Amt) AS Overdue_Amt
+                        FROM overdue_rows orr
+                        GROUP BY orr.Customer_Id, orr.Customer_Name
                     )
-                    SELECT orr.Payment_Schedule_Id,
-                           orr.Invoice_Id,
-                           orr.Customer_Id,
-                           orr.Customer_Name,
-                           orr.Invoice_No,
-                           orr.Due_Date,
-                           orr.As_Of_Date,
-                           orr.Overdue_Amt,
-                           orr.Cur_Symbol,
-                           orr.ISO_Code,
-                           orr.Std_Precision,
+                    SELECT c.Customer_Id,
+                           c.Customer_Name,
+                           c.Invoice_Count,
+                           c.Oldest_Due_Date,
+                           " + TodayDateExpr() + @" AS As_Of_Date,
+                           c.Overdue_Amt,
+                           sc.Cur_Symbol AS Cur_Symbol,
+                           sc.ISO_Code AS ISO_Code,
+                           sc.Std_Precision AS Std_Precision,
                            COUNT(1) OVER () AS Total_Rows
-                    FROM overdue_rows orr
-                    ORDER BY orr.Overdue_Amt DESC,
-                             orr.Due_Date ASC,
-                             orr.Invoice_No ASC,
-                             orr.Payment_Schedule_Id ASC
+                    FROM by_customer c
+                    CROSS JOIN schema_currency sc
+                    ORDER BY c.Overdue_Amt DESC,
+                             c.Oldest_Due_Date ASC,
+                             c.Customer_Name ASC,
+                             c.Customer_Id ASC
                     OFFSET " + offset + @" ROWS FETCH NEXT " + limit + @" ROWS ONLY";
 
                 List<object> items = new List<object>();
@@ -298,10 +312,11 @@ namespace VAS.Controllers
                         {
                             stdPrecision = Util.GetValueOfInt(dr["Std_Precision"]);
                         }
-                        DateTime? dueDate = dr["Due_Date"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["Due_Date"]);
+                        DateTime? dueDate = dr["Oldest_Due_Date"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["Oldest_Due_Date"]);
                         DateTime? asOfDate = dr["As_Of_Date"] == DBNull.Value ? (DateTime?)null : Util.GetValueOfDateTime(dr["As_Of_Date"]);
-                        // Whole calendar days overdue - computed in C# to avoid the SQL
-                        // date subtraction returning an interval/TimeSpan.
+                        // Worst (largest) days overdue for this customer, which is the
+                        // age of their OLDEST overdue due date. Computed in C# to avoid
+                        // the SQL date subtraction returning an interval/TimeSpan.
                         int overdueDays = 0;
                         if (dueDate.HasValue && asOfDate.HasValue)
                         {
@@ -310,12 +325,10 @@ namespace VAS.Controllers
                         }
                         items.Add(new
                         {
-                            paymentScheduleId = Util.GetValueOfInt(dr["Payment_Schedule_Id"]),
-                            invoiceId = Util.GetValueOfInt(dr["Invoice_Id"]),
                             customerId = Util.GetValueOfInt(dr["Customer_Id"]),
                             customerName = Util.GetValueOfString(dr["Customer_Name"]),
-                            invoice = Util.GetValueOfString(dr["Invoice_No"]),
-                            dueDate = dueDate.HasValue ? dueDate.Value.ToString("yyyy-MM-dd") : "",
+                            invoiceCount = Util.GetValueOfInt(dr["Invoice_Count"]),
+                            oldestDueDate = dueDate.HasValue ? dueDate.Value.ToString("yyyy-MM-dd") : "",
                             overdueDays = overdueDays,
                             overdueAmt = Util.GetValueOfDecimal(dr["Overdue_Amt"])
                         });

@@ -46,10 +46,6 @@
         write();
     }
 
-    // Currencies of Indian-numbering countries get Indian digit grouping and
-    // Lakh/Crore compact notation; all others get international grouping and K/M/B/T.
-    var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
-
     var CUSTOMER_WINDOW_NAME = 'Business Partner';
 
     VAS.VAS_125_OpenPipelineWidget = function () {
@@ -70,7 +66,7 @@
         }
 
         function usesIndianNumbering(isoCode) {
-            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+            return VIS.Util.usesIndianNumbering(isoCode);
         }
 
         function currencyLocale(isoCode) {
@@ -86,32 +82,16 @@
             return !isNaN(precision) && precision >= 0 ? precision : 0;
         }
 
-        function trimTrailingZeros(text) {
-            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
-        }
-
-        // Compact currency amount (e.g. ₹3.42 Cr / €1.25M). Sign before the symbol,
-        // compaction on the absolute value.
-        function formatCompactAmount(value, symbol, isoCode) {
+        // Compact currency amount (e.g. ₹3.42Cr / €1.25M). The magnitude comes from
+        // VIS.Util.formatCompactAmount, which scales against the base
+        // (accounting-schema) currency's numbering system and renders at the
+        // system-configured standard precision; the sign sits BEFORE the symbol.
+        function formatCompactAmount(value, symbol, isoCode, precision) {
             var number = Number(value || 0);
             if (!isFinite(number)) { number = 0; }
             var sign = number < 0 ? '-' : '';
-            var abs = Math.abs(number);
             var currency = symbol || isoCode || '';
-            var compact;
-            if (usesIndianNumbering(isoCode)) {
-                if (abs >= 10000000) { compact = trimTrailingZeros((abs / 10000000).toFixed(2)) + ' Cr'; }
-                else if (abs >= 100000) { compact = trimTrailingZeros((abs / 100000).toFixed(2)) + ' Lakh'; }
-                else if (abs >= 1000) { compact = trimTrailingZeros((abs / 1000).toFixed(1)) + 'K'; }
-                else { compact = abs.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 }); }
-            } else {
-                if (abs >= 1000000000000) { compact = trimTrailingZeros((abs / 1000000000000).toFixed(1)) + 'T'; }
-                else if (abs >= 1000000000) { compact = trimTrailingZeros((abs / 1000000000).toFixed(1)) + 'B'; }
-                else if (abs >= 1000000) { compact = trimTrailingZeros((abs / 1000000).toFixed(1)) + 'M'; }
-                else if (abs >= 1000) { compact = trimTrailingZeros((abs / 1000).toFixed(1)) + 'K'; }
-                else { compact = abs.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 }); }
-            }
-            return sign + currency + compact;
+            return sign + currency + VIS.Util.formatCompactAmount(number, isoCode, getPrecision(precision));
         }
 
         // Full, precise currency amount for the value tooltip.
@@ -181,14 +161,14 @@
 
             // Empty: formatted zero + "No open opportunities" (spec §States Empty).
             if (customerCount <= 0) {
-                var zero = formatCompactAmount(0, data.currency_symbol, data.currency_iso);
+                var zero = formatCompactAmount(0, data.currency_symbol, data.currency_iso, data.std_precision);
                 $value.text(zero).attr('title', formatFullAmount(0, data.currency_symbol, data.currency_iso, data.std_precision));
                 $meta.text(label('VAS_125_NoOpenOpportunities', 'No open opportunities')).removeAttr('title');
                 $card.attr('aria-label', label('VAS_125_OpenPipeline', 'Open pipeline') + ': ' + zero + '; ' + label('VAS_125_NoOpenOpportunities', 'No open opportunities'));
                 return;
             }
 
-            var compact = formatCompactAmount(data.pipeline_value, data.currency_symbol, data.currency_iso);
+            var compact = formatCompactAmount(data.pipeline_value, data.currency_symbol, data.currency_iso, data.std_precision);
             var full = formatFullAmount(data.pipeline_value, data.currency_symbol, data.currency_iso, data.std_precision);
             var countText = clientsWithOppsText(customerCount);
 

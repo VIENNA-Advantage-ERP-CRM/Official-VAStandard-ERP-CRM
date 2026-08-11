@@ -23,15 +23,20 @@ namespace VAS.Controllers
 {
     /// <summary>
     /// Module Name : VAS_136_OnboardingStatusWidget
-    /// Purpose     : 3x1 donut - share of active customers fully onboarded vs still
-    ///               in progress. Profile completion is scored 20 points per profile
-    ///               section that has data (see ProfileCompletionExpr) - there is no
-    ///               VAS_ProfileCompletion column. Onboarded = 100, In progress =
-    ///               &lt; 100. Legend rows drill into the filtered,
-    ///               paged customer list. MRole (tenant + org + record access) is
-    ///               applied to the single physical table C_BPartner.
+    /// Purpose     : 3x1 donut - how far customer onboarding has got overall. The
+    ///               headline (completionPercent, the ring and its centre label) is the
+    ///               MEAN Profile Completion % across active customers; the legend
+    ///               counts split those customers into fully onboarded (= 100) vs in
+    ///               progress (&lt; 100). Profile completion is scored 20 points per
+    ///               profile section that has data (see ProfileCompletionExpr) - there
+    ///               is no VAS_ProfileCompletion column. Legend rows drill into the
+    ///               filtered, paged customer list. MRole (tenant + org + record
+    ///               access) is applied to the single physical table C_BPartner.
     /// Chronological development:
     ///   VAI052      2026-07-22 Created
+    ///   VAI052      2026-08-10 Headline switched from share-fully-onboarded to the
+    ///                          mean Profile Completion %, so the ring reports
+    ///                          onboarding completion rather than a customer split
     /// </summary>
     public class VAS_136_OnboardingStatusWidgetController : Controller
     {
@@ -90,10 +95,12 @@ namespace VAS.Controllers
                     )
                     SELECT COUNT(1) AS Total_Customers,
                            SUM(CASE WHEN cs.Onb_Progress >= 100 THEN 1 ELSE 0 END) AS Onboarded_Count,
-                           SUM(CASE WHEN cs.Onb_Progress < 100 THEN 1 ELSE 0 END) AS In_Progress_Count
+                           SUM(CASE WHEN cs.Onb_Progress < 100 THEN 1 ELSE 0 END) AS In_Progress_Count,
+                           COALESCE(SUM(cs.Onb_Progress), 0) AS Progress_Total
                     FROM CustomerScope cs";
 
                 int total = 0, onboarded = 0, inProgress = 0;
+                decimal progressTotal = 0;
                 IDataReader dr = null;
                 try
                 {
@@ -103,6 +110,7 @@ namespace VAS.Controllers
                         total = Util.GetValueOfInt(dr["Total_Customers"]);
                         onboarded = Util.GetValueOfInt(dr["Onboarded_Count"]);
                         inProgress = Util.GetValueOfInt(dr["In_Progress_Count"]);
+                        progressTotal = Util.GetValueOfDecimal(dr["Progress_Total"]);
                     }
                 }
                 finally
@@ -110,7 +118,13 @@ namespace VAS.Controllers
                     CloseReader(dr);
                 }
 
-                // Percentages computed here to keep the SQL dialect-neutral.
+                // Percentages computed here to keep the SQL dialect-neutral. The
+                // headline is the MEAN profile completion across customers - the
+                // "how far along is onboarding overall" figure - not the share of
+                // customers already at 100%, which the two legend counts carry.
+                // Summed in SQL and divided here so no dialect-specific AVG rounding
+                // is involved.
+                double completionPercent = total > 0 ? Math.Round((double)progressTotal / total, 1) : 0;
                 double onboardedPercent = total > 0 ? Math.Round(100.0 * onboarded / total, 1) : 0;
                 double inProgressPercent = total > 0 ? Math.Round(100.0 * inProgress / total, 1) : 0;
 
@@ -119,6 +133,8 @@ namespace VAS.Controllers
                     totalCustomers = total,
                     onboardedCount = onboarded,
                     inProgressCount = inProgress,
+                    // Mean profile completion; the donut ring and its centre label.
+                    completionPercent = completionPercent,
                     onboardedPercent = onboardedPercent,
                     inProgressPercent = inProgressPercent
                 };

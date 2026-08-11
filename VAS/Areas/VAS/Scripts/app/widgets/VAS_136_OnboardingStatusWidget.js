@@ -1,12 +1,14 @@
 /**
  * VAS_136 Onboarding Status Widget (Customers module dashboard)
- * Purpose - 3x1 donut: share of active customers fully onboarded vs still in
- *           progress, with both counts, driven by C_BPartner.VAS_ProfileCompletion
- *           (clamped 0..100; onboarded = 100). Each legend row opens that group's
- *           filtered, paged customer list; a row opens the customer record.
+ * Purpose - 3x1 donut showing how far customer onboarding has got overall. The ring
+ *           and its centre label are the MEAN Profile Completion % across active
+ *           customers (scored 20 points per profile section that holds data, so
+ *           0..100); the two legend counts split those customers into fully
+ *           onboarded (100%) vs still in progress. Each legend row opens that
+ *           group's filtered, paged customer list; a row opens the customer record.
  * Design  - onboarding-status.html (attached) + Design Specs/dashboard-widgets.md.
  *           Glass surface, icon-well header, SVG ring (onboarded #20A464 /
- *           in-progress #D78B10) with the onboarded percent in the centre and a
+ *           in-progress #D78B10) with the completion percent in the centre and a
  *           two-row legend. Internal sizing in em; SVG strokes/borders in px.
  *           CSS namespaced vas136-* (Prompt_Instructions MPC prefix rule).
  *
@@ -28,6 +30,9 @@
  * 10  | Retry                            | VAS_136_Retry
  * 11  | of                               | VAS_136_Of
  * 12  | Close                            | VAS_136_Close
+ * 13  | Showing                          | VAS_136_Showing
+ * 14  | Previous page                    | VAS_136_PrevPage
+ * 15  | Next page                        | VAS_136_NextPage
  * ──────────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -85,6 +90,15 @@
             if (typeof parsed === 'string' && parsed.length) { parsed = JSON.parse(parsed); }
             return parsed || {};
         }
+        // Projects fact: name the customer's delivery project rather than only
+        // counting it. The server sends the first project name plus the total, so
+        // a customer with several reads "Name +2"; none renders the empty dash.
+        function projectText(name, count, dash) {
+            if (!name) { return dash; }
+            var extra = Number(count || 0) - 1;
+            return escapeHtml(extra > 0 ? name + ' +' + formatCount(extra) : name);
+        }
+
         function formatCount(value) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
@@ -132,13 +146,23 @@
             else if (tier === 'Silver') { cls = 'vas136-tag-info'; }
             return '<span class="vas136-tag ' + cls + '">' + escapeHtml(tier) + '</span>';
         }
-        function usesIndian(iso) { return ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'].indexOf(String(iso || '').toUpperCase()) >= 0; }
+        // Standard precision of the base currency reported by the detail endpoint,
+        // falling back to the session context.
+        function currencyPrecision() {
+            var p = Number(searchCurrency.precision);
+            if (!isNaN(p) && p >= 0) { return p; }
+            if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                p = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+            return !isNaN(p) && p >= 0 ? p : 0;
+        }
+        // Compact amount in the base (accounting-schema) currency; the scale follows
+        // that currency's numbering system at the system-configured precision.
         function formatArr(value) {
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
-            var sign = n < 0 ? '-' : '', abs = Math.abs(n);
+            var sign = n < 0 ? '-' : '';
             var symbol = searchCurrency.symbol || searchCurrency.iso || '';
-            var body = abs >= 1000 ? Math.round(abs / 1000).toLocaleString(window.navigator.language) + 'K' : abs.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
-            return sign + symbol + body;
+            return sign + symbol + VIS.Util.formatCompactAmount(n, searchCurrency.iso, currencyPrecision());
         }
 
         function stepClass(step) {
@@ -182,11 +206,15 @@
 
             var onboarded = Number(data.onboardedCount || 0);
             var inProgress = Number(data.inProgressCount || 0);
-            var pct = Number(data.onboardedPercent || 0);
+            // Headline = mean Profile Completion % across customers ("how far along is
+            // onboarding overall"), NOT the share of customers already at 100% - that
+            // is what the two legend counts below carry. Ring and centre therefore
+            // always agree.
+            var pct = Number(data.completionPercent || 0);
             if (!isFinite(pct) || pct < 0) { pct = 0; }
             if (pct > 100) { pct = 100; }
             if ($sub) { $sub.text(Math.round(pct) + '% ' + label('VAS_136_Complete', 'complete')); }
-            // Green arc length = onboarded share; the amber base ring shows the rest.
+            // Arc length = completion reached; the base ring shows what is left.
             var dashOffset = RING_CIRC * (1 - pct / 100);
 
             var ring = '<div class="vas136-ring">' +
@@ -274,18 +302,22 @@
             var end = listOffset + items.length;
             var pages = Math.max(1, Math.ceil(listTotal / LIST_PAGE));
             var current = Math.floor(listOffset / LIST_PAGE);
-            var lbl = start + '–' + end + ' ' + label('VAS_136_Of', 'of') + ' ' + formatCount(listTotal);
+            /* Footer pager (dashboard-widgets.md §"Widget Footer Pager"): helper
+               left, compact prev · "N of M" · next right. The control stays put
+               on a single page with both arrows disabled. */
+            var of = label('VAS_136_Of', 'of');
+            var helper = label('VAS_136_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
+            var pageText = (current + 1) + ' ' + of + ' ' + pages;
 
             $listBody.html('<div class="vas136-list">' + rows + '</div>');
-            if (pages > 1) {
-                $listPager.html(
-                    '<button type="button" class="vas136-pgbtn" data-dir="prev" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas136-pglabel">' + escapeHtml(lbl) + '</span>' +
-                    '<button type="button" class="vas136-pgbtn" data-dir="next" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>'
-                );
-            } else {
-                $listPager.html('<span></span><span class="vas136-pglabel">' + escapeHtml(lbl) + '</span><span></span>');
-            }
+            $listPager.html(
+                '<span class="vas136-pglabel">' + escapeHtml(helper) + '</span>' +
+                '<span class="vas136-pgctl">' +
+                    '<button type="button" class="vas136-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_136_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
+                    '<span class="vas136-pgtext">' + escapeHtml(pageText) + '</span>' +
+                    '<button type="button" class="vas136-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_136_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
+                '</span>'
+            );
         }
         function turnPage(direction) {
             var next = listOffset + (direction === 'next' ? LIST_PAGE : -LIST_PAGE);
@@ -377,7 +409,7 @@
                 fact(label('VAS_136_Owner', 'Owner'), escapeHtml(data.rep || dash)) +
                 fact(label('VAS_136_ARR', 'ARR'), escapeHtml(formatArr(data.value))) +
                 fact(label('VAS_136_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
-                fact(label('VAS_136_Projects', 'Projects'), projects > 0 ? escapeHtml(formatCount(projects)) : dash) +
+                fact(label('VAS_136_Projects', 'Projects'), projectText(data.projectName, projects, dash)) +
                 fact(label('VAS_136_Pipeline', 'Pipeline'), pipeline > 0 ? escapeHtml(formatArr(pipeline)) : dash) +
                 fact(label('VAS_136_Overdue', 'Overdue'), Number(data.overdueAmount || 0) > 0 ? escapeHtml(formatArr(data.overdueAmount)) : dash) +
             '</div>';

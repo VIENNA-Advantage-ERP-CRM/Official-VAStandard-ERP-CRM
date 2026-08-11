@@ -4,25 +4,40 @@
  *           customers by company name, code, primary contact, e-mail, customer
  *           group (segment) and owner (sales rep). Shows at most seven
  *           relevance-ranked rows; each row has avatar, company, contact/segment/
- *           owner meta, an optional tier tag (only when the tenant configures a
- *           Rating->tier mapping) and three quick actions (create task, schedule,
+ *           owner meta, an optional tier tag (2026-08-07: resolved from the
+ *           tenant's own AD_Ref_List label for C_BPartner.Rating, so it appears
+ *           without any per-tenant code change; a customer with no rating still
+ *           shows no tag) and three quick actions (create task, schedule,
  *           log activity). Clicking a row zooms the host Customers window to that
  *           C_BPartner record in place; "See all matches" re-filters the same grid.
- * Design  - customer-search.html (attached) + Design Specs/dashboard-widgets.md
- *           "Full-Width Dashboard Search Widget". Onfinity glass tokens; internal
- *           sizing in em; no inner scrollbar (autosuggest bounded to seven).
+ * Design  - Design Specs/dashboard-widgets.md "Full-Width Dashboard Search
+ *           Widget". Onfinity glass tokens; internal sizing in em; no inner
+ *           scrollbar (autosuggest bounded to seven).
  *           CSS namespaced vas120-* (Prompt_Instructions MPC prefix rule).
+ *           2026-08-06 - markup flattened to the shared single glass pill
+ *           (icon + input + clear); the nested .vas120-field capsule that made
+ *           this widget look unlike VAS_067/078/144/164 was removed.
  *
  * Backend - VAS_120_CustomerSearchWidget/SearchCustomers  (rows + total count)
  *
  * Routing - Record open + See-all use widgetFirevalueChanged (in-place zoom on the
  *           host window, Prompt_Instructions Scenario 1), mirroring VAS_067/VAS_083.
- * Quick actions - Best-effort openers: an integrator wires the real Task /
- *           Appointment / Activity windows via the documented override
- *           VAS.VAS_120_openCustomerActivity(kind, C_BPartner_ID); absent that,
- *           the widget opens the customer record as a safe, guarded fallback.
- *           See the integration note in the PR description. No production toast-
- *           only stubs remain.
+ * Quick actions - 2026-08-10: the standard-actions rule applies - New Task and
+ *           New Appointment hand off to the platform's own forms so the UI and
+ *           behaviour match the standard everywhere:
+ *             task     -> VIS.AppointmentsForm.init(..., isTask = true)
+ *             schedule -> VIS.AppointmentsForm.init(..., isTask = false)
+ *           This is the same entry point the VIS toolbar (cmd_task /
+ *           cmd_appointment) and the VAS_105 / VAS_123 right panels use. The
+ *           widget-local task / appointment dialogs survive only as a fallback for
+ *           a host where that form is unavailable (VIS.AppointmentsForm delegates
+ *           to the WSP module and reports when it is absent), as do their
+ *           SaveTask / SaveAppointment endpoints.
+ *           The documented override VAS.VAS_120_openCustomerActivity(kind,
+ *           C_BPartner_ID) still wins when an integrator has wired something else.
+ *           New Email / New Letter are not actions on this widget; the platform's
+ *           standard email entry point is VIS.Email in a VIS.CFrame (see VAS_105),
+ *           and "Letter" exists as an activity category rather than its own form.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  #  | Current Text                                              | Message Key
@@ -38,7 +53,30 @@
  *  9  | No owner                                                  | VAS_120_NoOwner
  * 10  | Create task                                               | VAS_120_CreateTask
  * 11  | Schedule                                                  | VAS_120_Schedule
- * 12  | Log activity                                              | VAS_120_LogActivity
+ * 13  | Close                                                     | VAS_120_Close
+ * 14  | Cancel                                                    | VAS_120_Cancel
+ * 15  | Save                                                      | VAS_120_Save
+ * 16  | Call / Note / Meeting / Email                             | VAS_120_TypeCall … TypeEmail
+ * 17  | Summary                                                   | VAS_120_Summary
+ * 18  | What happened / next step…                                | VAS_120_SummaryPlaceholder
+ * 19  | Please enter a summary.                                   | VAS_120_SummaryRequired
+ * 21  | Schedule appointment                                      | VAS_120_ScheduleAppointment
+ * 22  | Title                                                     | VAS_120_Title
+ * 23  | Review                                                    | VAS_120_Review
+ * 24  | Date                                                      | VAS_120_Date
+ * 25  | Time                                                      | VAS_120_Time
+ * 26  | Please enter a title.                                     | VAS_120_TitleRequired
+ * 27  | Please pick a date.                                       | VAS_120_DateRequired
+ * 28  | Could not schedule the appointment.                       | VAS_120_ScheduleSaveFailed
+ * 29  | New task                                                  | VAS_120_NewTask
+ * 30  | Task                                                      | VAS_120_Task
+ * 31  | What needs to happen?                                     | VAS_120_TaskPlaceholder
+ * 32  | Customer                                                  | VAS_120_Customer
+ * 33  | Due                                                       | VAS_120_Due
+ * 34  | Today / Tomorrow / In 3 days / Next week                  | VAS_120_DueToday … DueNextWeek
+ * 35  | Add task                                                  | VAS_120_AddTask
+ * 36  | Please enter a task.                                      | VAS_120_TaskRequired
+ * 37  | Could not add the task.                                   | VAS_120_TaskSaveFailed
  * ──────────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -49,6 +87,10 @@
     // itself. Documented for admin confirmation (in-place zoom uses the resolved
     // host window name first; this is only the fallback ActionName).
     var CUSTOMER_WINDOW_NAME = "Business Partner";
+
+
+    // Own endpoints for the task / appointment popups (AppointmentsInfo).
+    var WIDGET_ENDPOINT = "VAS_120_CustomerSearchWidget/";
 
     VAS.VAS_120_CustomerSearchWidget = function () {
 
@@ -69,6 +111,27 @@
         var lastTotal = 0;
         var lastQuery = '';
         var minLength = 2;
+        // AD_Table_ID of C_BPartner, supplied with the search rows. The standard
+        // Task / Appointment forms need the record's table context, and a dashboard
+        // widget has no framework-supplied table_ID the way a tab panel does.
+        var bpTableId = 0;
+
+        // Quick-action dialog roots + the customer the open dialog acts on.
+        var $schedule;
+        var $task;
+        var currentBpId = 0;
+        var currentBpName = '';
+
+
+        // Relative due dates for the New task popup. The offset (in days) is sent
+        // to the server, which resolves it against its own date, so the stored due
+        // date never depends on the browser clock or time zone.
+        var DUE_OPTIONS = [
+            { days: 0, key: 'VAS_120_DueToday', text: 'Today' },
+            { days: 1, key: 'VAS_120_DueTomorrow', text: 'Tomorrow' },
+            { days: 3, key: 'VAS_120_DueIn3Days', text: 'In 3 days' },
+            { days: 7, key: 'VAS_120_DueNextWeek', text: 'Next week' }
+        ];
 
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
@@ -123,6 +186,9 @@
             if (name === 'arrow') {
                 return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>';
             }
+            if (name === 'check') {
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+            }
             return '';
         }
 
@@ -153,18 +219,25 @@
                 .toUpperCase();
         }
 
-        // Tier tag colour class per the Onfinity tier palette (only used when the
-        // backend supplied a mapped tier; unknown ratings show no tag).
+        // Tier tag colour class per the Onfinity tier palette. The backend now sends
+        // the tenant's own AD_Ref_List label for C_BPartner.Rating, so the three
+        // known tiers keep their palette colour (case-insensitively) and any other
+        // configured label falls back to the neutral grey tag rather than rendering
+        // an uncoloured, near-invisible chip. A customer with no rating still sends
+        // no tier at all, so no tag is drawn.
         function tierClass(tier) {
-            if (tier === 'Platinum') { return 'vas120-tag-violet'; }
-            if (tier === 'Gold') { return 'vas120-tag-amber'; }
-            if (tier === 'Silver') { return 'vas120-tag-info'; }
-            return '';
+            var name = String(tier || '').trim().toLowerCase();
+            if (name === 'platinum') { return 'vas120-tag-violet'; }
+            if (name === 'gold') { return 'vas120-tag-amber'; }
+            if (name === 'silver') { return 'vas120-tag-info'; }
+            return 'vas120-tag-neutral';
         }
 
         this.Initalize = function () {
             createWidget();
             createSuggestionList();
+            createScheduleDialog();
+            createTaskDialog();
             bindEvents();
         };
 
@@ -172,13 +245,13 @@
             var placeholder = label('VAS_120_SearchPlaceholder', 'Search customers by company, contact, segment, or owner…');
             var suggestId = 'vas120-suggestions-' + escapeHtml(String($self.windowNo || ''));
 
+            // Single glass pill: icon, input and clear sit directly inside the
+            // band — no nested capsule (shared dashboard search-widget design).
             $root.html(
                 '<div class="vas120-searchbar">' +
-                    '<div class="vas120-field">' +
-                        '<span class="vas120-search-icon">' + icon('search') + '</span>' +
-                        '<input class="vas120-input" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="' + suggestId + '" placeholder="' + escapeHtml(placeholder) + '">' +
-                        '<button type="button" class="vas120-clear" aria-label="' + escapeHtml(label('Clear', 'Clear')) + '" style="display:none">' + icon('close') + '</button>' +
-                    '</div>' +
+                    '<span class="vas120-search-icon">' + icon('search') + '</span>' +
+                    '<input class="vas120-input" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="' + suggestId + '" placeholder="' + escapeHtml(placeholder) + '">' +
+                    '<button type="button" class="vas120-clear" aria-label="' + escapeHtml(label('Clear', 'Clear')) + '">' + icon('close') + '</button>' +
                 '</div>'
             );
 
@@ -237,8 +310,11 @@
                 event.stopPropagation();
                 var kind = $(this).attr('data-action');
                 var bpId = Number($(this).attr('data-id'));
-                openCustomerActivity(kind, bpId);
+                // The dialogs show the customer name, so resolve the row before
+                // the popover is torn down.
+                var customer = suggestions[Number($(this).closest('.vas120-option').attr('data-index'))];
                 closeSuggestions();
+                openCustomerActivity(kind, bpId, customer ? (customer.Name || customer.Value || '') : '');
             });
             $suggest.on('mousedown', '.vas120-more', function (event) {
                 event.preventDefault();
@@ -246,14 +322,21 @@
             });
 
             $(document).on('mousedown' + ns, function (event) {
-                if (!$(event.target).closest('.vas120-searchbar, .vas120-suggest').length) {
+                if (!$(event.target).closest('.vas120-searchbar, .vas120-suggest, .vas120-modal').length) {
                     closeSuggestions();
                 }
             });
+            // Escape dismisses the topmost surface: an open dialog first, then the
+            // suggestion popover.
             $(document).on('keydown' + ns, function (event) {
-                if (event.key === 'Escape') { closeSuggestions(); }
+                if (event.key !== 'Escape') { return; }
+                var $open = openModal();
+                if ($open) { closeDialog($open); }
+                else { closeSuggestions(); }
             });
 
+            // A dashboard scroll must not tear a modal down, so only the popover
+            // reacts to scrolling.
             $(window).on('scroll' + ns, closeSuggestions);
             $(window).on('resize' + ns, function () {
                 if ($suggest && $suggest.hasClass('is-open')) { positionSuggest(); }
@@ -299,6 +382,7 @@
                     if (parsed.Error) { renderState(parsed.Error); return; }
 
                     if (parsed.MinLength) { minLength = parsed.MinLength; }
+                    if (parsed.BPartnerTableId) { bpTableId = Number(parsed.BPartnerTableId); }
                     lastQuery = searchText;
                     lastTotal = Number(parsed.Total || 0);
                     suggestions = parsed.Rows || [];
@@ -322,7 +406,6 @@
             var noOwner = label('VAS_120_NoOwner', 'No owner');
             var taskLabel = label('VAS_120_CreateTask', 'Create task');
             var scheduleLabel = label('VAS_120_Schedule', 'Schedule');
-            var logLabel = label('VAS_120_LogActivity', 'Log activity');
 
             var html = suggestions.map(function (customer, index) {
                 var displayName = customer.Name || customer.Value || '';
@@ -351,7 +434,6 @@
                     '<span class="vas120-actions">' +
                         '<button type="button" class="vas120-action" data-action="task" data-id="' + customer.Id + '" title="' + escapeHtml(taskLabel) + '" aria-label="' + escapeHtml(taskLabel) + '">' + icon('task') + '</button>' +
                         '<button type="button" class="vas120-action" data-action="schedule" data-id="' + customer.Id + '" title="' + escapeHtml(scheduleLabel) + '" aria-label="' + escapeHtml(scheduleLabel) + '">' + icon('calendar') + '</button>' +
-                        '<button type="button" class="vas120-action" data-action="log" data-id="' + customer.Id + '" title="' + escapeHtml(logLabel) + '" aria-label="' + escapeHtml(logLabel) + '">' + icon('log') + '</button>' +
                     '</span>' +
                     '<span class="vas120-option-chev">' + icon('chevron') + '</span>' +
                 '</div>';
@@ -476,16 +558,252 @@
             } catch (e) { /* best-effort */ }
         }
 
-        // Quick action opener. Prefers a host-provided integration hook wired to
-        // the real Task / Appointment / Activity windows; otherwise opens the
-        // customer record so the action can be created from there. Guarded so a
-        // missing target never breaks the dashboard. See integration note.
-        function openCustomerActivity(kind, bpId) {
+        // Quick action opener. A host-provided integration hook still wins when it
+        // is wired to the real Task / Appointment / Activity windows; otherwise the
+        // widget's own dialog handles the action inline and saves it.
+        // Standard-actions rule: New Task and New Appointment must hand off to the
+        // platform's own forms, so the UI and behaviour match the standard everywhere
+        // - never a widget-local re-implementation. VIS.AppointmentsForm.init is the
+        // same entry point the VIS toolbar (cmd_task / cmd_appointment) and the
+        // VAS_105 / VAS_123 right panels already use; its 5th argument selects task
+        // (true) over appointment (false).
+        function openStandardAppointmentForm(bpId, isTask) {
+            if (!window.VIS || !VIS.AppointmentsForm || typeof VIS.AppointmentsForm.init !== 'function') { return false; }
+            if (!bpTableId) { return false; }
+
+            var userId = (VIS.context && typeof VIS.context.getAD_User_ID === 'function') ? VIS.context.getAD_User_ID() : 0;
+            var userName = (VIS.context && typeof VIS.context.getAD_UserName === 'function') ? VIS.context.getAD_UserName() : '';
+            VIS.AppointmentsForm.init(bpTableId, bpId, userId, userName, isTask);
+            return true;
+        }
+
+        function openCustomerActivity(kind, bpId, name) {
             if (!bpId) { return; }
             if (typeof VAS.VAS_120_openCustomerActivity === 'function') {
                 try { VAS.VAS_120_openCustomerActivity(kind, bpId); return; } catch (e) { /* fall through */ }
             }
-            zoomToCustomer(bpId);
+
+            currentBpId = bpId;
+            currentBpName = name || '';
+
+            // The built-in dialogs remain only as a fallback for a host page where the
+            // platform form is unavailable (e.g. the WSP module is not deployed, which
+            // VIS.AppointmentsForm reports itself).
+            if (kind === 'task') {
+                if (!openStandardAppointmentForm(bpId, true)) { openTaskDialog(); }
+            } else if (kind === 'schedule') {
+                if (!openStandardAppointmentForm(bpId, false)) { openScheduleDialog(); }
+            }
+        }
+
+        /* ── Quick-action dialogs ────────────────────────────────────────────
+         * One shared modal shell (scrim + panel + head/body/foot) so the three
+         * popups differ only in their form body and primary button, matching the
+         * dialog chrome the sibling Customers widgets already use.
+         * ------------------------------------------------------------------ */
+
+        // Field ids are per-widget-instance so two dashboards hosting this widget
+        // never collide on a <label for>.
+        function fieldId(name) {
+            return 'vas120-' + name + '-' + String($self.AD_UserHomeWidgetID || $self.windowNo || '0');
+        }
+
+        function buildDialog(modifier, titleText, bodyHtml, confirmText) {
+            var $dialog = $(
+                '<div class="vas120-modal ' + modifier + '" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(titleText) + '">' +
+                    '<div class="vas120-scrim" data-vas120-close></div>' +
+                    '<section class="vas120-panel">' +
+                        '<header class="vas120-mhead">' +
+                            '<h2 class="vas120-mtitle">' + escapeHtml(titleText) + '</h2>' +
+                            '<span class="vas120-mhead-right">' +
+                                '<span class="vas120-mcust"></span>' +
+                                '<button type="button" class="vas120-mclose" data-vas120-close aria-label="' + escapeHtml(label('VAS_120_Close', 'Close')) + '">' + icon('close') + '</button>' +
+                            '</span>' +
+                        '</header>' +
+                        '<div class="vas120-mbody">' + bodyHtml +
+                            '<div class="vas120-merror" role="alert"></div>' +
+                        '</div>' +
+                        '<footer class="vas120-mfoot">' +
+                            '<button type="button" class="vas120-btn vas120-btn-ghost" data-vas120-close>' + escapeHtml(label('VAS_120_Cancel', 'Cancel')) + '</button>' +
+                            '<button type="button" class="vas120-btn vas120-btn-primary" data-vas120-save>' + icon('check') + escapeHtml(confirmText) + '</button>' +
+                        '</footer>' +
+                    '</section>' +
+                '</div>'
+            );
+
+            $('body').append($dialog);
+            $dialog.find('.vas120-merror').hide();
+            $dialog.on('click', '[data-vas120-close]', function () { closeDialog($dialog); });
+            return $dialog;
+        }
+
+        function openDialog($dialog) {
+            $dialog.find('.vas120-mcust').text(currentBpName);
+            showError($dialog, '');
+            setBusy($dialog, false);
+            $dialog.addClass('is-open').attr('aria-hidden', 'false');
+            $('body').addClass('vas120-modal-open');
+        }
+
+        function closeDialog($dialog) {
+            if (!$dialog) { return; }
+            // Blur first: an aria-hidden container must not keep focus.
+            if (document.activeElement && $dialog[0].contains(document.activeElement)) { document.activeElement.blur(); }
+            $dialog.removeClass('is-open').attr('aria-hidden', 'true');
+            if (!openModal()) { $('body').removeClass('vas120-modal-open'); }
+        }
+
+        // The single dialog currently on screen, or null. Only one can be open.
+        function openModal() {
+            if ($schedule && $schedule.hasClass('is-open')) { return $schedule; }
+            if ($task && $task.hasClass('is-open')) { return $task; }
+            return null;
+        }
+
+        function showError($dialog, message) {
+            var $error = $dialog.find('.vas120-merror');
+            if (!message) { $error.hide().text(''); return; }
+            $error.text(message).show();
+        }
+
+        function setBusy($dialog, isBusy) {
+            $dialog.find('[data-vas120-save]').prop('disabled', !!isBusy);
+        }
+
+        function focusField($dialog, field) {
+            window.setTimeout(function () { $dialog.find('[data-field="' + field + '"]').focus(); }, 0);
+        }
+
+        // Posts one quick action and closes the dialog on success. All three
+        // endpoints answer { success:true, … } or { error:"…" }.
+        function saveAction($dialog, endpoint, data, failText) {
+            setBusy($dialog, true);
+            showError($dialog, '');
+
+            $.ajax({
+                url: VIS.Application.contextUrl + endpoint,
+                type: 'POST',
+                data: data,
+                success: function (response) {
+                    setBusy($dialog, false);
+                    var parsed = parseResponse(response);
+                    if (parsed && parsed.error) { showError($dialog, parsed.error); return; }
+                    if (!parsed || !parsed.success) { showError($dialog, failText); return; }
+                    closeDialog($dialog);
+                },
+                error: function () {
+                    setBusy($dialog, false);
+                    showError($dialog, failText);
+                }
+            });
+        }
+
+        /* ---------- Schedule appointment (title + date + time) --------------- */
+
+        function createScheduleDialog() {
+            var titleFieldId = fieldId('apptitle');
+            var dateId = fieldId('apdate');
+            var timeId = fieldId('aptime');
+
+            var body =
+                '<div class="vas120-field">' +
+                    '<label class="vas120-flabel" for="' + titleFieldId + '">' + escapeHtml(label('VAS_120_Title', 'Title')) + '</label>' +
+                    '<input type="text" class="vas120-finput" id="' + titleFieldId + '" data-field="title" autocomplete="off">' +
+                '</div>' +
+                '<div class="vas120-frow">' +
+                    '<div class="vas120-field">' +
+                        '<label class="vas120-flabel" for="' + dateId + '">' + escapeHtml(label('VAS_120_Date', 'Date')) + '</label>' +
+                        '<input type="date" class="vas120-finput" id="' + dateId + '" data-field="date">' +
+                    '</div>' +
+                    '<div class="vas120-field">' +
+                        '<label class="vas120-flabel" for="' + timeId + '">' + escapeHtml(label('VAS_120_Time', 'Time')) + '</label>' +
+                        '<input type="time" class="vas120-finput" id="' + timeId + '" data-field="time">' +
+                    '</div>' +
+                '</div>';
+
+            $schedule = buildDialog('vas120-modal-schedule', label('VAS_120_ScheduleAppointment', 'Schedule appointment'), body, label('VAS_120_Schedule', 'Schedule'));
+            $schedule.on('click', '[data-vas120-save]', saveAppointment);
+        }
+
+        function openScheduleDialog() {
+            var suggested = label('VAS_120_Review', 'Review') + (currentBpName ? ' — ' + currentBpName : '');
+            $schedule.find('[data-field="title"]').val(suggested);
+            $schedule.find('[data-field="date"]').val('');
+            $schedule.find('[data-field="time"]').val('');
+            openDialog($schedule);
+            focusField($schedule, 'date');
+        }
+
+        function saveAppointment() {
+            var title = ($schedule.find('[data-field="title"]').val() || '').trim();
+            var date = $schedule.find('[data-field="date"]').val() || '';
+            var time = $schedule.find('[data-field="time"]').val() || '';
+
+            if (!title) {
+                showError($schedule, label('VAS_120_TitleRequired', 'Please enter a title.'));
+                return;
+            }
+            if (!date) {
+                showError($schedule, label('VAS_120_DateRequired', 'Please pick a date.'));
+                return;
+            }
+
+            // date/time carry the input elements' ISO values (yyyy-MM-dd / HH:mm),
+            // which are locale-independent, so the server parses them exactly.
+            saveAction($schedule, WIDGET_ENDPOINT + 'SaveAppointment',
+                { C_BPartner_ID: currentBpId, title: title, date: date, time: time },
+                label('VAS_120_ScheduleSaveFailed', 'Could not schedule the appointment.'));
+        }
+
+        /* ---------- New task (task + customer + due) ------------------------- */
+
+        function createTaskDialog() {
+            var subjectId = fieldId('tasksubject');
+            var customerId = fieldId('taskcustomer');
+            var dueId = fieldId('taskdue');
+
+            var dueOptions = DUE_OPTIONS.map(function (option) {
+                return '<option value="' + option.days + '">' + escapeHtml(label(option.key, option.text)) + '</option>';
+            }).join('');
+
+            var body =
+                '<div class="vas120-field">' +
+                    '<label class="vas120-flabel" for="' + subjectId + '">' + escapeHtml(label('VAS_120_Task', 'Task')) + '</label>' +
+                    '<input type="text" class="vas120-finput" id="' + subjectId + '" data-field="subject" autocomplete="off" placeholder="' + escapeHtml(label('VAS_120_TaskPlaceholder', 'What needs to happen?')) + '">' +
+                '</div>' +
+                '<div class="vas120-frow">' +
+                    '<div class="vas120-field">' +
+                        '<label class="vas120-flabel" for="' + customerId + '">' + escapeHtml(label('VAS_120_Customer', 'Customer')) + '</label>' +
+                        '<input type="text" class="vas120-finput" id="' + customerId + '" data-field="customer" readonly>' +
+                    '</div>' +
+                    '<div class="vas120-field">' +
+                        '<label class="vas120-flabel" for="' + dueId + '">' + escapeHtml(label('VAS_120_Due', 'Due')) + '</label>' +
+                        '<select class="vas120-fselect" id="' + dueId + '" data-field="due">' + dueOptions + '</select>' +
+                    '</div>' +
+                '</div>';
+
+            $task = buildDialog('vas120-modal-task', label('VAS_120_NewTask', 'New task'), body, label('VAS_120_AddTask', 'Add task'));
+            $task.on('click', '[data-vas120-save]', saveTask);
+        }
+
+        function openTaskDialog() {
+            $task.find('[data-field="subject"]').val('');
+            $task.find('[data-field="customer"]').val(currentBpName);
+            $task.find('[data-field="due"]').val(String(DUE_OPTIONS[0].days));
+            openDialog($task);
+            focusField($task, 'subject');
+        }
+
+        function saveTask() {
+            var subject = ($task.find('[data-field="subject"]').val() || '').trim();
+            if (!subject) {
+                showError($task, label('VAS_120_TaskRequired', 'Please enter a task.'));
+                return;
+            }
+
+            saveAction($task, WIDGET_ENDPOINT + 'SaveTask',
+                { C_BPartner_ID: currentBpId, subject: subject, dueDays: Number($task.find('[data-field="due"]').val() || 0) },
+                label('VAS_120_TaskSaveFailed', 'Could not add the task.'));
         }
 
         this.refreshWidget = function () {
@@ -508,6 +826,10 @@
             $(window).off(ns);
             if ($dashboardScroll && $dashboardScroll.length) { $dashboardScroll.off(ns); }
             if ($suggest) { $suggest.remove(); $suggest = null; }
+            // The dialogs live on <body>, so they must be torn down explicitly.
+            if ($schedule) { $schedule.remove(); $schedule = null; }
+            if ($task) { $task.remove(); $task = null; }
+            $('body').removeClass('vas120-modal-open');
             $root.remove();
         };
     };

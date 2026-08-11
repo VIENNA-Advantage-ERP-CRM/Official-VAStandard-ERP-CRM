@@ -38,16 +38,20 @@
     border: 2px solid #FFFFFF;                  /* px — physical edge */
     border-radius: 14px;                        /* px */
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
-    background: linear-gradient(180deg, rgba(252, 235, 211, 0.7), rgba(255, 255, 255, 0.5));
+    /* Standard glass surface, identical to every sibling widget. The open-ticket
+       state is carried by the value colour, icon and the "triage" affordance - not by
+       tinting the card. dashboard-widgets.md: "Do not use full tinted or semantic
+       gradient backgrounds just to indicate success, warning, loss, or status". */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
     backdrop-filter: blur(10px);
     cursor: pointer;
-    transition: box-shadow 180ms ease, transform 180ms ease;
 }
 
-    .vas126-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 14px 30px rgba(15, 61, 97, 0.12);
-    }
+/* 2026-08-06 — the hover lift (translateY(-2px) + 0 14px 30px rgba(15,61,97,.12))
+   was removed on request; the card no longer moves or re-elevates on hover, and
+   the transition went with it since nothing is left to animate. The pointer
+   cursor and the focus ring stay — they are affordances for the click target,
+   not hover decoration. Matches VAS_122/124/125 (.MPC-kpi-clickable). */
 
     .vas126-card:focus-visible {
         outline: 2px solid #1F83FF;
@@ -212,7 +216,7 @@
 }
 
     .vas126-close:hover {
-        background: #F2F6FA;
+        background: #F1F4F8;
     }
 
     .vas126-close svg {
@@ -368,7 +372,7 @@
 .vas126-tag-amber { background: #FCEBD3; color: #9A6500; }
 .vas126-tag-info { background: #DFF1FF; color: #0E5DA8; }
 .vas126-tag-neutral { background: #EEF2F6; color: #5F7283; }
-.vas126-tag-key { background: #FBE9D2; color: #9A5B00; }
+.vas126-tag-key { background: #FFF6E2; color: #9A6500; }
 
 /* Footer — pager row + action buttons. */
 .vas126-panel-foot {
@@ -381,40 +385,73 @@
     background: #FBFDFF;
 }
 
+/* Footer pager — dashboard-widgets.md §"Widget Footer Pager": two zones, the
+   result-range helper on the left and a compact prev · "N of M" · next control
+   on the right. 2026-08-06: replaced the centred solid-blue 34px circles with
+   the shared 24px rounded-square buttons / 14px chevrons from §Pager Buttons.
+   Sizes stay px — this pager is modal chrome, like the rest of this panel. */
 .vas126-pager {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 14px;                                  /* px */
 }
 
 .vas126-pglabel {
-    font-size: 13px;                            /* px */
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 12px;                            /* px */
     color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas126-pgctl {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;                                   /* px */
+    flex-shrink: 0;
+}
+
+.vas126-pgtext {
+    min-width: 48px;                            /* px */
+    text-align: center;
+    font-size: 13px;                            /* px */
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .vas126-pgbtn {
-    width: 34px;
-    height: 34px;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-    border: none;
-    background: #1F83FF;
-    color: #FFFFFF;
+    width: 24px;                                /* px */
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 6px;                         /* px */
+    background: #FBFDFF;
+    color: #0083DA;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(31, 131, 255, 0.28);
 }
 
+    .vas126-pgbtn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
     .vas126-pgbtn:disabled {
-        background: #C7D6E2;
-        box-shadow: none;
+        color: #B8C6D2;
         cursor: default;
     }
 
     .vas126-pgbtn svg {
-        width: 16px;
-        height: 16px;
+        width: 14px;                            /* px */
+        height: 14px;
+        stroke: currentColor;
     }
 
 .vas126-foot-actions {
@@ -457,7 +494,7 @@
 }
 
     .vas126-btn-primary:hover {
-        background: #1675E6;
+        background: #1F83FF;
     }
 
 .vas126-list-state {
