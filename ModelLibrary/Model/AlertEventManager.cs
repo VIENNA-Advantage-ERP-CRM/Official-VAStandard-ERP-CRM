@@ -117,6 +117,7 @@ namespace VAdvantage.Alert
 
                     RuleDetail detail = new RuleDetail();
                     detail.TableId = ruleTableID;
+                    detail.TabId = Util.GetValueOfInt(rule.Get_Value("AD_Tab_ID"));
                     detail.ColumnIds = colIdList;
                     detail.IsInsert = Util.GetValueOfBool(rule.Get_Value("IsInsert"));
                     detail.IsUpdate = Util.GetValueOfBool(rule.Get_Value("IsUpdate"));
@@ -231,6 +232,22 @@ namespace VAdvantage.Alert
                     tabName = Util.GetValueOfString(dr["TabName"]);
                 }
             }
+            else if (rule.TabId > 0)
+            {
+                string Query = @"SELECT w.Name, w.DisplayName, t.Name AS TabName
+                                 FROM AD_Tab t 
+                                 INNER JOIN AD_Window w ON(t.AD_Window_ID = w.AD_Window_ID)
+                                 WHERE t.AD_Tab_ID = " + rule.TabId;
+
+                DataSet ds = DB.ExecuteDataset(Query);
+                if (ds != null && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow dr = ds.Tables[0].Rows[0];
+                    windowName = Util.GetValueOfString(dr["Name"]);
+                    windowDisplayName = Util.GetValueOfString(dr["DisplayName"]);
+                    tabName = Util.GetValueOfString(dr["TabName"]);
+                }
+            }
             else
             {
                 log.Severe("Window and tab ID not found");
@@ -277,8 +294,9 @@ namespace VAdvantage.Alert
                 record_id = document.Get_ID();
             }
 
-            VAS_CommonMethod.RefValuesResult outp = VAS_CommonMethod.GetRefValues(document.GetCtx(), windowName, tableName, record_id);
+            VAS_CommonMethod.RefValuesResult outp = VAS_CommonMethod.GetRefValues(document.GetCtx(), windowName, tableName, record_id, document);
             refValues = outp?.NewJsonData;
+            Dictionary<string, object> oldRefValues = outp?.OldJsonData;
 
             if (refValues == null || refValues.Count == 0)
             {
@@ -330,7 +348,7 @@ namespace VAdvantage.Alert
                 }
 
                 // FETCH FIELDNAME MAP (ColumnName → FieldName), already ordered by AD_Field.SeqNo
-                Dictionary<string, string> fieldMap = GetFieldNamesByColumnName(document.GetWindowTabID());
+                Dictionary<string, string> fieldMap = GetFieldNamesByColumnName(document.GetWindowTabID() > 0 ? document.GetWindowTabID() : rule.TabId);
 
                 if (updatedColumn.Count > 0)
                 {
@@ -346,7 +364,11 @@ namespace VAdvantage.Alert
                             {
                                 List<object> row = new List<object>();
 
+                                object oldValue = null;
+                                oldRefValues?.TryGetValue(fieldName, out oldValue);
+
                                 row.Add(fieldName);
+                                row.Add(oldValue?.ToString()); // old value
                                 row.Add(refValues[fieldName]?.ToString()); // new value
 
                                 data.Add(row);
@@ -568,12 +590,13 @@ namespace VAdvantage.Alert
 
                     if (eventType.Equals("UPDATE") && row.Count > 2)
                     {
-                        // string oldVal = Util.GetValueOfString(row[1]);
+                        string oldVal = Util.GetValueOfString(row[1]);
                         string newVal = Util.GetValueOfString(row[2]);
                         detailRows.Append($@"
                 <tr>
-                    <td style='font-size: 14px; color: #475569; padding: 8px; border-bottom: 1px solid #e2e8f0;'>{field}</td>                 
-                    <td style='font-size: 14px; color: #16a34a; padding: 8px; border-bottom: 1px solid #e2e8f0; text-align:right;'>{newVal}</td>
+                    <td align='left' style='font-size: 14px; color: #475569; padding: 8px; border-bottom: 1px solid #e2e8f0; text-align:left;'>{field}</td>
+                    <td align='right' style='font-size: 14px; color: #dc2626; padding: 8px; border-bottom: 1px solid #e2e8f0; text-align:left; text-decoration: line-through;'>{oldVal}</td>
+                    <td align='right' style='font-size: 14px; color: #16a34a; padding: 8px; border-bottom: 1px solid #e2e8f0; text-align:right;'>{newVal}</td>
                 </tr>");
                     }
                     else
@@ -583,8 +606,8 @@ namespace VAdvantage.Alert
                         {
                             detailRows.Append($@"
                 <tr>
-                    <td style='font-size: 14px; color: #475569; padding: 8px; border-bottom: 1px solid #e2e8f0;'>{field}</td>
-                    <td style='font-size: 14px; color: #0f172a; padding: 8px; border-bottom: 1px solid #e2e8f0; text-align:right;'>{value}</td>
+                    <td align='left' style='font-size: 14px; color: #475569; padding: 8px; border-bottom: 1px solid #e2e8f0; text-align:left;'>{field}</td>
+                    <td align='right' style='font-size: 14px; color: #0f172a; padding: 8px; border-bottom: 1px solid #e2e8f0; text-align:right;'>{value}</td>
                 </tr>");
                         }
                     }
@@ -597,8 +620,8 @@ namespace VAdvantage.Alert
 
             // Header columns
             string headerColumns = eventType.Equals("UPDATE")
-                ? "<th style='text-align:left; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "Field") + "</th><th style='text-align:right; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "NewValue") + "</th>"
-                : "<th style='text-align:left; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "Field") + "</th><th style='text-align:right; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "VAS_Value") + "</th>";
+                ? "<th align='left' style='text-align:left; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "Field") + "</th><th align='left' style='text-align:left; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "OldValue") + "</th><th align='right' style='text-align:right; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "NewValue") + "</th>"
+                : "<th align='left' style='text-align:left; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "Field") + "</th><th align='right' style='text-align:right; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "VAS_Value") + "</th>";
 
             // Record Window Details section (common)
             string recordDetailsSection = $@"
@@ -827,6 +850,7 @@ namespace VAdvantage.Alert
     public class RuleDetail
     {
         public int TableId { get; set; }
+        public int TabId { get; set; }
         public List<int> ColumnIds { get; set; } = new List<int>();
         public bool IsInsert { get; set; }
         public bool IsUpdate { get; set; }
