@@ -524,42 +524,59 @@ namespace VASLogic.Models
         /// modal's Print button.
         ///
         /// AD_Table_ID comes from the X_C_Payment generated constant.
-        /// AD_Process_ID is resolved via the same chain the standard
-        /// window-toolbar Print button uses:
-        ///     TableName 'C_Payment' → AD_Window_ID → AD_Tab → AD_Tab.AD_Process_ID
-        /// AD_Tab carries the print/report process for the tab; the toolbar
-        /// Print button reads this when the user is on the Payment window,
-        /// so deriving it the same way keeps both entry points aligned.
+        /// AD_Process_ID is the process linked on the FIRST tab (tab index 0) of
+        /// the VAS_ARReceipt window, and only when that tab is the C_Payment tab:
+        ///     'VAS_ARReceipt' → AD_Window_ID → first AD_Tab by SeqNo → AD_Process_ID
+        /// AD_Tab carries the print/report process for the tab; the standard
+        /// window toolbar's Print button reads the same value when the user is on
+        /// the Payment window, so deriving it the same way keeps both entry points
+        /// aligned. A process linked on any OTHER tab does not count.
+        ///
+        /// AD_Process_ID comes back 0 when that tab carries none — the caller then
+        /// hides its Print button rather than offering an action that cannot run.
+        /// C_Payment_ID 0 is therefore allowed: the widget probes for print
+        /// availability once, before any receipt is open.
         /// </summary>
         public PaymentPrintInfo GetPaymentPrintInfo(Ctx ctx, int C_Payment_ID)
         {
             PaymentPrintInfo info = new PaymentPrintInfo();
-            if (ctx == null || C_Payment_ID <= 0) { return info; }
+            if (ctx == null) { return info; }
 
             int adTableId = X_C_Payment.Table_ID;
 
             PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
             int AD_Window_ID = obj.GetWindowId("VAS_ARReceipt", "Payment");
-
+            if (AD_Window_ID <= 0) { return info; }
 
             SqlParameter[] pParams = new SqlParameter[]
             {
-                new SqlParameter("@AD_Table_ID", adTableId),
-                new SqlParameter("@AD_Window_ID",AD_Window_ID)
+                 new SqlParameter("@AD_Table_ID", adTableId),
+                new SqlParameter("@AD_Window_ID", AD_Window_ID)
             };
-            int adProcessId = Util.GetValueOfInt(DB.ExecuteScalar(
-                @"SELECT t.AD_Process_ID
+
+            DataSet ds = DB.ExecuteDataset(
+                @"SELECT t.AD_Table_ID, t.AD_Process_ID
                   FROM AD_Tab t
                   INNER JOIN AD_Window w ON (t.AD_Window_ID = w.AD_Window_ID)
                   WHERE t.AD_Table_ID = @AD_Table_ID
-                    AND t.AD_Process_ID IS NOT NULL
                     AND t.AD_Window_ID = @AD_Window_ID
-                    AND t.AD_Process_ID > 0
+                    AND NVL(t.AD_Process_ID, 0) > 0
                     AND t.IsActive = 'Y'
                     AND w.IsActive = 'Y'
-                  ORDER BY t.SeqNo
+                  ORDER BY t.SeqNo, t.AD_Tab_ID
                   FETCH FIRST 1 ROW ONLY",
-                pParams , null));
+                pParams, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+            {
+                return info;
+            }
+
+            DataRow tab = ds.Tables[0].Rows[0];
+            int adProcessId = Util.GetValueOfInt(tab["AD_Process_ID"]);
+            if (adProcessId <= 0)
+            {
+                return info;
+            }
 
             info.AD_Process_ID = adProcessId;
             info.AD_Table_ID = adTableId;
