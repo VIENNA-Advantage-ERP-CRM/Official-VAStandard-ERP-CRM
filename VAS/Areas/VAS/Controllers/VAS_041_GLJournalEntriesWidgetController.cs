@@ -111,7 +111,7 @@ namespace VAS.Controllers
                                     FROM ProtectedJournal ProtectedJournal
                                 " + periodJoin + @"
                                     INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.C_AcctSchema_ID = ProtectedJournal.C_AcctSchema_ID)
-                                    INNER JOIN GL_JournalLine GL_JournalLine ON (ProtectedJournal.GL_Journal_ID = GL_JournalLine.GL_Journal_ID
+                                    LEFT JOIN GL_JournalLine GL_JournalLine ON (ProtectedJournal.GL_Journal_ID = GL_JournalLine.GL_Journal_ID
                                                                                   AND GL_JournalLine.IsActive = 'Y')
                                     INNER JOIN DocumentStatusReference DocumentStatusReference ON (DocumentStatusReference.Value = ProtectedJournal.DocStatus)
                                     GROUP BY
