@@ -6,6 +6,10 @@
 ///               the VAS.VAS_101_OverviewInventoryCount tab panel.
 /// Chronological development:
 ///   VAI163   2026-07-06  Created
+///   VAI163   2026-08-12  Added GetWindow_ID: resolves a window by NAME for the
+///                        panel's record-open path, so a Related Documents row
+///                        whose screen is not the table's default zoom target can
+///                        still be opened. Ported from VAS_092.
 /// </summary>
 
 using Newtonsoft.Json;
@@ -38,6 +42,26 @@ namespace VAS.Controllers
                     model.GetInventoryCountOverview(ctx, M_Inventory_ID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// Resolves a window's AD_Window_ID from its name, for the panel's
+        /// record-open path — a Related Documents row opens the screen named for
+        /// its table rather than whatever the table's zoom target resolves to.
+        /// </summary>
+        /// <param name="fields">Window name (AD_Window.Name), as sent by
+        /// VIS.dataContext.getJSONRecord.</param>
+        /// <returns>The window id, or 0 when the name is unknown to this client.</returns>
+        public JsonResult GetWindow_ID(string fields)
+        {
+            int windowId = 0;
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_101_OverviewInventoryCountModel model = new VAS_101_OverviewInventoryCountModel();
+                windowId = model.GetWindowId(ctx, fields);
+            }
+            return Json(JsonConvert.SerializeObject(windowId), JsonRequestBehavior.AllowGet);
         }
     }
 }

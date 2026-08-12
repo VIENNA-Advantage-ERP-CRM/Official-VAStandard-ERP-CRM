@@ -137,6 +137,18 @@
  *                        WINDOW_NAME_BY_TABLE. Neither table's zoom target
  *                        resolves to a window, so both fell through to the
  *                        "Cannot open" toast on every click.
+ *   VAI163   2026-08-11  openRecord gains a third and final step: when neither a
+ *                        named window nor the client's zoom target resolves, the
+ *                        server is asked which window the TABLE opens in
+ *                        (GetWindowIdByTable -> AD_Table.AD_Window_ID, else the
+ *                        first window with a tab on it). The VA075 work order
+ *                        chip needed it — that module is not part of this
+ *                        solution, so its screen cannot be named here, and the
+ *                        browser-side zoom lookup only knows tables the client
+ *                        has cached. Any future chip gets the same safety net.
+ *   VAI163   2026-08-12  The details card drops its Warehouse field — the
+ *                        Issued From block on the left of the same card already
+ *                        names the warehouse, so the card carried it twice.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -475,8 +487,9 @@
             // Reference chip strip under this card, which names every source
             // document and opens it on click. Repeating them as flat fields said
             // the same thing twice, and less usefully.
-            $right.append(headerField(msg("VAS_102_Warehouse", "Warehouse"),
-                na(data.WarehouseName), false));
+            // Warehouse is not a field here either: the Issued From block on the
+            // left of this same card already names it, so a second copy a few
+            // centimetres away said nothing new.
             // Posted is deliberately not a field here: the header pill already
             // carries it and the Issue Timeline dates it, so a third copy on the
             // details card only repeated what was on screen twice over.
@@ -1245,10 +1258,50 @@
             }
         }
 
-        // Open the record's window filtered to that row: the window named for this
-        // table when it has one, else the table's default zoom target. Either way
-        // the window is started with an equal-query on the table's key column
-        // (TableName_ID). Degrades to a toast so a click never throws.
+        // Table name -> AD_Window_ID read from the dictionary, cached like the
+        // name lookup above (-1 for "asked, and there is none").
+        var windowIdByTable = {};
+
+        // Last resort: ask the server which window the TABLE's records open in
+        // (AD_Table.AD_Window_ID, else the first window with a tab on the table).
+        //
+        // The browser-side zoom lookup only knows tables the client has cached,
+        // so a module that ships its own window and is not part of this solution
+        // — VA075 — never resolved and every click on its chip ended at the
+        // "Cannot open" toast. The dictionary knows it whatever the client has
+        // loaded, and this needs no screen name hard-coded for it.
+        function resolveWindowIdByTable(tableName) {
+            if (!tableName) return 0;
+            if (windowIdByTable.hasOwnProperty(tableName)) {
+                return windowIdByTable[tableName] > 0 ? windowIdByTable[tableName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_102_OverviewInternalUse/GetWindowIdByTable", tableName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) {
+                    windowIdByTable[tableName] = -1;
+                    console.log("resolveWindowIdByTable: no window for table " + tableName);
+                    return 0;
+                }
+                windowIdByTable[tableName] = id;
+                return id;
+            } catch (e) {
+                windowIdByTable[tableName] = -1;
+                console.log(e);
+                return 0;
+            }
+        }
+
+        // Open the record's window filtered to that row, trying in order: the
+        // window named for this table, the client's zoom target, then the
+        // dictionary's window for the table. Either way the window is started
+        // with an equal-query on the table's key column (TableName_ID). Degrades
+        // to a toast so a click never throws.
         function openRecord(tableName, recordId) {
             if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
             try {
@@ -1258,6 +1311,7 @@
                     VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
                     windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, false) || 0;
                 }
+                if (windowId <= 0) windowId = resolveWindowIdByTable(tableName);
                 if (windowId > 0 && VIS.viewManager &&
                     typeof VIS.viewManager.startWindow === "function") {
                     var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);

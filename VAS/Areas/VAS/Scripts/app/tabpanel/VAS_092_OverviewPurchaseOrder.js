@@ -259,6 +259,15 @@
  *                        clear or a newer fetch invalidates — a reply holding a
  *                        stale token is dropped instead of rendering.
  *                        Ported from VAS_106.
+ *   VAI163   2026-08-11  Order Progress dates its receipt stage from when the
+ *                        GRN was CREATED (model side) rather than the movement
+ *                        date, which a user can back-date. A stage whose date is
+ *                        a stored timestamp is marked stamp:true and rendered
+ *                        with formatStampDate, so the calendar day shown is the
+ *                        viewer's own — the stored value is UTC and carries no
+ *                        zone designator, so a receipt entered late in the
+ *                        evening used to date to the next morning. Drafted
+ *                        carries the same marker; it always read C_Order.Created.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1128,11 +1137,18 @@
                 ? getMsg("VAS_092_PaymentCompleted")
                 : getMsg("VAS_092_PendingAmount");
             return [
-                { key: "VAS_092_Drafted",          done: true,                     active: data.CurrentStage === 1, date: data.Created || data.DateOrdered },
+                // stamp: true marks a date that is a stored TIMESTAMP (UTC, no
+                // zone designator) rather than a document date field, so it is
+                // rendered in the viewer's own zone — otherwise a record created
+                // late in the local evening reports the following UTC day.
+                { key: "VAS_092_Drafted",          done: true,                     active: data.CurrentStage === 1, date: data.Created || data.DateOrdered, stamp: true },
                 { key: "VAS_092_Completed",        done: data.IsCompleted,         active: data.CurrentStage === 2, date: data.OrderCompletedDate || data.DateOrdered },
                 { key: "VAS_092_WithVendor",       done: data.IsWithVendor,        active: data.CurrentStage === 3, date: data.OrderCompletedDate || data.DateOrdered },
                 { key: "VAS_092_ExpectedDelivery", done: data.IsExpectedDelivery,  active: data.CurrentStage === 4, date: data.DatePromised, required: true },
-                { key: "VAS_092_PartialDelivered", label: recvLabel, done: data.IsPartialDelivered, active: data.CurrentStage === 5, date: data.LastReceiptDate },
+                // The receipt stage dates from when the GRN was CREATED (model
+                // side), which is a stamp — not the movement date it used to
+                // show, which a user can back-date.
+                { key: "VAS_092_PartialDelivered", label: recvLabel, done: data.IsPartialDelivered, active: data.CurrentStage === 5, date: data.LastReceiptDate, stamp: true },
                 { key: "VAS_092_InvoiceRaised",    done: data.IsInvoiceRaised,     active: data.CurrentStage === 6, date: data.LastInvoiceDate },
                 { key: "VAS_092_PaymentDone",      label: paymentLabel, done: data.IsPaymentDone, active: data.CurrentStage === 7, date: data.LastPaymentDate }
             ];
@@ -1165,7 +1181,7 @@
                     stateCls = "vas_092-is-pending"; statusText = getMsg("VAS_092_Pending");
                 }
 
-                var dateText = formatDate(s.date);
+                var dateText = s.stamp ? formatStampDate(s.date) : formatDate(s.date);
                 var metaText = statusText;
                 if (s.done && dateText) {
                     metaText = s.required
@@ -2618,6 +2634,23 @@
 
         function formatDate(value) {
             var d = parseDbDate(value, false);
+            if (!d) return "";
+            try {
+                return d.toLocaleDateString(window.navigator.language, {
+                    year: "numeric", month: "short", day: "2-digit"
+                });
+            } catch (e) {
+                return d.toDateString();
+            }
+        }
+
+        // The calendar day of a stored TIMESTAMP, in the viewer's own zone. The
+        // DB keeps these in UTC and the server emits no zone designator, so
+        // reading one with formatDate (which deliberately does not shift a
+        // date-only field) would print the UTC day — a receipt entered at 9pm
+        // local would date to the following morning.
+        function formatStampDate(value) {
+            var d = parseDbDate(value, true);
             if (!d) return "";
             try {
                 return d.toLocaleDateString(window.navigator.language, {

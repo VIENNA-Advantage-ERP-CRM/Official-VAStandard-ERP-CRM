@@ -219,6 +219,20 @@
 ///                          run's identifier column is chosen from whichever the
 ///                          schema has, all AD_Column-guarded — a deployment
 ///                          without VAMRP behaves exactly as before.
+///   VAI163   2026-08-11  - LastReceiptDate is the goods receipt's CREATED stamp
+///                          (MAX(M_InOut.Created)) instead of MAX(MovementDate).
+///                          The movement date is a document field a user can
+///                          back-date or set forward, so the Order Progress
+///                          receipt stage could report a date on which nothing
+///                          had yet been entered.
+///                        - The Blanket Order origin no longer REQUIRES
+///                          IsBlanketTrx = 'Y' on the parent. The release order's
+///                          own C_Order_Blanket reference is the part of the link
+///                          the platform always writes, and demanding the parent
+///                          flag hid the chip wherever it is not carried; the
+///                          flag now only orders the result. NVL gave way to
+///                          COALESCE so the statement reads the same on Oracle
+///                          and PostgreSQL.
 /// </summary>
 
 using System;
@@ -317,7 +331,14 @@ namespace VASLogic.Models
                                   AND ci.IsActive   = 'Y'
                                   AND ci.IsPaid     = 'Y'
                                   AND ci.DocStatus IN ('CO', 'CL'))             AS PaidInvoiceCount,
-                              (SELECT MAX(io.MovementDate)
+                              -- When the goods receipt was CREATED, not the date
+                              -- it books stock on. MovementDate is a document
+                              -- field a user can back-date (or set forward), so
+                              -- the receipt stage of the Order Progress read as a
+                              -- date on which nothing had been entered yet. The
+                              -- creation stamp is when the GRN actually came into
+                              -- being, which is what the stage reports.
+                              (SELECT MAX(io.Created)
                                  FROM M_InOut io
                                 WHERE io.C_Order_ID = o.C_Order_ID
                                   AND io.IsActive   = 'Y'
@@ -1034,14 +1055,23 @@ namespace VASLogic.Models
             {
                 try
                 {
+                    // IsBlanketTrx is REPORTED, not required. Requiring it hid the
+                    // chip wherever the flag is not carried on the parent order —
+                    // the release order's own C_Order_Blanket reference is what
+                    // says the document was released against a blanket, and it is
+                    // the only part of the link the platform always writes.
+                    // COALESCE, not NVL: this statement has to read the same on
+                    // Oracle and PostgreSQL.
                     string sql = @"SELECT bo.C_Order_ID  AS BlanketId,
-                                          bo.DocumentNo  AS BlanketNo
+                                          bo.DocumentNo  AS BlanketNo,
+                                          COALESCE(bo.IsBlanketTrx, 'N') AS IsBlanketTrx
                                      FROM C_Order o
                                      INNER JOIN C_Order bo
                                             ON (bo.C_Order_ID = o.C_Order_Blanket)
                                     WHERE o.C_Order_ID = @C_Order_ID
-                                      AND NVL(bo.IsBlanketTrx, 'N') = 'Y'
-                                      AND NVL(bo.IsActive, 'Y')     = 'Y'";
+                                      AND COALESCE(o.C_Order_Blanket, 0) > 0
+                                      AND COALESCE(bo.IsActive, 'Y')     = 'Y'
+                                    ORDER BY COALESCE(bo.IsBlanketTrx, 'N') DESC";
                     DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                     if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                     {

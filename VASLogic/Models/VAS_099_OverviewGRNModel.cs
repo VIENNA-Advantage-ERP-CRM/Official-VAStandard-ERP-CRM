@@ -211,6 +211,12 @@
 ///                        oldest-first, which buried the most recent event at the
 ///                        bottom of the feed — and, since the feed paginates at 15
 ///                        rows, on a later page entirely. Matches VAS_092.
+///   VAI163   2026-08-12  Added GetWindowId: resolves an AD_Window_ID from a
+///                        window NAME for the panel's record-open path, so a
+///                        record whose screen is not its table's default zoom
+///                        target (a receipt confirmation -> the
+///                        VAS_ShipReceiptConfirm window) can be opened. Ported
+///                        from VAS_092.
 /// </summary>
 
 using System;
@@ -823,25 +829,9 @@ namespace VASLogic.Models
             }
         }
 
-        /// <summary>
-        /// Returns the document no of the most recent AP invoice raised against
-        /// the receipt's purchase order, or an empty string when there is none.
-        /// M_InOut has no invoice FK — C_Invoice carries C_Order_ID — so the
-        /// invoice is reached through the parent PO. That link is order-scoped,
-        /// not receipt-scoped: on a part-received PO the invoice returned may
-        /// cover other receipts of the same order. Reversed and voided invoices
-        /// are excluded. A DB issue degrades to "" so the overview still renders.
-        /// </summary>
-        /// Public wrapper over <see cref="GetLatestInvoice"/> so the controller can
-        /// report the invoice document generated for an order.
-        /// </summary>
-        /// <param name="C_Order_ID">Parent purchase order id; 0 when unlinked.</param>
-        public string GetLatestInvoiceDocNoForOrder(int C_Order_ID)
-        {
-            DateTime? ignoredDate;
-            int ignoredId;
-            return GetLatestInvoice(C_Order_ID, out ignoredDate, out ignoredId);
-        }
+        // GetLatestInvoiceDocNoForOrder — the public wrapper over GetLatestInvoice
+        // below — is gone with the controller's GenerateInvoice action, its only
+        // caller. The read side calls GetLatestInvoice directly.
 
         /// <summary>
         /// Reads the latest AP invoice's id, document no and invoice date in one go.
@@ -2495,6 +2485,49 @@ namespace VASLogic.Models
             catch (Exception ex)
             {
                 _log.Severe("LoadPaymentDocuments (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Resolves a window's AD_Window_ID from its name (AD_Window.Name) for the
+        /// panel's record-open path. A record whose screen is not the table's
+        /// default zoom target — a receipt confirmation, which opens the
+        /// VAS_ShipReceiptConfirm window — is opened by naming its window instead,
+        /// and the name is only ever turned into an id here, against the
+        /// dictionary.
+        ///
+        /// Restricted to windows this tenant can see (AD_Client_ID 0 or its own),
+        /// preferring the tenant's own row over the system one. Whether the ROLE
+        /// may open it is the platform's call, made when the window is started.
+        /// </summary>
+        /// <param name="ctx">User context (client).</param>
+        /// <param name="windowName">Window name to resolve.</param>
+        /// <returns>The window id, or 0 when the name resolves to nothing.</returns>
+        public int GetWindowId(Ctx ctx, string windowName)
+        {
+            if (string.IsNullOrEmpty(windowName)) return 0;
+            try
+            {
+                string sql = @"SELECT w.AD_Window_ID
+                                 FROM AD_Window w
+                                WHERE w.Name         = @Name
+                                  AND w.IsActive     = 'Y'
+                                  AND w.AD_Client_ID IN (0, @AD_Client_ID)
+                                ORDER BY w.AD_Client_ID DESC";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@Name", windowName.Trim()),
+                    new SqlParameter("@AD_Client_ID", ctx == null ? 0 : ctx.GetAD_Client_ID())
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return 0;
+                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetWindowId (" + windowName + "): " + ex.Message);
+                return 0;
             }
         }
 

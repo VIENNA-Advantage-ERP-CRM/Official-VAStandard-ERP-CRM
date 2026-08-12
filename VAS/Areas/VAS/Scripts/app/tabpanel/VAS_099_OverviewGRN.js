@@ -92,7 +92,7 @@
  *                          (parseDbDate / formatStampDate). Date-only fields are
  *                          still shown exactly as stored.
  *                        - Activity is rendered in the order the model returns it
- *                          — oldest first, created -> updated -> completed.
+ *                          â€” oldest first, created -> updated -> completed.
  *                        - Generate Invoice is enabled for any completed receipt,
  *                          including a manually created one with no purchase
  *                          order (it is invoiced from its own lines).
@@ -114,7 +114,7 @@
  *   VAI163   2026-08-03  - Added the Generated From chip strip (purchase order,
  *                          reference invoice, originating sales order), each chip
  *                          opening its source record, with Manual as the fallback
- *                          — the VAS_092 Purchase Order pattern.
+ *                          â€” the VAS_092 Purchase Order pattern.
  *                        - Added the Documents section: the invoices,
  *                          confirmations and payments raised against the receipt,
  *                          with date, status and amount, each row opening the
@@ -128,7 +128,7 @@
  *                        of leaving the previously selected record on screen.
  *                        Both refreshPanelData and a new data-status listener
  *                        ask isTabInserting(), which reads GridTab.gridTable
- *                        .getIsInserting() — the flag GridTable.dataNew() raises
+ *                        .getIsInserting() â€” the flag GridTable.dataNew() raises
  *                        for both actions. The record id cannot answer it: a
  *                        copied row carries the source record's key until saved.
  *                        Ported from VAS_092.
@@ -143,8 +143,8 @@
  *                        Ported from VAS_092.
  *                        - The material table carries a .vas_099-matTable modifier
  *                          (like the Documents / Quality Parameters tables), so a
- *                          rule can address its own columns — the UOM cell's
- *                          trailing inset — without catching theirs.
+ *                          rule can address its own columns â€” the UOM cell's
+ *                          trailing inset â€” without catching theirs.
  *   VAI163   2026-08-06  Activity paginates at 15 rows a page (ACTIVITY_PER_PAGE),
  *                          reusing the material-lines pager. buildPager() is no
  *                          longer tied to linesPage / LINES_PER_PAGE: it takes the
@@ -155,7 +155,7 @@
  *   VAI163   2026-08-06  - render() draws each section behind its own guard
  *                          (drawSection). They ran in a bare sequence, so the first
  *                          section to throw took every section below it off the
- *                          screen — silently, with nothing logged.
+ *                          screen â€” silently, with nothing logged.
  *                        - msg() falls back properly. VIS.Msg answers an unseeded
  *                          key with the key BRACKETED and upper-cased, which is
  *                          never equal to the key, so the English fallback was
@@ -170,8 +170,8 @@
  *                        - Material Lines always renders, with an empty state, so a
  *                          receipt whose lines did not come back is no longer
  *                          indistinguishable from one with no lines section at all.
- *                        - Line quantities read in the line's ENTERED uom — the one
- *                          the UOM cell names — and Rate is restated per that uom
+ *                        - Line quantities read in the line's ENTERED uom â€” the one
+ *                          the UOM cell names â€” and Rate is restated per that uom
  *                          so Qty x Rate reconciles to Amount on a converted line.
  *                        - Generate Invoice: a blocked button now says why (hover
  *                          and click) instead of being mute; a failure to load the
@@ -196,7 +196,7 @@
  *                        refreshPanelData now goes through scheduleFetch, which
  *                        holds REFRESH_DELAY_MS and re-asks isTabInserting(), and
  *                        every fetch carries a token (fetchToken) that a clear or
- *                        a newer fetch invalidates — a reply holding a stale token
+ *                        a newer fetch invalidates â€” a reply holding a stale token
  *                        is dropped instead of rendering. clear() also drops the
  *                        busy indicator, which a discarded reply used to strand.
  *                        Ported from VAS_092.
@@ -210,7 +210,7 @@
  *                          lines failed to load"; the model now catches and logs
  *                          that failure, so it only stated the obvious.
  *                        - Generated From no longer carries a Reference Invoice
- *                          chip — the Documents section lists every invoice raised
+ *                          chip â€” the Documents section lists every invoice raised
  *                          against the receipt, with date, status and amount. A
  *                          receipt whose only origin is that invoice drops the
  *                          strip rather than claiming Manual.
@@ -222,8 +222,8 @@
  *                        parameters moved inside Material Lines:
  *                        - Card 4 is Confirmation Check, reading the document
  *                          type's own IsShipConfirm (Applicable / Non-Applicable)
- *                          with "Product QA Parameters: n" — the receipt lines
- *                          whose product has parameters defined — underneath.
+ *                          with "Product QA Parameters: n" â€” the receipt lines
+ *                          whose product has parameters defined â€” underneath.
  *                        - Cards 5 and 6 are Accepted Quantity (ConfirmedQty) and
  *                          Difference Quantity (DifferenceQty) with "Scrapped
  *                          Quantity: n" (ScrappedQty) under the latter. Both are
@@ -246,17 +246,52 @@
  *                        - To Verify is right-aligned: it is a quantity, and it
  *                          reads against the line's own Received / Ordered
  *                          figures directly above it.
+ *   VAI163   2026-08-11  Removed the Complete GRN and Generate Invoice buttons,
+ *                        and with them the whole Actions section: renderActions,
+ *                        actionButton, disableBtn, blockBtn, runAction,
+ *                        successText and the Generate Invoice dialog
+ *                        (openInvoiceDialog / showError). Nothing else reached
+ *                        any of them. Both actions live on the receipt's own
+ *                        screen, which carries the document's full validation.
+ *                        The controller's CompleteGRN / GenerateInvoice /
+ *                        GetInvoiceDocTypes endpoints went with them, as did the
+ *                        model's GetLatestInvoiceDocNoForOrder — nothing outside
+ *                        this panel called any of it.
+ *   VAI163   2026-08-12  - A receipt confirmation in Documents opens its record
+ *                          again. M_InOutConfirm's zoom target does not resolve
+ *                          to a screen the role can open, so the click answered
+ *                          with the platform's "with your current roles"
+ *                          refusal. openRecord now asks WINDOW_NAME_BY_TABLE
+ *                          first, which names the Ship/Receipt Confirmation
+ *                          window (VAS_ShipReceiptConfirm), and resolves it to
+ *                          an id through the panel's own GetWindow_ID endpoint;
+ *                          the zoom target stays as the fallback for every other
+ *                          table. Ported from VAS_092.
+ *                        - An e-mail's recipient line lists every address on the
+ *                          mail (To, Cc and Bcc, each labelled) in full instead
+ *                          of naming the To list and counting the rest as
+ *                          "+n more". The count could only be resolved by
+ *                          opening the message, which a mail stored without a
+ *                          body cannot do. allRecipients / countAddresses went
+ *                          with it, as did the sub-line's tooltip.
+ *                        - A value that has not been entered reads as a dash,
+ *                          not "N/A" (na / BLANK) — the placeholder the panel
+ *                          already used for a missing document no, date or
+ *                          amount.
+ *                        - To Verify is right-aligned by the quality drawer's
+ *                          own rule rather than by the material table's
+ *                          (stylesheet).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
-    // True when the tab is sitting on a row that has not been saved yet —
+    // True when the tab is sitting on a row that has not been saved yet â€”
     // whether it came from New Record or from Copy Record.
     //
     // The authority is the GRID TABLE's insert flag: VIS.GridTable.dataNew()
     // raises it for both actions and clears it again on save, refresh or undo,
     // and GridTable.getIsInserting() reads it. GridTab does NOT expose that
-    // method — it only holds the table as .gridTable — so asking the tab itself
+    // method â€” it only holds the table as .gridTable â€” so asking the tab itself
     // always answers "no".
     //
     // The record id cannot answer this on its own: a copied row carries the
@@ -304,7 +339,7 @@
                 inserting = false;
             }
             // The event does not report insert state on every build, and a
-            // COPIED row still carries the source record's key — so ask the tab
+            // COPIED row still carries the source record's key â€” so ask the tab
             // as well before trusting the id below.
             if (!inserting) inserting = isTabInserting($self.curTab);
 
@@ -318,10 +353,10 @@
             }
 
             if (inserting || rid <= 0) {
-                // New (unsaved) record — nothing to show against it. Asked of
+                // New (unsaved) record â€” nothing to show against it. Asked of
                 // shownRecordId rather than record_ID: a fetch still in flight
                 // has already claimed the former, so a New Record raised while
-                // the first (slow) request is on the wire still clears — and
+                // the first (slow) request is on the wire still clears â€” and
                 // invalidates the reply that would otherwise repaint it.
                 if (shownRecordId || data) {
                     $self.record_ID = 0;
@@ -346,14 +381,14 @@
 
         // Material lines are paged client-side (the whole set arrives in one
         // payload). Page index resets whenever a different record is loaded.
-        // A receipt of 25 lines or fewer shows them all — the pager only appears
+        // A receipt of 25 lines or fewer shows them all â€” the pager only appears
         // once there is a second page to reach.
         var LINES_PER_PAGE = 25;
         var linesPage = 0;
         var activityPage = 0;   // current Activity page (0-based, like linesPage)
         // Which material lines have their quality-parameter drawer open, keyed by
-        // M_InOutLine_ID. Survives a pager repaint — paging away from a line and
-        // back keeps what the reader opened — and is cleared per record.
+        // M_InOutLine_ID. Survives a pager repaint â€” paging away from a line and
+        // back keeps what the reader opened â€” and is cleared per record.
         var lineQpOpen = {};
 
         // The M_InOut_ID the panel is currently showing OR loading. 0 = nothing.
@@ -373,7 +408,7 @@
         // carrying a token that is no longer the current one belongs to a record
         // the panel has already moved off, so it is dropped instead of painting.
         // This is what stops a slow FIRST response from landing on top of the
-        // empty panel New Record had already cleared — the delay above cannot do
+        // empty panel New Record had already cleared â€” the delay above cannot do
         // it, because the response can arrive at any time.
         var fetchToken = 0;
         var pendingFetch = null;    // timer handle of a scheduled fetch, if any
@@ -402,15 +437,70 @@
             });
         }
 
+        // Tables whose record does NOT open in the table's default zoom window,
+        // mapped to the name of the window it does open. The VAS_092 Purchase
+        // Order overview carries the same map for the same reason.
+        //
+        // A receipt confirmation is the case that needed it: M_InOutConfirm's
+        // zoom target does not resolve to a screen this role can open, so
+        // clicking a confirmation in Documents answered with the platform's
+        // "with your current roles" refusal instead of the record. Naming the
+        // window it actually lives on — Ship/Receipt Confirmation — resolves the
+        // id from the dictionary instead of guessing at it.
+        //
+        // Any further screen that needs naming belongs here; nothing else has to
+        // change.
+        var WINDOW_NAME_BY_TABLE = {
+            "M_InOutConfirm": "VAS_ShipReceiptConfirm"
+        };
+
+        // Window name -> AD_Window_ID, resolved once per name and remembered for
+        // the life of the panel. A name the dictionary does not know is cached as
+        // -1 so a failed lookup is not repeated on every click.
+        var windowIdByName = {};
+
+        // Resolves a window id from its name through the panel's own endpoint.
+        // Returns 0 when it cannot be resolved, which leaves openRecord() to fall
+        // back to the table's zoom target.
+        function resolveWindowIdByName(windowName) {
+            if (!windowName) return 0;
+            if (windowIdByName.hasOwnProperty(windowName)) {
+                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_099_OverviewGRN/GetWindow_ID", windowName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) {
+                    windowIdByName[windowName] = -1;
+                    console.log("resolveWindowIdByName: no window named " + windowName);
+                    return 0;
+                }
+                windowIdByName[windowName] = id;
+                return id;
+            } catch (e) {
+                windowIdByName[windowName] = -1;
+                console.log(e);
+                return 0;
+            }
+        }
+
         // Opens the record's window filtered to that row, using the platform's
-        // zoom API (the same pattern as VAS_092_OverviewPurchaseOrder): resolve the
-        // table's default zoom window, then start it with an equal-query on the
-        // table's key column. Degrades to a toast so a click never throws.
+        // zoom API (the same pattern as VAS_092_OverviewPurchaseOrder): the window
+        // named for this table when it has one, else the table's default zoom
+        // target, then start it with an equal-query on the table's key column.
+        // Degrades to a toast so a click never throws.
         function openRecord(tableName, recordId, isSOTrx) {
             if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
             try {
-                var windowId = 0;
-                if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
+                var windowId = resolveWindowIdByName(WINDOW_NAME_BY_TABLE[tableName]);
+
+                if (windowId <= 0 &&
+                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
                     // The 4th arg (IsSOTrx) picks the sales vs purchase window for
                     // dual-purpose tables like C_Order.
                     windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, !!isSOTrx) || 0;
@@ -464,7 +554,7 @@
             // "showing or loading", and leaving it stale through the wait would
             // let the data-status listener fire a second fetch for the same row.
             shownRecordId = +recordID || 0;
-            // Feedback while we hold — clear()/fetchData() own it from here.
+            // Feedback while we hold â€” clear()/fetchData() own it from here.
             showBusy(true);
             pendingFetch = setTimeout(function () {
                 pendingFetch = null;
@@ -513,7 +603,7 @@
         };
 
         // Empties the panel back to its "no goods receipt selected" state, and
-        // drops any fetch that was still on its way to it — without that, the
+        // drops any fetch that was still on its way to it â€” without that, the
         // reply of the request in flight repaints the record New Record / Copy
         // Record has just cleared.
         this.clear = function () {
@@ -550,13 +640,13 @@
             // its own guard.
             //
             // They used to be called in a bare sequence, so the FIRST one to throw
-            // took every section below it off the screen with it — a single bad
+            // took every section below it off the screen with it â€” a single bad
             // field in the snapshot silently erased the material lines, the quality
             // parameters, the documents and the action buttons, with nothing on
             // screen and nothing in the log to say why. A section that fails now
             // costs only itself.
             //
-            // References is gone: every field it carried is already on screen — the
+            // References is gone: every field it carried is already on screen â€” the
             // purchase order, reference invoice and sales order as clickable chips
             // in Generated From, and the rest in the header card. The section only
             // repeated them as dead N/A text.
@@ -573,7 +663,10 @@
             drawSection("documents", renderDocuments);
             drawSection("notes",    renderNotes);
             drawSection("activity", renderActivity);
-            drawSection("actions",  renderActions);
+            // The action bar (Complete GRN / Generate Invoice) is gone â€” both
+            // actions belong to the receipt's own screen, which is where they
+            // carry the document's full validation and where a reader expects to
+            // find them. The panel reports the receipt; it no longer drives it.
         }
 
         // Runs one section's renderer, containing any failure to that section.
@@ -586,7 +679,7 @@
         }
 
         // True when the receipt's document type asks for a receipt confirmation
-        // (C_DocType.IsShipConfirm) — the Confirmation Check card and the two
+        // (C_DocType.IsShipConfirm) â€” the Confirmation Check card and the two
         // confirmation-quantity cards beside it hang off this.
         function confirmationApplicable() {
             return !!(data && data.IsShipConfirmDocType);
@@ -606,7 +699,7 @@
             }
         }
 
-        // The parameters defined against one material line (empty when none — that
+        // The parameters defined against one material line (empty when none â€” that
         // line then carries no expander).
         function qualityParamsFor(ln) {
             return (ln && qpByLine[ln.Line]) || [];
@@ -631,17 +724,24 @@
             return $sec;
         }
 
-        // Returns "N/A" for blank values so the layout never shows an empty cell.
+        // Placeholder for a value that has not been entered yet. An em dash, not
+        // "N/A": the panel already writes one for a missing document no, date or
+        // amount (buildDocumentRow), so every blank now reads the same way, and a
+        // dash says "nothing here" without the abbreviation's tone of a rule
+        // having been broken.
+        var BLANK = "—";
+
+        // Returns the dash for blank values so the layout never shows an empty cell.
         function na(value) {
             return (value === null || value === undefined || String(value).trim() === "")
-                ? VIS.Msg.getMsg("VAS_099_NA")
+                ? BLANK
                 : value;
         }
 
         // Prefer the seeded AD_Message; else a readable English fallback; else the
         // key. Used for message keys that may not be seeded yet.
         //
-        // VIS.Msg does NOT answer an unseeded key with the key itself — it answers
+        // VIS.Msg does NOT answer an unseeded key with the key itself â€” it answers
         // with the key bracketed and upper-cased ("[VAS_099_GENERATEDFROM]"). That
         // is never equal to the key, so the fallback below was unreachable and the
         // panel printed raw keys on any database where the VAS_099_* messages have
@@ -662,7 +762,7 @@
 
         // The currency token: prefer the linked order's symbol / ISO, else INR.
         function currencyToken() {
-            return (data && (data.CurSymbol || data.ISO_Code)) || "₹";
+            return (data && (data.CurSymbol || data.ISO_Code)) || "â‚¹";
         }
 
         // ---------- Status / priority maps (codes -> label + tone) ---------- //
@@ -690,7 +790,7 @@
 
         // PriorityRule code -> { key, tone }.
         // Low and Minor are the "nothing to worry about" end of the scale, so they
-        // carry the green (success) badge rather than a grey one — the tone is
+        // carry the green (success) badge rather than a grey one â€” the tone is
         // driven by the priority value, like every other step of the scale.
         var PRIORITY_MAP = {
             "1": { key: "VAS_099_Urgent", tone: "risk" },
@@ -719,14 +819,14 @@
             var $tl = $('<div class="vas_099-hdrTitleWrap"></div>');
             $tl.append($('<div class="vas_099-hdrTitle"></div>').text(
                 VIS.Msg.getMsg("VAS_099_GoodsReceiptNote") +
-                (data.DocumentNo ? " — " + data.DocumentNo : "")));
+                (data.DocumentNo ? " â€” " + data.DocumentNo : "")));
 
             var subBits = [];
             var received = formatDate(data.MovementDate);
             if (received) subBits.push(VIS.Msg.getMsg("VAS_099_Received") + " " + received);
             if (data.ReceivedBy) subBits.push(VIS.Msg.getMsg("VAS_099_ReceivedBy") + " " + data.ReceivedBy);
             if (subBits.length) {
-                $tl.append($('<div class="vas_099-hdrSub"></div>').text(subBits.join(" · ")));
+                $tl.append($('<div class="vas_099-hdrSub"></div>').text(subBits.join(" Â· ")));
             }
             $top.append($tl);
 
@@ -793,7 +893,7 @@
 
         // ---------- Generated From (chip strip) ---------- //
 
-        // The source documents this receipt was generated from — the purchase
+        // The source documents this receipt was generated from â€” the purchase
         // order it was raised against and the originating sales order on a drop
         // shipment. Only origins that actually exist are shown, each a clickable
         // chip that opens the source record; "Manual" is the fallback for a
@@ -802,7 +902,7 @@
         //
         // The AP invoice is an origin but not a chip: the Documents section
         // already lists it. A receipt whose ONLY origin is that invoice therefore
-        // has nothing to put in the strip — the strip is dropped rather than
+        // has nothing to put in the strip â€” the strip is dropped rather than
         // labelling it Manual, which it is not.
         function renderLinked() {
             var $strip = $('<section class="vas_099-genfrom"></section>');
@@ -812,7 +912,7 @@
             var $chips = $('<div class="vas_099-gfChips"></div>');
             var any = false;
 
-            // Purchase Order — opened on the purchase side (isSOTrx false), since
+            // Purchase Order â€” opened on the purchase side (isSOTrx false), since
             // both order kinds live in C_Order.
             if (data.PONo || data.PurchaseOrderId > 0) {
                 $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_099_AgainstPO"),
@@ -823,11 +923,11 @@
 
             // The AP invoice is deliberately NOT a chip here. Every invoice raised
             // against the receipt is already a row of the Documents section below,
-            // where it carries its date, status and amount and opens the same way —
+            // where it carries its date, status and amount and opens the same way â€”
             // a chip repeating one of them adds a second, thinner answer to a
             // question already answered.
 
-            // Sales Order — the originating order on a drop shipment. Opened as a
+            // Sales Order â€” the originating order on a drop shipment. Opened as a
             // sales transaction so the framework resolves the Sales Order window.
             if (data.RefOrderDocNo || data.RefOrderId > 0) {
                 $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_099_ReferenceSalesOrder"),
@@ -837,7 +937,7 @@
             }
 
             if (!any) {
-                // An invoice-only origin is a real origin, shown in Documents —
+                // An invoice-only origin is a real origin, shown in Documents â€”
                 // so there is nothing to add here and nothing to call Manual.
                 if (data.ReferenceInvoice || data.ReferenceInvoiceId > 0) return;
                 $chips.append(originChip("pencil", msg("VAS_099_Manual", "Manual"),
@@ -861,7 +961,7 @@
                 if (isSOTrx) $chip.attr("data-open-sotrx", "Y");
             }
             // The chip caps at the strip's width and its value truncates inside
-            // it, so one long document number cannot run off the panel — the
+            // it, so one long document number cannot run off the panel â€” the
             // untruncated text stays readable on the chip's own tooltip.
             $chip.attr("title", value ? label + ": " + value : label);
             $chip.append(svgIcon(icon));
@@ -906,7 +1006,7 @@
 
         function renderSnapshot() {
             // The confirmation cards hang off the document type's own
-            // IsShipConfirm flag — "this receipt is going to be confirmed", which
+            // IsShipConfirm flag â€” "this receipt is going to be confirmed", which
             // is what makes a confirmed / difference / scrapped quantity a
             // meaningful thing to report. (It is NOT the same question as "does a
             // quality check apply to a line", which drives the Quality column and
@@ -934,7 +1034,7 @@
                 formatNumber(+data.ReceivedQty || 0, 0),
                 VIS.Msg.getMsg("VAS_099_Units")));
 
-            // Confirmation Check — whether this receipt's document type asks for a
+            // Confirmation Check â€” whether this receipt's document type asks for a
             // receipt confirmation, with the number of its lines that carry QA
             // parameters underneath. The two answer different questions: a receipt
             // can be confirmable with no QA parameters on any product, and a
@@ -948,7 +1048,7 @@
 
             // The confirmation quantities, straight from the receipt's
             // confirmation lines. Only shown when the receipt is one that gets
-            // confirmed at all — on any other document type they are structurally
+            // confirmed at all â€” on any other document type they are structurally
             // zero and would read as a finding rather than an absence.
             if (confirms) {
                 $snap.append(metricCard("accepted", "checkCircle",
@@ -956,7 +1056,7 @@
                     formatNumber(+data.AcceptedQty || 0, 0),
                     msg("VAS_099_UnitsConfirmed", "units confirmed")));
 
-                // Difference is target less confirmed — what did not arrive as
+                // Difference is target less confirmed â€” what did not arrive as
                 // expected. Scrapped rides underneath it: it is the part of that
                 // gap the confirmation explicitly wrote off, so the two read
                 // together.
@@ -978,11 +1078,11 @@
             // Label, value and caption each clip to a single line inside the card,
             // so a long figure (the Received quantity / received value above all)
             // shows ellipsised. The whole card carries the untruncated text as a
-            // tooltip — a title on the card serves every cell inside it, so
+            // tooltip â€” a title on the card serves every cell inside it, so
             // hovering anywhere over the card reads out the full value.
             var tip = label;
             if (value) tip += ": " + value;
-            if (sub) tip += " · " + sub;
+            if (sub) tip += " Â· " + sub;
             $c.attr("title", tip);
 
             var $head = $('<div class="vas_099-mHead"></div>');
@@ -1000,17 +1100,17 @@
         // The receipt's document lifecycle: Drafted -> In Progress -> Completed ->
         // Posted -> Invoiced. Each stage is driven by document state, not by the
         // presence of a date; the date is only the caption underneath.
-        //   Drafted     — the record exists, so always done (captioned with Created).
-        //   In Progress — the document has moved past draft (any of IP/AP/WC/WP)
+        //   Drafted     â€” the record exists, so always done (captioned with Created).
+        //   In Progress â€” the document has moved past draft (any of IP/AP/WC/WP)
         //                 or reached a terminal state (CO/CL/VO/RE). Invalid (IN)
         //                 and Not Approved (NA) do not count as progressed.
-        //   Completed   — DocStatus CO or CL, captioned with the movement date.
-        //   Posted      — M_InOut.Posted, captioned with the date posting actually
+        //   Completed   â€” DocStatus CO or CL, captioned with the movement date.
+        //   Posted      â€” M_InOut.Posted, captioned with the date posting actually
         //                 ran (PostedDate, from the receipt's Fact_Acct rows). The
         //                 accounting date is only a fallback: it is the date the
         //                 posting was booked to and normally equals the movement
         //                 date, which is not what this stage is reporting.
-        //   Invoiced    — an AP invoice exists for the receipt's purchase order.
+        //   Invoiced    â€” an AP invoice exists for the receipt's purchase order.
         var PROGRESSED_STATUS = ["IP", "AP", "WC", "WP", "CO", "CL", "VO", "RE"];
 
         function timelineStages() {
@@ -1024,7 +1124,7 @@
             return [
                 { key: "VAS_099_Drafted",    fallback: "Drafted",     date: data.Created,             done: true,       stamp: true },
                 { key: "VAS_099_InProgress", fallback: "In Progress", date: progressed ? data.Updated : null, done: progressed, stamp: true },
-                // The date the record was completed on — the workflow's own stamp.
+                // The date the record was completed on â€” the workflow's own stamp.
                 // NOT the movement date: that is when the goods moved, typed on the
                 // receipt, and a receipt entered for last month but completed today
                 // captioned this stage with last month.
@@ -1103,7 +1203,7 @@
 
             // No lines on the receipt, no section. The empty state this replaces
             // was there to distinguish "no lines" from "the lines section failed
-            // to draw" — a receipt whose lines were dropped by a refused query
+            // to draw" â€” a receipt whose lines were dropped by a refused query
             // looked identical to one that has none. That failure is now caught
             // and logged on the server (LoadLines), so the placeholder only ever
             // told a reader something they can see for themselves: a receipt with
@@ -1111,12 +1211,12 @@
             if (!lines.length) return;
 
             var $sec = section(msg("VAS_099_MaterialLines", "Material Lines"), {
-                summary: (data.LineCount || 0) + " " + msg("VAS_099_Items", "items") + " · " +
+                summary: (data.LineCount || 0) + " " + msg("VAS_099_Items", "items") + " Â· " +
                     formatNumber(+data.ReceivedQty || 0, 0) + " " + msg("VAS_099_Units", "units")
             });
 
             // The Quality column is only meaningful when a quality check actually
-            // applies to something on this receipt — with none, the column (header
+            // applies to something on this receipt â€” with none, the column (header
             // and every cell) is dropped and the grid falls back to six columns.
             var showQuality = false;
             for (var q = 0; q < lines.length; q++) {
@@ -1125,7 +1225,7 @@
 
             // Named like the Documents / Quality Parameters tables so a rule can
             // address the material table's own columns without also catching
-            // theirs — they share .vas_099-tRow but not its column meanings.
+            // theirs â€” they share .vas_099-tRow but not its column meanings.
             var $tbl = $('<div class="vas_099-table vas_099-matTable"></div>');
             if (!showQuality) $tbl.addClass("vas_099-no-quality");
 
@@ -1142,7 +1242,7 @@
             }
             $tbl.append($head);
 
-            // Totals footer — always the whole receipt, never just the page.
+            // Totals footer â€” always the whole receipt, never just the page.
             var $foot = $('<div class="vas_099-tFoot"></div>');
             var $bit = $('<span class="vas_099-tf vas_099-is-grand"></span>');
             $bit.append(document.createTextNode(VIS.Msg.getMsg("VAS_099_TotalReceivedValue")));
@@ -1160,7 +1260,7 @@
 
             // Rows are replaced in place, ahead of the totals footer, so the
             // table's existing structure and its CSS grid stay exactly as they
-            // were — no wrapper element between the table and its rows.
+            // were â€” no wrapper element between the table and its rows.
             function paintPage() {
                 var pageCount = Math.max(1, Math.ceil(lines.length / LINES_PER_PAGE));
                 if (linesPage >= pageCount) linesPage = pageCount - 1;
@@ -1192,7 +1292,7 @@
         // disabled states stay accurate.
         //
         // `page` is the 0-based page being shown and `onGo` is handed the page to
-        // move to, so each paged section owns its own page variable — the material
+        // move to, so each paged section owns its own page variable â€” the material
         // lines and the activity feed page independently of one another. Nothing
         // is drawn for a single-page list, so a short section shows no controls.
         function buildPager($pager, page, pageCount, total, start, end, onGo) {
@@ -1244,12 +1344,12 @@
             var $tr = $('<div class="vas_099-tRow vas_099-tBody"></div>');
 
             // Item (name + attribute, then product code / locator). The name cell
-            // ellipsises, so the full text goes on a hover tooltip — same treatment
+            // ellipsises, so the full text goes on a hover tooltip â€” same treatment
             // as the locator below, and it leaves the layout untouched.
             var $item = $('<span class="vas_099-itItem"></span>');
             var $name = $('<div class="vas_099-itName"></div>');
 
-            // Expander, only on a product that actually has parameters to show —
+            // Expander, only on a product that actually has parameters to show â€”
             // a caret against a line with nothing under it is a promise the click
             // cannot keep. Its state is held per line id so a pager repaint (or a
             // move to another page and back) keeps what the reader opened.
@@ -1272,26 +1372,26 @@
 
             // Attribute Set Instance (size / lot / serial ...) reads as part of
             // what the product IS, so it follows the name on the same line rather
-            // than sitting on a line of its own. Only a real instance is shown — a
+            // than sitting on a line of its own. Only a real instance is shown â€” a
             // blank / "--" placeholder is not an attribute.
             var asi = (ln.AttributeSetInstance || "").trim();
             var hasAsi = (asi && asi !== "--" && asi !== "-");
             if (hasAsi) {
                 $name.append($('<span class="vas_099-itAttr"></span>').text(asi));
             }
-            var nameTip = (ln.ProductName || "") + (hasAsi ? " — " + asi : "");
+            var nameTip = (ln.ProductName || "") + (hasAsi ? " â€” " + asi : "");
             if (nameTip) $name.attr("title", nameTip);
             $item.append($name);
 
-            // Sub-line: product search key (no "SKU" prefix) · locator. The line
+            // Sub-line: product search key (no "SKU" prefix) Â· locator. The line
             // ellipsises when the column is narrow, so the locator carries the full
-            // name as a hover tooltip — readable without widening the layout.
+            // name as a hover tooltip â€” readable without widening the layout.
             var $sku = $('<div class="vas_099-itSku"></div>');
             if (ln.ProductCode) {
                 $sku.append($('<span></span>').text(ln.ProductCode));
             }
             if (ln.LocatorName) {
-                if ($sku.children().length) $sku.append(document.createTextNode(" · "));
+                if ($sku.children().length) $sku.append(document.createTextNode(" Â· "));
                 $sku.append($('<span class="vas_099-itLoc"></span>')
                     .text(VIS.Msg.getMsg("VAS_099_Locator") + " " + ln.LocatorName)
                     .attr("title", ln.LocatorName));
@@ -1311,7 +1411,7 @@
             // Ordered
             $tr.append($('<span class="vas_099-ta-r"></span>').text(formatNumber(+ln.OrderedQty || 0, prec)));
 
-            // Received — the figure on its own line so it lands on the same
+            // Received â€” the figure on its own line so it lands on the same
             // baseline and right edge as Ordered, with the progress bar stacked
             // underneath rather than pushing the number out of the column.
             var ordered = +ln.OrderedQty || 0;
@@ -1323,7 +1423,7 @@
             var $bar = $('<span class="vas_099-recvBar"><i></i></span>');
             $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
             $recv.append($bar);
-            // Every quantity on the row is in the line's ENTERED uom — the one the
+            // Every quantity on the row is in the line's ENTERED uom â€” the one the
             // UOM cell names. The tooltip spells the pair out with that unit, so a
             // converted line (2 Box, not 24 Each) is unambiguous on hover.
             var recvTip = formatNumber(received, prec) + " " + msg("VAS_099_Of", "of") +
@@ -1332,7 +1432,7 @@
             $recv.attr("title", recvTip);
             $tr.append($recv);
 
-            // Rate — per the entered uom, so Qty x Rate reconciles to Amount on the
+            // Rate â€” per the entered uom, so Qty x Rate reconciles to Amount on the
             // row as shown (the model restates it for a converted line).
             $tr.append($('<span class="vas_099-ta-r"></span>').text(
                 formatAmount(+ln.UnitRate || 0, cur, data.StdPrecision))
@@ -1343,7 +1443,7 @@
             $tr.append($('<span class="vas_099-ta-r"></span>').text(
                 formatAmount(+ln.LineValue || 0, cur, data.StdPrecision)));
 
-            // Quality marker — omitted entirely when no line on this receipt has a
+            // Quality marker â€” omitted entirely when no line on this receipt has a
             // quality check applicable (the column itself is not rendered then).
             //
             // A tick or a cross rather than the words: the column is one of seven
@@ -1376,8 +1476,8 @@
             "N": { key: "VAS_099_Pending", fallback: "Pending", tone: "vas_099-q-wait" }
         };
 
-        // The quality parameters defined against ONE material line's product —
-        // colour, size, grade or whatever the quality plan names — with the
+        // The quality parameters defined against ONE material line's product â€”
+        // colour, size, grade or whatever the quality plan names â€” with the
         // acceptable value, the inspected value and the resulting verdict.
         //
         // These used to be a section of their own at the bottom of the panel,
@@ -1387,7 +1487,7 @@
         // open under the line itself, collapsed until asked for, so the parameters
         // and the quantity they apply to are read together.
         //
-        // Returns null for a line with no parameters — that line carries no
+        // Returns null for a line with no parameters â€” that line carries no
         // expander either.
         function buildQualityDrawer(ln) {
             var rows = qualityParamsFor(ln);
@@ -1397,7 +1497,7 @@
             var $drawer = $('<div class="vas_099-qpDrawer"></div>');
             if (!open) $drawer.hide();
 
-            // Nothing has been inspected yet — these are the checks the
+            // Nothing has been inspected yet â€” these are the checks the
             // confirmation is going to raise, read from the plan. Said once, above
             // the table, rather than left for the reader to infer from a column of
             // Pending tags.
@@ -1408,7 +1508,7 @@
             if (planned) {
                 $drawer.append($('<div class="vas_099-qpNote"></div>')
                     .text(msg("VAS_099_QualityExpected",
-                              "Expected on confirmation — nothing inspected yet.")));
+                              "Expected on confirmation â€” nothing inspected yet.")));
             }
 
             var $tbl = $('<div class="vas_099-qpMini"></div>');
@@ -1442,8 +1542,8 @@
             // Six columns inside a side panel's table: every cell here ellipsises,
             // and a parameter name or a value-list entry is exactly the kind of
             // text that runs past it. The whole row therefore carries the full set
-            // as its tooltip — hovering anywhere on it reads out every parameter of
-            // that inspection, label by label — and the cells most likely to be
+            // as its tooltip â€” hovering anywhere on it reads out every parameter of
+            // that inspection, label by label â€” and the cells most likely to be
             // clipped repeat their own value on top of it, so a pointer resting on
             // one column answers for that column first.
             $tr.attr("title", qualityRowTooltip(q, statusText));
@@ -1487,7 +1587,7 @@
 
         // Every column of one inspection row, one labelled line each, for the
         // row's hover tooltip. Blank fields are left out rather than printed as
-        // "Label: N/A" — a tooltip that exists to recover clipped text should not
+        // "Label: N/A" â€” a tooltip that exists to recover clipped text should not
         // be padded with the absence of it.
         function qualityRowTooltip(q, statusText) {
             var bits = [];
@@ -1514,7 +1614,7 @@
 
         // The invoices, confirmations and payments that exist against this
         // receipt. Each row opens the underlying document through the shared
-        // openRecord() zoom path — the same table the PO overview uses.
+        // openRecord() zoom path â€” the same table the PO overview uses.
         function renderDocuments() {
             var rows = (data && data.Documents) || [];
             if (!rows.length) return;
@@ -1539,7 +1639,7 @@
             $sec.append($tbl);
         }
 
-        // "1 invoices · 2 confirmations" — only the kinds actually present count.
+        // "1 invoices Â· 2 confirmations" â€” only the kinds actually present count.
         function buildDocumentsSummary(rows) {
             var inv = 0, conf = 0, pay = 0;
             for (var i = 0; i < rows.length; i++) {
@@ -1551,7 +1651,7 @@
             if (inv)  bits.push(inv + " " + msg("VAS_099_InvoicesCount", "invoices"));
             if (conf) bits.push(conf + " " + msg("VAS_099_ConfirmationsCount", "confirmations"));
             if (pay)  bits.push(pay + " " + msg("VAS_099_PaymentsCount", "payments"));
-            return bits.join(" · ");
+            return bits.join(" Â· ");
         }
 
         function buildDocumentRow(d) {
@@ -1571,21 +1671,21 @@
             $item.append(svgIcon(docIcon));
 
             var $txt = $('<span class="vas_099-docTxt"></span>');
-            $txt.append($('<div class="vas_099-itName"></div>').text(d.DocumentNo || "—"));
+            $txt.append($('<div class="vas_099-itName"></div>').text(d.DocumentNo || "â€”"));
 
             var sub;
             if (d.Type === "confirmation") {
                 sub = msg("VAS_099_ReceiptConfirmation", "Receipt Confirmation");
-                if (d.LineCount) sub += " · " + d.LineCount + " " + VIS.Msg.getMsg("VAS_099_Lines");
+                if (d.LineCount) sub += " Â· " + d.LineCount + " " + VIS.Msg.getMsg("VAS_099_Lines");
             } else if (d.Type === "payment") {
                 sub = msg("VAS_099_APPayment", "AP Payment");
                 if (+d.DiscountAmt) {
-                    sub += " · " + msg("VAS_099_DiscountedAmount", "Discount") + ": " +
+                    sub += " Â· " + msg("VAS_099_DiscountedAmount", "Discount") + ": " +
                         formatAmount(+d.DiscountAmt || 0, currencyToken(), data.StdPrecision);
                 }
             } else {
                 sub = msg("VAS_099_VendorInvoice", "Vendor Invoice");
-                if (d.IsPaid) sub += " · " + msg("VAS_099_Paid", "Paid");
+                if (d.IsPaid) sub += " Â· " + msg("VAS_099_Paid", "Paid");
             }
             $txt.append($('<div class="vas_099-itSku"></div>').text(sub));
             $item.append($txt);
@@ -1596,7 +1696,7 @@
             // timestamp; an invoice / payment carries a document date.
             var when = (d.Type === "confirmation")
                 ? formatStampDate(d.DocDate) : formatDate(d.DocDate);
-            $tr.append($('<span></span>').text(when || "—"));
+            $tr.append($('<span></span>').text(when || "â€”"));
 
             var st = statusMeta(d.DocStatus);
             $tr.append($('<span></span>').append(
@@ -1605,7 +1705,7 @@
             // A confirmation has no amount of its own.
             var $amt = $('<span class="vas_099-ta-r"></span>');
             $amt.text((d.Amount === null || d.Amount === undefined)
-                ? "—"
+                ? "â€”"
                 : formatAmount(+d.Amount || 0, currencyToken(), data.StdPrecision));
             $tr.append($amt);
 
@@ -1660,7 +1760,7 @@
             var $list = $('<div class="vas_099-actList"></div>');
             $sec.append($list);
 
-            // The pager sits INSIDE the list card, closing it — the VAS_092
+            // The pager sits INSIDE the list card, closing it â€” the VAS_092
             // Purchase Order treatment. (The material-lines pager is a sibling of
             // its table for a different reason: that table takes its own horizontal
             // scroll and the controls must not scroll away with the columns. The
@@ -1679,7 +1779,7 @@
                 $list.empty();
                 for (var i = start; i < end; i++) {
                     $list.append(activityRow(rows[i]));
-                    // An e-mail's body is heavy — it stays collapsed under its row
+                    // An e-mail's body is heavy â€” it stays collapsed under its row
                     // and opens only when the reader asks for it.
                     var $mail = activityBody(rows[i]);
                     if ($mail) $list.append($mail);
@@ -1714,24 +1814,23 @@
             $title.append($('<span class="vas_099-actLead"></span>')
                 .text(title).attr("title", title));
 
-            // An e-mail names its recipients under the subject: the To list, plus
-            // a count of the Cc / Bcc addresses so a reader can see at a glance
-            // that others were copied. Every address itself is listed in the body.
+            // An e-mail names its recipients under the subject — every address on
+            // the To, Cc and Bcc lists, in full. No tooltip: the line is no
+            // longer an abridgement of something the reader has to hover to see.
             if (a.Type === "email") {
                 var to = recipientSummary(a);
                 if (to) {
-                    $title.append($('<small class="vas_099-actSub"></small>')
-                        .text(to).attr("title", allRecipients(a) || to));
+                    $title.append($('<small class="vas_099-actSub"></small>').text(to));
                 }
             }
             $row.append($title);
 
-            // "when · by whom" — the audit trail's whole point. For an e-mail that
+            // "when Â· by whom" â€” the audit trail's whole point. For an e-mail that
             // is when it went out and who sent it.
             var when = formatDateTime(a.Created);
             if (a.UserName) {
                 when = when
-                    ? when + " · " + msg("VAS_099_By", "by") + " " + a.UserName
+                    ? when + " Â· " + msg("VAS_099_By", "by") + " " + a.UserName
                     : msg("VAS_099_By", "by") + " " + a.UserName;
             }
             $row.append($('<span class="vas_099-actWhen"></span>').text(when).attr("title", when));
@@ -1761,7 +1860,7 @@
                 return (a.Text || "").trim() || msg("VAS_099_NoSubject", "(no subject)");
             }
             var title = meta.titleKey ? msg(meta.titleKey, meta.titleText) : (meta.titleText || "");
-            if (a.DocumentNo) title += " — " + a.DocumentNo;
+            if (a.DocumentNo) title += " â€” " + a.DocumentNo;
             return title;
         }
 
@@ -1792,341 +1891,43 @@
                 .text(msg(key, fallback) + " " + String(value).trim()));
         }
 
-        // Row sub-line: the To list, plus "+n more" covering the Cc / Bcc
-        // addresses. Counting by comma / semicolon is enough for a summary — the
-        // body lists the addresses verbatim.
-        function recipientSummary(a) {
-            var to = (a.MailTo || "").trim();
-            var extra = countAddresses(a.MailCc) + countAddresses(a.MailBcc);
-            if (!to && !extra) return "";
-            var s = msg("VAS_099_MailTo", "To:") + " " + (to || VIS.Msg.getMsg("VAS_099_NA"));
-            if (extra > 0) s += " +" + extra + " " + msg("VAS_099_MoreRecipients", "more");
-            return s;
-        }
-
-        // Every address on the mail, for the row's hover tooltip.
-        function allRecipients(a) {
-            var bits = [];
-            if (a.MailTo)  bits.push(msg("VAS_099_MailTo",  "To:")  + " " + a.MailTo);
-            if (a.MailCc)  bits.push(msg("VAS_099_MailCc",  "Cc:")  + " " + a.MailCc);
-            if (a.MailBcc) bits.push(msg("VAS_099_MailBcc", "Bcc:") + " " + a.MailBcc);
-            return bits.join("\n");
-        }
-
-        function countAddresses(value) {
-            if (!value || !String(value).trim()) return 0;
-            var parts = String(value).split(/[;,]/);
-            var n = 0;
-            for (var i = 0; i < parts.length; i++) {
-                if (parts[i].trim()) n++;
-            }
-            return n;
-        }
-
-        // ---------- Actions (visual buttons) ---------- //
-
-        // Document actions. Complete GRN runs the receipt's Complete (DocAction
-        // "CO"); Generate Invoice creates the AP invoice for the receipt's linked
-        // purchase order. Both confirm first, POST to the controller, then refresh
-        // the panel. Buttons disable themselves when the action does not apply.
-        function renderActions() {
-            var $bar = $('<section class="vas_099-actions"></section>');
-
-            var isCompleted = (data.StatusCode === "CO" || data.StatusCode === "CL");
-            var isClosedOff = (data.StatusCode === "VO" || data.StatusCode === "RE");
-            var hasPO = +data.C_Order_ID > 0;
-
-            // Complete GRN — only when the receipt is still open (not completed /
-            // voided / reversed).
-            var $complete = actionButton("check", VIS.Msg.getMsg("VAS_099_CompleteGRN"), "pri");
-            if (isCompleted || isClosedOff) {
-                disableBtn($complete);
-            } else {
-                $complete.on("click", function () {
-                    if (!confirm(msg("VAS_099_ConfirmComplete",
-                        "Complete this goods receipt? This will process the receipt."))) return;
-                    runAction($complete, "CompleteGRN",
-                        msg("VAS_099_CompleteFailed", "Could not complete the goods receipt."));
-                });
-            }
-            $bar.append($complete);
-
-            // Generate Invoice — any completed receipt can be invoiced. With a
-            // purchase order the invoice covers the order's uninvoiced received
-            // quantity; a manually created receipt (no order) is invoiced from the
-            // receipt's own lines, so the button no longer depends on a PO.
-            var $invoice = actionButton("doc", msg("VAS_099_GenerateInvoice", "Generate Invoice"), "sec");
-            if (!isCompleted) {
-                // A disabled button used to be silent: clicking it did nothing at
-                // all, so the reason it cannot run was never stated. It now says
-                // which of the two reasons applies — the receipt is not completed
-                // yet, or it is voided / reversed and never will be.
-                blockBtn($invoice, isClosedOff
-                    ? msg("VAS_099_InvoiceNotOnVoided",
-                          "This goods receipt is voided or reversed — no invoice can be generated from it.")
-                    : msg("VAS_099_InvoiceNeedsComplete",
-                          "Complete the goods receipt before generating an invoice."));
-            } else {
-                // Same as the main screen: the document type and the vendor's
-                // invoice reference are asked for before anything is generated.
-                $invoice.on("click", function () { openInvoiceDialog($invoice); });
-            }
-            $bar.append($invoice);
-
-            $body.append($bar);
-        }
-
-        function actionButton(icon, label, kind) {
-            var $b = $('<span class="vas_099-btn"></span>').addClass("vas_099-btn-" + (kind || "sec"));
-            $b.append(svgIcon(icon));
-            $b.append($('<span></span>').text(label));
-            return $b;
-        }
-
-        function disableBtn($b) { $b.addClass("vas_099-is-disabled"); }
-
-        // A button that cannot run, but says so. `is-disabled` sets
-        // pointer-events:none, which also swallows the tooltip and the click — so a
-        // greyed button was completely mute about why it was greyed. `is-blocked`
-        // looks the same and still receives the pointer, so the reason reaches the
-        // reader both on hover and on click. It carries no action handler, so it
-        // stays as unable to run as `is-disabled` is.
-        function blockBtn($b, why) {
-            $b.addClass("vas_099-is-blocked").attr("title", why);
-            $b.on("click", function () { toast(why, true); });
-        }
-
-        // POSTs a document action to the controller, then refreshes the panel on
-        // success. Guards against double-clicks while the action is in flight.
-        // `extra` carries an action's own parameters (the invoice dialog's document
-        // type / reference); the record id is always sent.
-        function runAction($btn, endpoint, failMsg, extra, onDone) {
-            if ($btn.hasClass("vas_099-is-disabled") || $btn.hasClass("vas_099-is-busy")) return;
-            $btn.addClass("vas_099-is-busy");
-            showBusy(true);
-
-            var payload = { M_InOut_ID: $self.record_ID };
-            if (extra) {
-                for (var k in extra) {
-                    if (extra.hasOwnProperty(k)) payload[k] = extra[k];
-                }
-            }
-
-            $.ajax({
-                url: VIS.Application.contextUrl + "VAS_099_OverviewGRN/" + endpoint,
-                type: "POST",
-                dataType: "json",
-                data: payload,
-                success: function (raw) {
-                    var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    $btn.removeClass("vas_099-is-busy");
-                    // A caller that returns true from onDone has shown the refusal
-                    // itself (the invoice dialog puts it in the form), so it is not
-                    // repeated as a toast behind the dialog.
-                    var handled = onDone ? (onDone(res) === true) : false;
-                    if (res && res.success) {
-                        toast(successText(res), false);
-                        // Re-fetch so the status pill, timeline and buttons reflect
-                        // the new document state.
-                        $self.fetchData($self.record_ID);
-                    } else {
-                        // The action was refused (a closed period, a validation the
-                        // document raised). Show its reason and re-read the record:
-                        // a refused completion can still have moved the document
-                        // (to Invalid), and the panel must not keep showing the
-                        // state it had before.
-                        if (!handled) toast((res && (res.error || res.message)) || failMsg, true);
-                        $self.fetchData($self.record_ID);
-                    }
-                },
-                error: function () {
-                    $btn.removeClass("vas_099-is-busy");
-                    showBusy(false);
-                    if (onDone) onDone(null);
-                    toast(failMsg, true);
-                }
-            });
-        }
-
-        // The text a successful action leaves on screen.
+        // Row sub-line: every address the mail went to, written out in full —
+        // To, then Cc, then Bcc, each behind its own label.
         //
-        // A generated invoice is named here rather than taken from the server's
-        // sentence, so the number is guaranteed to reach the reader (it is the one
-        // thing they need in order to go and find the document) and the wording is
-        // translatable through AD_Message like the rest of the panel. The server's
-        // own message is the fallback, and a plain "Done." the last resort.
-        function successText(res) {
-            if (res && res.invoiceNo) {
-                return msg("VAS_099_InvoiceCreated", "Invoice") + " " + res.invoiceNo + " " +
-                       msg("VAS_099_Generated", "generated.");
-            }
-            return (res && res.message) || msg("VAS_099_Done", "Done.");
+        // It used to name the To list alone and count the rest as "+n more",
+        // which asked the reader to open the message (or hover it) to learn who
+        // was actually copied — and a mail stored without a body cannot be
+        // opened at all, so on those rows the addresses were unreachable. The
+        // sub-line wraps rather than ellipsising now (stylesheet), so a long
+        // list is read on the row itself.
+        //
+        // A label with nothing behind it is left out entirely rather than
+        // printed against a dash: this line lists recipients, and "Cc: —" is not
+        // one.
+        function recipientSummary(a) {
+            var bits = [];
+            appendAddressBit(bits, "VAS_099_MailTo",  "To:",  a.MailTo);
+            appendAddressBit(bits, "VAS_099_MailCc",  "Cc:",  a.MailCc);
+            appendAddressBit(bits, "VAS_099_MailBcc", "Bcc:", a.MailBcc);
+            return bits.join(" · ");
         }
 
-        // ---------- Generate Invoice dialog ---------- //
-
-        // The panel asks for the same two things the main screen's Generate
-        // Invoice dialog asks for — the target document type and the vendor's own
-        // invoice reference — plus the generate-charges flag, and generates
-        // nothing until both mandatory fields are answered. The document types
-        // offered are the ones the receipt qualifies for (fetched with the
-        // receipt's own default already selected).
-        function openInvoiceDialog($btn) {
-            if ($btn.hasClass("vas_099-is-disabled") || $btn.hasClass("vas_099-is-busy")) return;
-
-            showBusy(true);
-            $.ajax({
-                url: VIS.Application.contextUrl + "VAS_099_OverviewGRN/GetInvoiceDocTypes",
-                type: "GET",
-                dataType: "json",
-                data: { M_InOut_ID: $self.record_ID },
-                // Nothing has been generated at this point — this call only reads
-                // the document types the dialog offers. Reporting a failure here as
-                // "Could not generate the invoice" told the reader an invoice had
-                // been attempted and had failed, which is not what happened; the
-                // message now names what actually went wrong.
-                success: function (raw) {
-                    showBusy(false);
-                    var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (!res || !res.success) {
-                        toast((res && (res.error || res.message)) ||
-                            msg("VAS_099_DocTypesFailed",
-                                "Could not load the invoice document types."), true);
-                        return;
-                    }
-                    if (!(res.docTypes || []).length) {
-                        toast(msg("VAS_099_NoInvoiceDocTypes",
-                            "No invoice document type is available for this goods receipt."), true);
-                        return;
-                    }
-                    buildInvoiceDialog($btn, res);
-                },
-                error: function () {
-                    showBusy(false);
-                    toast(msg("VAS_099_DocTypesFailed",
-                        "Could not load the invoice document types."), true);
-                }
-            });
+        function appendAddressBit(bits, key, fallback, value) {
+            var text = (value === null || value === undefined) ? "" : String(value).trim();
+            if (!text) return;
+            bits.push(msg(key, fallback) + " " + text);
         }
 
-        function buildInvoiceDialog($btn, res) {
-            var docTypes = res.docTypes || [];
+        // allRecipients (the row's hover tooltip) and countAddresses (the "+n
+        // more" tally) are gone with the abridged sub-line they served: the row
+        // now writes every address out, so there is nothing left to count or to
+        // recover on hover.
 
-            var $overlay = $('<div class="vas_099-modal"></div>');
-            var $card = $('<div class="vas_099-modalCard"></div>');
-
-            var $head = $('<div class="vas_099-modalHead"></div>');
-            $head.append($('<h3></h3>').text(msg("VAS_099_CreateInvoice", "Create Invoice")));
-            if (res.documentNo) {
-                $head.append($('<span class="vas_099-modalSub"></span>')
-                    .text(VIS.Msg.getMsg("VAS_099_GoodsReceiptNote") + " " + res.documentNo));
-            }
-            $card.append($head);
-
-            var $body = $('<div class="vas_099-modalBody"></div>');
-
-            // Document type — mandatory, as on the main screen.
-            var $docField = $('<label class="vas_099-fld"></label>');
-            $docField.append($('<span class="vas_099-fldLbl"></span>')
-                .text(msg("VAS_099_DocumentType", "Document Type") + " *"));
-            var $docSel = $('<select class="vas_099-input"></select>');
-            $docSel.append($('<option></option>').attr("value", "")
-                .text(msg("VAS_099_SelectDocType", "Select a document type")));
-            for (var i = 0; i < docTypes.length; i++) {
-                var $opt = $('<option></option>')
-                    .attr("value", docTypes[i].C_DocType_ID).text(docTypes[i].Name);
-                if (+docTypes[i].C_DocType_ID === +res.defaultDocTypeId) $opt.prop("selected", true);
-                $docSel.append($opt);
-            }
-            $docField.append($docSel);
-            $body.append($docField);
-
-            // Invoice reference — mandatory on the purchase side, as on the main
-            // screen: it is the vendor's own invoice number against this receipt.
-            var $refField = $('<label class="vas_099-fld"></label>');
-            $refField.append($('<span class="vas_099-fldLbl"></span>')
-                .text(msg("VAS_099_InvoiceReference", "Invoice Reference") + " *"));
-            var $ref = $('<input type="text" class="vas_099-input" maxlength="60">');
-            $refField.append($ref);
-            $body.append($refField);
-
-            // Generate charges — spreads the receipt's charges over the lines.
-            var $chargeField = $('<label class="vas_099-fldChk"></label>');
-            var $charges = $('<input type="checkbox">');
-            $chargeField.append($charges);
-            $chargeField.append($('<span></span>')
-                .text(msg("VAS_099_GenerateCharges", "Generate Charges")));
-            $body.append($chargeField);
-
-            var $error = $('<div class="vas_099-modalErr" style="display:none;"></div>');
-            $body.append($error);
-            $card.append($body);
-
-            var $foot = $('<div class="vas_099-modalFoot"></div>');
-            var $cancel = $('<span class="vas_099-btn vas_099-btn-sec"></span>')
-                .append($('<span></span>').text(msg("VAS_099_Cancel", "Cancel")));
-            var $create = $('<span class="vas_099-btn vas_099-btn-pri"></span>')
-                .append($('<span></span>').text(msg("VAS_099_CreateInvoice", "Create Invoice")));
-            $foot.append($cancel).append($create);
-            $card.append($foot);
-
-            $overlay.append($card);
-            $root.append($overlay);
-            $ref.trigger("focus");
-
-            function close() { $overlay.remove(); }
-
-            // Clicking the backdrop (never the card) closes without generating.
-            $overlay.on("click", function (e) { if (e.target === $overlay[0]) close(); });
-            $cancel.on("click", close);
-
-            $create.on("click", function () {
-                var docId = +$docSel.val() || 0;
-                var ref = ($ref.val() || "").trim();
-
-                if (!docId && !ref) {
-                    return showError($error, msg("VAS_099_DocTypeAndRefMandatory",
-                        "Select a document type and enter the invoice reference."));
-                }
-                if (!docId) {
-                    return showError($error, msg("VAS_099_DocTypeMandatory",
-                        "Select a document type."));
-                }
-                if (!ref) {
-                    return showError($error, msg("VAS_099_InvoiceRefMandatory",
-                        "Enter the invoice reference."));
-                }
-                $error.hide();
-
-                // The dialog stays up until the server answers, then closes only
-                // when an invoice was actually created — a refusal is shown in
-                // place, with the values still filled in.
-                $create.addClass("vas_099-is-busy");
-                runAction($btn, "GenerateInvoice",
-                    msg("VAS_099_InvoiceFailed", "Could not generate the invoice."),
-                    {
-                        C_DocType_ID: docId,
-                        InvoiceReference: ref,
-                        GenerateCharges: $charges.is(":checked")
-                    },
-                    function (res) {
-                        $create.removeClass("vas_099-is-busy");
-                        if (res && res.success) {
-                            // Closed here so the success toast — which names the
-                            // generated invoice — is the thing left on screen.
-                            close();
-                            return false;
-                        }
-                        showError($error, (res && (res.error || res.message)) ||
-                            msg("VAS_099_InvoiceFailed", "Could not generate the invoice."));
-                        return true;      // shown in the form; no toast behind it
-                    });
-            });
-        }
-
-        function showError($error, text) {
-            $error.text(text).show();
-        }
+        // The Actions section is gone with the buttons it drew. renderActions,
+        // actionButton, disableBtn, blockBtn, runAction, successText, the
+        // Generate Invoice dialog (openInvoiceDialog / showError) and the
+        // CompleteGRN / GenerateInvoice calls went with it — nothing else
+        // reached any of them. The controller's matching endpoints are gone too.
 
         // Lightweight self-contained toast.
         function toast(message, isError) {
@@ -2169,7 +1970,7 @@
         };
 
         // Returns a span wrapping the named inline SVG (innerHTML so the browser
-        // parses the SVG in HTML context — no namespace juggling).
+        // parses the SVG in HTML context â€” no namespace juggling).
         function svgIcon(name) {
             var $wrap = $('<span class="vas_099-ic"></span>');
             $wrap[0].innerHTML = SVG_ICONS[name] || "";
@@ -2201,17 +2002,17 @@
 
         // Parses a .NET/Newtonsoft DB value into a Date.
         //
-        // asUtc = true  → for genuine *timestamps* (Created / Updated / completion
+        // asUtc = true  â†’ for genuine *timestamps* (Created / Updated / completion
         //   / posting / e-mail stamps). The DB stores these in UTC and Newtonsoft
         //   emits no timezone designator (e.g. "2026-08-03T06:29:00"), which the
-        //   browser would otherwise read as a local wall-clock reading — the
+        //   browser would otherwise read as a local wall-clock reading â€” the
         //   activity trail then showed times hours away from the user's clock. We
         //   tag it "Z" so toLocale* renders it in the viewer's own zone.
-        // asUtc = false → for *date-only* fields (movement / PO / expected /
+        // asUtc = false â†’ for *date-only* fields (movement / PO / expected /
         //   invoice / QA dates). These carry no meaningful time of day, so the
-        //   wall-clock value is parsed as-is and never shifted — the calendar day
+        //   wall-clock value is parsed as-is and never shifted â€” the calendar day
         //   shown always matches the day stored.
-        // Strings that already carry a "Z" or ±hh:mm offset are left untouched.
+        // Strings that already carry a "Z" or Â±hh:mm offset are left untouched.
         function parseDbDate(value, asUtc) {
             if (!value) return null;
             if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
@@ -2245,14 +2046,14 @@
             return d ? toLocalDate(d) : "";
         }
 
-        // A real timestamp shown as a date — converted to the viewer's zone first,
+        // A real timestamp shown as a date â€” converted to the viewer's zone first,
         // so a late-evening event is not captioned with the previous day.
         function formatStampDate(value) {
             var d = parseDbDate(value, true);
             return d ? toLocalDate(d) : "";
         }
 
-        // Date + time — the audit trail needs the time of day, not just the date,
+        // Date + time â€” the audit trail needs the time of day, not just the date,
         // and it needs it on the reader's own clock.
         function formatDateTime(value) {
             var d = parseDbDate(value, true);
@@ -2312,7 +2113,7 @@
 
     /* Release variables from memory */
     VAS.VAS_099_OverviewGRN.prototype.dispose = function () {
-        // Kill any held fetch first — its timer would otherwise fire against a
+        // Kill any held fetch first â€” its timer would otherwise fire against a
         // panel whose curTab has just been nulled out below.
         if (typeof this.abortPendingFetch === "function") {
             try { this.abortPendingFetch(); } catch (e) { }
