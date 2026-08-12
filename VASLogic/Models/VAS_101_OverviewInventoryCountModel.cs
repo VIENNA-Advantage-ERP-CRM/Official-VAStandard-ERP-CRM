@@ -11,13 +11,51 @@
 ///   VAI163   2026-07-06  Created. Optional module columns (CurrentCostPrice,
 ///                        VA024_UnitPrice) are guarded through AD_Column so the
 ///                        panel works whether or not those modules are installed.
+///   VAI163   2026-08-12  - Variance is COUNTED minus SYSTEM, always.
+///                          M_InventoryLine.DifferenceQty is no longer preferred:
+///                          the platform writes it the other way round
+///                          (DBFunctionCollection derives QtyCount = QtyBook -
+///                          DifferenceQty, so it is BOOK minus COUNT), which
+///                          inverted every line that carried one — a short count
+///                          was tagged Excess and signed +, and the Short / Excess
+///                          roll-ups were swapped with it.
+///                        - A line is valued by the DIRECTION of its variance
+///                          (BuildRateExpr): PriceCost where counted exceeds
+///                          system — the price the found stock comes in at,
+///                          falling back to CurrentCostPrice when it is zero —
+///                          and CurrentCostPrice otherwise. PriceCost is
+///                          dictionary-guarded like the others.
+///                        - Lines carry their Attribute Set Instance, joined only
+///                          for a REAL instance so a line with no attributes
+///                          cannot pick up the zero-record's description.
+///                        - Added LoadProjectRef (M_Inventory.C_Project_ID,
+///                          guarded) for the panel's Related Documents section,
+///                          LoadNotes (the header description plus each line's,
+///                          labelled with its line no and product) and
+///                          LoadActivity (created / updated / completed / posted
+///                          milestones plus chat notes, newest-first, capped at
+///                          200 — the panel pages at 15). Each source is
+///                          separately guarded so one DB problem degrades to a
+///                          partial trail.
+///                        - Added GetWindowId (ported from VAS_092) for the
+///                          panel's record-open path.
+///   VAI163   2026-08-12  Activity gains the e-mails sent against the count
+///                        (LoadEmailActivity, MailAttachment1 by AD_Table_ID +
+///                        Record_ID): recipients, subject, body, when and who sent
+///                        it. The body travels with the row so the panel can reveal
+///                        it on click without a second round trip, and an HTML mail
+///                        is flattened to readable text first (MailBodyToText) — no
+///                        markup is ever handed to the panel. Ported from VAS_102,
+///                        which reads the same table.
 /// </summary>
 
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
@@ -49,12 +87,34 @@ namespace VASLogic.Models
             // references columns that actually exist in this schema.
             bool hasCurrentCost = ColumnExists("M_InventoryLine", "CurrentCostPrice");
             bool hasUnitPrice   = ColumnExists("M_InventoryLine", "VA024_UnitPrice");
+            bool hasPriceCost   = ColumnExists("M_InventoryLine", "PriceCost");
 
-            // COALESCE([l.CurrentCostPrice], [l.VA024_UnitPrice], 0)
-            string rateExpr = BuildRateExpr(hasCurrentCost, hasUnitPrice);
-            // COALESCE(l.DifferenceQty, QtyCount - QtyBook) — variance per line.
+            // The rate a line is valued at depends on WHICH WAY it varies:
+            //
+            //   system > counted (stock is going out) -> CurrentCostPrice, what the
+            //       stock on hand is already carried at;
+            //   counted > system (stock is coming in) -> PriceCost, what the found
+            //       stock is being brought in at, falling back to CurrentCostPrice
+            //       when PriceCost is zero or the column is absent.
+            //
+            // A matched line varies by nothing, so either rate values it the same.
+            string rateExpr = BuildRateExpr(hasCurrentCost, hasUnitPrice, hasPriceCost);
+
+            // Variance per line = COUNTED minus SYSTEM, so a count that came up
+            // short of the book reads negative and one that came up over reads
+            // positive — which is what the panel's Short / Excess tags and their
+            // ( - ) / ( + ) signs mean.
+            //
+            // M_InventoryLine.DifferenceQty is deliberately NOT used: the platform
+            // writes it the other way round (DBFunctionCollection derives
+            // QtyCount = QtyBook - DifferenceQty, so DifferenceQty is BOOK minus
+            // COUNT). Preferring it inverted every line that carried one — a short
+            // count was tagged Excess and signed +, and the Short / Excess counts
+            // above the table were swapped with it. Deriving the figure from the
+            // two quantities the panel puts either side of it also means the column
+            // can never disagree with them.
             const string varExpr =
-                "COALESCE(l.DifferenceQty, COALESCE(l.QtyCount, 0) - COALESCE(l.QtyBook, 0))";
+                "(COALESCE(l.QtyCount, 0) - COALESCE(l.QtyBook, 0))";
 
             string sql = @"SELECT
                               inv.M_Inventory_ID,
@@ -139,23 +199,550 @@ namespace VASLogic.Models
             // ----- Count lines -----
             result.Lines = LoadLines(M_Inventory_ID, rateExpr, varExpr);
 
+            // ----- Related documents, notes and the audit trail -----
+            LoadProjectRef(M_Inventory_ID, result);
+            result.Notes    = LoadNotes(M_Inventory_ID, result.Description);
+            result.Activity = LoadActivity(M_Inventory_ID, result.StatusCode);
+
             return result;
         }
 
         /// <summary>
-        /// Builds the unit-rate SQL expression from whichever optional cost
-        /// columns exist on M_InventoryLine, ending at 0.
+        /// The project the count was raised for (M_Inventory.C_Project_ID), for the
+        /// panel's Related Documents section. C_Project_ID is not on every schema's
+        /// M_Inventory, so the read is dictionary-guarded: without it the section
+        /// simply has nothing to list.
         /// </summary>
-        private string BuildRateExpr(bool hasCurrentCost, bool hasUnitPrice)
+        /// <param name="M_Inventory_ID">Selected inventory count id.</param>
+        /// <param name="d">Overview payload being populated.</param>
+        private void LoadProjectRef(int M_Inventory_ID, InventoryCountOverviewData d)
         {
-            List<string> cols = new List<string>();
-            if (hasCurrentCost) cols.Add("l.CurrentCostPrice");
-            if (hasUnitPrice)   cols.Add("l.VA024_UnitPrice");
-            if (cols.Count == 0) return "0";
+            if (!ColumnExists("M_Inventory", "C_Project_ID")) return;
 
-            StringBuilder sb = new StringBuilder("COALESCE(");
-            sb.Append(string.Join(", ", cols));
-            sb.Append(", 0)");
+            try
+            {
+                string sql = @"SELECT p.C_Project_ID, p.Value AS ProjectNo, p.Name AS ProjectName
+                                 FROM M_Inventory inv
+                                INNER JOIN C_Project p ON (p.C_Project_ID = inv.C_Project_ID)
+                                WHERE inv.M_Inventory_ID = @M_Inventory_ID";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                d.C_Project_ID = Util.GetValueOfInt(r["C_Project_ID"]);
+                d.ProjectNo    = Util.GetValueOfString(r["ProjectNo"]);
+                d.ProjectName  = Util.GetValueOfString(r["ProjectName"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadProjectRef (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Every description entered against the count: the one typed on the header
+        /// (already in hand from the main query) followed by the one typed on each
+        /// line, labelled with its line no and product so a reader knows which row
+        /// it annotates.
+        /// </summary>
+        /// <param name="M_Inventory_ID">Selected inventory count id.</param>
+        /// <param name="headerNote">M_Inventory.Description, or "" .</param>
+        /// <returns>Notes in reading order; never null, may be empty.</returns>
+        private List<NoteData> LoadNotes(int M_Inventory_ID, string headerNote)
+        {
+            List<NoteData> notes = new List<NoteData>();
+
+            if (!string.IsNullOrEmpty(headerNote) && headerNote.Trim().Length > 0)
+                notes.Add(new NoteData { NoteType = "header", Text = headerNote.Trim() });
+
+            try
+            {
+                string sql = @"SELECT l.Line, l.Description, p.Name AS ProductName
+                                 FROM M_InventoryLine l
+                                 LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = l.M_Product_ID)
+                                WHERE l.M_Inventory_ID = @M_Inventory_ID
+                                  AND l.IsActive       = 'Y'
+                                  AND l.Description IS NOT NULL
+                                ORDER BY l.Line";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return notes;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    string text = Util.GetValueOfString(r["Description"]);
+                    if (string.IsNullOrEmpty(text) || text.Trim().Length == 0) continue;
+
+                    // "Line 10 — Steel Bolt M8: <note>", so the note names the row
+                    // it was written against without the reader counting back to
+                    // the table.
+                    string label = "";
+                    int lineNo = Util.GetValueOfInt(r["Line"]);
+                    if (lineNo > 0) label = "Line " + lineNo;
+                    string product = Util.GetValueOfString(r["ProductName"]);
+                    if (!string.IsNullOrEmpty(product))
+                        label = (label.Length > 0 ? label + " — " : "") + product;
+
+                    notes.Add(new NoteData
+                    {
+                        NoteType = "line",
+                        Label    = label,
+                        Text     = text.Trim()
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadNotes (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+            return notes;
+        }
+
+        /// <summary>
+        /// The count's audit trail: who created it, who last changed it and when,
+        /// when it was completed and posted, plus any chat notes logged against it —
+        /// merged newest-first and capped.
+        ///
+        /// Each source runs under its own guard, so a DB-level problem with one
+        /// degrades to a partial trail (logged) rather than breaking the overview.
+        /// Modelled on VAS_102, which reads the same table.
+        /// </summary>
+        /// <param name="M_Inventory_ID">Selected inventory count id.</param>
+        /// <param name="docStatus">The count's DocStatus, for the completion entry.</param>
+        /// <returns>Activity rows, newest first; never null.</returns>
+        private List<ActivityData> LoadActivity(int M_Inventory_ID, string docStatus)
+        {
+            // A runaway guard, not a headline count: the panel pages the feed 15
+            // rows at a time, so it sits high enough that a real count never
+            // reaches it.
+            const int MAX_ENTRIES = 200;
+
+            List<ActivityData> activity = new List<ActivityData>();
+            LoadCountMilestones(M_Inventory_ID, docStatus, activity);
+            LoadPostingActivity(M_Inventory_ID, activity);
+            LoadNoteActivity(M_Inventory_ID, activity);
+            LoadEmailActivity(M_Inventory_ID, activity);
+
+            // Newest first; entries with no timestamp sink to the bottom.
+            activity.Sort(delegate (ActivityData a, ActivityData b)
+            {
+                return b.Created.GetValueOrDefault(DateTime.MinValue)
+                        .CompareTo(a.Created.GetValueOrDefault(DateTime.MinValue));
+            });
+
+            if (activity.Count > MAX_ENTRIES)
+                activity = activity.GetRange(0, MAX_ENTRIES);
+            return activity;
+        }
+
+        /// <summary>
+        /// The count's own milestones: created (Created / CreatedBy), updated
+        /// (Updated / UpdatedBy, only when it differs from the create stamp) and,
+        /// for a completed or closed count, completed — the workflow's DocComplete
+        /// stamp when there is one, else the last change.
+        /// </summary>
+        private void LoadCountMilestones(
+            int M_Inventory_ID, string docStatus, List<ActivityData> list)
+        {
+            try
+            {
+                string sql = @"SELECT inv.Created,
+                                      inv.Updated,
+                                      cu.Name AS CreatedByName,
+                                      uu.Name AS UpdatedByName
+                                 FROM M_Inventory inv
+                                 LEFT OUTER JOIN AD_User cu ON (inv.CreatedBy = cu.AD_User_ID)
+                                 LEFT OUTER JOIN AD_User uu ON (inv.UpdatedBy = uu.AD_User_ID)
+                                WHERE inv.M_Inventory_ID = @M_Inventory_ID";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                DateTime? created = Util.GetValueOfDateTime(r["Created"]);
+                DateTime? updated = Util.GetValueOfDateTime(r["Updated"]);
+                string updatedBy  = Util.GetValueOfString(r["UpdatedByName"]);
+
+                list.Add(new ActivityData
+                {
+                    Type     = "created",
+                    UserName = Util.GetValueOfString(r["CreatedByName"]),
+                    Created  = created
+                });
+
+                // A count saved once has Updated == Created; that is not an edit.
+                if (updated.HasValue &&
+                    (!created.HasValue || updated.Value > created.Value.AddSeconds(1)))
+                {
+                    list.Add(new ActivityData
+                    {
+                        Type     = "updated",
+                        UserName = updatedBy,
+                        Created  = updated
+                    });
+                }
+
+                if (docStatus == "CO" || docStatus == "CL")
+                {
+                    DateTime? completedAt = GetCompletedDate(M_Inventory_ID);
+                    list.Add(new ActivityData
+                    {
+                        Type     = "completed",
+                        UserName = !string.IsNullOrEmpty(_lastCompletedByName)
+                            ? _lastCompletedByName : updatedBy,
+                        Created  = completedAt.HasValue ? completedAt : updated
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadCountMilestones (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>Who completed the count and when — the workflow's DocComplete
+        /// activity stamp, or null when it has none. The actor is left in
+        /// <see cref="_lastCompletedByName"/> for the caller.</summary>
+        private string _lastCompletedByName;
+
+        private DateTime? GetCompletedDate(int M_Inventory_ID)
+        {
+            _lastCompletedByName = "";
+            try
+            {
+                string sql = @"SELECT MAX(wfa.Created) AS CompletedOn,
+                                      MAX(u.Name)      AS CompletedBy
+                                 FROM AD_WF_Process wfp
+                                INNER JOIN AD_WF_Activity wfa
+                                        ON (wfa.AD_WF_Process_ID = wfp.AD_WF_Process_ID)
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = wfp.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = wfa.AD_User_ID)
+                                WHERE wfp.Record_ID = @M_Inventory_ID
+                                  AND adt.TableName = 'M_Inventory'
+                                  AND wfp.IsActive  = 'Y'
+                                  AND wfa.IsActive  = 'Y'
+                                  AND wfa.WFState   = 'CC'";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
+
+                _lastCompletedByName = Util.GetValueOfString(ds.Tables[0].Rows[0]["CompletedBy"]);
+                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["CompletedOn"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetCompletedDate (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Adds a "posted" entry from the earliest Fact_Acct row written for the
+        /// count, carrying the user who ran the posting.
+        /// </summary>
+        private void LoadPostingActivity(int M_Inventory_ID, List<ActivityData> list)
+        {
+            try
+            {
+                string sql = @"SELECT fa.Created, u.Name AS UserName
+                                 FROM Fact_Acct fa
+                                INNER JOIN AD_Table adt ON (adt.AD_Table_ID = fa.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_User u ON (fa.CreatedBy = u.AD_User_ID)
+                                WHERE fa.Record_ID  = @M_Inventory_ID
+                                  AND adt.TableName = 'M_Inventory'
+                                ORDER BY fa.Created";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                list.Add(new ActivityData
+                {
+                    Type     = "posted",
+                    UserName = Util.GetValueOfString(r["UserName"]),
+                    Created  = Util.GetValueOfDateTime(r["Created"])
+                });
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadPostingActivity (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Adds the chat notes (CM_ChatEntry) logged against this count — each
+        /// carrying the commenter's name, the moment it was posted and the comment
+        /// text, which is what the panel prints on the row.
+        ///
+        /// The author is taken from CM_ChatEntry.AD_User_ID falling back to
+        /// CreatedBy: an entry logged through the platform's own chat plumbing often
+        /// leaves AD_User_ID null, which would print a comment with no name.
+        /// </summary>
+        private void LoadNoteActivity(int M_Inventory_ID, List<ActivityData> list)
+        {
+            try
+            {
+                string sql = @"SELECT ce.CharacterData,
+                                      ce.Created,
+                                      COALESCE(u.Name, cu.Name) AS UserName
+                                 FROM CM_ChatEntry ce
+                                INNER JOIN CM_Chat ch      ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
+                                 LEFT OUTER JOIN AD_User u  ON (ce.AD_User_ID = u.AD_User_ID)
+                                 LEFT OUTER JOIN AD_User cu ON (ce.CreatedBy  = cu.AD_User_ID)
+                                WHERE ch.AD_Table_ID =
+                                      (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'M_Inventory')
+                                  AND ch.Record_ID = @M_Inventory_ID
+                                  AND ce.IsActive  = 'Y'";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    list.Add(new ActivityData
+                    {
+                        Type     = "note",
+                        Text     = Util.GetValueOfString(r["CharacterData"]),
+                        UserName = Util.GetValueOfString(r["UserName"]),
+                        Created  = Util.GetValueOfDateTime(r["Created"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadNoteActivity (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Adds the e-mails sent against this count (MailAttachment1, joined by
+        /// AD_Table_ID = M_Inventory + Record_ID = the count id) as "email" rows:
+        /// recipients, subject (Title), body (TextMsg), when (Created) and who sent
+        /// it (CreatedBy).
+        ///
+        /// The body travels with the row so the panel can reveal it on click
+        /// without a second round trip. Ported from VAS_102, which reads the same
+        /// table.
+        /// </summary>
+        private void LoadEmailActivity(int M_Inventory_ID, List<ActivityData> list)
+        {
+            try
+            {
+                // A row is an e-mail when it has somewhere to go — a recipient on
+                // any of the address columns. AttachmentType is deliberately NOT
+                // filtered on: its value varies between installations, and a row
+                // that carries an address is a mail whatever the column says.
+                //
+                // "Has an address" is tested against a SPACE, not against ''.
+                // Oracle stores the empty string as NULL, so NVL(TRIM(x), '')
+                // yields NULL and `<> ''` compares against NULL — UNKNOWN for every
+                // row, including the ones that DO carry an address, and the query
+                // returned no mails at all. Comparing to ' ' keeps the fallback
+                // non-null on Oracle, and SQL Server blank-pads the comparison so
+                // an empty address still fails it.
+                //
+                // The table id is matched with IN + UPPER so a dictionary holding
+                // the name in another case, or more than one row for it, resolves
+                // instead of failing the statement.
+                string sql = @"SELECT ma.MailAddress,
+                                      ma.MailAddressCc,
+                                      ma.MailAddressBcc,
+                                      ma.MailAddressFrom,
+                                      ma.Title,
+                                      ma.TextMsg,
+                                      ma.Created,
+                                      ma.IsMailSent,
+                                      u.Name AS UserName
+                                 FROM MailAttachment1 ma
+                                 LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy)
+                                WHERE ma.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'M_INVENTORY')
+                                  AND ma.Record_ID          = @M_Inventory_ID
+                                  AND NVL(ma.IsActive, 'Y') = 'Y'
+                                  AND (NVL(TRIM(ma.MailAddress), ' ')    <> ' '
+                                    OR NVL(TRIM(ma.MailAddressCc), ' ')  <> ' '
+                                    OR NVL(TRIM(ma.MailAddressBcc), ' ') <> ' ')
+                                ORDER BY ma.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    list.Add(new ActivityData
+                    {
+                        Type       = "email",
+                        // Text is the row's headline everywhere in this feed; for
+                        // an e-mail that is its subject.
+                        Text       = Util.GetValueOfString(r["Title"]),
+                        // A mail sent as HTML stores its markup in TextMsg; the
+                        // panel shows a body as text, so it is flattened here.
+                        Body       = MailBodyToText(Util.GetValueOfString(r["TextMsg"])),
+                        MailTo     = Util.GetValueOfString(r["MailAddress"]),
+                        MailCc     = Util.GetValueOfString(r["MailAddressCc"]),
+                        MailBcc    = Util.GetValueOfString(r["MailAddressBcc"]),
+                        MailFrom   = Util.GetValueOfString(r["MailAddressFrom"]),
+                        IsMailSent = Util.GetValueOfString(r["IsMailSent"]) == "Y",
+                        UserName   = Util.GetValueOfString(r["UserName"]),
+                        Created    = Util.GetValueOfDateTime(r["Created"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: a schema without MailAttachment1 just shows no e-mails.
+                _log.Severe("LoadEmailActivity (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Cheap "is this markup" test — a real tag, not a stray '&lt;' in a
+        /// plain-text mail ("qty &lt; 10"), so a plain body is left untouched.
+        /// </summary>
+        private static readonly Regex HTML_BODY = new Regex(
+            @"<\s*/?\s*(html|body|head|br|p|div|table|thead|tbody|tr|td|th|span|a|img|b|i|u"
+            + @"|strong|em|ul|ol|li|h[1-6]|font|style|script)\b",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        /// <summary>
+        /// Renders a mail body (MailAttachment1.TextMsg) as readable plain text.
+        ///
+        /// A mail sent as HTML stores its markup here and the panel shows the body
+        /// as text, so without this the reader gets tags instead of a message.
+        /// Block-level markup becomes line breaks, table cells become tabs,
+        /// everything else is dropped and entities are decoded LAST — so the
+        /// browser still receives text it can safely escape and no markup is ever
+        /// handed to the panel. A body with no markup is returned as stored.
+        /// </summary>
+        private static string MailBodyToText(string body)
+        {
+            if (string.IsNullOrEmpty(body)) return body;
+            if (!HTML_BODY.IsMatch(body)) return body;      // plain-text mail
+
+            try
+            {
+                string s = body;
+
+                // Head matter, styles and scripts carry no reading content.
+                s = Regex.Replace(s, @"<\s*(script|style|head)\b[^>]*>.*?<\s*/\s*\1\s*>", " ",
+                                  RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+                // Block boundaries become line breaks so paragraphs survive.
+                s = Regex.Replace(s, @"<\s*br\s*/?\s*>", "\n", RegexOptions.IgnoreCase);
+                s = Regex.Replace(s, @"<\s*/\s*(p|div|tr|li|h[1-6]|table|blockquote)\s*>", "\n",
+                                  RegexOptions.IgnoreCase);
+                // Opening tags too, so a <p> with no closing tag still breaks.
+                // 'tr' is deliberately absent — </tr> already ends the row, and
+                // breaking on both would leave a blank line between every row.
+                s = Regex.Replace(s, @"<\s*(p|div|li|h[1-6])\b[^>]*>", "\n",
+                                  RegexOptions.IgnoreCase);
+                // Cells read better separated than run together.
+                s = Regex.Replace(s, @"<\s*/\s*(td|th)\s*>", "\t", RegexOptions.IgnoreCase);
+
+                // Everything left is presentation.
+                s = Regex.Replace(s, @"<[^>]*>", string.Empty);
+
+                // Entities last, so an escaped &lt;b&gt; in the text was never
+                // treated as a tag above.
+                s = WebUtility.HtmlDecode(s);
+                s = s.Replace(' ', ' ');               // nbsp reads as a space
+
+                // Normalise the whitespace the markup left behind.
+                s = s.Replace("\r\n", "\n").Replace('\r', '\n');
+                s = Regex.Replace(s, @"[^\S\n\t]+", " ");   // runs of spaces -> one
+                s = Regex.Replace(s, @"\t{2,}", "\t");
+                s = Regex.Replace(s, @"[ \t]*\n[ \t]*", "\n");   // incl. the last cell's tab
+                s = Regex.Replace(s, @"\n{3,}", "\n\n");    // at most one blank line
+
+                return s.Trim();
+            }
+            catch (Exception ex)
+            {
+                // Never lose the mail over a formatting failure — show it raw.
+                _log.Severe("MailBodyToText: " + ex.Message);
+                return body;
+            }
+        }
+
+        /// <summary>Single-parameter helper for the count-scoped queries.</summary>
+        private SqlParameter[] InventoryParam(int M_Inventory_ID)
+        {
+            return new SqlParameter[] { new SqlParameter("@M_Inventory_ID", M_Inventory_ID) };
+        }
+
+        /// <summary>
+        /// Resolves a window's AD_Window_ID from its name (AD_Window.Name) for the
+        /// panel's record-open path — a Related Documents row opens the screen named
+        /// for its table rather than whatever the table's zoom target resolves to.
+        ///
+        /// Restricted to windows this tenant can see (AD_Client_ID 0 or its own),
+        /// preferring the tenant's own row over the system one. Whether the ROLE may
+        /// open it is the platform's call, made when the window is started. Ported
+        /// from VAS_092.
+        /// </summary>
+        /// <param name="ctx">User context (client).</param>
+        /// <param name="windowName">Window name to resolve.</param>
+        /// <returns>The window id, or 0 when the name resolves to nothing.</returns>
+        public int GetWindowId(Ctx ctx, string windowName)
+        {
+            if (string.IsNullOrEmpty(windowName)) return 0;
+            try
+            {
+                string sql = @"SELECT w.AD_Window_ID
+                                 FROM AD_Window w
+                                WHERE w.Name         = @Name
+                                  AND w.IsActive     = 'Y'
+                                  AND w.AD_Client_ID IN (0, @AD_Client_ID)
+                                ORDER BY w.AD_Client_ID DESC";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@Name", windowName.Trim()),
+                    new SqlParameter("@AD_Client_ID", ctx == null ? 0 : ctx.GetAD_Client_ID())
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return 0;
+                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetWindowId (" + windowName + "): " + ex.Message);
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Builds the unit-rate SQL expression from whichever optional cost columns
+        /// exist on M_InventoryLine, ending at 0.
+        ///
+        /// The rate follows the DIRECTION of the line's variance:
+        ///   * counted greater than system — stock being brought in — is valued at
+        ///     PriceCost, the price it comes in at, falling back to
+        ///     CurrentCostPrice when PriceCost is zero;
+        ///   * otherwise (system greater than or equal to counted) it is valued at
+        ///     CurrentCostPrice, what the stock on hand is already carried at.
+        ///
+        /// VA024_UnitPrice stays the last resort behind both, as it was. A schema
+        /// carrying neither cost column values every line at 0, exactly as before.
+        /// </summary>
+        private string BuildRateExpr(bool hasCurrentCost, bool hasUnitPrice, bool hasPriceCost)
+        {
+            // What the stock on hand is carried at — the "going out" rate.
+            List<string> onHand = new List<string>();
+            if (hasCurrentCost) onHand.Add("l.CurrentCostPrice");
+            if (hasUnitPrice)   onHand.Add("l.VA024_UnitPrice");
+            string onHandExpr = onHand.Count == 0
+                ? "0" : "COALESCE(" + string.Join(", ", onHand.ToArray()) + ", 0)";
+
+            if (!hasPriceCost) return onHandExpr;
+
+            // The "coming in" rate: PriceCost, but only when it says something —
+            // NULLIF sends a stored zero down to the on-hand rate rather than
+            // valuing found stock at nothing.
+            string inExpr = "COALESCE(NULLIF(l.PriceCost, 0), " + onHandExpr + ")";
+
+            StringBuilder sb = new StringBuilder();
+            sb.Append("(CASE WHEN COALESCE(l.QtyCount, 0) > COALESCE(l.QtyBook, 0) THEN ");
+            sb.Append(inExpr);
+            sb.Append(" ELSE ");
+            sb.Append(onHandExpr);
+            sb.Append(" END)");
             return sb.ToString();
         }
 
@@ -184,6 +771,7 @@ namespace VASLogic.Models
                               " + varExpr + @"                       AS VarianceQty,
                               p.Value           AS ProductCode,
                               p.Name            AS ProductName,
+                              asi.Description   AS AttributeSetInstance,
                               loc.Value         AS LocatorCode,
                               COALESCE(loc.LocatorCombination, loc.Bin, loc.Value) AS LocatorName,
                               u.Name            AS UOMName,
@@ -194,6 +782,13 @@ namespace VASLogic.Models
                            LEFT OUTER JOIN M_Product p   ON (p.M_Product_ID   = l.M_Product_ID)
                            LEFT OUTER JOIN C_UOM     u   ON (u.C_UOM_ID        = l.C_UOM_ID)
                            LEFT OUTER JOIN M_Locator loc ON (loc.M_Locator_ID  = l.M_Locator_ID)
+                           -- Only a REAL instance is joined: id 0 is the
+                           -- dictionary's no-attributes row, whose description is
+                           -- a bare double dash that would otherwise print against
+                           -- every line carrying no attributes at all.
+                           LEFT OUTER JOIN M_AttributeSetInstance asi
+                                  ON (asi.M_AttributeSetInstance_ID = l.M_AttributeSetInstance_ID
+                                      AND l.M_AttributeSetInstance_ID > 0)
                            WHERE l.M_Inventory_ID = @M_Inventory_ID
                              AND l.IsActive       = 'Y'
                            ORDER BY l.Line";
@@ -219,6 +814,7 @@ namespace VASLogic.Models
                 ln.VarianceQty        = Util.GetValueOfDecimal(r["VarianceQty"]);
                 ln.ProductCode        = Util.GetValueOfString(r["ProductCode"]);
                 ln.ProductName        = Util.GetValueOfString(r["ProductName"]);
+                ln.AttributeSetInstance = Util.GetValueOfString(r["AttributeSetInstance"]);
                 ln.LocatorCode        = Util.GetValueOfString(r["LocatorCode"]);
                 ln.LocatorName        = Util.GetValueOfString(r["LocatorName"]);
                 ln.UOMName            = Util.GetValueOfString(r["UOMName"]);
@@ -262,14 +858,44 @@ namespace VASLogic.Models
         //  Data carriers                                                     //
         // ----------------------------------------------------------------- //
 
+        /// <summary>One note shown in the Notes section: the count header's
+        /// description, or the description entered on one of its lines.</summary>
+        public class NoteData
+        {
+            public string NoteType { get; set; }   // header | line
+            public string Label    { get; set; }   // "Line 10 — Steel Bolt M8" (line notes)
+            public string Text     { get; set; }
+        }
+
+        /// <summary>One entry in the count's audit trail.</summary>
+        public class ActivityData
+        {
+            /// <summary>created | updated | completed | posted | note | email</summary>
+            public string    Type       { get; set; }
+            public string    UserName   { get; set; }   // actor / mail sender
+            public DateTime? Created    { get; set; }   // when
+            public string    Text       { get; set; }   // note body / e-mail subject
+
+            // E-mail (MailAttachment1) — the body is revealed on click.
+            public string    Body       { get; set; }   // TextMsg (flattened to text)
+            public string    MailTo     { get; set; }   // MailAddress
+            public string    MailCc     { get; set; }   // MailAddressCc
+            public string    MailBcc    { get; set; }   // MailAddressBcc
+            public string    MailFrom   { get; set; }   // MailAddressFrom
+            public bool      IsMailSent { get; set; }
+        }
+
         public class InventoryCountLineData
         {
             public int      M_InventoryLine_ID { get; set; }
             public int      Line               { get; set; }
             public string   Description        { get; set; }
             public int      M_Product_ID       { get; set; }
-            public string   ProductCode        { get; set; }   // SKU
+            public string   ProductCode        { get; set; }   // product search key
             public string   ProductName        { get; set; }
+            // M_AttributeSetInstance.Description — the lot / serial / attributes
+            // the line was counted against. Blank when it carries none.
+            public string   AttributeSetInstance { get; set; }
             public string   LocatorCode        { get; set; }
             public string   LocatorName        { get; set; }
             public string   UOMName            { get; set; }
@@ -306,8 +932,17 @@ namespace VASLogic.Models
             public int       ExcessCount      { get; set; }
             public int       VarianceLineCount { get; set; }
 
+            // Related documents — the project the count was raised for
+            // (M_Inventory.C_Project_ID), when the schema carries the column and
+            // the count names one.
+            public int       C_Project_ID   { get; set; }
+            public string    ProjectNo      { get; set; }   // C_Project.Value
+            public string    ProjectName    { get; set; }
+
             // Collections
-            public List<InventoryCountLineData> Lines { get; set; }
+            public List<InventoryCountLineData> Lines    { get; set; }
+            public List<NoteData>               Notes    { get; set; }
+            public List<ActivityData>           Activity { get; set; }
         }
     }
 }

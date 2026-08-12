@@ -175,6 +175,17 @@
     <Compile Include="Areas\VAS\Controllers\VAS_056_AutoAllocatedAPPaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_065_APInvoicePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_189_ARInvoiceDetailPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_178_NewMaterialIssueQuickActionController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_179_OpenMaterialIssuesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_180_IssuedMTDWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_181_ProductionIssuesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_182_SparesConsumablesIssuesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_183_MaterialConsumptionWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_184_HighValueUsageWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_185_InventoryUseTrendWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_186_ProductCategoryUsageWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_187_RecentInventoryUseWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_188_TopUsedProductsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_074_CreateInvoiceLinePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_107_CreateOrderBottomPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_105_AccountRightPanelController.cs" />

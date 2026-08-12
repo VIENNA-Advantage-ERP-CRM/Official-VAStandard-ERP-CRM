@@ -528,6 +528,65 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// Resolves the window a TABLE's records open in: the table's own zoom
+        /// target (AD_Table.AD_Window_ID), falling back to the first window that
+        /// has a tab on the table.
+        ///
+        /// This is the panel's last resort for a chip whose screen cannot be named
+        /// in the client's map — a module that ships its own window and is not
+        /// part of this solution (VA075) has no name that can be hard-coded, and
+        /// the browser-side zoom lookup only knows tables the client has cached.
+        /// Reading the dictionary here works for any installed module.
+        ///
+        /// Each statement carries a single bind name, occurring once: positional
+        /// binding gives a repeated name a second, unfilled placeholder.
+        /// </summary>
+        /// <param name="ctx">User context (unused today; kept for symmetry with
+        /// <see cref="GetWindowId"/>, which filters by client).</param>
+        /// <param name="tableName">Physical table name, e.g. "VA075_WorkOrder".</param>
+        /// <returns>The window id, or 0 when the table has no window at all.</returns>
+        public int GetWindowIdByTable(Ctx ctx, string tableName)
+        {
+            if (string.IsNullOrEmpty(tableName)) return 0;
+            string name = tableName.Trim();
+            try
+            {
+                string sql = @"SELECT t.AD_Window_ID
+                                 FROM AD_Table t
+                                WHERE UPPER(t.TableName) = UPPER(@TableName)
+                                  AND t.IsActive         = 'Y'
+                                  AND COALESCE(t.AD_Window_ID, 0) > 0";
+                DataSet ds = DB.ExecuteDataset(
+                    sql, new SqlParameter[] { new SqlParameter("@TableName", name) }, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    int id = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+                    if (id > 0) return id;
+                }
+
+                // No zoom target on the table itself — take the window whose first
+                // tab sits on this table, which is the screen that maintains it.
+                sql = @"SELECT tb.AD_Window_ID
+                          FROM AD_Tab tb
+                         INNER JOIN AD_Table t ON (t.AD_Table_ID = tb.AD_Table_ID)
+                         WHERE UPPER(t.TableName) = UPPER(@TableName)
+                           AND tb.IsActive        = 'Y'
+                           AND t.IsActive         = 'Y'
+                         ORDER BY tb.SeqNo, tb.AD_Tab_ID";
+                ds = DB.ExecuteDataset(
+                    sql, new SqlParameter[] { new SqlParameter("@TableName", name) }, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return 0;
+                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetWindowIdByTable (" + name + "): " + ex.Message);
+                return 0;
+            }
+        }
+
+        /// <summary>
         /// Builds the unit-rate SQL expression from whichever optional cost
         /// columns exist on M_InventoryLine, ending at 0.
         /// </summary>

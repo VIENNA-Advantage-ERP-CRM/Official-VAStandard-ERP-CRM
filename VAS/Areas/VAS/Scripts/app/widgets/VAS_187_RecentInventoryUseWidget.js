@@ -7,12 +7,24 @@
  * Summary Message Table
  *  # | Current Text                           | Message Key
  * ---+----------------------------------------+-----------------------------------
- *  1 | Recent Inventory Use                   | VAS_RecentInventoryUse
- *  2 | Latest material issue transactions     | VAS_LatestMaterialIssueTxns
- *  3 | All Statuses                           | VAS_AllStatuses
- *  4 | Completed                              | VAS_Completed
- *  5 | Drafted                                | VAS_Drafted
- *  6 | Couldn't load                           | VAS_CouldntLoad
+ *  1 | Recent Inventory Use                   | VAS_187_RecentInventoryUse
+ *  2 | Latest material issue transactions     | VAS_187_LatestMaterialIssueTxns
+ *  3 | All Statuses                           | VAS_187_AllStatuses
+ *  4 | Completed                              | VAS_187_Completed
+ *  5 | Drafted                                | VAS_187_Drafted
+ *  6 | Couldn't load                           | VAS_187_CouldntLoad
+ *
+ * DocStatus chip labels (see STATUS_LABELS below), one per AD_Ref_List reference 131 value:
+ *  7 | Closed                                 | VAS_187_Closed
+ *  8 | In Process                             | VAS_187_InProcess
+ *  9 | Approved                               | VAS_187_Approved
+ * 10 | Not Approved                           | VAS_187_NotApproved
+ * 11 | Waiting Confirmation                   | VAS_187_WaitingConfirmation
+ * 12 | Waiting Payment                        | VAS_187_WaitingPayment
+ * 13 | Invalid                                | VAS_187_Invalid
+ * 14 | Reversed                               | VAS_187_Reversed
+ * 15 | Voided                                 | VAS_187_Voided
+ * 16 | Unknown                                | VAS_187_Unknown
  */
 ; VAS = window.VAS || {};
 
@@ -93,13 +105,33 @@
             return '₹' + val.toLocaleString(window.navigator.language);
         }
 
+        /* DocStatus code -> [css tone, message key, English fallback].
+           Codes come from AD_Ref_List reference 131. Previously only CO/CL and DR were translated
+           and every other status fell through rendering the RAW CODE ("IP", "RE", "VO", "WC"),
+           which was both untranslated and not the label the spec asks for ("In Process", not "IP"). */
+        var STATUS_LABELS = {
+            'CO': ['co', 'VAS_187_Completed', 'Completed'],
+            'CL': ['co', 'VAS_187_Closed', 'Closed'],
+            'DR': ['dr', 'VAS_187_Drafted', 'Drafted'],
+            'IP': ['ip', 'VAS_187_InProcess', 'In Process'],
+            'AP': ['ip', 'VAS_187_Approved', 'Approved'],
+            'NA': ['dr', 'VAS_187_NotApproved', 'Not Approved'],
+            'WC': ['ip', 'VAS_187_WaitingConfirmation', 'Waiting Confirmation'],
+            'WP': ['ip', 'VAS_187_WaitingPayment', 'Waiting Payment'],
+            'IN': ['dr', 'VAS_187_Invalid', 'Invalid'],
+            'RE': ['dr', 'VAS_187_Reversed', 'Reversed'],
+            'VO': ['dr', 'VAS_187_Voided', 'Voided'],
+            '??': ['ip', 'VAS_187_Unknown', 'Unknown']
+        };
+
         function getStatusBadge(status) {
-            if (status === 'CO' || status === 'CL') {
-                return '<span class="vas-riu-badge co">' + escapeHtml(label("VAS_Completed", "Completed")) + '</span>';
-            } else if (status === 'DR') {
-                return '<span class="vas-riu-badge dr">' + escapeHtml(label("VAS_Drafted", "Drafted")) + '</span>';
+            var entry = STATUS_LABELS[status];
+            if (!entry) {
+                // Genuinely unmapped code: show it rather than an empty chip, but keep it visible
+                // as an anomaly instead of pretending it is a known status.
+                return '<span class="vas-riu-badge ip">' + escapeHtml(status) + '</span>';
             }
-            return '<span class="vas-riu-badge ip">' + escapeHtml(status) + '</span>';
+            return '<span class="vas-riu-badge ' + entry[0] + '">' + escapeHtml(label(entry[1], entry[2])) + '</span>';
         }
 
         function showBusy(show) {
@@ -184,7 +216,7 @@
                     '<div class="vas-riu-doc-meta" title="' + escapeHtml(metaStr) + '">' + escapeHtml(metaStr) + '</div>' +
                     '</div>' +
                     '<div class="vas-riu-row-right">' +
-                    '<div class="vas-riu-lines-qty">' + item.lineCount + ' lines · ' + formatQty(item.totalQty) + '</div>' +
+                    '<div class="vas-riu-lines-qty">' + item.lineCount + ' ' + escapeHtml(label("VAS_187_Lines", "lines")) + ' · ' + formatQty(item.totalQty) + '</div>' +
                     '<div class="vas-riu-val">' + formatINR(item.totalValue) + '</div>' +
                     '</div>' +
                     '</button>';
@@ -211,8 +243,8 @@
         }
 
         function createWidget() {
-            var title = label("VAS_RecentInventoryUse", "Recent Inventory Use");
-            var sub = label("VAS_LatestMaterialIssueTxns", "Latest material issue transactions");
+            var title = label("VAS_187_RecentInventoryUse", "Recent Inventory Use");
+            var sub = label("VAS_187_LatestMaterialIssueTxns", "Latest material issue transactions");
 
             $card = $(
                 '<div class="vas-riu-card vas-widget-bg">' +
@@ -227,9 +259,9 @@
                 '</div>' +
                 '</div>' +
                 '<select class="vas-riu-select vas-riu-status-sel">' +
-                '<option value="ALL">' + escapeHtml(label("VAS_AllStatuses", "All Statuses")) + '</option>' +
-                '<option value="CO">' + escapeHtml(label("VAS_Completed", "Completed")) + '</option>' +
-                '<option value="DR">' + escapeHtml(label("VAS_Drafted", "Drafted")) + '</option>' +
+                '<option value="ALL">' + escapeHtml(label("VAS_187_AllStatuses", "All Statuses")) + '</option>' +
+                '<option value="CO">' + escapeHtml(label("VAS_187_Completed", "Completed")) + '</option>' +
+                '<option value="DR">' + escapeHtml(label("VAS_187_Drafted", "Drafted")) + '</option>' +
                 '</select>' +
                 '</div>' +
                 '<div class="vas-riu-body"></div>' +

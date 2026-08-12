@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Purchase Requisition overview tab panel. Renders a
  *                  review-oriented overview of the selected requisition
@@ -89,6 +89,214 @@
  *                        counting the whole feed. Ported from VAS_092.
  *   VAI163   2026-08-07  Emits the vas_098-prefixed modifier classes the
  *                        stylesheet now uses.
+ *   VAI163   2026-08-11  - Timestamps render in the viewer's local system zone.
+ *                          The July change read them as WALL-CLOCK, on the belief
+ *                          that Created is stored in server local time; the DB
+ *                          actually stores UTC and the server emits no zone
+ *                          designator, so the panel printed the stored UTC clock
+ *                          and every creation time read hours out. parseDbDate
+ *                          tags a bare timestamp "Z"; a date-only field is still
+ *                          parsed as it stands so its calendar day cannot roll
+ *                          over, and the day-count arithmetic is unaffected.
+ *                        - The progress stepper dates its stages with
+ *                          formatStampDateShort: every one of them is a stamp,
+ *                          and the date-only formatter would print the UTC day.
+ *                        - Line items page at 25 rows instead of 10, matching the
+ *                          Purchase Order and Internal Use overviews.
+ *                        - Activity carries the e-mails sent against the
+ *                          requisition (type "email"): the subject headlines the
+ *                          row, the recipient runs underneath it and the
+ *                          timestamp / sender sit where every other entry carries
+ *                          them. The message body opens on click, headed by the
+ *                          full From / To / Cc / Bcc set. Follows VAS_092.
+ *                        - The items footer's Budget figure falls back to the
+ *                          budget the requisition is drawn against (model side)
+ *                          when no line carries a calculated one, and its tooltip
+ *                          says which of the two is on screen.
+ *   VAI163   2026-08-11  - Minor priority reads green, not grey: grey said "no
+ *                          priority set" when what it means is the lowest one
+ *                          there is. Every priority still takes its tone from its
+ *                          own PriorityRule value (PRIORITY_MAP).
+ *                        - The details card drops its Reference field. It named
+ *                          the purchase order raised from the requisition, so it
+ *                          read N/A on every requisition not yet converted — and
+ *                          the conversion is already reported by the progress
+ *                          stepper and by Activity's "PO Created" entry, both of
+ *                          which name the order.
+ *                        - Line items show the Attribute Set Instance directly
+ *                          under the product name, above the search key: the
+ *                          attribute qualifies WHICH stock was asked for.
+ *                        - A charge line's Source Stock cell is blank
+ *                          (isChargeLine). A charge is not stocked, so neither
+ *                          "0" nor "N/A" is a fact about it; the model leaves such
+ *                          a line without source data at all, so it also stops
+ *                          counting against the requisition's source availability.
+ *                        - Activity moved below Notes, to the bottom of the
+ *                          panel: it is the longest section and the least often
+ *                          read, so anything under it was pushed off the panel.
+ *   VAI163   2026-08-12  - The Purchase Order button confirms a PURCHASE ORDER.
+ *                          Its text is keyed ConfirmPurchaseOrder now: the older
+ *                          ConfirmConvertToPO is seeded with the RFQ sentence on
+ *                          existing databases, so the button asked the reader to
+ *                          confirm an RFQ. A fresh key cannot inherit the wrong
+ *                          text — the same move the button LABELS made when they
+ *                          were renamed.
+ *                        - msg() treats VIS.Msg's bracketed "[VAS_098_FOO]"
+ *                          answer as not-found (isMissingMsg), so an unseeded key
+ *                          reaches its English fallback instead of rendering as
+ *                          raw bracketed text. It only tested m !== full, which a
+ *                          bracketed answer always passes. Ported from VAS_099.
+ *                        - Notes carries every description entered against the
+ *                          requisition: the header's, then each LINE's
+ *                          (M_RequisitionLine.Description), captioned with its
+ *                          line no and product. A line note was previously
+ *                          unreachable from the panel — the Items table shows the
+ *                          product, its attributes and its search key, not the
+ *                          description.
+ *                        - The RFQ button greys out once EVERY line has been
+ *                          converted into a purchase order (isFullyConverted:
+ *                          ConvertedLineCount >= LineCount). It stayed live on a
+ *                          fully converted requisition, offering to seek quotes
+ *                          for lines already ordered. A PARTLY converted one
+ *                          keeps it — the outstanding lines are what an RFQ is
+ *                          for — which is why data.IsConverted (true from the
+ *                          first converted line) is not the test.
+ *                        - Added the Documents section, built like the Purchase
+ *                          Order overview's: the purchase orders, RFQs and
+ *                          material transfers raised from this requisition, with
+ *                          a per-kind count in the section header, each row
+ *                          carrying its date, status and amount and opening the
+ *                          record on click. Drawn only when there is something to
+ *                          list.
+ *                        - Added the Reference strip (renderReference), the
+ *                          mirror of the PO overview's Generated From and in the
+ *                          same place — directly under the details card. One chip
+ *                          per source document: field-service work order,
+ *                          production order, project, replenishment; each opens
+ *                          its record except replenishment, which is a process
+ *                          and has none. A requisition generated from nothing
+ *                          reads "Manual".
+ *                        - Added the record-open path both of those need
+ *                          (bindEvents / openRecord / WINDOW_NAME_BY_TABLE /
+ *                          resolveWindowIdByName, against the new GetWindow_ID
+ *                          endpoint), ported from VAS_092.
+ *   VAI163   2026-08-12  - Every Activity row carries "when · by whom" in the
+ *                          same place, read from UserName (which the model now
+ *                          sets on every row). The actor used to be spliced onto
+ *                          the end of a milestone's or a document's own sentence,
+ *                          sat beside the timestamp on an e-mail, and was missing
+ *                          altogether from a COMMENT — a chat entry showed its
+ *                          text and a time with no author. activityText() is the
+ *                          action alone now.
+ *                        - A comment's headline wraps to three lines rather than
+ *                          ellipsising after one (vas_098-multiline): it is the
+ *                          comment itself, not a label.
+ *                        - Notes is drawn only when the requisition carries a
+ *                          DESCRIPTION of its own. Without one the section and
+ *                          its heading are absent instead of framing a "no notes"
+ *                          placeholder — and a requisition with line notes but no
+ *                          description of its own shows no Notes section at all,
+ *                          which is the intended behaviour: the header
+ *                          description is what decides whether the section
+ *                          exists, and the line notes are a detail of it.
+ *                        - The progress line's last stage is Posted
+ *                          (M_Requisition.Posted, dated by PostedDate) in place
+ *                          of Closed. Closing is a state most requisitions never
+ *                          reach; posting is one every completed requisition
+ *                          does.
+ *                          Posted is marked from its own flag and does NOT
+ *                          back-fill the stages before it (LIFECYCLE_STAGES):
+ *                          posting follows completion, so it is routinely true
+ *                          while Converted and In Fulfilment are still ahead, and
+ *                          the chain rule would have reported purchase orders
+ *                          that do not exist. Closed was safely terminal and
+ *                          needed none of that. The "Stage n of m" caption counts
+ *                          the chain, which is now five.
+ *   VAI163   2026-08-12  - Source Stock is now Received On Hand, and reports the
+ *                          warehouse a purchased line is RECEIVED into as well as
+ *                          the one an internal line is served from (model side).
+ *                          An externally procured requisition has no source
+ *                          warehouse, so the column read N/A for the life of the
+ *                          document and never reflected the receipt that
+ *                          satisfied it; it now rises as each GRN completes. The
+ *                          tooltip names the warehouse and the quantity received.
+ *                        - Quantity and unit price read in the line's SELECTED
+ *                          UOM (model side). The row was already labelled with
+ *                          that unit while carrying the product's BASE figures, so
+ *                          a line keyed as 2 BOX of an EA-held product read as 24
+ *                          against a "BOX" label, priced per EA.
+ *                        - The unit price shows to the currency's precision
+ *                          (moneyPrecise) instead of being rounded to whole
+ *                          currency units — a rate of 0.75 an EA printed as 1.
+ *                          Line amounts and totals keep money().
+ *                        - Items is drawn only when the requisition HAS lines;
+ *                          the empty frame and its "no line items" placeholder
+ *                          are gone.
+ *   VAI163   2026-08-12  - Removed the RFQ and Material Transfer buttons (and
+ *                          isFullyConverted, which only gated the first). Neither
+ *                          could ever succeed from this panel, so both answered
+ *                          every click with an error: the RFQ process selects its
+ *                          lines by ORGANISATION and needs a topic, quote type
+ *                          and response date that an overview has no business
+ *                          inventing, and the material-transfer process ships
+ *                          with the DTD001 module, which is not installed here.
+ *                          Both actions live on the requisition window, with the
+ *                          parameter screen they need. Purchase Order stays and
+ *                          becomes the strip's primary action.
+ *                        - The Reference strip gains a Field Service Request chip
+ *                          (M_Requisition.VA075_FieldServiceReq_ID), beside the
+ *                          work order rather than sharing with it: a request can
+ *                          exist without a work order, and one work order can
+ *                          serve several.
+ *                        - openRecord gains a third and final step: when neither a
+ *                          named window nor the client's zoom target resolves, the
+ *                          server is asked which window the TABLE opens in
+ *                          (GetWindowIdByTable). The VA075 work order and field
+ *                          service request chips needed it — that module is not
+ *                          part of this solution, so its screens cannot be named
+ *                          here, and the browser-side zoom lookup only knows
+ *                          tables the client has cached, so both fell through to
+ *                          the "cannot open" toast on every click. Ported from
+ *                          VAS_102.
+ *   VAI163   2026-08-12  - The Reference strip gains the order whose demand the
+ *                          requisition serves (M_RequisitionLine.Ref_OrderLine_ID
+ *                          -> C_OrderLine -> C_Order). C_Order is dual-purpose, so
+ *                          the chip reads Sales Order only when the linked order
+ *                          actually is one, and openRecord takes an isSOTrx flag
+ *                          again (WINDOW_NAME_BY_TABLE_SOTRX) so each side opens
+ *                          in its own window.
+ *                        - The Production Order chip also resolves from
+ *                          M_RequisitionLine.VAMFG_M_WorkOrderComponent_ID (model
+ *                          side): a line raised for one COMPONENT of a production
+ *                          order carries the component, not the order.
+ *                        - Removed the convert strip entirely — the "conversion
+ *                          available" note and the Purchase Order button, with
+ *                          convertBtn() and runAction(). Those actions belong to
+ *                          the requisition window, behind the parameter screen and
+ *                          document validation the process expects, and the note
+ *                          restated what the progress stepper already shows. The
+ *                          controller's ConvertToPurchaseOrder endpoint went with
+ *                          it and the controller is read-only again.
+ *                        - Removed the procurement-type header badge ("Internal
+ *                          Fulfillment" / "Purchase Requisition"). The header
+ *                          sub-line opens with the same words and the details card
+ *                          carries them as a labelled field.
+ *                        - The Posted badge is drawn only once the record IS
+ *                          posted (or posting errored, which the reader has to act
+ *                          on). It used to read "Not Posted" on every drafted
+ *                          requisition — not news about a document that cannot be
+ *                          posted yet.
+ *                        - New Record / Copy Record reliably empty the panel, by
+ *                          the mechanism VAS_099 needed for the same bug: the
+ *                          framework can call refreshPanelData BEFORE GridTable
+ *                          raises its insert flag, so the panel loaded the row
+ *                          just left; and a reply already on the wire landed after
+ *                          the clear and repainted it. refreshPanelData now goes
+ *                          through scheduleFetch (holds REFRESH_DELAY_MS and
+ *                          re-asks isTabInserting), every fetch carries a token a
+ *                          clear or newer fetch invalidates, shownRecordId tracks
+ *                          "showing or loading", and clear() drops the busy
+ *                          indicator a discarded reply used to strand.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -161,14 +369,18 @@
             }
 
             if (inserting || rid <= 0) {
-                // New (unsaved) record — nothing to show against it.
-                if ($self.record_ID) {
+                // New (unsaved) record — nothing to show against it. Asked of
+                // shownRecordId rather than record_ID: a fetch still in flight has
+                // already claimed the former, so a New Record raised while the
+                // first (slow) request is on the wire still clears — and
+                // invalidates the reply that would otherwise repaint it.
+                if (shownRecordId || data) {
                     $self.record_ID = 0;
                     $self.clear();
                 }
                 return;
             }
-            if (rid !== $self.record_ID) {
+            if (rid !== shownRecordId) {
                 $self.record_ID = rid;
                 $self.fetchData(rid);
             }
@@ -183,11 +395,41 @@
         var $emptyState;
         var data = null;
 
+        // The record the panel is SHOWING or LOADING. Distinct from record_ID,
+        // which the host sets: this one is claimed the moment a fetch is
+        // scheduled, so a New Record raised mid-flight can tell there is something
+        // to clear.
+        var shownRecordId = 0;
+
+        // How long refreshPanelData holds before it actually fetches.
+        // On New Record / Copy Record the framework can call refreshPanelData
+        // BEFORE GridTable raises its insert flag, so isTabInserting() asked at
+        // that instant still answers "no" and the panel would load the record the
+        // user has just moved off — which is exactly what left the previous
+        // requisition on screen. Asking again after this pause gets the truth. It
+        // also collapses a burst of arrow-key row changes into one request.
+        var REFRESH_DELAY_MS = 150;
+
+        // Raised by every fetch, every scheduled fetch and every clear. A reply
+        // carrying a token that is no longer the current one belongs to a record
+        // the panel has already moved off, so it is dropped instead of painting —
+        // without this, the reply of a request already on the wire lands AFTER the
+        // clear and repaints the record that was just cleared. Ported from VAS_099.
+        var fetchToken = 0;
+        var pendingFetch = null;
+
         // Line items page client-side (the whole set arrives in one payload); the
-        // page resets whenever a different record is loaded.
-        var LINES_PER_PAGE = 10;
+        // page resets whenever a different record is loaded. 25 rows a page,
+        // matching the Purchase Order and Internal Use overviews: the pager only
+        // appears once a requisition actually exceeds that.
+        var LINES_PER_PAGE = 25;
         var linesPage = 0;
         var activityPage = 0;   // current Activity page (0-based, like linesPage)
+
+        // Placeholder for a document field that carries no value — an RFQ has no
+        // amount, an unposted transfer no date. A dash, so an empty cell is never
+        // mistaken for a zero.
+        var DASH = "—";
 
         // ---- Code maps: status/priority codes -> message key + tone. Labels
         //      are looked up through VIS.Msg (AD_Message VAS_098_*) at render. ---- //
@@ -204,10 +446,11 @@
             "IN": { key: "Invalid",     tone: "vas_098-cancelled" },
             "NA": { key: "NotApproved", tone: "vas_098-cancelled" }
         };
-        // Tones match the colours the requisition window itself uses for the
-        // PriorityRule field: urgent red, high orange, medium blue, low green,
-        // minor grey. Urgent and High used to share one tone, and Low shared grey
-        // with Minor, so the badge disagreed with the screen.
+        // Tone per PriorityRule value: urgent red, high orange, medium blue, low
+        // and minor green. Urgent and High used to share one tone, and Low shared
+        // grey with Minor, so the badge disagreed with the requisition window.
+        // Minor is green rather than grey — grey read as "no priority set" when
+        // what it means is the lowest one there is.
         var PRIORITY_MAP = {
             "1": { key: "UrgentPriority", tone: "vas_098-urgent" },
             "3": { key: "HighPriority",   tone: "vas_098-high"   },
@@ -223,6 +466,7 @@
             $emptyState.text(msg("NoData"));
             $root.append($body).append($emptyState);
             createBusyIndicator();
+            bindEvents();
         };
 
         function createBusyIndicator() {
@@ -242,7 +486,48 @@
             $busy[0].style.visibility = show ? "visible" : "hidden";
         }
 
+        // Drops whatever the panel was loading: cancels a fetch still waiting on
+        // its delay and invalidates the token of one already on the wire, so
+        // neither can paint over what the caller is about to put on screen.
+        function invalidateFetch() {
+            fetchToken++;
+            if (pendingFetch) {
+                clearTimeout(pendingFetch);
+                pendingFetch = null;
+            }
+        }
+
+        // Same thing, reachable from dispose so a timer cannot outlive the panel.
+        this.abortPendingFetch = invalidateFetch;
+
+        // Waits REFRESH_DELAY_MS, re-asks the tab whether it is inserting, and only
+        // then fetches. See REFRESH_DELAY_MS for why the wait is needed.
+        this.scheduleFetch = function (recordID) {
+            invalidateFetch();
+            var token = fetchToken;
+            // Claim the record now, not when the timer fires: shownRecordId means
+            // "showing or loading", and leaving it stale through the wait would let
+            // the data-status listener fire a second fetch for the same row.
+            shownRecordId = +recordID || 0;
+            // Feedback while we hold — clear() / fetchData() own it from here.
+            showBusy(true);
+            pendingFetch = setTimeout(function () {
+                pendingFetch = null;
+                if (token !== fetchToken) return;   // superseded while waiting
+                // The insert flag may only have been raised during the wait.
+                if (isTabInserting($self.curTab)) {
+                    $self.record_ID = 0;
+                    $self.clear();
+                    return;
+                }
+                $self.fetchData(recordID);
+            }, REFRESH_DELAY_MS);
+        };
+
         this.fetchData = function (recordID) {
+            invalidateFetch();
+            var token = fetchToken;
+            shownRecordId = +recordID || 0;
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_098_PurchaseRequisition/GetRequisitionOverview",
@@ -250,6 +535,10 @@
                 dataType: "json",
                 data: { M_Requisition_ID: recordID },
                 success: function (raw) {
+                    // Reply for a record the panel has already left (a New Record
+                    // cleared it, or a newer row was selected). Whoever superseded
+                    // us owns the busy indicator now, so leave it be.
+                    if (token !== fetchToken) return;
                     var parsed = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     data = parsed;
                     linesPage = 0;
@@ -258,6 +547,7 @@
                     showBusy(false);
                 },
                 error: function (err) {
+                    if (token !== fetchToken) return;
                     console.log(err);
                     showBusy(false);
                 }
@@ -265,10 +555,15 @@
         };
 
         this.clear = function () {
+            // Anything in flight or held belongs to the record being cleared.
+            invalidateFetch();
+            shownRecordId = 0;
             data = null;
             linesPage = 0;
             activityPage = 0;
             render();
+            // A discarded reply would otherwise strand the indicator.
+            showBusy(false);
         };
 
         function render() {
@@ -288,7 +583,9 @@
 
             renderHead();
             renderDetails();
-            renderConvert();
+            // Where the requisition came from, directly under the details card —
+            // the placement the Purchase Order overview gives its own strip.
+            renderReference();
             renderStats();
             renderProgress();
             renderLower();
@@ -299,16 +596,28 @@
         // ----------------------------------------------------------------- //
 
         // Localised label lookup. All on-screen text is seeded in AD_Message as
-        // VAS_098_<key>. VIS.Msg returns the key itself when it is not seeded, so
-        // an optional English fallback keeps a raw "VAS_098_Foo" off the screen
-        // until the message is added to the dictionary.
+        // VAS_098_<key>, with an optional English fallback for a key that has not
+        // been added to the dictionary yet.
+        //
+        // VIS.Msg does NOT answer an unseeded key with the key itself — it answers
+        // with the key bracketed and upper-cased ("[VAS_098_CONFIRMPURCHASEORDER]").
+        // That is never equal to the key, so the `m !== full` test alone let the
+        // bracketed form straight through and the fallback below was unreachable:
+        // an unseeded key rendered as raw bracketed text at the user. A bracketed
+        // answer now counts as "not found". Ported from VAS_099 / VAS_190.
         function msg(key, fallback) {
             var full = "VAS_098_" + key;
             try {
                 var m = VIS.Msg.getMsg(full);
-                if (m && m !== full) return m;
+                if (m && m !== full && !isMissingMsg(m)) return m;
             } catch (e) { }
             return (fallback !== null && fallback !== undefined) ? fallback : full;
+        }
+
+        // True for VIS.Msg's "key not seeded" answer: the key, bracketed.
+        function isMissingMsg(text) {
+            var t = String(text);
+            return t.length > 1 && t.charAt(0) === "[" && t.charAt(t.length - 1) === "]";
         }
 
         // The requisition's own document status. "Converted" is a progress state,
@@ -340,6 +649,10 @@
         function procurementType() {
             return data.SourceWarehouseName ? msg("InternalFulfillment") : msg("PurchaseRequisition");
         }
+
+        // isFullyConverted() is gone with the RFQ button it gated: that was the
+        // only caller. The convert strip's remaining action (Purchase Order) is
+        // gated by canConvert, which reads the document status and data.IsConverted.
 
         function tag(label, tone) {
             var $t = $('<span class="vas_098-tag"></span>').addClass(tone || "vas_098-draft");
@@ -373,14 +686,21 @@
 
             var $pills = $('<div class="vas_098-hdrPills"></div>');
             $pills.append(priorityPill(pm));
-            if (data.SourceWarehouseName) {
-                // origin / procurement-type chip (design shows a chip here)
-                $pills.append(tag(procurementType(), "vas_098-mwo"));
-            }
+            // The procurement-type chip ("Internal Fulfillment" / "Purchase
+            // Requisition") is deliberately absent. It repeated the header
+            // sub-line, which already opens with the procurement type, and the
+            // details card names it again as a labelled field — three copies of one
+            // fact across a single screenful.
             $pills.append(tag(st.label, st.tone));
-            // Posting status of the record, beside the document status.
-            var pst = postedMeta();
-            $pills.append(tag(pst.label, pst.tone));
+            // Posted, and ONLY when it is posted. The pill used to be drawn for
+            // every record — reading "Not Posted" on every drafted requisition,
+            // which is not news about a document that cannot be posted yet. It is a
+            // milestone badge now: absent until the milestone is reached, like the
+            // Posted stage of the progress line. A posting ERROR still shows, since
+            // that is something the reader has to act on.
+            if (data.Posted || data.PostedCode === "E") {
+                $pills.append(tag(postedMeta().label, postedMeta().tone));
+            }
             $top.append($pills);
 
             $head.append($top);
@@ -435,11 +755,11 @@
             $r.append(headerField(msg("ProcurementType"), procurementType()));
             $r.append(headerField(msg("PriceList"), data.PriceListName || msg("NA")));
             $r.append(headerField(msg("RequestWarehouse"), data.RequestWarehouseName || msg("NA")));
-            // Reference — the purchase order raised from this requisition. N/A
-            // until it has been converted.
-            $r.append(headerField(msg("Reference", "Reference"), referenceText()));
-           
-           
+            // The Reference field is deliberately absent. It named the purchase
+            // order raised from this requisition, which reads N/A on every
+            // requisition that has not been converted — most of them — and the
+            // conversion is already reported by the progress stepper and by the
+            // "PO Created" entry in Activity, both of which name the order.
             $card.append($r);
 
             $body.append($card);
@@ -457,15 +777,12 @@
             $container.append($bit);
         }
 
-        // The purchase order this requisition produced. When it produced more than
-        // one, the first is named and the rest counted.
-        function referenceText() {
-            if (!data.OrderDocumentNo) return msg("NA");
-            var count = +data.OrderCount || 0;
-            return count > 1
-                ? data.OrderDocumentNo + " +" + (count - 1) + " " + msg("More", "more")
-                : data.OrderDocumentNo;
-        }
+        // referenceText() is gone with the Reference field it filled. The purchase
+        // order the requisition produced is still on screen: the Converted stage
+        // of the progress stepper dates it, and Activity's "PO Created" entry
+        // names it from its own row (ActivityData.DocumentNo). The payload's
+        // OrderDocumentNo / OrderCount are no longer read by this panel; they are
+        // left on the model, which uses OrderCount for its own milestone logic.
 
         // Labelled field block (uppercase caption + value) for the right column.
         function headerField(label, value) {
@@ -475,114 +792,399 @@
             return $f;
         }
 
-        // ------------------------ Convert strip -------------------------- //
+        // -------------------------- Reference ---------------------------- //
 
-        function renderConvert() {
-            var canConvert = data.StatusCode === "CO" && !data.IsConverted;
+        // The documents this requisition was GENERATED FROM, in the Purchase Order
+        // overview's "Generated From" shape: a labelled strip of chips directly
+        // under the details card, one per source document, each opening that
+        // record on click.
+        //
+        // Only origins that exist are drawn. A requisition linked to none of them
+        // was raised by hand and says so — "Manual" is a chip like any other, not
+        // an apology for an empty strip.
+        //
+        // Replenishment is the one origin with no record behind it: the Replenish
+        // Report raises the requisition and stamps only its description, so that
+        // chip names the origin without being a link. Everything else opens.
+        function renderReference() {
+            var $strip = $('<section class="vas_098-genfrom"></section>');
+            $strip.append($('<span class="vas_098-gfLabel"></span>')
+                .text(msg("GeneratedFrom", "Generated From")));
 
-            var $strip = $('<div class="vas_098-convert"></div>');
+            var $chips = $('<div class="vas_098-gfChips"></div>');
+            var any = false;
 
-            var noteText, noteOk = false;
-            if (data.IsConverted) {
-                // "Converted" — the note used to read "Already converted".
-                noteText = msg("Converted");
-                noteOk = true;
-            } else if (canConvert) {
-                noteText = msg("ReadyToConvertNote");
-                noteOk = true;
-            } else {
-                noteText = msg("ConversionAvailable");
+            // Maintenance work order first — it is the strongest origin when more
+            // than one is present.
+            if (data.WorkOrderNo) {
+                $chips.append(originChip("wrench", msg("WorkOrder", "Work Order"),
+                    countedValue(data.WorkOrderNo, data.WorkOrderCount),
+                    "warning", "VA075_WorkOrder", data.VA075_WorkOrder_ID));
+                any = true;
             }
 
-            var $note = $('<span class="vas_098-cvnote"></span>');
-            if (noteOk) $note.append($('<span class="vas_098-ok"></span>').append(svgIcon("check")));
-            $note.append(document.createTextNode(noteText));
-            $strip.append($note);
+            // The field service request the requisition was raised against
+            // (M_Requisition.VA075_FieldServiceReq_ID). A separate VA075 document
+            // to the work order above — a request can exist without one, and one
+            // work order can serve several — so it gets its own chip rather than
+            // sharing.
+            if (data.FieldServiceReqNo) {
+                $chips.append(originChip("clipboard",
+                    msg("FieldServiceRequest", "Field Service Request"),
+                    countedValue(data.FieldServiceReqNo, data.FieldServiceReqCount),
+                    "info", "VA075_FieldServiceReq", data.VA075_FieldServiceReq_ID));
+                any = true;
+            }
 
-            // Document actions, each run through the platform's process engine via
-            // the controller. Preconditions are per-action rather than one shared
-            // flag: raising an RFQ is still legitimate after the requisition has
-            // been converted to a PO, so it no longer greys out with the others.
-            var isCompleted = data.StatusCode === "CO" || data.StatusCode === "CL";
-            var isClosedOff = data.StatusCode === "VO" || data.StatusCode === "RE";
-            var canAct = isCompleted && !isClosedOff;
+            // Production order (VAMFG) — a manufacturing document, NOT the
+            // maintenance work order above. Reached from the line's own work order
+            // or from the component it was raised for (model side).
+            if (data.ProductionOrderNo) {
+                $chips.append(originChip("factory",
+                    msg("ProductionOrder", "Production Order"),
+                    countedValue(data.ProductionOrderNo, data.ProductionOrderCount),
+                    "warning", "VAMFG_M_WorkOrder", data.VAMFG_M_WorkOrder_ID));
+                any = true;
+            }
 
-            // Button labels name the target document only — the "Convert to" /
-            // "Create" verb has been dropped from each. New message keys are used
-            // so the old seeded ConvertTo* / CreateRFQ text does not resurface.
-            var $actions = $('<div class="vas_098-cvactions"></div>');
-            $actions.append(convertBtn(msg("MaterialTransfer", "Material Transfer"), "transfer", "vas_098-primary",
-                canConvert, "ConvertToMaterialTransfer",
-                msg("ConfirmMaterialTransfer",
-                    "Create a material transfer from this requisition?")));
-            $actions.append(convertBtn(msg("RFQ", "RFQ"), "rfq", "vas_098-secondary",
-                canAct, "CreateRFQ",
-                msg("ConfirmCreateRFQ",
-                    "Create an RFQ from this requisition?")));
-            $actions.append(convertBtn(msg("PurchaseOrder", "Purchase Order"), "external", "vas_098-secondary",
-                canConvert, "ConvertToPurchaseOrder",
-                msg("ConfirmConvertToPO",
-                    "Create the purchase order(s) for this requisition?")));
-            $strip.append($actions);
+            // The order whose demand this requisition serves
+            // (M_RequisitionLine.Ref_OrderLine_ID). C_Order carries both sides of
+            // the trade, so the chip names the side the linked order is actually
+            // on rather than assuming a sale, and opens it in that side's window.
+            if (data.RefOrderNo) {
+                var $order = originChip("doc",
+                    data.RefOrderIsSOTrx ? msg("SalesOrder", "Sales Order")
+                                         : msg("Order", "Order"),
+                    countedValue(data.RefOrderNo, data.RefOrderCount),
+                    "success", "C_Order", data.RefOrderId);
+                if (data.RefOrderIsSOTrx) $order.attr("data-open-sotrx", "Y");
+                $chips.append($order);
+                any = true;
+            }
 
+            // The project whose planned lines were copied into this requisition.
+            // Its search key identifies it on the chip and its name sits on the
+            // tooltip, so the strip lists identifiers only.
+            if (data.ProjectId > 0) {
+                $chips.append(originChip("folder", msg("Project", "Project"),
+                    countedValue(projectLabel(), data.ProjectCount),
+                    "info", "C_Project", data.ProjectId, projectTooltip()));
+                any = true;
+            }
+
+            // Replenishment — no document to open, so the chip is a plain one.
+            if (data.IsReplenishment) {
+                $chips.append(originChip("refresh",
+                    msg("Replenishment", "Replenishment"), null, "success", null, 0));
+                any = true;
+            }
+
+            if (!any) {
+                $chips.append(originChip("pencil", msg("Manual", "Manual"),
+                    null, "muted", null, 0));
+            }
+
+            $strip.append($chips);
             $body.append($strip);
         }
 
-        // Action button: confirms, POSTs to the controller, then refreshes the
-        // panel so the status, progress stepper and button states reflect the
-        // result. Disabled buttons carry a reason as a tooltip.
-        function convertBtn(label, icon, variant, enabled, endpoint, confirmText) {
-            var $b = $('<button type="button" class="vas_098-btn"></button>').addClass(variant);
-            $b.append(svgIcon(icon));
-            $b.append(document.createTextNode(label));
+        // "REQ-1 +2" — the first document named, the rest counted, for an origin
+        // that several documents feed.
+        function countedValue(value, count) {
+            if (!value) return "";
+            var extra = (+count || 0) - 1;
+            return extra > 0 ? (value + " +" + extra) : value;
+        }
 
-            if (!enabled) {
-                $b.prop("disabled", true);
-                $b.attr("title", data.IsConverted
-                    ? msg("AlreadyConverted")
-                    : msg("ConversionAvailable"));
-                return $b;
+        // The project chip's value: the project's search key, falling back to its
+        // name when the key is blank, so the chip is never a bare label.
+        function projectLabel() {
+            return ((data.ProjectNo || "").trim()) || ((data.ProjectName || "").trim());
+        }
+
+        // The project's name, for the chip's tooltip — the strip itself carries
+        // the identifier, as it does for every other document.
+        function projectTooltip() {
+            var name = (data.ProjectName || "").trim();
+            if (!name || name === projectLabel()) return "";
+            return msg("Project", "Project") + ": " + name;
+        }
+
+        // Origin chip: leading (tinted) icon + grey label + dark value. Given a
+        // table and a record id it becomes a link that opens that record, marked
+        // with a trailing arrow.
+        function originChip(icon, label, value, iconTone, tableName, recordId, tooltip) {
+            var $chip = $('<span class="vas_098-chip"></span>')
+                .addClass("vas_098-ic-" + (iconTone || "muted"));
+
+            var isLink = tableName && recordId && +recordId > 0;
+            if (isLink) {
+                $chip.addClass("vas_098-is-link")
+                    .attr("data-open-table", tableName)
+                    .attr("data-open-id", recordId);
             }
 
-            $b.on("click", function () {
-                if (!confirm(confirmText)) return;
-                runAction($b, endpoint, label);
-            });
-            return $b;
+            $chip.append(svgIcon(icon));
+            $chip.append($('<span class="vas_098-chipLabel"></span>').text(label));
+            if (value) $chip.append($('<span class="vas_098-chipVal"></span>').text(value));
+            if (isLink) $chip.append(svgIcon("arrowUpRight"));
+            // The chip caps at the strip's width and its value truncates inside it,
+            // so one long document number cannot run off the panel — the whole of
+            // it stays readable on the chip's own tooltip.
+            $chip.attr("title", tooltip || (value ? label + ": " + value : label));
+            return $chip;
         }
 
-        // POSTs a convert action and refreshes on success. Guards against
-        // double-clicks while the request is in flight.
-        function runAction($btn, endpoint, label) {
-            if ($btn.prop("disabled")) return;
-            $btn.prop("disabled", true);
-            showBusy(true);
-            $.ajax({
-                url: VIS.Application.contextUrl + "VAS_098_PurchaseRequisition/" + endpoint,
-                type: "POST",
-                dataType: "json",
-                data: { M_Requisition_ID: $self.record_ID },
-                success: function (raw) {
-                    var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.success) {
-                        toast(res.message || label, false);
-                        // Re-fetch: conversion changes the progress stepper, the
-                        // convert note and which actions still apply.
-                        $self.fetchData($self.record_ID);
-                    } else {
-                        $btn.prop("disabled", false);
-                        showBusy(false);
-                        toast((res && (res.error || res.message)) ||
-                              msg("ActionFailed", "The action could not be completed."), true);
-                    }
-                },
-                error: function () {
-                    $btn.prop("disabled", false);
-                    showBusy(false);
-                    toast(msg("ActionFailed", "The action could not be completed."), true);
-                }
+        // -------------------------- Documents ---------------------------- //
+
+        // The documents raised FROM this requisition: the purchase orders its
+        // lines were converted into, the RFQs issued against it and the material
+        // transfers fulfilling it. Built like the Purchase Order overview's own
+        // Documents section — same columns, same per-kind summary, same clickable
+        // rows opening the underlying record through openRecord().
+        //
+        // A requisition with nothing raised from it yet carries no section at all,
+        // rather than an empty frame.
+        function renderDocuments() {
+            var rows = (data && data.Documents) || [];
+            if (!rows.length) return null;
+
+            sectionHead(msg("Documents", "Documents"), documentsSummary(rows));
+
+            var $panel = $('<div class="vas_098-lowersec"></div>');
+            var $tbl = $('<div class="vas_098-items vas_098-docTable"></div>');
+
+            var $head = $('<div class="vas_098-docRow vas_098-ithead"></div>');
+            $head.append($('<span></span>').text(msg("Document", "Document")));
+            $head.append($('<span></span>').text(msg("DocDate", "Date")));
+            $head.append($('<span></span>').text(msg("DocStatus", "Status")));
+            $head.append($('<span class="vas_098-ta-r"></span>').text(msg("Amount", "Amount")));
+            $tbl.append($head);
+
+            for (var i = 0; i < rows.length; i++) $tbl.append(documentRow(rows[i]));
+
+            $panel.append($tbl);
+            return $panel;
+        }
+
+        // "2 purchase orders · 1 RFQs" — only the kinds actually present count.
+        function documentsSummary(rows) {
+            var ord = 0, rfq = 0, mov = 0;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].Type === "order") ord++;
+                else if (rows[i].Type === "rfq") rfq++;
+                else if (rows[i].Type === "movement") mov++;
+            }
+            var bits = [];
+            if (ord) bits.push(ord + " " + msg("PurchaseOrdersCount", "purchase orders"));
+            if (rfq) bits.push(rfq + " " + msg("RFQsCount", "RFQs"));
+            if (mov) bits.push(mov + " " + msg("TransfersCount", "material transfers"));
+            return bits.join(" · ");
+        }
+
+        function documentRow(d) {
+            var $r = $('<div class="vas_098-docRow vas_098-itbody"></div>');
+
+            var canOpen = d.TableName && +d.RecordId > 0;
+            if (canOpen) {
+                $r.addClass("vas_098-is-link")
+                    .attr("data-open-table", d.TableName)
+                    .attr("data-open-id", d.RecordId);
+            }
+
+            // Identity: doc number + kind, with the open affordance on the right.
+            var $item = $('<span class="vas_098-docItem"></span>');
+            var icon = d.Type === "rfq" ? "rfq" : (d.Type === "movement" ? "transfer" : "doc");
+            $item.append(svgIcon(icon));
+
+            var $txt = $('<span class="vas_098-docTxt"></span>');
+            $txt.append($('<div class="vas_098-itname"></div>').text(d.DocumentNo || DASH));
+
+            var sub;
+            if (d.Type === "rfq") sub = msg("RFQ", "RFQ");
+            else if (d.Type === "movement") sub = msg("MaterialTransfer", "Material Transfer");
+            else sub = msg("PurchaseOrder", "Purchase Order");
+            if (d.LineCount) sub += " · " + d.LineCount + " " + msg("Lines");
+            $txt.append($('<div class="vas_098-itsku"></div>').text(sub));
+
+            $item.append($txt);
+            if (canOpen) $item.append(svgIcon("arrowUpRight"));
+            $r.append($item);
+
+            $r.append($('<span></span>').text(formatDate(d.DocDate) || DASH));
+
+            var st = STATUS_MAP[d.DocStatus];
+            $r.append($('<span></span>').append(st
+                ? tag(msg(st.key), st.tone)
+                : tag(d.DocStatus || msg("NA"), "vas_098-draft")));
+
+            // An RFQ and a material transfer have no monetary total of their own,
+            // and the model sends null rather than a zero for them — a zero here
+            // would read as "this document is worth nothing".
+            var $amt = $('<span class="vas_098-ta-r"></span>');
+            $amt.text((d.Amount === null || d.Amount === undefined) ? DASH : money(d.Amount));
+            $r.append($amt);
+
+            return $r;
+        }
+
+        // ------------------ Events / record navigation ------------------- //
+
+        // Delegated once on the root, so it survives every re-render: a Reference
+        // chip or a Documents row opens the record it points at.
+        function bindEvents() {
+            $root.on("click", ".vas_098-chip.vas_098-is-link, .vas_098-is-link[data-open-table]", function (e) {
+                e.preventDefault();
+                openRecord($(this).attr("data-open-table"), $(this).attr("data-open-id"),
+                    $(this).attr("data-open-sotrx") === "Y");
             });
         }
+
+        // Tables whose record does NOT open in the table's default zoom window,
+        // mapped to the name of the window it does open. The VAS_092 Purchase
+        // Order overview carries the same map for the same reason: an RFQ opens
+        // the VAS_RFQ window, not whatever C_RfQ's zoom target resolves to, and a
+        // requisition's purchase orders are purchase-side C_Order records.
+        //
+        // Any further screen that needs naming belongs here; nothing else has to
+        // change.
+        var WINDOW_NAME_BY_TABLE = {
+            "C_RfQ":      "VAS_RFQ",
+            "C_Project":  "VAS_Project",
+            "C_Order":    "VAS_PurchaseOrder",
+            "M_Movement": "VAS_MaterialTransfer"
+        };
+
+        // The same map for a record opened as a SALES transaction. C_Order serves
+        // both sides — the Documents section lists the purchase orders raised FROM
+        // the requisition, while the Reference strip can name the sales order whose
+        // demand it serves — so each side names its own window and this one wins
+        // when the flag is set. Ported from VAS_092.
+        var WINDOW_NAME_BY_TABLE_SOTRX = {
+            "C_Order": "VAS_SalesOrder"
+        };
+
+        // Window name -> AD_Window_ID, resolved once per name and remembered for
+        // the life of the panel. A name the dictionary does not know is cached as
+        // -1 so a failed lookup is not repeated on every click.
+        var windowIdByName = {};
+
+        // Resolves a window id from its name through the panel's own endpoint.
+        // Returns 0 when it cannot be resolved, which leaves openRecord() to fall
+        // back to the table's zoom target.
+        function resolveWindowIdByName(windowName) {
+            if (!windowName) return 0;
+            if (windowIdByName.hasOwnProperty(windowName)) {
+                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_098_PurchaseRequisition/GetWindow_ID", windowName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) {
+                    windowIdByName[windowName] = -1;
+                    console.log("resolveWindowIdByName: no window named " + windowName);
+                    return 0;
+                }
+                windowIdByName[windowName] = id;
+                return id;
+            } catch (e) {
+                windowIdByName[windowName] = -1;
+                console.log(e);
+                return 0;
+            }
+        }
+
+        // Table name -> AD_Window_ID, cached like windowIdByName above.
+        var windowIdByTable = {};
+
+        // Last resort: ask the SERVER which window the table opens in
+        // (AD_Table.AD_Window_ID, else the first window with a tab on it).
+        //
+        // The VA075 work order and field service request chips need this. That
+        // module is not part of this solution, so its screens cannot be named in
+        // WINDOW_NAME_BY_TABLE, and the browser-side zoom lookup only knows tables
+        // the client has cached — so both chips fell through to the "cannot open"
+        // toast on every click. Any future chip gets the same safety net. Ported
+        // from VAS_102.
+        function resolveWindowIdByTable(tableName) {
+            if (!tableName) return 0;
+            if (windowIdByTable.hasOwnProperty(tableName)) {
+                return windowIdByTable[tableName] > 0 ? windowIdByTable[tableName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_098_PurchaseRequisition/GetWindowIdByTable", tableName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) {
+                    windowIdByTable[tableName] = -1;
+                    console.log("resolveWindowIdByTable: no window for table " + tableName);
+                    return 0;
+                }
+                windowIdByTable[tableName] = id;
+                return id;
+            } catch (e) {
+                windowIdByTable[tableName] = -1;
+                console.log(e);
+                return 0;
+            }
+        }
+
+        // Opens the record's window filtered to that row, in three steps: the
+        // window named for this table when it has one, else the table's default
+        // zoom target, else the window the DICTIONARY says the table opens in.
+        // Either way the window is started with an equal-query on the table's key
+        // column. Degrades to a toast so a click never throws.
+        function openRecord(tableName, recordId, isSOTrx) {
+            if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
+            try {
+                // A sales-transaction record takes its own window name where the
+                // table has one; everything else takes the plain mapping.
+                var windowName = (isSOTrx && WINDOW_NAME_BY_TABLE_SOTRX[tableName])
+                    ? WINDOW_NAME_BY_TABLE_SOTRX[tableName]
+                    : WINDOW_NAME_BY_TABLE[tableName];
+                var windowId = resolveWindowIdByName(windowName);
+
+                if (windowId <= 0 &&
+                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
+                    // The 4th arg (IsSOTrx) picks the sales vs purchase window for
+                    // a dual-purpose table like C_Order.
+                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, !!isSOTrx) || 0;
+                }
+                if (windowId <= 0) windowId = resolveWindowIdByTable(tableName);
+                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === "function") {
+                    var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
+                    VIS.viewManager.startWindow(windowId, zoomQuery);
+                    return;
+                }
+            } catch (e) { console.log(e); }
+            toast(msg("OpenRecord", "Open") + " " + tableName + " #" + recordId, false);
+        }
+
+        // ------------------------ Convert strip -------------------------- //
+        // The convert strip is gone: the "conversion available" note and the
+        // Purchase Order / RFQ / Material Transfer buttons with it, along with
+        // convertBtn() and runAction() which served only them.
+        //
+        // Every one of those actions belongs to the requisition window, where the
+        // process runs behind its own parameter screen and the document's full
+        // validation. Two of the three could never succeed from here at all (the
+        // RFQ process selects by organisation and needs commercial terms this
+        // panel has no business inventing; the material-transfer process ships
+        // with a module that is not installed), and the note that headed them
+        // only ever restated what the progress stepper already shows. VAS_099
+        // dropped its own action bar for the same reasons.
+        //
+        // The controller's ConvertToPurchaseOrder endpoint went with them.
+
 
         // Lightweight self-contained toast.
         function toast(message, isError) {
@@ -624,16 +1226,20 @@
             $s3.append(statSub(formatNumber(data.RequestedUnits) + " " + msg("UnitsRequested"), ""));
             $strip.append($s3);
 
-            // Source availability — on-hand stock at the source warehouse. Shows a
-            // real quantity (0 included) whenever a source warehouse is configured;
-            // only external procurement, which has no source warehouse, reads N/A.
+            // Stock availability — on-hand at the warehouse the goods are served
+            // from or received into, whichever applies (model side). Shows a real
+            // quantity (0 included) whenever a warehouse could be resolved; only a
+            // requisition naming neither reads N/A. The sub-line names the
+            // warehouse the figure was actually read at, so an externally procured
+            // requisition is not made to look like an internal one.
             var $s4 = statCard("vas_098-a-amber", msg("SourceAvailability"));
             if (data.HasSourceData) {
                 $s4.append($('<div class="vas_098-sval"></div>')
                     .text(formatNumber(data.SourceStockOnHand || 0)));
+                var stockWh = data.StockWarehouseName || data.SourceWarehouseName;
                 $s4.append(statSub(
                     msg("OnHandAtSource", "on hand") +
-                    (data.SourceWarehouseName ? " · " + data.SourceWarehouseName : "") +
+                    (stockWh ? " · " + stockWh : "") +
                     " · " + (data.FullyInStockLines || 0) + " / " + (data.LineCount || 0) + " " +
                     msg("LinesFullyInStock"), ""));
             } else {
@@ -691,28 +1297,51 @@
             // In fulfilment once a purchase order raised from this requisition has
             // been completed — not from a per-line ordered quantity.
             var fulfilment = data.HasOrdered;
-            // Closed when the requisition itself is closed, or when every purchase
-            // order raised from it has closed.
-            var closed     = data.IsClosed;
 
+            // Every stage below is dated by a stored TIMESTAMP — when the record
+            // was created, when the workflow completed it, when the order it
+            // became was raised — not by a document date field, so all of them
+            // read through formatStampDateShort and land on the viewer's own day.
+            //
+            // The last stage is Posted (M_Requisition.Posted), replacing Closed.
+            // Closing is a state most requisitions never reach — the stage sat
+            // pending for the life of the document — where posting is something
+            // every completed requisition does, and is the fact a reader is
+            // actually looking for at the end of the line.
             return [
-                { key: "vas_098-c1", label: msg("Drafted"),      done: true,       sub: formatDateShort(data.Created) },
-                { key: "vas_098-c2", label: msg("Submitted"),    done: submitted,  sub: formatDateShort(data.CompletedDate) },
-                { key: "vas_098-c3", label: msg("Completed"),    done: completed,  sub: formatDateShort(data.CompletedDate) },
-                { key: "vas_098-c4", label: msg("Converted"),    done: converted,  sub: formatDateShort(data.ConvertedDate) },
-                { key: "vas_098-c5", label: msg("InFulfilment"), done: fulfilment, sub: formatDateShort(data.FulfilmentDate) },
-                { key: "vas_098-c6", label: msg("Closed"),       done: closed,     sub: formatDateShort(data.ClosedDate) }
+                { key: "vas_098-c1", label: msg("Drafted"),      done: true,        sub: formatStampDateShort(data.Created) },
+                { key: "vas_098-c2", label: msg("Submitted"),    done: submitted,   sub: formatStampDateShort(data.CompletedDate) },
+                { key: "vas_098-c3", label: msg("Completed"),    done: completed,   sub: formatStampDateShort(data.CompletedDate) },
+                { key: "vas_098-c4", label: msg("Converted"),    done: converted,   sub: formatStampDateShort(data.ConvertedDate) },
+                { key: "vas_098-c5", label: msg("InFulfilment"), done: fulfilment,  sub: formatStampDateShort(data.FulfilmentDate) },
+                { key: "vas_098-c6", label: msg("Posted"),       done: !!data.Posted, sub: formatStampDateShort(data.PostedDate) }
             ];
         }
+
+        // How many of the stages above form the requisition's LIFECYCLE CHAIN —
+        // the run in which reaching one stage means every earlier one was reached
+        // too. The first five do: a converted requisition was completed, and a
+        // completed one was submitted.
+        //
+        // Posted (the sixth) does not belong to that chain. Posting follows
+        // COMPLETION, so it is routinely true while Converted and In Fulfilment
+        // are still ahead — and under the chain rule a posted requisition would
+        // light up every stage before it, reporting purchase orders that do not
+        // exist. It is therefore marked from its own flag alone, and never
+        // back-fills the stages before it. (Closed, which it replaced, was safely
+        // terminal and needed none of this.)
+        var LIFECYCLE_STAGES = 5;
 
         function renderProgress() {
             var stages = progressStages();
 
-            // Monotonic reach: a stage is "reached" if it or any later stage is done.
+            // Monotonic reach across the LIFECYCLE stages only: one of them is
+            // "reached" if it or any later stage in the chain is done. Posted is
+            // outside the chain (see LIFECYCLE_STAGES) and is not consulted here.
             var reached = [];
-            for (var i = 0; i < stages.length; i++) {
+            for (var i = 0; i < LIFECYCLE_STAGES; i++) {
                 var any = false;
-                for (var j = i; j < stages.length; j++) { if (stages[j].done) { any = true; break; } }
+                for (var j = i; j < LIFECYCLE_STAGES; j++) { if (stages[j].done) { any = true; break; } }
                 reached.push(any);
             }
             var current = 1;
@@ -721,15 +1350,23 @@
             var st = statusMeta();
             var $sh = $('<div class="vas_098-sechead"></div>');
             $sh.append($('<h2></h2>').text(msg("RequisitionProgress")));
+            // Counted over the lifecycle chain, which is what "stage n of m"
+            // describes — Posted is a milestone beside it, not the sixth step of it.
             $sh.append($('<span class="vas_098-secright"></span>').text(
-                msg("Stage") + " " + current + " " + msg("Of") + " " + stages.length + " · " + st.label));
+                msg("Stage") + " " + current + " " + msg("Of") + " " + LIFECYCLE_STAGES + " · " + st.label));
             $body.append($sh);
 
             var $stepper = $('<div class="vas_098-stepper"></div>');
             for (var s = 0; s < stages.length; s++) {
                 var stg = stages[s];
                 var stateCls, sub, showCheck;
-                if (s + 1 < current) { stateCls = "vas_098-done";    showCheck = true;  sub = stg.sub || ""; }
+                if (s >= LIFECYCLE_STAGES) {
+                    // Posted: done or not, on its own flag. It is never the
+                    // "active" stage — nobody is working towards it, the posting
+                    // engine either has run or has not.
+                    if (stg.done) { stateCls = "vas_098-done"; showCheck = true; sub = stg.sub || msg("Posted"); }
+                    else { stateCls = "vas_098-pending"; showCheck = false; sub = msg("NotPosted", "Not Posted"); }
+                } else if (s + 1 < current) { stateCls = "vas_098-done";    showCheck = true;  sub = stg.sub || ""; }
                 else if (s + 1 === current) { stateCls = "vas_098-active"; showCheck = false; sub = activeSub(stg, current); }
                 else { stateCls = "vas_098-pending"; showCheck = false; sub = msg("Pending"); }
                 $stepper.append(stepEntry(s + 1, stg, stateCls, showCheck, sub));
@@ -755,21 +1392,43 @@
 
         // -------------------- Lower region (stacked) --------------------- //
 
-        // Items, then Activity, then Notes — each a headed section stacked down the
-        // panel. These used to be three tabs; Activity and Notes now sit at the
-        // bottom where they are visible without a click.
+        // Items, then Notes, then Activity — each a headed section stacked down
+        // the panel. These used to be three tabs; all three now sit down the page
+        // where they are visible without a click.
+        //
+        // Activity comes last deliberately: it is the longest section (it pages,
+        // and grows for the life of the document) and the least often read, so
+        // anything below it would be pushed off the bottom of the panel. Notes is
+        // a short block and reads better directly under the lines it annotates.
         function renderLower() {
             var lines = (data.Lines) || [];
             var activity = (data.Activity) || [];
 
-            sectionHead(msg("Items"), lines.length + " " + msg("Lines"));
-            $body.append(renderItemsPanel(lines));
+            // Items only exists when the requisition has lines. An empty frame
+            // headed "Items — 0 lines" said nothing the reader could not see, and
+            // on a requisition still being keyed it was the first thing on the
+            // panel. The heading goes with the table it heads.
+            if (lines.length) {
+                sectionHead(msg("Items"), lines.length + " " + msg("Lines"));
+                $body.append(renderItemsPanel(lines));
+            }
+
+            // Documents sits directly under the items it was raised from, and
+            // draws nothing (its section header included) when the requisition has
+            // produced none yet — hence the null check rather than an empty frame.
+            var $docs = renderDocuments();
+            if ($docs) $body.append($docs);
+
+            // Notes only exists when the requisition carries a description of its
+            // own. Without one, no section: the heading goes with the card it heads.
+            var $notes = renderNotesPanel();
+            if ($notes) {
+                sectionHead(msg("Notes"), "");
+                $body.append($notes);
+            }
 
             sectionHead(msg("Activity"), activity.length + " " + msg("Updates", "updates"));
             $body.append(renderActivityPanel(activity));
-
-            sectionHead(msg("Notes"), "");
-            $body.append(renderNotesPanel());
         }
 
         // Section header: title on the left, optional summary on the right.
@@ -791,16 +1450,19 @@
             $head.append($('<span></span>').text(msg("Item")));
             $head.append($('<span></span>').text(msg("UOM", "UOM")));
             $head.append($('<span class="vas_098-ta-c"></span>').text(msg("Qty")));
-            $head.append($('<span class="vas_098-ta-r"></span>').text(msg("SourceStock")));
+            // "Received On Hand": what is actually held in the warehouse the goods
+            // come from or land in. It used to read "Source Stock", which only ever
+            // described the internal-fulfilment case — the column now covers the
+            // purchased one too, where the figure rises as receipts complete.
+            $head.append($('<span class="vas_098-ta-r"></span>')
+                .text(msg("ReceivedOnHand", "Received On Hand")));
             $head.append($('<span class="vas_098-ta-r"></span>').text(msg("UnitCost")));
             $head.append($('<span class="vas_098-ta-r"></span>').text(msg("EstTotal")));
             $items.append($head);
 
-            if (!lines.length) {
-                $items.append($('<div class="vas_098-itempty"></div>').text(msg("NoLineItems")));
-                $panel.append($items);
-                return $panel;
-            }
+            // renderLower only calls this with lines, so the "no line items"
+            // placeholder that used to stand here is gone with the empty section
+            // it filled.
 
             // Totals footer always covers the whole requisition, never the page.
             var $foot = itemsFooter();
@@ -876,17 +1538,19 @@
             var $item = $('<span></span>');
             var pname = ln.ProductName || msg("NA");
             $item.append($('<div class="vas_098-itname"></div>').text(pname).attr("title", pname));
+            // Attribute Set Instance (lot / serial / size ...) sits directly under
+            // the product name — the attribute qualifies WHICH stock was asked
+            // for, so it belongs with the name rather than below the search key.
+            // Only a real instance is shown; a blank or "--" placeholder is not.
+            var asi = (ln.AttributeSetInstance || "").trim();
+            if (asi && asi !== "--" && asi !== "-") {
+                $item.append($('<div class="vas_098-itattr"></div>').text(asi).attr("title", asi));
+            }
             // Product search key, shown without the former "SKU" prefix.
             if (ln.ProductValue) {
                 $item.append($('<div class="vas_098-itsku"></div>').text(ln.ProductValue));
             } else if (ln.Description) {
                 $item.append($('<div class="vas_098-itsku"></div>').text(ln.Description));
-            }
-            // Attribute Set Instance (lot / serial / size ...), only when the line
-            // carries a real instance — a blank or "--" placeholder is not shown.
-            var asi = (ln.AttributeSetInstance || "").trim();
-            if (asi && asi !== "--" && asi !== "-") {
-                $item.append($('<div class="vas_098-itattr"></div>').text(asi).attr("title", asi));
             }
             $r.append($item);
 
@@ -900,16 +1564,38 @@
 
             $r.append(sourceCell(ln));
 
-            $r.append($('<span class="vas_098-ta-r"></span>').text(money(ln.UnitPrice)));
+            // The unit price is per SELECTED unit (model side) and is shown to the
+            // currency's own precision rather than rounded to whole units: a rate
+            // of 0.75 an EA is a real price, and money() would have printed it as 1.
+            // The line amount keeps the whole-currency treatment the rest of the
+            // panel uses for totals.
+            var $price = $('<span class="vas_098-ta-r"></span>').text(moneyPrecise(ln.UnitPrice));
+            if (ln.UOMName) {
+                $price.attr("title", moneyPrecise(ln.UnitPrice) + " / " + ln.UOMName);
+            }
+            $r.append($price);
             $r.append($('<span class="vas_098-ta-r"></span>').text(money(ln.LineAmount)));
             return $r;
         }
 
-        // On-hand stock for this line's product at the source warehouse, against
-        // the requested quantity. N/A only when the requisition has no source
-        // warehouse at all — with one configured, no stock reads as 0, not N/A.
+        // On-hand stock for this line's product at the warehouse it is served from
+        // or received into, against the requested quantity. Both figures are in the
+        // line's selected UOM (model side), so they read against each other and
+        // against the Qty column beside them.
+        //
+        // The tooltip names the warehouse the figure was read at and, once a goods
+        // receipt has completed against the line, how much it brought in — the
+        // event that moved the on-hand in the first place.
+        //
+        // N/A only when no warehouse could be resolved at all; with one, no stock
+        // reads as 0, not N/A.
+        //
+        // A CHARGE line is left blank. A charge is not stocked, so it has no
+        // on-hand anywhere; "0" or "N/A" both read as a fact about the charge's
+        // availability, and neither is one.
         function sourceCell(ln) {
             var $c = $('<span class="vas_098-ta-r"></span>');
+            if (isChargeLine(ln)) return $c;
             if (!ln.HasSourceData) {
                 $c.append($('<span class="vas_098-na"></span>').text(msg("NA")));
                 return $c;
@@ -919,8 +1605,17 @@
             var pct = req > 0 ? Math.round((onHand / req) * 100) : (onHand > 0 ? 100 : 0);
             var cls = (req > 0 && onHand >= req) ? "vas_098-full" : "vas_098-short";
             var $src = $('<span class="vas_098-src"></span>').addClass(cls);
-            $src.attr("title", msg("OnHandAtSource", "on hand") +
-                (data.SourceWarehouseName ? " · " + data.SourceWarehouseName : ""));
+
+            var tip = [msg("OnHandAtSource", "on hand")];
+            var wh = data.StockWarehouseName || data.SourceWarehouseName;
+            if (wh) tip.push(wh);
+            var received = +ln.ReceivedQty || 0;
+            if (received > 0) {
+                tip.push(msg("ReceivedQty", "Received") + ": " +
+                    formatNumber(received, ln.UOMPrecision) +
+                    (ln.UOMName ? " " + ln.UOMName : ""));
+            }
+            $src.attr("title", tip.join(" · "));
             var $bar = $('<span class="vas_098-bar"><i></i></span>');
             $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
             $src.append($bar);
@@ -930,14 +1625,32 @@
             return $c;
         }
 
+        // A line raised against a charge rather than a product. The charge id is
+        // the authority — a charge line carries no M_Product_ID, and the model
+        // sends both — so a product line with an unresolved name is never mistaken
+        // for one.
+        function isChargeLine(ln) {
+            return (+ln.C_Charge_ID || 0) > 0 && (+ln.M_Product_ID || 0) <= 0;
+        }
+
         function itemsFooter() {
             var $f = $('<div class="vas_098-itfoot"></div>');
-            // Budget set for the requisition (VAS_AvailableBudget, written by the
-            // "Calculate Budget" process) sits where the subtotal used to, so the
-            // estimate can be read straight against it. N/A when no budget has been
-            // calculated for this requisition.
-            $f.append(footBit(msg("Budget", "Budget"),
-                (+data.AvailableBudget || 0) > 0 ? money(data.AvailableBudget) : msg("NA"), false));
+            // The budget set for the requisition sits where the subtotal used to,
+            // so the estimate can be read straight against it. Its source is the
+            // line-level VAS_AvailableBudget the "Calculate Budget" process stamps,
+            // falling back (model side) to the budget the requisition is drawn
+            // against — that process rarely runs, and the field used to read N/A
+            // on almost every record. The tooltip says which of the two the figure
+            // is, so a whole budget is never mistaken for a remaining balance.
+            var budget = +data.AvailableBudget || 0;
+            var $budget = footBit(msg("Budget", "Budget"),
+                budget > 0 ? money(budget) : msg("NA"), false);
+            if (budget > 0) {
+                $budget.attr("title", data.BudgetIsRequisitionLevel
+                    ? msg("BudgetForRequisition", "Budget set for this requisition")
+                    : msg("BudgetAvailableOnLines", "Budget available to the requisition's lines"));
+            }
+            $f.append($budget);
             $f.append(footBit(msg("EstimatedTotal"), money(data.EstimatedValue), true));
             return $f;
         }
@@ -960,7 +1673,9 @@
             // Downstream lifecycle documents.
             po:          { cls: "vas_098-po",  key: "ActPO",          fallback: "PO"  },
             grn:         { cls: "vas_098-grn", key: "ActGRN",         fallback: "GRN" },
-            grncomplete: { cls: "vas_098-grn", key: "ActGRNComplete", fallback: "GRN" }
+            grncomplete: { cls: "vas_098-grn", key: "ActGRNComplete", fallback: "GRN" },
+            // E-mails sent against the requisition (MailAttachment1).
+            email:       { cls: "vas_098-email", key: "ActEmail",     fallback: "Email" }
         };
 
         // Maximum activity rows shown per page; the feed paginates beyond this.
@@ -994,7 +1709,13 @@
                 var end = Math.min(activity.length, start + ACTIVITY_PER_PAGE);
 
                 $card.empty();
-                for (var i = start; i < end; i++) $card.append(activityRow(activity[i]));
+                for (var i = start; i < end; i++) {
+                    $card.append(activityRow(activity[i]));
+                    // An e-mail's body is heavy — it stays collapsed under its row
+                    // and opens only when the reader asks for it.
+                    var $mail = activityBody(activity[i]);
+                    if ($mail) $card.append($mail);
+                }
 
                 buildPager($pager, activityPage, pageCount, activity.length, start, end,
                     function (p) { activityPage = p; paintPage(); });
@@ -1013,21 +1734,132 @@
 
             var $main = $('<div class="vas_098-actmain"></div>');
             var $wrap = $('<div class="vas_098-atwrap"></div>');
-            $wrap.append($('<span class="vas_098-at"></span>').text(activityText(a)));
-            $wrap.append($('<span class="vas_098-attime"></span>').text(formatDateTime(a.Created)));
+            var text = activityText(a);
+            var $text = $('<span class="vas_098-at"></span>').text(text).attr("title", text);
+            // A comment's headline IS the comment, so it wraps instead of
+            // ellipsising after one line (stylesheet). Every other headline is a
+            // short labelled action and reads fine on one.
+            if (a.Type === "comment") $text.addClass("vas_098-multiline");
+            $wrap.append($text);
+
+            // "when · by whom", on EVERY row — the audit trail's whole point is
+            // who did what and when, so the three parts are always in the same
+            // three places: the badge says what kind of event it is, the headline
+            // says what happened, and this says when and by whom.
+            //
+            // It used to be built here for an e-mail only, while the milestone and
+            // document rows spliced the actor onto the end of their own sentence
+            // and a comment named nobody at all — so a chat entry showed its text
+            // and a timestamp with no author. The name is read from UserName,
+            // which every row now carries (model side).
+            var when = formatDateTime(a.Created);
+            if (a.UserName) {
+                when = when ? when + " · " + msg("By") + " " + a.UserName
+                            : msg("By") + " " + a.UserName;
+            }
+            $wrap.append($('<span class="vas_098-attime"></span>').text(when).attr("title", when));
             $main.append($wrap);
+
+            // An e-mail names its recipients under the subject: the To list, plus a
+            // count of the Cc / Bcc addresses so the reader can see at a glance
+            // that others were copied. Every address is listed in the body.
+            if (a.Type === "email") {
+                var to = recipientSummary(a);
+                if (to) {
+                    $main.append($('<div class="vas_098-actsub"></div>')
+                        .text(to).attr("title", allRecipients(a) || to));
+                }
+            }
             $row.append($main);
+
+            // Rows carrying a body are clickable; the caret shows the state.
+            if (hasActivityBody(a)) {
+                $row.addClass("vas_098-openable")
+                    .attr("title", msg("ShowMailBody", "Click to read the message"));
+                $row.on("click", function () {
+                    var $panel = $row.next(".vas_098-actbody");
+                    if (!$panel.length) return;
+                    var nowOpen = !$row.hasClass("vas_098-open");
+                    $row.toggleClass("vas_098-open", nowOpen)
+                        .attr("title", nowOpen ? msg("HideMailBody", "Click to hide the message")
+                                               : msg("ShowMailBody", "Click to read the message"));
+                    $panel.toggle(nowOpen);
+                });
+            }
+
             return $row;
         }
 
+        // Only an e-mail carries a body worth opening; a mail stored without one
+        // stays a plain, non-clickable row.
+        function hasActivityBody(a) {
+            return !!(a && a.Type === "email" && a.Body && String(a.Body).trim());
+        }
+
+        // The e-mail body, collapsed beneath its activity row. The full recipient
+        // set (From / To / Cc / Bcc) heads it, so every address the mail went to is
+        // on screen once the reader opens the message.
+        function activityBody(a) {
+            if (!hasActivityBody(a)) return null;
+
+            var $panel = $('<div class="vas_098-actbody" style="display:none;"></div>');
+            appendMailMeta($panel, "MailFrom", "From:", a.MailFrom);
+            appendMailMeta($panel, "MailTo",   "To:",   a.MailTo);
+            appendMailMeta($panel, "MailCc",   "Cc:",   a.MailCc);
+            appendMailMeta($panel, "MailBcc",  "Bcc:",  a.MailBcc);
+            $panel.append($('<p></p>').text(String(a.Body).trim()));
+            return $panel;
+        }
+
+        function appendMailMeta($panel, key, fallback, value) {
+            if (!value || !String(value).trim()) return;
+            $panel.append($('<div class="vas_098-actmeta"></div>')
+                .text(msg(key, fallback) + " " + String(value).trim()));
+        }
+
+        // Row sub-line: the To list, plus "+n more" covering the Cc / Bcc
+        // addresses. Counting by comma / semicolon is enough for a summary — the
+        // body lists the addresses verbatim.
+        function recipientSummary(a) {
+            var to = (a.MailTo || "").trim();
+            var extra = countAddresses(a.MailCc) + countAddresses(a.MailBcc);
+            if (!to && !extra) return "";
+            var s = msg("MailTo", "To:") + " " + (to || msg("NA"));
+            if (extra > 0) s += " +" + extra + " " + msg("MoreRecipients", "more");
+            return s;
+        }
+
+        // Every address on the mail, for the row's hover tooltip.
+        function allRecipients(a) {
+            var bits = [];
+            if (a.MailTo)  bits.push(msg("MailTo",  "To:")  + " " + a.MailTo);
+            if (a.MailCc)  bits.push(msg("MailCc",  "Cc:")  + " " + a.MailCc);
+            if (a.MailBcc) bits.push(msg("MailBcc", "Bcc:") + " " + a.MailBcc);
+            return bits.join("\n");
+        }
+
+        function countAddresses(value) {
+            if (!value || !String(value).trim()) return 0;
+            var parts = String(value).split(/[;,]/);
+            var n = 0;
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].trim()) n++;
+            }
+            return n;
+        }
+
+        // The row's headline: WHAT happened. Who did it and when is written once,
+        // by activityRow, in the row's own "when · by whom" slot — so none of the
+        // sentences below carry a trailing "by <user>" any more. They used to, and
+        // the actor then appeared in a different place on an e-mail row than on
+        // every other kind.
         function activityText(a) {
-            if (a.Type === "create")
-                return msg("RequisitionCreated") + (a.Text ? " " + msg("By") + " " + a.Text : "");
+            if (a.Type === "create") return msg("RequisitionCreated");
             if (a.Type === "status")
-                return msg("RequisitionMarked") + " " + statusMeta().label + (a.Text ? " " + msg("By") + " " + a.Text : "");
+                return msg("RequisitionMarked") + " " + statusMeta().label;
 
             // Downstream documents name themselves, so the row reads
-            // "PO Created — PO-000123 by <user>".
+            // "PO Created — PO-000123".
             if (a.Type === "po" || a.Type === "grn" || a.Type === "grncomplete") {
                 var label;
                 if (a.Type === "po") label = msg("POCreated", "PO Created");
@@ -1035,8 +1867,13 @@
                 else label = msg("GRNCompleted", "GRN Completed");
 
                 if (a.DocumentNo) label += " — " + a.DocumentNo;
-                if (a.Text) label += " " + msg("By") + " " + a.Text;
                 return label;
+            }
+
+            // An e-mail's headline is its subject; the recipient runs underneath it
+            // and the sender sits with the timestamp, as on every other row.
+            if (a.Type === "email") {
+                return (a.Text || "").trim() || msg("NoSubject", "(no subject)");
             }
 
             return a.Text || msg("ActComment");
@@ -1044,24 +1881,78 @@
 
         // ---- Notes ---- //
 
+        // Every description entered against the requisition: the one typed on the
+        // header (M_Requisition.Description) first, then the one typed on each
+        // line (M_RequisitionLine.Description).
+        //
+        // The line descriptions used to be reachable only by reading the Items
+        // table row by row — and they are not shown there at all, since the item
+        // cell carries the product name, its attribute set and its search key. A
+        // note written against a line is a note about the requisition, so it
+        // belongs here with the header's.
+        //
+        // Each line's note is labelled with the line no and the product it was
+        // written against, so a reader knows which row it annotates without
+        // counting back to the table.
+        //
+        // The section exists only when the REQUISITION ITSELF carries a
+        // description. With none, it is not drawn at all — heading included —
+        // rather than standing as an empty card saying so.
+        //
+        // The header's description is the whole gate, deliberately: a requisition
+        // with line notes but no description of its own shows no Notes section,
+        // and those line notes are not reachable from the panel. The alternative —
+        // opening the section for line notes alone — was considered and rejected;
+        // the header description is what decides whether this requisition has
+        // anything to say. Line notes remain a detail OF that section, not a
+        // reason to raise it.
         function renderNotesPanel() {
-            var $panel = $('<div class="vas_098-lowersec"></div>');
-            var $card = $('<div class="vas_098-panelcard vas_098-notescard"></div>');
+            if (!data.Description || !String(data.Description).trim()) return null;
 
             var $notes = $('<div class="vas_098-notesbody"></div>');
-            var text = data.Description;
-            if (text) {
-                var paras = String(text).split(/\r?\n+/);
-                for (var i = 0; i < paras.length; i++) {
-                    var t = paras[i].trim();
-                    if (t) $notes.append($('<p></p>').text(t));
-                }
-            }
-            if (!$notes.children().length) $notes.append($('<p class="vas_098-na"></p>').text(msg("NoNotes")));
-            $card.append($notes);
+            appendNoteText($notes, data.Description, null);
 
+            var lines = (data.Lines) || [];
+            for (var i = 0; i < lines.length; i++) {
+                appendNoteText($notes, lines[i].Description, lineNoteLabel(lines[i]));
+            }
+
+            var $panel = $('<div class="vas_098-lowersec"></div>');
+            var $card = $('<div class="vas_098-panelcard vas_098-notescard"></div>');
+            $card.append($notes);
             $panel.append($card);
             return $panel;
+        }
+
+        // "Line 10 — Steel Bolt M8", the caption above a line's own note. Falls
+        // back to the line no alone when the row names no product (a charge line
+        // with nothing keyed), and to nothing at all when it has no line no either.
+        function lineNoteLabel(ln) {
+            var bits = [];
+            if (+ln.Line > 0) bits.push(msg("Line", "Line") + " " + ln.Line);
+            var name = (ln.ProductName || "").trim();
+            if (name) bits.push(name);
+            return bits.length ? bits.join(" — ") : "";
+        }
+
+        // Appends one note: its optional caption, then a paragraph per line of the
+        // text (the header description is free text and often multi-line). A blank
+        // note contributes nothing, caption included.
+        function appendNoteText($notes, text, label) {
+            if (!text || !String(text).trim()) return;
+
+            var paras = String(text).split(/\r?\n+/);
+            var $written = [];
+            for (var i = 0; i < paras.length; i++) {
+                var t = paras[i].trim();
+                if (t) $written.push($('<p></p>').text(t));
+            }
+            if (!$written.length) return;
+
+            if (label) {
+                $notes.append($('<div class="vas_098-notelbl"></div>').text(label));
+            }
+            for (var j = 0; j < $written.length; j++) $notes.append($written[j]);
         }
 
         // ----------------------------------------------------------------- //
@@ -1080,7 +1971,16 @@
             rfq:       '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
             list:      '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
             clock:     '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>',
-            note:      '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>'
+            note:      '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>',
+            // Reference strip + Documents section.
+            doc:       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>',
+            folder:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2Z"/></svg>',
+            factory:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20V9l6 4V9l6 4V9l6 4v7Z"/><path d="M2 20h20"/><path d="M7 20v-4"/><path d="M12 20v-4"/><path d="M17 20v-4"/></svg>',
+            wrench:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1 5 5l-9.7 9.7a2.1 2.1 0 0 1-3-3l9.7-9.7Z"/><path d="M14.7 6.3 9 1"/></svg>',
+            clipboard: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>',
+            refresh:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>',
+            pencil:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+            arrowUpRight: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>'
         };
 
         function svgIcon(name) {
@@ -1101,6 +2001,14 @@
             return currencySymbol() + " " + v.toLocaleString(window.navigator.language);
         }
 
+        // The same, kept to the currency's own precision — for a per-unit rate,
+        // where rounding to whole currency units destroys the figure rather than
+        // tidying it (0.75 an EA would print as 1).
+        function moneyPrecise(value) {
+            var p = (+data.StdPrecision >= 0) ? +data.StdPrecision : 2;
+            return currencySymbol() + " " + formatNumber(value, p);
+        }
+
         function formatNumber(value, precision) {
             var p = (precision >= 0) ? precision : 0;
             return (+value || 0).toLocaleString(window.navigator.language, {
@@ -1112,33 +2020,48 @@
             return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
         }
 
-        // Parses a timestamp as it came off the server, as WALL-CLOCK time.
+        // Parses a .NET/Newtonsoft DB value into a Date.
         //
-        // Created / Updated are stored in server local time. Depending on how the
-        // DateTime is tagged on the way out, the JSON can carry a "Z" or an
-        // offset, and `new Date(...)` then converts it into the browser's timezone
-        // — so the panel showed a creation time hours away from the one the
-        // requisition window shows. Reading the date and time components straight
-        // out of the string and building a local Date keeps the two in agreement
-        // regardless of how the value was tagged.
-        function parseServerDate(value) {
+        // asUtc = true  → for genuine TIMESTAMPS (Created, activity, completion
+        //   moments). The DB stores these in UTC and the server emits no timezone
+        //   designator (e.g. "2026-08-05T10:00:00"), which the browser would
+        //   otherwise read as local — so the panel printed the stored UTC clock
+        //   and every creation time read hours out. Tagging it "Z" makes
+        //   toLocale* render it in the viewer's own system zone.
+        // asUtc = false → for DATE-ONLY fields (document / required dates). These
+        //   carry no meaningful time-of-day, so the wall-clock value is parsed as
+        //   it stands and never shifted — the calendar day shown always matches
+        //   the day stored, whatever the viewer's zone.
+        // Strings already carrying a "Z" or a ±hh:mm offset are left untouched.
+        //
+        // This replaces the earlier component-by-component "wall clock" parse,
+        // which treated every value as already-local and so displayed a UTC
+        // timestamp verbatim.
+        function parseDbDate(value, asUtc) {
             if (!value) return null;
             if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
-
-            var m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/
-                .exec(String(value));
-            if (m) {
-                return new Date(+m[1], +m[2] - 1, +m[3],
-                                +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+            var s = String(value);
+            var hasTz = /(z|[+-]\d{2}:?\d{2})$/i.test(s);
+            var isDateTime = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(s);
+            if (asUtc && isDateTime && !hasTz) {
+                s = s.replace(" ", "T") + "Z";
+            } else if (!asUtc && isDateTime) {
+                // Keep the calendar date: drop any zone marker and parse as local
+                // so no conversion can roll the day over.
+                s = s.replace(" ", "T").replace(/(z|[+-]\d{2}:?\d{2})$/i, "");
             }
-
-            // Anything else (e.g. an epoch value) falls back to native parsing.
-            var d = new Date(value);
+            var d = new Date(s);
             return isNaN(d.getTime()) ? null : d;
         }
 
+        // Kept for the day-count arithmetic, which compares two DATE-ONLY fields
+        // and must not have either shifted across a midnight.
+        function parseServerDate(value) {
+            return parseDbDate(value, false);
+        }
+
         function formatDate(value) {
-            var d = parseServerDate(value);
+            var d = parseDbDate(value, false);
             if (!d) return "";
             try {
                 return d.toLocaleDateString(window.navigator.language,
@@ -1147,7 +2070,20 @@
         }
 
         function formatDateShort(value) {
-            var d = parseServerDate(value);
+            var d = parseDbDate(value, false);
+            if (!d) return "";
+            try {
+                return d.toLocaleDateString(window.navigator.language, { month: "short", day: "numeric" });
+            } catch (e) { return ""; }
+        }
+
+        // The calendar day of a stored TIMESTAMP, in the viewer's own zone — for
+        // the progress stepper, whose stages are dated by when they happened
+        // rather than by a document field. Reading one with formatDateShort would
+        // print the UTC day, so a requisition raised late in the evening dated to
+        // the following morning.
+        function formatStampDateShort(value) {
+            var d = parseDbDate(value, true);
             if (!d) return "";
             try {
                 return d.toLocaleDateString(window.navigator.language, { month: "short", day: "numeric" });
@@ -1155,7 +2091,7 @@
         }
 
         function formatDateTime(value) {
-            var d = parseServerDate(value);
+            var d = parseDbDate(value, true);
             if (!d) return "";
             try {
                 var dp = d.toLocaleDateString(window.navigator.language, { month: "short", day: "numeric" });
@@ -1194,7 +2130,9 @@
         }
         this.record_ID = recordID;
         this.selectedRow = selectedRow;
-        this.fetchData(recordID);
+        // Held rather than fetched outright: the insert flag is not always up yet
+        // when we get here, so scheduleFetch asks once more before loading.
+        this.scheduleFetch(recordID);
     };
 
     /* Set width as per window width */
@@ -1204,6 +2142,11 @@
 
     /* Release variables from memory */
     VAS.VAS_098_PurchaseRequisition.prototype.dispose = function () {
+        // Kill any held fetch first — its timer would otherwise fire against a
+        // panel whose curTab has just been nulled out below.
+        if (typeof this.abortPendingFetch === "function") {
+            try { this.abortPendingFetch(); } catch (e) { }
+        }
         if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
             try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
         }

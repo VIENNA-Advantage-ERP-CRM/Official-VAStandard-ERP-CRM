@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VAS_184_HighValueUsageWidget
  * 2x2 List Widget for Inventory Use dashboard.
  * Displays top 10 products consumed ranked by current cost price descending.
@@ -7,24 +7,24 @@
  * Summary Message Table
  *  # | Current Text                           | Message Key
  * ---+----------------------------------------+-----------------------------------
- *  1 | High-Value Usage                       | VAS_HighValueUsage
- *  2 | No usage for                           | VAS_NoUsageForPeriod
- *  3 | Couldn't load                           | VAS_CouldntLoad
- *  4 | Close                                  | VAS_Close
- *  5 | Attribute                              | VAS_Attribute
- *  6 | UoM                                    | VAS_UoM
- *  7 | Current Cost Price                     | VAS_CurrentCostPrice
- *  8 | Total Issued                           | VAS_TotalIssued
- *  9 | Doc No.                                | VAS_DocNo
- * 10 | Date                                   | VAS_Date
- * 11 | WH + Loc                               | VAS_WarehouseLocator
- * 12 | Qty                                    | VAS_Qty
- * 13 | Value                                  | VAS_Value
- * 14 | Loading...                             | VAS_Loading
- * 15 | No issues found                        | VAS_NoIssuesFound
- * 16 | of                                     | VAS_Of
- * 17 | Page                                   | VAS_Page
- * 18 | lines                                  | VAS_Lines
+ *  1 | High-Value Usage                       | VAS_184_HighValueUsage
+ *  2 | No usage for                           | VAS_184_NoUsageForPeriod
+ *  3 | Couldn't load                           | VAS_184_CouldntLoad
+ *  4 | Close                                  | VAS_184_Close
+ *  5 | Attribute                              | VAS_184_Attribute
+ *  6 | UoM                                    | VAS_184_UoM
+ *  7 | Current Cost Price                     | VAS_184_CurrentCostPrice
+ *  8 | Total Issued                           | VAS_184_TotalIssued
+ *  9 | Doc No.                                | VAS_184_DocNo
+ * 10 | Date                                   | VAS_184_Date
+ * 11 | WH + Loc                               | VAS_184_WarehouseLocator
+ * 12 | Qty                                    | VAS_184_Qty
+ * 13 | Value                                  | VAS_184_Value
+ * 14 | Loading...                             | VAS_184_Loading
+ * 15 | No issues found                        | VAS_184_NoIssuesFound
+ * 16 | of                                     | VAS_184_Of
+ * 17 | Page                                   | VAS_184_Page
+ * 18 | lines                                  | VAS_184_Lines
  */
 ; VAS = window.VAS || {};
 
@@ -265,32 +265,32 @@
                 '<h3 class="vas-hvu-modal-title" title="' + escapeHtml(pname) + '">' + escapeHtml(pname) + '</h3>' +
                 '<span class="vas-hvu-cost-chip">' + escapeHtml(formatINR(cost)) + '</span>' +
                 '</div>' +
-                '<button type="button" class="vas-hvu-modal-close" aria-label="' + escapeHtml(label("VAS_Close", "Close")) + '">' +
+                '<button type="button" class="vas-hvu-modal-close" aria-label="' + escapeHtml(label("VAS_184_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
                 '</button>' +
                 '</div>' +
                 '<div class="vas-hvu-modal-body">' +
                 '<div class="vas-hvu-modal-grid">' +
-                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_Attribute", "Attribute")) + '</div><div class="vas-hvu-m-val" title="' + escapeHtml(attr) + '">' + escapeHtml(attr) + '</div></div>' +
-                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_UoM", "UoM")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(uom) + '</div></div>' +
-                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_CurrentCostPrice", "Current Cost Price")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatINR(cost)) + '</div></div>' +
-                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_TotalIssued", "Total Issued")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatQty(issuedQty) + ' ' + uom + ' · ' + formatINR(issuedValue)) + '</div></div>' +
+                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_Attribute", "Attribute")) + '</div><div class="vas-hvu-m-val" title="' + escapeHtml(attr) + '">' + escapeHtml(attr) + '</div></div>' +
+                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_UoM", "UoM")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(uom) + '</div></div>' +
+                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_CurrentCostPrice", "Current Cost Price")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatINR(cost)) + '</div></div>' +
+                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_184_TotalIssued", "Total Issued")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatQty(issuedQty) + ' ' + uom + ' · ' + formatINR(issuedValue)) + '</div></div>' +
                 '</div>' +
                 '<table class="vas-hvu-issues-table">' +
                 '<thead><tr>' +
-                '<th>' + escapeHtml(label("VAS_DocNo", "Doc No.")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Date", "Date")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_WarehouseLocator", "WH + Loc")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Qty", "Qty")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Value", "Value")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_184_DocNo", "Doc No.")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_184_Date", "Date")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_184_WarehouseLocator", "WH + Loc")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_184_Qty", "Qty")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_184_Value", "Value")) + '</th>' +
                 '</tr></thead>' +
-                '<tbody class="vas-hvu-m-tbody"><tr><td colspan="5" class="vas-hvu-m-msgcell">' + escapeHtml(label("VAS_Loading", "Loading...")) + '</td></tr></tbody>' +
+                '<tbody class="vas-hvu-m-tbody"><tr><td colspan="5" class="vas-hvu-m-msgcell">' + escapeHtml(label("VAS_184_Loading", "Loading...")) + '</td></tr></tbody>' +
                 '</table>' +
                 '<div class="vas-hvu-foot">' +
-                '<div class="vas-hvu-foot-helper vas-hvu-m-helper">' + escapeHtml('0 ' + label("VAS_Of", "of") + ' 0 ' + label("VAS_Lines", "lines")) + '</div>' +
+                '<div class="vas-hvu-foot-helper vas-hvu-m-helper">' + escapeHtml('0 ' + label("VAS_184_Of", "of") + ' 0 ' + label("VAS_184_Lines", "lines")) + '</div>' +
                 '<div class="vas-hvu-pager">' +
                 '<button type="button" class="vas-hvu-pager-btn vas-hvu-m-prev" disabled>&lsaquo;</button>' +
-                '<span class="vas-hvu-pager-txt vas-hvu-m-pager-txt">' + escapeHtml(label("VAS_Page", "Page") + ' 1 ' + label("VAS_Of", "of") + ' 1') + '</span>' +
+                '<span class="vas-hvu-pager-txt vas-hvu-m-pager-txt">' + escapeHtml(label("VAS_184_Page", "Page") + ' 1 ' + label("VAS_184_Of", "of") + ' 1') + '</span>' +
                 '<button type="button" class="vas-hvu-pager-btn vas-hvu-m-next" disabled>&rsaquo;</button>' +
                 '</div>' +
                 '</div>' +
@@ -313,9 +313,9 @@
                 var $mPrev = $modal.find('.vas-hvu-m-prev');
                 var $mNext = $modal.find('.vas-hvu-m-next');
 
-                var ofTxt = label("VAS_Of", "of");
-                var linesTxt = label("VAS_Lines", "lines");
-                var pageTxt = label("VAS_Page", "Page");
+                var ofTxt = label("VAS_184_Of", "of");
+                var linesTxt = label("VAS_184_Lines", "lines");
+                var pageTxt = label("VAS_184_Page", "Page");
 
                 /* The popup is exactly one page tall, so every page must render mPageSize rows.
                    Pages holding fewer records are padded with spacer rows to stop the modal from
@@ -332,7 +332,7 @@
 
                 if (issueHistory.length === 0) {
                     $tbody.html('<tr><td colspan="5" class="vas-hvu-m-msgcell">' +
-                        escapeHtml(label("VAS_NoIssuesFound", "No issues found")) + '</td></tr>' +
+                        escapeHtml(label("VAS_184_NoIssuesFound", "No issues found")) + '</td></tr>' +
                         fillerRows(mPageSize - 1));
                     $mHelper.text('0 ' + ofTxt + ' 0 ' + linesTxt);
                     $mPagerTxt.text(pageTxt + ' 1 ' + ofTxt + ' 1');
@@ -413,7 +413,7 @@
         }
 
         function createWidget() {
-            var title = label("VAS_HighValueUsage", "High-Value Usage");
+            var title = label("VAS_184_HighValueUsage", "High-Value Usage");
 
             $card = $(
                 '<div class="vas-hvu-card vas-widget-bg">' +

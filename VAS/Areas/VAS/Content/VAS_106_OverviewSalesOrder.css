@@ -28,6 +28,65 @@
  *                        base-theme rule meant the base design won and
  *                        repainted the panel; scoping them to the panel ends
  *                        that.
+ *   VAI163   2026-08-12  - The layout holds at 80% browser zoom, which reports
+ *                          ~1.25x more CSS pixels for the same physical width and
+ *                          so left the panel narrower than its own tracks needed.
+ *                          Every flexible track is minmax(0, Nfr) instead of a
+ *                          bare Nfr, which cannot shrink below its content — one
+ *                          long product name or address used to widen its track
+ *                          and push the row past the panel (-hdrCard, -snap,
+ *                          -formGrid and all four data tables). The data tables
+ *                          take their own horizontal scroll (overflow-x on
+ *                          .vas_106-table, was `hidden`) with a per-table row
+ *                          min-width, so a narrow panel scrolls to the last
+ *                          columns instead of clipping them away. The KPI strip
+ *                          goes two-up from 700px rather than 620px, matching
+ *                          VAS_099 / VAS_098.
+ *                        - Bill to / Ship to are one address per line
+ *                          (.vas_106-addrLabel / -addrVal).
+ *                        - The action bar is gone from the panel, so
+ *                          .vas_106-actionbar / -cvNote / -cvOk / -cvActions style
+ *                          nothing any more. They are left in place: .vas_106-btn
+ *                          and its -primary / -sm states are still worn by the
+ *                          contract form's Create button.
+ *   VAI163   2026-08-12  Added the Documents table (.vas_106-docTable / -docItem
+ *                        / -docTxt), which replaces the separate Deliveries and
+ *                        Invoices ones — .vas_106-dvTable and -invTable are left
+ *                        in place but style nothing now. Added the line's
+ *                        Attribute Set Instance sub-line (.vas_106-itAttr).
+ *   VAI163   2026-08-12  - Sections no longer collapse: .vas_106-dsecHead is a
+ *                        plain heading (no pointer, no hover state), and the
+ *                        chevron / collapsed rules (.vas_106-dsecChev,
+ *                        .vas_106-collapsed and the RTL chevron mirror) are gone
+ *                        with the control they served.
+ *                        - The contract switch is a read-only indicator, so it
+ *                        drops its pointer cursor.
+ *                        - Added .vas_106-linesTable.vas_106-no-contract: the
+ *                        six-track grid for an order with no service line, whose
+ *                        Contract column is not drawn.
+ *                        - Activity rows wrap between the headline and the
+ *                        "when · by whom" stamp (.vas_106-atWrap), which now
+ *                        carries the actor's name on every row; a comment's
+ *                        headline wraps to three lines
+ *                        (.vas_106-at.vas_106-multiline).
+ *   VAI163   2026-08-12  Delivery Readiness puts the unit in front of the product
+ *                        name on one line (.vas_106-uomTag + .vas_106-nameTxt,
+ *                        with .vas_106-rdTable .vas_106-itName turned into a flex
+ *                        row so the ellipsis moves onto the name).
+ *   VAI163   2026-08-12  - The PANEL never scrolls sideways: .vas_106-root gains
+ *                          width / max-width / overflow-x: hidden, .vas_106-body
+ *                          and its children min-width: 0, and a Created From chip
+ *                          truncates its value instead of dragging the strip. A
+ *                          single wide child used to pull the whole panel
+ *                          horizontally — what an 80% zoom exposes, the panel
+ *                          measuring ~1.25x more CSS pixels for the same physical
+ *                          width. A table that cannot fit still takes its own
+ *                          inner scroll. Matches VAS_098 / VAS_099.
+ *                        - Added the per-line change-history drawer
+ *                          (.vas_106-lineHist / -lhTable / -lhWhen / -lhBy) and
+ *                          its toggle (.vas_106-histBtn). The drawer sits on the
+ *                          lines table's own tracks and carries its min-width, so
+ *                          it travels with the table when that scrolls sideways.
  ***********************************************************/
 
 .vas_106-root {
@@ -51,7 +110,15 @@
 
     position: relative;
     height: 100%;
+    width: 100%;
+    max-width: 100%;
     overflow-y: auto;
+    /* The PANEL itself never scrolls sideways — a table that cannot fit takes its
+       own inner overflow-x instead. Without this a single wide child dragged the
+       whole panel horizontally, which is what a zoomed-out browser exposes: at 80%
+       the panel measures ~1.25x more CSS pixels for the same physical width, so
+       content that just fitted no longer does. Matches VAS_098 / VAS_099. */
+    overflow-x: hidden;
     color: var(--vaso-text);
     font-family: Roboto, "Segoe UI", Arial, sans-serif;
     container-type: inline-size;
@@ -67,7 +134,12 @@
     display: flex;
     flex-direction: column;
     gap: 0.875em;
+    /* A flex item defaults to min-width:auto and so refuses to shrink below its
+       content; every section below would otherwise widen the column instead of
+       fitting inside it. */
+    min-width: 0;
 }
+.vas_106-body > * { min-width: 0; max-width: 100%; }
 
 .vas_106-empty {
     padding: 40px 18px;
@@ -145,7 +217,10 @@
    so short fields sit in rows instead of stacking into a tall column that
    leaves the identity half empty. */
 .vas_106-hdrCard {
-    display: grid; grid-template-columns: 40% 1fr; gap: 0.875em 1.75em;
+    /* minmax(0, 1fr), not a bare 1fr: a bare fr track cannot shrink below its
+       content, so one long address or field value widened the column and pushed
+       the card past the panel instead of wrapping inside it. */
+    display: grid; grid-template-columns: 40% minmax(0, 1fr); gap: 0.875em 1.75em;
     border: 1px solid var(--vaso-card-bd); border-radius: var(--vaso-card-radius);
     background: #fff; padding: 0.875em 1em;
 }
@@ -172,6 +247,11 @@
     font-size: 0.75em; color: var(--vaso-sub); line-height: 1.45; margin-top: 0.25em;
 }
 .vas_106-custAddr .vas_106-ic { color: var(--vaso-muted); margin-top: 0.15em; }
+/* Bill to / Ship to, one per line. The label holds its own width so the two
+   addresses start at the same column; the address itself takes the rest of the
+   line and wraps within it, with the whole of it on the line's tooltip. */
+.vas_106-addrLabel { flex: none; font-weight: 700; color: var(--vaso-muted); }
+.vas_106-addrVal { min-width: 0; overflow-wrap: break-word; }
 .vas_106-custContact {
     display: flex; flex-wrap: wrap; gap: 0.375em 1.125em;
     font-size: 0.75em; color: var(--vaso-text); margin-top: 0.4375em;
@@ -202,8 +282,10 @@
 }
 .vas_106-gfChips { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5em; min-width: 0; }
 
+/* A chip caps at the strip's width and truncates its VALUE inside it, so one
+   long document number cannot drag the strip past the panel. */
 .vas_106-chip {
-    display: inline-flex; align-items: center; gap: 0.4375em;
+    display: inline-flex; align-items: center; gap: 0.4375em; max-width: 100%; min-width: 0;
     background: #fff; border: 1px solid var(--vaso-card-bd); border-radius: 9px;
     padding: 0.375em 0.625em; font-size: 0.75em; line-height: 1.3; white-space: nowrap;
 }
@@ -212,8 +294,11 @@
 .vas_106-chip .vas_106-ic { color: var(--vaso-muted); }
 .vas_106-chip.vas_106-ic-info    .vas_106-ic { color: var(--vaso-info-tx); }
 .vas_106-chip.vas_106-ic-success .vas_106-ic { color: var(--vaso-success-tx); }
-.vas_106-chipLabel { color: var(--vaso-muted); }
-.vas_106-chipVal   { color: var(--vaso-text); font-weight: 700; }
+.vas_106-chipLabel { color: var(--vaso-muted); flex: none; }
+.vas_106-chipVal   {
+    color: var(--vaso-text); font-weight: 700;
+    min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* ----------------------------------------------------------- */
 /*  Workflow action bar                                         */
@@ -244,7 +329,7 @@
 /* ----------------------------------------------------------- */
 /*  KPI strip                                                   */
 /* ----------------------------------------------------------- */
-.vas_106-snap { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75em; }
+.vas_106-snap { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75em; }
 .vas_106-metric {
     min-width: 0; border: 1px solid var(--vaso-card-bd);
     border-left: 3px solid var(--vaso-neutral-tx); border-radius: var(--vaso-card-radius);
@@ -275,8 +360,13 @@
 .vas_106-metric.vas_106-tone-invoiced  .vas_106-mBar i { background: #20A464; }
 .vas_106-metric.vas_106-tone-readiness .vas_106-mBar i { background: #8B7CFF; }
 
-@container (max-width: 620px) { .vas_106-snap { grid-template-columns: repeat(2, 1fr); } }
-@container (max-width: 340px) { .vas_106-snap { grid-template-columns: 1fr; } }
+/* The four-across row needs real room: each card carries an uppercase label, a
+   large figure and a caption. Two-up from 700px, matching VAS_099 / VAS_098 —
+   the old 620px threshold was one a zoomed-out browser slipped past, leaving a
+   crushed 4-up strip at the width where the sibling panels had already
+   reflowed. */
+@container (max-width: 700px) { .vas_106-snap { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 340px) { .vas_106-snap { grid-template-columns: minmax(0, 1fr); } }
 
 /* ----------------------------------------------------------- */
 /*  Section header (progress + generic)                         */
@@ -328,34 +418,119 @@
 /*  Collapsible detail section                                  */
 /* ----------------------------------------------------------- */
 .vas_106-dsec { display: block; }
+/* A section heading, not a control: the sections no longer collapse, so the
+   header is a plain div with no pointer cursor and no hover state. */
 .vas_106-dsecHead {
     display: flex; align-items: center; gap: 0.5625em; width: 100%;
     padding: 0.625em 0.125em; background: none; border: none;
-    border-bottom: 1px solid var(--vaso-card-bd); cursor: pointer; font-family: inherit; text-align: left;
+    border-bottom: 1px solid var(--vaso-card-bd); font-family: inherit; text-align: left;
 }
 .vas_106-tIc { display: flex; color: var(--vaso-primary); }
 .vas_106-dsecTitle { font-size: 0.9375em; font-weight: 700; color: #141414; letter-spacing: .15px; }
-.vas_106-dsecHead:hover .vas_106-dsecTitle { color: var(--vaso-action-dk); }
 .vas_106-badge {
     height: 1.25em; min-width: 1.75em; padding: 0 0.5em; border-radius: 999px;
     background: var(--vaso-primary); color: #fff; font-size: 0.75em; font-weight: 700;
     display: flex; align-items: center; justify-content: center;
 }
-.vas_106-dsecChev { margin-left: auto; display: flex; color: var(--vaso-primary); transition: transform .2s ease; }
-.vas_106-dsec.vas_106-collapsed .vas_106-dsecChev { transform: rotate(180deg); }
+/* The chevron and the collapsed state are gone: .vas_106-dsecChev is no longer
+   rendered and .vas_106-collapsed is never set, so a section is simply open. */
 .vas_106-dsecBody { padding-top: 0.75em; }
-.vas_106-dsec.vas_106-collapsed .vas_106-dsecBody { display: none; }
 
 /* ----------------------------------------------------------- */
 /*  Data tables                                                 */
 /* ----------------------------------------------------------- */
-.vas_106-table { border: 1px solid var(--vaso-card-bd); border-radius: var(--vaso-card-radius); background: #fff; overflow: hidden; }
+/* The table scrolls horizontally at ANY width rather than clipping (overflow was
+   `hidden`): the rows carry a min-width, so when the panel is narrower than the
+   columns need — which is exactly what a zoomed-out browser produces, handing the
+   panel an in-between width — the reader scrolls to the last columns instead of
+   losing them off the edge. Matches VAS_099 / VAS_098. */
+.vas_106-table {
+    border: 1px solid var(--vaso-card-bd); border-radius: var(--vaso-card-radius);
+    background: #fff; overflow-x: auto; overflow-y: hidden;
+}
 .vas_106-tRow { display: grid; align-items: center; gap: 0.625em; padding: 0.625em 0.875em; }
+/* Grid items default to min-width:auto, which blocks the ellipsis on the cells
+   below from ever kicking in. */
+.vas_106-tRow > * { min-width: 0; }
 
-.vas_106-linesTable .vas_106-tRow { grid-template-columns: 2.2fr 0.5fr 0.9fr 0.5fr 0.9fr 1fr 1.4fr; }
-.vas_106-rdTable    .vas_106-tRow { grid-template-columns: 2fr 1.3fr 1.1fr 0.9fr 1.6fr; }
-.vas_106-dvTable    .vas_106-tRow { grid-template-columns: 1.4fr 1fr 1.4fr 0.7fr 1fr; }
-.vas_106-invTable   .vas_106-tRow { grid-template-columns: 1.6fr 1.1fr 1.1fr 1fr; }
+/* Every track is minmax(0, Nfr). A bare Nfr track cannot shrink below its
+   content, so one long product name or amount pushed the row wider than the
+   table and the right-hand columns were clipped away entirely — the layout fault
+   that showed up at 80% browser zoom, where the panel measures ~1.25x more CSS
+   pixels for the same physical width and the content no longer fits the tracks. */
+.vas_106-linesTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
+                           minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.4fr);
+    min-width: 620px;
+}
+/* No service line on the order, so no Contract column — six tracks, and the row
+   needs proportionally less room before it has to scroll. */
+.vas_106-linesTable.vas_106-no-contract .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
+                           minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr);
+    min-width: 520px;
+}
+.vas_106-rdTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 1.1fr)
+                           minmax(0, 0.9fr) minmax(0, 1.6fr);
+    min-width: 480px;
+}
+.vas_106-dvTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.4fr)
+                           minmax(0, 0.7fr) minmax(0, 1fr);
+    min-width: 460px;
+}
+.vas_106-invTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1fr);
+    min-width: 400px;
+}
+/* Line change history, in a drawer under the line it belongs to.
+
+   Its table sits on the SAME six tracks as the lines table (minus the Contract
+   column, which a past version has nothing to say about), so every figure lands
+   under the column it belongs to on the line above. It carries the lines table's
+   min-width too, so when that table is scrolled sideways the drawer travels with
+   it rather than stopping at the edge of the visible box. */
+.vas_106-lineHist { padding: 0 0 0.625em 1.25em; background: var(--vaso-faint-blue); min-width: 620px; }
+.vas_106-linesTable.vas_106-no-contract .vas_106-lineHist { min-width: 520px; }
+.vas_106-lhTable { margin-top: 0.5em; }
+.vas_106-lhTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
+                           minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr);
+    min-width: 0;
+}
+/* When the change was made, with that version's own note under it. */
+.vas_106-lhWhen { min-width: 0; display: flex; flex-direction: column; }
+.vas_106-lhWhen small {
+    color: var(--vaso-muted); font-size: 0.85em; margin-top: 0.125em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vas_106-lhBy { color: var(--vaso-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The per-line history toggle, at the end of the product name. Icon-only: the
+   tooltip carries the meaning and the change count. */
+.vas_106-histBtn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.5em; height: 1.5em; margin-left: 0.375em; vertical-align: -0.25em;
+    padding: 0; border: none; border-radius: 5px;
+    background: none; color: var(--vaso-muted); cursor: pointer; font-family: inherit;
+    transition: transform .12s ease, color .12s ease;
+}
+.vas_106-histBtn:hover { background: var(--vaso-faint-blue); color: var(--vaso-primary); }
+.vas_106-histBtn.vas_106-is-open { color: var(--vaso-primary); }
+
+/* Documents: Document | Date | Status | Amount — the Purchase Order overview's
+   four columns, one table for shipments, invoices and receipts alike. */
+.vas_106-docTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    min-width: 440px;
+}
+/* Document identity cell: kind icon + doc no / caption + open affordance. */
+.vas_106-docItem { display: flex; align-items: center; gap: 0.5em; min-width: 0; }
+.vas_106-docTxt { min-width: 0; flex: 1; }
+.vas_106-docItem > .vas_106-ic:last-child { color: var(--vaso-muted); flex: none; }
+.vas_106-tBody.vas_106-is-link:hover .vas_106-docItem > .vas_106-ic:last-child,
+.vas_106-tBody.vas_106-is-link:hover .vas_106-itName { color: var(--vaso-primary); }
 
 .vas_106-tHead {
     background: var(--vaso-faint-blue); border-bottom: 1px solid var(--vaso-card-bd);
@@ -371,6 +546,23 @@
 .vas_106-itItem { min-width: 0; }
 .vas_106-itName { font-size: 1.0769em; font-weight: 700; color: var(--vaso-text); line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vas_106-itSku  { font-size: 0.9231em; color: var(--vaso-muted); margin-top: 0.125em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Attribute Set Instance (lot / serial / size ...), directly under the product
+   name — the attribute qualifies WHICH stock was sold. Darker than the unit
+   line below it: it identifies the goods, where that only labels the count. */
+.vas_106-itAttr { font-size: 0.9231em; color: var(--vaso-sub); margin-top: 0.125em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Delivery Readiness: the unit LEADS the product name on one line. The tag holds
+   its width and the name gives way, so the ellipsis moves off .vas_106-itName —
+   which is a flex row here — and onto the name text inside it. Scoped to this
+   table; the Order Lines rows keep the unit on their sub-line. */
+.vas_106-rdTable .vas_106-itName { display: flex; align-items: baseline; gap: 0.4375em; }
+.vas_106-rdTable .vas_106-nameTxt {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vas_106-uomTag {
+    flex: none; font-size: 0.8em; font-weight: 700; letter-spacing: .3px;
+    text-transform: uppercase; color: var(--vaso-muted);
+}
 .vas_106-naDash { color: var(--vaso-muted); }
 
 /* Delivered progress cell */
@@ -398,9 +590,11 @@
 /*  Line-level contract toggle + link                           */
 /* ----------------------------------------------------------- */
 .vas_106-lineContract { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.5em; flex-wrap: wrap; }
+/* Read-only state indicator, not a control — no pointer cursor, and every switch
+   the panel renders carries .vas_106-locked. */
 .vas_106-switch {
     width: 34px; height: 18px; border-radius: 999px; background: #CBD5DF; position: relative;
-    cursor: pointer; flex: none; transition: background .15s;
+    flex: none; transition: background .15s;
 }
 .vas_106-switch::after {
     content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
@@ -427,9 +621,9 @@
 .vas_106-contractForm { display: none; background: var(--vaso-faint-blue); border-bottom: 1px solid var(--vaso-row-div); padding: 0.875em 1.125em 1.125em; }
 .vas_106-contractForm.vas_106-open { display: block; }
 .vas_106-cfCap { display: flex; align-items: center; gap: 0.4375em; font-size: 0.6875em; letter-spacing: .4px; text-transform: uppercase; color: #106AB0; margin-bottom: 0.875em; }
-.vas_106-formGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1em 1.375em; }
-@container (max-width: 620px) { .vas_106-formGrid { grid-template-columns: repeat(2, 1fr); } }
-@container (max-width: 340px) { .vas_106-formGrid { grid-template-columns: 1fr; } }
+.vas_106-formGrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1em 1.375em; }
+@container (max-width: 700px) { .vas_106-formGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 340px) { .vas_106-formGrid { grid-template-columns: minmax(0, 1fr); } }
 
 .vas_106-ff { display: flex; align-items: flex-start; gap: 0.6875em; padding-bottom: 0.5em; border-bottom: 1px solid #D7D7D7; }
 .vas_106-ff:hover { border-bottom-color: var(--vaso-primary); }
@@ -484,9 +678,25 @@ select.vas_106-ffInput { appearance: none; -webkit-appearance: none; cursor: poi
 .vas_106-actBadge.vas_106-tone-purple  { background: var(--vaso-purple-bg); color: var(--vaso-purple-tx); }
 .vas_106-actBadge.vas_106-tone-neutral { background: #EEF3F8; color: var(--vaso-neutral-tx); }
 .vas_106-actMain { flex: 1; min-width: 0; }
-.vas_106-atWrap { display: flex; justify-content: space-between; gap: 0.75em; align-items: baseline; }
-.vas_106-at { font-size: 0.8125em; color: var(--vaso-text); }
-.vas_106-actTime { font-size: 0.6875em; color: var(--vaso-muted); white-space: nowrap; flex: none; }
+/* Headline left, "when · by whom" right — wrapping when the two cannot share a
+   line. The stamp carries the actor's name on every row, so it is long enough to
+   have squeezed the headline out otherwise. */
+.vas_106-atWrap {
+    display: flex; justify-content: space-between; flex-wrap: wrap;
+    gap: 0.125em 0.75em; align-items: baseline;
+}
+.vas_106-at { font-size: 0.8125em; color: var(--vaso-text); min-width: 0; }
+/* A COMMENT's headline is the comment itself: it wraps (to three lines) rather
+   than running off the row, since that text is what the reader came for. */
+.vas_106-at.vas_106-multiline {
+    overflow-wrap: break-word; word-break: break-word; line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+/* margin-left:auto keeps it right-aligned when it wraps onto a line of its own. */
+.vas_106-actTime {
+    font-size: 0.6875em; color: var(--vaso-muted); white-space: nowrap;
+    flex: none; margin-left: auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* Activity pager — a sibling of the list card, so the controls keep their place
    while the card's rows are replaced underneath them. Modelled on the VAS_099
@@ -555,5 +765,4 @@ select.vas_106-ffInput { appearance: none; -webkit-appearance: none; cursor: poi
 [dir="rtl"] .vas_106-table .vas_106-ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .vas_106-prog { justify-content: flex-start; }
 [dir="rtl"] .vas_106-tFoot { justify-content: flex-start; }
-[dir="rtl"] .vas_106-dsecChev { margin-left: 0; margin-right: auto; }
 [dir="rtl"] .vas_106-hdrColL { border-right: none; border-left: 1px solid var(--vaso-row-div); padding-right: 0; padding-left: 1.25em; }

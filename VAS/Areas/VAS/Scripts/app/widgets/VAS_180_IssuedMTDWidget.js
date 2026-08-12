@@ -6,10 +6,10 @@
  * Summary Message Table
  *  # | Current Text                    | Message Key
  * ---+---------------------------------+-----------------------------------
- *  1 | Issued MTD                      | VAS_IssuedMTD
- *  2 | Issue lines this month          | VAS_IssueLinesThisMonth
- *  3 | No issue lines MTD              | VAS_NoIssueLinesMTD
- *  4 | Couldn't load                   | VAS_CouldntLoad
+ *  1 | Issued MTD                      | VAS_180_IssuedMTD
+ *  2 | Issue lines this month          | VAS_180_IssueLinesThisMonth
+ *  3 | No issue lines MTD              | VAS_180_NoIssueLinesMTD
+ *  4 | Couldn't load                   | VAS_180_CouldntLoad
  */
 ; VAS = window.VAS || {};
 
@@ -122,8 +122,8 @@
             }
             if ($metaEl) {
                 $metaEl.text(lastCount === 0
-                    ? label("VAS_NoIssueLinesMTD", "No issue lines MTD")
-                    : label("VAS_IssueLinesThisMonth", "Issue lines this month"));
+                    ? label("VAS_180_NoIssueLinesMTD", "No issue lines MTD")
+                    : label("VAS_180_IssueLinesThisMonth", "Issue lines this month"));
             }
             if ($card) { $card.prop('disabled', false); }
         }
@@ -134,12 +134,15 @@
                 $valueEl.text('—');
                 $valueEl.removeAttr('title');
             }
-            if ($metaEl) { $metaEl.text(label("VAS_CouldntLoad", "Couldn't load")); }
+            if ($metaEl) { $metaEl.text(label("VAS_180_CouldntLoad", "Couldn't load")); }
             if ($card) { $card.prop('disabled', true); }
         }
 
         function openIssuedMTDList() {
-            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL') AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
+            // Keep in lock-step with GetIssuedMTDCountData in the controller. This drills through
+            // at DOCUMENT level, so it can carry the IsInternalUse filter but not the line-level
+            // QtyInternalUse one - it lands on the issue documents behind the counted lines.
+            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL') AND COALESCE(M_Inventory.IsInternalUse, 'N') = 'Y' AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
             var windowParam = {
                 "TabWhereClause": where,
                 "TabLayout": "N",
@@ -149,7 +152,7 @@
         }
 
         function createWidget() {
-            var title = label("VAS_IssuedMTD", "Issued MTD");
+            var title = label("VAS_180_IssuedMTD", "Issued MTD");
             $card = $(
                 '<button type="button" class="vas-imtd-card vas-widget-bg" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-imtd-label">' + escapeHtml(title) + '</div>' +
