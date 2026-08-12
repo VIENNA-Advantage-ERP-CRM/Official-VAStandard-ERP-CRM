@@ -114,6 +114,34 @@
  *                        pills gave way to a tick / cross (.vas_099-qMark). The
  *                        eight-column .vas_099-qpTable and the .vas_099-qpEmpty
  *                        placeholder went with the section they styled.
+ *   VAI163   2026-08-11  The Locator segment (.vas_099-itLoc) drops cursor: help.
+ *                        It swapped the pointer for the question-mark cursor,
+ *                        which read as a stray "?" beside the text; the title
+ *                        tooltip carrying the full locator name is the whole
+ *                        affordance and is unchanged.
+ *                        The action-bar and Generate Invoice dialog rules
+ *                        (.vas_099-actions / -btn / -btn-pri / -btn-sec /
+ *                        -is-disabled / -is-blocked / -is-busy and the dialog's
+ *                        own) are no longer used by the panel — the buttons they
+ *                        styled are gone. They are left in place rather than
+ *                        deleted, since the toast and busy states share some of
+ *                        the same tokens.
+ *   VAI163   2026-08-12  - The quality drawer's To Verify column states its own
+ *                          alignment (.vas_099-qpMini .vas_099-qpMiniRow >
+ *                          span.vas_099-ta-r), as justify-self: end as well as
+ *                          text-align: right. It had been relying on the
+ *                          table-wide .vas_099-table .vas_099-ta-r rule reaching
+ *                          into the drawer; placing the grid item at the end of
+ *                          its track holds the quantity right whatever else wins
+ *                          text-align. Status takes the matching centred rule,
+ *                          and both are mirrored for RTL.
+ *                        - The activity recipient line (.vas_099-actSub) wraps
+ *                          instead of ellipsising, and breaks inside a word, so
+ *                          the mail's addresses are readable in full on the row.
+ *                          Only the headline (.vas_099-actLead) still clips to
+ *                          one line; the two used to share the rule. The opened
+ *                          message's From / To / Cc / Bcc lines
+ *                          (.vas_099-actMeta) break on the address too.
  ***********************************************************/
 
 .vas_099-root {
@@ -740,9 +768,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-/* Locator segment — the full locator name is on its title attribute, so signal
-   that hovering reveals something. */
-.vas_099-itLoc { cursor: help; }
+/* Locator segment — the full locator name is on its title attribute and the
+   browser's own tooltip shows it on hover. No cursor override: `cursor: help`
+   swapped the pointer for the question-mark cursor, which read as a stray "?"
+   glyph appearing beside the text. The tooltip is the whole affordance. */
 /* Attribute Set Instance (size / lot / serial ...) — it follows the product name
    on the same line, in the muted weight, so it reads as part of what the product
    is rather than as a second fact about the row. The name line clips as a whole. */
@@ -893,6 +922,28 @@
 }
 .vas_099-qpMiniRow:last-child { border-bottom: none; }
 .vas_099-qpMiniRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* To Verify is a quantity, so it is held to the right edge of its track in the
+   head and the body alike, and reads against the line's own Received / Ordered
+   figures directly above it.
+
+   Given its own rule rather than left to the table-wide `.vas_099-table
+   .vas_099-ta-r`, and stated as justify-self as well as text-align: the drawer
+   is a grid inside the material table, and a grid item placed at the end of its
+   track sits right whatever a competing rule does to text-align. max-width
+   keeps the shrink-to-fit box inside the track so a long figure still clips
+   with the ellipsis its cell already carries. */
+.vas_099-qpMini .vas_099-qpMiniRow > span.vas_099-ta-r {
+    justify-self: end;
+    max-width: 100%;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.vas_099-qpMini .vas_099-qpMiniRow > span.vas_099-ta-c {
+    justify-self: center;
+    max-width: 100%;
+    text-align: center;
+}
 
 .vas_099-qpMiniHead {
     background: #F5F8FB;
@@ -1087,19 +1138,29 @@
 }
 
 /* The headline (event sentence / note text / e-mail subject) and, for an
-   e-mail, the recipient beneath it. Each line clips on its own so the row
-   height stays predictable. */
+   e-mail, the recipients beneath it. The headline clips to one line so the row
+   height stays predictable — it has a tooltip carrying the whole of it. */
 .vas_099-actLead,
 .vas_099-actSub {
     display: block;
+}
+.vas_099-actLead {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* The recipient line WRAPS instead of clipping: it lists the mail's addresses
+   in full, and an address cut off mid-domain identifies nobody. break-word
+   rather than a plain wrap, since a single long address has no space in it to
+   break at. */
 .vas_099-actSub {
     font-size: 0.8462em; /* ~0.6875em against the body anchor */
     color: var(--grn-muted);
     margin-top: 0.125em;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
 }
 
 .vas_099-actWhen {
@@ -1137,10 +1198,14 @@
     line-height: 1.55;
 }
 .vas_099-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+/* From / To / Cc / Bcc heading the opened message. Wraps on the address, for
+   the same reason the row's recipient line does. */
 .vas_099-actMeta {
     font-size: 0.8462em;
     color: var(--grn-muted);
     margin-bottom: 0.3125em;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 /* The narrow-panel container query the grid layout needed is gone with it: the
@@ -1363,6 +1428,10 @@
 /* ----------------------------------------------------------- */
 [dir="rtl"] .vas_099-hdrColL { border-right: none; border-left: 1px solid var(--grn-row-div); padding-right: 0; padding-left: 1.25em; }
 [dir="rtl"] .vas_099-table .vas_099-ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_099-qpMini .vas_099-qpMiniRow > span.vas_099-ta-r {
+    justify-self: start;
+    text-align: left;
+}
 [dir="rtl"] .vas_099-recv { align-items: flex-start; }
 [dir="rtl"] .vas_099-actRow { text-align: right; }
 [dir="rtl"] .vas_099-actWhen { text-align: left; }

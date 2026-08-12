@@ -4,6 +4,15 @@
  * chronological  : Development
  * Created Date   : 4 May 2026
  * Created by     : VAI154
+ * Chronological development:
+ *   VAI163   2026-08-11  Recent Activity paginates at 15 rows a page
+ *                        (ACTIVITY_PER_PAGE), matching every other tab panel's
+ *                        activity feed. A voucher accumulates an event for each
+ *                        approval, release and reversal, and the card used to
+ *                        render all of them. The header count still reports the
+ *                        whole feed, and a feed that fits on one page shows no
+ *                        controls. The pager's own labels carry English
+ *                        fallbacks (pagerMsg) since their AD_Message keys are new.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -23,6 +32,11 @@
         var $emptyState;
         var $errorState;
         var data = null;
+
+        // Recent Activity pages client-side (the whole feed arrives in one
+        // payload); the page resets whenever a different voucher is loaded.
+        var ACTIVITY_PER_PAGE = 15;
+        var activityPage = 0;
 
         var STAGE_LABELS = [
             { code: "Drafted",   msgKey: "VAS_PVStageDrafted" },
@@ -85,6 +99,7 @@
                 success: function (raw) {
                     var parsed = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     data = parsed;
+                    activityPage = 0;
                     render();
                     showBusy(false);
                 },
@@ -99,6 +114,7 @@
 
         this.clear = function () {
             data = null;
+            activityPage = 0;
             render();
         };
 
@@ -705,10 +721,82 @@
                 return $card;
             }
 
-            for (var i = 0; i < events.length; i++) {
-                $card.append(buildActivityRow(events[i]));
+            // The feed pages at ACTIVITY_PER_PAGE rows. A voucher accumulates an
+            // event for every approval, release and reversal, and an unpaged card
+            // grew without limit. The header count above still reports the WHOLE
+            // feed, not the page.
+            var $rows  = $('<div class="vas-pvp-actRows"></div>');
+            var $pager = $('<div class="vas-pvp-actPager"></div>');
+            $card.append($rows);
+            if (events.length > ACTIVITY_PER_PAGE) $card.append($pager);
+
+            function paintPage() {
+                var pageCount = Math.max(1, Math.ceil(events.length / ACTIVITY_PER_PAGE));
+                if (activityPage >= pageCount) activityPage = pageCount - 1;
+                if (activityPage < 0) activityPage = 0;
+
+                var start = activityPage * ACTIVITY_PER_PAGE;
+                var end = Math.min(events.length, start + ACTIVITY_PER_PAGE);
+
+                $rows.empty();
+                for (var i = start; i < end; i++) {
+                    $rows.append(buildActivityRow(events[i]));
+                }
+                buildActivityPager($pager, activityPage, pageCount, events.length,
+                    start, end, function (p) { activityPage = p; paintPage(); });
             }
+
+            paintPage();
             return $card;
+        }
+
+        // Range caption on the left, Previous / page-of / Next on the right.
+        // Rebuilt on every page change so the disabled states stay accurate, and
+        // nothing at all is drawn for a single-page feed.
+        function buildActivityPager($pager, page, pageCount, total, start, end, onGo) {
+            $pager.empty();
+            if (pageCount <= 1) return;
+
+            $pager.append($('<span class="vas-pvp-actPgRange"></span>').text(
+                pagerMsg("VAS_PVShowing", "Showing") + " " + (start + 1) + "-" + end + " " +
+                pagerMsg("VAS_PVOf", "of") + " " + total));
+
+            var $ctrls = $('<span class="vas-pvp-actPgCtrls"></span>');
+            $ctrls.append(activityPagerButton(pagerMsg("VAS_PVPrevious", "Previous"),
+                page <= 0, function () { onGo(page - 1); }));
+            $ctrls.append($('<span class="vas-pvp-actPgPos"></span>').text(
+                pagerMsg("VAS_PVPage", "Page") + " " + (page + 1) + " " +
+                pagerMsg("VAS_PVOf", "of") + " " + pageCount));
+            $ctrls.append(activityPagerButton(pagerMsg("VAS_PVNext", "Next"),
+                page >= pageCount - 1, function () { onGo(page + 1); }));
+            $pager.append($ctrls);
+        }
+
+        // The pager's own labels are new AD_Message keys. Until they are seeded
+        // VIS.Msg.getMsg answers with the key itself (or the key in brackets,
+        // depending on the platform build) — both of which would put raw
+        // "VAS_PV..." text in front of the reader, so an English fallback stands
+        // in. Every other label on this panel predates it and is already seeded.
+        function pagerMsg(key, fallback) {
+            try {
+                var m = VIS.Msg.getMsg(key);
+                if (m) {
+                    var bare = (m.charAt(0) === "[" && m.charAt(m.length - 1) === "]")
+                        ? m.substring(1, m.length - 1) : m;
+                    if (bare.toUpperCase() !== String(key).toUpperCase()) return m;
+                }
+            } catch (e) { }
+            return fallback;
+        }
+
+        function activityPagerButton(label, disabled, handler) {
+            var $b = $('<span class="vas-pvp-actPgBtn"></span>').text(label);
+            if (disabled) {
+                $b.addClass("is-disabled");
+            } else {
+                $b.on("click", handler);
+            }
+            return $b;
         }
 
         function buildActivityRow(ev) {

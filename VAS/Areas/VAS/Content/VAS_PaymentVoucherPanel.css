@@ -805,6 +805,50 @@
     align-items: center;
 }
 
+/* ---------- Recent Activity pager ---------- */
+/* Drawn only when the feed runs past one page; the header count above always
+   reports the whole feed, not the page. */
+.vas-pvp-actPager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #E4EAF0;
+    font-size: 12px;
+    color: #748494;
+}
+
+.vas-pvp-actPgCtrls {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vas-pvp-actPgBtn {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #D9E2EB;
+    border-radius: 7px;
+    padding: 3px 9px;
+    background: #fff;
+    color: #2C3E50;
+    cursor: pointer;
+    user-select: none;
+}
+
+.vas-pvp-actPgBtn:hover { border-color: #B9C8D6; }
+
+.vas-pvp-actPgBtn.is-disabled {
+    opacity: .45;
+    cursor: default;
+    pointer-events: none;
+}
+
+.vas-pvp-actPgPos { white-space: nowrap; }
+
 .vas-pvp-actIconWell {
     width: 24px;
     height: 24px;

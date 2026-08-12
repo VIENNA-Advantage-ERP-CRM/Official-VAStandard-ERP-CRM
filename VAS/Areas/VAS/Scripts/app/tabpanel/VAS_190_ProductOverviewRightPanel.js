@@ -41,6 +41,16 @@
  *   VAI163   2026-08-10  Activity gained chat comments (CM_Chat / CM_ChatEntry)
  *                        as their own "chat" entry type. The comment itself is
  *                        the row's headline, with the whole text on the tooltip.
+ *   VAI163   2026-08-11  Stock details and Recent transactions name the unit
+ *                        beside the figure (qtyText, the helper the Stock
+ *                        summary already used) instead of printing a bare
+ *                        number. Both columns are the product's BASE uom —
+ *                        M_Storage.QtyOnHand and M_Transaction.MovementQty —
+ *                        and a quantity whose unit the reader has to infer from
+ *                        another section is a quantity they can misread.
+ *   VAI163   2026-08-11  Activity pages at 15 rows rather than 6, matching every
+ *                        other tab panel's feed; at 6 a product with any history
+ *                        was mostly pager clicks.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -109,7 +119,9 @@
         // touches another, and a product change resets every one of them.
         var pages = {};
         var ROWS_PER_PAGE = 10;
-        var ACTIVITY_PER_PAGE = 6;
+        // 15 rows a page, the same as every other overview panel's activity feed.
+        // It was 6, which made a product with any history nothing but pager clicks.
+        var ACTIVITY_PER_PAGE = 15;
 
         // ----------------------------------------------------------------- //
         //  Messages                                                          //
@@ -767,6 +779,10 @@
         function renderStockDetails() {
             var rows = data.StockDetails;
             var prec = +data.Product.UomPrecision || 0;
+            // M_Storage holds the on-hand in the product's BASE uom, so every
+            // figure in this grid is in that unit — it is named on each row
+            // rather than left to be inferred from the Stock summary above.
+            var uom = data.Product.BaseUomName || "";
             var $sec = section(msg("VAS_190_StockDetails", "Stock details"),
                                rows.length + " " + msg("VAS_190_Lines", "lines"));
 
@@ -795,7 +811,7 @@
                 $row.append(gridCell(r.WarehouseName || "—", null, true));
                 $row.append(gridCell(r.LocatorName || "—"));
                 $row.append(gridCell(r.Attributes || "—"));
-                $row.append(gridCell(formatNumber(+r.QtyOnHand || 0, prec), "r"));
+                $row.append(gridCell(qtyText(r.QtyOnHand, prec, uom), "r"));
                 return $row;
             });
 
@@ -1116,6 +1132,9 @@
         function renderTransactions() {
             var rows = data.Transactions;
             var prec = +data.Product.UomPrecision || 0;
+            // M_Transaction.MovementQty is in the product's BASE uom, as the
+            // stock figures above are, so the unit is named on the row.
+            var uom = data.Product.BaseUomName || "";
             var $sec = section(msg("VAS_190_RecentTransactions", "Recent transactions"),
                                msg("VAS_190_Showing", "showing") + " " + rows.length);
 
@@ -1168,7 +1187,7 @@
                 $row.append($doc);
 
                 $row.append(gridCell(formatDate(t.MovementDate) || "—"));
-                $row.append(gridCell(formatNumber(+t.MovementQty || 0, prec), "r"));
+                $row.append(gridCell(qtyText(t.MovementQty, prec, uom), "r"));
                 // A movement with no genuine price shows a dash. No cost is
                 // computed to fill the column.
                 $row.append(gridCell(
