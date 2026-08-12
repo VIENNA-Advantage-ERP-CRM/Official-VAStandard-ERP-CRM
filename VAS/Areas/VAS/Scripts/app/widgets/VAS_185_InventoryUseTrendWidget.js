@@ -7,10 +7,18 @@
  * Summary Message Table
  *  # | Current Text                           | Message Key
  * ---+----------------------------------------+-----------------------------------
- *  1 | Inventory Use Trend                    | VAS_InventoryUseTrend
- *  2 | Monthly quantity and value             | VAS_MonthlyQuantityAndValue
- *  3 | Click a month for details              | VAS_ClickMonthForDetails
- *  4 | Couldn't load                           | VAS_CouldntLoad
+ *  1 | Inventory Use Trend                    | VAS_185_InventoryUseTrend
+ *  2 | Monthly quantity and value             | VAS_185_MonthlyQuantityAndValue
+ *  3 | Click a month for details              | VAS_185_ClickMonthForDetails
+ *  4 | Couldn't load                           | VAS_185_CouldntLoad
+ *  5 | Quantity                               | VAS_185_Quantity
+ *  6 | Value                                  | VAS_185_Value
+ *  7 | Documents                              | VAS_185_Documents
+ *  8 | Qty                                    | VAS_185_Qty
+ *
+ * Month axis labels (Jan, Feb, ...) come from the CONTROLLER, not from here, and are NOT message
+ * keys - no VAS widget translates month names. See
+ * VAS_185_InventoryUseTrendWidgetController.MonthShortNames.
  */
 ; VAS = window.VAS || {};
 
@@ -200,7 +208,8 @@
                 rect.setAttribute('data-idx', j);
 
                 var titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-                titleEl.textContent = item.fullMonth + ': Qty ' + formatQty(item.qty) + ', Value ' + formatINR(item.val);
+                titleEl.textContent = item.fullMonth + ': ' + label("VAS_185_Qty", "Qty") + ' ' + formatQty(item.qty)
+                    + ', ' + label("VAS_185_Value", "Value") + ' ' + formatINR(item.val);
                 rect.appendChild(titleEl);
                 $svg.append(rect);
 
@@ -264,7 +273,7 @@
                 circle.setAttribute('data-idx', pt.idx);
 
                 var titlePt = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-                titlePt.textContent = pt.item.fullMonth + ': Value ' + formatINR(pt.item.val);
+                titlePt.textContent = pt.item.fullMonth + ': ' + label("VAS_185_Value", "Value") + ' ' + formatINR(pt.item.val);
                 circle.appendChild(titlePt);
                 $svg.append(circle);
             }
@@ -311,8 +320,8 @@
         }
 
         function createWidget() {
-            var title = label("VAS_InventoryUseTrend", "Inventory Use Trend");
-            var sub = label("VAS_MonthlyQuantityAndValue", "Monthly quantity and value");
+            var title = label("VAS_185_InventoryUseTrend", "Inventory Use Trend");
+            var sub = label("VAS_185_MonthlyQuantityAndValue", "Monthly quantity and value");
 
             $card = $(
                 '<div class="vas-iut-card vas-widget-bg">' +
@@ -333,17 +342,17 @@
                 '</div>' +
                 '</div>' +
                 '<div class="vas-iut-legend">' +
-                '<div class="vas-iut-leg-item"><span class="vas-iut-swatch-bar"></span><span>Quantity</span></div>' +
-                '<div class="vas-iut-leg-item"><span class="vas-iut-swatch-line"></span><span>Value</span></div>' +
-                '<div class="vas-iut-leg-hint">' + escapeHtml(label("VAS_ClickMonthForDetails", "Click a month for details")) + '</div>' +
+                '<div class="vas-iut-leg-item"><span class="vas-iut-swatch-bar"></span><span>' + escapeHtml(label("VAS_185_Quantity", "Quantity")) + '</span></div>' +
+                '<div class="vas-iut-leg-item"><span class="vas-iut-swatch-line"></span><span>' + escapeHtml(label("VAS_185_Value", "Value")) + '</span></div>' +
+                '<div class="vas-iut-leg-hint">' + escapeHtml(label("VAS_185_ClickMonthForDetails", "Click a month for details")) + '</div>' +
                 '</div>' +
                 '<div class="vas-iut-chart-wrap">' +
                 '<svg class="vas-iut-svg"></svg>' +
                 '<div class="vas-iut-popover vas-iut-hidden">' +
                 '<div class="vas-iut-pop-title"></div>' +
-                '<div class="vas-iut-pop-row"><span>Quantity:</span><span class="vas-iut-pop-qty"></span></div>' +
-                '<div class="vas-iut-pop-row"><span>Value:</span><span class="vas-iut-pop-val"></span></div>' +
-                '<div class="vas-iut-pop-row"><span>Documents:</span><span class="vas-iut-pop-docs"></span></div>' +
+                '<div class="vas-iut-pop-row"><span>' + escapeHtml(label("VAS_185_Quantity", "Quantity")) + ':</span><span class="vas-iut-pop-qty"></span></div>' +
+                '<div class="vas-iut-pop-row"><span>' + escapeHtml(label("VAS_185_Value", "Value")) + ':</span><span class="vas-iut-pop-val"></span></div>' +
+                '<div class="vas-iut-pop-row"><span>' + escapeHtml(label("VAS_185_Documents", "Documents")) + ':</span><span class="vas-iut-pop-docs"></span></div>' +
                 '</div>' +
                 '</div>' +
                 '</div>'

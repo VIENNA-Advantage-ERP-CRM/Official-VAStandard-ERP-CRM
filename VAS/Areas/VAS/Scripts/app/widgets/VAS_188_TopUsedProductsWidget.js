@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VAS_188_TopUsedProductsWidget
  * 4x2 Ranked List Widget for Inventory Use dashboard.
  * Displays top 10 products consumed ranked by quantity or value for selected period,
@@ -8,24 +8,24 @@
  * Summary Message Table
  *  # | Current Text                           | Message Key
  * ---+----------------------------------------+-----------------------------------
- *  1 | Top Used Products                      | VAS_TopUsedProducts
- *  2 | Most consumed items by volume         | VAS_MostConsumedItemsByVolume
- *  3 | Qty                                    | VAS_Qty
- *  4 | Value                                  | VAS_Value
- *  5 | Couldn't load                           | VAS_CouldntLoad
- *  6 | Close                                  | VAS_Close
- *  7 | Month                                  | VAS_Month
- *  8 | Consumed Qty                           | VAS_ConsumedQty
- *  9 | Consumed Value                         | VAS_ConsumedValue
- * 10 | Issue Lines                            | VAS_IssueLines
- * 11 | Doc No.                                | VAS_DocNo
- * 12 | Date                                   | VAS_Date
- * 13 | WH + Loc                               | VAS_WarehouseLocator
- * 14 | Loading...                             | VAS_Loading
- * 15 | No usage lines found.                  | VAS_NoUsageLinesFound
- * 16 | of                                     | VAS_Of
- * 17 | Page                                   | VAS_Page
- * 18 | lines                                  | VAS_Lines
+ *  1 | Top Used Products                      | VAS_188_TopUsedProducts
+ *  2 | Most consumed items by volume         | VAS_188_MostConsumedItemsByVolume
+ *  3 | Qty                                    | VAS_188_Qty
+ *  4 | Value                                  | VAS_188_Value
+ *  5 | Couldn't load                           | VAS_188_CouldntLoad
+ *  6 | Close                                  | VAS_188_Close
+ *  7 | Month                                  | VAS_188_Month
+ *  8 | Consumed Qty                           | VAS_188_ConsumedQty
+ *  9 | Consumed Value                         | VAS_188_ConsumedValue
+ * 10 | Issue Lines                            | VAS_188_IssueLines
+ * 11 | Doc No.                                | VAS_188_DocNo
+ * 12 | Date                                   | VAS_188_Date
+ * 13 | WH + Loc                               | VAS_188_WarehouseLocator
+ * 14 | Loading...                             | VAS_188_Loading
+ * 15 | No usage lines found.                  | VAS_188_NoUsageLinesFound
+ * 16 | of                                     | VAS_188_Of
+ * 17 | Page                                   | VAS_188_Page
+ * 18 | lines                                  | VAS_188_Lines
  */
 ; VAS = window.VAS || {};
 
@@ -241,32 +241,32 @@
                 '<h3 class="vas-tup-modal-title" title="' + escapeHtml(pname) + '">' + escapeHtml(pname) + '</h3>' +
                 '<span class="vas-tup-cat-badge">' + escapeHtml(categoryName) + '</span>' +
                 '</div>' +
-                '<button type="button" class="vas-tup-modal-close" aria-label="' + escapeHtml(label("VAS_Close", "Close")) + '">' +
+                '<button type="button" class="vas-tup-modal-close" aria-label="' + escapeHtml(label("VAS_188_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
                 '</button>' +
                 '</div>' +
                 '<div class="vas-tup-modal-body">' +
                 '<div class="vas-tup-summary-grid">' +
-                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_Month", "Month")) + '</div><div class="vas-tup-field-val">' + escapeHtml(monthFull) + '</div></div>' +
-                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_ConsumedQty", "Consumed Qty")) + '</div><div class="vas-tup-field-val">' + escapeHtml(formatQty(totalQty) + ' ' + uomName) + '</div></div>' +
-                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_ConsumedValue", "Consumed Value")) + '</div><div class="vas-tup-field-val">' + escapeHtml(formatINR(totalValue)) + '</div></div>' +
-                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_IssueLines", "Issue Lines")) + '</div><div class="vas-tup-field-val vas-tup-m-lines-cnt">—</div></div>' +
+                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_Month", "Month")) + '</div><div class="vas-tup-field-val">' + escapeHtml(monthFull) + '</div></div>' +
+                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedQty", "Consumed Qty")) + '</div><div class="vas-tup-field-val">' + escapeHtml(formatQty(totalQty) + ' ' + uomName) + '</div></div>' +
+                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedValue", "Consumed Value")) + '</div><div class="vas-tup-field-val">' + escapeHtml(formatINR(totalValue)) + '</div></div>' +
+                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_IssueLines", "Issue Lines")) + '</div><div class="vas-tup-field-val vas-tup-m-lines-cnt">—</div></div>' +
                 '</div>' +
                 '<table class="vas-tup-lines-table">' +
                 '<thead><tr>' +
-                '<th>' + escapeHtml(label("VAS_DocNo", "Doc No.")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Date", "Date")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_WarehouseLocator", "WH + Loc")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Qty", "Qty")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Value", "Value")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_188_DocNo", "Doc No.")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_188_Date", "Date")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_188_WarehouseLocator", "WH + Loc")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_188_Qty", "Qty")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_188_Value", "Value")) + '</th>' +
                 '</tr></thead>' +
-                '<tbody class="vas-tup-m-tbody"><tr><td colspan="5" class="vas-tup-m-msgcell">' + escapeHtml(label("VAS_Loading", "Loading...")) + '</td></tr></tbody>' +
+                '<tbody class="vas-tup-m-tbody"><tr><td colspan="5" class="vas-tup-m-msgcell">' + escapeHtml(label("VAS_188_Loading", "Loading...")) + '</td></tr></tbody>' +
                 '</table>' +
                 '<div class="vas-tup-modal-foot">' +
-                '<div class="vas-tup-m-helper">' + escapeHtml('0 ' + label("VAS_Of", "of") + ' 0 ' + label("VAS_Lines", "lines")) + '</div>' +
+                '<div class="vas-tup-m-helper">' + escapeHtml('0 ' + label("VAS_188_Of", "of") + ' 0 ' + label("VAS_188_Lines", "lines")) + '</div>' +
                 '<div class="vas-tup-modal-pager">' +
                 '<button type="button" class="vas-tup-modal-pager-btn vas-tup-m-prev" disabled>&lsaquo;</button>' +
-                '<span class="vas-tup-m-pager-txt">' + escapeHtml(label("VAS_Page", "Page") + ' 1 ' + label("VAS_Of", "of") + ' 1') + '</span>' +
+                '<span class="vas-tup-m-pager-txt">' + escapeHtml(label("VAS_188_Page", "Page") + ' 1 ' + label("VAS_188_Of", "of") + ' 1') + '</span>' +
                 '<button type="button" class="vas-tup-modal-pager-btn vas-tup-m-next" disabled>&rsaquo;</button>' +
                 '</div>' +
                 '</div>' +
@@ -289,9 +289,9 @@
                 var $mPrev = $modal.find('.vas-tup-m-prev');
                 var $mNext = $modal.find('.vas-tup-m-next');
 
-                var ofTxt = label("VAS_Of", "of");
-                var linesTxt = label("VAS_Lines", "lines");
-                var pageTxt = label("VAS_Page", "Page");
+                var ofTxt = label("VAS_188_Of", "of");
+                var linesTxt = label("VAS_188_Lines", "lines");
+                var pageTxt = label("VAS_188_Page", "Page");
 
                 /* The popup is exactly one page tall, so every page must render mPageSize rows.
                    Pages holding fewer records are padded with spacer rows to stop the modal from
@@ -308,7 +308,7 @@
 
                 if (usageLines.length === 0) {
                     $tbody.html('<tr><td colspan="5" class="vas-tup-m-msgcell">' +
-                        escapeHtml(label("VAS_NoUsageLinesFound", "No usage lines found.")) + '</td></tr>' +
+                        escapeHtml(label("VAS_188_NoUsageLinesFound", "No usage lines found.")) + '</td></tr>' +
                         fillerRows(mPageSize - 1));
                     $mHelper.text('0 ' + ofTxt + ' 0 ' + linesTxt);
                     $mPagerTxt.text(pageTxt + ' 1 ' + ofTxt + ' 1');
@@ -390,8 +390,8 @@
         }
 
         function createWidget() {
-            var title = label("VAS_TopUsedProducts", "Top Used Products");
-            var sub = label("VAS_MostConsumedItemsByVolume", "Most consumed items by volume");
+            var title = label("VAS_188_TopUsedProducts", "Top Used Products");
+            var sub = label("VAS_188_MostConsumedItemsByVolume", "Most consumed items by volume");
 
             $card = $(
                 '<div class="vas-tup-card vas-widget-bg">' +

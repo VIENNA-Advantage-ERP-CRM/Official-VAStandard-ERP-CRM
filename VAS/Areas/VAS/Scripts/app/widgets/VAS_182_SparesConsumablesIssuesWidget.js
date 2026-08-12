@@ -6,9 +6,9 @@
  * Summary Message Table
  *  # | Current Text                    | Message Key
  * ---+---------------------------------+-----------------------------------
- *  1 | Spares / Consumables            | VAS_SparesConsumables
- *  2 | Of issued value MTD             | VAS_OfIssuedValueMTD
- *  3 | Couldn't load                   | VAS_CouldntLoad
+ *  1 | Spares / Consumables            | VAS_182_SparesConsumables
+ *  2 | Of issued value MTD             | VAS_182_OfIssuedValueMTD
+ *  3 | Couldn't load                   | VAS_182_CouldntLoad
  */
 ; VAS = window.VAS || {};
 
@@ -114,7 +114,7 @@
                 $valueEl.attr('title', pct + '%');
             }
             if ($metaEl) {
-                $metaEl.text(label("VAS_OfIssuedValueMTD", "Of issued value MTD"));
+                $metaEl.text(label("VAS_182_OfIssuedValueMTD", "Of issued value MTD"));
             }
             if ($card) { $card.prop('disabled', false); }
         }
@@ -124,12 +124,21 @@
                 $valueEl.text('—');
                 $valueEl.removeAttr('title');
             }
-            if ($metaEl) { $metaEl.text(label("VAS_CouldntLoad", "Couldn't load")); }
+            if ($metaEl) { $metaEl.text(label("VAS_182_CouldntLoad", "Couldn't load")); }
             if ($card) { $card.prop('disabled', true); }
         }
 
         function openSparesConsumablesList() {
-            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL') AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
+            // Keep in lock-step with GetSparesConsumablesPercentageData in the controller, and the
+            // exact complement of the VAS_181 drill-through. The classification is line-level but
+            // this drills through at DOCUMENT level, so it is expressed as an EXISTS over the
+            // non-work-order issue lines.
+            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL')"
+                + " AND COALESCE(M_Inventory.IsInternalUse, 'N') = 'Y'"
+                + " AND EXISTS (SELECT 1 FROM M_InventoryLine il WHERE il.M_Inventory_ID = M_Inventory.M_Inventory_ID"
+                + " AND il.IsActive = 'Y' AND COALESCE(il.QtyInternalUse, 0) > 0"
+                + " AND COALESCE(il.VA075_WorkOrder_ID, 0) = 0 AND COALESCE(il.VAMFG_M_WorkOrder_ID, 0) = 0)"
+                + " AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
             var windowParam = {
                 "TabWhereClause": where,
                 "TabLayout": "N",
@@ -139,7 +148,7 @@
         }
 
         function createWidget() {
-            var title = label("VAS_SparesConsumables", "Spares / Consumables");
+            var title = label("VAS_182_SparesConsumables", "Spares / Consumables");
             $card = $(
                 '<button type="button" class="vas-sci-card vas-widget-bg" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-sci-label">' + escapeHtml(title) + '</div>' +

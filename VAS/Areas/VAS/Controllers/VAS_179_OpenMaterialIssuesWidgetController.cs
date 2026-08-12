@@ -50,11 +50,16 @@ namespace VIS.Controllers
         {
             if (ctx == null) { return 0; }
 
-            // Query M_Inventory (Physical Inventory / Internal Use / Material Issue) for open documents
+            // M_Inventory backs BOTH Physical Inventory and Internal Use (Material Issue)
+            // documents - IsInternalUse = 'Y' is what separates them. Without that filter this
+            // KPI counts physical inventory counts as material issues (29 instead of 15 on
+            // FSMTesting6). DocStatus: DR Drafted, IP In Progress, WC Waiting Confirmation,
+            // IN Invalid - i.e. raised but not yet fulfilled.
             string sql = $@"
                 SELECT COUNT(inv.M_Inventory_ID)
                 FROM M_Inventory inv
                 WHERE inv.IsActive = 'Y'
+                  AND inv.IsInternalUse = 'Y'
                   AND inv.DocStatus IN ('DR', 'IP', 'WC', 'IN')";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
