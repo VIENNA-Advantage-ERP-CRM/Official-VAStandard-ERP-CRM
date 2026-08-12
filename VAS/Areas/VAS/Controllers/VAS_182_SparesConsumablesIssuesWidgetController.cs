@@ -55,14 +55,30 @@ namespace VIS.Controllers
             string msl = ToSqlDate(monthStart);
             string nmsl = ToSqlDate(nextMonthStart);
 
+            // Spares / consumables share = value of issue lines NOT raised against a work order.
+            // Exact complement of VAS_181_ProductionIssuesWidget, so the two KPIs sum to 100%
+            // (as the source spec intends: 61% production + 39% spares).
+            //
+            // The previous classification (C_Charge_ID IS NULL AND M_RequisitionLine_ID IS NULL)
+            // could never be true: an internal-use line always carries a charge account, so on
+            // FSMTesting6 this KPI returned a hard 0% for every period.
+            //
+            // Cost fallback must end in 0: NVL(CurrentCostPrice, PriceCost) yields NULL when both
+            // are null, and SUM() silently drops those lines from the total.
             string sql = @"
-                SELECT 
-                  COALESCE(SUM(CASE WHEN line.C_CHARGE_ID IS NULL AND line.M_REQUISITIONLINE_ID IS NULL THEN (line.QtyInternalUse * NVL(line.CurrentCostPrice, line.PriceCost)) ELSE 0 END), 0) AS SparesValue,
-                  COALESCE(SUM(line.QtyInternalUse * NVL(line.CurrentCostPrice, line.PriceCost)), 0) AS TotalValue
+                SELECT
+                  COALESCE(SUM(CASE WHEN COALESCE(line.VA075_WorkOrder_ID, 0) = 0
+                                     AND COALESCE(line.VAMFG_M_WorkOrder_ID, 0) = 0
+                                    THEN (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0))
+                                    ELSE 0 END), 0) AS SparesValue,
+                  COALESCE(SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)), 0) AS TotalValue
                 FROM M_InventoryLine line
                 INNER JOIN M_Inventory inv ON inv.M_Inventory_ID = line.M_Inventory_ID
                 WHERE inv.IsActive = 'Y'
                   AND inv.DocStatus IN ('CO', 'CL')
+                  AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
+                  AND line.IsActive = 'Y'
+                  AND COALESCE(line.QtyInternalUse, 0) > 0
                   AND inv.MovementDate >= " + msl + @"
                   AND inv.MovementDate < " + nmsl;
 

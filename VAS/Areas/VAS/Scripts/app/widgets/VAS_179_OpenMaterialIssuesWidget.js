@@ -6,10 +6,10 @@
  * Summary Message Table
  *  # | Current Text                    | Message Key
  * ---+---------------------------------+-----------------------------------
- *  1 | Open Issues                     | VAS_OpenMaterialIssues
- *  2 | Awaiting fulfillment            | VAS_AwaitingFulfillment
- *  3 | No open issues                  | VAS_NoOpenMaterialIssues
- *  4 | Couldn't load                   | VAS_CouldntLoad
+ *  1 | Open Issues                     | VAS_179_OpenMaterialIssues
+ *  2 | Awaiting fulfillment            | VAS_179_AwaitingFulfillment
+ *  3 | No open issues                  | VAS_179_NoOpenMaterialIssues
+ *  4 | Couldn't load                   | VAS_179_CouldntLoad
  */
 ; VAS = window.VAS || {};
 
@@ -122,8 +122,8 @@
             }
             if ($metaEl) {
                 $metaEl.text(lastCount === 0
-                    ? label("VAS_NoOpenMaterialIssues", "No open issues")
-                    : label("VAS_AwaitingFulfillment", "Awaiting fulfillment"));
+                    ? label("VAS_179_NoOpenMaterialIssues", "No open issues")
+                    : label("VAS_179_AwaitingFulfillment", "Awaiting fulfillment"));
             }
             if ($card) { $card.prop('disabled', false); }
         }
@@ -134,12 +134,15 @@
                 $valueEl.text('—');
                 $valueEl.removeAttr('title');
             }
-            if ($metaEl) { $metaEl.text(label("VAS_CouldntLoad", "Couldn't load")); }
+            if ($metaEl) { $metaEl.text(label("VAS_179_CouldntLoad", "Couldn't load")); }
             if ($card) { $card.prop('disabled', true); }
         }
 
         function openMaterialIssuesList() {
-            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('DR', 'IP', 'WC', 'IN')";
+            // Must stay in lock-step with GetOpenMaterialIssuesCountData in the controller -
+            // including IsInternalUse, or the drilled-through list shows physical inventory
+            // documents the KPI never counted.
+            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.IsInternalUse = 'Y' AND M_Inventory.DocStatus IN ('DR', 'IP', 'WC', 'IN')";
             var windowParam = {
                 "TabWhereClause": where,
                 "TabLayout": "N",
@@ -149,7 +152,7 @@
         }
 
         function createWidget() {
-            var title = label("VAS_OpenMaterialIssues", "Open Issues");
+            var title = label("VAS_179_OpenMaterialIssues", "Open Issues");
             $card = $(
                 '<button type="button" class="vas-omi-card vas-widget-bg" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-omi-label">' + escapeHtml(title) + '</div>' +
