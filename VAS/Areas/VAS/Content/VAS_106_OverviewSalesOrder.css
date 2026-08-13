@@ -87,6 +87,14 @@
  *                          its toggle (.vas_106-histBtn). The drawer sits on the
  *                          lines table's own tracks and carries its min-width, so
  *                          it travels with the table when that scrolls sideways.
+ *   VAI163   2026-08-12  Activity rows can carry an e-mail: the recipient sits
+ *                        under the subject (.vas_106-actSub) and the message
+ *                        itself opens on click — the row turns into a control
+ *                        (.vas_106-actRow.vas_106-is-openable / -is-open) with a
+ *                        caret (.vas_106-actCaret) and a collapsed panel beneath
+ *                        it (.vas_106-actBody / -actMeta). The row divider is
+ *                        drawn between ADJACENT rows, so a row following an opened
+ *                        message is given the border that rule cannot reach.
  ***********************************************************/
 
 .vas_106-root {
@@ -697,6 +705,43 @@ select.vas_106-ffInput { appearance: none; -webkit-appearance: none; cursor: poi
     font-size: 0.6875em; color: var(--vaso-muted); white-space: nowrap;
     flex: none; margin-left: auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* An e-mail's recipient, under its subject. One line: the addresses in full are
+   in the message the row opens, and its tooltip carries them meanwhile. */
+.vas_106-actSub {
+    display: block; margin-top: 0.125em;
+    font-size: 0.6875em; color: var(--vaso-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* An activity carrying a message (an e-mail) opens on click. */
+.vas_106-actRow.vas_106-is-openable { cursor: pointer; }
+.vas_106-actRow.vas_106-is-openable:hover { background: var(--vaso-faint-blue); }
+.vas_106-actCaret {
+    flex: none; display: inline-flex; align-items: center;
+    color: var(--vaso-muted); margin-top: 0.15em;
+    transition: transform .15s ease;
+}
+.vas_106-actRow.vas_106-is-open .vas_106-actCaret { transform: rotate(90deg); }
+
+/* The message itself, tucked under its row. pre-wrap keeps the paragraphs the
+   server's flattening left behind; break-word keeps a long URL inside the panel,
+   which never scrolls sideways. */
+.vas_106-actBody {
+    background: #F7FAFD;
+    border-top: 1px solid var(--vaso-row-div);
+    padding: 0.625em 0.875em 0.75em 2.5em;
+    font-size: 0.75em; line-height: 1.55; color: var(--vaso-text);
+}
+.vas_106-actBody p { margin: 0; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; }
+.vas_106-actMeta { font-size: 0.85em; color: var(--vaso-muted); margin-bottom: 0.3125em; }
+/* The row divider is drawn between ADJACENT rows, so a row following an opened
+   message has to be given the one that rule cannot reach. */
+.vas_106-actBody + .vas_106-actRow { border-top: 1px solid var(--vaso-row-div); }
+
+[dir="rtl"] .vas_106-actBody { padding-left: 0.875em; padding-right: 2.5em; }
+[dir="rtl"] .vas_106-actCaret svg { transform: scaleX(-1); }
+[dir="rtl"] .vas_106-actRow.vas_106-is-open .vas_106-actCaret { transform: rotate(-90deg); }
 
 /* Activity pager — a sibling of the list card, so the controls keep their place
    while the card's rows are replaced underneath them. Modelled on the VAS_099

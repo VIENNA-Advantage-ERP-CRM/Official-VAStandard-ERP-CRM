@@ -49,6 +49,14 @@
  *                        openable row and its caret (.vas_101-actRow.-is-openable /
  *                        -is-open / -actCaret) and the message body that opens
  *                        under it (.vas_101-actBody / -actMeta).
+ *   VAI163   2026-08-12  The count-card row gains a fourth card carrying a MONEY
+ *                        figure (Variance Value), so a status value can now be an
+ *                        amount: .vas_101-statVal-amt takes a notch less size and
+ *                        clips to one line rather than wrapping inside its card.
+ *                        Activity gains field-change rows — the value move under
+ *                        the field's name (.vas_101-actDelta / -cvOld / -cvArrow /
+ *                        -cvNew), with the old value struck through and the new
+ *                        one carrying the weight.
  ***********************************************************/
 
 .vas_101-root {
@@ -369,6 +377,16 @@
     text-align: center;
 }
 .vas_101-statVal { font-size: 1.25em; font-weight: 700; line-height: 1.1; color: var(--ic-text); }
+/* A money figure carries a currency token and two decimals, so it is far longer
+   than a line count — at the count cards' size it would wrap inside its own
+   card. It takes a notch less and clips to one line, with the full figure on the
+   element's tooltip. */
+.vas_101-statVal.vas_101-statVal-amt {
+    font-size: 1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .vas_101-statLbl { font-size: 0.6875em; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--ic-muted); margin-top: 0.25em; }
 
 .vas_101-statCard.vas_101-tone-match  .vas_101-statVal { color: var(--ic-success-tx); }
@@ -697,6 +715,25 @@
 .vas_101-actSub {
     display: block; font-size: 0.8462em; color: var(--ic-muted); margin-top: 0.125em;
     white-space: normal; overflow-wrap: break-word; word-break: break-word; line-height: 1.45;
+}
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value. */
+.vas_101-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_101-cvOld {
+    color: var(--ic-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_101-cvArrow { flex: none; color: var(--ic-muted); }
+.vas_101-cvNew {
+    color: var(--ic-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
 }
 .vas_101-actRow.vas_101-is-openable { cursor: pointer; }
 .vas_101-actRow.vas_101-is-openable:hover { background: #F7FBFE; }

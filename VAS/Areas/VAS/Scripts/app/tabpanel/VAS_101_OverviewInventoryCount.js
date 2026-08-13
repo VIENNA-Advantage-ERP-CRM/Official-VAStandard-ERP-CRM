@@ -74,6 +74,28 @@
  *                        where every other entry carries them. The message body
  *                        opens on click, headed by the full From / To / Cc / Bcc
  *                        set. Follows VAS_099 / VAS_102.
+ *   VAI163   2026-08-12  - The header field reads "Document Number", not "Count
+ *                          No" — it is the document's number, and that is what
+ *                          every other screen calls it — and the header names the
+ *                          count's DOCUMENT TYPE beside it (model side), which it
+ *                          could not answer before.
+ *                        - The line table's "System Qty" column reads "On Hand
+ *                          Qty": the figure is the stock the system believes is on
+ *                          hand, and naming it for where it came from rather than
+ *                          for what it is left the reader guessing.
+ *                        - A fourth count card, "Variance Value", beside Excess:
+ *                          what the variance is WORTH (model side), signed and
+ *                          tinted by the same rule as the quantity — money the
+ *                          count could not find reads negative and red. Its rate
+ *                          is chosen per line by the direction the line varies in.
+ *                        - Activity reports WHICH FIELDS changed (type "changed"):
+ *                          one row per changed column, headlined by the field —
+ *                          prefixed with the line it happened on, since a count's
+ *                          real edits are its counted quantities — with "was X →
+ *                          now Y" beneath it (.vas_101-actDelta). It replaces the
+ *                          single "Inventory count updated" row, which came from
+ *                          M_Inventory.Updated and so could only ever report the
+ *                          LAST save, without saying what it touched.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -452,7 +474,14 @@
             $card.append($left);
 
             var $right = $('<div class="vas_101-hdrColR"></div>');
-            $right.append(headerField(VIS.Msg.getMsg("VAS_101_CountNo"), na(data.DocumentNo), false));
+            // "Document Number", not "Count No": it is the document's number, and
+            // that is what every other screen in the product calls it.
+            $right.append(headerField(msg("VAS_101_DocumentNumber", "Document Number"),
+                na(data.DocumentNo), false));
+            // The document type the count was raised on — which count this is, and
+            // the one field the header could not answer.
+            $right.append(headerField(msg("VAS_101_DocumentType", "Document Type"),
+                na(data.DocTypeName), false));
             // The Reference field is deliberately absent. It carried the count's
             // DESCRIPTION — free text, where the reader expects a document
             // identifier — and that description is now shown in full in the Notes
@@ -540,6 +569,20 @@
             $row.append(statusCard(VIS.Msg.getMsg("VAS_101_Matched"), data.MatchedCount || 0, "match"));
             $row.append(statusCard(VIS.Msg.getMsg("VAS_101_Short"),   data.ShortCount || 0,   "short"));
             $row.append(statusCard(VIS.Msg.getMsg("VAS_101_Excess"),  data.ExcessCount || 0,  "excess"));
+
+            // What the variance is WORTH, beside the three cards that count it.
+            // The rate is chosen per line by the DIRECTION it varies in (model
+            // side): a short line at CurrentCostPrice, what the stock on hand is
+            // carried at, and an over line at PriceCost — what the found stock
+            // comes in at — falling back to CurrentCostPrice when that is zero.
+            //
+            // Signed like the quantity it derives from, and tinted by the same
+            // rule: money the count could not find reads negative and red.
+            var vv = +data.VarianceValue || 0;
+            var vvTone = vv < 0 ? "short" : (vv > 0 ? "excess" : "match");
+            $row.append(statusCard(msg("VAS_101_VarianceValue", "Variance Value"),
+                signedAmount(vv, currencyToken(), data.StdPrecision), vvTone, true));
+
             // The line COUNT is not repeated here: the snapshot card above already
             // reports it, and it is not a count outcome like the three beside it —
             // Matched / Short / Excess are what a line can turn out to be, and the
@@ -547,11 +590,23 @@
             $body.append($row);
         }
 
-        function statusCard(label, value, tone) {
+        // `isAmount` shrinks the figure a notch: a money value with a currency
+        // token and two decimals is far longer than a line count, and at the count
+        // cards' size it would otherwise wrap inside its own card.
+        function statusCard(label, value, tone, isAmount) {
             var $c = $('<div class="vas_101-statCard"></div>').addClass("vas_101-tone-" + tone);
-            $c.append($('<div class="vas_101-statVal"></div>').text(value + ""));
+            var $v = $('<div class="vas_101-statVal"></div>').text(value + "");
+            if (isAmount) $v.addClass("vas_101-statVal-amt").attr("title", value + "");
+            $c.append($v);
             $c.append($('<div class="vas_101-statLbl"></div>').text(label));
             return $c;
+        }
+
+        // Signed money: "+₹ N" for a gain, "−₹ N" for a loss, plain for zero.
+        function signedAmount(value, cur, precision) {
+            var v = +value || 0;
+            if (v === 0) return formatAmount(0, cur, precision);
+            return (v > 0 ? "+" : "−") + formatAmount(Math.abs(v), cur, precision);
         }
 
         // ---------- Count timeline (3-node stepper) ---------- //
@@ -654,7 +709,10 @@
             var $head = $('<div class="vas_101-tRow vas_101-tHead"></div>');
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_101_Item")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_101_UOM")));
-            $head.append($('<span class="vas_101-ta-r"></span>').text(VIS.Msg.getMsg("VAS_101_SystemQty")));
+            // "On Hand Qty", not "System Qty": the figure is the stock the system
+            // believes is on hand (M_InventoryLine.QtyBook), and naming it for
+            // where it came from rather than what it is left the reader guessing.
+            $head.append($('<span class="vas_101-ta-r"></span>').text(msg("VAS_101_OnHandQty", "On Hand Qty")));
             $head.append($('<span class="vas_101-ta-r"></span>').text(VIS.Msg.getMsg("VAS_101_CountedQty")));
             $head.append($('<span class="vas_101-ta-r"></span>').text(VIS.Msg.getMsg("VAS_101_Variance")));
             $head.append($('<span class="vas_101-ta-r"></span>').text(VIS.Msg.getMsg("VAS_101_Value")));
@@ -854,6 +912,9 @@
         // Activity type -> tag label + tone + icon, and the sentence shown for it.
         var ACT_TYPES = {
             created:   { tone: "neutral", icon: "user",  tagKey: "VAS_101_TagCreated",   tagText: "Created",   titleKey: "VAS_101_ActCreated",   titleText: "Inventory count created" },
+            // One row per FIELD that changed, not one per save. "updated" is kept
+            // only so an older cached payload still renders.
+            changed:   { tone: "info",    icon: "pencil", tagKey: "VAS_101_TagChanged",  tagText: "Changed",   titleKey: null,                   titleText: "" },
             updated:   { tone: "info",    icon: "pencil", tagKey: "VAS_101_TagUpdated",  tagText: "Updated",   titleKey: "VAS_101_ActUpdated",   titleText: "Inventory count updated" },
             completed: { tone: "success", icon: "check", tagKey: "VAS_101_TagCompleted", tagText: "Completed", titleKey: "VAS_101_ActCompleted", titleText: "Inventory count completed" },
             posted:    { tone: "purple",  icon: "coins", tagKey: "VAS_101_TagPosted",    tagText: "Posted",    titleKey: "VAS_101_ActPosted",    titleText: "Posted to accounting" },
@@ -932,6 +993,13 @@
                 var to = recipientSummary(a);
                 if (to) $title.append($('<small class="vas_101-actSub"></small>').text(to));
             }
+
+            // A field change shows the move itself under the field's name: what the
+            // value was, and what it became. That is the whole point of a change
+            // row — "updated" without it is the thing this replaced.
+            if (a.Type === "changed") {
+                $title.append(changeDelta(a));
+            }
             $row.append($title);
 
             // "when · by whom" — the audit trail's whole point, in the same place on
@@ -967,7 +1035,28 @@
             if (a.Type === "email") {
                 return (a.Text || "").trim() || msg("VAS_101_NoSubject", "(no subject)");
             }
+            // A field change is headlined by the FIELD, prefixed with the line it
+            // happened on when it was a line that changed. The values go on the
+            // sub-line beneath (changeDelta).
+            if (a.Type === "changed") {
+                var name = a.FieldName || msg("VAS_101_Field", "Field");
+                return a.ChangeScope ? a.ChangeScope + " · " + name : name;
+            }
             return meta.titleKey ? msg(meta.titleKey, meta.titleText) : (meta.titleText || "");
+        }
+
+        // "was X → now Y" under the field's name. A value the log recorded as empty
+        // reads as an em dash rather than as a blank, so a cleared field is visibly
+        // cleared instead of looking like a rendering gap.
+        function changeDelta(a) {
+            var $d = $('<small class="vas_101-actSub vas_101-actDelta"></small>');
+            var blank = "—";
+
+            $d.append($('<span class="vas_101-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_101-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_101-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
         }
 
         // Only an e-mail carries a body worth opening; a mail stored without one
