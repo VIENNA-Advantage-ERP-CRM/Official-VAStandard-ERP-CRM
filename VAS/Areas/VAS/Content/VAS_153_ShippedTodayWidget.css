@@ -36,7 +36,7 @@
        its dependency on --dash-inline-size froze all text from growing past a
        point. max()+rem floor guards very narrow windows; no ceiling above it, so
        text keeps scaling at any resolution. Everything below is em off this. */
-    font-size: max(0.9rem, 1.3vw);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.014), 32px);
 }
 
 .MPC-sht-title {

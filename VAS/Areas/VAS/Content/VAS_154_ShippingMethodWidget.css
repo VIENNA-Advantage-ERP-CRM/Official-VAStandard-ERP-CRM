@@ -1,29 +1,11 @@
-/* Shipping Method Widget (VAS_154) - 3x2 read-only donut + legend + DO
-   drill-down modal.
-
-   ===== DYNAMIC SIZING MODEL (why this scales and earlier builds did not) =====
-   The ONE font anchor on the card is expressed in viewport width (vw), and every
-   internal dimension (font, padding, gap, icon, border, radius, shadow) is an em
-   derived from it - so the whole widget is scale-invariant and grows/shrinks with
-   the SCREEN at any resolution. This deliberately does NOT use the JS-written
-   custom property --dash-inline-size (it is measured from a dashboard container
-   whose width does not track the screen in this app, so it froze the old build)
-   nor container-query cqi units (they anchor to the widget's own wrapper, which
-   has the same problem). The reference-good KPI (Active Items) works precisely
-   because its anchor falls back to 100vw; this widget uses vw directly for the
-   same reason. The SVG donut's centre text is in the donut's own 0 0 120 120
-   viewBox space (scales with the rendered SVG). The modal is a fixed <body>
-   overlay and also anchors to the viewport. */
+/* Shipping Method Widget (VAS_154) - 3x2 read-only donut + legend + DO drill-down modal. */
 
 .vas-shm-root { width: 100%; height: 100%; position: relative; }
 .vas-shm-root, .vas-shm-root * { box-sizing: border-box; }
 
 .vas-shm-card {
     font-family: Roboto, Arial, sans-serif;
-    /* THE single dynamic anchor - viewport-based so it tracks the screen. ~1.3vw
-       reproduces the reference design size on a normal dashboard width; the rem
-       floor only guards very narrow windows. Every em below scales from this. */
-    font-size: max(0.9rem, 1.3vw);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.014), 24px);
     width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden;
     border: 0.1em solid #fff; border-radius: 0.72em; box-shadow: 0 0.5em 1.2em rgba(15, 61, 97, .06);
     backdrop-filter: blur(0.5em); padding: .875em;
@@ -45,35 +27,25 @@
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     background-image: none !important;
-    font-size: 0.75em;
-    font-family: 'Roboto', sans-serif;
+    font-family: inherit;
     font-weight: 500;
+    font-size: .75em;
     color: #102C3F;
-    background-color: #FFFFFF;
+    background: #FFFFFF;
     border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: 0.35em 0.75em;
-    min-width: 4.5em;
+    padding: .35em .75em;
+    cursor: pointer;
+    line-height: 1.2;
     text-align: center;
     text-align-last: center;
-    outline: none;
-    cursor: pointer;
-    box-sizing: border-box;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-.vas-shm-sel select:hover,
-.vas-shm-sel select:focus {
-    background-color: #EEF8FF;
-    border-color: #0083DA;
-}
-.vas-shm-chev { display: none !important; }
+.vas-shm-sel select.vas-shm-month-sel { min-width: 7.5em; }
+.vas-shm-sel select.vas-shm-year-sel { min-width: 5.2em; }
+.vas-shm-sel select:hover { background: #EEF8FF; border-color: #0083DA; }
+.vas-shm-sel select:focus { outline: 2px solid #0083DA; outline-offset: 1px; }
 
-/* ---- body: donut + legend side by side. No gap between them (per feedback -
-   the donut's own box already has breathing room via its own size below); the
-   legend stretches to the full body height so it grows with the card. The donut
-   is capped well under 100% height so, combined with its 1:1 aspect-ratio, it
-   never balloons wide enough to squeeze the legend's numbers/currency off the
-   edge - that was the direct cause of the amount column getting clipped. */
+/* ---- body: donut + legend side by side ---- */
 .vas-shm-body { flex: 1; min-height: 0; overflow: hidden; margin-top: .5em; display: flex; align-items: stretch; gap: 0; }
 .vas-shm-donut { flex: 0 0 auto; height: 65%; align-self: center; display: flex; align-items: center; justify-content: center; aspect-ratio: 1 / 1; }
 .vas-shm-svg { height: 100%; width: auto; }
@@ -82,19 +54,11 @@
 .vas-shm-seg { cursor: pointer; transition: opacity .12s; outline: none; }
 .vas-shm-seg:hover { opacity: .85; }
 .vas-shm-seg:focus-visible { opacity: .85; stroke-width: 16; }
-/* SVG centre text - values are in the donut's 0 0 120 120 viewBox space (SVG user
-   units, not layout px), so they scale with the rendered donut, not the page. */
 .vas-shm-ctr-num { font-size: 20px; font-weight: 700; fill: #102C3F; }
 .vas-shm-ctr-lab { font-size: 8px; font-weight: 500; fill: #748494; letter-spacing: .04em; }
 
-/* 3 equal dynamic tracks so every legend row fills its share of the body height
-   and grows with the widget (parent stretches; legend fills height:100%). */
 .vas-shm-legend { flex: 1; min-width: 0; height: 100%; display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); row-gap: .35em; }
 .vas-shm-lg {
-    /* Only the method name is allowed to shrink (down to a 2em floor, with its
-       own ellipsis below) - count/pct/amt are "auto" so the grid protects their
-       full min-content width first. That is what stops the currency amount from
-       ever getting squeezed/clipped when the row gets tight. */
     display: grid; grid-template-columns: .8em minmax(2em, 1fr) auto auto auto; column-gap: .35em; align-items: center;
     width: 100%; height: 100%; background: transparent; border: none; border-radius: 0.4em; padding: .35em .4em; cursor: pointer; text-align: left; font-family: inherit;
 }
@@ -118,11 +82,7 @@
 
 /* ===================== MODAL ===================== */
 .vas-shm-overlay {
-    /* Viewport-anchored (the overlay lives on <body>, outside the widget's query
-       container, so cqi is unavailable here). vw scales the whole pop-up with the
-       screen; rem bounds keep it readable on very narrow / very wide displays -
-       all dynamic units, no fixed px. Internals below are em off this anchor. */
-    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0117), 24px);
+    font-size: clamp(16px, 1.17vw, 24px);
     position: fixed; inset: 0; background: rgba(16, 44, 63, .35);
     display: flex; align-items: center; justify-content: center; z-index: 50; padding: 2em; font-family: Roboto, Arial, sans-serif;
 }
@@ -142,8 +102,6 @@
 .vas-shm-mloading { padding: 1.5em; text-align: center; color: #748494; }
 .vas-shm-empty { padding: 1.5em; text-align: center; color: #748494; font-size: .8em; }
 
-/* Fixed 5-row grid so the modal body is sized for 5 rows and never shrinks when
-   a page has fewer (the drill-down pages 5 orders at a time). */
 .vas-shm-dolist { display: grid; grid-template-rows: repeat(5, 2.4em); }
 .vas-shm-dolist .vas-shm-empty { grid-row: 1 / -1; display: flex; align-items: center; justify-content: center; }
 
@@ -158,10 +116,10 @@
 .vas-shm-doamount { font-weight: 700; font-size: .8em; color: #102C3F; text-align: right; white-space: nowrap; }
 
 .vas-shm-mfoot { display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: 0.625em 1.125em; border-top: 0.0625em solid #E4EDF4; flex-shrink: 0; }
-.vas-shm-mtot { font-weight: 700; font-size: .8em; color: #102C3F; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vas-shm-pager { display: flex; align-items: center; gap: 0.4em; flex: 0 0 auto; }
-.vas-shm-pgbtn { width: 1.1em; height: 1.1em; display: flex; align-items: center; justify-content: center; border-radius: 0.4em; border: 0.0625em solid #E4EDF4; background: rgba(255, 255, 255, .9); cursor: pointer; padding: 0; color: #0083DA; }
+.vas-shm-mtot { font-weight: 700; font-size: .8125em; color: #102C3F; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas-shm-pager { display: flex; align-items: center; gap: 0.5em; flex: 0 0 auto; }
+.vas-shm-pgbtn { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid #E4EDF4; background: rgba(255, 255, 255, .9); cursor: pointer; padding: 0; color: #0083DA; }
 .vas-shm-pgbtn:hover:not(:disabled) { background: #EAF4FD; }
 .vas-shm-pgbtn:disabled { background: rgba(255, 255, 255, .6); cursor: default; color: #B8C6D2; }
-.vas-shm-pgbtn svg { width: 0.65em; height: 0.65em; }
-.vas-shm-pgtext { font-weight: 500; font-size: 0.75em; color: #102C3F; }
+.vas-shm-pgbtn svg { width: 14px; height: 14px; }
+.vas-shm-pgtext { font-weight: 500; font-size: 0.875em; color: #102C3F; }
