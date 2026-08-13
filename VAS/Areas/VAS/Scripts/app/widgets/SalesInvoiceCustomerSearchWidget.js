@@ -1,24 +1,49 @@
-/**
+﻿/**
  * Sales Invoice Customer Search Widget
  * Purpose - Full-width (1x9) type-ahead search that finds sales invoices by customer, document
- *           number, amount or status and zooms the chosen record. Selecting a suggestion fires
- *           widgetFirevalueChanged with a TabWhereClause so the host window's invoice tab opens that
- *           record (TabLayout 'Y' = single/form view), the same host mechanism the other dashboard
- *           widgets use.
+ *           number, document type, amount or status and zooms the chosen record. Selecting a
+ *           suggestion fires widgetFirevalueChanged with a TabWhereClause so the host window's
+ *           invoice tab opens that record (TabLayout 'Y' = single/form view), the same host
+ *           mechanism the other dashboard widgets use.
+ *
+ * Search surface:
+ *   - Free text (OR'ed server-side): document number, customer name, TARGET DOCUMENT TYPE
+ *     (C_DocTypeTarget_ID - by C_DocType.Name "Credit Memo" or DocBaseType code "ARC"), SALES ORDER
+ *     document number (an order's number lists every invoice raised against it - header
+ *     C_Invoice.C_Order_ID and line C_InvoiceLine.C_OrderLine_ID both count), document status
+ *     keyword, paid / unpaid, and grand-total amount when numeric.
+ *   - Filters (funnel button, AND'ed on top of the text): Invoice Date (C_Invoice.DateInvoiced),
+ *     Due Date (C_InvoicePaySchedule.DueDate), a grand-total Amount band, and a Currency
+ *     restriction (C_Invoice.C_Currency_ID). The amounts use the framework VAmountTextBox and the
+ *     currency the framework VTextBoxButton lookup on C_Currency_ID, so the decimal separator and
+ *     the lookup behave exactly as in a standard window. A filter on its own is a valid search -
+ *     the text box may stay empty.
  *
  * Data flow:
- *   - Client types -> Invoices/SearchInvoices (debounced, top 10) returns matching invoices.
+ *   - Client types / applies a filter -> Invoices/SearchInvoices (debounced, 25 per scroll page).
  *   - Selecting a row -> widgetFirevalueChanged({ TabWhereClause, TabLayout, TabIndex }) -> host zoom.
  *
  * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
  *  #  | Current Text                                  | Message Key            | MsgText
  * ----+-----------------------------------------------+------------------------+----------------------------
- *  1  | Find invoices by customer, number, amount…    | VAS_063_InvoiceSearchPlaceholder | Find invoices by customer, number, amount or status…
+ *  1  | Find invoices by customer, number, amount…    | VAS_063_InvoiceSearchPlaceholder | Find invoices by customer, number, document type, amount or status…
  *  2  | {n} matches / {n} match                       | VAS_063_Matches / VAS_063_Match | matches / match
  *  3  | for                                           | VAS_063_For            | for
  *  4  | No invoices match                             | VAS_063_NoInvoicesMatch | No invoices match
  *  5  | Searching…                                    | VAS_063_Searching      | Searching…
  *  6  | Clear                                         | VAS_063_Clear          | Clear
+ *  7  | Filters                                       | VAS_063_Filters        | Filters
+ *  8  | Invoice Date                                  | VAS_063_InvoiceDate    | Invoice Date
+ *  9  | Due Date                                      | VAS_063_DueDate        | Due Date
+ * 10  | From / To                                     | VAS_063_From / VAS_063_To | From / To
+ * 11  | Apply                                         | VAS_063_Apply          | Apply
+ * 12  | Clear all                                     | VAS_063_ClearAll       | Clear all
+ * 13  | "From" date must be on or before "To"         | VAS_063_InvalidRange   | "From" date must be on or before "To"
+ * 14  | the selected date range                       | VAS_063_SelectedRange  | the selected filters
+ * 15  | Amount                                        | VAS_063_Amount         | Amount
+ * 16  | Currency                                      | VAS_063_Currency       | Currency
+ * 17  | "From" amount must be <= "To"                 | VAS_063_InvalidAmountRange | "From" amount must be less than or equal to "To"
+ * 18  | SO (sales order prefix on a row)              | VAS_063_SalesOrder     | SO
  *  -  | Status labels (DR/IP/CO/CL/AP/NA/WP/WC/RE/VO/IN) | VAS_063_StatusDraft etc. | Draft / In Progress / ...
  * ──────────────────────────────────────────────────────────────────────────────────────
  */
@@ -57,9 +82,23 @@
 
         var $input;
         var $clear;
+        var $filterBtn;
         /* The dropdown is mounted on <body> (fixed-positioned, anchored to the input) so the dashboard
            cell's overflow can never clip it. */
         var $suggest = null;
+        /* Filter popover — mounted on <body> for the same reason as the dropdown. */
+        var $filters = null;
+        /* Applied filters. Dates are ISO yyyy-MM-dd, amounts are plain numbers, currency is a
+           C_Currency_ID; '' / 0 means "no bound". These NARROW the text search; when the text box is
+           empty they ARE the search. */
+        var filterState = {
+            invFrom: '', invTo: '', dueFrom: '', dueTo: '',
+            amtFrom: '', amtTo: '', currencyId: 0, currencyName: ''
+        };
+        /* Framework controls inside the popover (built once, in ensureFilters): two VAmountTextBox
+           for the amount band and a VTextBoxButton lookup on C_Currency_ID. Null when VIS.Controls
+           isn't available — the popover then falls back to plain inputs / hides the currency row. */
+        var amtFromCtrl = null, amtToCtrl = null, currencyCtrl = null;
         var searchTimer = null;
         var reqSeq = 0;            /* guards against out-of-order responses */
         var cursor = -1;
@@ -161,6 +200,11 @@
                 '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
                 'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' +
                 '<path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+            /* Funnel — opens the Invoice Date / Due Date range popover. */
+            var filterSvg =
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>';
 
             var $pill = $('<div class="vas-sics-input">');
             $pill.append(searchSvg);
@@ -168,12 +212,18 @@
             $input = $(
                 '<input type="text" class="vas-sics-field" autocomplete="off" ' +
                 'role="combobox" aria-autocomplete="list" aria-expanded="false" ' +
-                'placeholder="' + escapeHtml(lbl('VAS_063_InvoiceSearchPlaceholder', 'Find invoices by Customer, Document No., Amount or Document Status…')) + '">'
+                'placeholder="' + escapeHtml(lbl('VAS_063_InvoiceSearchPlaceholder', 'Find invoices by Customer, Document No., Document Type, Amount or Document Status…')) + '">'
             );
 
             $clear = $('<button type="button" class="vas-sics-clear" aria-label="' + escapeHtml(lbl('VAS_063_Clear', 'Clear')) + '">' + clearSvg + '</button>');
 
-            $pill.append($input).append($clear);
+            /* The dot badge lights up while any range is applied, so the narrowing is never invisible. */
+            $filterBtn = $('<button type="button" class="vas-sics-filter" aria-haspopup="dialog" aria-expanded="false" ' +
+                'title="' + escapeHtml(lbl('VAS_063_Filters', 'Filters')) + '" ' +
+                'aria-label="' + escapeHtml(lbl('VAS_063_Filters', 'Filters')) + '">' +
+                filterSvg + '<span class="vas-sics-filter-dot"></span></button>');
+
+            $pill.append($input).append($clear).append($filterBtn);
             $zone.append($pill);
 
             /* Gutter band: the pill floats centered with equal empty space left & right (the search
@@ -205,7 +255,9 @@
             });
         }
 
-        /* Anchor the dropdown to the input pill (fixed positioning). */
+        /* Anchor the dropdown to the input pill (fixed positioning). The results always sit directly
+           under the pill; the filter popover OVERLAYS them (higher layer) rather than pushing them
+           down, so the list keeps its place while filters are being set. */
         function positionSuggest() {
             if (!$suggest) return;
             var el = $input.closest('.vas-sics-input')[0];
@@ -229,25 +281,315 @@
             $(window).off('scroll.vasSics resize.vasSics');
         }
 
+        /* ── Filter popover ──
+           Two date ranges (Invoice Date -> C_Invoice.DateInvoiced, Due Date ->
+           C_InvoicePaySchedule.DueDate), a grand-total amount band, and a currency restriction.
+           Every bound is optional and open-endable. Dates are native <input type="date"> so they are
+           always ISO yyyy-MM-dd on the wire; the amounts and the currency use the framework's own
+           controls (VAmountTextBox / VTextBoxButton) so the decimal separator and the C_Currency_ID
+           lookup behave exactly as they do in a standard window. */
+        function hasFilters() {
+            return !!(filterState.invFrom || filterState.invTo || filterState.dueFrom || filterState.dueTo ||
+                filterState.amtFrom !== '' || filterState.amtTo !== '' || filterState.currencyId);
+        }
+
+        /* Human-readable "Invoice Date 2026-01-01 → 2026-01-31" pieces, used by the count line and
+           the empty state so a filter-only search still says what it searched for. */
+        function filterSummary() {
+            var parts = [];
+            if (filterState.invFrom || filterState.invTo) {
+                parts.push(lbl('VAS_063_InvoiceDate', 'Invoice Date') + ' ' +
+                    (filterState.invFrom || '…') + ' → ' + (filterState.invTo || '…'));
+            }
+            if (filterState.dueFrom || filterState.dueTo) {
+                parts.push(lbl('VAS_063_DueDate', 'Due Date') + ' ' +
+                    (filterState.dueFrom || '…') + ' → ' + (filterState.dueTo || '…'));
+            }
+            if (filterState.amtFrom !== '' || filterState.amtTo !== '') {
+                parts.push(lbl('VAS_063_Amount', 'Amount') + ' ' +
+                    (filterState.amtFrom === '' ? '…' : filterState.amtFrom) + ' → ' +
+                    (filterState.amtTo === '' ? '…' : filterState.amtTo));
+            }
+            if (filterState.currencyId) {
+                parts.push(lbl('VAS_063_Currency', 'Currency') + ' ' + (filterState.currencyName || filterState.currencyId));
+            }
+            return parts.join(' · ');
+        }
+
+        function dateRangeHtml(title, fromId, toId) {
+            return '<div class="vas-sics-frow">' +
+                '<div class="vas-sics-flabel">' + escapeHtml(title) + '</div>' +
+                '<div class="vas-sics-fpair">' +
+                '<label><span>' + escapeHtml(lbl('VAS_063_From', 'From')) + '</span>' +
+                '<input type="date" id="' + fromId + '"></label>' +
+                '<label><span>' + escapeHtml(lbl('VAS_063_To', 'To')) + '</span>' +
+                '<input type="date" id="' + toId + '"></label>' +
+                '</div></div>';
+        }
+
+        /* Amount / currency rows carry EMPTY slots; the framework controls are injected into them
+           after the popover is in the DOM (a framework control must be built, then appended). */
+        function slotRangeHtml(title, fromSlotId, toSlotId) {
+            return '<div class="vas-sics-frow">' +
+                '<div class="vas-sics-flabel">' + escapeHtml(title) + '</div>' +
+                '<div class="vas-sics-fpair">' +
+                '<label><span>' + escapeHtml(lbl('VAS_063_From', 'From')) + '</span>' +
+                '<span class="vas-sics-fslot" id="' + fromSlotId + '"></span></label>' +
+                '<label><span>' + escapeHtml(lbl('VAS_063_To', 'To')) + '</span>' +
+                '<span class="vas-sics-fslot" id="' + toSlotId + '"></span></label>' +
+                '</div></div>';
+        }
+
+        function frameworkCtrlsAvailable() {
+            return !!(window.VIS && VIS.Controls && VIS.DisplayType && VIS.Env);
+        }
+
+        /* Grand-total bounds. VAmountTextBox.getValue() resolves the user's decimal separator and
+           returns a plain number, so the widget never parses amounts itself (and never posts a
+           locale-formatted string). Falls back to a plain decimal input when VIS.Controls is absent. */
+        function buildAmountControls(uid) {
+            var slots = [$filters.find('#' + uid + 'AmtFromSlot'), $filters.find('#' + uid + 'AmtToSlot')];
+            if (!frameworkCtrlsAvailable() || !VIS.Controls.VAmountTextBox) {
+                slots[0].append('<input type="text" inputmode="decimal" class="vas-sics-fctrl" id="' + uid + 'AmtFrom">');
+                slots[1].append('<input type="text" inputmode="decimal" class="vas-sics-fctrl" id="' + uid + 'AmtTo">');
+                return;
+            }
+            try {
+                var DT = VIS.DisplayType;
+                amtFromCtrl = new VIS.Controls.VAmountTextBox('GrandTotal', false, false, true, 50, 100, DT.Amount, lbl('VAS_063_From', 'From'));
+                amtToCtrl = new VIS.Controls.VAmountTextBox('GrandTotal', false, false, true, 50, 100, DT.Amount, lbl('VAS_063_To', 'To'));
+                slots[0].append(amtFromCtrl.getControl().addClass('vas-sics-fctrl').css('width', '100%'));
+                slots[1].append(amtToCtrl.getControl().addClass('vas-sics-fctrl').css('width', '100%'));
+            } catch (e) {
+                if (window.console) { console.log(e); }
+                amtFromCtrl = null; amtToCtrl = null;
+            }
+        }
+
+        /* Currency picker: the framework's C_Currency_ID Search lookup (VTextBoxButton + its info
+           button), the same control a standard window renders for that column. The where clause is
+           inlined and carries no window-context @tokens@, so windowNo 0 is fine for the lookup. */
+        function buildCurrencyControl(uid) {
+            var $slot = $filters.find('#' + uid + 'CurSlot');
+            if (!frameworkCtrlsAvailable() || !VIS.Controls.VTextBoxButton || !VIS.MLookupFactory) {
+                $slot.closest('.vas-sics-frow').remove();   // no framework lookup -> no currency row
+                return;
+            }
+            try {
+                var DT = VIS.DisplayType;
+                var lookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), ($self.windowNo || 0), 0, DT.Search,
+                    'C_Currency_ID', 0, false, " C_Currency.IsActive = 'Y' ");
+                currencyCtrl = new VIS.Controls.VTextBoxButton('C_Currency_ID', false, false, true, DT.Search, lookup);
+                $slot.append(currencyCtrl.getControl().addClass('vas-sics-fctrl').attr('data-hasbtn', ' ').css('width', '100%'));
+                var btn = currencyCtrl.getBtn ? currencyCtrl.getBtn(0) : null;
+                if (btn) { $slot.append($('<span class="vas-sics-fbtnwrap"></span>').append(btn)); }
+                /* Keep the display text for the summary line — getValue() only yields the id. */
+                currencyCtrl.fireValueChanged = function () {
+                    filterState.currencyName = (currencyCtrl.getDisplay ? currencyCtrl.getDisplay() : '') || '';
+                };
+            } catch (e) {
+                if (window.console) { console.log(e); }
+                currencyCtrl = null;
+                $slot.closest('.vas-sics-frow').remove();
+            }
+        }
+
+        function ensureFilters() {
+            if ($filters) return;
+            /* Ids are suffixed with the widget instance so two copies of the widget on one
+               dashboard never share an input id. */
+            var uid = 'vasSics' + ($self.AD_UserHomeWidgetID || $self.windowNo || '0');
+            $filters = $('<div class="vas-sics-filters" role="dialog" aria-label="' +
+                escapeHtml(lbl('VAS_063_Filters', 'Filters')) + '">');
+            $filters.html(
+                dateRangeHtml(lbl('VAS_063_InvoiceDate', 'Invoice Date'), uid + 'InvFrom', uid + 'InvTo') +
+                dateRangeHtml(lbl('VAS_063_DueDate', 'Due Date'), uid + 'DueFrom', uid + 'DueTo') +
+                slotRangeHtml(lbl('VAS_063_Amount', 'Amount'), uid + 'AmtFromSlot', uid + 'AmtToSlot') +
+                '<div class="vas-sics-frow">' +
+                '<div class="vas-sics-flabel">' + escapeHtml(lbl('VAS_063_Currency', 'Currency')) + '</div>' +
+                '<div class="vas-sics-fcur" id="' + uid + 'CurSlot"></div></div>' +
+                '<p class="vas-sics-ferror" role="alert"></p>' +
+                '<div class="vas-sics-factions">' +
+                '<button type="button" class="vas-sics-fbtn" data-act="clear">' + escapeHtml(lbl('VAS_063_ClearAll', 'Clear all')) + '</button>' +
+                '<button type="button" class="vas-sics-fbtn vas-sics-fbtn--primary" data-act="apply">' + escapeHtml(lbl('VAS_063_Apply', 'Apply')) + '</button>' +
+                '</div>');
+            $('body').append($filters);
+
+            $filters.data('ids', {
+                invFrom: uid + 'InvFrom', invTo: uid + 'InvTo', dueFrom: uid + 'DueFrom', dueTo: uid + 'DueTo',
+                amtFrom: uid + 'AmtFrom', amtTo: uid + 'AmtTo'
+            });
+            buildAmountControls(uid);
+            buildCurrencyControl(uid);
+
+            /* Wrapped, not passed straight through: jQuery would hand the event object to
+               applyFilters as its keepOpen argument. */
+            $filters.on('click', '[data-act=apply]', function () { applyFilters(false); });
+            /* "Clear all" blanks the fields and re-runs the search but KEEPS the popover open, so
+               the user can immediately dial in a different filter. */
+            $filters.on('click', '[data-act=clear]', function () {
+                clearFilterInputs();
+                applyFilters(true);
+            });
+            /* Enter in a plain field applies, Escape closes. Both are wired explicitly and stop the
+               bubble, because the framework shell swallows those keys on its own global handler. */
+            $filters.on('keydown', function (e) {
+                if (e.key === 'Escape') { closeFilters(); $input.focus(); return; }
+                if (e.key !== 'Enter') return;
+                /* A framework control owns its own Enter (the currency lookup runs its search on it),
+                   so only the plain fields apply the filters. */
+                if ($(e.target).hasClass('vas-sics-fctrl')) return;
+                e.preventDefault(); e.stopPropagation();
+                applyFilters();
+            });
+        }
+
+        /* Paint one amount control: a number sets it, '' blanks it. setValue(null) leaves a formatted
+           zero behind on VAmountTextBox, so an empty bound clears the underlying input directly. */
+        function setAmountCtrl(ctrl, fallbackId, value) {
+            if (!ctrl) { $filters.find('#' + fallbackId).val(value === '' ? '' : value); return; }
+            try {
+                if (value === '') { ctrl.setValue(null); ctrl.getControl().val(''); }
+                else { ctrl.setValue(value); }
+            } catch (e) { if (window.console) { console.log(e); } }
+        }
+
+        /* Blank every control in the popover (used by "Clear all" and by refreshWidget). */
+        function clearFilterInputs() {
+            var ids = $filters.data('ids');
+            $filters.find('input[type=date]').val('');
+            setAmountCtrl(amtFromCtrl, ids.amtFrom, '');
+            setAmountCtrl(amtToCtrl, ids.amtTo, '');
+            if (currencyCtrl) {
+                try { currencyCtrl.setValue(null); } catch (e) { if (window.console) { console.log(e); } }
+                filterState.currencyName = '';
+            }
+        }
+
+        /* Read one amount bound: the framework control when present, else the fallback input
+           (parsed against the user's decimal separator, never a raw parseFloat). */
+        function readAmount(ctrl, fallbackId) {
+            if (ctrl) {
+                var v = ctrl.getValue();
+                return (v === null || v === undefined || v === '' || isNaN(v)) ? '' : Number(v);
+            }
+            var raw = ($filters.find('#' + fallbackId).val() || '').trim();
+            if (!raw) { return ''; }
+            /* isDecimalPoint() false -> the user types "1.234,56": strip dots, comma is the point. */
+            var pointed = (VIS.Env && VIS.Env.isDecimalPoint && !VIS.Env.isDecimalPoint())
+                ? raw.replace(/\./g, '').replace(',', '.')
+                : raw.replace(/,/g, '');
+            var n = Number(pointed);
+            return isNaN(n) ? '' : n;
+        }
+
+        /* Anchor under the pill's right edge (fixed positioning, same as the dropdown). */
+        function positionFilters() {
+            if (!$filters) return;
+            var el = $input.closest('.vas-sics-input')[0];
+            if (!el) return;
+            var r = el.getBoundingClientRect();
+            var w = $filters.outerWidth() || 320;
+            var left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+            $filters.css({ left: left + 'px', top: (r.bottom + 8) + 'px' });
+        }
+
+        function openFilters() {
+            ensureFilters();
+            /* Repaint the controls from the APPLIED state, so a popover closed without applying does
+               not leave half-typed values behind. */
+            var ids = $filters.data('ids');
+            $filters.find('#' + ids.invFrom).val(filterState.invFrom);
+            $filters.find('#' + ids.invTo).val(filterState.invTo);
+            $filters.find('#' + ids.dueFrom).val(filterState.dueFrom);
+            $filters.find('#' + ids.dueTo).val(filterState.dueTo);
+            setAmountCtrl(amtFromCtrl, ids.amtFrom, filterState.amtFrom);
+            setAmountCtrl(amtToCtrl, ids.amtTo, filterState.amtTo);
+            if (currencyCtrl) {
+                try { currencyCtrl.setValue(filterState.currencyId || null); } catch (e) { if (window.console) { console.log(e); } }
+            }
+            $filters.find('.vas-sics-ferror').text('');
+            $filters.addClass('is-open');
+            positionFilters();
+            $filterBtn.attr('aria-expanded', 'true');
+            $(window).on('scroll.vasSicsF resize.vasSicsF', positionFilters);
+            $filters.find('input[type=date]').first().focus();
+        }
+
+        function closeFilters() {
+            if ($filters) $filters.removeClass('is-open');
+            if ($filterBtn) $filterBtn.attr('aria-expanded', 'false');
+            $(window).off('scroll.vasSicsF resize.vasSicsF');
+        }
+
+        function filtersOpen() {
+            return !!($filters && $filters.hasClass('is-open'));
+        }
+
+        /* Read the popover into the applied state and re-run the search. A reversed range is
+           rejected in place (the popover stays open) rather than silently returning nothing.
+           keepOpen leaves the popover up afterwards (used by "Clear all"). */
+        function applyFilters(keepOpen) {
+            var ids = $filters.data('ids');
+            var next = {
+                invFrom: $filters.find('#' + ids.invFrom).val() || '',
+                invTo: $filters.find('#' + ids.invTo).val() || '',
+                dueFrom: $filters.find('#' + ids.dueFrom).val() || '',
+                dueTo: $filters.find('#' + ids.dueTo).val() || '',
+                amtFrom: readAmount(amtFromCtrl, ids.amtFrom),
+                amtTo: readAmount(amtToCtrl, ids.amtTo),
+                currencyId: currencyCtrl ? (parseInt(currencyCtrl.getValue(), 10) || 0) : 0,
+                currencyName: filterState.currencyName
+            };
+            /* 0 in BOTH amount bounds is "no amount filter", not "invoices totalling exactly zero" —
+               a zeroed pair is what the controls read back when the user clears them by typing 0.
+               (A single 0 bound stays meaningful: 0 → 5000 is a real band.) */
+            if (next.amtFrom === 0 && next.amtTo === 0) { next.amtFrom = ''; next.amtTo = ''; }
+            if ((next.invFrom && next.invTo && next.invFrom > next.invTo) ||
+                (next.dueFrom && next.dueTo && next.dueFrom > next.dueTo)) {
+                /* ISO strings compare lexicographically, so a plain > is a correct date compare. */
+                $filters.find('.vas-sics-ferror').text(lbl('VAS_063_InvalidRange', '"From" date must be on or before "To"'));
+                return;
+            }
+            if (next.amtFrom !== '' && next.amtTo !== '' && next.amtFrom > next.amtTo) {
+                $filters.find('.vas-sics-ferror').text(lbl('VAS_063_InvalidAmountRange', '"From" amount must be less than or equal to "To"'));
+                return;
+            }
+            if (!next.currencyId) { next.currencyName = ''; }
+            filterState = next;
+            $filterBtn.toggleClass('is-active', hasFilters());
+            if (!keepOpen) { closeFilters(); }
+            if ($input.val().trim() || hasFilters()) { runSearch(); }
+            else { closeSuggest(); }
+        }
+
         /* ── Events ── */
         function bindEvents() {
             $root.on('input', '.vas-sics-field', function () {
                 $clear.toggleClass('is-visible', $input.val().length > 0);
                 if (searchTimer) clearTimeout(searchTimer);
                 var q = $input.val().trim();
-                if (!q) { closeSuggest(); return; }
+                /* Emptying the box does NOT end the search while a date range is applied — the
+                   range on its own is a valid search. */
+                if (!q && !hasFilters()) { closeSuggest(); return; }
                 searchTimer = setTimeout(runSearch, 250);
             });
 
             $root.on('focus', '.vas-sics-field', function () {
-                if ($input.val().trim()) runSearch();
+                if ($input.val().trim() || hasFilters()) runSearch();
             });
 
             $root.on('click', '.vas-sics-clear', function () {
                 $input.val('');
                 $clear.removeClass('is-visible');
-                closeSuggest();
+                /* Clears the TEXT only; the date ranges have their own "Clear all". */
+                if (hasFilters()) { runSearch(); } else { closeSuggest(); }
                 $input.focus();
+            });
+
+            $root.on('click', '.vas-sics-filter', function (e) {
+                e.preventDefault();
+                if (filtersOpen()) { closeFilters(); } else { openFilters(); }
             });
 
             $root.on('keydown', '.vas-sics-field', function (e) {
@@ -262,10 +604,15 @@
                 else if (e.key === 'Escape') { closeSuggest(); }
             });
 
-            /* Click anywhere outside the input zone or the dropdown closes it. */
+            /* Click outside the input zone or the dropdown closes the SUGGEST list. The filter
+               popover is deliberately NOT closed here: it holds a framework lookup whose Info
+               window lives outside both elements, and losing the half-set filters to a stray click
+               is worse than leaving it up. It closes on the funnel toggle, Escape or Apply. */
             $(document).on('mousedown.vasSics-' + ($self.AD_UserHomeWidgetID || ''), function (e) {
-                if ($(e.target).closest('.vas-sics-zone').length) return;
-                if ($suggest && $(e.target).closest($suggest).length) return;
+                var $t = $(e.target);
+                if ($t.closest('.vas-sics-zone').length) return;
+                if ($suggest && $t.closest($suggest).length) return;
+                if ($filters && $t.closest($filters).length) return;
                 closeSuggest();
             });
         }
@@ -286,7 +633,7 @@
         /* ── Run a fresh search (resets to page 1) and render the dropdown ── */
         function runSearch() {
             var q = $input.val().trim();
-            if (!q) { closeSuggest(); return; }
+            if (!q && !hasFilters()) { closeSuggest(); return; }
 
             ensureSuggest();
             $suggest.html('<div class="vas-sics-state">' + escapeHtml(lbl('VAS_063_Searching', 'Searching…')) + '</div>');
@@ -304,14 +651,23 @@
            append=true adds the next page's rows to the bottom (infinite scroll). */
         function fetchPage(page, append) {
             var q = curQuery;
-            if (!q) { return; }
+            if (!q && !hasFilters()) { return; }
             if (append) { loadingMore = true; showLoadMore(true); }
 
             var mySeq = ++reqSeq;
             $.ajax({
                 url: VIS.Application.contextUrl + 'Invoices/SearchInvoices',
                 type: 'GET',
-                data: { q: q, max: 25, page: page },
+                data: {
+                    q: q, max: 25, page: page,
+                    /* Empty bounds are sent as '' / 0 and ignored server-side (open-ended range).
+                       Amounts go over the wire as plain invariant numbers — VAmountTextBox has
+                       already resolved the user's decimal separator. */
+                    invFrom: filterState.invFrom, invTo: filterState.invTo,
+                    dueFrom: filterState.dueFrom, dueTo: filterState.dueTo,
+                    amtFrom: filterState.amtFrom, amtTo: filterState.amtTo,
+                    currencyId: filterState.currencyId || 0
+                },
                 success: function (res) {
                     /* Ignore stale responses (a newer keystroke / page already fired). */
                     if (mySeq !== reqSeq) return;
@@ -336,7 +692,11 @@
         function metaHtml(q) {
             var word = matches.length === 1 ? lbl('VAS_063_Match', 'match') : lbl('VAS_063_Matches', 'matches');
             var count = matches.length + (hasMore ? '+' : '');
-            return '<div class="vas-sics-meta"><strong>' + count + '</strong> ' + word + ' ' + lbl('VAS_063_For', 'for') + ' "' + escapeHtml(q) + '"</div>';
+            /* What was searched: the term, the applied ranges, or both. */
+            var subject = q ? '"' + escapeHtml(q) + '"' : escapeHtml(filterSummary());
+            var extra = (q && hasFilters()) ? ' <span class="vas-sics-metafilter">' + escapeHtml(filterSummary()) + '</span>' : '';
+            return '<div class="vas-sics-meta"><strong>' + count + '</strong> ' + word + ' ' +
+                lbl('VAS_063_For', 'for') + ' ' + subject + extra + '</div>';
         }
 
         function updateMeta(q) {
@@ -353,17 +713,27 @@
             $.each(rows, function (j, r) {
                 var i = startIndex + j;
                 var color = PALETTE[i % PALETTE.length];
+                /* Left meta: status dot + document number + document type + status. Document type is
+                   highlighted like the other searchable fields (it IS searchable — by name or
+                   DocBaseType). Amount and invoice date live in the right-hand column instead. */
                 var meta = '<span class="vas-sics-dot" style="background:' + statusColor(r.docStatus) + ';"></span>' +
                     highlight(r.documentNo, q) +
-                    ' · ' + formatAmount(r.grandTotal, r.curSymbol) +
-                    ' · ' + escapeHtml(statusLabel(r.docStatus)) +
-                    (r.dateInvoiced ? ' · ' + escapeHtml(r.dateInvoiced) : '');
+                    (r.docTypeName ? ' · ' + highlight(r.docTypeName, q) : '') +
+                    /* Sales order the invoice came from - labelled, and highlighted like the other
+                       searchable fields, so a search by order number shows WHY each row matched. */
+                    (r.orderDocumentNo ? ' · ' + escapeHtml(lbl('VAS_063_SalesOrder', 'SO')) + ' ' + highlight(r.orderDocumentNo, q) : '') +
+                    ' · ' + escapeHtml(statusLabel(r.docStatus));
+                /* Right column: amount over invoice date, right-aligned — the money is what the eye
+                   scans down, so it gets its own edge instead of trailing the meta line. */
+                var side = '<div class="vas-sics-amt">' + formatAmount(r.grandTotal, r.curSymbol) + '</div>' +
+                    (r.dateInvoiced ? '<div class="vas-sics-date">' + escapeHtml(r.dateInvoiced) + '</div>' : '');
                 html += '<div class="vas-sics-line" data-index="' + i + '" role="option">' +
                     '<div class="vas-sics-avatar" style="background:' + color + ';">' + escapeHtml(initials(r.customerName)) + '</div>' +
                     '<div class="vas-sics-info">' +
                     '<div class="vas-sics-name">' + highlight(r.customerName || '—', q) + '</div>' +
                     '<div class="vas-sics-rowmeta">' + meta + '</div>' +
                     '</div>' +
+                    '<div class="vas-sics-side">' + side + '</div>' +
                     '</div>';
             });
             return html;
@@ -377,7 +747,11 @@
 
             if (matches.length === 0) {
                 hasMore = false;
-                $suggest.html('<div class="vas-sics-empty">' + lbl('VAS_063_NoInvoicesMatch', 'No invoices match') + ' "<strong>' + escapeHtml(q) + '</strong>".</div>');
+                /* Name what actually failed to match: the term, or the range when searching by date alone. */
+                var subject = q
+                    ? '"<strong>' + escapeHtml(q) + '</strong>"'
+                    : '<strong>' + escapeHtml(filterSummary() || lbl('VAS_063_SelectedRange', 'the selected filters')) + '</strong>';
+                $suggest.html('<div class="vas-sics-empty">' + lbl('VAS_063_NoInvoicesMatch', 'No invoices match') + ' ' + subject + '.</div>');
                 openSuggest();
                 return;
             }
@@ -439,8 +813,13 @@
         /* ── Refresh ── */
         this.refreshWidget = function () {
             closeSuggest();
+            closeFilters();
             if ($input) { $input.val(''); }
             if ($clear) { $clear.removeClass('is-visible'); }
+            /* A refresh resets every filter too, so the widget comes back in its neutral state. */
+            filterState = { invFrom: '', invTo: '', dueFrom: '', dueTo: '', amtFrom: '', amtTo: '', currencyId: 0, currencyName: '' };
+            if ($filters) { clearFilterInputs(); }
+            if ($filterBtn) { $filterBtn.removeClass('is-active'); }
             matches = [];
         };
 
@@ -452,8 +831,11 @@
         this.disposeComponent = function () {
             $(document).off('mousedown.vasSics-' + ($self.AD_UserHomeWidgetID || ''));
             $(window).off('scroll.vasSics resize.vasSics');
+            $(window).off('scroll.vasSicsF resize.vasSicsF');
             if (searchTimer) clearTimeout(searchTimer);
             if ($suggest) { $suggest.remove(); $suggest = null; }
+            /* Both body-mounted layers must go with the widget, or they outlive the dashboard cell. */
+            if ($filters) { $filters.remove(); $filters = null; }
             $root.remove();
         };
     };
