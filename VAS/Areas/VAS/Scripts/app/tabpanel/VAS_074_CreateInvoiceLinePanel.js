@@ -782,6 +782,14 @@
                     });
             } catch (e) { if (window.console) console.log(e); }
         }
+        /* Repaint the hosting window's current tab so the parent grid/single view picks up the
+           invoice totals the save just recalculated. Guarded - the framework only sets curTab
+           when the panel is started from a tab. */
+        function refreshCurTab() {
+            try {
+                if ($self.curTab && typeof $self.curTab.dataRefreshAll === "function") $self.curTab.dataRefreshAll();
+            } catch (e) { if (window.console) console.log(e); }
+        }
         /* Per-line TCS amount (VA106_TCSAmount) - 0 when the module isn't installed or
            the column isn't set; read case-insensitively (PG lowercases the key). */
         function lineTcs(line) { return +lineVal(line, "VA106_TCSAmount") || 0; }
@@ -3984,7 +3992,7 @@
                     saveInFlight = false;
                     batch.forEach(function (l) { l._saving = false; });
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); refreshSummary(); if (done) done(true); }
+                    if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); refreshSummary(); refreshCurTab(); if (done) done(true); }
                     else { batch.forEach(function (l) { setRowBusy(l, false); }); showServerSaveErrors(batch, res); if (done) done(false); }
                     flushPendingSave();   // save any line(s) queued while this was in flight
                 },
@@ -4103,7 +4111,7 @@
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { applyLinePaging(res); reloadLinesKeepingUnsaved(res.Lines); showToast(lbl("VAS_074_LinesDeleted", "Lines deleted")); refreshSummary(); }
+                    if (res && res.Success) { applyLinePaging(res); reloadLinesKeepingUnsaved(res.Lines); showToast(lbl("VAS_074_LinesDeleted", "Lines deleted")); refreshSummary(); refreshCurTab(); }
                     else showToast(lbl((res && res.ErrorKey) || "VAS_074_DeleteFailed", "Delete failed"));
                 },
                 error: function (err) { console.log(err); showBusy(false); showToast(lbl("VAS_074_DeleteFailed", "Delete failed")); }
