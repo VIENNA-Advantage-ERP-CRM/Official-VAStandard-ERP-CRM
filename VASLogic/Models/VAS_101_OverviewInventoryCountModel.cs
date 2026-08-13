@@ -47,6 +47,25 @@
 ///                        is flattened to readable text first (MailBodyToText) — no
 ///                        markup is ever handed to the panel. Ported from VAS_102,
 ///                        which reads the same table.
+///   VAI163   2026-08-12  - Added VarianceValue: what the count's variance is
+///                          WORTH — Σ (variance qty x the line's rate), using the
+///                          same direction-aware rate the lines are valued at
+///                          (BuildRateExpr), so a short line is valued at
+///                          CurrentCostPrice and an over line at PriceCost falling
+///                          back to CurrentCostPrice. Signed like the quantity it
+///                          derives from: negative is stock the count could not
+///                          find.
+///                        - Added DocTypeName (M_Inventory.C_DocType_ID ->
+///                          C_DocType), dictionary-guarded, for the header.
+///                        - Activity reports WHICH FIELDS changed and when
+///                          (LoadFieldChangeActivity, AD_ChangeLog): one row per
+///                          changed column carrying its label, its old value and
+///                          its new one, for the count header AND its lines — a
+///                          count's edits are its counted quantities, and those
+///                          live on the lines. It replaces the single "updated"
+///                          milestone derived from M_Inventory.Updated, which could
+///                          only ever report the LAST save and never said what it
+///                          touched.
 /// </summary>
 
 using System;
@@ -116,6 +135,15 @@ namespace VASLogic.Models
             const string varExpr =
                 "(COALESCE(l.QtyCount, 0) - COALESCE(l.QtyBook, 0))";
 
+            // The document type is what the count screen names the document by, so
+            // the panel shows it. C_DocType_ID is dictionary-guarded: it is not on
+            // every schema's M_Inventory, and its absence must not cost the whole
+            // query its rows.
+            bool hasDocType = ColumnExists("M_Inventory", "C_DocType_ID");
+            string docTypeExpr = hasDocType ? "dt.Name" : "CAST(NULL AS VARCHAR(255))";
+            string docTypeJoin = hasDocType
+                ? "LEFT OUTER JOIN C_DocType dt ON (dt.C_DocType_ID = inv.C_DocType_ID)" : "";
+
             string sql = @"SELECT
                               inv.M_Inventory_ID,
                               inv.DocumentNo,
@@ -126,6 +154,7 @@ namespace VASLogic.Models
                               inv.Description,
                               wh.Name          AS WarehouseName,
                               creator.Name     AS CountedBy,
+                              " + docTypeExpr + @" AS DocTypeName,
                               (SELECT COUNT(*)
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
@@ -138,6 +167,15 @@ namespace VASLogic.Models
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS NetVarianceQty,
+                              -- What that variance is WORTH: each line's variance
+                              -- at the line's own rate, which is chosen by the
+                              -- DIRECTION it varies in (see BuildRateExpr). Signed
+                              -- like the quantity, so stock the count could not
+                              -- find reads negative.
+                              (SELECT NVL(SUM(" + varExpr + @" * " + rateExpr + @"), 0)
+                                 FROM M_InventoryLine l
+                                WHERE l.M_Inventory_ID = inv.M_Inventory_ID
+                                  AND l.IsActive       = 'Y')                   AS VarianceValue,
                               (SELECT NVL(SUM(CASE WHEN " + varExpr + @" = 0 THEN 1 ELSE 0 END), 0)
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
@@ -153,6 +191,7 @@ namespace VASLogic.Models
                             FROM M_Inventory inv
                             LEFT OUTER JOIN M_Warehouse wh   ON (inv.M_Warehouse_ID = wh.M_Warehouse_ID)
                             LEFT OUTER JOIN AD_User creator  ON (inv.CreatedBy      = creator.AD_User_ID)
+                            " + docTypeJoin + @"
                             WHERE inv.M_Inventory_ID = @M_Inventory_ID
                               AND inv.IsActive       = 'Y'
                               AND COALESCE(inv.IsInternalUse, 'N') <> 'Y'";
@@ -182,11 +221,13 @@ namespace VASLogic.Models
             result.Description    = Util.GetValueOfString(r["Description"]);
             result.WarehouseName  = Util.GetValueOfString(r["WarehouseName"]);
             result.CountedBy      = Util.GetValueOfString(r["CountedBy"]);
+            result.DocTypeName    = Util.GetValueOfString(r["DocTypeName"]);
 
             // ----- KPI aggregates -----
             result.LineCount      = Util.GetValueOfInt(r["LineCount"]);
             result.TotalValue     = Util.GetValueOfDecimal(r["TotalValue"]);
             result.NetVarianceQty = Util.GetValueOfDecimal(r["NetVarianceQty"]);
+            result.VarianceValue  = Util.GetValueOfDecimal(r["VarianceValue"]);
             result.MatchedCount   = Util.GetValueOfInt(r["MatchedCount"]);
             result.ShortCount     = Util.GetValueOfInt(r["ShortCount"]);
             result.ExcessCount    = Util.GetValueOfInt(r["ExcessCount"]);
@@ -318,6 +359,11 @@ namespace VASLogic.Models
 
             List<ActivityData> activity = new List<ActivityData>();
             LoadCountMilestones(M_Inventory_ID, docStatus, activity);
+            // What was actually edited, field by field. This is what the reader
+            // wants from an audit trail — the coarse "updated" milestone
+            // LoadCountMilestones used to add could only report the LAST save and
+            // never said what it touched, so it is gone.
+            LoadFieldChangeActivity(M_Inventory_ID, activity);
             LoadPostingActivity(M_Inventory_ID, activity);
             LoadNoteActivity(M_Inventory_ID, activity);
             LoadEmailActivity(M_Inventory_ID, activity);
@@ -368,17 +414,10 @@ namespace VASLogic.Models
                     Created  = created
                 });
 
-                // A count saved once has Updated == Created; that is not an edit.
-                if (updated.HasValue &&
-                    (!created.HasValue || updated.Value > created.Value.AddSeconds(1)))
-                {
-                    list.Add(new ActivityData
-                    {
-                        Type     = "updated",
-                        UserName = updatedBy,
-                        Created  = updated
-                    });
-                }
+                // No "updated" row here any more. It came from M_Inventory.Updated,
+                // which is only ever the LAST save — it could not report an earlier
+                // edit at all, and it never said what was changed. The change log
+                // answers both (LoadFieldChangeActivity).
 
                 if (docStatus == "CO" || docStatus == "CL")
                 {
@@ -396,6 +435,137 @@ namespace VASLogic.Models
             {
                 _log.Severe("LoadCountMilestones (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// The count's field-level edit history, read from the platform's change
+        /// log (AD_ChangeLog): one row per changed COLUMN carrying the dictionary's
+        /// label for it, the value it held before and the value it holds now, when
+        /// the change was saved and who saved it.
+        ///
+        /// Both the header (M_Inventory) and its LINES (M_InventoryLine) are read.
+        /// A count's meaningful edits are its counted quantities, and those live on
+        /// the lines — a header-only trail would report almost nothing. A line
+        /// change is labelled with its line number and product so the reader can
+        /// tell which row moved.
+        ///
+        /// Rows are NOT collapsed to one per save the way VAS_092 collapses them:
+        /// this panel is asked for exactly what changed, so a save touching three
+        /// columns is three rows.
+        ///
+        /// Silently degrades when change logging is off for the table — there are
+        /// simply no rows, and the feed keeps its milestones.
+        /// </summary>
+        /// <param name="M_Inventory_ID">Selected inventory count id.</param>
+        /// <param name="list">Activity list being populated.</param>
+        private void LoadFieldChangeActivity(int M_Inventory_ID, List<ActivityData> list)
+        {
+            // ----- Header edits -----
+            try
+            {
+                string sql = @"SELECT cl.Created,
+                                      cl.OldValue,
+                                      cl.NewValue,
+                                      COALESCE(c.Name, c.ColumnName) AS FieldName,
+                                      u.Name AS UserName
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_Column c ON (c.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User  u  ON (u.AD_User_ID   = cl.CreatedBy)
+                                WHERE cl.Record_ID = @M_Inventory_ID
+                                  AND adt.TableName = 'M_Inventory'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
+                                ORDER BY cl.Created DESC";
+                AddChangeRows(DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null), "", list);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadFieldChangeActivity/header (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+
+            // ----- Line edits -----
+            //
+            // The line ids are reached through a subselect so the statement carries
+            // its bind name exactly once: positional binding gives a repeated name
+            // a second, unfilled placeholder.
+            try
+            {
+                string sql = @"SELECT cl.Created,
+                                      cl.OldValue,
+                                      cl.NewValue,
+                                      COALESCE(c.Name, c.ColumnName) AS FieldName,
+                                      u.Name  AS UserName,
+                                      l.Line  AS LineNo,
+                                      p.Name  AS ProductName
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                INNER JOIN M_InventoryLine l
+                                        ON (l.M_InventoryLine_ID = cl.Record_ID)
+                                 LEFT OUTER JOIN M_Product p ON (p.M_Product_ID  = l.M_Product_ID)
+                                 LEFT OUTER JOIN AD_Column c ON (c.AD_Column_ID  = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User  u  ON (u.AD_User_ID    = cl.CreatedBy)
+                                WHERE adt.TableName = 'M_InventoryLine'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
+                                  AND l.M_Inventory_ID = @M_Inventory_ID
+                                ORDER BY cl.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        string scope = "#" + Util.GetValueOfInt(r["LineNo"]);
+                        string prod  = Util.GetValueOfString(r["ProductName"]);
+                        if (!string.IsNullOrEmpty(prod)) scope += " " + prod.Trim();
+                        AddChangeRow(r, scope, list);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadFieldChangeActivity/lines (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>Adds every row of a change-log result under one scope label.</summary>
+        private void AddChangeRows(DataSet ds, string scope, List<ActivityData> list)
+        {
+            if (ds == null || ds.Tables.Count == 0) return;
+            foreach (DataRow r in ds.Tables[0].Rows) AddChangeRow(r, scope, list);
+        }
+
+        /// <summary>
+        /// Turns one AD_ChangeLog row into an activity entry. A change whose column
+        /// cannot be resolved through the dictionary is skipped: without a field
+        /// name the row says only that "something" changed, which is what this
+        /// whole loader exists to stop reporting.
+        /// </summary>
+        private void AddChangeRow(DataRow r, string scope, List<ActivityData> list)
+        {
+            string field = Util.GetValueOfString(r["FieldName"]);
+            if (string.IsNullOrEmpty(field)) return;
+
+            list.Add(new ActivityData
+            {
+                Type        = "changed",
+                FieldName   = field,
+                OldValue    = ChangeValue(Util.GetValueOfString(r["OldValue"])),
+                NewValue    = ChangeValue(Util.GetValueOfString(r["NewValue"])),
+                ChangeScope = scope,
+                UserName    = Util.GetValueOfString(r["UserName"]),
+                Created     = Util.GetValueOfDateTime(r["Created"])
+            });
+        }
+
+        /// <summary>
+        /// Normalises a logged value for display. The platform writes the literal
+        /// "null" into AD_ChangeLog for a cleared field, which would otherwise be
+        /// shown to the reader as though it were the text "null".
+        /// </summary>
+        private static string ChangeValue(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            string v = value.Trim();
+            return string.Equals(v, "null", StringComparison.OrdinalIgnoreCase) ? "" : v;
         }
 
         /// <summary>Who completed the count and when — the workflow's DocComplete
@@ -870,11 +1040,22 @@ namespace VASLogic.Models
         /// <summary>One entry in the count's audit trail.</summary>
         public class ActivityData
         {
-            /// <summary>created | updated | completed | posted | note | email</summary>
+            /// <summary>created | changed | completed | posted | note | email</summary>
             public string    Type       { get; set; }
             public string    UserName   { get; set; }   // actor / mail sender
             public DateTime? Created    { get; set; }   // when
             public string    Text       { get; set; }   // note body / e-mail subject
+
+            // Field-level edit (AD_ChangeLog) — WHICH field changed, from what to
+            // what, and on which record.
+            /// <summary>The dictionary's label for the changed column.</summary>
+            public string    FieldName  { get; set; }
+            public string    OldValue   { get; set; }
+            public string    NewValue   { get; set; }
+            /// <summary>Which record the edit landed on: "" for the count header,
+            /// else the line's number and product — a count's real edits are its
+            /// counted quantities, and those live on the lines.</summary>
+            public string    ChangeScope { get; set; }
 
             // E-mail (MailAttachment1) — the body is revealed on click.
             public string    Body       { get; set; }   // TextMsg (flattened to text)
@@ -919,6 +1100,10 @@ namespace VASLogic.Models
             public string    Description    { get; set; }
             public string    WarehouseName  { get; set; }
             public string    CountedBy      { get; set; }
+            /// <summary>The document type the count was raised on
+            /// (M_Inventory.C_DocType_ID -> C_DocType.Name). "" when the schema
+            /// does not carry the column.</summary>
+            public string    DocTypeName    { get; set; }
 
             // Currency
             public int       StdPrecision   { get; set; }
@@ -927,6 +1112,10 @@ namespace VASLogic.Models
             public int       LineCount        { get; set; }
             public decimal   TotalValue       { get; set; }
             public decimal   NetVarianceQty   { get; set; }
+            /// <summary>What the variance is WORTH — Σ (variance qty x the line's
+            /// direction-aware rate). Signed like the quantity: negative is stock
+            /// the count could not find.</summary>
+            public decimal   VarianceValue    { get; set; }
             public int       MatchedCount     { get; set; }
             public int       ShortCount       { get; set; }
             public int       ExcessCount      { get; set; }

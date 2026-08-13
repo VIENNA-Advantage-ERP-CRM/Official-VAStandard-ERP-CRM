@@ -18,12 +18,7 @@
 
 .vas-dsm-card {
     font-family: Roboto, Arial, sans-serif;
-    /* Single dynamic font anchor, viewport-based (vw) so it tracks the SCREEN,
-       not a JS-measured container width - the old clamp's fixed 24px ceiling and
-       its dependency on --dash-inline-size froze all text from growing past a
-       point. max()+rem floor guards very narrow windows; no ceiling above it, so
-       text keeps scaling at any resolution. Everything below is em off this. */
-    font-size: max(0.9rem, 1.3vw);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.014), 24px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -64,28 +59,23 @@
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     background-image: none !important;
-    font-size: 0.75em;
-    font-family: 'Roboto', sans-serif;
+    font-family: inherit;
     font-weight: 500;
+    font-size: .75em;
     color: #102C3F;
-    background-color: #FFFFFF;
+    background: #FFFFFF;
     border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: 0.35em 0.75em;
-    min-width: 4.5em;
+    padding: .35em .75em;
+    cursor: pointer;
+    line-height: 1.2;
     text-align: center;
     text-align-last: center;
-    outline: none;
-    cursor: pointer;
-    box-sizing: border-box;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-.vas-dsm-sel select:hover,
-.vas-dsm-sel select:focus {
-    background-color: #EEF8FF;
-    border-color: #0083DA;
-}
-.vas-dsm-chev { display: none !important; }
+.vas-dsm-sel select.vas-dsm-month-sel { min-width: 7.5em; }
+.vas-dsm-sel select.vas-dsm-year-sel { min-width: 5.2em; }
+.vas-dsm-sel select:hover { background: #EEF8FF; border-color: #0083DA; }
+.vas-dsm-sel select:focus { outline: 2px solid #0083DA; outline-offset: 1px; }
 
 /* ---- body: status-mix bars ---- */
 .vas-dsm-body { flex: 1; min-height: 0; overflow: hidden; margin-top: .25em; display: flex; flex-direction: column; justify-content: space-evenly; }
@@ -123,9 +113,7 @@
 
 /* ===================== MODAL ===================== */
 .vas-dsm-overlay {
-    /* Viewport-anchored (the modal lives on <body>, outside the widget), same
-       basis as the widget card so it scales at any resolution; internals are em. */
-    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0117), 24px);
+    font-size: clamp(16px, 1.17vw, 24px);
     position: fixed; inset: 0; background: rgba(16, 44, 63, .35);
     display: flex; align-items: center; justify-content: center; z-index: 50; padding: 2em;
     font-family: Roboto, Arial, sans-serif;
@@ -148,9 +136,6 @@
 
 .vas-dsm-mbody { overflow: hidden; padding: 0.25em 1.125em 0.625em; }
 
-/* Fixed 5-row grid so the modal body is sized for 5 rows and never shrinks when
-   a page has fewer (the drill-down pages 5 orders at a time). Unused tracks stay
-   blank instead of collapsing the pop-up. */
 .vas-dsm-dolist { display: grid; grid-template-rows: repeat(5, 2.4em); }
 .vas-dsm-dolist .vas-dsm-empty { grid-row: 1 / -1; display: flex; align-items: center; justify-content: center; }
 .vas-dsm-mloading { padding: 1.5em; text-align: center; color: #748494; }
@@ -180,8 +165,8 @@
 .vas-dsm-dostatus.voided .vas-dsm-dot { background: #D14545; }
 
 .vas-dsm-mfoot { display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: 0.625em 1.125em; border-top: 1px solid #E4EDF4; flex-shrink: 0; }
-.vas-dsm-mtotal { font-weight: 400; font-size: .8em; color: #748494; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vas-dsm-mfoot .vas-dsm-pager { flex: 0 0 auto; gap: 0.4em; }
-.vas-dsm-mfoot .vas-dsm-pgbtn { width: 1.1em; height: 1.1em; border-radius: 0.4em; }
-.vas-dsm-mfoot .vas-dsm-pgbtn svg { width: 0.65em; height: 0.65em; }
-.vas-dsm-mfoot .vas-dsm-pgtext { font-size: 0.75em; }
+.vas-dsm-mtotal { font-weight: 400; font-size: .8125em; color: #748494; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas-dsm-mfoot .vas-dsm-pager { flex: 0 0 auto; gap: 0.5em; }
+.vas-dsm-mfoot .vas-dsm-pgbtn { width: 24px; height: 24px; border-radius: 6px; border: 1px solid #E4EDF4; background: rgba(255, 255, 255, 0.9); display: inline-flex; align-items: center; justify-content: center; color: #0083DA; cursor: pointer; padding: 0; }
+.vas-dsm-mfoot .vas-dsm-pgbtn svg { width: 14px; height: 14px; }
+.vas-dsm-mfoot .vas-dsm-pgtext { font-weight: 500; font-size: 0.875em; color: #102C3F; }

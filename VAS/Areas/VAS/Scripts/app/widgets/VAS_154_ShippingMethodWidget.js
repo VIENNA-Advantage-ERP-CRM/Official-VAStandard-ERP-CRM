@@ -182,8 +182,8 @@
                 '</div>' +
                 '</div>' +
                 '<div class="vas-shm-filters">' +
-                '<span class="vas-shm-sel"><select class="vas-shm-month" aria-label="Filter by month"></select>' + chevD() + '</span>' +
-                '<span class="vas-shm-sel"><select class="vas-shm-year" aria-label="Filter by year"></select>' + chevD() + '</span>' +
+                '<span class="vas-shm-sel"><select class="vas-shm-month vas-shm-month-sel" aria-label="Filter by month"></select></span>' +
+                '<span class="vas-shm-sel"><select class="vas-shm-year vas-shm-year-sel" aria-label="Filter by year"></select></span>' +
                 '</div>' +
                 '</div>' +
                 '<div class="vas-shm-body">' +
@@ -199,7 +199,7 @@
         }
 
         function populateFilters() {
-            var mn = monthsShort();
+            var mn = monthsFull();
             var $m = $root.find('.vas-shm-month');
             if (!$m.children().length) {
                 var mo = '';
