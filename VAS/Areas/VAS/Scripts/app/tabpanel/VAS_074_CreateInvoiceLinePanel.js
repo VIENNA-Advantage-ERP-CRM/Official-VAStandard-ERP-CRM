@@ -71,6 +71,11 @@
         var rowCounter = 0;
         var editing = null;            // { rowId, field }
         var morePopoverFor = null;     // rowId
+        /* The "..." (Additional Info) modal is open in VIEW-ONLY mode: the hosting tab has an
+           unsaved edit, so the fields are built read-only and the user can look but not change.
+           Captured once when the modal opens (so the whole session is consistent) and cleared
+           by closeDialogs. */
+        var moreViewOnly = false;
         // True only WHILE render() detaches/re-attaches the row whose catalog dropdown is
         // open (see the preserve block in render). Detaching a focused input fires a native
         // blur, whose handler (commitPrimary) would otherwise clear `editing` + rebuild the
@@ -790,6 +795,28 @@
                 if ($self.curTab && typeof $self.curTab.dataRefreshAll === "function") $self.curTab.dataRefreshAll();
             } catch (e) { if (window.console) console.log(e); }
         }
+        /* True when the hosting tab has an edit the user hasn't saved yet (a header field
+           changed, or a brand-new unsaved record). curTab is the framework GridTab; its
+           needSave(true, false) is the "is ANYTHING pending" form (-> GridTable.needSave(-2, false)),
+           as opposed to the per-row variants. Guarded - a panel started without a tab has none. */
+        function tabHasUnsavedChanges() {
+            try {
+                return !!($self.curTab && typeof $self.curTab.needSave === "function" && $self.curTab.needSave(true, false));
+            } catch (e) { if (window.console) console.log(e); return false; }
+        }
+
+        /* Gate in front of EVERY panel mutation (edit a cell, add / delete / save a line,
+           scan, attribute, additional-info). The panel persists lines against the invoice
+           header as the SERVER currently has it and recomputes tax/totals from it, so a
+           pending tab edit must be saved (or ignored) first - otherwise the user's unsaved
+           header changes are silently not part of what the lines are calculated against.
+           Returns true when the gesture must be blocked, after messaging the user. */
+        function blockedByTabChanges() {
+            if (!tabHasUnsavedChanges()) return false;
+            showToast(lbl("VAS_074_SaveTabChangesFirst", "Please save the changes on the tab first, then change the lines"));
+            return true;
+        }
+
         /* Per-line TCS amount (VA106_TCSAmount) - 0 when the module isn't installed or
            the column isn't set; read case-insensitively (PG lowercases the key). */
         function lineTcs(line) { return +lineVal(line, "VA106_TCSAmount") || 0; }
@@ -1169,6 +1196,11 @@
            their ids so commitMorePopover() reads them; dynamic fields commit on change. */
         function openMoreDialog(line) {
             closeDialogs();
+            // An unsaved edit on the hosting tab does NOT block the modal: the user can still
+            // OPEN it and READ the additional info. Every field is built read-only instead
+            // (see buildDynField) and a notice above the footer says why. Set AFTER closeDialogs,
+            // which clears the flag.
+            moreViewOnly = panelEditable() && tabHasUnsavedChanges();
             morePopoverFor = line.rowId;
             // Snapshot the line's editable state BEFORE any field is touched. The dialog's
             // dynamic fields commit live to line.values/display on change, so closing via the
@@ -1195,6 +1227,13 @@
                 '<button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="close-more">' + esc(lbl("VAS_074_Done", "Done")) + "</button></footer>");
             backdrop.append(dialog);
             $("body").append(backdrop);
+            // View-only: say WHY the fields can't be edited, just above the footer (same slot as
+            // the mandatory-field message, warning tone instead of danger).
+            if (moreViewOnly) {
+                dialog.find(".vas-cil-dialog__footer").before(
+                    $('<div class="vas-cil-more-note" role="status"></div>')
+                        .text(lbl("VAS_074_TabChangesViewOnly", "View only - save the changes on the tab first to edit these fields")));
+            }
 
             var $body = dialog.find("#vasCilMoreBody");
 
@@ -1206,8 +1245,9 @@
             function done() {
                 // Block close while a conditionally-mandatory curated field (e.g. Capital/Expense
                 // on an Asset-Related line) is still empty - show the message in the modal and
-                // keep it open until the required value is set.
-                var miss = firstMissingDynMandatory(line);
+                // keep it open until the required value is set. Skipped in view-only mode: the
+                // fields are read-only there, so the user could never satisfy the check.
+                var miss = moreViewOnly ? null : firstMissingDynMandatory(line);
                 if (miss) { showMoreDialogError(miss); return; }
                 commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line);
             }
@@ -1298,6 +1338,7 @@
         function startEdit(line, field) {
             if (!panelEditable()) return;             // completed/void/reversed/closed -> read-only
             if (line._saving) return;                 // row is being saved - locked until it returns
+            if (blockedByTabChanges()) return;        // unsaved edit on the hosting tab - save it first
             // Product / Charge cell has no FIELD_COL mapping, so gate the treat-as-discount
             // lock here (Qty / UOM go through fieldReadOnly below via isColumnReadOnly).
             if ((field === "product" || field === "charge") && isTreatAsDiscount()) return;
@@ -1495,6 +1536,7 @@
         /* ---------- line operations ---------- */
         function addLine() {
             if (!parent || !parent.IsEditable) { showToast(lbl("VAS_074_InvoiceNotEditable", "This invoice cannot take new lines")); return; }
+            if (blockedByTabChanges()) return;        // unsaved edit on the hosting tab - save it first
             var maxLine = 0;
             for (var i = 0; i < lines.length; i++) maxLine = Math.max(maxLine, lines[i].values.Line || 0);
             var line = {
@@ -2627,7 +2669,9 @@
         }
 
         function buildDynField(line, m) {
-            var ro = isColumnReadOnly(line, m.ColumnName);
+            // View-only modal (pending tab edit) forces EVERY field read-only, whatever the
+            // column's own IsReadOnly / ReadOnlyLogic says.
+            var ro = moreViewOnly || isColumnReadOnly(line, m.ColumnName);
             var kind = dynFieldKind(m);
             // Caption only - the framework renders the mandatory red asterisk itself.
             var caption = m.Name || m.ColumnName;
@@ -3298,6 +3342,7 @@
             // raw VASCILDISP_HasAttrSet flag off the line (case-insensitive), not the AttrName-
             // conflated display flag - see productHasAttributeSet.
             if (!productHasAttributeSet(line)) return;
+            if (blockedByTabChanges()) return;        // unsaved edit on the hosting tab - save it first
             closeDialogs();
             VIS.AttributeControl.open({
                 M_Product_ID: line.values.M_Product_ID,
@@ -3811,6 +3856,7 @@
 
         /* ---------- scan dialog ---------- */
         function openScanDialog() {
+            if (blockedByTabChanges()) return;        // unsaved edit on the hosting tab - save it first
             closeDialogs();
             scanState = { rows: [], input: "", error: "" };
             var backdrop = $('<div class="vas-cil-dialog-backdrop" id="vasCilScan"></div>');
@@ -3969,6 +4015,7 @@
         function saveRows(done, restrictIds) {
             commitMorePopover();
             if (!panelEditable()) { if (done) done(false); return; }   // read-only when doc completed/void/reversed/closed
+            if (blockedByTabChanges()) { if (done) done(false); return; }   // unsaved edit on the hosting tab - save it first
             var batch = unsavedLines();
             // A DEFERRED flush saves ONLY the rows the user had actually Save-clicked (snapshotted
             // in restrictIds), never a line added afterwards while the prior save was running.
@@ -4099,6 +4146,7 @@
 
         function deleteSelected() {
             if (!panelEditable()) return;             // read-only when doc completed/void/reversed/closed
+            if (blockedByTabChanges()) return;        // unsaved edit on the hosting tab - save it first
             var sel = selectedLines(); if (!sel.length) return;
             var ids = [], localOnly = [];
             sel.forEach(function (l) { if (l.values.C_InvoiceLine_ID > 0) ids.push(l.values.C_InvoiceLine_ID); else localOnly.push(l); });
@@ -4127,7 +4175,7 @@
             setTimeout(function () { $t.removeClass("vas-cil-toast--show"); setTimeout(function () { $t.remove(); }, 300); }, 2600);
         }
 
-        function closeDialogs() { $("#vasCilAttr, #vasCilScan, #vasCilMore").remove(); attrState = null; scanState = null; morePopoverFor = null; }
+        function closeDialogs() { $("#vasCilAttr, #vasCilScan, #vasCilMore").remove(); attrState = null; scanState = null; morePopoverFor = null; moreViewOnly = false; }
 
         function onDocMouseDown(e) {
             // The additional-fields modal manages its own outside-click (backdrop); no
