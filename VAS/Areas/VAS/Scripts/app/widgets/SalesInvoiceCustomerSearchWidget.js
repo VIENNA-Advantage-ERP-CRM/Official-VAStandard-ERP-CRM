@@ -266,19 +266,41 @@
             $suggest.css({ left: r.left + 'px', top: (r.bottom + 8) + 'px', width: r.width + 'px' });
         }
 
+        /* Both layers are position:fixed and anchored to the pill, so they must be re-anchored on
+           every scroll. The dashboard scrolls its OWN container (not the window) and scroll events
+           do not bubble, so a $(window).on('scroll') binding never fires for it — the listener is
+           registered on document in the CAPTURE phase instead, which sees scrolls from any element
+           on the way down. */
+        function repositionLayers() {
+            if ($suggest && $suggest.hasClass('is-open')) { positionSuggest(); }
+            if (filtersOpen()) { positionFilters(); }
+        }
+
+        function bindReposition() {
+            document.addEventListener('scroll', repositionLayers, true);
+            window.addEventListener('resize', repositionLayers);
+        }
+
+        /* Unbound only once BOTH layers are down — either one still open needs the listener. */
+        function unbindReposition() {
+            if ((($suggest && $suggest.hasClass('is-open'))) || filtersOpen()) { return; }
+            document.removeEventListener('scroll', repositionLayers, true);
+            window.removeEventListener('resize', repositionLayers);
+        }
+
         function openSuggest() {
             ensureSuggest();
             positionSuggest();
             $suggest.addClass('is-open');
             $input.attr('aria-expanded', 'true');
-            $(window).on('scroll.vasSics resize.vasSics', positionSuggest);
+            bindReposition();
         }
 
         function closeSuggest() {
             if ($suggest) $suggest.removeClass('is-open');
             $input.attr('aria-expanded', 'false');
             cursor = -1;
-            $(window).off('scroll.vasSics resize.vasSics');
+            unbindReposition();
         }
 
         /* ── Filter popover ──
@@ -512,14 +534,14 @@
             $filters.addClass('is-open');
             positionFilters();
             $filterBtn.attr('aria-expanded', 'true');
-            $(window).on('scroll.vasSicsF resize.vasSicsF', positionFilters);
+            bindReposition();
             $filters.find('input[type=date]').first().focus();
         }
 
         function closeFilters() {
             if ($filters) $filters.removeClass('is-open');
             if ($filterBtn) $filterBtn.attr('aria-expanded', 'false');
-            $(window).off('scroll.vasSicsF resize.vasSicsF');
+            unbindReposition();
         }
 
         function filtersOpen() {
@@ -830,8 +852,9 @@
 
         this.disposeComponent = function () {
             $(document).off('mousedown.vasSics-' + ($self.AD_UserHomeWidgetID || ''));
-            $(window).off('scroll.vasSics resize.vasSics');
-            $(window).off('scroll.vasSicsF resize.vasSicsF');
+            /* Unconditional: unbindReposition would bail while a layer is still marked open. */
+            document.removeEventListener('scroll', repositionLayers, true);
+            window.removeEventListener('resize', repositionLayers);
             if (searchTimer) clearTimeout(searchTimer);
             if ($suggest) { $suggest.remove(); $suggest = null; }
             /* Both body-mounted layers must go with the widget, or they outlive the dashboard cell. */
