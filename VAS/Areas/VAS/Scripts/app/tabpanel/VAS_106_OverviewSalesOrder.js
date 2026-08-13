@@ -218,6 +218,26 @@
  *                        a table that actually serves both (DUAL_PURPOSE_TABLES) —
  *                        asking it of a single-screen table like C_Contract could
  *                        resolve the wrong window, or none.
+ *   VAI163   2026-08-12  - Activity lists the e-mails sent against the order
+ *                          (EventType "Email", model side). The row is the subject,
+ *                          with the recipient beneath it (.vas_106-actSub) and the
+ *                          date / time · sender in the usual place; the MESSAGE
+ *                          itself stays collapsed and opens on click
+ *                          (.vas_106-actRow.vas_106-is-openable / -actCaret /
+ *                          -actBody), because a body is far too heavy to sit in a
+ *                          feed. The Note badge takes the "note" icon, which it now
+ *                          has to give up "mail" to the e-mail rows.
+ *                        - The status pill reads "Completed" in green for an order
+ *                          that has reached that state. It read "Confirmed" in blue
+ *                          until every line had shipped, which named the same state
+ *                          twice and gave a completed order the tone of a notice
+ *                          rather than a milestone. A part-shipped order still names
+ *                          its own state.
+ *                        - The Posted badge joins the header pills, straight after
+ *                          that status pill: a document that has reached the ledger
+ *                          says so beside the state that got it there, instead of
+ *                          only in the Order Progress heading. Still drawn only once
+ *                          the order IS posted.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -590,10 +610,15 @@
             if (data.DocStatus === "CL") return { label: getMsg("VAS_106_Closed", "Closed"), tone: "neutral" };
             if (data.DocStatus === "DR" || data.DocStatus === "IP")
                 return { label: getMsg("VAS_106_Draft", "Draft"), tone: "neutral" };
-            // Completed family — split by delivery progress.
-            if (f.total > 0 && f.full >= f.total) return { label: getMsg("VAS_106_Completed", "Completed"), tone: "success" };
-            if (f.full > 0) return { label: getMsg("VAS_106_PartiallyDelivered", "Partially Delivered"), tone: "warning" };
-            return { label: getMsg("VAS_106_Confirmed", "Confirmed"), tone: "info" };
+            // Completed family. Reaching Completed is what the pill reports, so it
+            // says so — in green. It used to read "Confirmed" in blue until every
+            // line had shipped, which named the same state twice and gave an
+            // ordinary completed order the tone of a notice rather than of the
+            // milestone it is. A part-shipped order still names its own state,
+            // which is the one thing here the delivery progress genuinely adds.
+            if (f.total > 0 && f.full > 0 && f.full < f.total)
+                return { label: getMsg("VAS_106_PartiallyDelivered", "Partially Delivered"), tone: "warning" };
+            return { label: getMsg("VAS_106_Completed", "Completed"), tone: "success" };
         }
 
         function renderHeader() {
@@ -618,6 +643,13 @@
             $pills.append(headerPill(pm.label, pm.tone, pm.icon, false));
             $pills.append(headerPill(cm.label, cm.tone, null, true));
             $pills.append(headerPill(sm.label, sm.tone, null, true));
+            // Posted comes straight after the status pill: a document that has
+            // reached the ledger says so beside the state that got it there. Drawn
+            // only once the order IS posted — "Not Posted" is not news about a
+            // document that cannot be posted yet, the same rule the Order Progress
+            // badge follows.
+            if (data.Posted === "Y")
+                $pills.append(headerPill(getMsg("VAS_106_Posted", "Posted"), "success", null, true));
             $top.append($pills);
 
             $strip.append($top);
@@ -1525,8 +1557,12 @@
         //  Activity                                                          //
         // ----------------------------------------------------------------- //
 
+        // A note takes the "note" icon: it had "mail", which now belongs to the
+        // e-mail rows, and two badges carrying the same envelope in one feed said
+        // the opposite of what the badges are for.
         var ACT_TYPES = {
-            Note:     { tone: "info",    icon: "mail",  label: "Note" },
+            Note:     { tone: "info",    icon: "note",  label: "Note" },
+            Email:    { tone: "purple",  icon: "mail",  label: "Email" },
             Delivery: { tone: "success", icon: "truck", label: "Delivery" },
             Invoice:  { tone: "warning", icon: "fileText", label: "Invoice" },
             Created:  { tone: "neutral", icon: "plus",  label: "Created" },
@@ -1555,7 +1591,14 @@
                 var end = Math.min(rows.length, start + ACTIVITY_PER_PAGE);
 
                 $card.empty();
-                for (var i = start; i < end; i++) $card.append(activityRow(rows[i]));
+                for (var i = start; i < end; i++) {
+                    $card.append(activityRow(rows[i]));
+                    // An e-mail's message is far too heavy to sit in a feed: it
+                    // stays collapsed under its own row and opens only when the
+                    // reader asks for it.
+                    var $mail = activityBody(rows[i]);
+                    if ($mail) $card.append($mail);
+                }
 
                 buildPager($pager, activityPage, pageCount, rows.length, start, end,
                     function (p) { activityPage = p; paintPage(); });
@@ -1628,12 +1671,102 @@
             }
             $wrapT.append($('<span class="vas_106-actTime"></span>').text(when).attr("title", when));
             $main.append($wrapT);
+
+            // An e-mail names its recipients under the subject: the To list, plus a
+            // count of the Cc / Bcc addresses so the reader can see at a glance
+            // that others were copied. Every address itself is listed in the body.
+            if (a.EventType === "Email") {
+                var to = recipientSummary(a);
+                if (to) {
+                    $main.append($('<div class="vas_106-actSub"></div>')
+                        .text(to).attr("title", allRecipients(a) || to));
+                }
+            }
             $row.append($main);
+
+            // A row carrying a message opens on click; the caret shows the state.
+            if (hasActivityBody(a)) {
+                $row.addClass("vas_106-is-openable")
+                    .attr("title", getMsg("VAS_106_ShowMailBody", "Show message"));
+                $row.append($('<span class="vas_106-actCaret"></span>').append(svgIcon("chevRight")));
+                $row.on("click", function () {
+                    var $panel = $row.next(".vas_106-actBody");
+                    if (!$panel.length) return;
+                    var nowOpen = !$row.hasClass("vas_106-is-open");
+                    $row.toggleClass("vas_106-is-open", nowOpen)
+                        .attr("title", nowOpen ? getMsg("VAS_106_HideMailBody", "Hide message")
+                                               : getMsg("VAS_106_ShowMailBody", "Show message"));
+                    $panel.toggle(nowOpen);
+                });
+            }
             return $row;
+        }
+
+        // Only an e-mail carries a body, and only one that actually has text —
+        // an empty message is nothing to open.
+        function hasActivityBody(a) {
+            return !!(a && a.EventType === "Email" && a.Body && String(a.Body).trim());
+        }
+
+        // The e-mail message, collapsed beneath its activity row. The full
+        // recipient set (From / To / Cc / Bcc) heads it, so every address the mail
+        // went to is on screen once the reader opens it. The body arrives as plain
+        // text (the server flattens an HTML mail) and is set with .text(), so
+        // nothing in a message can reach the DOM as markup.
+        function activityBody(a) {
+            if (!hasActivityBody(a)) return null;
+
+            var $panel = $('<div class="vas_106-actBody" style="display:none;"></div>');
+            appendMailMeta($panel, "VAS_106_MailFrom", "From", a.MailFrom);
+            appendMailMeta($panel, "VAS_106_MailTo",   "To",   a.MailTo);
+            appendMailMeta($panel, "VAS_106_MailCc",   "Cc",   a.MailCc);
+            appendMailMeta($panel, "VAS_106_MailBcc",  "Bcc",  a.MailBcc);
+            $panel.append($('<p></p>').text(String(a.Body).trim()));
+            return $panel;
+        }
+
+        function appendMailMeta($panel, key, fallback, value) {
+            if (!value || !String(value).trim()) return;
+            $panel.append($('<div class="vas_106-actMeta"></div>')
+                .text(getMsg(key, fallback) + " " + String(value).trim()));
+        }
+
+        // Row sub-line: the To list, plus "+n more" covering the Cc / Bcc
+        // addresses. Counting by comma / semicolon is enough for a summary — the
+        // body lists the addresses verbatim.
+        function recipientSummary(a) {
+            var to = (a.MailTo || "").trim();
+            var extra = countAddresses(a.MailCc) + countAddresses(a.MailBcc);
+            if (!to && !extra) return "";
+            var s = getMsg("VAS_106_MailTo", "To") + " " + (to || "—");
+            if (extra > 0) s += " +" + extra + " " + getMsg("VAS_106_MoreRecipients", "more");
+            return s;
+        }
+
+        // Every address on the mail, for the row's hover tooltip.
+        function allRecipients(a) {
+            var bits = [];
+            if (a.MailTo)  bits.push(getMsg("VAS_106_MailTo", "To") + " " + a.MailTo);
+            if (a.MailCc)  bits.push(getMsg("VAS_106_MailCc", "Cc") + " " + a.MailCc);
+            if (a.MailBcc) bits.push(getMsg("VAS_106_MailBcc", "Bcc") + " " + a.MailBcc);
+            return bits.join("\n");
+        }
+
+        function countAddresses(value) {
+            if (!value || !String(value).trim()) return 0;
+            var parts = String(value).split(/[;,]/), n = 0;
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].trim()) n++;
+            }
+            return n;
         }
 
         function activityTitle(a, meta) {
             if (a.EventType === "Note") return a.Title || getMsg("VAS_106_ActNote", "Note");
+            // An e-mail's headline is its subject; a mail sent without one still
+            // has to name itself.
+            if (a.EventType === "Email")
+                return a.Title || getMsg("VAS_106_ActNoSubject", "(No subject)");
             if (a.EventType === "Invoice")
                 return getMsg("VAS_106_ActInvoiceTxt", "Invoice") + " " + (a.Title || "") +
                        (a.Amount ? " (" + formatAmount(+a.Amount, data.CurSymbol, data.ISO_Code, data.StdPrecision) + ")" : "");

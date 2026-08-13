@@ -28,6 +28,25 @@
  *                        base-theme rule meant the base design won and
  *                        repainted the panel; scoping them to the panel ends
  *                        that.
+ *   VAI163   2026-08-13  Identity column now carries the customer detail fields
+ *                        (-custFields grid) instead of the vehicle / tracking
+ *                        contact bits, which moved to the field column with the
+ *                        rest of the dispatch and shipping-method fields; the
+ *                        -vendContact / -contactBit rules went with them.
+ *   VAI163   2026-08-13  Added the Reference chip strip (.vas_100-genfrom /
+ *                        .vas_100-chip / .vas_100-pill) and the record-open
+ *                        toast (.vas_100-toast), both ported from VAS_092.
+ *                        The action-button rules (.vas_100-actions /
+ *                        .vas_100-btn*) went with the buttons they styled.
+ *                        Snapshot tiles hold their wide four-across row only
+ *                        from 700px (was 620px) and use minmax(0, 1fr) tracks,
+ *                        so the single-record view breaks them into two rows of
+ *                        two instead of crushing four onto one line — the
+ *                        VAS_099 GRN behaviour.
+ *   VAI163   2026-08-13  Added the lines pager (.vas_100-pager / -pgRange /
+ *                        -pgCtrls / -pgPos / -pgBtn, plus its RTL chevron
+ *                        mirror), modelled on the VAS_106 pager, and the Notes
+ *                        card (.vas_100-noteCard) for the entered description.
  ***********************************************************/
 
 .vas_100-root {
@@ -254,23 +273,120 @@
 }
 .vas_100-vendAddr .vas_100-ic { color: var(--do-muted); margin-top: 0.15em; }
 
-.vas_100-vendContact {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375em 1.125em;
-    font-size: 0.75em;
-    color: var(--do-text);
-    margin-top: 0.375em;
+/* Customer detail fields (location / first name / e-mail) under the identity
+   line. Two across while there is room — the column is already the narrower
+   half of the card, so it drops to a single stack early. */
+.vas_100-custFields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625em 1.25em;
+    align-content: start;
+    margin-top: 0.625em;
 }
-.vas_100-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
-.vas_100-contactBit .vas_100-ic { color: var(--do-action); }
+
+@container (max-width: 620px) {
+    .vas_100-custFields { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Reference (Generated From chip strip)                       */
+/* ----------------------------------------------------------- */
+/* Light rounded strip carrying an uppercase caption and one chip per origin
+   document (Sales Order / Project / Reversal / RMA). */
+.vas_100-genfrom {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em 0.875em;
+    border: 1px solid var(--do-card-bd);
+    border-radius: var(--do-card-radius);
+    background: #F6FAF6;
+    padding: 0.625em 0.75em;
+}
+
+.vas_100-gfLabel {
+    flex: none;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--do-muted);
+}
+
+.vas_100-gfChips {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    min-width: 0;
+}
+
+/* Chip: white pill with a leading (tinted) icon, grey label, dark value and an
+   optional trailing status pill. The chip never outgrows the strip that holds
+   it — it caps at the strip width and the value truncates inside it, so one
+   long document number cannot run past the panel edge. */
+.vas_100-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    max-width: 100%;
+    background: #fff;
+    border: 1px solid var(--do-card-bd);
+    border-radius: 999px;
+    padding: 0.3125em 0.5625em;
+    font-size: 0.75em;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.vas_100-chip .vas_100-ic          { color: var(--do-muted); }
+.vas_100-chip.vas_100-ic-info    .vas_100-ic { color: var(--do-info-tx); }
+.vas_100-chip.vas_100-ic-success .vas_100-ic { color: var(--do-success-tx); }
+.vas_100-chip.vas_100-ic-warning .vas_100-ic { color: var(--do-warning-tx); }
+.vas_100-chip.vas_100-ic-purple  .vas_100-ic { color: var(--do-purple-tx); }
+.vas_100-chip.vas_100-ic-muted   .vas_100-ic { color: var(--do-muted); }
+
+.vas_100-chipLabel { flex: none; color: var(--do-muted); }
+.vas_100-chipVal   {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--do-text);
+    font-weight: 700;
+}
+
+/* Trailing status pill inside a chip (e.g. "Origin"). */
+.vas_100-pill {
+    flex: none;
+    border-radius: 999px;
+    padding: 0.125em 0.4375em;
+    margin-left: 0.0625em;
+    font-size: 0.9167em;
+    font-weight: 700;
+    line-height: 1.3;
+}
+.vas_100-pill.vas_100-tone-info    { background: var(--do-info-bg);    color: var(--do-info-tx); }
+.vas_100-pill.vas_100-tone-success { background: var(--do-success-bg); color: var(--do-success-tx); }
+.vas_100-pill.vas_100-tone-warning { background: var(--do-warning-bg); color: var(--do-warning-tx); }
+.vas_100-pill.vas_100-tone-purple  { background: var(--do-purple-bg);  color: var(--do-purple-tx); }
+.vas_100-pill.vas_100-tone-neutral { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
+
+/* Clickable origin chip — opens the source record. */
+.vas_100-chip.vas_100-is-link { cursor: pointer; }
+.vas_100-chip.vas_100-is-link:hover {
+    border-color: var(--do-action);
+    box-shadow: 0 0 0 1px var(--do-action) inset;
+}
+.vas_100-chip.vas_100-is-link > .vas_100-ic:last-child { color: var(--do-action); }
 
 /* ----------------------------------------------------------- */
 /*  Snapshot (metric grid)                                      */
 /* ----------------------------------------------------------- */
+/* minmax(0, 1fr), not 1fr: a long amount in one tile must not widen its track
+   and push the row past the panel. */
 .vas_100-snap {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.75em;
 }
 
@@ -331,11 +447,18 @@
     white-space: nowrap;
 }
 
-@container (max-width: 620px) {
-    .vas_100-snap { grid-template-columns: repeat(2, 1fr); }
+/* Narrow panels: 2-up (two rows of two), then single-column.
+
+   The four-across row needs real room: each card carries an uppercase label, a
+   1.25em figure and a caption, all of which clip to one line. At 620px a card is
+   ~145px of content — a delivery value with its currency ellipsises there. The
+   single-record view is exactly that narrow, which is what left the summary
+   crushed on one line. Matching VAS_099, the wide row only holds from 700px. */
+@container (max-width: 700px) {
+    .vas_100-snap { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container (max-width: 340px) {
-    .vas_100-snap { grid-template-columns: 1fr; }
+    .vas_100-snap { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ----------------------------------------------------------- */
@@ -540,54 +663,90 @@
 }
 
 /* ----------------------------------------------------------- */
-/*  Actions (visual buttons)                                    */
+/*  Lines pager                                                 */
 /* ----------------------------------------------------------- */
-.vas_100-actions {
+/* A sibling of the table, not a row inside it: the table takes its own
+   horizontal scroll on a narrow panel and the controls must not scroll away
+   with the columns. Modelled on the VAS_106 pager. */
+.vas_100-pager {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     flex-wrap: wrap;
-    gap: 0.625em;
-    padding-top: 0.125em;
+    gap: 0.5em 0.75em;
+    margin-top: 0.5em;
+    font-size: 0.75em;
+    color: var(--do-muted);
 }
 
-.vas_100-btn {
+.vas_100-pgCtrls { display: inline-flex; align-items: center; gap: 0.5em; }
+.vas_100-pgPos   { color: var(--do-text); font-weight: 700; }
+
+.vas_100-pgBtn {
     display: inline-flex;
     align-items: center;
-    gap: 0.4375em;
-    height: 2.25em;
-    padding: 0 1.125em;
+    gap: 0.3125em;
+    border: 1px solid var(--do-card-bd);
     border-radius: 999px;
-    font-size: 0.8125em;
+    background: #fff;
+    padding: 0.3125em 0.75em;
+    color: var(--do-action);
     font-weight: 700;
     line-height: 1;
     cursor: pointer;
     user-select: none;
+    white-space: nowrap;
 }
-.vas_100-btn .vas_100-ic { color: currentColor; }
-
-.vas_100-btn.vas_100-btn-pri {
-    background: var(--do-action);
-    border: 1px solid var(--do-action);
-    color: #fff;
-}
-.vas_100-btn.vas_100-btn-pri:hover { background: var(--do-action-dk); border-color: var(--do-action-dk); }
-
-.vas_100-btn.vas_100-btn-sec {
-    background: #fff;
-    border: 1px solid var(--do-action);
-    color: var(--do-action);
-}
-.vas_100-btn.vas_100-btn-sec:hover { background: var(--do-info-bg); }
-
-/* Disabled visual state (e.g. Raise Invoice before completion) */
-.vas_100-btn.vas_100-is-disabled {
-    background: #F1F4F7;
-    border-color: #DCE5EE;
-    color: #A6B2BD;
+.vas_100-pgBtn:hover { background: var(--do-info-bg); border-color: var(--do-action); }
+.vas_100-pgBtn .vas_100-ic { color: currentColor; }
+.vas_100-pgBtn.vas_100-is-disabled {
+    opacity: .45;
     cursor: default;
     pointer-events: none;
+    color: var(--do-muted);
 }
+
+/* ----------------------------------------------------------- */
+/*  Notes (entered description)                                 */
+/* ----------------------------------------------------------- */
+.vas_100-noteCard {
+    border: 1px solid var(--do-card-bd);
+    border-radius: var(--do-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+    font-size: 0.8125em;
+    color: var(--do-text);
+    line-height: 1.55;
+    /* The description is free text a user typed — keep their line breaks and
+       let a long unbroken run wrap instead of widening the panel. */
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+
+/* ----------------------------------------------------------- */
+/*  Toast (record-open fallback notice)                         */
+/* ----------------------------------------------------------- */
+/* Shown only when a Reference chip cannot resolve a window to open, so a click
+   reports something instead of doing nothing. */
+.vas_100-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 1.25em;
+    transform: translate(-50%, 0.75em);
+    max-width: 90%;
+    border-radius: 8px;
+    padding: 0.5em 0.875em;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1.35;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+    z-index: 1000;
+}
+.vas_100-toast.vas_100-ok  { background: var(--do-info-bg); color: var(--do-info-tx); }
+.vas_100-toast.vas_100-err { background: var(--do-risk-bg); color: var(--do-risk-tx); }
+.vas_100-toast.vas_100-show { opacity: 1; transform: translate(-50%, 0); }
 
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
@@ -598,4 +757,5 @@
 [dir="rtl"] .vas_100-tFoot { justify-content: flex-start; }
 [dir="rtl"] .vas_100-tf b { margin-left: 0; margin-right: 0.375em; }
 [dir="rtl"] .vas_100-tf.vas_100-is-grand b { margin-left: 0; margin-right: 0.5em; }
-[dir="rtl"] .vas_100-actions { justify-content: flex-start; }
+[dir="rtl"] .vas_100-chip .vas_100-pill { margin-left: 0; margin-right: 0.0625em; }
+[dir="rtl"] .vas_100-pgBtn .vas_100-ic svg { transform: scaleX(-1); }

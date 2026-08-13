@@ -217,6 +217,17 @@
 ///                        target (a receipt confirmation -> the
 ///                        VAS_ShipReceiptConfirm window) can be opened. Ported
 ///                        from VAS_092.
+///   VAI163   2026-08-13  Activity reports header edits FIELD BY FIELD
+///                        (LoadChangeActivity): one "updated" row per
+///                        AD_ChangeLog entry, naming the column that changed,
+///                        who changed it and when — so a reader can tell which
+///                        field moved, by whom, at what time. The completion
+///                        save's own changes are excluded; the "completed"
+///                        milestone already reports that event, and its
+///                        DocStatus / Processed writes would otherwise restate
+///                        it several times directly beneath it. The single
+///                        generic "updated" row built from the header stamp
+///                        survives only where change logging is off for M_InOut.
 /// </summary>
 
 using System;
@@ -1729,6 +1740,24 @@ namespace VASLogic.Models
 
             List<GRNActivityData> activity = new List<GRNActivityData>();
             LoadReceiptMilestones(M_InOut_ID, docStatus, activity);
+
+            // One row per FIELD the user changed. Must run after the milestones:
+            // it reads the completion moment they resolved (_lastCompletedAt).
+            int fieldChanges = LoadChangeActivity(M_InOut_ID, activity);
+
+            // The milestone above adds a single generic "the receipt was edited"
+            // row from the header's own stamp. That is a stand-in for exactly the
+            // detail this now carries, so it goes as soon as the change log has
+            // named the fields — otherwise the same edit is reported twice, once
+            // vaguely and once per field.
+            if (fieldChanges > 0)
+            {
+                activity.RemoveAll(delegate (GRNActivityData a)
+                {
+                    return a.Type == "updated" && string.IsNullOrEmpty(a.FieldName);
+                });
+            }
+
             LoadPostingActivity(M_InOut_ID, activity);
             LoadConfirmationActivity(M_InOut_ID, activity);
             LoadInvoiceActivity(M_InOut_ID, activity);
@@ -1841,6 +1870,9 @@ namespace VASLogic.Models
                     completedBy = _lastCompletedByName;
                     if (!completedAt.HasValue) completedAt = updated;
                 }
+                // Handed to LoadChangeActivity, which runs next and needs the same
+                // moment to tell the completion save apart from a real edit.
+                _lastCompletedAt = completedAt;
 
                 list.Add(new GRNActivityData
                 {
@@ -1885,6 +1917,83 @@ namespace VASLogic.Models
             {
                 _log.Severe("LoadReceiptMilestones (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// One "updated" row per FIELD the user changed on the receipt header,
+        /// read from the platform's change log (AD_ChangeLog for M_InOut / this
+        /// record). Each row names the field (the dictionary's display name for
+        /// the column, falling back to the raw column name), who changed it and
+        /// when — so the trail says which field moved rather than only that
+        /// something did.
+        ///
+        /// Changes written by the COMPLETION save are left out: completing a
+        /// receipt saves the header (DocStatus, Processed, DocAction), and those
+        /// rows would restate the "completed" milestone several times over
+        /// directly beneath it. Nothing is lost — that milestone reports the same
+        /// event, once.
+        ///
+        /// Silently degrades to no rows when change logging is off for the table,
+        /// in which case the caller keeps its single header-stamp "updated" row.
+        /// </summary>
+        /// <param name="M_InOut_ID">Selected goods receipt id.</param>
+        /// <param name="list">Feed being built; rows are appended.</param>
+        /// <returns>How many field-level rows were added.</returns>
+        private int LoadChangeActivity(int M_InOut_ID, List<GRNActivityData> list)
+        {
+            int added = 0;
+            try
+            {
+                // AD_Column is LEFT joined so a log row whose column has since been
+                // removed from the dictionary still reports its change.
+                string sql = @"SELECT cl.Created,
+                                      u.Name  AS UserName,
+                                      col.Name       AS FieldLabel,
+                                      col.ColumnName AS FieldColumn
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_Column col
+                                        ON (col.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                        ON (u.AD_User_ID = cl.CreatedBy)
+                                WHERE cl.Record_ID = @M_InOut_ID
+                                  AND adt.TableName = 'M_InOut'
+                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                ORDER BY cl.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return 0;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    DateTime? at = Util.GetValueOfDateTime(r["Created"]);
+                    if (!at.HasValue) continue;
+                    if (IsSameMoment(at, _lastCompletedAt)) continue;   // completion save
+
+                    string field = Util.GetValueOfString(r["FieldLabel"]);
+                    if (string.IsNullOrEmpty(field))
+                        field = Util.GetValueOfString(r["FieldColumn"]);
+                    // A row that can name no field at all would render as a bare
+                    // "Updated" with nothing to identify it — the generic milestone
+                    // row already says that much.
+                    if (string.IsNullOrEmpty(field)) continue;
+
+                    list.Add(new GRNActivityData
+                    {
+                        Type      = "updated",
+                        FieldName = field,
+                        UserName  = Util.GetValueOfString(r["UserName"]),
+                        Created   = at
+                    });
+                    added++;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Change logging is optional; without it the header stamp stands in.
+                _log.Severe("LoadChangeActivity (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
+            }
+            return added;
         }
 
         /// <summary>
@@ -1950,6 +2059,13 @@ namespace VASLogic.Models
         /// caller gets both the moment and the actor from one query.
         /// </summary>
         private string _lastCompletedByName;
+
+        /// <summary>
+        /// The completion moment resolved by <see cref="LoadReceiptMilestones"/>,
+        /// kept for <see cref="LoadChangeActivity"/> — which runs straight after it
+        /// and needs the same stamp to recognise the completion save.
+        /// </summary>
+        private DateTime? _lastCompletedAt;
 
         /// <summary>
         /// When the invoice found by the reference-invoice lookup was RAISED
@@ -2707,6 +2823,10 @@ namespace VASLogic.Models
             public string    Text       { get; set; }   // note text / e-mail subject
             public string    DocumentNo { get; set; }   // related document, when any
             public DateTime? Created    { get; set; }
+            /// <summary>For an "updated" row: the display name of the field that
+            /// changed. Empty on the generic header-stamp row that stands in when
+            /// change logging is off.</summary>
+            public string    FieldName  { get; set; }
 
             // E-mail (MailAttachment1) — the body is revealed on click.
             public string    Body       { get; set; }   // TextMsg (flattened to text)

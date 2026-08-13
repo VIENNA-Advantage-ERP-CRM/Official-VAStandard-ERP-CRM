@@ -31,6 +31,24 @@
  *                        base-theme rule meant the base design won and
  *                        repainted the panel; scoping them to the panel ends
  *                        that.
+ *   VAI163   2026-08-12  Line table loses its Locator column — 8 tracks in
+ *                        quality mode, 7 without. The locator moved into the
+ *                        Scrapped cell, which stacks now (.vas_104-scrapCell /
+ *                        -scrapLoc) and shows it only where something was
+ *                        actually scrapped. The item cell gained a name row
+ *                        (.vas_104-itNameRow) carrying the source line number
+ *                        (.vas_104-lineNo) and the quality-parameter toggle
+ *                        (.vas_104-qcBtn), whose drawer (.vas_104-qcDrawer /
+ *                        -qcTable / -qcRow / -qcHead / -qcBody / -qcHit /
+ *                        -qcMiss) is a full-width SIBLING of the line row rather
+ *                        than a child, so it is not trapped in one grid cell.
+ *                        Added the Notes and Activity sections at the foot of the
+ *                        panel (.vas_104-panelcard / -noteRow / -noteTag /
+ *                        -noteTxt / -actRow / -actBadge / -actMain / -actTitle /
+ *                        -actWhen) and the toast the source-document link falls
+ *                        back to (.vas_104-toast). The action bar
+ *                        (.vas_104-actions / .vas_104-btn) is gone with the Print
+ *                        and Confirm buttons it held.
  ***********************************************************/
 
 .vas_104-root {
@@ -236,7 +254,10 @@
     margin-top: 0.125em;
     overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
 }
-.vas_104-fVal.vas_104-is-link { color: var(--gc-link); }
+/* The source document opens its own window on click, so it behaves like the
+   link it was already styled as. */
+.vas_104-fVal.vas_104-is-link { color: var(--gc-link); cursor: pointer; }
+.vas_104-fVal.vas_104-is-link:hover { text-decoration: underline; }
 
 @container (max-width: 460px) {
     .vas_104-hdrCard { grid-template-columns: 1fr; }
@@ -366,17 +387,19 @@
     overflow: hidden;
 }
 
-/* Quality mode: 9 columns (QC mark column present). */
+/* Quality mode: 8 columns (QC mark column present). The Locator column is gone
+   — it moved under the Scrapped figure, where it only appears when something was
+   actually scrapped. */
 .vas_104-tRow {
     display: grid;
     align-items: center;
     gap: 0.625em;
     padding: 0.625em 0.875em;
-    grid-template-columns: 2.2fr 1fr 0.6fr 0.8fr 0.85fr 0.85fr 0.85fr 0.8fr 0.95fr;
+    grid-template-columns: 2.6fr 0.6fr 0.85fr 0.9fr 0.9fr 1fr 0.8fr 0.95fr;
 }
-/* No-quality mode: 8 columns (QC mark column hidden). */
+/* No-quality mode: 7 columns (QC mark column hidden). */
 .vas_104-root.vas_104-no-quality .vas_104-tRow {
-    grid-template-columns: 2.2fr 1fr 0.6fr 0.9fr 0.95fr 0.95fr 0.95fr 1fr;
+    grid-template-columns: 2.6fr 0.6fr 0.9fr 0.95fr 0.95fr 1.05fr 1fr;
 }
 
 .vas_104-tHead {
@@ -401,15 +424,37 @@
 .vas_104-table .vas_104-ta-c { text-align: center; justify-content: center; }
 
 .vas_104-itItem { min-width: 0; }
+
+/* The source line number, the product name and the quality toggle share one
+   line; only the NAME gives way, so the number and the toggle stay readable
+   however long the product is. */
+.vas_104-itNameRow {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    min-width: 0;
+}
 .vas_104-itName {
     font-size: 1.0769em;
     font-weight: 700;
     color: var(--gc-text);
     line-height: 1.25;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* The line number the GRN / shipment knows this row by. */
+.vas_104-lineNo {
+    flex: none;
+    font-size: 0.8462em;
+    font-weight: 700;
+    color: var(--gc-muted);
+    background: var(--gc-neutral-bg);
+    border-radius: 4px;
+    padding: 0.0625em 0.3125em;
+}
+/* Product value · attributes. */
 .vas_104-itSku {
     font-size: 0.9231em;
     color: var(--gc-muted);
@@ -425,11 +470,94 @@
 .vas_104-diff.vas_104-pos  { color: #9A6500; }
 .vas_104-diff.vas_104-zero { color: var(--gc-muted); font-weight: 500; }
 
-/* Scrapped cell — red when non-zero */
+/* Scrapped cell — the figure, red when non-zero, with the scrap locator beneath
+   it. The cell stacks, so it is the one right-aligned cell that is not a plain
+   number; align-items keeps both parts on the right edge. */
+.vas_104-scrapCell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 0;
+}
 .vas_104-scrap { color: var(--gc-muted); font-weight: 500; }
 .vas_104-scrap.vas_104-has { color: var(--gc-risk-tx); font-weight: 700; }
+.vas_104-scrapLoc {
+    max-width: 100%;
+    font-size: 0.8462em;
+    color: var(--gc-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
 .vas_104-dash { color: var(--gc-muted); }
+
+/* ---- Quality parameters: the per-line toggle and the drawer it opens ---- */
+
+.vas_104-qcBtn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    padding: 0.0625em 0.375em;
+    border: 1px solid var(--gc-card-bd);
+    border-radius: 999px;
+    font-size: 0.8462em;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--gc-muted);
+    background: #fff;
+    cursor: pointer;
+    user-select: none;
+}
+.vas_104-qcBtn:hover { border-color: var(--gc-action); color: var(--gc-action); }
+.vas_104-qcBtn.vas_104-is-open {
+    background: var(--gc-info-bg);
+    border-color: var(--gc-info-bg);
+    color: var(--gc-info-tx);
+}
+
+/* A sibling of the line row, not a child, so it spans the table's full width
+   instead of living inside one grid cell. */
+.vas_104-qcDrawer {
+    border-bottom: 1px solid var(--gc-row-div);
+    background: #F7FAFD;
+    padding: 0.5em 0.875em 0.625em 1.75em;
+}
+
+.vas_104-qcRow {
+    display: grid;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.3125em 0;
+    grid-template-columns: 0.9fr 1.3fr 1.1fr 1.1fr 0.6fr 0.8fr;
+}
+.vas_104-qcHead {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--gc-muted);
+    border-bottom: 1px solid var(--gc-card-bd);
+}
+.vas_104-qcBody {
+    font-size: 0.75em;
+    color: var(--gc-text);
+    border-bottom: 1px solid #E8EFF6;
+}
+.vas_104-qcBody:last-child { border-bottom: none; }
+.vas_104-qcRow > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_104-qcTable .vas_104-ta-r { text-align: right; }
+.vas_104-qcTable .vas_104-ta-c { text-align: center; }
+
+/* An inspected value that matched what was asked for, and one that did not. */
+.vas_104-qcHit  { color: var(--gc-success-tx); font-weight: 700; }
+.vas_104-qcMiss { color: var(--gc-risk-tx);    font-weight: 700; }
 
 /* Status / QC tags */
 .vas_104-tag {
@@ -474,60 +602,135 @@
 .vas_104-tf.vas_104-is-grand { color: var(--gc-text); font-weight: 700; }
 .vas_104-tf.vas_104-is-grand b { color: var(--gc-risk-tx); margin-left: 0.375em; }
 
-@container (max-width: 760px) {
+@container (max-width: 700px) {
     .vas_104-table { overflow-x: auto; }
     .vas_104-tRow,
-    .vas_104-root.vas_104-no-quality .vas_104-tRow { min-width: 760px; }
+    .vas_104-root.vas_104-no-quality .vas_104-tRow { min-width: 700px; }
+    /* The drawer travels with the rows it belongs to when the table scrolls. */
+    .vas_104-qcDrawer { min-width: 700px; }
 }
 
 /* ----------------------------------------------------------- */
-/*  Actions (visual buttons)                                    */
+/*  Notes + Activity                                            */
 /* ----------------------------------------------------------- */
-.vas_104-actions {
+/* The action bar (.vas_104-actions / .vas_104-btn) is gone with the Print and
+   Confirm buttons it held; both were presentational and neither did anything. */
+
+.vas_104-panelcard {
+    border: 1px solid var(--gc-card-bd);
+    border-radius: var(--gc-card-radius);
+    background: #fff;
+    padding: 0.25em 1em;
+}
+
+/* ---- Notes ---- */
+.vas_104-noteRow {
     display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 0.625em;
-    padding-top: 0.125em;
+    padding: 0.5625em 0;
+}
+.vas_104-noteRow + .vas_104-noteRow { border-top: 1px solid var(--gc-row-div); }
+.vas_104-noteTag {
+    flex: none;
+    border-radius: 999px;
+    padding: 0.125em 0.5em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+}
+.vas_104-noteTag.vas_104-n-header { background: var(--gc-info-bg);    color: var(--gc-info-tx); }
+.vas_104-noteTag.vas_104-n-line   { background: var(--gc-neutral-bg); color: var(--gc-neutral-tx); }
+.vas_104-noteTxt {
+    min-width: 0;
+    font-size: 0.8125em;
+    line-height: 1.5;
+    color: var(--gc-text);
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
-.vas_104-btn {
+/* ---- Activity ---- */
+.vas_104-actRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625em;
+    padding: 0.5625em 0;
+}
+.vas_104-actRow + .vas_104-actRow { border-top: 1px solid var(--gc-row-div); }
+
+.vas_104-actBadge {
+    flex: none;
     display: inline-flex;
     align-items: center;
-    gap: 0.4375em;
-    height: 2.25em;
-    padding: 0 1.125em;
-    border-radius: 999px;
-    font-size: 0.8125em;
+    gap: 0.3125em;
+    border-radius: 8px;
+    padding: 0.25em 0.5em;
+    font-size: 0.6875em;
     font-weight: 700;
-    line-height: 1;
-    cursor: pointer;
-    user-select: none;
 }
-.vas_104-btn .vas_104-ic { color: currentColor; }
+.vas_104-actBadge .vas_104-ic svg { width: 0.85em; height: 0.85em; }
+.vas_104-actBadge.vas_104-tone-info    { background: var(--gc-info-bg);    color: var(--gc-info-tx); }
+.vas_104-actBadge.vas_104-tone-success { background: var(--gc-success-bg); color: var(--gc-success-tx); }
+.vas_104-actBadge.vas_104-tone-neutral { background: var(--gc-neutral-bg); color: var(--gc-neutral-tx); }
 
-.vas_104-btn.vas_104-btn-pri {
-    background: var(--gc-action);
-    border: 1px solid var(--gc-action);
+/* Headline left, "when · by whom" right, wrapping when the two cannot share a
+   line. margin-left:auto keeps the stamp right-aligned even when it wraps onto
+   a line of its own. */
+.vas_104-actMain {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.125em 0.75em;
+    align-items: baseline;
+}
+.vas_104-actTitle { min-width: 0; font-size: 0.8125em; color: var(--gc-text); }
+/* A NOTE's headline is the comment itself: it wraps (to three lines) rather
+   than running off the row, since that text is what the reader came for. */
+.vas_104-actTitle.vas_104-multiline {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.vas_104-actWhen {
+    flex: none;
+    margin-left: auto;
+    max-width: 100%;
+    font-size: 0.6875em;
+    color: var(--gc-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ----------------------------------------------------------- */
+/*  Toast (source-document link failure)                        */
+/* ----------------------------------------------------------- */
+.vas_104-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 1.25em;
+    transform: translate(-50%, 0.75em);
+    z-index: 1000;
+    max-width: 90%;
+    padding: 0.5em 0.875em;
+    border-radius: 8px;
+    font-size: 0.8125em;
     color: #fff;
-}
-.vas_104-btn.vas_104-btn-pri:hover { background: var(--gc-action-dk); border-color: var(--gc-action-dk); }
-
-.vas_104-btn.vas_104-btn-sec {
-    background: #fff;
-    border: 1px solid var(--gc-action);
-    color: var(--gc-action);
-}
-.vas_104-btn.vas_104-btn-sec:hover { background: var(--gc-info-bg); }
-
-.vas_104-btn.vas_104-is-disabled {
-    background: #F1F4F7;
-    border-color: #DCE5EE;
-    color: #A6B2BD;
-    cursor: default;
+    opacity: 0;
+    transition: opacity .25s ease, transform .25s ease;
     pointer-events: none;
 }
+.vas_104-toast.vas_104-ok  { background: var(--gc-success-tx); }
+.vas_104-toast.vas_104-err { background: var(--gc-risk-tx); }
+.vas_104-toast.vas_104-show { opacity: 1; transform: translate(-50%, 0); }
 
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
@@ -536,4 +739,52 @@
 [dir="rtl"] .vas_104-table .vas_104-ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .vas_104-tFoot { justify-content: flex-start; }
 [dir="rtl"] .vas_104-tf b { margin-left: 0; margin-right: 0.375em; }
-[dir="rtl"] .vas_104-actions { justify-content: flex-start; }
+/* The stacked scrapped cell and the quality drawer mirror with the table. */
+[dir="rtl"] .vas_104-scrapCell { align-items: flex-start; }
+[dir="rtl"] .vas_104-qcDrawer { padding-left: 0.875em; padding-right: 1.75em; }
+[dir="rtl"] .vas_104-qcTable .vas_104-ta-r { text-align: left; }
+[dir="rtl"] .vas_104-actWhen { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .vas_104-pgBtn .vas_104-ic svg { transform: scaleX(-1); }
+
+/* ----------------------------------------------------------- */
+/*  Activity pager                                              */
+/* ----------------------------------------------------------- */
+/* A sibling of the list card, so the controls keep their place while the card's
+   rows are replaced underneath them. Modelled on the VAS_106 pager. */
+.vas_104-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5em 0.75em;
+    margin-top: 0.5em;
+    font-size: 0.75em;
+    color: var(--gc-muted);
+}
+
+.vas_104-pgCtrls { display: inline-flex; align-items: center; gap: 0.5em; }
+.vas_104-pgPos   { color: var(--gc-text); font-weight: 700; }
+
+.vas_104-pgBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border: 1px solid var(--gc-card-bd);
+    border-radius: 999px;
+    background: #fff;
+    padding: 0.3125em 0.75em;
+    color: var(--gc-action);
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.vas_104-pgBtn:hover { background: var(--gc-info-bg); border-color: var(--gc-action); }
+.vas_104-pgBtn .vas_104-ic { color: currentColor; }
+.vas_104-pgBtn.vas_104-is-disabled {
+    opacity: .45;
+    cursor: default;
+    pointer-events: none;
+    color: var(--gc-muted);
+}
