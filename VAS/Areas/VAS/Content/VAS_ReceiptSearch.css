@@ -135,7 +135,11 @@
     border-radius: 0.875em;           /* 14px */
     box-shadow: 0 1em 2.25em rgba(15, 61, 97, 0.16);
     padding: 0.375em;
-    z-index: 1000;
+    /* Stacking, deliberately in a narrow band BELOW 100 (was 1000): the filter popover has to sit
+       ABOVE this dropdown, and everything the popover's lookups open must sit above the popover —
+       their type-ahead menu is jQuery UI .ui-front (100) and the Info window rides
+       .web_dialog_overlay (101) / .vis-PopupWrap (102). Anything higher buries them. */
+    z-index: 90;
     display: none;
     max-height: 26.25em;              /* ~420px */
     overflow-y: auto;
@@ -166,9 +170,11 @@
         font-weight: 700;
     }
 
+/* Three columns: avatar · text · figures. The amount and the account date sit in that last
+   column so they align down the list instead of drifting with the meta line's length. */
 .vas-rsw-line {
     display: grid;
-    grid-template-columns: 2.125em 1fr;
+    grid-template-columns: 2.125em 1fr auto;
     align-items: center;
     gap: 0.75em;
     padding: 0.5625em 0.75em;
@@ -227,6 +233,26 @@
     margin-top: 0.125em;
 }
 
+/* ── Right-hand figures column: amount over date, right-aligned ── */
+.vas-rsw-metacol {
+    text-align: right;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas-rsw-amount {
+    font-size: 0.875em;               /* 14px — same weight class as the name */
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.25;
+}
+
+.vas-rsw-date {
+    font-size: 0.75em;                /* 12px — matches the meta line */
+    color: #748494;
+    margin-top: 0.125em;
+}
+
 .vas-rsw-dot {
     display: inline-block;
     width: 0.4375em;                  /* 7px */
@@ -277,6 +303,227 @@
     .vas-rsw-empty strong {
         color: #102C3F;
     }
+
+/* ═══════════════ Filter popover ═══════════════
+   Funnel button inside the search pill plus a body-mounted panel: an Account Date range, a bank
+   account lookup, an amount band and a currency lookup. Same structure as the VAS_068 AP Payment
+   search popover, restyled into this widget's vas-rsw-* namespace and em-only scale. */
+
+/* ── Funnel button in the pill ── */
+.vas-rsw-filter {
+    position: relative;
+    width: 2em;                       /* 32px — matches .vas-rsw-clear */
+    height: 2em;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: #748494;
+    border-radius: 50%;
+    transition: background 150ms ease, color 150ms ease;
+}
+
+    .vas-rsw-filter:hover {
+        background: #F4F7FA;
+    }
+
+    /* Filters applied: accent colour + dot badge. */
+    .vas-rsw-filter.is-on {
+        color: #0083DA;
+    }
+
+.vas-rsw-filter-dot {
+    display: none;
+    position: absolute;
+    top: 0.1875em;
+    right: 0.1875em;
+    width: 0.375em;
+    height: 0.375em;
+    border-radius: 50%;
+    background: #0083DA;
+}
+
+.vas-rsw-filter.is-on .vas-rsw-filter-dot {
+    display: block;
+}
+
+/* ── Popover (appended to <body>, fixed under the pill) ── */
+.vas-rsw-filters {
+    position: fixed;
+    box-sizing: border-box;
+    width: 22em;                      /* 352px */
+    max-width: calc(100vw - 1em);
+    background: #FFFFFF;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.875em;           /* 14px */
+    box-shadow: 0 1em 2.25em rgba(15, 61, 97, 0.16);
+    font-size: 1em;
+    color: #102C3F;
+    padding: 0.9em;
+    /* Above the suggest dropdown (90), below every framework lookup layer (100 / 101 / 102). */
+    z-index: 95;
+    display: none;
+}
+
+    .vas-rsw-filters.is-open {
+        display: block;
+    }
+
+.vas-rsw-frow + .vas-rsw-frow {
+    margin-top: 0.75em;
+}
+
+.vas-rsw-flabel {
+    font-size: 0.75em;                /* 12px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 0.35em;
+}
+
+.vas-rsw-fpair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5em;
+}
+
+/* The cell sets the 0.75em control context; only the caption steps down, so a native date input
+   and a framework control (both 1em) end up exactly the same size. */
+.vas-rsw-fpair label {
+    display: block;
+    margin: 0;
+    font-size: 0.75em;
+    font-weight: 500;
+    color: #748494;
+}
+
+    .vas-rsw-fpair label span {
+        display: block;
+        font-size: 0.9167em;
+        margin-bottom: 0.25em;
+    }
+
+.vas-rsw-fslot {
+    display: block;
+}
+
+/* Underline fields (framework borderless style): bottom rule only, no box, no radius. High
+   specificity + !important to defeat the global core input styling, as the pill's field does. */
+.vas-rsw-filters .vas-rsw-fpair input[type=date],
+.vas-rsw-filters .vas-rsw-fpair input[type=date]:focus,
+.vas-rsw-filters .vas-rsw-fctrl,
+.vas-rsw-filters .vas-rsw-fctrl:focus {
+    width: 100%;
+    height: 2.375em;
+    padding: 0 0.25em !important;
+    margin: 0 !important;
+    /* Filter fields read one step larger than their captions - 1.2em of the 0.75em row context.
+       The em height/padding above scale with it, so the field grows as a whole. */
+    font-size: 1.2em;
+    color: #102C3F;
+    background: transparent !important;
+    border: 0 none !important;
+    border-bottom: 0.0625em solid #E4EDF4 !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+    .vas-rsw-filters .vas-rsw-fpair input[type=date]:focus,
+    .vas-rsw-filters .vas-rsw-fctrl:focus {
+        border-bottom-color: #BFE4FF !important;
+    }
+
+/* Full-width lookup row (bank account, currency): ONE underlined field spanning the control and
+   its lookup button — the rule belongs to the row, so it runs unbroken beneath both. */
+.vas-rsw-flookup {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-size: 0.75em;
+    border-bottom: 0.0625em solid #E4EDF4;
+}
+
+    .vas-rsw-flookup:focus-within {
+        border-bottom-color: #BFE4FF;
+    }
+
+    .vas-rsw-flookup > input {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+/* The row owns the underline; the field inside must not draw a second one. */
+.vas-rsw-filters .vas-rsw-flookup .vas-rsw-fctrl,
+.vas-rsw-filters .vas-rsw-flookup .vas-rsw-fctrl:focus {
+    border-bottom: 0 none !important;
+}
+
+.vas-rsw-fbtnwrap {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+}
+
+    /* The framework's lookup button keeps its glyph, drops all chrome and takes the accent
+       colour — it reads as the field's trailing affordance. */
+    .vas-rsw-fbtnwrap > * {
+        height: 2.375em;
+        min-width: 1.75em;
+        padding: 0 0.25em;
+        border: 0 none;
+        background: transparent;
+        color: #0083DA;
+        cursor: pointer;
+        box-shadow: none;
+    }
+
+        .vas-rsw-fbtnwrap > *:hover {
+            color: #0072BE;
+        }
+
+.vas-rsw-ferror {
+    margin: 0.6em 0 0;
+    font-size: 0.75em;
+    color: #C0392B;
+}
+
+    .vas-rsw-ferror:empty {
+        display: none;
+    }
+
+.vas-rsw-factions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5em;
+    margin-top: 0.9em;
+}
+
+.vas-rsw-fbtn {
+    border: 0 none;
+    border-radius: 0.5em;
+    padding: 0.45em 0.9em;
+    font-size: 0.8125em;              /* 13px */
+    font-weight: 700;
+    cursor: pointer;
+    background: #F4F7FA;
+    color: #102C3F;
+    transition: background 150ms ease;
+}
+
+    .vas-rsw-fbtn:hover {
+        background: #E9F1F8;
+    }
+
+    .vas-rsw-fbtn.is-primary {
+        background: #0083DA;
+        color: #FFFFFF;
+    }
+
+        .vas-rsw-fbtn.is-primary:hover {
+            background: #0072BE;
+        }
 
 /* Narrow-cell safety — container-based (matches the cqi font anchor) so the height
    responds to the dashboard CELL width, not the viewport. Fires when the widget cell

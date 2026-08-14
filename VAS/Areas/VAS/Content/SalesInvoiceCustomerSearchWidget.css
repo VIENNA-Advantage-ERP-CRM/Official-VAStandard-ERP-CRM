@@ -134,7 +134,9 @@
     border-radius: 14px;
     box-shadow: 0 16px 36px rgba(15, 61, 97, 0.16);
     padding: 0.375em;
-    z-index: 1000;
+    /* Bottom of the widget's own stacking band: the filter panel (95) overlays this, and both stay
+       under the framework's 100+ layers so a lookup's menu / Info window is never buried. */
+    z-index: 90;
     display: none;
     max-height: 26.25em;              /* ~420px */
     overflow-y: auto;
@@ -165,9 +167,10 @@
         font-weight: 700;
     }
 
+/* avatar | customer + meta (flexes) | amount + date (sized to content, right edge) */
 .vas-sics-line {
     display: grid;
-    grid-template-columns: 2.125em 1fr;
+    grid-template-columns: 2.125em minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.75em;
     padding: 0.5625em 0.75em;
@@ -225,6 +228,28 @@
     margin-top: 0.125em;
 }
 
+/* ── Right-hand column: grand total over invoice date ──
+   The amount carries the row's weight (same size/weight as the customer name); the date sits
+   under it in the muted meta tone. Both right-aligned and kept on one line so the column edge
+   stays straight down the list. */
+.vas-sics-side {
+    text-align: end;
+    white-space: nowrap;
+    justify-self: end;
+}
+
+.vas-sics-amt {
+    font-size: 0.875em;               /* 14px — matches .vas-sics-name */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-sics-date {
+    font-size: 0.75em;                /* 12px — matches .vas-sics-rowmeta */
+    color: #748494;
+    margin-top: 0.125em;
+}
+
 .vas-sics-dot {
     display: inline-block;
     width: 0.4375em;                  /* 7px */
@@ -256,6 +281,259 @@
     padding: 0.625em 0.75em;
     color: #748494;
     font-size: 0.6875em;              /* 11px — matches the meta count line */
+}
+
+/* ── Date-filter button (funnel) inside the pill ── */
+.vas-sics-filter {
+    position: relative;
+    width: 2em;                       /* 32px — matches the clear button */
+    height: 2em;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: #748494;
+    border-radius: 50%;
+    transition: background 150ms ease, color 150ms ease;
+}
+
+    .vas-sics-filter:hover {
+        background: #F4F7FA;
+    }
+
+    /* Applied ranges: the funnel takes the accent colour and shows its dot badge. */
+    .vas-sics-filter.is-active {
+        color: #0083DA;
+    }
+
+.vas-sics-filter-dot {
+    display: none;
+    position: absolute;
+    top: 0.25em;
+    right: 0.25em;
+    width: 0.4375em;                  /* 7px */
+    height: 0.4375em;
+    border-radius: 50%;
+    background: #0083DA;
+}
+
+.vas-sics-filter.is-active .vas-sics-filter-dot {
+    display: block;
+}
+
+/* ── Date-range popover (mounted on body, fixed — same layer treatment as the
+      suggest dropdown so the dashboard cell cannot clip it) ── */
+.vas-sics-filters {
+    position: fixed;
+    font-size: 1em;
+    width: 21.875em;                  /* ~350px */
+    max-width: calc(100vw - 1em);
+    background: #FFFFFF;
+    /* Borders / radii / shadow offsets in px (design.md — must not scale). */
+    border: 1px solid #E4EDF4;
+    border-radius: 14px;
+    box-shadow: 0 16px 36px rgba(15, 61, 97, 0.16);
+    padding: 0.875em;
+    /* Stacking, deliberately in a narrow band BELOW 100 (see .vas-sics-suggest): above the results
+       list so the panel overlays it, but under every framework layer the currency lookup needs —
+       its type-ahead menu is jQuery UI .ui-front (100) and its Info window rides
+       .web_dialog_overlay (101) / .vis-PopupWrap (102). Anything higher here buries them. */
+    z-index: 95;
+    display: none;
+}
+
+    .vas-sics-filters.is-open {
+        display: block;
+    }
+
+.vas-sics-frow + .vas-sics-frow {
+    margin-top: 0.75em;
+}
+
+.vas-sics-flabel {
+    font-size: 0.86em;                /* 12px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 0.375em;
+}
+
+.vas-sics-fpair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5em;
+}
+
+    /* The cell sets the 12px control context; only the caption steps down to 11px, so a native
+       date input and a framework control (both 1em) end up exactly the same size. */
+    .vas-sics-fpair label {
+        display: block;
+        margin: 0;
+        font-size: 0.75em;            /* 12px — the control context */
+        color: #748494;
+        font-weight: 500;
+    }
+
+        .vas-sics-fpair label span {
+            display: block;
+            font-size: 0.9167em;      /* ~11px caption */
+            margin-bottom: 0.25em;
+        }
+
+    /* High specificity to defeat the global core <input> styling, as the pill field does.
+       Underline field: bottom rule only, no box, no radius — matches the framework controls
+       sitting next to them in the Amount / Currency rows. */
+    .vas-sics-filters .vas-sics-fpair input[type=date],
+    .vas-sics-filters .vas-sics-fpair input[type=date]:focus {
+        width: 100%;
+        height: 2.375em;
+        padding: 0 0.25em !important;
+        margin: 0 !important;
+        font-size: 1em;               /* 12px, from the cell context */
+        color: #102C3F;
+        background: transparent !important;
+        border: 0 none !important;
+        border-bottom: 1px solid #e4edf4 !important;
+        /* border-radius: 8px !important; */
+        box-shadow: none !important;
+        outline: none !important;
+    }
+
+        .vas-sics-filters .vas-sics-fpair input[type=date]:focus {
+            border-bottom-color: #BFE4FF !important;
+        }
+
+/* Slot that hosts a framework control (VAmountTextBox / VTextBoxButton) inside a From/To cell. */
+.vas-sics-fslot {
+    display: block;
+}
+
+/* Currency row: ONE underlined field that spans the text box and its lookup button — the rule
+   belongs to the row, not to the two controls, so it runs unbroken beneath both (framework
+   floating-label field look). Steps down to the same 12px control context the From/To cells use,
+   so every control in the popover matches. */
+.vas-sics-fcur {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-size: 0.88em;                /* 12px */
+    border-bottom: 1px solid #e4edf4;
+}
+
+    .vas-sics-fcur:focus-within {
+        border-bottom-color: #BFE4FF;
+    }
+
+    .vas-sics-fcur .vas-sics-fslot,
+    .vas-sics-fcur > input {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    /* The row owns the underline; the field inside it must not draw a second one. */
+    .vas-sics-filters .vas-sics-fcur .vas-sics-fctrl,
+    .vas-sics-filters .vas-sics-fcur .vas-sics-fctrl:focus {
+        border-bottom: 0 none !important;
+    }
+
+.vas-sics-fbtnwrap {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+}
+
+    /* The framework's own lookup button keeps its glyph, drops all chrome, and takes the accent
+       colour — it reads as the field's trailing affordance, like a native caret. */
+    .vas-sics-fbtnwrap > * {
+        height: 2.375em;
+        min-width: 1.75em;
+        padding: 0 0.25em;
+        border: 0 none;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        color: #0083DA;
+        cursor: pointer;
+    }
+
+        .vas-sics-fbtnwrap > *:hover {
+            color: #0072BE;
+        }
+
+/* Framework controls (amount boxes, currency lookup) styled to match the native date inputs —
+   high specificity + !important to defeat the global core input styling, as the pill field does. */
+.vas-sics-filters .vas-sics-fctrl,
+.vas-sics-filters .vas-sics-fctrl:focus {
+    width: 100%;
+    height: 2.375em;
+    padding: 0 0.25em !important;
+    margin: 0 !important;
+    font-size: 1em;                   /* inherits the 12px control context of its cell */
+    color: #102C3F;
+    background: transparent !important;
+    /* Underline field (framework borderless style): bottom rule only, no box, no radius. */
+    border: 0 none !important;
+    border-bottom: 1px solid #e4edf4 !important;
+    /* border-radius: 8px !important; */
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+    .vas-sics-filters .vas-sics-fctrl:focus {
+        border-bottom-color: #BFE4FF !important;
+    }
+
+/* Reversed-range message — the popover stays open until it's fixed. */
+.vas-sics-ferror {
+    margin: 0.625em 0 0;
+    min-height: 0;
+    font-size: 0.6875em;              /* 11px */
+    font-weight: 600;
+    color: #C0392B;
+}
+
+    .vas-sics-ferror:empty {
+        display: none;
+    }
+
+.vas-sics-factions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5em;
+    margin-top: 0.875em;
+}
+
+.vas-sics-fbtn {
+    padding: 0.4375em 0.875em;
+    font-size: 0.75em;                /* 12px */
+    font-weight: 600;
+    color: #102C3F;
+    background: #F4F7FA;
+    border: 1px solid #E4EDF4;        /* px (design.md — borders don't scale) */
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+
+    .vas-sics-fbtn:hover {
+        background: #E9F1F8;
+    }
+
+.vas-sics-fbtn--primary {
+    color: #FFFFFF;
+    background: #0083DA;
+    border-color: #0083DA;
+}
+
+    .vas-sics-fbtn--primary:hover {
+        background: #0072BE;
+    }
+
+/* Applied-range echo on the count line, when a text term is also present. */
+.vas-sics-metafilter {
+    color: #0083DA;
 }
 
 /* Narrow-cell safety — container-based (matches the cqi font anchor) so the
