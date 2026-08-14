@@ -18,6 +18,22 @@
  *   VAS_DocSearch_Invoice     => "Invoice"
  *   VAS_Allocated             => "Allocated"
  *   VAS_Reconciled            => "Reconciled"
+ *   VAS_068_AcctDate          => "Account Date"
+ *   VAS_068_BankAccount       => "Bank Account"
+ *   VAS_063_Filters           => "Filters"          (filter popover, shared with VAS_063 / VAS_067)
+ *   VAS_063_Amount            => "Amount"
+ *   VAS_063_Currency          => "Currency"
+ *   VAS_063_From / VAS_063_To => "From" / "To"
+ *   VAS_063_Apply             => "Apply"
+ *   VAS_063_ClearAll          => "Clear all"
+ *   VAS_063_InvalidRange      => '"From" date must be on or before "To"'
+ *   VAS_063_InvalidAmountRange=> '"From" amount must be less than or equal to "To"'
+ *
+ * Filters (funnel button, AND'ed on top of the term): Account Date (C_Payment.DateAcct),
+ * Bank Account (C_Payment.C_BankAccount_ID), a payment-amount band on PayAmt and a Currency
+ * restriction. The amounts use the framework VAmountTextBox; the bank account and the currency
+ * both use a VTextBoxButton Search lookup, so the decimal separator and the lookups behave as in
+ * a standard window. A filter on its own is a valid search - the term may stay empty.
  *
  * Result row: initials avatar, vendor name as the headline, then one
  * dot-separated meta line - status dot + doc no, document type, bank
@@ -61,6 +77,19 @@
         var hasMore = false;
         var isLoadingMore = false;
 
+        /* ---- Filter popover (mounted on <body>, like the results panel) ---- */
+        var $filterBtn = null, $filters = null;
+        /* Applied filters. Dates are ISO yyyy-MM-dd, amounts plain numbers, bank account a
+           C_BankAccount_ID and currency a C_Currency_ID; '' / 0 = no bound. They NARROW the term;
+           with an empty term they ARE the search. */
+        var filterState = {
+            acctFrom: '', acctTo: '', bankAccountId: 0, bankAccountName: '',
+            amtFrom: '', amtTo: '', currencyId: 0, currencyName: ''
+        };
+        /* Framework controls inside the popover; null when VIS.Controls is unavailable (the
+           popover then falls back to plain inputs / drops the lookup rows). */
+        var amtFromCtrl = null, amtToCtrl = null, bankCtrl = null, currencyCtrl = null;
+
         /* ---- Initialise ---- */
         this.initalize = function () {
             widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) !== 0
@@ -92,11 +121,24 @@
 
             var $clear = $('<button type="button" class="vas-dssrch-clear" tabindex="-1">&#215;</button>');
             $bar.append($clear);
+
+            /* Funnel — opens the filter popover. The dot badge lights up while any filter is
+               applied, so the narrowing is never invisible. */
+            $filterBtn = $('<button type="button" class="vas-dssrch-filter" tabindex="-1" ' +
+                'title="' + dsEsc(msg('VAS_063_Filters', 'Filters')) + '" ' +
+                'aria-label="' + dsEsc(msg('VAS_063_Filters', 'Filters')) + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+                'stroke-linecap="round" stroke-linejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>' +
+                '<span class="vas-dssrch-filter-dot"></span></button>');
+            $bar.append($filterBtn);
             $root.append($bar);
 
             // Dropdown lives on <body> so the dashboard cell's overflow:hidden
             // cannot clip it; positioned as a fixed popover under the bar.
-            $panel = $('<div class="vas-dssrch-panel" id="vas_dssrch_panel_' + widgetID + '">');
+            // vas-dssrch-panel--layered drops THIS widget's panel into the widget stacking band
+            // (see the CSS) so the filter popover can sit above it while both stay under the
+            // framework's lookup layers. The shared .vas-dssrch-panel z-index is left alone.
+            $panel = $('<div class="vas-dssrch-panel vas-dssrch-panel--layered" id="vas_dssrch_panel_' + widgetID + '">');
             $('body').append($panel);
             $panel.on('scroll', onPanelScroll);
 
@@ -111,7 +153,7 @@
             });
             $input.on('focus', function () {
                 var term = $.trim($input.val());
-                if (term.length >= MIN_LEN && $panel.children().length > 0) { openPanel(); }
+                if ((term.length >= MIN_LEN || hasFilters()) && $panel.children().length > 0) { openPanel(); }
             });
             $input.on('keydown', function (e) {
                 if (e.key === 'Escape' || e.keyCode === 27) { closePanel(); }
@@ -119,31 +161,364 @@
             $clear.on('click', function () {
                 $input.val('');
                 $bar.removeClass('vas-dssrch-has-text');
-                setBusy(false);
-                closePanel();
+                /* Clears the TERM only; the filters have their own "Clear all". */
+                if (hasFilters()) { setBusy(true); runSearch(''); }
+                else { setBusy(false); closePanel(); }
                 $input.focus();
+            });
+            $filterBtn.on('click', function (e) {
+                e.preventDefault();
+                if (filtersOpen()) { closeFilters(); } else { openFilters(); }
             });
 
             $self._onDocClick = function (e) {
+                /* The filter popover is deliberately NOT closed by an outside click: it holds
+                   framework lookups whose Info window lives outside both elements, and losing
+                   half-set filters to a stray click is worse than leaving it up. It closes on the
+                   funnel toggle, Escape or Apply. */
                 if (!$panel.hasClass('vas-dssrch-open')) { return; }
                 if ($bar[0].contains(e.target) || $panel[0].contains(e.target)) { return; }
+                if ($filters && $filters[0].contains(e.target)) { return; }
                 closePanel();
             };
+            /* Both layers are position:fixed against the bar, so they re-anchor on every scroll.
+               The dashboard scrolls its OWN container and scroll events do not bubble, hence the
+               capture-phase listener on window/document (registered below with `true`). */
             $self._onReflow = function () {
                 if ($panel.hasClass('vas-dssrch-open')) { positionPanel(); }
+                if (filtersOpen()) { positionFilters(); }
             };
             document.addEventListener('mousedown', $self._onDocClick, true);
             window.addEventListener('resize', $self._onReflow, true);
             window.addEventListener('scroll', $self._onReflow, true);
         }
 
+        /* ================= Filter popover =================
+           An Account Date range, a bank account, a payment-amount band and a currency restriction;
+           every bound optional and open-endable. Dates are native <input type="date"> (always ISO
+           on the wire); the amounts, the bank account and the currency use the framework's own
+           controls so the decimal separator and the lookups behave exactly as in a standard
+           window. */
+        function hasFilters() {
+            return !!(filterState.acctFrom || filterState.acctTo || filterState.bankAccountId ||
+                filterState.amtFrom !== '' || filterState.amtTo !== '' || filterState.currencyId);
+        }
+
+        /* "Account Date 2026-01-01 → 2026-01-31" pieces for the count line, so a filter-only
+           search still says what it searched for. */
+        function filterSummary() {
+            var parts = [];
+            if (filterState.acctFrom || filterState.acctTo) {
+                parts.push(msg('VAS_068_AcctDate', 'Account Date') + ' ' +
+                    (filterState.acctFrom || '…') + ' → ' + (filterState.acctTo || '…'));
+            }
+            if (filterState.bankAccountId) {
+                parts.push(msg('VAS_068_BankAccount', 'Bank Account') + ' ' +
+                    (filterState.bankAccountName || filterState.bankAccountId));
+            }
+            if (filterState.amtFrom !== '' || filterState.amtTo !== '') {
+                parts.push(msg('VAS_063_Amount', 'Amount') + ' ' +
+                    (filterState.amtFrom === '' ? '…' : filterState.amtFrom) + ' → ' +
+                    (filterState.amtTo === '' ? '…' : filterState.amtTo));
+            }
+            if (filterState.currencyId) {
+                parts.push(msg('VAS_063_Currency', 'Currency') + ' ' + (filterState.currencyName || filterState.currencyId));
+            }
+            return parts.join(' · ');
+        }
+
+        function dateRangeHtml(title, fromId, toId) {
+            return '<div class="vas-dssrch-frow"><div class="vas-dssrch-flabel">' + dsEsc(title) + '</div>' +
+                '<div class="vas-dssrch-fpair">' +
+                '<label><span>' + dsEsc(msg('VAS_063_From', 'From')) + '</span><input type="date" id="' + fromId + '"></label>' +
+                '<label><span>' + dsEsc(msg('VAS_063_To', 'To')) + '</span><input type="date" id="' + toId + '"></label>' +
+                '</div></div>';
+        }
+
+        /* Amount row carries EMPTY slots; the framework controls are injected once the popover is
+           in the DOM (a framework control must be built, then appended). */
+        function slotRangeHtml(title, fromSlotId, toSlotId) {
+            return '<div class="vas-dssrch-frow"><div class="vas-dssrch-flabel">' + dsEsc(title) + '</div>' +
+                '<div class="vas-dssrch-fpair">' +
+                '<label><span>' + dsEsc(msg('VAS_063_From', 'From')) + '</span><span class="vas-dssrch-fslot" id="' + fromSlotId + '"></span></label>' +
+                '<label><span>' + dsEsc(msg('VAS_063_To', 'To')) + '</span><span class="vas-dssrch-fslot" id="' + toSlotId + '"></span></label>' +
+                '</div></div>';
+        }
+
+        /* Single full-width lookup row (bank account, currency) - one underline spanning the
+           control and its button. */
+        function lookupRowHtml(title, slotId) {
+            return '<div class="vas-dssrch-frow"><div class="vas-dssrch-flabel">' + dsEsc(title) + '</div>' +
+                '<div class="vas-dssrch-fcur" id="' + slotId + '"></div></div>';
+        }
+
+        function frameworkCtrlsAvailable() {
+            return !!(window.VIS && VIS.Controls && VIS.DisplayType && VIS.Env);
+        }
+
+        function buildAmountControls(uid) {
+            var slots = [$filters.find('#' + uid + 'AmtFromSlot'), $filters.find('#' + uid + 'AmtToSlot')];
+            if (!frameworkCtrlsAvailable() || !VIS.Controls.VAmountTextBox) {
+                slots[0].append('<input type="text" inputmode="decimal" class="vas-dssrch-fctrl" id="' + uid + 'AmtFrom">');
+                slots[1].append('<input type="text" inputmode="decimal" class="vas-dssrch-fctrl" id="' + uid + 'AmtTo">');
+                return;
+            }
+            try {
+                var DT = VIS.DisplayType;
+                amtFromCtrl = new VIS.Controls.VAmountTextBox('PayAmt', false, false, true, 50, 100, DT.Amount, msg('VAS_063_From', 'From'));
+                amtToCtrl = new VIS.Controls.VAmountTextBox('PayAmt', false, false, true, 50, 100, DT.Amount, msg('VAS_063_To', 'To'));
+                slots[0].append(amtFromCtrl.getControl().addClass('vas-dssrch-fctrl').css('width', '100%'));
+                slots[1].append(amtToCtrl.getControl().addClass('vas-dssrch-fctrl').css('width', '100%'));
+            } catch (e) {
+                if (window.console) { console.log(e); }
+                amtFromCtrl = null; amtToCtrl = null;
+            }
+        }
+
+        /* Bank account picker: the framework's C_BankAccount_ID Search lookup (VTextBoxButton +
+           its info button) - the same treatment as the currency row below, so both lookup rows
+           type-ahead and open an Info window. The where clause is inlined and carries no
+           window-context @tokens@, so windowNo 0 is fine for the lookup. */
+        function buildBankControl(uid) {
+            var $slot = $filters.find('#' + uid + 'BankSlot');
+            if (!frameworkCtrlsAvailable() || !VIS.Controls.VTextBoxButton || !VIS.MLookupFactory) {
+                $slot.closest('.vas-dssrch-frow').remove();
+                return;
+            }
+            try {
+                var DT = VIS.DisplayType;
+                var lookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), ($self.windowNo > 0 ? $self.windowNo : 0), 0, DT.Search,
+                    'C_BankAccount_ID', 0, false, " C_BankAccount.IsActive = 'Y' ");
+                bankCtrl = new VIS.Controls.VTextBoxButton('C_BankAccount_ID', false, false, true, DT.Search, lookup);
+                $slot.append(bankCtrl.getControl().addClass('vas-dssrch-fctrl').attr('data-hasbtn', ' ').css('width', '100%'));
+                var btn = bankCtrl.getBtn ? bankCtrl.getBtn(0) : null;
+                if (btn) { $slot.append($('<span class="vas-dssrch-fbtnwrap"></span>').append(btn)); }
+                /* getValue() only yields the id — keep the display text for the summary line. */
+                bankCtrl.fireValueChanged = function () {
+                    filterState.bankAccountName = bankDisplay();
+                };
+            } catch (e) {
+                if (window.console) { console.log(e); }
+                bankCtrl = null;
+                $slot.closest('.vas-dssrch-frow').remove();
+            }
+        }
+
+        /* The lookup's own label for the summary line. */
+        function bankDisplay() {
+            if (!bankCtrl) { return ''; }
+            try { return (bankCtrl.getDisplay ? bankCtrl.getDisplay() : '') || ''; }
+            catch (e) { return ''; }
+        }
+
+        /* Currency picker: the framework's C_Currency_ID Search lookup (VTextBoxButton + its info
+           button). */
+        function buildCurrencyControl(uid) {
+            var $slot = $filters.find('#' + uid + 'CurSlot');
+            if (!frameworkCtrlsAvailable() || !VIS.Controls.VTextBoxButton || !VIS.MLookupFactory) {
+                $slot.closest('.vas-dssrch-frow').remove();
+                return;
+            }
+            try {
+                var DT = VIS.DisplayType;
+                var lookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), ($self.windowNo > 0 ? $self.windowNo : 0), 0, DT.Search,
+                    'C_Currency_ID', 0, false, " C_Currency.IsActive = 'Y' ");
+                currencyCtrl = new VIS.Controls.VTextBoxButton('C_Currency_ID', false, false, true, DT.Search, lookup);
+                $slot.append(currencyCtrl.getControl().addClass('vas-dssrch-fctrl').attr('data-hasbtn', ' ').css('width', '100%'));
+                var btn = currencyCtrl.getBtn ? currencyCtrl.getBtn(0) : null;
+                if (btn) { $slot.append($('<span class="vas-dssrch-fbtnwrap"></span>').append(btn)); }
+                currencyCtrl.fireValueChanged = function () {
+                    filterState.currencyName = (currencyCtrl.getDisplay ? currencyCtrl.getDisplay() : '') || '';
+                };
+            } catch (e) {
+                if (window.console) { console.log(e); }
+                currencyCtrl = null;
+                $slot.closest('.vas-dssrch-frow').remove();
+            }
+        }
+
+        function ensureFilters() {
+            if ($filters) { return; }
+            /* Ids carry the widget instance so two copies on one dashboard never collide. */
+            var uid = 'vasPay' + widgetID;
+            $filters = $('<div class="vas-dssrch-filters" role="dialog" aria-label="' + dsEsc(msg('VAS_063_Filters', 'Filters')) + '">');
+            $filters.html(
+                dateRangeHtml(msg('VAS_068_AcctDate', 'Account Date'), uid + 'AcctFrom', uid + 'AcctTo') +
+                lookupRowHtml(msg('VAS_068_BankAccount', 'Bank Account'), uid + 'BankSlot') +
+                slotRangeHtml(msg('VAS_063_Amount', 'Amount'), uid + 'AmtFromSlot', uid + 'AmtToSlot') +
+                lookupRowHtml(msg('VAS_063_Currency', 'Currency'), uid + 'CurSlot') +
+                '<p class="vas-dssrch-ferror" role="alert"></p>' +
+                '<div class="vas-dssrch-factions">' +
+                '<button type="button" class="vas-dssrch-fbtn" data-act="clear">' + dsEsc(msg('VAS_063_ClearAll', 'Clear all')) + '</button>' +
+                '<button type="button" class="vas-dssrch-fbtn vas-dssrch-fbtn-primary" data-act="apply">' + dsEsc(msg('VAS_063_Apply', 'Apply')) + '</button>' +
+                '</div>');
+            $('body').append($filters);
+
+            $filters.data('ids', {
+                acctFrom: uid + 'AcctFrom', acctTo: uid + 'AcctTo',
+                amtFrom: uid + 'AmtFrom', amtTo: uid + 'AmtTo'
+            });
+            buildBankControl(uid);
+            buildAmountControls(uid);
+            buildCurrencyControl(uid);
+
+            /* Wrapped, not passed straight through: jQuery would hand the event object to
+               applyFilters as its keepOpen argument. */
+            $filters.on('click', '[data-act=apply]', function () { applyFilters(false); });
+            /* "Clear all" blanks the fields and re-runs the search but KEEPS the popover open. */
+            $filters.on('click', '[data-act=clear]', function () { clearFilterInputs(); applyFilters(true); });
+            $filters.on('keydown', function (e) {
+                if (e.key === 'Escape' || e.keyCode === 27) { closeFilters(); $input.focus(); return; }
+                if (e.key !== 'Enter' && e.keyCode !== 13) { return; }
+                /* A framework control owns its own Enter (the lookup searches on it). */
+                if ($(e.target).hasClass('vas-dssrch-fctrl')) { return; }
+                e.preventDefault(); e.stopPropagation();
+                applyFilters(false);
+            });
+        }
+
+        /* Paint one amount control: a number sets it, '' blanks it. setValue(null) leaves a
+           formatted zero behind on VAmountTextBox, so an empty bound clears the input directly. */
+        function setAmountCtrl(ctrl, fallbackId, value) {
+            if (!ctrl) { $filters.find('#' + fallbackId).val(value === '' ? '' : value); return; }
+            try {
+                if (value === '') { ctrl.setValue(null); ctrl.getControl().val(''); }
+                else { ctrl.setValue(value); }
+            } catch (e) { if (window.console) { console.log(e); } }
+        }
+
+        function clearFilterInputs() {
+            var ids = $filters.data('ids');
+            $filters.find('input[type=date]').val('');
+            setAmountCtrl(amtFromCtrl, ids.amtFrom, '');
+            setAmountCtrl(amtToCtrl, ids.amtTo, '');
+            if (bankCtrl) {
+                try { bankCtrl.setValue(null); } catch (e) { if (window.console) { console.log(e); } }
+                filterState.bankAccountName = '';
+            }
+            if (currencyCtrl) {
+                try { currencyCtrl.setValue(null); } catch (e) { if (window.console) { console.log(e); } }
+                filterState.currencyName = '';
+            }
+        }
+
+        /* Read one amount bound: the framework control when present, else the fallback input
+           (parsed against the user's decimal separator, never a raw parseFloat). */
+        function readAmount(ctrl, fallbackId) {
+            if (ctrl) {
+                var v = ctrl.getValue();
+                return (v === null || v === undefined || v === '' || isNaN(v)) ? '' : Number(v);
+            }
+            var raw = $.trim($filters.find('#' + fallbackId).val() || '');
+            if (!raw) { return ''; }
+            var pointed = (VIS.Env && VIS.Env.isDecimalPoint && !VIS.Env.isDecimalPoint())
+                ? raw.replace(/\./g, '').replace(',', '.')
+                : raw.replace(/,/g, '');
+            var n = Number(pointed);
+            return isNaN(n) ? '' : n;
+        }
+
+        function positionFilters() {
+            if (!$filters || !$bar || !$bar[0]) { return; }
+            var r = $bar[0].getBoundingClientRect();
+            var w = $filters.outerWidth() || 320;
+            var left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+            $filters.css({ left: Math.round(left) + 'px', top: Math.round(r.bottom + 6) + 'px' });
+        }
+
+        function filtersOpen() { return !!($filters && $filters.hasClass('vas-dssrch-open')); }
+
+        function openFilters() {
+            ensureFilters();
+            /* Repaint from the APPLIED state, so a popover closed without applying leaves no
+               half-typed values behind. */
+            var ids = $filters.data('ids');
+            $filters.find('#' + ids.acctFrom).val(filterState.acctFrom);
+            $filters.find('#' + ids.acctTo).val(filterState.acctTo);
+            setAmountCtrl(amtFromCtrl, ids.amtFrom, filterState.amtFrom);
+            setAmountCtrl(amtToCtrl, ids.amtTo, filterState.amtTo);
+            if (bankCtrl) {
+                try { bankCtrl.setValue(filterState.bankAccountId || null); } catch (e) { if (window.console) { console.log(e); } }
+            }
+            if (currencyCtrl) {
+                try { currencyCtrl.setValue(filterState.currencyId || null); } catch (e) { if (window.console) { console.log(e); } }
+            }
+            $filters.find('.vas-dssrch-ferror').text('');
+            $filters.addClass('vas-dssrch-open');
+            positionFilters();
+            $filters.find('input[type=date]').first().focus();
+        }
+
+        function closeFilters() {
+            if ($filters) { $filters.removeClass('vas-dssrch-open'); }
+        }
+
+        /* Read the popover into the applied state and re-run the search. A reversed range is
+           rejected in place (the popover stays open) rather than silently returning nothing.
+           keepOpen leaves the popover up afterwards (used by "Clear all"). */
+        function applyFilters(keepOpen) {
+            var ids = $filters.data('ids');
+            var next = {
+                acctFrom: $filters.find('#' + ids.acctFrom).val() || '',
+                acctTo: $filters.find('#' + ids.acctTo).val() || '',
+                bankAccountId: bankCtrl ? (parseInt(bankCtrl.getValue(), 10) || 0) : 0,
+                /* Read live rather than trusting fireValueChanged - the combo may have been set
+                   without firing it. */
+                bankAccountName: bankDisplay() || filterState.bankAccountName,
+                amtFrom: readAmount(amtFromCtrl, ids.amtFrom),
+                amtTo: readAmount(amtToCtrl, ids.amtTo),
+                currencyId: currencyCtrl ? (parseInt(currencyCtrl.getValue(), 10) || 0) : 0,
+                currencyName: filterState.currencyName
+            };
+            /* 0 in BOTH amount bounds is "no amount filter", not "payments of exactly zero".
+               (A single 0 bound stays meaningful: 0 → 5000 is a real band.) */
+            if (next.amtFrom === 0 && next.amtTo === 0) { next.amtFrom = ''; next.amtTo = ''; }
+            /* ISO strings compare lexicographically, so a plain > is a correct date compare. */
+            if (next.acctFrom && next.acctTo && next.acctFrom > next.acctTo) {
+                $filters.find('.vas-dssrch-ferror').text(msg('VAS_063_InvalidRange', '"From" date must be on or before "To"'));
+                return;
+            }
+            if (next.amtFrom !== '' && next.amtTo !== '' && next.amtFrom > next.amtTo) {
+                $filters.find('.vas-dssrch-ferror').text(msg('VAS_063_InvalidAmountRange', '"From" amount must be less than or equal to "To"'));
+                return;
+            }
+            if (!next.bankAccountId) { next.bankAccountName = ''; }
+            if (!next.currencyId) { next.currencyName = ''; }
+            filterState = next;
+            $filterBtn.toggleClass('vas-dssrch-filter-on', hasFilters());
+            if (!keepOpen) { closeFilters(); }
+            var term = $.trim($input.val());
+            if (term.length >= MIN_LEN || hasFilters()) { setBusy(true); runSearch(term); }
+            else { setBusy(false); closePanel(); }
+        }
+
         /* ---- Debounced search ---- */
         function scheduleSearch(term) {
             if (debounceTimer) { window.clearTimeout(debounceTimer); }
+            /* A filter on its own is a valid search, so an empty / too-short term keeps searching
+               while any filter is applied - the 2-character minimum only guards the bare term. */
+            if (term.length < MIN_LEN && hasFilters()) {
+                setBusy(true);
+                debounceTimer = window.setTimeout(function () { runSearch(term); }, 280);
+                return;
+            }
             if (term.length === 0) { setBusy(false); closePanel(); return; }
             if (term.length < MIN_LEN) { setBusy(false); renderHint(); return; }
             setBusy(true);
             debounceTimer = window.setTimeout(function () { runSearch(term); }, 280);
+        }
+
+        /* The filter values every request carries; empty bounds are sent as '' / 0 and ignored
+           server-side (open-ended). Amounts go over the wire as plain invariant numbers -
+           VAmountTextBox has already resolved the user's decimal separator. */
+        function searchParams(term, offset) {
+            return {
+                query: term, maxRows: PAGE_SIZE, offset: offset,
+                acctFrom: filterState.acctFrom, acctTo: filterState.acctTo,
+                bankAccountId: filterState.bankAccountId || 0,
+                amtFrom: filterState.amtFrom, amtTo: filterState.amtTo,
+                currencyId: filterState.currencyId || 0
+            };
         }
 
         function runSearch(term) {
@@ -154,7 +529,7 @@
             isLoadingMore = false;
             $.ajax({
                 url: VIS.Application.contextUrl + ENDPOINT,
-                data: { query: term, maxRows: PAGE_SIZE, offset: 0 },
+                data: searchParams(term, 0),
                 dataType: 'json',
                 async: true,
                 success: function (res) {
@@ -197,7 +572,7 @@
             showMoreSpinner(true);
             $.ajax({
                 url: VIS.Application.contextUrl + ENDPOINT,
-                data: { query: term, maxRows: PAGE_SIZE, offset: offset },
+                data: searchParams(term, offset),
                 dataType: 'json',
                 async: true,
                 success: function (res) {
@@ -275,6 +650,8 @@
 
         function updateCount() {
             var text = loadedCount + (hasMore ? '+' : '') + ' ' + msg('VAS_DocSearch_Results', 'results');
+            /* Echo the applied filters, so a filter-only search says what it searched for. */
+            if (hasFilters()) { text += ' · ' + filterSummary(); }
             $panel.find('.vas-dssrch-count').text(text);
         }
 
@@ -488,6 +865,14 @@
             setBusy(false);
             $panel.empty();
             closePanel();
+            /* A refresh resets the filters too, so the widget comes back in its neutral state. */
+            closeFilters();
+            filterState = {
+                acctFrom: '', acctTo: '', bankAccountId: 0, bankAccountName: '',
+                amtFrom: '', amtTo: '', currencyId: 0, currencyName: ''
+            };
+            if ($filterBtn) { $filterBtn.removeClass('vas-dssrch-filter-on'); }
+            if ($filters) { clearFilterInputs(); }
         };
 
         this.getRoot = function () { return $root; };
@@ -500,6 +885,9 @@
                 window.removeEventListener('scroll', $self._onReflow, true);
             }
             if ($panel) { $panel.remove(); }
+            /* Both body-mounted layers must go with the widget, or they outlive the dashboard cell. */
+            if ($filters) { $filters.remove(); $filters = null; }
+            amtFromCtrl = null; amtToCtrl = null; bankCtrl = null; currencyCtrl = null;
         };
     };
 

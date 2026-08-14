@@ -522,9 +522,10 @@
 .vas-dssrch-state-error svg { color: #C0392B; }
 
 /* ==========================================================
-   Filter popover (VAS_067) — funnel button in the bar plus a body-mounted panel with two date
-   ranges, an amount band and a currency lookup. Only the widgets that render this markup are
-   affected; the shared bar / panel rules above are untouched.
+   Filter popover (VAS_067, VAS_068) — funnel button in the bar plus a body-mounted panel of
+   filter rows: date ranges, an amount band and full-width lookups (currency; bank account on
+   VAS_068). Only the widgets that render this markup are affected; the shared bar / panel rules
+   above are untouched.
    ========================================================== */
 
 /* ---------- Funnel button in the search bar ---------- */
@@ -596,7 +597,6 @@
     font-size: 0.75rem;
     font-weight: 700;
     color: #102C3F;
-    margin-bottom: 0.35rem;
 }
 
 .vas-dssrch-fpair {
@@ -647,8 +647,8 @@
     border-bottom-color: #B6DEFB !important;
 }
 
-/* Currency row: ONE underlined field spanning the text box and its lookup button — the rule
-   belongs to the row, so it runs unbroken beneath both. */
+/* Full-width lookup row (currency, bank account): ONE underlined field spanning the control and
+   its lookup button — the rule belongs to the row, so it runs unbroken beneath both. */
 .vas-dssrch-fcur {
     display: flex;
     align-items: center;
