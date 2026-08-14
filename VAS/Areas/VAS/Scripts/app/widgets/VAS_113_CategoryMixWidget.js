@@ -338,49 +338,63 @@
 
             var start = modalState.page * MODAL_PER_PAGE;
             var end = Math.min(start + MODAL_PER_PAGE, totalItems);
-            var pct = Math.round(sharePct(category)) + '%';
 
-            var facts =
-                '<div class="MPC-cm-form-grid">' +
-                    fieldHtml(label('VAS_113_Category', 'Category'), category.name, true) +
-                    fieldHtml(label('VAS_113_ActiveItemsLabel', 'Active items'), formatQty(category.active_items)) +
-                    fieldHtml(label('VAS_113_Share', 'Share'), pct) +
-                    fieldHtml(label('VAS_113_Sample', 'Sample'), (totalItems ? (end - start) : 0) + ' ' + label('VAS_Of', 'of') + ' ' + totalItems) +
-                '</div>';
+            var showStockColumns = !totalItems || items.some(function (item) {
+                return !item.product_type || item.product_type === 'I';
+            });
+            var colCount = showStockColumns ? 4 : 2;
 
             var rowsHtml = '';
             var shownRows = 0;
             if (!totalItems) {
-                rowsHtml = '<tr><td class="MPC-cm-td-empty" colspan="4">' + escapeHtml(label('VAS_113_NoCategories', 'No items.')) + '</td></tr>';
+                rowsHtml = '<tr><td class="MPC-cm-td-empty" colspan="' + colCount + '">' + escapeHtml(label('VAS_113_NoCategories', 'No items.')) + '</td></tr>';
                 shownRows = 1;
             } else {
                 for (var index = start; index < end; index++) {
                     var item = items[index];
+                    var isItem = !item.product_type || item.product_type === 'I';
                     rowsHtml +=
                         '<tr>' +
                             '<td class="MPC-cm-td-s">' + escapeHtml(item.sku) + '</td>' +
-                            '<td class="MPC-cm-td-s">' + escapeHtml(item.name) + '</td>' +
-                            '<td class="MPC-cm-td-r">' + escapeHtml(formatQty(item.on_hand)) + '</td>' +
-                            '<td class="MPC-cm-td-r" title="' + escapeHtml(formatFullAmount(item.stock_value)) + '">' + escapeHtml(formatCompactAmount(item.stock_value)) + '</td>' +
-                        '</tr>';
+                            '<td class="MPC-cm-td-s" title="' + escapeHtml(item.name) + '">' + escapeHtml(item.name) + '</td>';
+                    if (showStockColumns) {
+                        if (isItem) {
+                            rowsHtml +=
+                                '<td class="MPC-cm-td-r">' + escapeHtml(formatQty(item.on_hand)) + '</td>' +
+                                '<td class="MPC-cm-td-r" title="' + escapeHtml(formatFullAmount(item.stock_value)) + '">' + escapeHtml(formatCompactAmount(item.stock_value)) + '</td>';
+                        } else {
+                            rowsHtml +=
+                                '<td class="MPC-cm-td-r">—</td>' +
+                                '<td class="MPC-cm-td-r">—</td>';
+                        }
+                    }
+                    rowsHtml += '</tr>';
                     shownRows++;
                 }
             }
-            // Fixed modal height: pad short pages to MODAL_PER_PAGE rows so a page
-            // with fewer lines does not shrink the popup (no scrolling either).
+
             for (var fillIndex = shownRows; fillIndex < MODAL_PER_PAGE; fillIndex++) {
-                rowsHtml += '<tr class="MPC-cm-filler"><td>&nbsp;</td><td></td><td></td><td></td></tr>';
+                if (showStockColumns) {
+                    rowsHtml += '<tr class="MPC-cm-filler"><td>&nbsp;</td><td></td><td></td><td></td></tr>';
+                } else {
+                    rowsHtml += '<tr class="MPC-cm-filler"><td>&nbsp;</td><td></td></tr>';
+                }
             }
+
+            var thead = '<thead><tr>' +
+                '<th style="width:' + (showStockColumns ? '22%' : '30%') + '">' + escapeHtml(label('Code', 'Code')) + '</th>' +
+                '<th style="width:' + (showStockColumns ? '44%' : '70%') + '">' + escapeHtml(label('VAS_113_Name', 'Name')) + '</th>';
+            if (showStockColumns) {
+                thead +=
+                    '<th class="MPC-cm-th-r" style="width:17%">' + escapeHtml(label('VAS_113_OnHand', 'On Hand')) + '</th>' +
+                    '<th class="MPC-cm-th-r" style="width:17%">' + escapeHtml(label('VAS_113_StockValue', 'Stock Value')) + '</th>';
+            }
+            thead += '</tr></thead>';
 
             var table =
                 '<div class="MPC-cm-group-head">' + escapeHtml(label('VAS_113_ItemsInCategory', 'Items in this category')) + '</div>' +
                 '<table class="MPC-cm-mini-table">' +
-                    '<thead><tr>' +
-                        '<th>' + escapeHtml(label('VAS_113_SKU', 'SKU')) + '</th>' +
-                        '<th>' + escapeHtml(label('VAS_113_Name', 'Name')) + '</th>' +
-                        '<th class="MPC-cm-th-r">' + escapeHtml(label('VAS_113_OnHand', 'On Hand')) + '</th>' +
-                        '<th class="MPC-cm-th-r">' + escapeHtml(label('VAS_113_StockValue', 'Stock Value')) + '</th>' +
-                    '</tr></thead>' +
+                    thead +
                     '<tbody>' + rowsHtml + '</tbody>' +
                 '</table>';
 
@@ -397,7 +411,7 @@
                     '</div>';
             }
 
-            $modalBody.html(facts + table + pager);
+            $modalBody.html(table + pager);
         }
 
         this.Initalize = function () {

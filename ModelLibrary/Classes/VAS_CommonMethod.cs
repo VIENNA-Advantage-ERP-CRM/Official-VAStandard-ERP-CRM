@@ -9,8 +9,11 @@ using CoreLibrary.Classes;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
+using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using VAdvantage.Common;
@@ -1023,6 +1026,353 @@ namespace ModelLibrary.Classes
             public byte[] FileBytes { get; set; }
             public int FileSize => FileBytes?.Length ?? 0;
         }
+
+        #region Get Reference Values
+
+        private static readonly Regex s_sqlIdentifierRegex = new Regex(
+            "^[A-Za-z_][A-Za-z0-9_]*$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// Reads a record and resolves the display value of every lookup/list column defined on the
+        /// window tab that matches the given table, using the window metadata (tabs/fields/lookups)
+        /// built in-process instead of calling the VAI01 AI service API.
+        /// </summary>
+        /// <param name="window_name">Window Name whose tab metadata should be used to resolve references</param>
+        /// <param name="table_name">Table Name of the record to read</param>
+        /// <param name="record_id">Record ID (value of {table_name}_ID) to read</param>
+        /// <param name="document">Optional in-memory PO instance; when supplied, its pre-change (old) column
+        /// values are resolved the same way as the current record and returned in OldJsonData</param>
+        /// <returns>Reference-resolved column values (NewJsonData/OldJsonData) along with the raw record data</returns>
+        public static RefValuesResult GetRefValues(Ctx ctx, string window_name, string table_name, int record_id, PO document)
+        {
+            var result = new RefValuesResult();
+            try
+            {
+                GridWindow windowVO = GetWindowVO(ctx, window_name);
+
+                string query = $"SELECT * FROM {table_name} WHERE {table_name}_ID = {record_id.ToString(CultureInfo.InvariantCulture)}";
+                DataSet ds = DB.ExecuteDataset(query, null, document.Get_Trx());
+
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                {
+                    return result;
+                }
+
+                DataTable data = ds.Tables[0];
+                result.Data = data;
+
+                List<ColumnInfo> columnsInformation = GetTabColumnsInfo(windowVO, table_name);
+
+                // De-duplicate by column name, then order by AD_Field.SeqNo so NewJsonData - and any
+                // HTML built from it - lists columns in the same order they appear on the window tab.
+                List<ColumnInfo> orderedColumns = columnsInformation
+                    .Where(column => !string.IsNullOrWhiteSpace(column.ColumnName) && data.Columns.Contains(column.ColumnName))
+                    .GroupBy(column => column.ColumnName, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(column => column.SeqNo)
+                    .ToList();
+
+                foreach (DataRow row in data.Rows)
+                {
+                    foreach (ColumnInfo columnMeta in orderedColumns)
+                    {
+                        string displayName = string.IsNullOrWhiteSpace(columnMeta.DisplayName)
+                            ? columnMeta.ColumnName
+                            : columnMeta.DisplayName;
+
+                        object value = row[columnMeta.ColumnName];
+
+                        if (!columnMeta.HasReference)
+                        {
+                            result.NewJsonData[displayName] = value == DBNull.Value ? null : value;
+                        }
+                        else if (value == null || value == DBNull.Value || columnMeta.ReferenceValueId == 0)
+                        {
+                            result.NewJsonData[displayName] = null;
+                        }
+                        else
+                        {
+                            string referenceQuery = BuildReferenceQuery(columnMeta, value);
+                            result.NewJsonData[displayName] = GetReferenceDisplayValue(referenceQuery);
+                        }
+
+                        if (document != null)
+                        {
+                            object oldValue = document.Get_ValueOld(columnMeta.ColumnName);
+
+                            if (!columnMeta.HasReference)
+                            {
+                                result.OldJsonData[displayName] = oldValue == DBNull.Value ? null : oldValue;
+                            }
+                            else if (oldValue == null || oldValue == DBNull.Value || columnMeta.ReferenceValueId == 0)
+                            {
+                                result.OldJsonData[displayName] = null;
+                            }
+                            else
+                            {
+                                string oldReferenceQuery = BuildReferenceQuery(columnMeta, oldValue);
+                                result.OldJsonData[displayName] = GetReferenceDisplayValue(oldReferenceQuery);
+                            }
+                        }
+                    }
+
+                    // only the requested record is expected; stop after the first row
+                    break;
+                }
+            }
+            catch (Exception e)
+            {
+                log.Info(e.Message);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Builds the window Virtual Object (tabs/fields/lookup metadata) for the given window name,
+        /// in-process, using the same framework calls the ViennaAdvantage UI relies on
+        /// (AEnv.GetMWindowVO + GridWindow) - without going through the VAI01 AIService REST API.
+        /// </summary>
+        private static GridWindow GetWindowVO(Ctx ctx, string windowName)
+        {
+            if (string.IsNullOrEmpty(windowName))
+            {
+                throw new ArgumentException("Window name is required.", nameof(windowName));
+            }
+
+            int AD_Window_ID = GetWindowIdByName(windowName);
+            if (AD_Window_ID < 1)
+            {
+                throw new InvalidOperationException("No window found for window name [" + windowName + "]");
+            }
+
+            bool hasAccess = MRole.GetDefault(ctx, false).GetWindowAccess(AD_Window_ID) ?? false;
+            if (!hasAccess)
+            {
+                throw new InvalidOperationException(Msg.GetMsg(ctx, "AccessTableNoView"));
+            }
+
+            int windowNo = new Random().Next(10, 99999);
+
+            ctx.SetContext("EnforceLookup", "Y");
+            ctx.SetContext("#ShowTrl", "Y");
+            ctx.SetContext("#ShowAcct", "Y");
+            ctx.SetContext("#ShowAdvanced", "Y");
+
+            var windowVO = VAdvantage.Classes.AEnv.GetMWindowVO(ctx, windowNo, AD_Window_ID, 0);
+            if (windowVO == null)
+            {
+                throw new InvalidOperationException(Msg.GetMsg(ctx, "AccessTableNoView"));
+            }
+
+            return new GridWindow(windowVO);
+        }
+
+        /// <summary>
+        /// Resolves AD_Window_ID for a window name.
+        /// </summary>
+        private static int GetWindowIdByName(string windowName)
+        {
+            string sql = "SELECT AD_WINDOW_ID FROM AD_WINDOW WHERE UPPER(NAME) = @windowName AND ISACTIVE = 'Y'";
+            SqlParameter[] parameters = new SqlParameter[] { new SqlParameter("@windowName", windowName.ToUpper()) };
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null));
+        }
+
+        /// <summary>
+        /// Finds the tab matching the given table (by table name or tab name) and returns metadata
+        /// (reference/lookup info) for every non-virtual column on it - mirroring the tab/field/lookup
+        /// walk previously done against the JSON returned by VAI01 AIService/GetWindowVO.
+        /// </summary>
+        private static List<ColumnInfo> GetTabColumnsInfo(GridWindow window, string tabNameToSearch)
+        {
+            var columnInformation = new List<ColumnInfo>();
+            if (window == null || window._tabs == null)
+            {
+                return columnInformation;
+            }
+
+            foreach (GridTab tab in window._tabs)
+            {
+                string tableName = tab?._vo?.TableName ?? string.Empty;
+                string displayName = tab?._vo?.Name ?? string.Empty;
+
+                if (!string.Equals(displayName, tabNameToSearch, StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(tableName, tabNameToSearch, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                List<GridField> fields = tab._gridTable?.m_fields ?? new List<GridField>();
+
+                // GridTabVO loads fields ordered by "IsDisplayed DESC, SeqNo" (AD_Field.SeqNo), and
+                // GridTab.LoadFields() adds them to m_fields in that same order, so the position in
+                // this list doubles as the AD_Field.SeqNo-based display order.                
+                foreach (GridField field in fields)
+                {
+                    var vo = field._vo;
+                    string columnSql = vo?.ColumnSQL ?? string.Empty;
+
+                    if (!string.IsNullOrEmpty(columnSql))
+                    {
+                        continue;
+                    }
+
+                    int displayType = vo?.displayType ?? 0;
+                    bool hasReference = false;
+                    string referenceColumnName = string.Empty;
+                    string lookupParentName = string.Empty;
+                    string keyColumn = string.Empty;
+                    string queryDirect = string.Empty;
+                    int referenceValueId = 0;
+
+                    if (field._lookup is MLookup lookup && lookup._vInfo != null)
+                    {
+                        hasReference = true;
+                        VAdvantage.Classes.VLookUpInfo vInfo = lookup._vInfo;
+
+                        referenceColumnName = vInfo.displayColSubQ ?? string.Empty;
+                        lookupParentName = vInfo.tableName ?? string.Empty;
+                        keyColumn = vInfo.keyColumn ?? string.Empty;
+                        queryDirect = vInfo.queryDirect ?? string.Empty;
+                        referenceValueId = vInfo.AD_Reference_Value_ID;
+
+                        if (vInfo.hasImageIdentifier && referenceColumnName.Contains("||"))
+                        {
+                            referenceColumnName = referenceColumnName
+                                .Split(new[] { "||" }, StringSplitOptions.None)
+                                .Last()
+                                .Trim();
+                        }
+                    }
+                    else if (displayType == 28)
+                    {
+                        hasReference = true;
+                        referenceValueId = vo?.AD_Reference_Value_ID ?? 0;
+                    }
+
+                    if (displayType != 17 && displayType != 28)
+                    {
+                        referenceValueId = -1;
+                    }
+
+                    columnInformation.Add(new ColumnInfo
+                    {
+                        ColumnName = vo?.ColumnName ?? string.Empty,
+                        DisplayName = vo?.Header ?? string.Empty,
+                        HasReference = hasReference,
+                        DisplayType = displayType,
+                        Description = vo?.Description ?? string.Empty,
+                        Help = vo?.Help ?? string.Empty,
+                        ReferenceColumnName = referenceColumnName,
+                        LookupParentName = lookupParentName,
+                        KeyColumn = keyColumn,
+                        ReferenceValueId = referenceValueId,
+                        QueryDirect = queryDirect,
+                        SeqNo = vo.seqNo
+                    });
+                }
+            }
+
+            return columnInformation;
+        }
+
+        private static string BuildReferenceQuery(ColumnInfo columnMeta, object value)
+        {
+            string valueExpression = ToSqlLiteral(value);
+
+            if (columnMeta.ReferenceValueId == -1)
+            {
+                return
+                    $"SELECT {columnMeta.ReferenceColumnName} " +
+                    $"FROM {columnMeta.LookupParentName} " +
+                    $"WHERE {columnMeta.KeyColumn} = {valueExpression}";
+            }
+
+            if (columnMeta.DisplayType == 28)
+            {
+                return
+                    "SELECT AD_Ref_List.Name FROM AD_Ref_List " +
+                    $"WHERE AD_Ref_List.Value = {valueExpression} " +
+                    $"AND AD_Ref_List.AD_Reference_ID = {columnMeta.ReferenceValueId.ToString(CultureInfo.InvariantCulture)}";
+            }
+
+            return
+                $"SELECT {columnMeta.ReferenceColumnName} " +
+                $"FROM {columnMeta.LookupParentName} " +
+                $"WHERE {columnMeta.KeyColumn} = {valueExpression} " +
+                $"AND {columnMeta.LookupParentName}.AD_Reference_ID = " +
+                columnMeta.ReferenceValueId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static object GetReferenceDisplayValue(string referenceQuery)
+        {
+            try
+            {
+                object value = DB.ExecuteScalar(referenceQuery, null, null);
+                return value == DBNull.Value ? null : value;
+            }
+            catch (Exception ex)
+            {
+                log.SaveError("GetRefValues_ReferenceQueryFailed", ex.Message);
+                return null;
+            }
+        }
+
+        private static string ToSqlLiteral(object value)
+        {
+            if (value == null || value == DBNull.Value)
+            {
+                return "NULL";
+            }
+
+            if (value is bool boolValue)
+            {
+                return boolValue ? "1" : "0";
+            }
+
+            if (value is byte || value is short || value is int || value is long)
+            {
+                return Convert.ToInt64(value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (value is decimal || value is double || value is float)
+            {
+                return Convert.ToDecimal(value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
+            }
+
+            return "'" + EscapeSqlString(Convert.ToString(value, CultureInfo.InvariantCulture)) + "'";
+        }
+
+        private static string EscapeSqlString(string value)
+        {
+            return value.Replace("'", "''");
+        }
+
+        public class RefValuesResult
+        {
+            public Dictionary<string, object> NewJsonData { get; set; } = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, object> OldJsonData { get; set; } = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            public DataTable Data { get; set; }
+        }
+
+        private class ColumnInfo
+        {
+            public string ColumnName { get; set; } = string.Empty;
+            public string DisplayName { get; set; } = string.Empty;
+            public bool HasReference { get; set; }
+            public int DisplayType { get; set; }
+            public string Description { get; set; } = string.Empty;
+            public string Help { get; set; } = string.Empty;
+            public string ReferenceColumnName { get; set; } = string.Empty;
+            public string LookupParentName { get; set; } = string.Empty;
+            public string KeyColumn { get; set; } = string.Empty;
+            public int ReferenceValueId { get; set; }
+            public string QueryDirect { get; set; } = string.Empty;
+            public int SeqNo { get; set; }
+        }
+
+        #endregion
 
     }
 }

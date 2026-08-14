@@ -170,7 +170,6 @@
             titles.appendChild(el('div', 'MPC-wc-subtitle', lbl('VAS_155_WC_Subtitle', 'Drafted and in-progress delivery confirmations')));
             head.appendChild(icon);
             head.appendChild(titles);
-            head.appendChild(el('span', 'MPC-wc-badge', lbl('VAS_155_WC_SizeBadge', '3 Col x 2 Row')));
 
             var gridHead = el('div', 'MPC-wc-row MPC-wc-ghead');
             gridHead.appendChild(el('span', null, lbl('VAS_155_WC_ColConfirmation', 'Confirmation')));

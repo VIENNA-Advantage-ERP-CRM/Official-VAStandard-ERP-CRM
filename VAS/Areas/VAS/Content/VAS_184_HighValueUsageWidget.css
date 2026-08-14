@@ -1,0 +1,483 @@
+/* VAS_184_HighValueUsageWidget Stylesheet (2x2 List Widget) */
+
+.vas-hvu-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas-hvu-root,
+    .vas-hvu-root * {
+        box-sizing: border-box;
+    }
+
+.vas-hvu-card {
+    font-family: Roboto, Arial, sans-serif;
+    /* Widget root anchor per Global VA Design Standards ("Dashboard Widgets").
+       cqi resolves against .vas-hvu-root, which declares container-type: inline-size, so this
+       needs no JS-populated variable and no px fallback. The previous value capped at 24px,
+       which stopped the text scaling on 2K/4K dashboards while the cell kept growing. */
+    font-size: clamp(14px, 4.5cqi, 36px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: left;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    backdrop-filter: blur(10px);
+    padding: .875em;
+    overflow: hidden;
+}
+
+/* Header & Filters */
+.vas-hvu-head {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    flex: 0 0 auto;
+}
+
+.vas-hvu-ico {
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+/* Header chrome is kept visually identical to the sibling widgets (183/185/186/187/188).
+   Those anchor at 4% of cell width while this widget anchors at the standard's 4.5cqi, so their
+   em ratios are divided by 4.5/4 here: 1.15 -> 1.022, .85 -> .756, .6875 -> .611. The factor is
+   constant wherever both anchors are inside their clamp range, i.e. across 1080p and 2K. */
+    .vas-hvu-ico svg {
+        width: 1.022em;
+        height: 1.022em;
+    }
+
+.vas-hvu-title {
+    font-size: .756em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-hvu-filters {
+    display: flex;
+    align-items: center;
+    gap: .375em;
+    margin-top: .5em;
+    margin-bottom: .375em;
+    flex: 0 0 auto;
+}
+
+/* Select Filter Dropdowns, per Global VA Design Standards: native arrow removed so the value can
+   sit centred (the arrow otherwise reserves space on the right and pushes text off-centre), with
+   min-width sized so a 4-digit year never clips. Font ratio matched to the sibling widgets. */
+.vas-hvu-select {
+    font-family: inherit;
+    font-size: .611em;
+    font-weight: 500;
+    color: #41576A;
+    background: #fff;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+    text-align: center;
+    text-align-last: center;
+    padding: 0.35em 0.75em;
+    min-width: 4.5em;
+    outline: none;
+    cursor: pointer;
+}
+
+    /* Centre each option row too, so the open list matches the closed control. */
+    .vas-hvu-select option {
+        text-align: center;
+    }
+
+    .vas-hvu-select:focus {
+        border-color: #0083DA;
+    }
+
+/* Product Row List */
+.vas-hvu-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+}
+
+.vas-hvu-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    /* Keep the natural row height: as a flex child the default flex-shrink would compress rows
+       when the page is full, which would both distort the design and make the row-height
+       measurement that drives the rows-per-page calculation unstable. */
+    flex: 0 0 auto;
+    padding: .375em 0;
+    border-bottom: 1px solid #E2EAF1;
+    border-top: 0;
+    border-left: 0;
+    border-right: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: background 150ms ease;
+}
+
+    .vas-hvu-row:last-child {
+        border-bottom: 0;
+    }
+
+    .vas-hvu-row:hover {
+        background: rgba(234, 248, 255, 0.6);
+    }
+
+.vas-hvu-row-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-hvu-p-name {
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-hvu-p-meta {
+    font-size: .6875em;
+    color: #5F7283;
+    margin-top: .125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-hvu-p-cost {
+    font-size: .75em;
+    font-weight: 700;
+    color: #A33F3F;
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Footer Pager */
+.vas-hvu-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #EDF2F6;
+    padding-top: .4em;
+    margin-top: .25em;
+    flex: 0 0 auto;
+}
+
+.vas-hvu-foot-helper {
+    font-size: .75em;
+    color: #748494;
+}
+
+.vas-hvu-pager {
+    display: flex;
+    align-items: center;
+    gap: .4em;
+    font-size: .8125em;
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas-hvu-pager-btn {
+    width: 1.6em;
+    height: 1.6em;
+    border: 1px solid #D9E2EB;
+    border-radius: .4em;
+    background: #fff;
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    font-size: 1em;
+    line-height: 1;
+}
+
+    .vas-hvu-pager-btn:hover:not(:disabled) {
+        background: #EEF6FF;
+        color: #0083DA;
+        box-shadow: inset 0 0 0 1px #0083DA;
+        outline: none;
+    }
+
+/* Pager text sits inside .vas-hvu-pager, which carries the .8125em scale. */
+.vas-hvu-pager-txt {
+    min-width: 6.5em;
+    text-align: center;
+    white-space: nowrap;
+}
+
+    .vas-hvu-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-hvu-empty {
+    padding: 2em 1em;
+    text-align: center;
+    color: #5F7283;
+    font-size: .75em;
+}
+
+.vas-hvu-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .62);
+    border-radius: 14px;
+    z-index: 5;
+}
+
+.vas-hvu-hidden {
+    display: none !important;
+}
+
+/* Product Issues Modal */
+.vas-hvu-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.45);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1em;
+}
+
+/* Built to the Global VA Design & Dynamic System Standards:
+   - the card is the single fluid root anchor (clamp), every descendant sizes in em from it
+   - no hardcoded px dimensions or fixed font sizes on any child
+   - height follows content: the table always renders a full page of rows (short pages padded),
+     so the popup is exactly one page tall and never resizes while paging
+   - row hover uses an inset ring so it is not clipped by overflow:hidden */
+.vas-hvu-modal-card {
+    /* Root anchor for the whole popup. */
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(14px, 1.2vw, 22px);
+    width: clamp(340px, 85vw, 1400px);
+    height: auto;
+    max-height: clamp(420px, 85vh, 900px);
+    background: #fff;
+    border-radius: .75em;
+    border: 1px solid #D9E2EB;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 .9em 2.2em rgba(15, 61, 97, 0.18);
+    overflow: hidden;
+}
+
+.vas-hvu-modal-head {
+    flex: 0 0 auto;
+    min-height: 2.75em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    padding: .5em 1em;
+    border-bottom: 1px solid #1F83FF;
+}
+
+.vas-hvu-modal-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    min-width: 0;
+}
+
+.vas-hvu-modal-title {
+    font-size: .82em;
+    font-weight: 700;
+    color: #102C3F;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-hvu-cost-chip {
+    background: #FCEFEF;
+    color: #A33F3F;
+    font-size: .6em;
+    font-weight: 700;
+    padding: .2em .7em;
+    border-radius: 999px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.vas-hvu-modal-close {
+    flex: 0 0 auto;
+    width: 1.45em;
+    height: 1.45em;
+    border: 0;
+    background: transparent;
+    border-radius: .35em;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #141414;
+}
+
+    .vas-hvu-modal-close svg {
+        width: .82em;
+        height: .82em;
+    }
+
+    .vas-hvu-modal-close:hover {
+        background: #EEF6FF;
+        color: #0083DA;
+        box-shadow: inset 0 0 0 1px #0083DA;
+        outline: none;
+    }
+
+.vas-hvu-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 1em;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: .5em;
+}
+
+.vas-hvu-modal-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: .4em 1em;
+    flex: 0 0 auto;
+}
+
+.vas-hvu-modal-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas-hvu-m-lbl {
+    font-size: .6em;
+    color: #5F7283;
+}
+
+.vas-hvu-m-val {
+    font-size: .7em;
+    font-weight: 500;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-hvu-issues-table {
+    width: 100%;
+    /* separate + zero spacing keeps the td borders while letting the hover ring paint on <tr> */
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    flex: 0 0 auto;
+}
+
+    .vas-hvu-issues-table th {
+        font-size: .58em;
+        font-weight: 500;
+        color: #41576A;
+        padding: .5em .6em;
+        text-align: left;
+        border-bottom: 1px solid #C5D2DD;
+        white-space: nowrap;
+    }
+
+        .vas-hvu-issues-table th:nth-child(4),
+        .vas-hvu-issues-table th:nth-child(5) {
+            text-align: right;
+        }
+
+    .vas-hvu-issues-table td {
+        font-size: .64em;
+        color: #5F7283;
+        padding: .5em .55em;
+        border-bottom: 1px solid #E2EAF1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        /* Uniform row height so filler rows are indistinguishable in size from real ones. */
+        height: 2.2em;
+        vertical-align: middle;
+    }
+
+        .vas-hvu-issues-table td:nth-child(4),
+        .vas-hvu-issues-table td:nth-child(5) {
+            text-align: right;
+            font-weight: 700;
+            color: #102C3F;
+        }
+
+    .vas-hvu-issues-table tbody tr {
+        border-radius: 8px;
+        outline: none;
+    }
+
+        .vas-hvu-issues-table tbody tr:hover {
+            box-shadow: inset 0 0 0 1px #0083DA;
+        }
+
+            .vas-hvu-issues-table tbody tr:hover td {
+                background: #F5FBFF;
+            }
+
+    /* Spacer rows that keep a short page the same height as a full one. Not interactive. */
+    .vas-hvu-issues-table tbody tr.vas-hvu-m-filler:hover {
+        box-shadow: none;
+    }
+
+        .vas-hvu-issues-table tbody tr.vas-hvu-m-filler:hover td {
+            background: transparent;
+        }
+
+    .vas-hvu-issues-table tbody tr.vas-hvu-m-filler td {
+        border-bottom-color: #F1F5F9;
+    }
+
+/* Loading / empty state cell */
+.vas-hvu-m-msgcell {
+    text-align: center;
+    color: #748494;
+    white-space: normal;
+}
+
+/* NOTE: a duplicated, unscoped ".vas-modal-*" block used to live here (and in five sibling
+   widget stylesheets). It was dead code - no JavaScript referenced those class names, this
+   widget uses its own scoped modal classes - and it carried hardcoded px font sizes with
+   !important, which breaks the Universal Dynamic Responsive System rule. Removed 2026-08-12. */

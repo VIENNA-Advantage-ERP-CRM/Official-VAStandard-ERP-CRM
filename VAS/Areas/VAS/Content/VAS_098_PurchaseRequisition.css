@@ -1,8 +1,8 @@
-/************************************************************
+﻿/************************************************************
  * Module Name : VAS
  * Purpose     : Styles for the Purchase Requisition overview tab panel
  *               (VAS.VAS_098_PurchaseRequisition). All classes are
- *               MPC-prefixed (MPC-vasrq-*) and scoped under the panel root
+ *               panel-prefixed (vas_098-*) and scoped under the panel root
  *               to avoid global collisions. Ports the attached
  *               requisition-window reference design (glass/white surfaces,
  *               soft blue borders, chips with leading dots, stat cards with
@@ -18,9 +18,101 @@
  *                        to a bottom rule when narrow). Panel keeps its own px
  *                        units and widget shadow, which the em-based overview
  *                        panels do not use.
+ *   VAI163   2026-07-28  Panel heading enlarged (20px -> 24px). Root is now an
+ *                        inline-size container that never scrolls horizontally,
+ *                        and the responsive rules moved from viewport @media to
+ *                        @container so the layout is correct in a narrow side
+ *                        panel at any browser zoom (80% included) — the old
+ *                        900px / 560px viewport breakpoints never matched there.
+ *   VAI163   2026-07-28  People block gains a heading and a per-name role caption
+ *                        (.vas_098-peopleLbl / -personRole / -personName). Line
+ *                        items gain the Attribute Set Instance sub-line
+ *                        (.vas_098-itattr) and ellipsis on the name / key cells.
+ *   VAI163   2026-07-28  Items / Activity / Notes tab bar replaced by stacked
+ *                        sections (.vas_098-lowerhead / -lowersec); the tab
+ *                        styles and the count badge are gone. Product-category
+ *                        chip replaced by a plain UOM cell (.vas_098-uom).
+ *   VAI163   2026-07-28  Priority tones now match the requisition window (urgent
+ *                        red / high orange / medium blue / low green / minor
+ *                        grey). Convert strip wraps instead of overflowing the
+ *                        panel. Added the line-items pager (.vas_098-pager) and
+ *                        the PO / GRN activity badges.
+ *   VAI163   2026-07-31  Header aligned to the VAS_092 Purchase Order Overview
+ *                        standard: details card is 40%/1fr (was 1.4fr/1fr) and
+ *                        its field column (-hdrColR) is a two-across grid
+ *                        instead of a single tall stack, collapsing to one
+ *                        column under 460px. Field values wrap rather than
+ *                        ellipsis-truncate now that the column is narrower.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vasrq- -> vas_098- so the panel's
+ *                        styles cannot collide with another panel's.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare
+ *                        (.a-green, .ta-r, .primary) now carry the vas_098-
+ *                        prefix too. Sharing a name with a base-theme rule
+ *                        meant the base design won and repainted the panel;
+ *                        scoping them to the panel ends that.
+ *   VAI163   2026-08-11  - The layout holds at 80% browser zoom, which reports
+ *                          ~1.25x more CSS pixels for the same physical width and
+ *                          so kept the panel just above its old thresholds. The
+ *                          stat strip goes two-up from 700px rather than 620px,
+ *                          and every flexible track is minmax(0, Nfr) instead of
+ *                          a bare Nfr, which cannot shrink below its content —
+ *                          one long amount used to widen its own card / cell and
+ *                          push the row past the panel (-stats, -hdrCard,
+ *                          -itrow). Matches VAS_099 and VAS_102.
+ *                        - The item table scrolls horizontally at ANY width (it
+ *                          used to switch to scrolling only under 400px), so a
+ *                          panel just wide of that cannot clip its last columns.
+ *                          The row min-width follows the column count: 520px at
+ *                          six columns, 360px at the four shown below 700px.
+ *                        - Activity e-mail rows: a purple Email badge, a
+ *                          recipient sub-line (.vas_098-actsub) and a message
+ *                          body that opens on click (.vas_098-actrow.-openable /
+ *                          -actbody / -actmeta). A long subject ellipsises
+ *                          instead of pushing the timestamp out of the row.
+ *   VAI163   2026-08-11  Minor priority (.vas_098-prio.vas_098-minor) is green,
+ *                        the tone Low already carried. Grey read as "no priority
+ *                        set" rather than as the lowest priority there is.
+ *   VAI163   2026-08-12  - Added the Reference strip (.vas_098-genfrom /
+ *                          -gfLabel / -gfChips / -chip / -chipLabel / -chipVal,
+ *                          with .vas_098-is-link for a chip that opens its source
+ *                          record and .vas_098-ic-* tinting the leading icon
+ *                          only) — a port of the VAS_092 Generated From strip.
+ *                        - Added the Documents table (.vas_098-docRow / -docItem
+ *                          / -docTxt, rows clickable via
+ *                          .vas_098-docRow.vas_098-is-link). It reuses the items
+ *                          box (.vas_098-items) for its frame and scroll but
+ *                          carries its OWN four-track grid: the two tables share
+ *                          the box, not their column meanings.
+ *                        - Added the line-note caption in Notes
+ *                          (.vas_098-notelbl), which names the line a note was
+ *                          written against.
+ *   VAI163   2026-08-12  - The stat strip goes single-column at 340px, not 400px,
+ *                          matching VAS_099's snapshot. Between those two widths
+ *                          the four cards stacked one per line here while the GRN
+ *                          panel's stayed 2-up — which is what a record opened in
+ *                          SINGLE VIEW hits, the form taking the width and the
+ *                          tab panel left under 400px.
+ *                        - Section heads wrap (.vas_098-sechead): the summary
+ *                          drops under the title instead of being crushed against
+ *                          it in a narrow panel.
+ *                        - Activity rows wrap between the headline and the
+ *                          "when · by whom" stamp (.vas_098-atwrap), which now
+ *                          carries the actor's name on EVERY row and so is long
+ *                          enough to have squeezed the headline to an ellipsis.
+ *                          The stamp keeps its right alignment when it wraps
+ *                          (margin-left:auto). A comment's headline wraps to
+ *                          three lines (.vas_098-at.vas_098-multiline) instead of
+ *                          ellipsising after one.
+ *   VAI163   2026-08-12  The convert strip is gone from the panel, so
+ *                        .vas_098-convert / -cvnote / -cvactions / -btn (and its
+ *                        -primary / -secondary / :disabled states) style nothing
+ *                        any more. They are left in place rather than deleted:
+ *                        .vas_098-ok is shared with the toast, and the button
+ *                        rules are the panel's only record of its own control
+ *                        styling should an action return.
  ***********************************************************/
 
-.MPC-vasrq-root {
+.vas_098-root {
     /* Palette (from the reference design) */
     --rq-primary:#0083DA; --rq-action:#1F83FF; --rq-link:#106AB0;
     --rq-faint-blue:#EEF6FF; --rq-divider:#EDF2F6; --rq-border:#E4EDF4;
@@ -35,203 +127,404 @@
 
     position: relative;
     height: 100%;
+    width: 100%;
+    max-width: 100%;
     overflow-y: auto;
+    /* Never let the panel itself scroll horizontally (e.g. at 80% browser zoom);
+       the item table keeps its own inner overflow-x scroll when narrow. */
+    overflow-x: hidden;
+    /* The responsive rules below are @container, not @media: this is a side panel
+       a few hundred px wide, so the viewport width says nothing about how much
+       room it actually has. Anchoring them to the panel's own inline size is what
+       makes the layout correct at any browser zoom. */
+    container-type: inline-size;
     color: var(--rq-text);
     font-family: Roboto, "Segoe UI", Arial, sans-serif;
     box-sizing: border-box;
 }
-.MPC-vasrq-root * { box-sizing: border-box; }
+.vas_098-root * { box-sizing: border-box; }
 
-.MPC-vasrq-body { padding: 16px 20px 18px; display: flex; flex-direction: column; }
+.vas_098-body { padding: 16px 20px 18px; display: flex; flex-direction: column; }
 
-.MPC-vasrq-empty { padding: 40px 18px; text-align: center; color: var(--rq-text-muted); font-size: 14px; }
-.MPC-vasrq-na { color: var(--rq-text-muted); }
+.vas_098-empty { padding: 40px 18px; text-align: center; color: var(--rq-text-muted); font-size: 14px; }
+.vas_098-na { color: var(--rq-text-muted); }
 
 /* ---------- Tags / pills ---------- */
-.MPC-vasrq-tag { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:4px 9px;
+.vas_098-tag { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:4px 9px;
     font-size:11px; font-weight:700; line-height:1; white-space:nowrap }
-.MPC-vasrq-tag .MPC-vasrq-dot { width:6px; height:6px; border-radius:50% }
-.MPC-vasrq-tag.sent{background:var(--rq-sent-bg);color:var(--rq-sent-tx)} .MPC-vasrq-tag.sent .MPC-vasrq-dot{background:var(--rq-sent-tx)}
-.MPC-vasrq-tag.approved{background:var(--rq-success-bg);color:var(--rq-success-tx)} .MPC-vasrq-tag.approved .MPC-vasrq-dot{background:var(--rq-success-tx)}
-.MPC-vasrq-tag.draft{background:var(--rq-draft-bg);color:var(--rq-draft-tx)} .MPC-vasrq-tag.draft .MPC-vasrq-dot{background:var(--rq-draft-tx)}
-.MPC-vasrq-tag.partial{background:var(--rq-warn-bg);color:var(--rq-warn-tx)} .MPC-vasrq-tag.partial .MPC-vasrq-dot{background:var(--rq-warn-tx)}
-.MPC-vasrq-tag.cancelled{background:var(--rq-danger-bg);color:var(--rq-danger-tx)} .MPC-vasrq-tag.cancelled .MPC-vasrq-dot{background:var(--rq-danger-tx)}
-.MPC-vasrq-tag.mwo{background:#EFEAFF;color:#5F4AA6} .MPC-vasrq-tag.mwo .MPC-vasrq-dot{background:#5F4AA6}
+.vas_098-tag .vas_098-dot { width:6px; height:6px; border-radius:50% }
+.vas_098-tag.vas_098-sent{background:var(--rq-sent-bg);color:var(--rq-sent-tx)} .vas_098-tag.vas_098-sent .vas_098-dot{background:var(--rq-sent-tx)}
+.vas_098-tag.vas_098-approved{background:var(--rq-success-bg);color:var(--rq-success-tx)} .vas_098-tag.vas_098-approved .vas_098-dot{background:var(--rq-success-tx)}
+.vas_098-tag.vas_098-draft{background:var(--rq-draft-bg);color:var(--rq-draft-tx)} .vas_098-tag.vas_098-draft .vas_098-dot{background:var(--rq-draft-tx)}
+.vas_098-tag.vas_098-partial{background:var(--rq-warn-bg);color:var(--rq-warn-tx)} .vas_098-tag.vas_098-partial .vas_098-dot{background:var(--rq-warn-tx)}
+.vas_098-tag.vas_098-cancelled{background:var(--rq-danger-bg);color:var(--rq-danger-tx)} .vas_098-tag.vas_098-cancelled .vas_098-dot{background:var(--rq-danger-tx)}
+.vas_098-tag.vas_098-mwo{background:#EFEAFF;color:#5F4AA6} .vas_098-tag.vas_098-mwo .vas_098-dot{background:#5F4AA6}
 
-.MPC-vasrq-ic { display:inline-flex; align-items:center; flex:none }
-.MPC-vasrq-ic svg { display:block }
+.vas_098-ic { display:inline-flex; align-items:center; flex:none }
+.vas_098-ic svg { display:block }
 
 /* ---------- Priority pill ---------- */
-.MPC-vasrq-prio { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:5px 11px; font-size:12px; font-weight:700; line-height:1 }
-.MPC-vasrq-prio.high{background:#FCE3D2;color:#A8430F}
-.MPC-vasrq-prio.med{background:#E4F0FF;color:#0E5DA8}
-.MPC-vasrq-prio.low{background:#E9EDF1;color:#5A6B79}
+/* Tones mirror the colours the requisition window uses for PriorityRule:
+   urgent red, high orange, medium blue, low green, minor grey. */
+.vas_098-prio { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:5px 11px; font-size:12px; font-weight:700; line-height:1 }
+.vas_098-prio.vas_098-urgent{background:#FAD7D7;color:#B44045}
+.vas_098-prio.vas_098-high{background:#FCE3D2;color:#A8430F}
+.vas_098-prio.vas_098-med{background:#E4F0FF;color:#0E5DA8}
+.vas_098-prio.vas_098-low{background:#CCEFDD;color:#0C5D38}
+/* Minor is green, like Low. Both say "this can wait", and the grey it used to
+   carry read as "no priority set" rather than as the lowest one. */
+.vas_098-prio.vas_098-minor{background:#CCEFDD;color:#0C5D38}
 
 /* ---------- Header — title strip ---------- */
 /* Untinted strip carrying the title + subtitle and the priority / type /
    status pills, matching VAS_106_OverviewSalesOrder. Status reads from the
    pills on the right rather than a banner tint. */
-.MPC-vasrq-hdr { border-radius:14px; padding:14px 16px }
-.MPC-vasrq-hdrTop { display:flex; align-items:flex-start; justify-content:space-between; gap:16px }
-.MPC-vasrq-hdrTitleWrap { min-width:0 }
-.MPC-vasrq-hdrTitle { font-size:20px; font-weight:700; color:var(--rq-text); line-height:1.15 }
-.MPC-vasrq-hdrSub { font-size:12px; color:var(--rq-text-2); margin-top:4px }
-.MPC-vasrq-hdrPills { flex:none; display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px }
+.vas_098-hdr { border-radius:14px; padding:14px 16px }
+.vas_098-hdrTop { display:flex; align-items:flex-start; justify-content:space-between; gap:16px }
+.vas_098-hdrTitleWrap { min-width:0 }
+/* Panel heading, on the standard header scale (VAS_092: 1.25em of a ~16px body). */
+.vas_098-hdrTitle { font-size:20px; font-weight:700; color:var(--rq-text); line-height:1.2 }
+.vas_098-hdrSub { font-size:12px; color:var(--rq-text-2); margin-top:4px }
+.vas_098-hdrPills { flex:none; display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px }
 
 /* ---------- Header — details card (Source Warehouse | fields) ---------- */
-.MPC-vasrq-hdrCard { display:grid; grid-template-columns:1.4fr 1fr; gap:14px 28px;
-    border:1px solid var(--rq-border); border-radius:14px; background:#fff;
-    padding:14px 16px; box-shadow:var(--rq-widget-shadow); margin:10px 0 12px }
-.MPC-vasrq-hdrColL { min-width:0; border-right:1px solid var(--rq-divider); padding-right:20px }
-.MPC-vasrq-hdrColR { min-width:0; display:flex; flex-direction:column; gap:10px }
-.MPC-vasrq-fLabel { font-size:10.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted); line-height:1.3 }
-.MPC-vasrq-fVal { font-size:13px; font-weight:600; color:var(--rq-text); line-height:1.35; margin-top:2px }
-.MPC-vasrq-srcName { font-size:16px; font-weight:700; color:var(--rq-text); margin-top:3px }
-.MPC-vasrq-srcRoute { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--rq-text-2); margin-top:5px }
-.MPC-vasrq-srcRoute .MPC-vasrq-ic { color:var(--rq-primary) }
-.MPC-vasrq-srcPeople { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12.5px; color:var(--rq-text); margin-top:9px }
-.MPC-vasrq-personBit { display:inline-flex; align-items:center; gap:7px }
-.MPC-vasrq-personBit .MPC-vasrq-ic { color:var(--rq-primary) }
-.MPC-vasrq-hdrField { min-width:0 }
+/* Identity takes 40% of the card; the fields take the rest and run two across,
+   so short fields sit in rows instead of stacking into a tall column that
+   leaves the identity half empty. Flat card — no shadow — on the standard
+   12px radius, matching every other overview panel. */
+/* minmax(0, 1fr) so a long field value wraps inside the field column instead of
+   widening it and pushing the card past the panel. */
+.vas_098-hdrCard { display:grid; grid-template-columns:40% minmax(0, 1fr); gap:14px 28px;
+    border:1px solid var(--rq-border); border-radius:12px; background:#fff;
+    padding:14px 16px; margin:10px 0 12px }
+.vas_098-hdrColL { min-width:0; border-right:1px solid var(--rq-divider); padding-right:20px }
+.vas_098-hdrColR { min-width:0; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:12px 24px; align-content:start }
+.vas_098-fLabel { font-size:10.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted); line-height:1.3 }
+.vas_098-fVal { font-size:13px; font-weight:700; color:var(--rq-text); line-height:1.35; margin-top:2px;
+    overflow-wrap:break-word }
+.vas_098-srcName { font-size:16px; font-weight:700; color:var(--rq-text); margin-top:3px }
+/* .vas_098-srcRoute removed with the duplicated requester-warehouse line. */
+.vas_098-peopleLbl { margin-top:11px }
+.vas_098-srcPeople { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12.5px; color:var(--rq-text); margin-top:4px }
+.vas_098-personBit { display:inline-flex; align-items:baseline; gap:7px; min-width:0 }
+.vas_098-personBit .vas_098-ic { color:var(--rq-primary); align-self:center }
+/* Role reads as a quiet caption; the name carries the weight. */
+.vas_098-personRole { color:var(--rq-text-muted); font-size:11px; font-weight:700;
+    letter-spacing:.3px; text-transform:uppercase; white-space:nowrap; flex:none }
+.vas_098-personName { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.vas_098-hdrField { min-width:0 }
+
+/* ---------- Reference strip (Generated From) ---------- */
+/* Directly under the details card, in the VAS_092 Purchase Order shape: a label
+   followed by one chip per source document. The strip wraps, so a requisition
+   carrying several origins never pushes past the panel. */
+.vas_098-genfrom { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px;
+    padding:10px 14px; margin-bottom:13px;
+    background:var(--rq-glass-grad); border:1px solid var(--rq-border); border-radius:12px }
+.vas_098-gfLabel { flex:none; font-size:10.5px; font-weight:700; letter-spacing:.4px;
+    text-transform:uppercase; color:var(--rq-text-muted) }
+.vas_098-gfChips { display:flex; align-items:center; flex-wrap:wrap; gap:8px; min-width:0 }
+
+/* A chip caps at the strip's width and truncates its VALUE inside it, so one
+   long document number cannot run off the panel; the whole of it stays on the
+   chip's tooltip. */
+.vas_098-chip { display:inline-flex; align-items:center; gap:6px; max-width:100%; min-width:0;
+    background:#fff; border:1px solid var(--rq-border); border-radius:999px;
+    padding:5px 11px; font-size:12px; line-height:1.2 }
+.vas_098-chipLabel { color:var(--rq-text-muted); font-weight:700; white-space:nowrap; flex:none }
+.vas_098-chipVal { color:var(--rq-text); font-weight:600; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.vas_098-chip.vas_098-is-link { cursor:pointer }
+.vas_098-chip.vas_098-is-link:hover { border-color:var(--rq-action); background:var(--rq-faint-blue) }
+.vas_098-chip.vas_098-is-link:hover .vas_098-chipVal { color:var(--rq-link) }
+/* The leading icon carries the chip's tone; the rest of the chip stays neutral
+   so a strip of several origins reads as one row rather than a colour chart. */
+.vas_098-chip.vas_098-ic-info    > .vas_098-ic:first-child { color:var(--rq-sent-tx) }
+.vas_098-chip.vas_098-ic-success > .vas_098-ic:first-child { color:var(--rq-success-tx) }
+.vas_098-chip.vas_098-ic-warning > .vas_098-ic:first-child { color:var(--rq-warn-tx) }
+.vas_098-chip.vas_098-ic-muted   > .vas_098-ic:first-child { color:var(--rq-text-muted) }
+.vas_098-chip > .vas_098-ic:last-child { color:var(--rq-text-muted) }
 
 /* ---------- Convert strip ---------- */
-.MPC-vasrq-convert { display:flex; align-items:center; justify-content:space-between; gap:14px;
+/* The strip must wrap inside the panel. It used to be a single non-wrapping flex
+   row with flex:none actions, so three buttons that cannot shrink pushed straight
+   past the panel's right edge. */
+.vas_098-convert { display:flex; align-items:center; justify-content:space-between;
+    gap:10px 14px; flex-wrap:wrap;
     background:linear-gradient(180deg,rgba(230,243,252,0.55),rgba(245,250,253,0.7));
     border:1px solid var(--rq-border); border-radius:12px; padding:10px 14px; margin-bottom:13px }
-.MPC-vasrq-cvnote { font-size:12.5px; color:var(--rq-text-2); display:flex; align-items:center; gap:7px }
-.MPC-vasrq-cvnote .MPC-vasrq-ok { color:var(--rq-success-tx); display:flex }
-.MPC-vasrq-cvactions { display:flex; gap:9px; flex:none; flex-wrap:wrap }
-.MPC-vasrq-btn { height:34px; padding:0 15px; border-radius:999px; font-size:13px; font-weight:500; font-family:inherit;
-    cursor:pointer; display:inline-flex; align-items:center; gap:7px; white-space:nowrap }
-.MPC-vasrq-btn.primary { background:var(--rq-action); color:#fff; border:none }
-.MPC-vasrq-btn.primary:hover:not(:disabled) { background:#0069AE }
-.MPC-vasrq-btn.secondary { background:#fff; color:var(--rq-primary); border:1px solid var(--rq-action) }
-.MPC-vasrq-btn.secondary:hover:not(:disabled) { background:var(--rq-faint-blue) }
-.MPC-vasrq-btn:disabled { opacity:.45; cursor:not-allowed }
+.vas_098-cvnote { font-size:12.5px; color:var(--rq-text-2); display:flex; align-items:center; gap:7px;
+    min-width:0; flex:1 1 auto }
+.vas_098-cvnote .vas_098-ok { color:var(--rq-success-tx); display:flex; flex:none }
+.vas_098-cvactions { display:flex; gap:9px; flex:0 1 auto; flex-wrap:wrap; justify-content:flex-end; min-width:0 }
+.vas_098-btn { height:34px; padding:0 15px; border-radius:999px; font-size:13px; font-weight:500; font-family:inherit;
+    cursor:pointer; display:inline-flex; align-items:center; gap:7px; white-space:nowrap; max-width:100% }
+.vas_098-btn.vas_098-primary { background:var(--rq-action); color:#fff; border:none }
+.vas_098-btn.vas_098-primary:hover:not(:disabled) { background:#0069AE }
+.vas_098-btn.vas_098-secondary { background:#fff; color:var(--rq-primary); border:1px solid var(--rq-action) }
+.vas_098-btn.vas_098-secondary:hover:not(:disabled) { background:var(--rq-faint-blue) }
+.vas_098-btn:disabled { opacity:.45; cursor:not-allowed }
 
 /* ---------- Stat strip ---------- */
-.MPC-vasrq-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px }
-.MPC-vasrq-stat { position:relative; background:rgba(255,255,255,0.85); border:1px solid var(--rq-border);
+/* minmax(0, 1fr), not a bare 1fr: a bare fr track cannot shrink below its
+   content, so a long amount widened its own card and pushed the strip past the
+   panel instead of ellipsising inside it. */
+.vas_098-stats { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; margin-bottom:14px }
+.vas_098-stat { position:relative; background:rgba(255,255,255,0.85); border:1px solid var(--rq-border);
     border-radius:11px; padding:10px 13px 10px 15px; overflow:hidden; min-width:0 }
-.MPC-vasrq-stat::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px }
-.MPC-vasrq-stat.a-blue::before { background:var(--rq-action) }
-.MPC-vasrq-stat.a-violet::before { background:#8B7CFF }
-.MPC-vasrq-stat.a-green::before { background:#20A464 }
-.MPC-vasrq-stat.a-amber::before { background:#D78B10 }
-.MPC-vasrq-stat.breach { background:linear-gradient(180deg,#FFF1F0,#FFF9F9) }
-.MPC-vasrq-stat.breach::before { background:var(--rq-danger) }
-.MPC-vasrq-scap { font-size:10.5px; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted) }
-.MPC-vasrq-sval { font-size:19px; font-weight:700; color:var(--rq-text); margin-top:5px; line-height:1.1;
+.vas_098-stat::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px }
+.vas_098-stat.vas_098-a-blue::before { background:var(--rq-action) }
+.vas_098-stat.vas_098-a-violet::before { background:#8B7CFF }
+.vas_098-stat.vas_098-a-green::before { background:#20A464 }
+.vas_098-stat.vas_098-a-amber::before { background:#D78B10 }
+.vas_098-stat.vas_098-breach { background:linear-gradient(180deg,#FFF1F0,#FFF9F9) }
+.vas_098-stat.vas_098-breach::before { background:var(--rq-danger) }
+.vas_098-scap { font-size:10.5px; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted) }
+.vas_098-sval { font-size:19px; font-weight:700; color:var(--rq-text); margin-top:5px; line-height:1.1;
     display:flex; align-items:center; gap:7px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.MPC-vasrq-ssub { font-size:11.5px; color:var(--rq-text-2); margin-top:3px }
-.MPC-vasrq-ssub.breach { color:#A33F3F; font-weight:700 }
-.MPC-vasrq-breachic { color:var(--rq-danger); display:flex }
+.vas_098-ssub { font-size:11.5px; color:var(--rq-text-2); margin-top:3px }
+.vas_098-ssub.vas_098-breach { color:#A33F3F; font-weight:700 }
+.vas_098-breachic { color:var(--rq-danger); display:flex }
 
 /* ---------- Section head ---------- */
-.MPC-vasrq-sechead { display:flex; align-items:center; justify-content:space-between; margin:4px 0 8px }
-.MPC-vasrq-sechead h2 { font-size:15px; font-weight:700; color:var(--rq-text); margin:0 }
-.MPC-vasrq-secright { font-size:12.5px; color:var(--rq-text-2) }
+/* Title left, summary right — but the two WRAP rather than compete for one line.
+   In a narrow panel (a record opened in single view leaves the tab panel much
+   less room than the grid does) the summary was crushed against the title;
+   allowing the wrap drops it onto its own line, aligned left under the heading,
+   and the row grows instead of squeezing. */
+.vas_098-sechead { display:flex; align-items:baseline; justify-content:space-between;
+    flex-wrap:wrap; gap:2px 12px; margin:4px 0 8px }
+.vas_098-sechead h2 { font-size:15px; font-weight:700; color:var(--rq-text); margin:0; min-width:0 }
+.vas_098-secright { font-size:12.5px; color:var(--rq-text-2); min-width:0 }
 
 /* ---------- Stepper ---------- */
-.MPC-vasrq-stepper { display:flex; background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px;
+.vas_098-stepper { display:flex; background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px;
     padding:15px 12px 11px; box-shadow:var(--rq-widget-shadow); margin-bottom:14px }
-.MPC-vasrq-step { flex:1; position:relative; display:flex; flex-direction:column; align-items:center; text-align:center;
+.vas_098-step { flex:1; position:relative; display:flex; flex-direction:column; align-items:center; text-align:center;
     padding:0 2px; --nb:#E7ECF1; --nf:#5A6B79; --ln:#E1EAF2 }
-.MPC-vasrq-step.c1{--nb:#E4E9EF;--nf:#5A6B79}
-.MPC-vasrq-step.c2{--nb:#D6F0E2;--nf:#0C5D38}
-.MPC-vasrq-step.c3{--nb:#D6EBFF;--nf:#0E5DA8}
-.MPC-vasrq-step.c4{--nb:#E8E1FF;--nf:#5F4AA6}
-.MPC-vasrq-step.c5{--nb:#FCE6C9;--nf:#9A6500}
-.MPC-vasrq-step.c6{--nb:#D4F1EC;--nf:#0B7A6B}
-.MPC-vasrq-step::before { content:''; position:absolute; top:11px; left:-50%; width:100%; height:3px; background:var(--ln); z-index:1 }
-.MPC-vasrq-step:first-child::before { display:none }
-.MPC-vasrq-step.done::before, .MPC-vasrq-step.active::before { background:#9ED1FF }
-.MPC-vasrq-node { width:24px; height:24px; border-radius:50%; z-index:2; display:flex; align-items:center; justify-content:center;
+.vas_098-step.vas_098-c1{--nb:#E4E9EF;--nf:#5A6B79}
+.vas_098-step.vas_098-c2{--nb:#D6F0E2;--nf:#0C5D38}
+.vas_098-step.vas_098-c3{--nb:#D6EBFF;--nf:#0E5DA8}
+.vas_098-step.vas_098-c4{--nb:#E8E1FF;--nf:#5F4AA6}
+.vas_098-step.vas_098-c5{--nb:#FCE6C9;--nf:#9A6500}
+.vas_098-step.vas_098-c6{--nb:#D4F1EC;--nf:#0B7A6B}
+.vas_098-step::before { content:''; position:absolute; top:11px; left:-50%; width:100%; height:3px; background:var(--ln); z-index:1 }
+.vas_098-step:first-child::before { display:none }
+.vas_098-step.vas_098-done::before, .vas_098-step.vas_098-active::before { background:#9ED1FF }
+.vas_098-node { width:24px; height:24px; border-radius:50%; z-index:2; display:flex; align-items:center; justify-content:center;
     font-size:11px; font-weight:700; background:var(--nb); color:var(--nf) }
-.MPC-vasrq-step.active .MPC-vasrq-node { border:2px solid var(--nf); box-shadow:0 0 0 4px rgba(15,61,97,0.06) }
-.MPC-vasrq-step.pending .MPC-vasrq-node { opacity:.8 }
-.MPC-vasrq-slabel { margin-top:9px; font-size:11.5px; font-weight:500; color:var(--rq-text-2); line-height:1.2 }
-.MPC-vasrq-step.done .MPC-vasrq-slabel, .MPC-vasrq-step.active .MPC-vasrq-slabel { color:var(--rq-text); font-weight:700 }
-.MPC-vasrq-ssub2 { margin-top:2px; font-size:10.5px; color:var(--rq-text-muted) }
-.MPC-vasrq-step.active .MPC-vasrq-ssub2 { color:var(--nf); font-weight:700 }
+.vas_098-step.vas_098-active .vas_098-node { border:2px solid var(--nf); box-shadow:0 0 0 4px rgba(15,61,97,0.06) }
+.vas_098-step.vas_098-pending .vas_098-node { opacity:.8 }
+.vas_098-slabel { margin-top:9px; font-size:11.5px; font-weight:500; color:var(--rq-text-2); line-height:1.2 }
+.vas_098-step.vas_098-done .vas_098-slabel, .vas_098-step.vas_098-active .vas_098-slabel { color:var(--rq-text); font-weight:700 }
+.vas_098-ssub2 { margin-top:2px; font-size:10.5px; color:var(--rq-text-muted) }
+.vas_098-step.vas_098-active .vas_098-ssub2 { color:var(--nf); font-weight:700 }
 
-/* ---------- Tabs ---------- */
-.MPC-vasrq-tabbar { display:flex; border-bottom:1px solid var(--rq-border); gap:0; flex-wrap:wrap }
-.MPC-vasrq-tab { display:flex; align-items:center; gap:8px; padding:12px 16px; cursor:pointer; background:none; border:none;
-    border-bottom:2px solid transparent; font-family:inherit; font-size:14px; letter-spacing:.25px; color:#141414 }
-.MPC-vasrq-tab .MPC-vasrq-tic { display:flex; color:#586575 }
-.MPC-vasrq-tab:hover { color:#0069AE } .MPC-vasrq-tab:hover .MPC-vasrq-tic { color:#0069AE }
-.MPC-vasrq-badge { height:20px; min-width:28px; padding:0 8px; border-radius:999px; background:var(--rq-primary); color:#fff;
-    font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center }
-.MPC-vasrq-tab.active { border-bottom-color:#141414; font-weight:500 }
-.MPC-vasrq-tab.active .MPC-vasrq-tic { color:var(--rq-primary) }
-.MPC-vasrq-tabbody { padding-top:14px }
-.MPC-vasrq-tabpanel { display:none } .MPC-vasrq-tabpanel.show { display:block; animation:MPC-vasrq-fade .25s ease both }
-@keyframes MPC-vasrq-fade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+/* ---------- Lower region (Items / Activity / Notes, stacked) ---------- */
+/* Replaced the Items / Activity / Notes tab bar: all three are sections down the
+   panel now, so Activity and Notes are visible without a click. */
+.vas_098-lowerhead { margin-top:16px }
+.vas_098-lowersec { margin-bottom:2px; animation:vas_098-fade .25s ease both }
+@keyframes vas_098-fade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
 
 /* ---------- Items ---------- */
-.MPC-vasrq-items { background:#fff; border:1px solid var(--rq-border); border-radius:13px; overflow:hidden; box-shadow:var(--rq-widget-shadow) }
-.MPC-vasrq-itrow { display:grid; grid-template-columns:2.2fr 1fr 0.6fr 1.2fr 1fr 1fr; align-items:center; padding:9px 14px; gap:10px }
-.MPC-vasrq-ithead { background:var(--rq-faint-blue); font-size:12px; color:var(--rq-text-muted); border-bottom:1px solid var(--rq-border) }
-.MPC-vasrq-itbody { font-size:13.5px; border-bottom:1px solid var(--rq-divider) }
-.MPC-vasrq-itbody:last-of-type { border-bottom:none }
-.MPC-vasrq-itbody:hover { background:#FAFCFE }
-.MPC-vasrq-itname { font-weight:700; color:var(--rq-text); font-size:13.5px; line-height:1.2 }
-.MPC-vasrq-itsku { font-size:11px; color:var(--rq-text-muted); margin-top:1px }
-.MPC-vasrq-items .ta-r { text-align:right } .MPC-vasrq-items .ta-c { text-align:center }
-.MPC-vasrq-cat { display:inline-block; font-size:11px; padding:3px 8px; border-radius:6px; background:#EEF3F8; color:#5A6B79; font-weight:500 }
-.MPC-vasrq-src { display:inline-flex; align-items:center; gap:6px; justify-content:flex-end; font-size:12.5px }
-.MPC-vasrq-src .MPC-vasrq-bar { width:40px; height:5px; border-radius:99px; background:#E7EEF4; overflow:hidden; flex:none }
-.MPC-vasrq-src .MPC-vasrq-bar i { display:block; height:100%; border-radius:99px }
-.MPC-vasrq-src.full i { background:var(--rq-success-tx) } .MPC-vasrq-src.short i { background:var(--rq-warn-tx) }
-.MPC-vasrq-src.full { color:var(--rq-success-tx); font-weight:500 } .MPC-vasrq-src.short { color:var(--rq-warn-tx); font-weight:500 }
-.MPC-vasrq-itfoot { display:flex; align-items:center; justify-content:flex-end; gap:22px; flex-wrap:wrap; padding:10px 16px;
+/* The table scrolls horizontally at ANY width, not only under a breakpoint: the
+   rows carry a min-width, so when the panel is narrower than the columns need
+   (a zoomed-out browser hands the panel an in-between width) the reader scrolls
+   to the last columns instead of losing them off the edge — the panel root
+   itself never scrolls sideways. */
+.vas_098-items { background:#fff; border:1px solid var(--rq-border); border-radius:13px; overflow-x:auto; overflow-y:hidden; box-shadow:var(--rq-widget-shadow) }
+/* Every track is minmax(0, Nfr); a bare Nfr cannot shrink below its content, so
+   one long product name pushed the row wider than the table and clipped the
+   right-hand columns away entirely. */
+.vas_098-itrow { display:grid; grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,0.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr); align-items:center; padding:9px 14px; gap:10px; min-width:520px }
+/* Grid items default to min-width:auto, which blocks the ellipsis on the cells
+   below from ever kicking in. */
+.vas_098-itrow > * { min-width:0 }
+.vas_098-ithead { background:var(--rq-faint-blue); font-size:12px; color:var(--rq-text-muted); border-bottom:1px solid var(--rq-border) }
+.vas_098-itbody { font-size:13.5px; border-bottom:1px solid var(--rq-divider) }
+.vas_098-itbody:last-of-type { border-bottom:none }
+.vas_098-itbody:hover { background:#FAFCFE }
+.vas_098-itname { font-weight:700; color:var(--rq-text); font-size:13.5px; line-height:1.2;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.vas_098-itsku { font-size:11px; color:var(--rq-text-muted); margin-top:1px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+/* Attribute Set Instance sub-line (lot / serial / size ...). */
+.vas_098-itattr { font-size:11px; color:var(--rq-text-2); margin-top:1px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.vas_098-items .vas_098-ta-r { text-align:right } .vas_098-items .vas_098-ta-c { text-align:center }
+/* Unit of measure cell (replaced the product-category chip). */
+.vas_098-uom { display:inline-block; font-size:12.5px; color:var(--rq-text);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.vas_098-src { display:inline-flex; align-items:center; gap:6px; justify-content:flex-end; font-size:12.5px }
+.vas_098-src .vas_098-bar { width:40px; height:5px; border-radius:99px; background:#E7EEF4; overflow:hidden; flex:none }
+.vas_098-src .vas_098-bar i { display:block; height:100%; border-radius:99px }
+.vas_098-src.vas_098-full i { background:var(--rq-success-tx) } .vas_098-src.vas_098-short i { background:var(--rq-warn-tx) }
+.vas_098-src.vas_098-full { color:var(--rq-success-tx); font-weight:500 } .vas_098-src.vas_098-short { color:var(--rq-warn-tx); font-weight:500 }
+.vas_098-itfoot { display:flex; align-items:center; justify-content:flex-end; gap:22px; flex-wrap:wrap; padding:10px 16px;
     background:var(--rq-faint-blue); border-top:1px solid var(--rq-border); font-size:13px }
-.MPC-vasrq-tf { color:var(--rq-text-2) } .MPC-vasrq-tf b { color:var(--rq-text); font-weight:600; margin-left:6px }
-.MPC-vasrq-grand { font-size:14px; color:var(--rq-text); font-weight:700 }
-.MPC-vasrq-grand b { color:var(--rq-primary); margin-left:8px; font-size:16px }
-.MPC-vasrq-itempty { padding:20px 16px; text-align:center; color:var(--rq-text-muted); font-size:13px }
+.vas_098-tf { color:var(--rq-text-2) } .vas_098-tf b { color:var(--rq-text); font-weight:600; margin-left:6px }
+.vas_098-grand { font-size:14px; color:var(--rq-text); font-weight:700 }
+.vas_098-grand b { color:var(--rq-primary); margin-left:8px; font-size:16px }
+.vas_098-itempty { padding:20px 16px; text-align:center; color:var(--rq-text-muted); font-size:13px }
+
+/* ---------- Documents (raised from the requisition) ---------- */
+/* Reuses the items box (border, radius, own horizontal scroll) with four tracks
+   of its own: Document | Date | Status | Amount. Its rows are .vas_098-docRow
+   rather than .vas_098-itrow — the two share the box but not its column
+   meanings, so neither table's grid can reach the other's. */
+.vas_098-docRow { display:grid; grid-template-columns:minmax(0,2.4fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);
+    align-items:center; padding:9px 14px; gap:10px; min-width:420px }
+.vas_098-docRow > * { min-width:0 }
+.vas_098-docItem { display:flex; align-items:center; gap:8px; min-width:0 }
+.vas_098-docTxt { min-width:0; flex:1 }
+/* A whole document row is clickable — the open arrow and the doc no tint on
+   hover, the way the chips do. */
+.vas_098-docRow.vas_098-is-link { cursor:pointer }
+.vas_098-docRow.vas_098-is-link:hover { background:#F2F8FD }
+.vas_098-docRow.vas_098-is-link .vas_098-docItem > .vas_098-ic:last-child { color:var(--rq-text-muted); flex:none }
+.vas_098-docRow.vas_098-is-link:hover .vas_098-docItem > .vas_098-ic:last-child,
+.vas_098-docRow.vas_098-is-link:hover .vas_098-itname { color:var(--rq-link) }
+
+/* ---------- Pager (line items) ---------- */
+/* Sibling of the items box, not a child: that box takes its own horizontal
+   scroll on narrow panels and the controls must stay put. */
+.vas_098-pager { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+    gap:8px 14px; margin-top:9px; font-size:12px; color:var(--rq-text-muted) }
+.vas_098-pgCtrls { display:inline-flex; align-items:center; gap:8px }
+.vas_098-pgPos { color:var(--rq-text); font-weight:700 }
+.vas_098-pgBtn { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--rq-border);
+    border-radius:999px; background:#fff; padding:5px 12px; color:var(--rq-primary);
+    font-weight:700; line-height:1; cursor:pointer; user-select:none; white-space:nowrap }
+.vas_098-pgBtn:hover { background:var(--rq-faint-blue); border-color:var(--rq-action) }
+.vas_098-pgBtn.vas_098-is-disabled { opacity:.45; cursor:default; pointer-events:none; color:var(--rq-text-muted) }
 
 /* ---------- Activity ---------- */
-.MPC-vasrq-panelcard { background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px; padding:8px 18px; box-shadow:var(--rq-widget-shadow) }
-.MPC-vasrq-actrow { display:flex; align-items:flex-start; gap:10px; padding:9px 0 }
-.MPC-vasrq-actrow + .MPC-vasrq-actrow { border-top:1px solid var(--rq-divider) }
-.MPC-vasrq-actbadge { display:inline-flex; align-items:center; gap:5px; border-radius:8px; padding:4px 8px; font-size:10.5px; font-weight:700; flex:none }
-.MPC-vasrq-actbadge.create { background:#EEF3F8; color:#5A6B79 }
-.MPC-vasrq-actbadge.submit { background:#E8F2FC; color:#0E5DA8 }
-.MPC-vasrq-actbadge.status { background:#E4F5EC; color:#0C5D38 }
-.MPC-vasrq-actbadge.comment { background:#EFEAFF; color:#5F4AA6 }
-.MPC-vasrq-actbadge.link { background:#E0F2F1; color:#0B7A6B }
-.MPC-vasrq-actmain { flex:1; min-width:0 }
-.MPC-vasrq-atwrap { display:flex; justify-content:space-between; gap:12px; align-items:baseline }
-.MPC-vasrq-at { font-size:13.5px; color:var(--rq-text) }
-.MPC-vasrq-attime { font-size:11.5px; color:var(--rq-text-muted); white-space:nowrap }
+.vas_098-panelcard { background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px; padding:8px 18px; box-shadow:var(--rq-widget-shadow) }
+.vas_098-actrow { display:flex; align-items:flex-start; gap:10px; padding:9px 0 }
+.vas_098-actrow + .vas_098-actrow { border-top:1px solid var(--rq-divider) }
+.vas_098-actbadge { display:inline-flex; align-items:center; gap:5px; border-radius:8px; padding:4px 8px; font-size:10.5px; font-weight:700; flex:none }
+.vas_098-actbadge.vas_098-create { background:#EEF3F8; color:#5A6B79 }
+.vas_098-actbadge.vas_098-submit { background:#E8F2FC; color:#0E5DA8 }
+.vas_098-actbadge.vas_098-status { background:#E4F5EC; color:#0C5D38 }
+.vas_098-actbadge.vas_098-comment { background:#EFEAFF; color:#5F4AA6 }
+.vas_098-actbadge.vas_098-link { background:#E0F2F1; color:#0B7A6B }
+/* Downstream lifecycle documents. */
+.vas_098-actbadge.vas_098-po  { background:#E4F0FF; color:#0E5DA8 }
+.vas_098-actbadge.vas_098-grn { background:#CCEFDD; color:#0C5D38 }
+.vas_098-actbadge.vas_098-email { background:#EFEAFF; color:#5F4AA6 }
+.vas_098-actmain { flex:1; min-width:0 }
+/* Headline left, "when · by whom" right — wrapping when the two cannot share a
+   line. The stamp now carries the actor's name on every row, not just an
+   e-mail's, so it is long enough to have squeezed the headline down to an
+   ellipsis on a narrow panel; it drops to its own line instead. */
+.vas_098-atwrap { display:flex; justify-content:space-between; flex-wrap:wrap;
+    gap:2px 12px; align-items:baseline }
+/* min-width:0 so a long subject ellipsises instead of pushing the timestamp
+   out of the row. */
+.vas_098-at { font-size:13.5px; color:var(--rq-text); min-width:0; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap }
+/* A COMMENT's headline is the comment itself, not a label — it wraps (to three
+   lines) rather than ellipsising, since a chat entry cut off after one line is
+   the part of the row the reader actually came for. */
+.vas_098-at.vas_098-multiline { white-space:normal; overflow-wrap:break-word; word-break:break-word;
+    line-height:1.45; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical }
+/* margin-left:auto keeps it right-aligned when it wraps onto a line of its own. */
+.vas_098-attime { font-size:11.5px; color:var(--rq-text-muted); white-space:nowrap;
+    flex:none; margin-left:auto; max-width:100%; overflow:hidden; text-overflow:ellipsis }
+
+/* ---------- Activity: e-mail rows ---------- */
+/* Recipient sub-line under an e-mail's subject. */
+.vas_098-actsub { margin-top:2px; font-size:11.5px; color:var(--rq-text-muted);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+/* A row carrying a message body opens it on click. */
+.vas_098-actrow.vas_098-openable { cursor:pointer }
+.vas_098-actrow.vas_098-openable:hover { background:var(--rq-faint-blue) }
+/* The body panel, revealed under its row. It is a sibling of the row, so it
+   carries the same left inset as the row's text column. */
+.vas_098-actbody { padding:10px 12px 12px; margin:0 0 8px; border-radius:9px;
+    background:var(--rq-faint-blue); border:1px solid var(--rq-border) }
+.vas_098-actmeta { font-size:11.5px; color:var(--rq-text-muted); word-break:break-word }
+.vas_098-actmeta + .vas_098-actmeta { margin-top:2px }
+/* The message itself keeps the sender's own line breaks. */
+.vas_098-actbody p { margin:8px 0 0; font-size:13px; color:var(--rq-text);
+    line-height:1.55; white-space:pre-wrap; word-break:break-word }
 
 /* ---------- Notes ---------- */
-.MPC-vasrq-notescard { padding:16px 18px }
-.MPC-vasrq-notesbody { font-size:13.5px; color:var(--rq-text); line-height:1.55 }
-.MPC-vasrq-notesbody p { margin:0 } .MPC-vasrq-notesbody p + p { margin-top:9px }
+.vas_098-notescard { padding:16px 18px }
+.vas_098-notesbody { font-size:13.5px; color:var(--rq-text); line-height:1.55 }
+.vas_098-notesbody p { margin:0 } .vas_098-notesbody p + p { margin-top:9px }
+/* Caption above a LINE's own note ("Line 10 — Steel Bolt M8"), so a reader knows
+   which row it annotates. The first one still needs its top gap: it follows the
+   header's note, not another caption. */
+.vas_098-notelbl { margin-top:12px; font-size:10.5px; font-weight:700; letter-spacing:.4px;
+    text-transform:uppercase; color:var(--rq-text-muted); line-height:1.3;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.vas_098-notelbl + p { margin-top:2px }
+.vas_098-notesbody > .vas_098-notelbl:first-child { margin-top:0 }
+
+/* ---------- Toast (convert-action feedback) ---------- */
+.vas_098-toast {
+    position:absolute; left:50%; bottom:16px; transform:translate(-50%, 12px);
+    max-width:90%; padding:8px 14px; border-radius:8px;
+    background:#102C3F; color:#fff; font-size:13px; line-height:1.4;
+    box-shadow:0 6px 18px rgba(16,44,63,0.25);
+    opacity:0; z-index:1000; pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+}
+.vas_098-toast.vas_098-show { opacity:1; transform:translate(-50%, 0) }
+.vas_098-toast.vas_098-err  { background:#B23636 }
+.vas_098-toast.vas_098-ok   { background:#0C5D38 }
+
+/* Disabled convert buttons still need to read as deliberately unavailable. */
+.vas_098-btn:disabled { opacity:.45; cursor:default }
 
 /* ---------- Reveal ---------- */
-.MPC-vasrq-hdr,.MPC-vasrq-hdrCard,.MPC-vasrq-convert,.MPC-vasrq-stats,.MPC-vasrq-stepper,.MPC-vasrq-tabbar { animation:MPC-vasrq-rise .4s ease both }
-@keyframes MPC-vasrq-rise { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+.vas_098-hdr,.vas_098-hdrCard,.vas_098-convert,.vas_098-stats,.vas_098-stepper { animation:vas_098-rise .4s ease both }
+@keyframes vas_098-rise { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
 
 /* ---------- Responsive ---------- */
-@media (max-width: 900px) {
-    .MPC-vasrq-hdrCard { grid-template-columns:1fr }
-    .MPC-vasrq-hdrColL { border-right:none; padding-right:0; border-bottom:1px solid var(--rq-divider); padding-bottom:12px }
-    .MPC-vasrq-stats { grid-template-columns:repeat(2,1fr) }
-    .MPC-vasrq-hdrTop { flex-direction:column }
-    .MPC-vasrq-hdrPills { justify-content:flex-start }
-    .MPC-vasrq-itrow { grid-template-columns:1.8fr 1fr 0.6fr 1.1fr; }
-    .MPC-vasrq-itrow > :nth-child(5), .MPC-vasrq-itrow > :nth-child(6) { display:none }
+/* Container queries, measured against .vas_098-root's own width. The former
+   @media breakpoints (900px / 560px) were viewport-based: in a ~400px side panel
+   on a desktop screen they never matched, so the six-column item row and the
+   four-up stat strip stayed crammed at every zoom level. Breakpoints are aligned
+   with VAS_099_OverviewGRN so the two panels collapse at the same widths. */
+/* Two-up from 700px, not 620px. Four stat cards each carry an uppercase label,
+   a large figure and a caption, all clipped to one line, so they need ~700px
+   before they stop crushing — and browser zoom is what exposed it: at 80% the
+   panel measures ~1.25x more CSS pixels for the same physical width, which used
+   to carry it over the old 620px threshold and turn a comfortable 2-up strip
+   into a crammed 4-up one. Matches VAS_099_OverviewGRN and VAS_102. */
+@container (max-width: 700px) {
+    .vas_098-stats { grid-template-columns:repeat(2, minmax(0, 1fr)) }
+    /* Four columns need proportionally less room before they have to scroll. */
+    .vas_098-itrow { grid-template-columns:minmax(0,1.8fr) minmax(0,1fr) minmax(0,0.6fr) minmax(0,1.1fr); min-width:360px }
+    .vas_098-itrow > :nth-child(5), .vas_098-itrow > :nth-child(6) { display:none }
 }
-@media (max-width: 560px) {
-    .MPC-vasrq-stats { grid-template-columns:1fr }
-    .MPC-vasrq-convert { flex-direction:column; align-items:stretch }
+@container (max-width: 460px) {
+    .vas_098-hdrCard { grid-template-columns:1fr }
+    .vas_098-hdrColL { border-right:none; padding-right:0; border-bottom:1px solid var(--rq-divider); padding-bottom:12px }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .vas_098-hdrColR { grid-template-columns:1fr }
+    .vas_098-hdrTop { flex-direction:column }
+    .vas_098-hdrPills { justify-content:flex-start }
+}
+@container (max-width: 400px) {
+    .vas_098-convert { flex-direction:column; align-items:stretch }
+}
+/* The stat strip goes single-column at 340px, not 400px — the width VAS_099's
+   snapshot uses. Between those two the requisition's four cards were stacking
+   one per line while the GRN panel's stayed 2-up, so the same record read as
+   four rows of summary here and two there. A record opened in SINGLE VIEW is
+   exactly where that showed: the form takes the width, the tab panel is left
+   under 400px, and the summary took four lines of it. */
+@container (max-width: 340px) {
+    .vas_098-stats { grid-template-columns:minmax(0, 1fr) }
 }
 
 /* ---------- RTL ---------- */
 /* Mirrors the header column divider only; the rest of this panel has no RTL
    overrides yet. */
-[dir="rtl"] .MPC-vasrq-hdrColL { border-right:none; border-left:1px solid var(--rq-divider); padding-right:0; padding-left:20px }
+[dir="rtl"] .vas_098-hdrColL { border-right:none; border-left:1px solid var(--rq-divider); padding-right:0; padding-left:20px }
+[dir="rtl"] .vas_098-pgBtn .vas_098-ic svg { transform:scaleX(-1) }

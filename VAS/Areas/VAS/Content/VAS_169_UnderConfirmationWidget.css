@@ -1,0 +1,105 @@
+/* Under Confirmation KPI Widget (VAS_169_UnderConfirmationWidget)
+   Glass background card with responsive clamp typography and warning text color when count >= 1.
+   All selectors are prefixed with .vas-under-confirmation- */
+
+.vas-under-confirmation-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.vas-under-confirmation-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas-under-confirmation-root,
+    .vas-under-confirmation-root * {
+        box-sizing: border-box;
+    }
+
+.vas-under-confirmation-card {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    text-align: left;
+    padding: .85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    transition: box-shadow 180ms ease, transform 180ms ease;
+    outline: none;
+}
+
+    .vas-under-confirmation-card:hover {
+        box-shadow: 0 14px 30px rgba(15, 61, 97, .13);
+        transform: translateY(-1px);
+    }
+
+    .vas-under-confirmation-card:focus-visible {
+        outline: 2px solid #1F83FF;
+        outline-offset: 2px;
+    }
+
+.vas-under-confirmation-label {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * 0.011375), 17px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.3;
+    display: block;
+}
+
+.vas-under-confirmation-value {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 1.75em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.05;
+    margin-top: .25em;
+    display: block;
+    transition: color 180ms ease;
+}
+
+/* Warning tone text color (#D78B10) when count >= 1 */
+.vas-under-confirmation-value.vas-under-confirmation-warning {
+    color: #D78B10;
+}
+
+.vas-under-confirmation-meta {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: .6875em;
+    font-weight: 400;
+    color: #748494;
+    line-height: 1.3;
+    margin-top: .25em;
+    display: block;
+}
+
+/* Busy overlay indicator */
+.vas-under-confirmation-busy {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    z-index: 10;
+}
+
+.vas-under-confirmation-hidden {
+    display: none !important;
+}

@@ -106,32 +106,44 @@
 }
 
 .MPC-dow-select {
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
     font-family: inherit;
     font-size: 0.75em;
     font-weight: 500;
     color: #102C3F;
     line-height: 1.2;
-    background: #FFFFFF url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230083DA' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 0.6em center;
-    background-size: 1em 1em;
-    border: 1px solid #E4EDF4;
+    background-color: #FFFFFF;
+    border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: 0.45em 2em 0.45em 0.75em;
+    padding: 0.35em 0.75em;
     cursor: pointer;
     flex-shrink: 0;
-    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.06);
+    text-align: center;
+    text-align-last: center;
+    outline: none;
+    box-sizing: border-box;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.MPC-dow-month {
+    min-width: 7.5em;
+}
+
+.MPC-dow-year {
+    min-width: 5.2em;
 }
 
 .MPC-dow-select:hover {
-    border-color: #BFE4FF;
-    background-color: #FBFDFF;
+    background-color: #EEF8FF;
+    border-color: #0083DA;
 }
 
 .MPC-dow-select:focus-visible {
-    outline: 2px solid #0083DA;
-    outline-offset: 1px;
+    border-color: #0083DA;
+    outline: none;
 }
 
 .MPC-dow-select:disabled {
@@ -393,10 +405,7 @@
 }
 
 .MPC-dow-overlay {
-    /* Viewport-anchored (the overlay lives on <body>, outside the widget), same
-       basis as the widget card so it scales at any resolution; every size below
-       is in em off this anchor. */
-    font-size: clamp(0.9rem, 1.6vw, 2.2rem);
+    font-size: clamp(16px, 1.17vw, 24px);
     position: fixed;
     inset: 0;
     background: rgba(16, 44, 63, 0.32);

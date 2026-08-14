@@ -1,22 +1,41 @@
 /* ─────────────────────────────────────────────────────────────────────────
  * VAS_120 Customer Search — full-width glass search band (Customers dashboard).
- * Design: customer-search.html (attached) + Design Specs/dashboard-widgets.md
- * "Full-Width Dashboard Search Widget". Onfinity glass tokens; internal type /
- * spacing in em against the widget-root font-size; borders / radii / shadows in
- * px (physical edges). Autosuggest is bounded to seven rows — no inner scrollbar.
+ * Design: Design Specs/dashboard-widgets.md "Full-Width Dashboard Search Widget".
+ * Onfinity glass tokens; internal type / spacing in em against the widget-root
+ * font-size; borders / radii / shadows in px (physical edges). Autosuggest is
+ * bounded to seven rows — no inner scrollbar.
  * All classes carry the module MPC prefix (vas120-*) per Prompt_Instructions.
+ *
+ * 2026-08-06 — Aligned to the shared dashboard search-widget design. The band
+ *   was full-bleed (100%) and wrapped a second, nested white capsule around the
+ *   input, so it read as a card-in-a-card and did not match VAS_067/068/069/070
+ *   (vas-dssrch-*), VAS_078 (MPC-product-search-*), VAS_144 (MPC-dos-*) or
+ *   VAS_164 (vas-stocksearch-*). It is now the single 80%-wide, centered glass
+ *   pill the spec describes: root carries 18px vertical padding only, pill
+ *   padding 1em/1.125em (16px/18px), icon 1.125em, input 0.875em, and the
+ *   suggest popover uses the shared 12px-radius / 0 18px 40px chrome.
  * ───────────────────────────────────────────────────────────────────────── */
 
 .vas120-root {
-    /* Widget root anchor — one lever; internal em values scale from this. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    /* Transparent cell — the dashboard gradient shows through the glass pill;
+       no card/box around it (shared search-widget rule). */
+    position: relative;
     width: 100%;
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
+    /* Spec: 18px top and bottom only, so the pill measures from the true
+       widget edges. */
+    padding: 1.125em 0;
+    overflow: visible;
+    /* Widget root anchor — one lever; internal em values scale from this. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
     color: #102C3F;
     font-family: Roboto, sans-serif;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
     .vas120-root,
@@ -24,93 +43,128 @@
         box-sizing: border-box;
     }
 
-/* Glass search band (outer stays transparent; the band carries the chrome). */
+/* Single glass search pill — 80% of the widget, horizontally centered.
+   Same chrome as every other dashboard search widget. */
 .vas120-searchbar {
-    width: 100%;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
-    border: 2px solid #FFFFFF;                 /* px — physical edge */
-    border-radius: 14px;                        /* px */
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
-    backdrop-filter: blur(10px);
-    padding: 0.7em 0.85em;
-    position: relative;
-}
-
-/* Pill input field. */
-.vas120-field {
+    width: 80%;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 0.625em;
-    background: #FFFFFF;
-    border: 1px solid #E4EDF4;                  /* px */
-    border-radius: 999px;                       /* px */
-    padding: 0.55em 0.9em;
-    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.05);
+    padding: 1em 1.125em;                       /* 16px / 18px at the 16px floor */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;                  /* px — physical edge */
+    border-radius: 14px;                        /* px */
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.06);
+    backdrop-filter: blur(10px);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-    .vas120-field:focus-within {
-        border-color: #BFE4FF;
-        box-shadow: 0 6px 16px rgba(31, 131, 255, 0.12);
+    .vas120-searchbar:focus-within {
+        border-color: #B6DEFB;
+        box-shadow: 0 6px 18px rgba(0, 131, 218, 0.16);
+    }
+
+    /* Never resize/scale the pill on hover — keep it perfectly stable. */
+    .vas120-root:hover,
+    .vas120-searchbar:hover {
+        transform: none !important;
     }
 
 .vas120-search-icon {
-    display: inline-grid;
-    place-items: center;
+    width: 1.125em;
+    height: 1.125em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
     color: #0083DA;
-    flex-shrink: 0;
 }
 
     .vas120-search-icon svg {
-        width: 1.125em;
-        height: 1.125em;
+        width: 100%;
+        height: 100%;
     }
 
-.vas120-input {
-    flex: 1;
+/* Force the input to disappear into the glass pill, overriding any global
+   app input styling (border / background / inset shadow / rounded box). */
+.vas120-searchbar .vas120-input,
+.vas120-searchbar .vas120-input:focus,
+.vas120-searchbar .vas120-input:hover {
+    flex: 1 1 auto;
     min-width: 0;
-    border: none;
-    outline: none;
-    background: transparent;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 none !important;
+    border-radius: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    background-image: none !important;
     font-family: inherit;
-    font-size: 0.85em;
+    font-size: 0.875em !important;
+    line-height: 1.4 !important;
     color: #102C3F;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
-    .vas120-input::placeholder {
-        color: #9FB0BD;
+    .vas120-searchbar .vas120-input::placeholder {
+        color: #748494;
+        opacity: 1;
     }
 
+/* Ghost clear button (matches the shared search widgets — no filled chip). */
 .vas120-clear {
-    width: 1.5em;
-    height: 1.5em;
-    border-radius: 999px;
-    display: grid;
+    width: 1.25em;
+    height: 1.25em;
+    flex: 0 0 auto;
+    display: none;
     place-items: center;
-    background: #F2F6FA;
+    padding: 0;
+    background: transparent;
     border: none;
+    border-radius: 50%;
     color: #748494;
-    flex-shrink: 0;
     cursor: pointer;
+    transition: color 0.15s ease, background-color 0.15s ease;
 }
+
+    .vas120-clear:hover {
+        color: #102C3F;
+        background-color: rgba(16, 44, 63, 0.08);
+    }
 
     .vas120-clear svg {
         width: 0.9em;
         height: 0.9em;
     }
 
+/* Narrow dashboards: let the pill take more of the cell. */
+@container (max-width: 50em) {
+    .vas120-searchbar {
+        width: 92%;
+    }
+}
+
 /* ── Suggest popover (fixed, on <body> so the cell cannot clip it) ─────── */
 
 .vas120-suggest {
     position: fixed;
-    z-index: 4000;
+    z-index: 10050;
     display: none;
     background: #FFFFFF;
     border: 1px solid #E4EDF4;                  /* px */
-    border-radius: 14px;                        /* px */
-    box-shadow: 0 20px 50px rgba(2, 20, 34, 0.18);
-    padding: 6px;
+    border-radius: 12px;                        /* px */
+    box-shadow: 0 18px 40px rgba(15, 61, 97, 0.18);
+    padding: 0.43em;
     font-family: Roboto, sans-serif;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    /* The popover lives outside .vas120-root, so it carries its own anchor —
+       same basis as every other search popover on the dashboard. */
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * .0105), 18px);
     color: #102C3F;
 }
 
@@ -128,19 +182,20 @@
     align-items: center;
     gap: 0.625em;
     padding: 0.55em 0.65em;
-    border-radius: 10px;                        /* px */
+    border-radius: 8px;                         /* px */
     cursor: pointer;
+    transition: background 120ms ease;
 }
 
     .vas120-option:hover,
     .vas120-option.is-active {
-        background: rgba(31, 131, 255, 0.06);
+        background: #EEF6FF;
     }
 
 .vas120-avatar {
     width: 2em;
     height: 2em;
-    border-radius: 10px;                        /* px */
+    border-radius: 8px;                         /* px */
     display: grid;
     place-items: center;
     font-size: 0.72em;
@@ -158,7 +213,7 @@
 
 .vas120-option-name {
     font-weight: 700;
-    font-size: 0.85em;
+    font-size: 0.875em;
     color: #102C3F;
     line-height: 1.2;
     white-space: nowrap;
@@ -168,8 +223,8 @@
 
 .vas120-option-meta {
     font-weight: 400;
-    font-size: 0.72em;
-    color: #5F7283;
+    font-size: 0.75em;
+    color: #748494;
     line-height: 1.3;
     margin-top: 1px;
     white-space: nowrap;
@@ -178,7 +233,7 @@
 }
 
 .vas120-option mark {
-    background: #FFF1B8;
+    background: #FFF6E2;
     color: inherit;
     border-radius: 3px;                         /* px */
     padding: 0 1px;
@@ -195,18 +250,21 @@
 .vas120-tag {
     display: inline-flex;
     align-items: center;
-    font-weight: 600;
+    font-weight: 500;
     font-size: 0.6875em;
-    padding: 0.1875em 0.5em;
-    border-radius: 6px;                         /* px */
+    padding: 0.16em 0.66em;
+    border-radius: 999px;                       /* px */
     line-height: 1.2;
     white-space: nowrap;
 }
 
-.vas120-tag-violet { background: #EFEAFF; color: #5F4AA6; }
-.vas120-tag-amber  { background: #FCEBD3; color: #9A6500; }
-.vas120-tag-info   { background: #DFF1FF; color: #0E5DA8; }
-.vas120-tag-key    { background: #FBE9D2; color: #9A5B00; }
+.vas120-tag-violet  { background: #EFEAFF; color: #5F4AA6; }
+.vas120-tag-amber   { background: #FCEBD3; color: #9A6500; }
+.vas120-tag-info    { background: #DFF1FF; color: #0E5DA8; }
+.vas120-tag-key     { background: #FFF6E2; color: #9A6500; }
+/* Any tier label outside Platinum/Gold/Silver — the tenant's own AD_Ref_List
+   wording for C_BPartner.Rating still gets a readable chip. */
+.vas120-tag-neutral { background: #EEF2F6; color: #5F7283; }
 
 /* Row quick actions. */
 .vas120-actions {
@@ -222,15 +280,14 @@
     border-radius: 8px;                         /* px */
     display: grid;
     place-items: center;
-    background: #F4F9FD;
-    border: 1px solid #E4EDF4;                  /* px */
+    background: rgba(0, 131, 218, 0.10);
+    border: none;
     color: #0083DA;
     cursor: pointer;
 }
 
     .vas120-action:hover {
-        background: #EAF8FF;
-        border-color: #BFE4FF;
+        background: #E7F4FF;
     }
 
     .vas120-action svg {
@@ -252,9 +309,10 @@
 
 /* Empty / loading / error / too-short state line. */
 .vas120-state {
-    padding: 0.9em 0.65em;
-    font-size: 0.85em;
+    padding: 1em;
+    font-size: 0.8125em;
     color: #748494;
+    text-align: center;
 }
 
 /* "See all N matches" footer. */
@@ -267,15 +325,296 @@
     border-top: 1px solid #EDF2F6;              /* px */
     font-size: 0.78em;
     font-weight: 600;
-    color: #1F83FF;
+    color: #0083DA;
     cursor: pointer;
 }
 
     .vas120-more:hover {
-        color: #1675E6;
+        color: #1F83FF;
     }
 
     .vas120-more svg {
         width: 0.75em;
         height: 0.75em;
     }
+
+/* ── Quick-action dialogs (New task / Schedule appointment / Log activity) ──
+ * 2026-08-07 — The three row actions now open real popups instead of zooming
+ * to the record. The shell matches the sibling Customers-module dialogs
+ * (VAS_126/127/137/138): scrim + 18px-radius white panel, 56px header, footer
+ * on #FBFDFF. These sit on <body>, outside .vas120-root, so — like the suggest
+ * popover — they carry their own font anchor and are sized in px (dialog chrome
+ * is physical, not widget-relative). z-index clears the popover's 10050.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas120-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    font-size: 14px;                            /* px — dialog chrome anchor */
+    color: #102C3F;
+}
+
+    .vas120-modal.is-open {
+        display: flex;
+    }
+
+    .vas120-modal,
+    .vas120-modal * {
+        box-sizing: border-box;
+    }
+
+.vas120-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 20, 34, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.vas120-panel {
+    position: relative;
+    width: 100%;
+    max-width: 560px;                           /* px */
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+}
+
+.vas120-mhead {
+    flex-shrink: 0;
+    height: 56px;                               /* px */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;                                  /* px */
+    padding: 0 20px;                            /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas120-mtitle {
+    margin: 0;
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas120-mhead-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+    min-width: 0;
+}
+
+/* Customer the dialog acts on — quiet, right-aligned in the header. */
+.vas120-mcust {
+    font-size: 13px;                            /* px */
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;                           /* px */
+}
+
+.vas120-mclose {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .vas120-mclose:hover {
+        background: #F1F4F8;
+    }
+
+    .vas120-mclose svg {
+        width: 20px;
+        height: 20px;
+    }
+
+.vas120-mbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 18px 24px 8px;                     /* px */
+}
+
+.vas120-mfoot {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;                                  /* px */
+    padding: 14px 24px;                         /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+.vas120-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;                                   /* px */
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;                            /* px */
+    font-weight: 600;
+    padding: 8px 16px;                          /* px */
+    border: none;
+    cursor: pointer;
+}
+
+    .vas120-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .vas120-btn[disabled] {
+        opacity: 0.6;
+        cursor: default;
+    }
+
+.vas120-btn-ghost {
+    background: #FFFFFF;
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+}
+
+    .vas120-btn-ghost:hover:not([disabled]) {
+        background: #EAF8FF;
+    }
+
+.vas120-btn-primary {
+    background: #1F83FF;
+    color: #FFFFFF;
+}
+
+    .vas120-btn-primary:hover:not([disabled]) {
+        background: #1F83FF;
+    }
+
+/* Activity-type chips (Call / Note / Meeting / Email). */
+.vas120-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;                                   /* px */
+    margin-bottom: 16px;                        /* px */
+}
+
+.vas120-type {
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;                            /* px */
+    font-weight: 600;
+    padding: 6px 16px;                          /* px */
+    border: 1px solid #BFE4FF;                  /* px */
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas120-type:hover {
+        background: #EAF8FF;
+    }
+
+    .vas120-type.is-active {
+        background: #1F83FF;
+        border-color: #1F83FF;
+        color: #FFFFFF;
+    }
+
+/* Form fields — underline inputs, matching the module's dialog forms. */
+.vas120-field {
+    flex: 1 1 0;
+    min-width: 0;
+    margin-bottom: 14px;                        /* px */
+}
+
+.vas120-frow {
+    display: flex;
+    gap: 24px;                                  /* px */
+}
+
+.vas120-flabel {
+    display: block;
+    font-size: 12px;                            /* px */
+    color: #141414;
+    margin-bottom: 8px;                         /* px */
+}
+
+/* The app skins bare inputs globally; reset that so the dialog fields read as
+   the flat underlines the design uses. */
+.vas120-modal .vas120-finput,
+.vas120-modal .vas120-fselect,
+.vas120-modal .vas120-ftext {
+    display: block;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 8px 2px !important;                /* px */
+    border: none !important;
+    border-bottom: 1px solid #D7D7D7 !important; /* px */
+    border-radius: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: #FFFFFF !important;
+    background-image: none !important;
+    font-family: inherit;
+    font-size: 16px !important;                 /* px */
+    line-height: 1.4 !important;
+    color: #000000;
+}
+
+    .vas120-modal .vas120-finput:focus,
+    .vas120-modal .vas120-fselect:focus,
+    .vas120-modal .vas120-ftext:focus {
+        border-bottom-color: #0083DA !important;
+    }
+
+    .vas120-modal .vas120-finput[readonly] {
+        color: #5F7283;
+    }
+
+    .vas120-modal .vas120-finput::placeholder,
+    .vas120-modal .vas120-ftext::placeholder {
+        color: #748494;
+        opacity: 1;
+    }
+
+.vas120-modal .vas120-ftext {
+    min-height: 84px !important;                /* px */
+    resize: vertical;
+}
+
+.vas120-merror {
+    margin-top: 10px;                           /* px */
+    font-size: 13px;                            /* px */
+    color: #ED1C24;
+}
+
+body.vas120-modal-open {
+    overflow: hidden;
+}
+
+/* Narrow viewports: stack the paired fields. */
+@media (max-width: 520px) {
+    .vas120-frow {
+        flex-direction: column;
+        gap: 0;
+    }
+}

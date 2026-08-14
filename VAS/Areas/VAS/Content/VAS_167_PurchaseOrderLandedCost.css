@@ -1,0 +1,962 @@
+/************************************************************
+ * Module Name : VAS
+ * Purpose     : Styles for the Expected Landed Cost tab panel
+ *               (VAS.VAS_167_PurchaseOrderLandedCost). All classes are
+ *               panel-prefixed (vas_167-*) and scoped under the panel
+ *               root to avoid global collisions.
+ *
+ *               Structure: a fixed title strip (title, PO Number · Ordered
+ *               date, state pill) above the only scrolling region — the panel
+ *               body, which opens with the order's details card. Every flex
+ *               child in that chain carries min-height: 0 / min-width: 0 so a
+ *               body full of expanded generated-lines blocks scrolls instead
+ *               of stretching the panel.
+ *
+ *               Palette is the canonical one (primary #0083DA, action
+ *               #1F83FF, link #106AB0, text #102C3F / #5F7283 / #748494,
+ *               surfaces #FFFFFF / #EEF6FF, border #E4EDF4, divider #EDF2F6).
+ *               Underline-only form fields, capsule buttons, no boxed inputs,
+ *               no nested card mosaics, no dark mode.
+ * Chronological development:
+ *   VAI163   2026-07-30  Created
+ *   VAI163   2026-07-31  Header restyled to the VAS_092 Purchase Order Overview
+ *                        pattern: an untinted title strip (.vas_167-head)
+ *                        carrying the title, sub-line and state pills
+ *                        (.vas_167-headPills), above a white two-column
+ *                        details card (.vas_167-hdrCard) — vendor identity
+ *                        left, labelled order fields right. Card surfaces now
+ *                        share that panel's tokens (--vaselc-card-bd /
+ *                        -row-div / -card-radius) and the add / edit form
+ *                        (.vas_167-form) dropped its tinted fill and dashed
+ *                        outline for the same plain white card.
+ *   VAI163   2026-08-04  Added .vas_167-empty.is-standalone — the "no expected
+ *                        landed cost" message when it stands in for the whole
+ *                        Cost Elements section (no caption, no table around it),
+ *                        so it carries that surface itself.
+ *   VAI163   2026-08-04  Generated Lines is white: the drawer's blue fill
+ *                        (.vas_167-linesWrap) and the blue frame / header /
+ *                        footer bands of its table (.vas_167-lTable, -lHead,
+ *                        -lFoot) give way to the neutral card surface every other
+ *                        table in the panel uses. Added .vas_167-attr — the
+ *                        Attribute Set Instance beside a generated line's product.
+ *                        Dropped .vas_167-hint with the trailing hint row it
+ *                        styled.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vaselc- -> vas_167- so the panel's
+ *                        styles cannot collide with another panel's.
+ *   VAI163   2026-08-06  Added the cost-table pager (.vas_167-pager / -pgRange /
+ *                        -pgCtrls / -pgPos / -pgBtn, plus its RTL chevron mirror).
+ *                        It closes the table card under the totals footer and
+ *                        borrows that footer's tinted strip, so the two read as one
+ *                        base to the card rather than two competing bars.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare (.ta-r,
+ *                        .show, .err, .tone-*, .dist-*, .is-*) now carry the
+ *                        vas_167- prefix too. Sharing a name with a base-theme
+ *                        rule meant the base design won and repainted the
+ *                        panel; scoping them to the panel ends that.
+ *   VAI163   2026-08-07  The title strip is no longer frozen over the body. The
+ *                        scroll moved from .vas_167-body up to .vas_167-root, so
+ *                        the panel scrolls as one piece and .vas_167-head travels
+ *                        with the details it introduces; the body is now
+ *                        `flex: 1 0 auto` (grows with its content, still fills the
+ *                        panel when short) and the scrollbar styling followed the
+ *                        scroll to .vas_167-root.
+ ***********************************************************/
+
+.vas_167-root {
+    /* Canonical palette */
+    --vaselc-text:        #102C3F;
+    --vaselc-text-strong: #141414;
+    --vaselc-sub:         #5F7283;
+    --vaselc-muted:       #748494;
+    --vaselc-primary:     #0083DA;
+    --vaselc-action:      #1F83FF;
+    --vaselc-link:        #106AB0;
+    --vaselc-white:       #FFFFFF;
+    --vaselc-faint:       #EEF6FF;
+    --vaselc-active:      #EAF8FF;
+    --vaselc-pale-bd:     #BFE4FF;
+    --vaselc-border:      #E4EDF4;
+    --vaselc-divider:     #EDF2F6;
+    --vaselc-field-bd:    #D7D7D7;
+    --vaselc-info-bg:     #DFF1FF;
+    /* Card surface — same tokens the PO Overview panel uses, so a card here
+       and a card there are the same object. */
+    --vaselc-card-bd:     #D9E2EB;
+    --vaselc-row-div:     #E2EAF1;
+    --vaselc-card-radius: 12px;
+    --vaselc-hdr-sub:     #41576A;
+    /* Semantic tones */
+    --vaselc-success-bg:  #CCEFDD;  --vaselc-success-tx: #0C5D38;
+    --vaselc-neutral-bg:  #E9EDF1;  --vaselc-neutral-tx: #5A6B79;
+    --vaselc-warn-bg:     #FCEFD2;  --vaselc-warn-tx:    #9A6500;
+    --vaselc-risk-bg:     #FAD7D7;  --vaselc-risk-tx:    #8F2D2D;
+    --vaselc-danger:      #ED1C24;
+    --vaselc-qty-bg:      #D9ECFF;  --vaselc-qty-tx:     #0E5DA8;
+    --vaselc-value-bg:    #EDE9FF;  --vaselc-value-tx:   #5F4AA6;
+    --vaselc-equal-bg:    #E4F5EC;  --vaselc-equal-tx:   #0C5D38;
+    --vaselc-volume-bg:   #E0F3F4;  --vaselc-volume-tx:  #14646B;
+    --vaselc-weight-bg:   #FBEBDD;  --vaselc-weight-tx:  #8A4B16;
+    --vaselc-shadow:      0 10px 24px rgba(15, 61, 97, 0.06);
+    --vaselc-radius:      13px;
+
+    position: relative;
+    height: 100%;
+    /* The PANEL scrolls, as one piece: the title strip travels with the order's
+       details rather than staying pinned over them. Reading the card means
+       reading the strip's PO number too, and freezing the strip cost the body
+       that much height on every screen without ever being asked to. */
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    /* Kept: where the host lays this panel out as a flex item, min-height: 0 is
+       what lets it shrink to the available height instead of growing to its
+       content — without it the scroll above never engages. */
+    min-height: 0;
+    min-width: 0;
+    background: var(--vaselc-white);
+    color: var(--vaselc-text);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.vas_167-root * { box-sizing: border-box; }
+
+/* ---------------- Header — title strip ---------------- */
+
+/* Untinted title strip in the PO Overview pattern: title + sub-line on the
+   left, tinted state pills on the right. It scrolls away with the body it
+   introduces; the hairline rule stays, now separating the title from the
+   details card rather than marking a frozen edge. */
+.vas_167-head {
+    flex: none;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 18px 12px;
+    background: var(--vaselc-white);
+    border-bottom: 1px solid var(--vaselc-border);
+}
+
+.vas_167-headText { min-width: 0; }
+
+.vas_167-headTitle {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--vaselc-text);
+    line-height: 1.2;
+}
+
+.vas_167-headSub {
+    font-size: 12px;
+    color: var(--vaselc-hdr-sub);
+    margin-top: 5px;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.vas_167-headSub b {
+    color: var(--vaselc-text);
+    font-weight: 700;
+}
+
+.vas_167-headPills {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* State pill: neutral "Expected" in draft, green "Lines Generated" once the
+   order is completed. Metrics follow the overview panel's header pill. */
+.vas_167-badge {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    background: var(--vaselc-neutral-bg);
+    color: var(--vaselc-neutral-tx);
+}
+
+.vas_167-badge::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+.vas_167-badge.vas_167-is-generated {
+    background: var(--vaselc-success-bg);
+    color: var(--vaselc-success-tx);
+}
+
+/* ---------------- Header — details card ---------------- */
+
+/* White two-column card in the PO Overview pattern: vendor identity on the
+   left behind a divider, labelled order fields two-across on the right. */
+.vas_167-hdrCard {
+    display: grid;
+    grid-template-columns: 40% 1fr;
+    gap: 14px 26px;
+    border: 1px solid var(--vaselc-card-bd);
+    border-radius: var(--vaselc-card-radius);
+    background: var(--vaselc-white);
+    padding: 13px 15px;
+    margin-bottom: 12px;
+}
+
+.vas_167-hdrColL {
+    min-width: 0;
+    border-right: 1px solid var(--vaselc-row-div);
+    padding-right: 18px;
+}
+
+.vas_167-hdrColR {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 11px 22px;
+    align-content: start;
+}
+
+.vas_167-hdrField { min-width: 0; }
+
+.vas_167-fLabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--vaselc-muted);
+    line-height: 1.3;
+}
+
+.vas_167-fVal {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--vaselc-text);
+    line-height: 1.35;
+    margin-top: 2px;
+    overflow-wrap: break-word;   /* a long vendor / type wraps instead of spilling */
+}
+
+/* A field value that opens its own record (the contract reference). */
+.vas_167-fVal.vas_167-is-link { color: var(--vaselc-link); cursor: pointer; }
+.vas_167-fVal.vas_167-is-link:hover { text-decoration: underline; }
+
+.vas_167-vendName {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--vaselc-text);
+    line-height: 1.3;
+    margin-top: 3px;
+    overflow-wrap: break-word;
+}
+
+.vas_167-vendContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 16px;
+    font-size: 11.5px;
+    color: var(--vaselc-text);
+    margin-top: 6px;
+}
+
+.vas_167-contactBit { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.vas_167-contactBit .vas_167-ic { color: var(--vaselc-primary); }
+
+/* Narrow panels: stack the two columns and drop the pills below the title. */
+@container (max-width: 460px) {
+    .vas_167-hdrCard { grid-template-columns: 1fr; }
+    .vas_167-hdrColL {
+        border-right: none;
+        padding-right: 0;
+        border-bottom: 1px solid var(--vaselc-row-div);
+        padding-bottom: 11px;
+    }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .vas_167-hdrColR { grid-template-columns: 1fr; }
+    .vas_167-head { flex-direction: column; }
+    .vas_167-headPills { justify-content: flex-start; }
+}
+
+/* ---------------- Scrolling body ---------------- */
+
+/* Grows with its content and never shrinks below it — the scroll belongs to
+   .vas_167-root now. `flex: 1 0 auto` still claims the free space when the
+   content is short, so the white surface fills the panel as it always did. */
+.vas_167-body {
+    flex: 1 0 auto;
+    min-width: 0;
+    padding: 14px 18px 20px;
+}
+
+.vas_167-root::-webkit-scrollbar { width: 9px; }
+.vas_167-root::-webkit-scrollbar-thumb {
+    background: rgba(15, 61, 97, 0.14);
+    border-radius: 99px;
+}
+
+.vas_167-stack {
+    min-width: 0;
+    animation: vas_167-rise 0.28s ease both;
+}
+
+.vas_167-noRecord {
+    padding: 40px 18px;
+    text-align: center;
+    color: var(--vaselc-muted);
+    font-size: 13px;
+}
+
+/* ---------------- Notice strips / hints ---------------- */
+
+.vas_167-strip {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 9px 13px;
+    margin-bottom: 12px;
+    border: 1px solid var(--vaselc-border);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(230, 243, 252, 0.55), rgba(245, 250, 253, 0.7));
+    font-size: 12px;
+    color: var(--vaselc-sub);
+    line-height: 1.45;
+}
+
+.vas_167-strip .vas_167-ic { flex: none; margin-top: 1px; }
+.vas_167-strip.vas_167-tone-warn .vas_167-ic { color: var(--vaselc-warn-tx); }
+.vas_167-strip.vas_167-tone-risk .vas_167-ic { color: var(--vaselc-risk-tx); }
+
+.vas_167-ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ---------------- Sub-caption row ---------------- */
+
+.vas_167-subcap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 0 9px;
+}
+
+.vas_167-cap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--vaselc-link);
+}
+
+.vas_167-capHint {
+    font-size: 11px;
+    color: var(--vaselc-sub);
+}
+
+/* ---------------- Cost elements table ---------------- */
+
+.vas_167-table {
+    background: var(--vaselc-white);
+    border: 1px solid var(--vaselc-border);
+    border-radius: var(--vaselc-radius);
+    overflow: hidden;
+    box-shadow: var(--vaselc-shadow);
+}
+
+/* Three visual columns: identity | amount | actions. The panel is too narrow
+   for the five stored attributes as separate columns. */
+.vas_167-row {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr auto;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 13px;
+    min-width: 0;
+}
+
+.vas_167-row > span { min-width: 0; }
+
+.vas_167-rowHead {
+    background: var(--vaselc-faint);
+    border-bottom: 1px solid var(--vaselc-border);
+    font-size: 11.5px;
+    color: var(--vaselc-muted);
+}
+
+.vas_167-rowBody {
+    font-size: 13px;
+    border-bottom: 1px solid var(--vaselc-divider);
+}
+
+.vas_167-rowBody:hover { background: #FAFCFE; }
+
+.vas_167-rowBody.vas_167-is-editing {
+    background: var(--vaselc-active);
+    box-shadow: inset 3px 0 0 var(--vaselc-primary);
+}
+
+.vas_167-name {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--vaselc-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_167-sub {
+    font-size: 10.5px;
+    color: var(--vaselc-muted);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_167-sub.vas_167-is-warn { color: var(--vaselc-risk-tx); }
+
+.vas_167-chipWrap { margin-top: 4px; }
+
+.vas_167-distChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas_167-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.vas_167-distChip.vas_167-dist-qty   { background: var(--vaselc-qty-bg);     color: var(--vaselc-qty-tx); }
+.vas_167-distChip.vas_167-dist-value { background: var(--vaselc-value-bg);   color: var(--vaselc-value-tx); }
+.vas_167-distChip.vas_167-dist-equal { background: var(--vaselc-equal-bg);   color: var(--vaselc-equal-tx); }
+.vas_167-distChip.vas_167-dist-volume{ background: var(--vaselc-volume-bg);  color: var(--vaselc-volume-tx); }
+.vas_167-distChip.vas_167-dist-weight{ background: var(--vaselc-weight-bg);  color: var(--vaselc-weight-tx); }
+.vas_167-distChip.vas_167-dist-other { background: var(--vaselc-neutral-bg); color: var(--vaselc-neutral-tx); }
+
+.vas_167-amt { text-align: right; }
+
+.vas_167-amtV {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--vaselc-text);
+}
+
+.vas_167-amtV span {
+    margin-left: 3px;
+    font-weight: 400;
+    font-size: 10.5px;
+    color: var(--vaselc-muted);
+}
+
+.vas_167-amt .vas_167-sub { white-space: nowrap; }
+
+/* Scoped to the panel root. Unscoped, these two aligned EVERY element in the
+   application carrying a ta-r / ta-c class, not just this panel's cells — the
+   one genuinely global rule pair in the tab-panel styles. Every other panel
+   already qualifies the same utility with its own root. */
+.vas_167-root .vas_167-ta-r { text-align: right; }
+.vas_167-root .vas_167-ta-c { text-align: center; }
+
+/* ---------------- Row actions ---------------- */
+
+.vas_167-acts {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Icon hit target stays at least 32px tall for pointer accessibility while the
+   painted button keeps the compact 26px look of the reference. */
+.vas_167-icBtn {
+    width: 32px;
+    height: 32px;
+    padding: 3px;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: #9FB1C0;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.vas_167-icBtn.vas_167-is-edit:hover { background: var(--vaselc-info-bg); color: var(--vaselc-link); }
+.vas_167-icBtn.vas_167-is-rm:hover   { background: var(--vaselc-risk-bg); color: var(--vaselc-risk-tx); }
+.vas_167-icBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 1px; }
+
+.vas_167-linesBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding: 0 9px;
+    flex: none;
+    border: none;
+    border-radius: 999px;
+    background: var(--vaselc-info-bg);
+    color: var(--vaselc-link);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.vas_167-linesBtn:hover { background: #CDE9FF; }
+.vas_167-linesBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 1px; }
+.vas_167-linesBtn .vas_167-ic { transition: transform 0.2s ease; }
+.vas_167-linesBtn.vas_167-is-open .vas_167-ic { transform: rotate(180deg); }
+
+/* ---------------- Generated lines block ---------------- */
+
+/* White, not tinted: the drawer is part of the entry it hangs under, and a blue
+   fill read as a separate object stacked inside the table. */
+.vas_167-linesWrap {
+    padding: 10px 12px 13px;
+    background: var(--vaselc-white);
+    border-bottom: 1px solid var(--vaselc-divider);
+    animation: vas_167-rise 0.28s ease both;
+}
+
+.vas_167-linesWrap.vas_167-is-closed { display: none; }
+
+.vas_167-linesCap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--vaselc-link);
+}
+
+.vas_167-linesEmpty {
+    padding: 6px 2px;
+    font-size: 11.5px;
+    color: var(--vaselc-muted);
+}
+
+/* Neutral card, like every other table surface in the panel — the blue frame
+   and blue header / footer bands went with the drawer's blue fill. */
+.vas_167-lTable {
+    background: var(--vaselc-white);
+    border: 1px solid var(--vaselc-card-bd);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.vas_167-lRow {
+    display: grid;
+    grid-template-columns: 1.9fr 1.1fr 0.55fr 1fr;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 11px;
+    min-width: 0;
+}
+
+.vas_167-lRow > span { min-width: 0; }
+
+.vas_167-lHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--vaselc-card-bd);
+    font-size: 10.5px;
+    color: var(--vaselc-muted);
+}
+
+.vas_167-lBody {
+    font-size: 12px;
+    border-bottom: 1px solid var(--vaselc-divider);
+}
+
+.vas_167-lBody:last-child { border-bottom: none; }
+.vas_167-lBody:hover { background: #FAFCFE; }
+.vas_167-lBody .vas_167-name { font-size: 12px; }
+
+/* Attribute Set Instance — an inline suffix to the product name on a generated
+   line, never a line of its own. */
+.vas_167-attr {
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--vaselc-sub);
+}
+
+.vas_167-base {
+    font-size: 11px;
+    color: var(--vaselc-sub);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_167-lFoot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 14px;
+    padding: 7px 11px;
+    background: #F5F8FB;
+    border-top: 1px solid var(--vaselc-card-bd);
+    font-size: 11.5px;
+}
+
+.vas_167-lFoot .vas_167-tf { color: var(--vaselc-sub); }
+.vas_167-lFoot .vas_167-tf b {
+    margin-left: 5px;
+    color: var(--vaselc-text);
+    font-weight: 700;
+}
+
+/* Reconciliation warning: the generated lines no longer sum to the entry. */
+.vas_167-tf.vas_167-is-warn { color: var(--vaselc-risk-tx); font-weight: 700; }
+
+/* ---------------- Table footer / empty ---------------- */
+
+.vas_167-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 9px 13px;
+    background: var(--vaselc-faint);
+    border-top: 1px solid var(--vaselc-border);
+    font-size: 12px;
+}
+
+.vas_167-foot .vas_167-tf { color: var(--vaselc-sub); }
+.vas_167-foot .vas_167-tf b {
+    margin-left: 5px;
+    color: var(--vaselc-text);
+    font-weight: 600;
+}
+
+/* ---------------- Cost-table pager ---------------- */
+
+/* Closes the table card, under the totals footer, so the controls travel with
+   the table they page. Only rendered once there is a second page to reach. */
+.vas_167-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 7px 12px;
+    padding: 8px 13px;
+    background: var(--vaselc-faint);
+    border-top: 1px solid var(--vaselc-border);
+    font-size: 12px;
+    color: var(--vaselc-sub);
+}
+
+.vas_167-pgCtrls { display: inline-flex; align-items: center; gap: 7px; }
+.vas_167-pgPos   { color: var(--vaselc-text); font-weight: 700; }
+
+.vas_167-pgBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid var(--vaselc-border);
+    border-radius: 99px;
+    background: var(--vaselc-white);
+    padding: 4px 11px;
+    color: var(--vaselc-link);
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.vas_167-pgBtn:hover { background: var(--vaselc-active); border-color: var(--vaselc-pale-bd); }
+.vas_167-pgBtn .vas_167-ic { color: currentColor; }
+.vas_167-pgBtn.vas_167-is-disabled {
+    opacity: .45;
+    cursor: default;
+    pointer-events: none;
+    color: var(--vaselc-muted);
+}
+
+[dir="rtl"] .vas_167-pgBtn .vas_167-ic svg { transform: scaleX(-1); }
+
+.vas_167-grand {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--vaselc-text);
+}
+
+.vas_167-grand b {
+    margin-left: 6px;
+    font-size: 14px;
+    color: var(--vaselc-primary);
+}
+
+.vas_167-empty {
+    padding: 15px 13px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--vaselc-muted);
+}
+
+/* The same message standing in for the whole Cost Elements section when the
+   order has no expected landed cost — it carries the surface the table would
+   have given it, since there is no table around it. */
+.vas_167-empty.vas_167-is-standalone {
+    background: var(--vaselc-white);
+    border: 1px solid var(--vaselc-border);
+    border-radius: var(--vaselc-radius);
+    box-shadow: var(--vaselc-shadow);
+    padding: 18px 13px;
+}
+
+/* ---------------- Add / edit form ---------------- */
+
+/* Plain white card on the same border / radius tokens as every other surface
+   in the PO Overview pattern — no tint, no dashed outline. */
+.vas_167-form {
+    margin-top: 12px;
+    padding: 13px 15px 15px;
+    background: var(--vaselc-white);
+    border: 1px solid var(--vaselc-card-bd);
+    border-radius: var(--vaselc-card-radius);
+}
+
+.vas_167-formCap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 13px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--vaselc-link);
+}
+
+/* Two columns — the usual four do not fit a 30% panel. */
+.vas_167-formGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 18px;
+}
+
+@container (max-width: 320px) {
+    .vas_167-formGrid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Underline-only field: no boxed input, no rounded card input. */
+.vas_167-ff {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--vaselc-field-bd);
+    min-width: 0;
+}
+
+.vas_167-ff:hover,
+.vas_167-ff:focus-within { border-bottom-color: var(--vaselc-primary); }
+
+.vas_167-ffBody {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.vas_167-ffBody label {
+    font-size: 11.5px;
+    color: var(--vaselc-sub);
+}
+
+.vas_167-req {
+    margin-left: 2px;
+    color: var(--vaselc-danger);
+}
+
+.vas_167-input {
+    width: 100%;
+    min-height: 18px;
+    padding: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--vaselc-text);
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+input.vas_167-input { cursor: text; }
+.vas_167-input.vas_167-is-num { text-align: right; }
+.vas_167-input::placeholder { color: #9F9F9F; font-weight: 400; }
+
+/* Select caret, drawn on the field rather than boxing the control. */
+.vas_167-ffBody.vas_167-is-select { position: relative; }
+.vas_167-ffBody.vas_167-is-select::after {
+    content: '';
+    position: absolute;
+    right: 2px;
+    bottom: 6px;
+    width: 6px;
+    height: 6px;
+    border-right: 1.8px solid var(--vaselc-primary);
+    border-bottom: 1.8px solid var(--vaselc-primary);
+    transform: rotate(45deg);
+    pointer-events: none;
+}
+
+.vas_167-formFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
+.vas_167-formNote {
+    font-size: 11px;
+    color: var(--vaselc-sub);
+}
+
+.vas_167-formErr {
+    margin-top: 10px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--vaselc-risk-bg);
+    color: var(--vaselc-risk-tx);
+    font-size: 11.5px;
+    line-height: 1.4;
+}
+
+/* Capsule buttons: filled primary, white/bordered secondary. */
+.vas_167-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 13px;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.vas_167-btn.vas_167-is-primary {
+    border: none;
+    background: var(--vaselc-action);
+    color: #fff;
+}
+
+.vas_167-btn.vas_167-is-primary:hover { background: #0069AE; }
+
+.vas_167-btn.vas_167-is-primary:disabled,
+.vas_167-btn.vas_167-is-primary:disabled:hover {
+    background: var(--vaselc-action);
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.vas_167-btn.vas_167-is-ghost {
+    border: 1px solid var(--vaselc-action);
+    background: #fff;
+    color: var(--vaselc-primary);
+}
+
+.vas_167-btn.vas_167-is-ghost:hover { background: var(--vaselc-faint); }
+.vas_167-btn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 2px; }
+
+/* ---------------- Toast ---------------- */
+
+.vas_167-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 18px;
+    transform: translate(-50%, 12px);
+    max-width: 88%;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    line-height: 1.4;
+    opacity: 0;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.vas_167-toast.vas_167-show { opacity: 1; transform: translate(-50%, 0); }
+.vas_167-toast.vas_167-ok  { background: var(--vaselc-success-bg); color: var(--vaselc-success-tx); }
+.vas_167-toast.vas_167-err { background: var(--vaselc-risk-bg);    color: var(--vaselc-risk-tx); }
+
+/* ---------------- Motion ---------------- */
+
+@keyframes vas_167-rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* ---------------- RTL ---------------- */
+
+.vis-rtl .vas_167-amt,
+[dir="rtl"] .vas_167-amt,
+.vis-rtl .vas_167-root .vas_167-ta-r,
+[dir="rtl"] .vas_167-root .vas_167-ta-r { text-align: left; }
+
+.vis-rtl .vas_167-acts,
+[dir="rtl"] .vas_167-acts { justify-self: start; }
+
+.vis-rtl .vas_167-ffBody.vas_167-is-select::after,
+[dir="rtl"] .vas_167-ffBody.vas_167-is-select::after { right: auto; left: 2px; }
+
+.vis-rtl .vas_167-hdrColL,
+[dir="rtl"] .vas_167-hdrColL {
+    border-right: none;
+    border-left: 1px solid var(--vaselc-row-div);
+    padding-right: 0;
+    padding-left: 18px;
+}
+
+@container (max-width: 460px) {
+    .vis-rtl .vas_167-hdrColL,
+    [dir="rtl"] .vas_167-hdrColL { border-left: none; padding-left: 0; }
+}

@@ -28,6 +28,9 @@
  *  8  | 31–60d                             | VAS_140_D3160
  *  9  | 61–90d                             | VAS_140_D6190
  * 10  | of                                 | VAS_140_Of
+ * 10a | Showing                            | VAS_140_Showing
+ * 10b | Previous page                      | VAS_140_PrevPage
+ * 10c | Next page                          | VAS_140_NextPage
  * 11  | Nothing here right now.            | VAS_140_NothingHere
  * 12  | No contracts.                      | VAS_140_NoContracts
  * 13  | Unable to load contracts.          | VAS_140_UnableToLoad
@@ -48,7 +51,6 @@
 ; (function (VAS, $) {
 
     var CUSTOMER_WINDOW_NAME = 'Business Partner';
-    var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
 
     function ensureDashInlineSizeVar($el) {
         if (window.__vasDashInlineSizeObserver) { return; }
@@ -109,23 +111,25 @@
             if (!isFinite(n)) { n = 0; }
             return Math.round(n).toLocaleString(window.navigator.language);
         }
-        function usesIndian(iso) { return INDIAN_NUMBERING_CURRENCIES.indexOf(String(iso || '').toUpperCase()) >= 0; }
+        // Standard precision of the supplied base-currency descriptor, falling back to
+        // the session context when the endpoint did not send one.
+        function precisionOf(cur) {
+            var p = Number(cur && cur.precision);
+            if (!isNaN(p) && p >= 0) { return p; }
+            if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                p = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+            return !isNaN(p) && p >= 0 ? p : 0;
+        }
+        // Compact money against the base (accounting-schema) currency the endpoint
+        // reported. VIS.Util.formatCompactAmount supplies the scaled magnitude at the
+        // system-configured precision; the sign is composed before the symbol here.
         function formatMoney(value, cur) {
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
-            var sign = n < 0 ? '-' : '', abs = Math.abs(n);
+            var sign = n < 0 ? '-' : '';
+            var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            var body;
-            if (cur && usesIndian(cur.iso)) {
-                if (abs >= 10000000) { body = (abs / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr'; }
-                else if (abs >= 100000) { body = (abs / 100000).toFixed(2).replace(/\.?0+$/, '') + ' Lakh'; }
-                else if (abs >= 1000) { body = (abs / 1000).toFixed(1).replace(/\.?0+$/, '') + 'K'; }
-                else { body = abs.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 }); }
-            } else {
-                if (abs >= 1000000) { body = (abs / 1000000).toFixed(1).replace(/\.?0+$/, '') + 'M'; }
-                else if (abs >= 1000) { body = (abs / 1000).toFixed(1).replace(/\.?0+$/, '') + 'K'; }
-                else { body = abs.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 }); }
-            }
-            return sign + symbol + body;
+            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
         }
         function renewalLabel(code) {
             // VAS Contract Master uses ATC/MNL; core C_Contract used A/M.
@@ -284,16 +288,19 @@
             var start = listOffset + 1, end = listOffset + items.length;
             var pages = Math.max(1, Math.ceil(listTotal / LIST_PAGE));
             var current = Math.floor(listOffset / LIST_PAGE);
-            var lbl = start + '–' + end + ' ' + label('VAS_140_Of', 'of') + ' ' + formatCount(listTotal);
-            if (pages > 1) {
-                $listPager.html(
-                    '<button type="button" class="vas140-pgbtn" data-dir="prev" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas140-pglabel">' + escapeHtml(lbl) + '</span>' +
-                    '<button type="button" class="vas140-pgbtn" data-dir="next" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>'
-                );
-            } else {
-                $listPager.html('<span></span><span class="vas140-pglabel">' + escapeHtml(lbl) + '</span><span></span>');
-            }
+            /* Footer pager (dashboard-widgets.md §"Widget Footer Pager"): helper
+               left, compact prev · "N of M" · next right. The control stays put
+               on a single page with both arrows disabled. */
+            var of = label('VAS_140_Of', 'of');
+            var helper = label('VAS_140_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
+            $listPager.html(
+                '<span class="vas140-pglabel">' + escapeHtml(helper) + '</span>' +
+                '<span class="vas140-pgctl">' +
+                    '<button type="button" class="vas140-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_140_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
+                    '<span class="vas140-pgtext">' + escapeHtml((current + 1) + ' ' + of + ' ' + pages) + '</span>' +
+                    '<button type="button" class="vas140-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_140_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
+                '</span>'
+            );
         }
         function turnPage(direction) {
             var next = listOffset + (direction === 'next' ? LIST_PAGE : -LIST_PAGE);

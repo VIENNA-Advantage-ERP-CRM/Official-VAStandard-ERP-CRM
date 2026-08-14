@@ -127,8 +127,15 @@ namespace VAS.Models
             if (windowID == Util.GetValueOfInt(Windows.InternalUse) || WindowName == "VAS_InternalUseInventory")//Inventory use
             {
                 // sql.Append(" WHERE VAICNT_TransactionType IN ('OT','IU')");
-                sql.Append(" WHERE (VAICNT_TransactionType IN ('OT') OR (VAICNT_TransactionType IN ('IU') AND VAICNT_ReferenceNo IN " +
-                    " (SELECT DocumentNo FROM M_Requisition WHERE DocStatus ='CO' AND M_Warehouse_ID = " + ToWarehouse + " AND DTD001_MWarehouseSource_ID=" + ToWarehouse + ")))");
+                // VAI163 2026-08-05: an Inventory Use can be raised against a VA075
+                // service work order, not only a requisition, so the cart reference
+                // is matched against both. Without this a work-order cart is filtered
+                // out of the form entirely — its lines are never created, and so
+                // VA075_WorkOrder_ID never gets stamped on them and the overview
+                // panel keeps reading "Manual Issue".
+                sql.Append(" WHERE (VAICNT_TransactionType IN ('OT') OR (VAICNT_TransactionType IN ('IU') AND (VAICNT_ReferenceNo IN " +
+                    " (SELECT DocumentNo FROM M_Requisition WHERE DocStatus ='CO' AND M_Warehouse_ID = " + ToWarehouse + " AND DTD001_MWarehouseSource_ID=" + ToWarehouse + ")" +
+                    VA075WorkOrderRefClause(ctx) + ")))");
             }
             if (windowID == Util.GetValueOfInt(Windows.InventoryMove) || WindowName == "VAS_InventoryMove") //Material Transfer
             {
@@ -537,6 +544,20 @@ namespace VAS.Models
                     hasReqLines = true;
             }
 
+            // VAI163 2026-07-29: the reference can also be a VA075 service work
+            // order, not just a requisition. When it is, every line created here
+            // stores it in VA075_WorkOrder_ID — that is what lets the Inventory Use
+            // overview panel show the work order instead of reading "Manual Issue".
+            //
+            // VAI163 2026-08-05: resolved from the reference alone, no longer only
+            // when the requisition lookup came back empty. A requisition whose lines
+            // were all pulled into an earlier issue also reports "no requisition
+            // lines", and gating on that let the work order go unstamped on the very
+            // documents this panel is meant to explain.
+            int VA075_WorkOrder_ID = 0;
+            if (!string.IsNullOrEmpty(RefNo))
+                VA075_WorkOrder_ID = GetVA075WorkOrderID(ctx, RefNo);
+
             try
             {
                 if (lstInventoryLines != null)
@@ -564,6 +585,10 @@ namespace VAS.Models
                         lines.Set_Value("C_UOM_ID", lstInventoryLines[i].UOMId);
                         lines.SetC_Charge_ID(_charge);
                         lines.CartInventoryForm = true;
+                        if (VA075_WorkOrder_ID > 0 && lines.Get_ColumnIndex("VA075_WorkOrder_ID") >= 0)
+                        {
+                            lines.Set_Value("VA075_WorkOrder_ID", VA075_WorkOrder_ID);
+                        }
                         if (hasReqLines)
                         {
                             if (sbLine.Length > 0)
@@ -621,6 +646,57 @@ namespace VAS.Models
                 }
             }
             return msg;
+        }
+
+        /// <summary>
+        /// VAI163-Extra OR clause accepting a VA075 service work order document no
+        /// as an Inventory Use cart reference, alongside the requisition numbers the
+        /// filter already allows.
+        ///
+        /// Returns an empty string when the VA075 module is not installed, so the
+        /// caller's filter is left exactly as it was on a schema without it. The
+        /// VA075 tables are read through plain SQL — no VA075 model class is
+        /// referenced, since that module is not part of this solution.
+        /// </summary>
+        /// <param name="ctx">User context, for client scoping.</param>
+        /// <returns>SQL fragment beginning with " OR ", or an empty string.</returns>
+        private string VA075WorkOrderRefClause(Ctx ctx)
+        {
+            if (!Env.IsModuleInstalled("VA075_")) return "";
+            return " OR VAICNT_ReferenceNo IN (SELECT DocumentNo FROM VA075_WorkOrder" +
+                   " WHERE IsActive='Y' AND AD_Client_ID=" + ctx.GetAD_Client_ID() + ")";
+        }
+
+        /// <summary>
+        /// VAI163-Returns the VA075 service work order carrying this document no,
+        /// or 0 when the reference is not a work order (or the VA075 module is not
+        /// installed). Used to stamp VA075_WorkOrder_ID on Inventory Use lines
+        /// created against a work order.
+        /// </summary>
+        /// <param name="ctx">User context, for client scoping.</param>
+        /// <param name="documentNo">Reference document no entered on the cart.</param>
+        /// <returns>VA075_WorkOrder_ID, or 0.</returns>
+        private int GetVA075WorkOrderID(Ctx ctx, string documentNo)
+        {
+            if (!Env.IsModuleInstalled("VA075_")) return 0;
+            try
+            {
+                SqlParameter[] param = new SqlParameter[1];
+                param[0] = new SqlParameter("@param1", documentNo);
+                // Client-scoped: document numbers are only unique within a client,
+                // so an unscoped MAX could hand back another tenant's work order.
+                return Util.GetValueOfInt(DB.ExecuteScalar(
+                    "SELECT MAX(VA075_WorkOrder_ID) FROM VA075_WorkOrder WHERE DocumentNo=@param1" +
+                    " AND IsActive='Y' AND AD_Client_ID=" + ctx.GetAD_Client_ID(),
+                    param, null));
+            }
+            catch (Exception ex)
+            {
+                // Not a work order reference (or no such table) — the line simply
+                // keeps no work order link.
+                _log.Info("GetVA075WorkOrderID (" + documentNo + "): " + ex.Message);
+                return 0;
+            }
         }
 
         /// <summary>

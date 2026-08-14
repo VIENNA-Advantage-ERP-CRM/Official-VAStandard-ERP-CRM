@@ -1,0 +1,615 @@
+/* Transfer Queue Widget (VAS_174)
+   3x2 table-based open-document queue with client-side filters and detail modal.
+   All selectors prefixed .vas-174- */
+
+/* ── Container & Card Shell ─────────────────────────────────────────── */
+.vas-174-container {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.vas-174-root {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.045), 24px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    backdrop-filter: blur(10px);
+    padding: 0.85em;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas-174-root,
+.vas-174-root * {
+    box-sizing: border-box;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.vas-174-header-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas-174-left-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-174-icon-well {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    min-height: 2em;
+    border-radius: 10px;
+    background: rgba(0, 131, 218, 0.10);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    flex-shrink: 0;
+}
+
+.vas-174-icon-well svg {
+    width: 1.1em;
+    height: 1.1em;
+    display: block;
+    stroke: #0083DA;
+}
+
+.vas-174-title-block {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-174-title {
+    font-weight: 500;
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 18px);
+    color: #102C3F;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-174-subtitle {
+    font-weight: 400;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.009625), 14px);
+    color: #717182;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-174-count-pill {
+    font-size: clamp(0.6875em, 0.8vw, 1em);
+    font-weight: 700;
+    color: #106AB0;
+    background-color: #DFF1FF;
+    border-radius: 999px;
+    padding: 0.2em 0.65em;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas-174-filters {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    flex-shrink: 0;
+}
+
+/* ── Dropdowns ───────────────────────────────────────────────────────── */
+.vas-174-dropdown {
+    position: relative;
+}
+
+.vas-174-dropdown-btn {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+    font-size: 0.75em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    color: #102C3F;
+    background-color: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    padding: 0.35em 0.75em;
+    min-width: 4.5em;
+    text-align: center;
+    outline: none;
+    cursor: pointer;
+    box-sizing: border-box;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.vas-174-dropdown-btn:hover {
+    background-color: #EEF8FF;
+    border-color: #0083DA;
+}
+
+.vas-174-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 300;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(8, 30, 48, 0.15);
+    min-width: 130px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 0.25rem 0;
+    font-family: 'Roboto', sans-serif;
+}
+
+.vas-174-dd-option {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.75rem;
+    cursor: pointer;
+    color: #102C3F;
+    transition: background-color 100ms ease;
+}
+
+.vas-174-dd-option:hover {
+    background-color: #EEF6FF;
+    color: #0083DA;
+}
+
+.vas-174-dd-option--sel {
+    font-weight: 700;
+    color: #0083DA;
+    background-color: rgba(0, 131, 218, 0.06);
+}
+
+/* ── Table & Rows ────────────────────────────────────────────────────── */
+.vas-174-table-wrap {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    margin-top: 0.5em;
+}
+
+.vas-174-table-header {
+    display: grid;
+    grid-template-columns: 1.4fr 1.1fr 2fr 1.2fr 0.8fr 1fr;
+    gap: 0.4em;
+    align-items: center;
+    padding: 0.4em 0.5em;
+    border-bottom: 1px solid #EDF2F6;
+    background: transparent;
+    flex-shrink: 0;
+}
+
+.vas-174-th {
+    font-size: 0.65em;
+    font-weight: 600;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-174-th-right { text-align: right; }
+.vas-174-th-center { text-align: center; }
+
+.vas-174-table-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas-174-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1.1fr 2fr 1.2fr 0.8fr 1fr;
+    gap: 0.4em;
+    align-items: center;
+    padding: 0.45em 0.5em;
+    border: none;
+    border-bottom: 1px solid #EDF2F6;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    border-radius: 8px;
+    transition: background-color 120ms ease;
+    outline: none;
+    width: 100%;
+}
+
+.vas-174-row:last-child {
+    border-bottom: none;
+}
+
+.vas-174-row:hover,
+.vas-174-row:focus-visible {
+    background-color: #EEF6FF;
+}
+
+.vas-174-row:hover .vas-174-docno {
+    text-decoration: underline;
+}
+
+.vas-174-docno {
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #106AB0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-174-doctype {
+    font-size: 0.75em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-174-route {
+    font-size: 0.75em;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-174-arrow {
+    color: #0083DA;
+    font-weight: 700;
+    margin: 0 0.15em;
+}
+
+.vas-174-date {
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-174-items {
+    font-size: 0.75em;
+    color: #102C3F;
+    text-align: right;
+    font-weight: 500;
+}
+
+.vas-174-status-cell {
+    text-align: center;
+}
+
+/* ── Status Pills ───────────────────────────────────────────────────── */
+.vas-174-pill {
+    font-size: clamp(10px, 0.75vw, 14px);
+    font-weight: 600;
+    border-radius: 999px;
+    padding: clamp(0.15em, 0.3vw, 0.3em) clamp(0.5em, 0.8vw, 1em);
+    white-space: nowrap;
+    display: inline-block;
+}
+
+.vas-174-pill--draft    { background-color: #EEF2F6; color: #5F7283; }
+.vas-174-pill--progress { background-color: #DFF1FF; color: #106AB0; }
+.vas-174-pill--closed   { background-color: #EDE8F9; color: #5F4AA6; }
+.vas-174-pill--ok       { background-color: #E2F6EF; color: #0B6B45; }
+.vas-174-pill--pending  { background-color: #FCF1DD; color: #9A6500; }
+.vas-174-pill--short    { background-color: #FBE3E4; color: #A33F3F; }
+
+/* ── Footer & Specification Pager Buttons ────────────────────── */
+.vas-174-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2em 1em;
+    text-align: center;
+    color: #748494;
+    flex: 1;
+}
+
+.vas-174-empty-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #102C3F;
+    margin-bottom: 0.25rem;
+}
+
+.vas-174-empty-sub {
+    font-size: 0.75rem;
+    color: #748494;
+}
+
+.vas-174-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #EDF2F6;
+    padding-top: 0.4em;
+    margin-top: 0.4em;
+    flex-shrink: 0;
+}
+
+.vas-174-footer-helper {
+    font-size: clamp(11px, 0.8vw, 15px) !important;
+    color: #748494 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-174-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+}
+
+.vas-174-pager-btn {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    max-width: 24px !important;
+    max-height: 24px !important;
+    border: 1px solid #E4EDF4 !important;
+    border-radius: 7px !important;
+    background-color: #FFFFFF !important;
+    color: #0083DA !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    cursor: pointer !important;
+    box-sizing: border-box !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease !important;
+}
+
+.vas-174-pager-btn:hover:not(:disabled) {
+    background-color: #EEF6FF !important;
+    border-color: #0083DA !important;
+}
+
+.vas-174-pager-btn:disabled {
+    color: #B8C6D2 !important;
+    background-color: #FAFAFA !important;
+    border-color: #E4EDF4 !important;
+    cursor: not-allowed !important;
+}
+
+.vas-174-pager-label {
+    font-size: clamp(11px, 0.8vw, 15px) !important;
+    color: #102C3F !important;
+    font-weight: 500 !important;
+    margin: 0 0.25em !important;
+}
+
+/* ── SCREEN-SIZE DYNAMIC RESPONSIVE MODAL (LOCKED STABLE HEIGHT) ────── */
+.vas-174-modal-scrim {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(8, 30, 48, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: clamp(12px, 2vw, 32px);
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+}
+
+.vas-174-modal {
+    background-color: #FFFFFF;
+    border-radius: clamp(12px, 1.5vw, 24px);
+    width: clamp(340px, 75vw, 1280px);
+    height: clamp(440px, 78vh, 880px) !important;
+    max-height: 88vh;
+    max-width: 95vw;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 30px 70px rgba(8, 30, 48, 0.35);
+    box-sizing: border-box;
+}
+
+.vas-174-modal-header {
+    display: flex;
+    align-items: center;
+    gap: clamp(0.4rem, 0.9vw, 1.2rem);
+    padding: clamp(0.65rem, 1.2vw, 1.5rem) clamp(0.85rem, 1.8vw, 2.5rem);
+    background: linear-gradient(180deg, #FBFDFF, #F2F9FF);
+    border-bottom: 1px solid #E4EDF4;
+    flex-shrink: 0;
+}
+
+.vas-174-modal-title {
+    font-size: clamp(14px, 1.15vw, 20px);
+    font-weight: 600;
+    color: #102C3F;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-174-modal-close {
+    width: clamp(28px, 2vw, 38px);
+    height: clamp(28px, 2vw, 38px);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: clamp(1rem, 1.3vw, 1.8rem);
+    color: #5F7283;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: clamp(6px, 0.6vw, 10px);
+    flex-shrink: 0;
+    transition: background-color 0.15s ease;
+}
+
+.vas-174-modal-close:hover {
+    background-color: #EDF2F6;
+}
+
+.vas-174-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: clamp(0.75rem, 1.5vw, 2rem);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.5rem, 1vw, 1.25rem);
+}
+
+/* 4-column read-only form grid */
+.vas-174-form-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: clamp(0.4rem, 0.8vw, 1.2rem) clamp(0.6rem, 1.2vw, 1.8rem);
+    background: #F8FAFC;
+    border: 1px solid #E4EDF4;
+    border-radius: clamp(8px, 1vw, 16px);
+    padding: clamp(0.6rem, 1.2vw, 1.5rem);
+    flex-shrink: 0;
+}
+
+.vas-174-form-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.vas-174-form-label {
+    font-size: clamp(10px, 0.75vw, 14px);
+    font-weight: 600;
+    color: #748494;
+    text-transform: uppercase;
+}
+
+.vas-174-form-val {
+    font-size: clamp(12px, 0.9vw, 16px);
+    font-weight: 600;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-174-modal-section-heading {
+    font-size: clamp(13px, 1vw, 18px);
+    font-weight: 700;
+    color: #102C3F;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    flex-shrink: 0;
+}
+
+.vas-174-modal-tbl-container {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid #E4EDF4;
+    border-radius: clamp(8px, 1vw, 16px);
+    background: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.vas-174-modal-tbl {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: clamp(12px, 0.9vw, 16px);
+}
+
+.vas-174-modal-tbl thead tr {
+    background-color: #F6FAFD;
+}
+
+.vas-174-modal-tbl th {
+    font-size: clamp(10px, 0.75vw, 14px);
+    font-weight: 600;
+    color: #748494;
+    text-transform: uppercase;
+    padding: clamp(0.4rem, 0.7vw, 1rem) clamp(0.5rem, 0.9vw, 1.2rem);
+    border-bottom: 1px solid #E4EDF4;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-174-modal-tbl td {
+    padding: clamp(0.35rem, 0.65vw, 0.95rem) clamp(0.5rem, 0.9vw, 1.2rem);
+    color: #102C3F;
+    border-bottom: 1px solid #EDF2F6;
+    vertical-align: middle;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-174-modal-tbl tbody tr:hover {
+    background-color: #EEF6FF;
+}
+
+.vas-174-item-name {
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-174-item-attr {
+    color: #748494;
+    font-size: clamp(10px, 0.75vw, 14px);
+    font-weight: 400;
+}
+
+.vas-174-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #EDF2F6;
+    padding-top: clamp(0.4rem, 0.8vw, 1rem);
+    flex-shrink: 0;
+}

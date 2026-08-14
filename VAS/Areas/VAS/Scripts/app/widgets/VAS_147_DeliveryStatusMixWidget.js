@@ -107,7 +107,7 @@
         }
 
         function monthNames() {
-            return lbl('VAS_147_DSM_Months', 'Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec').split(',');
+            return lbl('VAS_147_DSM_Months', 'January,February,March,April,May,June,July,August,September,October,November,December').split(',');
         }
 
         var currency = {};
@@ -157,8 +157,8 @@
                 '</div>' +
                 '</div>' +
                 '<div class="vas-dsm-filters">' +
-                '<span class="vas-dsm-sel"><select class="vas-dsm-month" aria-label="Filter by month"></select>' + chevD() + '</span>' +
-                '<span class="vas-dsm-sel"><select class="vas-dsm-year" aria-label="Filter by year"></select>' + chevD() + '</span>' +
+                '<span class="vas-dsm-sel"><select class="vas-dsm-month vas-dsm-month-sel" aria-label="Filter by month"></select></span>' +
+                '<span class="vas-dsm-sel"><select class="vas-dsm-year vas-dsm-year-sel" aria-label="Filter by year"></select></span>' +
                 '</div>' +
                 '</div>' +
                 '<div class="vas-dsm-body"></div>' +

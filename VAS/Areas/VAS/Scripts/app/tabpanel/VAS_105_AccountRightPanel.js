@@ -3,6 +3,16 @@
  * Purpose        : Account Right Detail Panel — client logic
  * Employee Code  : VAI154
  * Date           : 09-Jun-2026
+ *
+ * Chronological development:
+ *   VAI163   2026-08-06  The Engagement timeline paginates at 15 touches a page
+ *                        (ENGAGEMENT_PER_PAGE), reusing the of-lu-pager shell the
+ *                        Orders / Invoices panels use. Unlike those it pages
+ *                        client-side — the whole timeline already arrives in one
+ *                        payload — so prev/next re-enter renderEngagement rather
+ *                        than re-fetching. The stat strip above the rail still
+ *                        counts every touch, and an account with 15 or fewer shows
+ *                        no controls at all.
  ******************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -38,6 +48,14 @@
         var PAGE_SIZE_INLINE  = 5;
         var _ordersOffset     = 0;
         var _invoicesOffset   = 0;
+
+
+        // Opps / contracts client-side pagination (5 rows per page)
+        var OPP_PAGE_SIZE  = 5;
+        var CT_PAGE_SIZE   = 5;
+        var _oppsPage      = 0;
+        var _contractsPage = 0;
+
 
         // ── Helpers ──────────────────────────────────────────────────────────
         function esc(v) {
@@ -543,17 +561,60 @@
             el.innerHTML = html;
         }
 
+        // ── Section pagination bar (Opps / Contracts) ────────────────────────
+        // Returns HTML for the "Showing X – Y of Z | < N of M >" bar.
+        // Returns '' when all items fit on one page.
+        function buildSectionPager(secKey, totalItems, currentPage, pageSize) {
+            if (totalItems <= pageSize) return '';
+            var totalPages   = Math.ceil(totalItems / pageSize);
+            var start        = currentPage * pageSize + 1;
+            var end          = Math.min(start + pageSize - 1, totalItems);
+            var prevDisabled = currentPage <= 0;
+            var nextDisabled = currentPage >= totalPages - 1;
+            var chevL = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+            var chevR = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+            return '<div class="vas_105_acct-secpager">' +
+                     '<span class="vas_105_acct-secpager__info">' +
+                       esc(msg('VAS_040_Showing')) + ' <b>' + start + ' &ndash; ' + end + '</b> ' + esc(msg('of')) + ' <b>' + totalItems + '</b>' +
+                     '</span>' +
+                     '<nav class="vas_105_acct-secpager__nav" role="navigation">' +
+                       '<button type="button" class="vas_105_acct-secpager__btn" id="vas_105_' + secKey + 'prev_' + widgetID + '"' + (prevDisabled ? ' disabled' : '') + '>' + chevL + '</button>' +
+                       '<span class="vas_105_acct-secpager__page"><b>' + (currentPage + 1) + '</b>&nbsp;' + esc(msg('of')) + '&nbsp;' + totalPages + '</span>' +
+                       '<button type="button" class="vas_105_acct-secpager__btn" id="vas_105_' + secKey + 'next_' + widgetID + '"' + (nextDisabled ? ' disabled' : '') + '>' + chevR + '</button>' +
+                     '</nav>' +
+                   '</div>';
+        }
+
         // ── renderOpps ────────────────────────────────────────────────────────
-        function stageClass(code) {
-            var map = {
-                'DR': 'vas_105_acct-stage--qualified',
+        // Accepts both stageCode and stageName; stageName (from AD_Ref_List) is preferred for matching
+        // because actual DB code values vary per environment.
+        function stageClass(code, name) {
+            var n = (name || '').toLowerCase();
+            if (/prospect/i.test(n))         return 'vas_105_acct-stage--prospecting';
+            if (/qualif/i.test(n))           return 'vas_105_acct-stage--qualification';
+            if (/discover|design/i.test(n))  return 'vas_105_acct-stage--discovery';
+            if (/proposal|quote/i.test(n))   return 'vas_105_acct-stage--proposal';
+            if (/negotiat/i.test(n))         return 'vas_105_acct-stage--negotiation';
+            if (/follow/i.test(n))           return 'vas_105_acct-stage--followup';
+            if (/won/i.test(n))              return 'vas_105_acct-stage--won';
+            if (/closed|complete/i.test(n))  return 'vas_105_acct-stage--closed';
+            if (/lost|archiv/i.test(n))      return 'vas_105_acct-stage--lost';
+            if (/hold|pause/i.test(n))       return 'vas_105_acct-stage--hold';
+            // Fallback: known legacy codes
+            var codeMap = {
+                'DR': 'vas_105_acct-stage--qualification',
                 'IP': 'vas_105_acct-stage--proposal',
-                'CO': 'vas_105_acct-stage--negotiation',
-                'CL': 'vas_105_acct-stage--negotiation',
+                'CO': 'vas_105_acct-stage--won',
+                'CL': 'vas_105_acct-stage--closed',
                 'VO': 'vas_105_acct-stage--lost',
                 'RE': 'vas_105_acct-stage--hold'
             };
-            return map[code] || 'vas_105_acct-stage--qualified';
+            if (codeMap[code]) return codeMap[code];
+            // Hash-based cycle for any completely unrecognised stage name — deterministic per stage
+            var key = n || (code || '');
+            var h = 0;
+            for (var i = 0; i < key.length; i++) { h = (h * 31 + key.charCodeAt(i)) & 0xFFFF; }
+            return 'vas_105_acct-stage--c' + ((h % 8) + 1);
         }
         function stageLabel(code) {
             var map = {
@@ -568,48 +629,76 @@
         }
 
         function renderOpps(el, data) {
-            var items = (data && data.items) ? data.items : [];
-            var sym   = (data && data.currencySymbol) || getSym();
-            var prec  = (data && data.precision != null) ? parseInt(data.precision,10) : getPrec();
+            var allItems = (data && data.items) ? data.items : [];
+            var sym      = (data && data.currencySymbol) || getSym();
+            var prec     = (data && data.precision != null) ? parseInt(data.precision,10) : getPrec();
 
             var cntEl = document.getElementById(secId('opps') + '_cnt');
             if (cntEl) {
-                var open = items.filter(function(o){ return o.stageCode !== 'VO'; }).length;
+                // Exclude closed/lost/won/archived stages by both stage code and stage name keywords
+                var CLOSED_CODES = { 'CO': 1, 'CL': 1, 'VO': 1, 'RE': 1 };
+                var CLOSED_WORDS = /lost|archived|won|closed|reversed/i;
+                var open = allItems.filter(function(o) {
+                    if (CLOSED_CODES[o.stageCode]) return false;
+                    var name = o.stageName || o.stageCode || '';
+                    return !CLOSED_WORDS.test(name);
+                }).length;
                 cntEl.textContent = open > 0 ? (String(open) + ' ' + msg('Open')) : '';
             }
 
-            if (!items.length) { el.innerHTML = emptyState('VAS_105_NoOpps'); return; }
+            if (!allItems.length) { el.innerHTML = emptyState('VAS_105_NoOpps'); return; }
+
+            // Client-side pagination — slice the current page
+            var total    = allItems.length;
+            var pageStart = _oppsPage * OPP_PAGE_SIZE;
+            var items    = allItems.slice(pageStart, pageStart + OPP_PAGE_SIZE);
 
             var SVG_OPP = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>';
             var html =
                 '<div class="vas_105_acct-tablehead" style="grid-template-columns:2.25em 1.7fr 1fr 0.9fr 1fr;gap:0.75em;margin-top:0.5em;">' +
                   '<span></span>' +
-                  '<span>' + esc(msg('VIS_Name'))      + '</span>' +
-                  '<span>' + esc(msg('VAS_105_Stage'))     + '</span>' +
-                  '<span style="text-align:right;">' + esc(msg('VAS_Value'))     + '</span>' +
+                  '<span>' + esc(msg('VIS_Name'))          + '</span>' +
+                  '<span>' + esc(msg('VAS_105_Stage'))      + '</span>' +
+                  '<span style="text-align:right;">' + esc(msg('VAS_Value'))         + '</span>' +
                   '<span style="text-align:right;">' + esc(msg('VAS_105_CloseDate')) + '</span>' +
                 '</div>';
 
             for (var i = 0; i < items.length; i++) {
                 var o = items[i];
-                var idx = i;
                 html +=
-                    '<div class="vas_105_acct-clickrow" style="grid-template-columns:2.25em 1.7fr 1fr 0.9fr 1fr;gap:0.75em;" data-opp-idx="' + idx + '">' +
+                    '<div class="vas_105_acct-clickrow" style="grid-template-columns:2.25em 1.7fr 1fr 0.9fr 1fr;gap:0.75em;" data-opp-idx="' + i + '">' +
                       '<span class="vas_105_acct-wicon vas_105_acct-wicon--blue">' + SVG_OPP + '</span>' +
                       '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);">' + esc(o.name || '') + '</span>' +
-                      '<span><span class="vas_105_acct-stage ' + stageClass(o.stageCode) + '">' + esc(o.stageName || stageLabel(o.stageCode)) + '</span></span>' +
+                      '<span><span class="vas_105_acct-stage ' + stageClass(o.stageCode, o.stageName) + '">' + esc(o.stageName || stageLabel(o.stageCode)) + '</span></span>' +
                       '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(o.value), sym, prec)) + '</span>' +
                       '<span style="font-size:0.8125em;color:var(--acct-text-2);text-align:right;">' + esc(fmtDate(o.closeDate)) + '</span>' +
                     '</div>';
             }
+
+            html += buildSectionPager('opps', total, _oppsPage, OPP_PAGE_SIZE);
             el.innerHTML = html;
 
-            // Wire row clicks
+            // Wire row clicks (items is the current-page slice)
             var rows = el.querySelectorAll('.vas_105_acct-clickrow');
             for (var ri = 0; ri < rows.length; ri++) {
                 (function(row, oppData) {
                     row.onclick = function () { openOppDetail(oppData); };
                 })(rows[ri], items[ri]);
+            }
+
+            // Wire pagination buttons
+            if (total > OPP_PAGE_SIZE) {
+                var prevBtn = document.getElementById('vas_105_oppsprev_' + widgetID);
+                var nextBtn = document.getElementById('vas_105_oppsnext_' + widgetID);
+                var maxPage = Math.ceil(total / OPP_PAGE_SIZE) - 1;
+                if (prevBtn) prevBtn.onclick = function () {
+                    _oppsPage = Math.max(0, _oppsPage - 1);
+                    renderOpps(el, data);
+                };
+                if (nextBtn) nextBtn.onclick = function () {
+                    _oppsPage = Math.min(maxPage, _oppsPage + 1);
+                    renderOpps(el, data);
+                };
             }
         }
 
@@ -637,35 +726,40 @@
         }
 
         function renderContracts(el, data) {
-            var items = (data && data.items) ? data.items : [];
-            var sym   = (data && data.currencySymbol) || getSym();
-            var prec  = (data && data.precision != null) ? parseInt(data.precision,10) : getPrec();
-            var today = new Date().toISOString().split('T')[0];
+            var allItems = (data && data.items) ? data.items : [];
+            var sym      = (data && data.currencySymbol) || getSym();
+            var prec     = (data && data.precision != null) ? parseInt(data.precision,10) : getPrec();
+            var today    = new Date().toISOString().split('T')[0];
 
             var cntEl = document.getElementById(secId('contracts') + '_cnt');
             if (cntEl) {
                 // Completed/Active: C_Contract Processed=Y or VAS_ContractMaster ARD, not yet past end date
-                var active = items.filter(function(c){
+                var active = allItems.filter(function(c){
                     return (c.statusCode === 'Y' || c.statusCode === 'ARD') && !(c.endDate && c.endDate < today);
                 }).length;
                 // In Progress/Draft: C_Contract Processed=N or VAS_ContractMaster DFT
-                var inProg = items.filter(function(c){ return c.statusCode === 'N' || c.statusCode === 'DFT'; }).length;
+                var inProg = allItems.filter(function(c){ return c.statusCode === 'N' || c.statusCode === 'DFT'; }).length;
                 var parts  = [];
                 if (active) parts.push(String(active) + ' ' + msg('Active'));
                 if (inProg) parts.push(String(inProg) + ' ' + msg('VAS_105_InProgress'));
                 cntEl.textContent = parts.join(' · ');
             }
 
-            if (!items.length) { el.innerHTML = emptyState('VAS_105_NoContracts'); return; }
+            if (!allItems.length) { el.innerHTML = emptyState('VAS_105_NoContracts'); return; }
+
+            // Client-side pagination — slice the current page
+            var total     = allItems.length;
+            var pageStart = _contractsPage * CT_PAGE_SIZE;
+            var items     = allItems.slice(pageStart, pageStart + CT_PAGE_SIZE);
 
             var SVG_CONTRACT = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>';
             var html = '';
             for (var i = 0; i < items.length; i++) {
                 var c = items[i];
                 // A completed/active contract whose end date has passed is shown as Overdue.
-                var isOverdue    = (c.statusCode === 'Y' || c.statusCode === 'ARD') && c.endDate && c.endDate < today;
-                var statusCls    = isOverdue ? 'vas_105_acct-ctstatus--expired' : contractStatusClass(c.statusCode);
-                var statusLabel  = isOverdue ? msg('VIS_OverDue')                 : contractStatusLabel(c.statusCode);
+                var isOverdue   = (c.statusCode === 'Y' || c.statusCode === 'ARD') && c.endDate && c.endDate < today;
+                var statusCls   = isOverdue ? 'vas_105_acct-ctstatus--expired' : contractStatusClass(c.statusCode);
+                var statusLabel = isOverdue ? msg('VIS_OverDue')                : contractStatusLabel(c.statusCode);
                 var term = [fmtDate(c.startDate), c.endDate ? fmtDate(c.endDate) : 'Perpetual'].filter(Boolean).join(' – ');
                 html +=
                     '<div class="vas_105_acct-ctrow" data-ct-idx="' + i + '">' +
@@ -674,20 +768,39 @@
                         '<div style="display:flex;align-items:center;gap:0.5625em;">' +
                           '<span style="font-size:0.9375em;font-weight:700;color:var(--acct-text);">' + esc(c.name || c.contractNo || '') + '</span>' +
                           '<span class="vas_105_acct-ctstatus ' + statusCls + '">' + esc(statusLabel) + '</span>' +
+                          '<span class="vas_105_acct-ctsource">' + esc(c.source === 'CC' ? msg('VAS_105_ServiceContract') : msg('VAS_105_Contract')) + '</span>' +
                         '</div>' +
                         '<div style="margin-top:0.25em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.typeCode || '') + ' · ' + esc(term) + '</div>' +
-                        (c.productName ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.productName) + '</div>' : '') +
+                        (c.productName ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.productName) + '</div>' : (c.description ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.description) + '</div>' : '')) +
                       '</div>' +
                       '<div style="font-size:0.875em;font-weight:700;color:var(--acct-text);white-space:nowrap;">' + esc(fmtFull(toNum(c.value), sym, prec)) + '</div>' +
                     '</div>';
             }
+
+            html += buildSectionPager('contracts', total, _contractsPage, CT_PAGE_SIZE);
             el.innerHTML = html;
 
+            // Wire row clicks (items is the current-page slice)
             var rows = el.querySelectorAll('.vas_105_acct-ctrow');
             for (var ri = 0; ri < rows.length; ri++) {
                 (function(row, ct) {
                     row.onclick = function () { openContractDetail(ct); };
                 })(rows[ri], items[ri]);
+            }
+
+            // Wire pagination buttons
+            if (total > CT_PAGE_SIZE) {
+                var prevBtn = document.getElementById('vas_105_contractsprev_' + widgetID);
+                var nextBtn = document.getElementById('vas_105_contractsnext_' + widgetID);
+                var maxPage = Math.ceil(total / CT_PAGE_SIZE) - 1;
+                if (prevBtn) prevBtn.onclick = function () {
+                    _contractsPage = Math.max(0, _contractsPage - 1);
+                    renderContracts(el, data);
+                };
+                if (nextBtn) nextBtn.onclick = function () {
+                    _contractsPage = Math.min(maxPage, _contractsPage + 1);
+                    renderContracts(el, data);
+                };
             }
         }
 
@@ -787,22 +900,7 @@
             }
 
             if (total > PAGE_SIZE_INLINE) {
-                var start        = _ordersOffset + 1;
-                var end          = Math.min(_ordersOffset + PAGE_SIZE_INLINE, total);
-                var prevDisabled = _ordersOffset <= 0;
-                var nextDisabled = end >= total;
-                var chevL = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#586575" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
-                var chevR = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#586575" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
-                html +=
-                    '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.625em;">' +
-                      '<span class="of-lu-count" style="font-size:0.8125em;color:var(--acct-text-2);">' +
-                        esc(msg('VAS_040_Showing')) + ' <b>' + start + '&ndash;' + end + '</b> ' + esc(msg('of')) + ' <b>' + total + '</b>' +
-                      '</span>' +
-                      '<nav class="of-lu-pager-controls" role="navigation">' +
-                        '<button type="button" class="of-lu-pager-btn of-lu-prev-btn" id="vas_105_ordprev_' + widgetID + '"' + (prevDisabled ? ' disabled' : '') + '>' + chevL + '</button>' +
-                        '<button type="button" class="of-lu-pager-btn of-lu-next-btn" id="vas_105_ordnext_' + widgetID + '"' + (nextDisabled ? ' disabled' : '') + '>' + chevR + '</button>' +
-                      '</nav>' +
-                    '</div>';
+                html += buildSectionPager('ord', total, Math.floor(_ordersOffset / PAGE_SIZE_INLINE), PAGE_SIZE_INLINE);
             }
 
             el.innerHTML = html;
@@ -867,22 +965,7 @@
             }
 
             if (total > PAGE_SIZE_INLINE) {
-                var start        = _invoicesOffset + 1;
-                var end          = Math.min(_invoicesOffset + PAGE_SIZE_INLINE, total);
-                var prevDisabled = _invoicesOffset <= 0;
-                var nextDisabled = end >= total;
-                var chevL = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#586575" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
-                var chevR = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#586575" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
-                html +=
-                    '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.625em;">' +
-                      '<span class="of-lu-count" style="font-size:0.8125em;color:var(--acct-text-2);">' +
-                        esc(msg('VAS_040_Showing')) + ' <b>' + start + '&ndash;' + end + '</b> ' + esc(msg('of')) + ' <b>' + total + '</b>' +
-                      '</span>' +
-                      '<nav class="of-lu-pager-controls" role="navigation">' +
-                        '<button type="button" class="of-lu-pager-btn of-lu-prev-btn" id="vas_105_invprev_' + widgetID + '"' + (prevDisabled ? ' disabled' : '') + '>' + chevL + '</button>' +
-                        '<button type="button" class="of-lu-pager-btn of-lu-next-btn" id="vas_105_invnext_' + widgetID + '"' + (nextDisabled ? ' disabled' : '') + '>' + chevR + '</button>' +
-                      '</nav>' +
-                    '</div>';
+                html += buildSectionPager('inv', total, Math.floor(_invoicesOffset / PAGE_SIZE_INLINE), PAGE_SIZE_INLINE);
             }
 
             el.innerHTML = html;
@@ -1152,13 +1235,23 @@
                 return;
             }
 
+            // The timeline pages client-side: the stat strip above still counts
+            // every touch, only the rail below it is limited to one page.
+            var engPageCount = Math.max(1, Math.ceil(items.length / ENGAGEMENT_PER_PAGE));
+            if (_engPage >= engPageCount) _engPage = engPageCount - 1;
+            if (_engPage < 0) _engPage = 0;
+            var engStart = _engPage * ENGAGEMENT_PER_PAGE;
+            var engEnd   = Math.min(items.length, engStart + ENGAGEMENT_PER_PAGE);
+
             html += '<div class="vas_105_eng-tl-wrap">';
-            for (var i = 0; i < items.length; i++) {
+            for (var i = engStart; i < engEnd; i++) {
                 var item   = items[i];
                 var bCfg   = BADGE[item.touchType]    || BADGE['NOTE'];
                 var dotClr = DOT_COLOR[item.touchType] || '#94A3B8';
                 var icon   = TYPE_SVG[item.touchType]  || SVG_NOTE;
-                var isLast = (i === items.length - 1);
+                // The connector stops at the last entry ON THIS PAGE, so the rail
+                // never trails off below the final card.
+                var isLast = (i === engEnd - 1);
 
                 var titleText = item.title || '';
                 if (item.touchType === 'NOTE') {
@@ -1238,7 +1331,40 @@
             }
             html += '</div>';
 
+            // Pager — same shell the Orders / Invoices panels use, but the pages
+            // are cut from the payload already in hand rather than re-fetched.
+            if (engPageCount > 1) {
+                var engChevL = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#586575" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+                var engChevR = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#586575" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+                html +=
+                    '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.625em;">' +
+                      '<span class="of-lu-count" style="font-size:0.8125em;color:var(--acct-text-2);">' +
+                        esc(msg('VAS_040_Showing')) + ' <b>' + (engStart + 1) + '&ndash;' + engEnd + '</b> ' +
+                        esc(msg('of')) + ' <b>' + items.length + '</b>' +
+                      '</span>' +
+                      '<nav class="of-lu-pager-controls" role="navigation">' +
+                        '<button type="button" class="of-lu-pager-btn of-lu-prev-btn" data-eng-page="' + (_engPage - 1) + '"' +
+                          (_engPage <= 0 ? ' disabled' : '') + '>' + engChevL + '</button>' +
+                        '<button type="button" class="of-lu-pager-btn of-lu-next-btn" data-eng-page="' + (_engPage + 1) + '"' +
+                          (_engPage >= engPageCount - 1 ? ' disabled' : '') + '>' + engChevR + '</button>' +
+                      '</nav>' +
+                    '</div>';
+            }
+
             el.innerHTML = html;
+
+            // Bound here rather than delegated on $root: the pager has to re-enter
+            // this same function with the same el / data to repaint the rail.
+            if (engPageCount > 1) {
+                $(el).find('[data-eng-page]').on('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var p = parseInt(this.getAttribute('data-eng-page'), 10);
+                    if (isNaN(p) || p < 0 || p > engPageCount - 1) return;
+                    _engPage = p;
+                    renderEngagement(el, data);
+                });
+            }
         }
 
         // ── renderNotes ───────────────────────────────────────────────────────
@@ -1321,14 +1447,18 @@
 
         function openContractDetail(c) {
             var sym  = getSym(); var prec = getPrec();
+            var descHtml = c.description
+                ? '<div style="margin-top:1em;padding:0.875em;background:#F8FAFC;border:0.0625em solid #E4EDF4;border-radius:0.5em;font-size:0.875em;line-height:1.65;color:#102C3F;">' + esc(c.description) + '</div>'
+                : '';
             var body = detailRow(msg('VAS_105_ContractNo'), c.contractNo) +
                        detailRow(msg('Type'), c.typeCode) +
                        detailRow(msg('Status'), contractStatusLabel(c.statusCode)) +
                        detailRow(msg('StartDate'), fmtDate(c.startDate)) +
                        detailRow(msg('EndDate'), c.endDate ? fmtDate(c.endDate) : 'Perpetual') +
                        detailRow(msg('VAS_Value'), fmtFull(toNum(c.value), sym, prec)) +
-                       detailRow(msg('VAS_105_RenewalType'), c.renewalCode) +
-                       (c.productName ? detailRow(msg('Product'), c.productName) : '');
+                       detailRow(msg('VAS_105_RenewalType'), c.renewalName || c.renewalCode) +
+                       (c.productName ? detailRow(msg('Product'), c.productName) : '') +
+                       descHtml;
             var foot = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' + esc(msg('VIS_Close')) + '</button>';
             showModal(c.name || c.contractNo || msg('VAS_105_Contract'), msg('VAS_105_ContractDetail'), body, foot, false);
         }
@@ -1986,18 +2116,32 @@
                     return;
                 }
 
-                var subText = (data.subject || '') + (data.startDate ? ' · ' + fmtEngTs(data.startDate) : '');
-                document.getElementById('vas_105_mmeta_' + widgetID).textContent = subText;
+                // Header meta: "Account · Apr 14, 10:00am"
+                var acctName = (sectionState.overview.data && sectionState.overview.data.name) ? sectionState.overview.data.name : '';
+                var metaStr  = [acctName, data.startDate ? fmtEngTs(data.startDate) : ''].filter(Boolean).join(' · ');
+                document.getElementById('vas_105_mmeta_' + widgetID).textContent = metaStr;
 
-                var metaParts = [];
-                if (data.startDate) metaParts.push(esc(fmtEngTs(data.startDate)));
-                if (data.attendees) metaParts.push(esc(data.attendees));
-                if (data.location)  metaParts.push(esc(data.location));
+                // Duration string: "48m" or "1h 30m"
+                var durStr = '';
                 if (data.durationMins > 0) {
-                    var h = Math.floor(data.durationMins / 60), m = data.durationMins % 60;
-                    metaParts.push(h > 0 ? (h + 'h' + (m > 0 ? ' ' + m + 'm' : '')) : (m + 'm'));
+                    var dh = Math.floor(data.durationMins / 60), dm = data.durationMins % 60;
+                    durStr = dh > 0 ? (dh + 'h' + (dm > 0 ? ' ' + dm + 'm' : '')) : (dm + 'm');
                 }
 
+                // Attendee list and count
+                var attendeeList  = data.attendees ? data.attendees.split(',').filter(function(s){ return $.trim(s); }) : [];
+                var attendeeCount = attendeeList.length;
+                // Display first name only (first word) for each attendee
+                var displayNames  = attendeeList.map(function(n){ return $.trim(n).split(' ')[0]; }).join(', ');
+
+                // Details: "Google Meet · 48m · 4 attended"
+                var detailParts = [];
+                if (data.location)    detailParts.push(esc(data.location));
+                if (durStr)           detailParts.push(esc(durStr));
+                if (attendeeCount)    detailParts.push(attendeeCount + ' ' + esc(msg('VAS_105_Attended')));
+                var detailsHtml = detailParts.join(' &middot; ') || '&mdash;';
+
+                // Transcript block
                 var transcriptHtml = '';
                 if (data.transcript) {
                     var lines = String(data.transcript).replace(/\r\n/g, '\n').split('\n');
@@ -2023,22 +2167,56 @@
                 }
 
                 var bodyHtml = [
-                    '<div class="vas_105_mtg-subject">', esc(data.subject || '—'), '</div>',
-                    '<div class="vas_105_mtg-meta">', metaParts.join(' &middot; '), '</div>',
+                    // ── Hero: badge + subject ──
+                    '<div class="vas_105_mtg-hero">',
+                    '  <span class="vas_105_mtg-badge">', esc(msg('VAS_105_Meeting')), '</span>',
+                    '  <span class="vas_105_mtg-title">', esc(data.subject || '&mdash;'), '</span>',
+                    '</div>',
+
+                    // ── Info grid: Type/When row + Details/People row ──
+                    '<div class="vas_105_mtg-infogrid">',
+                    '  <div class="vas_105_mtg-infogrid__row">',
+                    '    <div class="vas_105_mtg-infogrid__cell">',
+                    '      <span class="vas_105_mtg-info-lbl">', esc(msg('Type')), '</span>',
+                    '      <span class="vas_105_mtg-info-val">', esc(msg('VAS_105_Meeting')), '</span>',
+                    '    </div>',
+                    '    <div class="vas_105_mtg-infogrid__cell">',
+                    '      <span class="vas_105_mtg-info-lbl">', esc(msg('When')), '</span>',
+                    '      <span class="vas_105_mtg-info-val">', data.startDate ? esc(fmtEngTs(data.startDate)) : '&mdash;', '</span>',
+                    '    </div>',
+                    '  </div>',
+                    '  <div class="vas_105_mtg-infogrid__row">',
+                    '    <div class="vas_105_mtg-infogrid__cell">',
+                    '      <span class="vas_105_mtg-info-lbl">', esc(msg('Details')), '</span>',
+                    '      <span class="vas_105_mtg-info-val">', detailsHtml, '</span>',
+                    '    </div>',
+                    '    <div class="vas_105_mtg-infogrid__cell">',
+                    '      <span class="vas_105_mtg-info-lbl">', esc(msg('People')), '</span>',
+                    '      <span class="vas_105_mtg-info-val">', displayNames ? esc(displayNames) : '&mdash;', '</span>',
+                    '    </div>',
+                    '  </div>',
+                    '</div>',
+
+                    // ── Comments: plain-text display block ──
+                    data.comments
+                        ? '<div class="vas_105_mtg-notes">' + esc(data.comments) + '</div>'
+                        : '',
+
+                    // ── Meeting URL (editable) ──
                     '<div class="vas_105_mtg-field">',
                     '  <label class="vas_105_mtg-field-label">', esc(msg('VAS_105_MeetingUrl')), '</label>',
                     '  <input type="text" class="vas_105_mtg-input" id="', widgetID, '_mtgUrl" value="', esc(data.meetingUrl || ''), '">',
                     '</div>',
-                    transcriptHtml,
-                    '<div class="vas_105_mtg-field">',
-                    '  <label class="vas_105_mtg-field-label">', esc(msg('Comments')), '</label>',
-                    '  <textarea class="vas_105_mtg-textarea" id="', widgetID, '_mtgComments" rows="3">', esc(data.comments || ''), '</textarea>',
-                    '</div>'
+
+                    // ── Hidden textarea carries comments for Save ──
+                    '<textarea id="', widgetID, '_mtgComments" style="display:none;">', esc(data.comments || ''), '</textarea>',
+
+                    transcriptHtml
                 ].join('');
 
                 var footHtml = [
                     '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" id="', widgetID, '_mtgClose">', esc(msg('Close')), '</button>',
-                    '<button class="vas_105_acct-btn vas_105_acct-btn--primary" id="', widgetID, '_mtgSave">', SVG_CHECK, ' ', esc(msg('Save')), '</button>'
+                    '<button class="vas_105_acct-btn vas_105_acct-btn--primary"   id="', widgetID, '_mtgSave">', SVG_CHECK, ' ', esc(msg('Save')), '</button>'
                 ].join('');
 
                 if (bodyEl) bodyEl.innerHTML = bodyHtml;
@@ -2255,6 +2433,8 @@
             _bpSectionCounts = {};     // clear stale counts from previous account
             _ordersOffset    = 0;
             _invoicesOffset  = 0;
+            _oppsPage        = 0;
+            _contractsPage   = 0;
 
             // Rebuild section shells — renderNoSelectionState() replaces the whole
             // body with a single div, so we must restore shells before AJAX callbacks

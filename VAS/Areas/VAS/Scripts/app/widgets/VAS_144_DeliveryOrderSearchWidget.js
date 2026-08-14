@@ -68,6 +68,7 @@
         var $root = $('<div class="MPC-dos-root">');
         var $pill;
         var $input;
+        var $clearBtn;
         var $dropdown;
         var $dashboardScroll;
         var $modal;
@@ -334,6 +335,7 @@
             if (!row || detailLoading) { return; }
             closeDropdown();
             $input.val(row.doNumber + ' - ' + row.customer);
+            if ($clearBtn) { $clearBtn.css('display', 'inline-flex'); }
             loadDetail(row.doId);
         }
 
@@ -592,18 +594,28 @@
                     '<input type="text" class="MPC-dos-input" autocomplete="off" role="combobox" aria-expanded="false"' +
                         ' aria-label="' + escapeHtml(label('VAS_144_SearchPlaceholder', 'Search delivery orders by customer, line item, location, sales order, rep or contact...')) + '"' +
                         ' placeholder="' + escapeHtml(label('VAS_144_SearchPlaceholder', 'Search delivery orders by customer, line item, location, sales order, rep or contact...')) + '" />' +
+                    '<button type="button" class="MPC-dos-clear" aria-label="' + escapeHtml(label('Clear', 'Clear')) + '" style="display:none">' +
+                        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>' +
+                    '</button>' +
                     '<span class="MPC-dos-hint">' + escapeHtml(label('VAS_144_EnterOpensTopMatch', 'Enter opens top match')) + '</span>' +
                 '</div>'
             );
             $root.append($pill);
             $input = $pill.find('.MPC-dos-input');
+            $clearBtn = $pill.find('.MPC-dos-clear');
 
             $dropdown = $('<div class="MPC-dos-dd" role="listbox">');
             $('body').append($dropdown);
 
-            $input.on('input' + eventNamespace, scheduleSearch);
+            $input.on('input' + eventNamespace, function () {
+                $clearBtn.css('display', $input.val() ? 'inline-flex' : 'none');
+                scheduleSearch();
+            });
             $input.on('focus' + eventNamespace, function () {
-                if ($input.val().trim()) { scheduleSearch(); }
+                if ($input.val().trim()) {
+                    $clearBtn.css('display', 'inline-flex');
+                    scheduleSearch();
+                }
             });
             $input.on('keydown' + eventNamespace, function (event) {
                 if (event.key === 'Escape') { closeDropdown(); return; }
@@ -611,6 +623,17 @@
                     event.preventDefault();
                     selectSuggestion(0);
                 }
+            });
+
+            $clearBtn.on('click' + eventNamespace, function () {
+                $input.val('');
+                $clearBtn.css('display', 'none');
+                requestSequence++;
+                suggestions = [];
+                if (searchTimer) { clearTimeout(searchTimer); }
+                if (searchRequest && searchRequest.readyState !== 4) { searchRequest.abort(); }
+                closeDropdown();
+                $input.focus();
             });
 
             $dropdown.on('mousedown' + eventNamespace, '.MPC-dos-dd-row', function (event) {
@@ -642,6 +665,7 @@
             suggestions = [];
             if (searchTimer) { clearTimeout(searchTimer); }
             if ($input) { $input.val(''); }
+            if ($clearBtn) { $clearBtn.css('display', 'none'); }
             closeDropdown();
             closeModal();
         };

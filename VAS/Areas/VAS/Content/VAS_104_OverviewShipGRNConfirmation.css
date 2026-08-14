@@ -1,8 +1,8 @@
-/************************************************************
+﻿/************************************************************
  * Module Name : VAS
  * Purpose     : Styles for the Ship / GRN Confirmation Overview tab panel
  *               (VAS.VAS_104_OverviewShipGRNConfirmation). All classes are
- *               MPC-prefixed (MPC-vasgc-*) and scoped under the panel root to
+ *               panel-prefixed (vas_104-*) and scoped under the panel root to
  *               avoid global collisions. Shares the Onfinity windows-and-panels
  *               em-anchored body language with VAS_101 / VAS_102 / VAS_103 —
  *               Roboto, white surfaces, soft blue borders, KPI tiles with accent
@@ -17,9 +17,41 @@
  *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
  *                        columns with a divider between them (stacking to a
  *                        bottom rule when narrow), plus its RTL mirror.
+ *   VAI163   2026-07-31  Header aligned to the VAS_092 Purchase Order Overview
+ *                        standard: details card is 40%/1fr (was 1.4fr/1fr) and
+ *                        its field column (-hdrColR) is a two-across grid
+ *                        instead of a single tall stack, collapsing to one
+ *                        column under 460px. Field values wrap rather than
+ *                        ellipsis-truncate now that the column is narrower.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vasgc- -> vas_104- so the panel's
+ *                        styles cannot collide with another panel's.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare
+ *                        (.is-link, .ta-r, .has, .tone-*, .s-*, .btn-*) now
+ *                        carry the vas_104- prefix too. Sharing a name with a
+ *                        base-theme rule meant the base design won and
+ *                        repainted the panel; scoping them to the panel ends
+ *                        that.
+ *   VAI163   2026-08-12  Line table loses its Locator column — 8 tracks in
+ *                        quality mode, 7 without. The locator moved into the
+ *                        Scrapped cell, which stacks now (.vas_104-scrapCell /
+ *                        -scrapLoc) and shows it only where something was
+ *                        actually scrapped. The item cell gained a name row
+ *                        (.vas_104-itNameRow) carrying the source line number
+ *                        (.vas_104-lineNo) and the quality-parameter toggle
+ *                        (.vas_104-qcBtn), whose drawer (.vas_104-qcDrawer /
+ *                        -qcTable / -qcRow / -qcHead / -qcBody / -qcHit /
+ *                        -qcMiss) is a full-width SIBLING of the line row rather
+ *                        than a child, so it is not trapped in one grid cell.
+ *                        Added the Notes and Activity sections at the foot of the
+ *                        panel (.vas_104-panelcard / -noteRow / -noteTag /
+ *                        -noteTxt / -actRow / -actBadge / -actMain / -actTitle /
+ *                        -actWhen) and the toast the source-document link falls
+ *                        back to (.vas_104-toast). The action bar
+ *                        (.vas_104-actions / .vas_104-btn) is gone with the Print
+ *                        and Confirm buttons it held.
  ***********************************************************/
 
-.MPC-vasgc-root {
+.vas_104-root {
     /* Canonical palette */
     --gc-text:        #102C3F;
     --gc-muted:       #5F7283;
@@ -46,12 +78,12 @@
     box-sizing: border-box;
 }
 
-.MPC-vasgc-root * { box-sizing: border-box; }
+.vas_104-root * { box-sizing: border-box; }
 
 /* Quality-mode gate: hide all QC-only elements when quality does not apply. */
-.MPC-vasgc-root.no-quality .qc-only { display: none !important; }
+.vas_104-root.vas_104-no-quality .vas_104-qc-only { display: none !important; }
 
-.MPC-vasgc-body {
+.vas_104-body {
     font-size: clamp(15px, 2.8cqi, 17px);
     padding: 1.125em 0.875em;
     display: flex;
@@ -59,7 +91,7 @@
     gap: 0.875em;
 }
 
-.MPC-vasgc-empty {
+.vas_104-empty {
     padding: 40px 18px;
     text-align: center;
     color: var(--gc-muted);
@@ -69,9 +101,9 @@
 /* ----------------------------------------------------------- */
 /*  Section + Section Header                                    */
 /* ----------------------------------------------------------- */
-.MPC-vasgc-sec { display: block; }
+.vas_104-sec { display: block; }
 
-.MPC-vasgc-secHead {
+.vas_104-secHead {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -79,7 +111,7 @@
     margin-bottom: 0.5em;
 }
 
-.MPC-vasgc-secTitle {
+.vas_104-secTitle {
     font-size: 1em;
     font-weight: 700;
     color: var(--gc-text);
@@ -88,7 +120,7 @@
     flex: 1 1 auto;
 }
 
-.MPC-vasgc-secSummary {
+.vas_104-secSummary {
     font-size: 0.75em;
     font-weight: 400;
     color: var(--gc-muted);
@@ -98,27 +130,27 @@
 /* ----------------------------------------------------------- */
 /*  Icon wrapper                                               */
 /* ----------------------------------------------------------- */
-.MPC-vasgc-ic { display: inline-flex; align-items: center; flex: none; }
-.MPC-vasgc-ic svg { display: block; }
+.vas_104-ic { display: inline-flex; align-items: center; flex: none; }
+.vas_104-ic svg { display: block; }
 
 /* ----------------------------------------------------------- */
 /*  Header — title strip                                        */
 /* ----------------------------------------------------------- */
-.MPC-vasgc-hdr {
+.vas_104-hdr {
     border-radius: 14px;
     padding: 0.875em 1em;
 }
 
-.MPC-vasgc-hdrTop {
+.vas_104-hdrTop {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.875em;
 }
 
-.MPC-vasgc-hdrTitleWrap { min-width: 0; }
+.vas_104-hdrTitleWrap { min-width: 0; }
 
-.MPC-vasgc-hdrEyebrow {
+.vas_104-hdrEyebrow {
     font-size: 0.6875em;
     font-weight: 700;
     letter-spacing: .6px;
@@ -127,20 +159,20 @@
     margin-bottom: 0.1875em;
 }
 
-.MPC-vasgc-hdrTitle {
+.vas_104-hdrTitle {
     font-size: 1.25em;
     font-weight: 700;
     color: var(--gc-text);
     line-height: 1.2;
 }
 
-.MPC-vasgc-hdrSub {
+.vas_104-hdrSub {
     font-size: 0.75em;
     color: var(--gc-sub);
     margin-top: 0.3125em;
 }
 
-.MPC-vasgc-hdrPills {
+.vas_104-hdrPills {
     flex: none;
     display: flex;
     align-items: center;
@@ -149,7 +181,7 @@
     gap: 0.5em;
 }
 
-.MPC-vasgc-hdrPill {
+.vas_104-hdrPill {
     display: inline-flex;
     align-items: center;
     gap: 0.3125em;
@@ -161,15 +193,15 @@
     white-space: nowrap;
 }
 
-.MPC-vasgc-hdrPill.tone-info    { background: var(--gc-info-bg);    color: var(--gc-info-tx); }
-.MPC-vasgc-hdrPill.tone-success { background: var(--gc-success-bg); color: var(--gc-success-tx); }
-.MPC-vasgc-hdrPill.tone-warning { background: var(--gc-warning-bg); color: var(--gc-warning-tx); }
-.MPC-vasgc-hdrPill.tone-risk    { background: var(--gc-risk-bg);    color: var(--gc-risk-tx); }
-.MPC-vasgc-hdrPill.tone-neutral { background: var(--gc-neutral-bg); color: var(--gc-neutral-tx); }
+.vas_104-hdrPill.vas_104-tone-info    { background: var(--gc-info-bg);    color: var(--gc-info-tx); }
+.vas_104-hdrPill.vas_104-tone-success { background: var(--gc-success-bg); color: var(--gc-success-tx); }
+.vas_104-hdrPill.vas_104-tone-warning { background: var(--gc-warning-bg); color: var(--gc-warning-tx); }
+.vas_104-hdrPill.vas_104-tone-risk    { background: var(--gc-risk-bg);    color: var(--gc-risk-tx); }
+.vas_104-hdrPill.vas_104-tone-neutral { background: var(--gc-neutral-bg); color: var(--gc-neutral-tx); }
 
-.MPC-vasgc-hdrPill .MPC-vasgc-ic { color: currentColor; }
+.vas_104-hdrPill .vas_104-ic { color: currentColor; }
 
-.MPC-vasgc-hdrDot {
+.vas_104-hdrDot {
     width: 0.5em;
     height: 0.5em;
     border-radius: 50%;
@@ -180,9 +212,12 @@
 /* ----------------------------------------------------------- */
 /*  Header — source & receipt details card                     */
 /* ----------------------------------------------------------- */
-.MPC-vasgc-hdrCard {
+/* Identity takes 40% of the card; the fields take the rest and run two across,
+   so short fields sit in rows instead of stacking into a tall column that
+   leaves the identity half empty. */
+.vas_104-hdrCard {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: 40% 1fr;
     gap: 0.875em 1.75em;
     border: 1px solid var(--gc-card-bd);
     border-radius: var(--gc-card-radius);
@@ -190,18 +225,19 @@
     padding: 0.875em 1em;
 }
 
-.MPC-vasgc-hdrColL { min-width: 0; border-right: 1px solid var(--gc-row-div); padding-right: 1.25em; }
+.vas_104-hdrColL { min-width: 0; border-right: 1px solid var(--gc-row-div); padding-right: 1.25em; }
 
-.MPC-vasgc-hdrColR {
+.vas_104-hdrColR {
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.625em;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75em 1.5em;
+    align-content: start;
 }
 
-.MPC-vasgc-hdrField { min-width: 0; }
+.vas_104-hdrField { min-width: 0; }
 
-.MPC-vasgc-fLabel {
+.vas_104-fLabel {
     font-size: 0.6875em;
     font-weight: 700;
     letter-spacing: .4px;
@@ -210,35 +246,39 @@
     line-height: 1.3;
 }
 
-.MPC-vasgc-fVal {
+.vas_104-fVal {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--gc-text);
     line-height: 1.35;
     margin-top: 0.125em;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
 }
-.MPC-vasgc-fVal.is-link { color: var(--gc-link); }
+/* The source document opens its own window on click, so it behaves like the
+   link it was already styled as. */
+.vas_104-fVal.vas_104-is-link { color: var(--gc-link); cursor: pointer; }
+.vas_104-fVal.vas_104-is-link:hover { text-decoration: underline; }
 
 @container (max-width: 460px) {
-    .MPC-vasgc-hdrCard { grid-template-columns: 1fr; }
-    .MPC-vasgc-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--gc-row-div); padding-bottom: 0.75em; }
-    .MPC-vasgc-hdrTop  { flex-direction: column; }
-    .MPC-vasgc-hdrPills { justify-content: flex-start; }
+    .vas_104-hdrCard { grid-template-columns: 1fr; }
+    .vas_104-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--gc-row-div); padding-bottom: 0.75em; }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .vas_104-hdrColR { grid-template-columns: 1fr; }
+    .vas_104-hdrTop  { flex-direction: column; }
+    .vas_104-hdrPills { justify-content: flex-start; }
 }
 
 /* ----------------------------------------------------------- */
 /*  Party identity                                             */
 /* ----------------------------------------------------------- */
-.MPC-vasgc-vendName {
+.vas_104-vendName {
     font-size: 0.9375em;
     font-weight: 700;
     color: var(--gc-text);
     margin-top: 0.1875em;
 }
 
-.MPC-vasgc-vendContact {
+.vas_104-vendContact {
     display: flex;
     flex-wrap: wrap;
     gap: 0.375em 1.125em;
@@ -246,20 +286,20 @@
     color: var(--gc-text);
     margin-top: 0.375em;
 }
-.MPC-vasgc-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
-.MPC-vasgc-contactBit .MPC-vasgc-ic { color: var(--gc-action); }
+.vas_104-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.vas_104-contactBit .vas_104-ic { color: var(--gc-action); }
 
 /* ----------------------------------------------------------- */
 /*  Snapshot (KPI metric grid)                                  */
 /* ----------------------------------------------------------- */
-.MPC-vasgc-snap {
+.vas_104-snap {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     gap: 0.75em;
 }
-.MPC-vasgc-root.no-quality .MPC-vasgc-snap { grid-template-columns: repeat(5, 1fr); }
+.vas_104-root.vas_104-no-quality .vas_104-snap { grid-template-columns: repeat(5, 1fr); }
 
-.MPC-vasgc-metric {
+.vas_104-metric {
     min-width: 0;
     border: 1px solid var(--gc-card-bd);
     border-left: 3px solid var(--gc-neutral-tx);
@@ -268,21 +308,21 @@
     padding: 0.75em 0.875em;
 }
 
-.MPC-vasgc-metric.tone-lines      { border-left-color: var(--gc-neutral-tx); }
-.MPC-vasgc-metric.tone-target     { border-left-color: var(--gc-info-tx); }
-.MPC-vasgc-metric.tone-confirmed  { border-left-color: var(--gc-success-tx); }
-.MPC-vasgc-metric.tone-difference { border-left-color: #E08A1E; }
-.MPC-vasgc-metric.tone-scrapped   { border-left-color: var(--gc-risk-tx); }
-.MPC-vasgc-metric.tone-qcpass     { border-left-color: var(--gc-success-tx); }
+.vas_104-metric.vas_104-tone-lines      { border-left-color: var(--gc-neutral-tx); }
+.vas_104-metric.vas_104-tone-target     { border-left-color: var(--gc-info-tx); }
+.vas_104-metric.vas_104-tone-confirmed  { border-left-color: var(--gc-success-tx); }
+.vas_104-metric.vas_104-tone-difference { border-left-color: #E08A1E; }
+.vas_104-metric.vas_104-tone-scrapped   { border-left-color: var(--gc-risk-tx); }
+.vas_104-metric.vas_104-tone-qcpass     { border-left-color: var(--gc-success-tx); }
 
-.MPC-vasgc-mHead {
+.vas_104-mHead {
     display: flex;
     align-items: center;
     gap: 0.375em;
     margin-bottom: 0.375em;
 }
 
-.MPC-vasgc-mLabel {
+.vas_104-mLabel {
     min-width: 0;
     font-size: 0.6875em;
     font-weight: 700;
@@ -294,14 +334,14 @@
     white-space: nowrap;
 }
 
-.MPC-vasgc-metric.tone-lines      .MPC-vasgc-mHead .MPC-vasgc-ic { color: var(--gc-neutral-tx); }
-.MPC-vasgc-metric.tone-target     .MPC-vasgc-mHead .MPC-vasgc-ic { color: var(--gc-info-tx); }
-.MPC-vasgc-metric.tone-confirmed  .MPC-vasgc-mHead .MPC-vasgc-ic { color: var(--gc-success-tx); }
-.MPC-vasgc-metric.tone-difference .MPC-vasgc-mHead .MPC-vasgc-ic { color: #E08A1E; }
-.MPC-vasgc-metric.tone-scrapped   .MPC-vasgc-mHead .MPC-vasgc-ic { color: var(--gc-risk-tx); }
-.MPC-vasgc-metric.tone-qcpass     .MPC-vasgc-mHead .MPC-vasgc-ic { color: var(--gc-success-tx); }
+.vas_104-metric.vas_104-tone-lines      .vas_104-mHead .vas_104-ic { color: var(--gc-neutral-tx); }
+.vas_104-metric.vas_104-tone-target     .vas_104-mHead .vas_104-ic { color: var(--gc-info-tx); }
+.vas_104-metric.vas_104-tone-confirmed  .vas_104-mHead .vas_104-ic { color: var(--gc-success-tx); }
+.vas_104-metric.vas_104-tone-difference .vas_104-mHead .vas_104-ic { color: #E08A1E; }
+.vas_104-metric.vas_104-tone-scrapped   .vas_104-mHead .vas_104-ic { color: var(--gc-risk-tx); }
+.vas_104-metric.vas_104-tone-qcpass     .vas_104-mHead .vas_104-ic { color: var(--gc-success-tx); }
 
-.MPC-vasgc-mVal {
+.vas_104-mVal {
     font-size: 1.25em;
     font-weight: 700;
     color: var(--gc-text);
@@ -310,12 +350,12 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.MPC-vasgc-metric.tone-confirmed  .MPC-vasgc-mVal { color: var(--gc-success-tx); }
-.MPC-vasgc-metric.tone-difference .MPC-vasgc-mVal { color: #9A6500; }
-.MPC-vasgc-metric.tone-scrapped   .MPC-vasgc-mVal { color: var(--gc-risk-tx); }
-.MPC-vasgc-metric.tone-qcpass     .MPC-vasgc-mVal { color: var(--gc-success-tx); }
+.vas_104-metric.vas_104-tone-confirmed  .vas_104-mVal { color: var(--gc-success-tx); }
+.vas_104-metric.vas_104-tone-difference .vas_104-mVal { color: #9A6500; }
+.vas_104-metric.vas_104-tone-scrapped   .vas_104-mVal { color: var(--gc-risk-tx); }
+.vas_104-metric.vas_104-tone-qcpass     .vas_104-mVal { color: var(--gc-success-tx); }
 
-.MPC-vasgc-mSub {
+.vas_104-mSub {
     font-size: 0.6875em;
     color: var(--gc-muted);
     margin-top: 0.25em;
@@ -325,42 +365,44 @@
 }
 
 @container (max-width: 720px) {
-    .MPC-vasgc-snap,
-    .MPC-vasgc-root.no-quality .MPC-vasgc-snap { grid-template-columns: repeat(3, 1fr); }
+    .vas_104-snap,
+    .vas_104-root.vas_104-no-quality .vas_104-snap { grid-template-columns: repeat(3, 1fr); }
 }
 @container (max-width: 460px) {
-    .MPC-vasgc-snap,
-    .MPC-vasgc-root.no-quality .MPC-vasgc-snap { grid-template-columns: repeat(2, 1fr); }
+    .vas_104-snap,
+    .vas_104-root.vas_104-no-quality .vas_104-snap { grid-template-columns: repeat(2, 1fr); }
 }
 @container (max-width: 300px) {
-    .MPC-vasgc-snap,
-    .MPC-vasgc-root.no-quality .MPC-vasgc-snap { grid-template-columns: 1fr; }
+    .vas_104-snap,
+    .vas_104-root.vas_104-no-quality .vas_104-snap { grid-template-columns: 1fr; }
 }
 
 /* ----------------------------------------------------------- */
 /*  Confirmation line table                                    */
 /* ----------------------------------------------------------- */
-.MPC-vasgc-table {
+.vas_104-table {
     border: 1px solid var(--gc-card-bd);
     border-radius: var(--gc-card-radius);
     background: #fff;
     overflow: hidden;
 }
 
-/* Quality mode: 9 columns (QC mark column present). */
-.MPC-vasgc-tRow {
+/* Quality mode: 8 columns (QC mark column present). The Locator column is gone
+   — it moved under the Scrapped figure, where it only appears when something was
+   actually scrapped. */
+.vas_104-tRow {
     display: grid;
     align-items: center;
     gap: 0.625em;
     padding: 0.625em 0.875em;
-    grid-template-columns: 2.2fr 1fr 0.6fr 0.8fr 0.85fr 0.85fr 0.85fr 0.8fr 0.95fr;
+    grid-template-columns: 2.6fr 0.6fr 0.85fr 0.9fr 0.9fr 1fr 0.8fr 0.95fr;
 }
-/* No-quality mode: 8 columns (QC mark column hidden). */
-.MPC-vasgc-root.no-quality .MPC-vasgc-tRow {
-    grid-template-columns: 2.2fr 1fr 0.6fr 0.9fr 0.95fr 0.95fr 0.95fr 1fr;
+/* No-quality mode: 7 columns (QC mark column hidden). */
+.vas_104-root.vas_104-no-quality .vas_104-tRow {
+    grid-template-columns: 2.6fr 0.6fr 0.9fr 0.95fr 0.95fr 1.05fr 1fr;
 }
 
-.MPC-vasgc-tHead {
+.vas_104-tHead {
     background: #F5F8FB;
     border-bottom: 1px solid var(--gc-card-bd);
     font-size: 0.6875em;
@@ -370,28 +412,50 @@
     color: var(--gc-muted);
 }
 
-.MPC-vasgc-tBody {
+.vas_104-tBody {
     border-bottom: 1px solid var(--gc-row-div);
     font-size: 0.8125em;
     color: var(--gc-text);
 }
-.MPC-vasgc-tBody:last-of-type { border-bottom: none; }
-.MPC-vasgc-tBody:hover { background: #FAFCFE; }
+.vas_104-tBody:last-of-type { border-bottom: none; }
+.vas_104-tBody:hover { background: #FAFCFE; }
 
-.MPC-vasgc-table .ta-r { text-align: right; justify-content: flex-end; }
-.MPC-vasgc-table .ta-c { text-align: center; justify-content: center; }
+.vas_104-table .vas_104-ta-r { text-align: right; justify-content: flex-end; }
+.vas_104-table .vas_104-ta-c { text-align: center; justify-content: center; }
 
-.MPC-vasgc-itItem { min-width: 0; }
-.MPC-vasgc-itName {
+.vas_104-itItem { min-width: 0; }
+
+/* The source line number, the product name and the quality toggle share one
+   line; only the NAME gives way, so the number and the toggle stay readable
+   however long the product is. */
+.vas_104-itNameRow {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    min-width: 0;
+}
+.vas_104-itName {
     font-size: 1.0769em;
     font-weight: 700;
     color: var(--gc-text);
     line-height: 1.25;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.MPC-vasgc-itSku {
+/* The line number the GRN / shipment knows this row by. */
+.vas_104-lineNo {
+    flex: none;
+    font-size: 0.8462em;
+    font-weight: 700;
+    color: var(--gc-muted);
+    background: var(--gc-neutral-bg);
+    border-radius: 4px;
+    padding: 0.0625em 0.3125em;
+}
+/* Product value · attributes. */
+.vas_104-itSku {
     font-size: 0.9231em;
     color: var(--gc-muted);
     margin-top: 0.125em;
@@ -401,19 +465,102 @@
 }
 
 /* Signed difference cell */
-.MPC-vasgc-diff { font-weight: 700; }
-.MPC-vasgc-diff.neg  { color: var(--gc-risk-tx); }
-.MPC-vasgc-diff.pos  { color: #9A6500; }
-.MPC-vasgc-diff.zero { color: var(--gc-muted); font-weight: 500; }
+.vas_104-diff { font-weight: 700; }
+.vas_104-diff.vas_104-neg  { color: var(--gc-risk-tx); }
+.vas_104-diff.vas_104-pos  { color: #9A6500; }
+.vas_104-diff.vas_104-zero { color: var(--gc-muted); font-weight: 500; }
 
-/* Scrapped cell — red when non-zero */
-.MPC-vasgc-scrap { color: var(--gc-muted); font-weight: 500; }
-.MPC-vasgc-scrap.has { color: var(--gc-risk-tx); font-weight: 700; }
+/* Scrapped cell — the figure, red when non-zero, with the scrap locator beneath
+   it. The cell stacks, so it is the one right-aligned cell that is not a plain
+   number; align-items keeps both parts on the right edge. */
+.vas_104-scrapCell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 0;
+}
+.vas_104-scrap { color: var(--gc-muted); font-weight: 500; }
+.vas_104-scrap.vas_104-has { color: var(--gc-risk-tx); font-weight: 700; }
+.vas_104-scrapLoc {
+    max-width: 100%;
+    font-size: 0.8462em;
+    color: var(--gc-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
-.MPC-vasgc-dash { color: var(--gc-muted); }
+.vas_104-dash { color: var(--gc-muted); }
+
+/* ---- Quality parameters: the per-line toggle and the drawer it opens ---- */
+
+.vas_104-qcBtn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    padding: 0.0625em 0.375em;
+    border: 1px solid var(--gc-card-bd);
+    border-radius: 999px;
+    font-size: 0.8462em;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--gc-muted);
+    background: #fff;
+    cursor: pointer;
+    user-select: none;
+}
+.vas_104-qcBtn:hover { border-color: var(--gc-action); color: var(--gc-action); }
+.vas_104-qcBtn.vas_104-is-open {
+    background: var(--gc-info-bg);
+    border-color: var(--gc-info-bg);
+    color: var(--gc-info-tx);
+}
+
+/* A sibling of the line row, not a child, so it spans the table's full width
+   instead of living inside one grid cell. */
+.vas_104-qcDrawer {
+    border-bottom: 1px solid var(--gc-row-div);
+    background: #F7FAFD;
+    padding: 0.5em 0.875em 0.625em 1.75em;
+}
+
+.vas_104-qcRow {
+    display: grid;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.3125em 0;
+    grid-template-columns: 0.9fr 1.3fr 1.1fr 1.1fr 0.6fr 0.8fr;
+}
+.vas_104-qcHead {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--gc-muted);
+    border-bottom: 1px solid var(--gc-card-bd);
+}
+.vas_104-qcBody {
+    font-size: 0.75em;
+    color: var(--gc-text);
+    border-bottom: 1px solid #E8EFF6;
+}
+.vas_104-qcBody:last-child { border-bottom: none; }
+.vas_104-qcRow > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_104-qcTable .vas_104-ta-r { text-align: right; }
+.vas_104-qcTable .vas_104-ta-c { text-align: center; }
+
+/* An inspected value that matched what was asked for, and one that did not. */
+.vas_104-qcHit  { color: var(--gc-success-tx); font-weight: 700; }
+.vas_104-qcMiss { color: var(--gc-risk-tx);    font-weight: 700; }
 
 /* Status / QC tags */
-.MPC-vasgc-tag {
+.vas_104-tag {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
@@ -423,14 +570,14 @@
     line-height: 1.3;
     white-space: nowrap;
 }
-.MPC-vasgc-tag.s-cleared { background: var(--gc-success-bg); color: var(--gc-success-tx); }
-.MPC-vasgc-tag.s-partial { background: var(--gc-info-bg);    color: var(--gc-info-tx); }
-.MPC-vasgc-tag.s-hold    { background: var(--gc-warning-bg); color: var(--gc-warning-tx); }
-.MPC-vasgc-tag.s-pending { background: var(--gc-neutral-bg); color: var(--gc-neutral-tx); }
-.MPC-vasgc-tag.s-pass    { background: var(--gc-success-bg); color: var(--gc-success-tx); }
-.MPC-vasgc-tag.s-fail    { background: var(--gc-risk-bg);    color: var(--gc-risk-tx); }
+.vas_104-tag.vas_104-s-cleared { background: var(--gc-success-bg); color: var(--gc-success-tx); }
+.vas_104-tag.vas_104-s-partial { background: var(--gc-info-bg);    color: var(--gc-info-tx); }
+.vas_104-tag.vas_104-s-hold    { background: var(--gc-warning-bg); color: var(--gc-warning-tx); }
+.vas_104-tag.vas_104-s-pending { background: var(--gc-neutral-bg); color: var(--gc-neutral-tx); }
+.vas_104-tag.vas_104-s-pass    { background: var(--gc-success-bg); color: var(--gc-success-tx); }
+.vas_104-tag.vas_104-s-fail    { background: var(--gc-risk-bg);    color: var(--gc-risk-tx); }
 
-.MPC-vasgc-tEmpty {
+.vas_104-tEmpty {
     padding: 1.25em 0.875em;
     text-align: center;
     font-size: 0.8125em;
@@ -439,7 +586,7 @@
 }
 
 /* Totals footer */
-.MPC-vasgc-tFoot {
+.vas_104-tFoot {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -450,71 +597,194 @@
     border-top: 1px solid var(--gc-card-bd);
     font-size: 0.8125em;
 }
-.MPC-vasgc-tf { color: var(--gc-muted); }
-.MPC-vasgc-tf b { color: var(--gc-text); font-weight: 700; margin-left: 0.375em; }
-.MPC-vasgc-tf.is-grand { color: var(--gc-text); font-weight: 700; }
-.MPC-vasgc-tf.is-grand b { color: var(--gc-risk-tx); margin-left: 0.375em; }
+.vas_104-tf { color: var(--gc-muted); }
+.vas_104-tf b { color: var(--gc-text); font-weight: 700; margin-left: 0.375em; }
+.vas_104-tf.vas_104-is-grand { color: var(--gc-text); font-weight: 700; }
+.vas_104-tf.vas_104-is-grand b { color: var(--gc-risk-tx); margin-left: 0.375em; }
 
-@container (max-width: 760px) {
-    .MPC-vasgc-table { overflow-x: auto; }
-    .MPC-vasgc-tRow,
-    .MPC-vasgc-root.no-quality .MPC-vasgc-tRow { min-width: 760px; }
+@container (max-width: 700px) {
+    .vas_104-table { overflow-x: auto; }
+    .vas_104-tRow,
+    .vas_104-root.vas_104-no-quality .vas_104-tRow { min-width: 700px; }
+    /* The drawer travels with the rows it belongs to when the table scrolls. */
+    .vas_104-qcDrawer { min-width: 700px; }
 }
 
 /* ----------------------------------------------------------- */
-/*  Actions (visual buttons)                                    */
+/*  Notes + Activity                                            */
 /* ----------------------------------------------------------- */
-.MPC-vasgc-actions {
+/* The action bar (.vas_104-actions / .vas_104-btn) is gone with the Print and
+   Confirm buttons it held; both were presentational and neither did anything. */
+
+.vas_104-panelcard {
+    border: 1px solid var(--gc-card-bd);
+    border-radius: var(--gc-card-radius);
+    background: #fff;
+    padding: 0.25em 1em;
+}
+
+/* ---- Notes ---- */
+.vas_104-noteRow {
     display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 0.625em;
-    padding-top: 0.125em;
+    padding: 0.5625em 0;
+}
+.vas_104-noteRow + .vas_104-noteRow { border-top: 1px solid var(--gc-row-div); }
+.vas_104-noteTag {
+    flex: none;
+    border-radius: 999px;
+    padding: 0.125em 0.5em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+}
+.vas_104-noteTag.vas_104-n-header { background: var(--gc-info-bg);    color: var(--gc-info-tx); }
+.vas_104-noteTag.vas_104-n-line   { background: var(--gc-neutral-bg); color: var(--gc-neutral-tx); }
+.vas_104-noteTxt {
+    min-width: 0;
+    font-size: 0.8125em;
+    line-height: 1.5;
+    color: var(--gc-text);
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
-.MPC-vasgc-btn {
+/* ---- Activity ---- */
+.vas_104-actRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625em;
+    padding: 0.5625em 0;
+}
+.vas_104-actRow + .vas_104-actRow { border-top: 1px solid var(--gc-row-div); }
+
+.vas_104-actBadge {
+    flex: none;
     display: inline-flex;
     align-items: center;
-    gap: 0.4375em;
-    height: 2.25em;
-    padding: 0 1.125em;
-    border-radius: 999px;
-    font-size: 0.8125em;
+    gap: 0.3125em;
+    border-radius: 8px;
+    padding: 0.25em 0.5em;
+    font-size: 0.6875em;
     font-weight: 700;
-    line-height: 1;
-    cursor: pointer;
-    user-select: none;
 }
-.MPC-vasgc-btn .MPC-vasgc-ic { color: currentColor; }
+.vas_104-actBadge .vas_104-ic svg { width: 0.85em; height: 0.85em; }
+.vas_104-actBadge.vas_104-tone-info    { background: var(--gc-info-bg);    color: var(--gc-info-tx); }
+.vas_104-actBadge.vas_104-tone-success { background: var(--gc-success-bg); color: var(--gc-success-tx); }
+.vas_104-actBadge.vas_104-tone-neutral { background: var(--gc-neutral-bg); color: var(--gc-neutral-tx); }
 
-.MPC-vasgc-btn.btn-pri {
-    background: var(--gc-action);
-    border: 1px solid var(--gc-action);
+/* Headline left, "when · by whom" right, wrapping when the two cannot share a
+   line. margin-left:auto keeps the stamp right-aligned even when it wraps onto
+   a line of its own. */
+.vas_104-actMain {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.125em 0.75em;
+    align-items: baseline;
+}
+.vas_104-actTitle { min-width: 0; font-size: 0.8125em; color: var(--gc-text); }
+/* A NOTE's headline is the comment itself: it wraps (to three lines) rather
+   than running off the row, since that text is what the reader came for. */
+.vas_104-actTitle.vas_104-multiline {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.vas_104-actWhen {
+    flex: none;
+    margin-left: auto;
+    max-width: 100%;
+    font-size: 0.6875em;
+    color: var(--gc-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ----------------------------------------------------------- */
+/*  Toast (source-document link failure)                        */
+/* ----------------------------------------------------------- */
+.vas_104-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 1.25em;
+    transform: translate(-50%, 0.75em);
+    z-index: 1000;
+    max-width: 90%;
+    padding: 0.5em 0.875em;
+    border-radius: 8px;
+    font-size: 0.8125em;
     color: #fff;
-}
-.MPC-vasgc-btn.btn-pri:hover { background: var(--gc-action-dk); border-color: var(--gc-action-dk); }
-
-.MPC-vasgc-btn.btn-sec {
-    background: #fff;
-    border: 1px solid var(--gc-action);
-    color: var(--gc-action);
-}
-.MPC-vasgc-btn.btn-sec:hover { background: var(--gc-info-bg); }
-
-.MPC-vasgc-btn.is-disabled {
-    background: #F1F4F7;
-    border-color: #DCE5EE;
-    color: #A6B2BD;
-    cursor: default;
+    opacity: 0;
+    transition: opacity .25s ease, transform .25s ease;
     pointer-events: none;
 }
+.vas_104-toast.vas_104-ok  { background: var(--gc-success-tx); }
+.vas_104-toast.vas_104-err { background: var(--gc-risk-tx); }
+.vas_104-toast.vas_104-show { opacity: 1; transform: translate(-50%, 0); }
 
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
-[dir="rtl"] .MPC-vasgc-hdrColL { border-right: none; border-left: 1px solid var(--gc-row-div); padding-right: 0; padding-left: 1.25em; }
-[dir="rtl"] .MPC-vasgc-table .ta-r { text-align: left; justify-content: flex-start; }
-[dir="rtl"] .MPC-vasgc-tFoot { justify-content: flex-start; }
-[dir="rtl"] .MPC-vasgc-tf b { margin-left: 0; margin-right: 0.375em; }
-[dir="rtl"] .MPC-vasgc-actions { justify-content: flex-start; }
+[dir="rtl"] .vas_104-hdrColL { border-right: none; border-left: 1px solid var(--gc-row-div); padding-right: 0; padding-left: 1.25em; }
+[dir="rtl"] .vas_104-table .vas_104-ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_104-tFoot { justify-content: flex-start; }
+[dir="rtl"] .vas_104-tf b { margin-left: 0; margin-right: 0.375em; }
+/* The stacked scrapped cell and the quality drawer mirror with the table. */
+[dir="rtl"] .vas_104-scrapCell { align-items: flex-start; }
+[dir="rtl"] .vas_104-qcDrawer { padding-left: 0.875em; padding-right: 1.75em; }
+[dir="rtl"] .vas_104-qcTable .vas_104-ta-r { text-align: left; }
+[dir="rtl"] .vas_104-actWhen { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .vas_104-pgBtn .vas_104-ic svg { transform: scaleX(-1); }
+
+/* ----------------------------------------------------------- */
+/*  Activity pager                                              */
+/* ----------------------------------------------------------- */
+/* A sibling of the list card, so the controls keep their place while the card's
+   rows are replaced underneath them. Modelled on the VAS_106 pager. */
+.vas_104-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5em 0.75em;
+    margin-top: 0.5em;
+    font-size: 0.75em;
+    color: var(--gc-muted);
+}
+
+.vas_104-pgCtrls { display: inline-flex; align-items: center; gap: 0.5em; }
+.vas_104-pgPos   { color: var(--gc-text); font-weight: 700; }
+
+.vas_104-pgBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border: 1px solid var(--gc-card-bd);
+    border-radius: 999px;
+    background: #fff;
+    padding: 0.3125em 0.75em;
+    color: var(--gc-action);
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.vas_104-pgBtn:hover { background: var(--gc-info-bg); border-color: var(--gc-action); }
+.vas_104-pgBtn .vas_104-ic { color: currentColor; }
+.vas_104-pgBtn.vas_104-is-disabled {
+    opacity: .45;
+    cursor: default;
+    pointer-events: none;
+    color: var(--gc-muted);
+}

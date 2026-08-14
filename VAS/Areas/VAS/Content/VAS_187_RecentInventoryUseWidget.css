@@ -1,0 +1,280 @@
+/* VAS_187_RecentInventoryUseWidget Stylesheet (4x2 Recent List Widget) */
+
+.vas-riu-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas-riu-root,
+    .vas-riu-root * {
+        box-sizing: border-box;
+    }
+
+.vas-riu-card {
+    font-family: Roboto, Arial, sans-serif;
+    /* Container-query scaling first (cqi resolves against the root, which sets
+       container-type: inline-size), with the JS-driven --widget-inline-size as the
+       fallback for engines without container queries. Same scale in both: 4cqi == 0.04. */
+    font-size: clamp(15px, 4cqi, 24px);
+    font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: left;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    backdrop-filter: blur(10px);
+    padding: .875em;
+    overflow: hidden;
+}
+
+/* Header & Filter */
+.vas-riu-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    flex: 0 0 auto;
+    margin-bottom: .4em;
+}
+
+.vas-riu-head-left {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    min-width: 0;
+}
+
+.vas-riu-ico {
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+    .vas-riu-ico svg {
+        width: 1.15em;
+        height: 1.15em;
+    }
+
+.vas-riu-title {
+    font-size: .85em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-riu-sub {
+    font-size: .6875em;
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.2;
+}
+
+.vas-riu-select {
+    font-family: inherit;
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    background: #fff;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    padding: .3em .5em;
+    outline: none;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+/* Document Row Items */
+.vas-riu-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+}
+
+.vas-riu-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    /* Rows share the body height evenly and may shrink (flex: 1 1 0 + min-height: 0).
+       Previously there was NO flex property here, so rows defaulted to flex: 0 1 auto and kept
+       their natural two-line height while pageSize is hard-coded to 4. Whenever 4 natural rows
+       were taller than the body, the surplus rows were pushed past the bottom edge and clipped by
+       overflow:hidden on .vas-riu-body - the pager promised 4 rows but fewer were visible.
+       min-height: 0 is what actually permits the shrink; without it a flex item refuses to go
+       below its content height and the overflow returns. Same fix as .vas-mcw-row (VAS_183). */
+    flex: 1 1 0;
+    min-height: 0;
+    padding: .4em 0;
+    border-bottom: 1px solid #E2EAF1;
+    border-top: 0;
+    border-left: 0;
+    border-right: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: background 150ms ease;
+}
+
+    .vas-riu-row:last-child {
+        border-bottom: 0;
+    }
+
+    .vas-riu-row:hover {
+        background: rgba(234, 248, 255, 0.6);
+    }
+
+.vas-riu-row-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-riu-doc-head {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+}
+
+.vas-riu-doc-no {
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-riu-badge {
+    font-size: .625em;
+    font-weight: 700;
+    padding: .15em .45em;
+    border-radius: 999px;
+    text-transform: uppercase;
+}
+
+    .vas-riu-badge.co {
+        background: #EAF8F0;
+        color: #2E7D32;
+    }
+
+    .vas-riu-badge.dr {
+        background: #F1F4F8;
+        color: #5F7283;
+    }
+
+    .vas-riu-badge.ip {
+        background: #FFF8E1;
+        color: #D78B10;
+    }
+
+.vas-riu-doc-meta {
+    font-size: .6875em;
+    color: #5F7283;
+    margin-top: .15em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-riu-row-right {
+    text-align: right;
+    flex: 0 0 auto;
+}
+
+.vas-riu-lines-qty {
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-riu-val {
+    font-size: .6875em;
+    color: #748494;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Footer Pager */
+.vas-riu-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #EDF2F6;
+    padding-top: .4em;
+    margin-top: .25em;
+    flex: 0 0 auto;
+}
+
+.vas-riu-foot-helper {
+    font-size: .75em;
+    color: #748494;
+}
+
+.vas-riu-pager {
+    display: flex;
+    align-items: center;
+    gap: .4em;
+    font-size: .8125em;
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas-riu-pager-btn {
+    width: 24px;
+    height: 24px;
+    border: 1px solid #D9E2EB;
+    border-radius: 6px;
+    background: #fff;
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+    .vas-riu-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-riu-empty {
+    padding: 2em 1em;
+    text-align: center;
+    color: #5F7283;
+    font-size: .75em;
+}
+
+.vas-riu-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .62);
+    border-radius: 14px;
+    z-index: 5;
+}
+
+.vas-riu-hidden {
+    display: none !important;
+}
+
+/* NOTE: a duplicated, unscoped ".vas-modal-*" block used to live here (and in five sibling
+   widget stylesheets). It was dead code - no JavaScript referenced those class names, this
+   widget uses its own scoped modal classes - and it carried hardcoded px font sizes with
+   !important, which breaks the Universal Dynamic Responsive System rule. Removed 2026-08-12. */

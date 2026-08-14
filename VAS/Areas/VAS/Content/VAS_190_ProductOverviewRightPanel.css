@@ -1,0 +1,576 @@
+/************************************************************
+ * Module Name    : VAS
+ * Purpose        : Styles for the Product Overview right tab panel
+ *                  (VAS.VAS_190_ProductOverviewRightPanel). All classes are
+ *                  panel-prefixed (vas_190-) and scoped under .vas_190-root so
+ *                  they cannot collide with another panel's or repaint a
+ *                  base-theme selector.
+ *
+ *                  Sizing follows the approved prototype: the panel body is the
+ *                  measuring anchor (container-type + a clamped font-size) and
+ *                  every internal size, padding, margin and gap is expressed in
+ *                  em against it. Borders, dividers, radii and the timeline dot
+ *                  stay in px so they do not scale with the text.
+ *
+ *                  The panel SHELL — width, collapse strip, header, close
+ *                  button — belongs to the VIS tab-panel host and is deliberately
+ *                  not styled here.
+ * Chronological development:
+ *   VAI163   2026-08-10  Created.
+ ***********************************************************/
+
+.vas_190-root {
+    /* Canonical palette */
+    --p190-text:        #102C3F;
+    --p190-secondary:   #41576A;
+    --p190-muted:       #5F7283;
+    --p190-divider:     #E2EAF1;
+    --p190-card-bd:     #D9E2EB;
+    --p190-action:      #0083DA;
+    --p190-disabled:    #9AB0C0;
+
+    --p190-info-bg:     #EAF8FF;  --p190-info-tx:    #0083DA;
+    --p190-ok-bg:       #E7F7EF;  --p190-ok-tx:      #0B6B45;
+    --p190-warn-bg:     #FFF6E2;  --p190-warn-tx:    #9A6500;
+    --p190-crit-bg:     #FCEFEF;  --p190-crit-tx:    #A33F3F;
+    --p190-purple-bg:   #EFEEFF;  --p190-purple-tx:  #5F4AA6;
+    --p190-neutral-bg:  #F1F4F8;  --p190-neutral-tx: #41576A;
+
+    --p190-radius-card: 12px;
+    --p190-radius-hero: 14px;
+
+    position: relative;
+    height: 100%;
+    background: #FFFFFF;
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    color: var(--p190-text);
+}
+
+/* The measuring anchor. Everything inside is em against this. */
+.vas_190-body {
+    container-type: inline-size;
+    font-size: clamp(16px, 1vw, 18px);
+    height: 100%;
+    overflow: auto;
+    overflow-x: hidden;
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+    background: #FFFFFF;
+}
+
+.vas_190-empty {
+    padding: 2em 1em;
+    text-align: center;
+    font-size: 0.875em;
+    color: var(--p190-muted);
+}
+
+/* ----------------------------------------------------------- */
+/*  Section header                                              */
+/* ----------------------------------------------------------- */
+.vas_190-sec { min-width: 0; }
+
+.vas_190-secHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin: 0.5em 0;
+    padding-bottom: 0.375em;
+    border-bottom: 1px solid var(--p190-divider);
+}
+/* The first section sits flush with the top of the body. */
+.vas_190-body > .vas_190-sec:first-child .vas_190-secHead { margin-top: 0; }
+
+.vas_190-secTitle {
+    font-weight: 700;
+    font-size: 1em;
+    color: var(--p190-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-secSum {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ----------------------------------------------------------- */
+/*  Chips                                                       */
+/* ----------------------------------------------------------- */
+.vas_190-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-weight: 700;
+    font-size: 0.6875em;
+    line-height: 1;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.vas_190-chip.vas_190-tone-info    { background: var(--p190-info-bg);    color: var(--p190-info-tx); }
+.vas_190-chip.vas_190-tone-ok      { background: var(--p190-ok-bg);      color: var(--p190-ok-tx); }
+.vas_190-chip.vas_190-tone-warn    { background: var(--p190-warn-bg);    color: var(--p190-warn-tx); }
+.vas_190-chip.vas_190-tone-crit    { background: var(--p190-crit-bg);    color: var(--p190-crit-tx); }
+.vas_190-chip.vas_190-tone-purple  { background: var(--p190-purple-bg);  color: var(--p190-purple-tx); }
+.vas_190-chip.vas_190-tone-neutral { background: var(--p190-neutral-bg); color: var(--p190-neutral-tx); font-weight: 500; }
+/* On the tinted hero the chip carries a white ground so it stays legible. */
+.vas_190-chip.vas_190-onTint { background: #FFFFFF; }
+
+/* ----------------------------------------------------------- */
+/*  Hero (product summary)                                      */
+/* ----------------------------------------------------------- */
+.vas_190-hero {
+    border-radius: var(--p190-radius-hero);
+    padding: 0.75em 0.875em;
+    border: 1px solid #CFE0ED;
+    background: linear-gradient(180deg, #EEF8FF 0%, #F7FBFF 100%);
+}
+.vas_190-hero.vas_190-tone-warn {
+    border-color: #EBD7A6;
+    background: linear-gradient(180deg, #FFF8E8 0%, #FBFAF3 100%);
+}
+.vas_190-hero.vas_190-tone-risk {
+    border-color: #EDC8C8;
+    background: linear-gradient(180deg, #FCEFEF 0%, #FBF7F7 100%);
+}
+
+.vas_190-heroTop { display: flex; align-items: flex-start; gap: 0.75em; }
+
+.vas_190-imgBox {
+    flex-shrink: 0;
+    width: 3.5em;
+    height: 3.5em;
+    border-radius: var(--p190-radius-card);
+    border: 1px solid #CFE0ED;
+    background: #FFFFFF;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.vas_190-imgBox img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* No stored image: a dashed placeholder rather than an empty white square. */
+.vas_190-imgBox.vas_190-imgEmpty { border-style: dashed; color: var(--p190-disabled); }
+.vas_190-imgBox.vas_190-imgEmpty .vas_190-ic svg { width: 1.5em; height: 1.5em; }
+
+.vas_190-heroId { min-width: 0; flex: 1; }
+.vas_190-heroName {
+    font-weight: 700;
+    font-size: 1.125em;
+    color: var(--p190-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-heroSub {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-secondary);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_190-statusLine { margin-top: 0.5em; font-weight: 700; font-size: 0.75em; }
+.vas_190-statusLine.vas_190-lineRisk { color: var(--p190-crit-tx); }
+.vas_190-statusLine.vas_190-lineWarn { color: var(--p190-warn-tx); }
+
+.vas_190-heroGrid {
+    margin-top: 0.75em;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 0.875em;
+    row-gap: 0.375em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Metric cells and detail cards                               */
+/* ----------------------------------------------------------- */
+.vas_190-mcell { min-width: 0; }
+.vas_190-mLabel { font-weight: 400; font-size: 0.6875em; color: var(--p190-muted); }
+.vas_190-mVal {
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: var(--p190-text);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-mMeta {
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: var(--p190-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A bordered white card is reserved for the hero, the detail cards and the
+   timeline entries — lists sit flat on the panel. */
+.vas_190-detailCard {
+    border-radius: var(--p190-radius-card);
+    border: 1px solid var(--p190-card-bd);
+    background: #FFFFFF;
+    padding: 0.875em;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 0.875em;
+    row-gap: 0.625em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Compact list                                                */
+/* ----------------------------------------------------------- */
+.vas_190-clist { min-width: 0; }
+
+.vas_190-clRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 0.625em 0.75em;
+    border-bottom: 1px solid var(--p190-divider);
+}
+.vas_190-clRow:last-child { border-bottom: none; }
+
+/* A row that navigates is focusable and says so on hover. */
+.vas_190-clRow.vas_190-clickable { cursor: pointer; border-radius: 8px; }
+.vas_190-clRow.vas_190-clickable:hover { background: #F7FBFF; }
+.vas_190-clRow.vas_190-clickable:focus-visible {
+    outline: 2px solid var(--p190-action);
+    outline-offset: -2px;
+}
+
+.vas_190-clLhs { min-width: 0; }
+.vas_190-clP {
+    font-weight: 700;
+    font-size: 0.75em;
+    color: var(--p190-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-clP .vas_190-soft { font-weight: 400; color: var(--p190-muted); }
+.vas_190-clM {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-secondary);
+    margin-top: 0.1875em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_190-clRhs { flex-shrink: 0; display: flex; align-items: center; gap: 0.625em; }
+.vas_190-clVal {
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: var(--p190-text);
+    text-align: right;
+    white-space: nowrap;
+}
+.vas_190-clSub {
+    display: block;
+    font-weight: 400;
+    font-size: 0.8461em;
+    color: var(--p190-muted);
+    margin-top: 0.15em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Entity list (BOMs)                                          */
+/* ----------------------------------------------------------- */
+.vas_190-elist { min-width: 0; }
+
+.vas_190-eRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 0.625em 0;
+    border-bottom: 1px solid var(--p190-divider);
+}
+.vas_190-eRow:last-child { border-bottom: none; }
+
+.vas_190-tile {
+    flex-shrink: 0;
+    width: 2.25em;
+    height: 2.25em;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--p190-info-bg);
+    color: var(--p190-action);
+}
+.vas_190-tile .vas_190-ic svg { width: 1.25em; height: 1.25em; }
+
+.vas_190-eId { min-width: 0; flex: 1; }
+.vas_190-eTitleRow { display: flex; align-items: center; gap: 0.5em; flex-wrap: wrap; min-width: 0; }
+.vas_190-eP {
+    font-weight: 700;
+    font-size: 0.875em;
+    color: var(--p190-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-eM {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-muted);
+    margin-top: 0.1875em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-eVal { flex-shrink: 0; text-align: right; }
+.vas_190-eV { font-weight: 700; font-size: 0.9375em; color: var(--p190-text); white-space: nowrap; }
+.vas_190-eS { font-weight: 400; font-size: 0.75em; color: var(--p190-muted); white-space: nowrap; }
+
+/* ----------------------------------------------------------- */
+/*  Data grid (stock details, transactions)                     */
+/* ----------------------------------------------------------- */
+/* A leading icon column then the named columns. Every track is minmax(0, Nfr):
+   a bare Nfr cannot shrink below its content, so one long warehouse name would
+   push the row wider than the panel and clip the right-hand columns away. */
+.vas_190-grid { width: 100%; min-width: 0; }
+
+.vas_190-gHead,
+.vas_190-gRow {
+    display: grid;
+    align-items: center;
+    column-gap: 0.5em;
+}
+.vas_190-colsStock .vas_190-gHead,
+.vas_190-colsStock .vas_190-gRow {
+    grid-template-columns: 1.75em minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.7fr);
+}
+/* The Document cell carries the document TYPE name in front of the number, so
+   it needs more of the row than the other three columns put together. */
+.vas_190-colsTx .vas_190-gHead,
+.vas_190-colsTx .vas_190-gRow {
+    grid-template-columns: 1.75em minmax(0, 2fr) minmax(0, 0.9fr) minmax(0, 0.6fr) minmax(0, 0.9fr);
+}
+
+.vas_190-gHead { padding: 0 0 0.375em; border-bottom: 1px solid var(--p190-card-bd); }
+.vas_190-gHead > span {
+    font-weight: 500;
+    font-size: 0.6875em;
+    color: var(--p190-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas_190-gRow { padding: 0.625em 0; border-bottom: 1px solid var(--p190-divider); }
+.vas_190-gRow:last-child { border-bottom: none; }
+.vas_190-gRow > span {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-secondary);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-gRow > span.vas_190-gId { font-weight: 700; color: var(--p190-text); }
+
+/* A grid row that opens its document. The whole row is the target — the cell
+   is coloured as the affordance so it reads as a link without nesting an
+   anchor inside a row that is itself a button. */
+.vas_190-gRow.vas_190-clickable { cursor: pointer; }
+.vas_190-gRow.vas_190-clickable:hover { background: #F7FBFF; }
+.vas_190-gRow.vas_190-clickable:focus-visible {
+    outline: 2px solid var(--p190-action);
+    outline-offset: -2px;
+}
+.vas_190-gRow > span.vas_190-gLink { color: var(--p190-action); }
+.vas_190-gRow.vas_190-clickable:hover > span.vas_190-gLink { text-decoration: underline; }
+
+/* Numeric columns line up digit for digit rather than drifting with
+   proportional glyph widths. */
+.vas_190-grid .vas_190-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.vas_190-gIcon { display: flex; align-items: center; justify-content: center; }
+.vas_190-gIcon .vas_190-ic svg { width: 1em; height: 1em; }
+.vas_190-ic-ok     { color: var(--p190-ok-tx); }
+.vas_190-ic-info   { color: var(--p190-action); }
+.vas_190-ic-warn   { color: var(--p190-warn-tx); }
+.vas_190-ic-purple { color: var(--p190-purple-tx); }
+
+/* ----------------------------------------------------------- */
+/*  Section pager                                               */
+/* ----------------------------------------------------------- */
+/* Centred beneath the section content. Never an inner scrollbar: the panel body
+   owns scrolling, and a section that paginates does not grow its own. */
+.vas_190-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    padding-top: 0.5em;
+}
+.vas_190-pgBtn {
+    width: 1.5em;
+    height: 1.5em;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--p190-action);
+    cursor: pointer;
+    padding: 0;
+}
+.vas_190-pgBtn:hover:not(:disabled) { background: #EEF8FF; }
+.vas_190-pgBtn:disabled { color: var(--p190-disabled); cursor: not-allowed; background: none; }
+.vas_190-pgBtn:focus-visible { outline: 2px solid var(--p190-action); outline-offset: 1px; }
+.vas_190-pgBtn .vas_190-ic svg { width: 0.875em; height: 0.875em; }
+.vas_190-pgText { font-weight: 400; font-size: 0.6875em; color: var(--p190-muted); }
+
+/* ----------------------------------------------------------- */
+/*  Activity timeline                                           */
+/* ----------------------------------------------------------- */
+.vas_190-timeline { display: flex; flex-direction: column; gap: 0.75em; }
+
+.vas_190-tlEntry { display: flex; align-items: flex-start; gap: 0.75em; }
+
+.vas_190-tlRail {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    align-self: stretch;
+}
+.vas_190-tlDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #1F83FF;
+    margin-top: 0.375em;
+}
+.vas_190-tlTrail {
+    margin-top: 0.25em;
+    flex: 1;
+    min-height: 2.5em;
+    width: 1px;
+    background: #D9E6F2;
+}
+/* The trail connects entries; the last one has nothing to connect to. */
+.vas_190-tlEntry:last-child .vas_190-tlTrail { display: none; }
+
+.vas_190-tlCard {
+    min-width: 0;
+    flex: 1;
+    border-radius: var(--p190-radius-card);
+    border: 1px solid var(--p190-card-bd);
+    background: #FFFFFF;
+    padding: 0.625em 0.75em;
+}
+.vas_190-tlCard.vas_190-clickable { cursor: pointer; transition: border-color .12s; }
+.vas_190-tlCard.vas_190-clickable:hover { border-color: var(--p190-action); }
+.vas_190-tlCard.vas_190-clickable:focus-visible {
+    outline: 2px solid var(--p190-action);
+    outline-offset: 1px;
+}
+
+.vas_190-tlTop { display: flex; align-items: center; justify-content: space-between; gap: 0.5em; }
+.vas_190-tlTitle {
+    font-weight: 700;
+    font-size: 0.875em;
+    color: var(--p190-text);
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-tlTitle > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas_190-tlTitle .vas_190-ic { flex-shrink: 0; }
+.vas_190-tlTitle .vas_190-ic svg { width: 0.875em; height: 0.875em; color: var(--p190-action); }
+.vas_190-tlTitle .vas_190-chev { color: var(--p190-muted); transition: transform .15s; }
+.vas_190-tlCard.vas_190-is-open .vas_190-chev { transform: rotate(180deg); }
+
+.vas_190-tlMeta {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-muted);
+    margin-top: 0.375em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- */
+/*  Inline mail expansion                                       */
+/* ----------------------------------------------------------- */
+.vas_190-mailInline {
+    display: none;
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--p190-divider);
+}
+.vas_190-tlCard.vas_190-is-open .vas_190-mailInline { display: block; }
+
+.vas_190-mailSub { font-weight: 700; font-size: 0.8125em; color: var(--p190-text); }
+.vas_190-mailMeta { margin-top: 0.5em; display: flex; flex-direction: column; gap: 0.1875em; }
+.vas_190-mailRow { display: flex; gap: 0.5em; font-size: 0.6875em; }
+.vas_190-mailK { flex-shrink: 0; width: 2.6em; font-weight: 500; color: var(--p190-muted); }
+.vas_190-mailV { font-weight: 400; color: var(--p190-secondary); word-break: break-word; min-width: 0; }
+
+/* The body keeps the line breaks the message was written with. */
+.vas_190-mailBody {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--p190-divider);
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--p190-secondary);
+    line-height: 1.6;
+    white-space: pre-line;
+    word-break: break-word;
+}
+
+/* ----------------------------------------------------------- */
+/*  Icons                                                       */
+/* ----------------------------------------------------------- */
+.vas_190-ic { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.vas_190-ic svg { width: 1em; height: 1em; display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Narrow panel                                                */
+/* ----------------------------------------------------------- */
+/* Two metric columns are too cramped below this — a single stack keeps the
+   values readable instead of ellipsising every one of them. */
+@container (max-width: 320px) {
+    .vas_190-heroGrid,
+    .vas_190-detailCard { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .vas_190-clVal,
+[dir="rtl"] .vas_190-eVal { text-align: left; }
+[dir="rtl"] .vas_190-grid .vas_190-num { text-align: left; }
+[dir="rtl"] .vas_190-pgBtn .vas_190-ic svg { transform: scaleX(-1); }
+[dir="rtl"] .vas_190-tlTitle .vas_190-chev { transform: none; }
+[dir="rtl"] .vas_190-tlCard.vas_190-is-open .vas_190-chev { transform: rotate(180deg); }

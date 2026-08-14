@@ -1,10 +1,15 @@
 /* ─────────────────────────────────────────────────────────────────────────
- * VAS_121 New Customer — 1x1 dashed quick-action tile (Customers dashboard).
- * Design: new-customer.html (attached) + Design Specs/dashboard-widgets.md
- * "Quick Action Widget". Pale-blue glass surface, 2px dashed #9ED1FF border,
- * centred blue "+" well above a bold title + muted subtitle. Internal type /
- * spacing in em against the widget-root font-size; borders / radii / shadows in
- * px (physical edges). All classes carry the module MPC prefix (vas121-*).
+ * VAS_121 New Customer — 1x1 quick-action tile (Customers dashboard).
+ * Design: Design Specs/dashboard-widgets.md "Quick Action Widget".
+ * White glass surface, centred blue "+" well above a bold title + muted
+ * subtitle. Internal type / spacing in em against the widget-root font-size;
+ * borders / radii / shadows in px (physical edges). All classes carry the
+ * module MPC prefix (vas121-*).
+ *
+ * 2026-08-06 — Removed the 2px dashed #9ED1FF border and the pale-blue
+ *   (#EAF6FF) fill; surface, shadow, padding and hover now match the other
+ *   quick-action tiles (VAS_CreateARInvoice, VAS_CreateGLJournal), which had
+ *   already moved off the dashed treatment.
  * ───────────────────────────────────────────────────────────────────────── */
 
 .vas121-root {
@@ -19,8 +24,10 @@
         box-sizing: border-box;
     }
 
-/* Dashed quick-action surface — the dashed blue border + blue "+" well mark it
-   as an "add" tile (matches the attached design). */
+/* Quick-action surface. The blue "+" well alone marks it as an "add" tile —
+   the dashed border and pale-blue fill were dropped so this matches the other
+   quick-action widgets (VAS_CreateARInvoice .vas-cai-card, VAS_CreateGLJournal
+   .vas-cgj-card), which render borderless white glass. */
 .vas121-card {
     font-family: Roboto, Arial, sans-serif;
     /* Widget root anchor — one lever; internal em values scale from this. */
@@ -33,18 +40,18 @@
     justify-content: center;
     gap: 0.5em;
     text-align: center;
-    padding: 0.875em;
-    border: 2px dashed #9ED1FF;                 /* px — physical edge */
+    padding: 0.85em;
+    border: none;
     border-radius: 14px;                        /* px */
-    background: linear-gradient(180deg, #EAF6FF 0%, rgba(255, 255, 255, 0.6) 100%);
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.05);
     cursor: pointer;
-    transition: box-shadow 180ms ease, transform 180ms ease;
+    transition: background 180ms ease, box-shadow 180ms ease;
 }
 
     .vas121-card:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 14px 30px rgba(15, 61, 97, 0.13);
+        background: linear-gradient(180deg, #DEEEFC 0%, #F0F7FD 100%);
+        box-shadow: 0 8px 18px rgba(16, 47, 74, 0.08);
     }
 
     .vas121-card:focus-visible {

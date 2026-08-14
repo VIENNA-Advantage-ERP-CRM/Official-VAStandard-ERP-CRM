@@ -124,27 +124,39 @@
 }
 
 .MPC-dor-select {
-    appearance: none;
-    -webkit-appearance: none;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
     font-family: inherit;
     font-weight: 500;
     font-size: 0.75em;
     color: #102C3F;
-    background: rgba(255, 255, 255, 0.9) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230083DA' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 0.4375em center;
-    background-size: 1em 1em;
-    border: 1px solid #E4EDF4;
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: 0.375em 1.625em 0.375em 0.625em;
+    padding: 0.35em 0.75em;
     cursor: pointer;
     line-height: 1.2;
+    text-align: center;
+    text-align-last: center;
+}
+
+.MPC-dor-select.MPC-dor-month {
+    min-width: 7.5em;
+}
+
+.MPC-dor-select.MPC-dor-year {
+    min-width: 5.2em;
 }
 
 .MPC-dor-select:hover {
-    background-color: #EAF4FD;
+    background-color: #EEF8FF;
+    border-color: #0083DA;
 }
 
 .MPC-dor-select:focus-visible {
-    outline: 2px solid #9ED1FF;
+    outline: 2px solid #0083DA;
     outline-offset: 1px;
 }
 
@@ -334,9 +346,7 @@
 }
 
 .MPC-dor-overlay {
-    /* The modal anchors its own font-size (up to 32px) so the whole pop-up scales
-       up like the Delivery Orders / GRN modal; internals below are all em. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
+    font-size: clamp(16px, 1.17vw, 24px);
     position: fixed;
     inset: 0;
     background: rgba(16, 44, 63, 0.35);

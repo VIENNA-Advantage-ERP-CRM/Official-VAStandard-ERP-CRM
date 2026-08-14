@@ -49,7 +49,10 @@ namespace VAS.Controllers
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_135_ActiveProjectsWidgetController).FullName);
 
-        private const int WidgetPageSize = 3;
+        // 2026-08-06: widget page size raised 3 -> 5 so the rows fill the card
+        // instead of leaving its lower half empty. The client always sends an
+        // explicit limit, so this is the fallback default only.
+        private const int WidgetPageSize = 5;
         private const int MaxListPageSize = 25;
 
         /// <summary>
@@ -77,7 +80,7 @@ namespace VAS.Controllers
         /// delayed customers first. Supplies the widget rows plus header totals.
         /// </summary>
         /// <param name="offset">Zero-based paging offset.</param>
-        /// <param name="limit">Page size (3 for the widget, up to 25 for the full list).</param>
+        /// <param name="limit">Page size (5 for the widget, up to 25 for the full list).</param>
         /// <returns>JSON { items:[...], total, customersWithDelays, offset, limit } or { error }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]

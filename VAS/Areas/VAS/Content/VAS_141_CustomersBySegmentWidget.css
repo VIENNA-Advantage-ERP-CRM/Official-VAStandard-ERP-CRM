@@ -63,7 +63,7 @@
     display: grid;
     place-items: center;
     background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
-    border: 1px solid #E8F2FB;                  /* px */
+    border: 1px solid #BFE4FF;                  /* px */
     color: #0083DA;
 }
 
@@ -141,44 +141,77 @@
     justify-content: center;
 }
 
-/* Widget-body pager (5 segments per page), em-sized against the widget root. */
+/* Widget-body pager (5 segments per page), em-sized against the widget root.
+   dashboard-widgets.md §"Widget Footer Pager": result-range helper on the left,
+   compact prev · "N of M" · next control on the right. 2026-08-06: replaced the
+   solid-blue 2.1em circles (which spread the record range between the arrows)
+   with the shared 1.5em/24px rounded-square buttons and 0.875em/14px chevrons
+   from §Pager Buttons. */
 .vas141-wpager {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5em;
+    gap: 1em;
     padding-top: 0.5em;
     margin-top: 0.25em;
     flex-shrink: 0;
 }
 
 .vas141-wpglabel {
+    flex: 1 1 auto;
+    min-width: 0;
     font-size: 0.75em;
     color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas141-wpgctl {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas141-wpgtext {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .vas141-wpgbtn {
-    width: 2.1em;
-    height: 2.1em;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-    border: none;
-    background: #1F83FF;
-    color: #FFFFFF;
+    width: 1.5em;                               /* 24px */
+    height: 1.5em;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 6px;                         /* px */
+    background: #FBFDFF;
+    color: #0083DA;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(31, 131, 255, 0.28);
 }
 
+    .vas141-wpgbtn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
     .vas141-wpgbtn:disabled {
-        background: #C7D6E2;
-        box-shadow: none;
+        color: #B8C6D2;
         cursor: default;
     }
 
     .vas141-wpgbtn svg {
-        width: 1.05em;
-        height: 1.05em;
+        width: 0.875em;                         /* 14px */
+        height: 0.875em;
+        stroke: currentColor;
     }
 
 .vas141-seg-top {
@@ -343,7 +376,7 @@
 }
 
     .vas141-close:hover {
-        background: #F2F6FA;
+        background: #F1F4F8;
     }
 
     .vas141-close svg {
@@ -438,40 +471,73 @@
     background: #FBFDFF;
 }
 
+/* Segment-list modal footer pager — dashboard-widgets.md §"Widget Footer Pager":
+   two zones, the result-range helper on the left and a compact
+   prev · "N of M" · next control on the right. 2026-08-06: replaced the centred
+   solid-blue 34px circles with the shared 24px rounded-square buttons / 14px
+   chevrons from §Pager Buttons. Sizes stay px — this pager is modal chrome. */
 .vas141-pager {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 14px;                                  /* px */
 }
 
 .vas141-pglabel {
-    font-size: 13px;                            /* px */
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 12px;                            /* px */
     color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas141-pgctl {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;                                   /* px */
+    flex-shrink: 0;
+}
+
+.vas141-pgtext {
+    min-width: 48px;                            /* px */
+    text-align: center;
+    font-size: 13px;                            /* px */
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .vas141-pgbtn {
-    width: 34px;
-    height: 34px;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-    border: none;
-    background: #1F83FF;
-    color: #FFFFFF;
+    width: 24px;                                /* px */
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 6px;                         /* px */
+    background: #FBFDFF;
+    color: #0083DA;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(31, 131, 255, 0.28);
 }
 
+    .vas141-pgbtn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
     .vas141-pgbtn:disabled {
-        background: #C7D6E2;
-        box-shadow: none;
+        color: #B8C6D2;
         cursor: default;
     }
 
     .vas141-pgbtn svg {
-        width: 15px;
-        height: 15px;
+        width: 14px;                            /* px */
+        height: 14px;
+        stroke: currentColor;
     }
 
 /* Bulk-assign modal. */
@@ -591,11 +657,11 @@
 }
 
     .vas141-btn-primary:hover {
-        background: #1675E6;
+        background: #1F83FF;
     }
 
     .vas141-btn-primary:disabled {
-        background: #C7D6E2;
+        background: #C5D2DD;
         cursor: default;
     }
 

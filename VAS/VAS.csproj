@@ -175,11 +175,24 @@
     <Compile Include="Areas\VAS\Controllers\VAS_056_AutoAllocatedAPPaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_065_APInvoicePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_189_ARInvoiceDetailPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_178_NewMaterialIssueQuickActionController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_179_OpenMaterialIssuesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_180_IssuedMTDWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_181_ProductionIssuesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_182_SparesConsumablesIssuesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_183_MaterialConsumptionWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_184_HighValueUsageWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_185_InventoryUseTrendWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_186_ProductCategoryUsageWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_187_RecentInventoryUseWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_188_TopUsedProductsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_074_CreateInvoiceLinePanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_107_CreateOrderBottomPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_105_AccountRightPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_106_OverviewSalesOrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_120_CustomerSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_122_TotalCustomersWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_123_QuotationRightPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_124_DelayedPaymentsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_125_OpenPipelineWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_126_OpenTicketsWidgetController.cs" />
@@ -296,8 +309,10 @@
     <Compile Include="Areas\VAS\Controllers\VAS_070_GLJournalSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_072_MatchSuggestionAPPaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_092_OverviewPurchaseOrderController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_167_PurchaseOrderLandedCostController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_098_PurchaseRequisitionController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_099_OverviewGRNController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_190_ProductOverviewRightPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_100_OverviewDOController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_101_OverviewInventoryCountController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_102_OverviewInternalUseController.cs" />
@@ -379,6 +394,14 @@
     <Compile Include="Areas\VAS\Controllers\VAS_090_ReceivingActionsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_091_MaterialReceiptSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_097_ExpectedGRNWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_167_NewTransferQuickActionWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_168_OpenTransfersWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_169_UnderConfirmationWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_170_CompletedTodayWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_171_InitiatedMTDWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_172_PendingTransferConfirmationWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_173_TransfersByWarehouseWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_174_TransferQueueWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_LeadController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_RequestController.cs" />
@@ -394,8 +417,10 @@
     <Content Include="Areas\VAS\Content\VAS_056_AutoAllocatedAPPaymentWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_072_MatchSuggestionAPPayment.css" />
     <Content Include="Areas\VAS\Content\VAS_092_OverviewPurchaseOrder.css" />
+    <Content Include="Areas\VAS\Content\VAS_167_PurchaseOrderLandedCost.css" />
     <Content Include="Areas\VAS\Content\VAS_098_PurchaseRequisition.css" />
     <Content Include="Areas\VAS\Content\VAS_099_OverviewGRN.css" />
+    <Content Include="Areas\VAS\Content\VAS_190_ProductOverviewRightPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_100_OverviewDO.css" />
     <Content Include="Areas\VAS\Content\VAS_101_OverviewInventoryCount.css" />
     <Content Include="Areas\VAS\Content\VAS_102_OverviewInternalUse.css" />
@@ -416,14 +441,27 @@
     <Content Include="Areas\VAS\Content\VAS_137_NeedsAttentionWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_138_DelayedPaymentsListWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_139_HighValuePipelineWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_140_ContractsExpiringWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_141_CustomersBySegmentWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_DocumentSearchWidgets.css" />
-    <Content Include="Areas\VAS\Content\VAS_InvoiceOverview.css" />
-    <Content Include="Areas\VAS\Content\VAS_PaymentVoucherPanel.css" />
+    <Content Include="Areas\VAS\Content\VAS_167_NewTransferQuickActionWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_168_OpenTransfersWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_169_UnderConfirmationWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_170_CompletedTodayWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_171_InitiatedMTDWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_172_PendingTransferConfirmationWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_173_TransfersByWarehouseWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_174_TransferQueueWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_167_NewTransferQuickActionWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_168_OpenTransfersWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_169_UnderConfirmationWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_170_CompletedTodayWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_171_InitiatedMTDWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_172_PendingTransferConfirmationWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_173_TransfersByWarehouseWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_174_TransferQueueWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_092_OverviewPurchaseOrder.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_167_PurchaseOrderLandedCost.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_098_PurchaseRequisition.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_099_OverviewGRN.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_190_ProductOverviewRightPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_100_OverviewDO.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_101_OverviewInventoryCount.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_102_OverviewInternalUse.js" />
@@ -471,6 +509,7 @@
     <Content Include="Areas\VAS\Content\VAS_065_APInvoicePanel.css" />
     <Content Include="Areas\VAS\Content\VAS_189_ARInvoiceDetailPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_074_CreateInvoiceLinePanel.css" />
+    <Content Include="Areas\VAS\Content\VAS_107_CreateOrderBottomPanel.css" />
     <Content Include="Areas\VAS\Content\OutstandingSalesOrderWidget.css" />
     <Content Include="Areas\VAS\Content\OverdueWidget.css" />
     <Content Include="Areas\VAS\Content\PaidthismonthWidget.css" />
@@ -637,6 +676,7 @@
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_065_APInvoicePanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_189_ARInvoiceDetailPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_074_CreateInvoiceLinePanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_107_CreateOrderBottomPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_030_BouncedAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_027_ClearedAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_046_ReconciliationStatusWidget.js" />
@@ -653,6 +693,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\TotalAmountReceivedThisMonthWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\util\CurrencyFormat.js" />
     <Content Include="Areas\VAS\Scripts\app\util\AttributeControl.js" />
+    <Content Include="Areas\VAS\Scripts\app\util\VAS_PanelUtil.js" />
     <Content Include="Areas\VAS\Scripts\app\util\VAS_ZoomUtil.js" />
     <Content Include="Areas\VAS\Scripts\app\util\VAS_OverlayWatch.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AgingReceivablesWidget.js" />
@@ -885,6 +926,14 @@
     <Compile Include="Areas\VAS\Controllers\VAS_164_StockSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_165_LocationWiseInventoryCountWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_166_NewCycleCountWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_167_NewTransferQuickActionWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_168_OpenTransfersWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_169_UnderConfirmationWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_170_CompletedTodayWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_171_InitiatedMTDWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_172_PendingTransferConfirmationWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_173_TransfersByWarehouseWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_174_TransferQueueWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_156_CountedMTDWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_156_CountedMTDWidget.js" />
     <Content Include="Areas\VAS\Content\VAS_157_VarianceLinesWidget.css" />
@@ -906,14 +955,52 @@
     <Content Include="Areas\VAS\Content\VAS_165_LocationWiseInventoryCountWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_165_LocationWiseInventoryCountWidget.js" />
     <Content Include="Areas\VAS\Content\VAS_166_NewCycleCountWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_167_NewTransferQuickActionWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_168_OpenTransfersWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_169_UnderConfirmationWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_170_CompletedTodayWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_171_InitiatedMTDWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_172_PendingTransferConfirmationWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_173_TransfersByWarehouseWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_174_TransferQueueWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_166_NewCycleCountWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_178_NewMaterialIssueQuickAction.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_178_NewMaterialIssueQuickAction.js" />
+    <Content Include="Areas\VAS\Content\VAS_179_OpenMaterialIssuesWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_179_OpenMaterialIssuesWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_180_IssuedMTDWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_180_IssuedMTDWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_181_ProductionIssuesWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_181_ProductionIssuesWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_182_SparesConsumablesIssuesWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_182_SparesConsumablesIssuesWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_183_MaterialConsumptionWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_183_MaterialConsumptionWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_184_HighValueUsageWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_184_HighValueUsageWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_185_InventoryUseTrendWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_185_InventoryUseTrendWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_186_ProductCategoryUsageWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_186_ProductCategoryUsageWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_187_RecentInventoryUseWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_187_RecentInventoryUseWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_188_TopUsedProductsWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_188_TopUsedProductsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_167_NewTransferQuickActionWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_168_OpenTransfersWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_169_UnderConfirmationWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_170_CompletedTodayWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_171_InitiatedMTDWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_172_PendingTransferConfirmationWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_173_TransfersByWarehouseWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_174_TransferQueueWidget.js" />
   </ItemGroup>
   <PropertyGroup>
-    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
   </PropertyGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
-  <Import Project="$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets" Condition="'$(VSToolsPath)' != ''" />
+  <Import Project="$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets" Condition="'$(VSToolsPath)' != '' And Exists('$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets')" />
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v10.0\WebApplications\Microsoft.WebApplication.targets" Condition="false" />
   <Target Name="MvcBuildViews" AfterTargets="AfterBuild" Condition="'$(MvcBuildViews)'=='true'">
     <AspNetCompiler VirtualPath="temp" PhysicalPath="$(WebProjectOutputDir)" />
@@ -922,7 +1009,7 @@
     <VisualStudio>
       <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
         <WebProjectProperties>
-          <UseIIS>True</UseIIS>
+          <UseIIS>False</UseIIS>
           <AutoAssignPort>True</AutoAssignPort>
           <DevelopmentServerPort>50353</DevelopmentServerPort>
           <DevelopmentServerVPath>/</DevelopmentServerVPath>
