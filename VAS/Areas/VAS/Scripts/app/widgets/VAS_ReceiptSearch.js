@@ -301,11 +301,21 @@
             if (filtersOpen()) { positionFilters(); }
         }
 
+        /* Both layers are mounted on <body>, so they outlive the dashboard being hidden - moving to
+           another window would leave them floating over it. The shared watchdog closes them as soon
+           as the pill itself stops being laid out (see VAS_OverlayWatch). */
+        var overlayWatch = VAS.OverlayWatch({
+            anchor: function () { return $input ? $input.closest('.vas-rsw-input')[0] : null; },
+            isOpen: function () { return !!($suggest && $suggest.hasClass('is-open')) || filtersOpen(); },
+            onHidden: function () { closeSuggest(); closeFilters(); }
+        });
+
         function openSuggest() {
             ensureSuggest();
             positionSuggest();
             $suggest.addClass('is-open');
             $input.attr('aria-expanded', 'true');
+            overlayWatch.start();
         }
 
         function closeSuggest() {
@@ -543,6 +553,7 @@
             $filters.find('.vas-rsw-ferror').text('');
             $filters.addClass('is-open');
             positionFilters();
+            overlayWatch.start();
             $filters.find('input[type=date]').first().focus();
         }
 
@@ -892,6 +903,7 @@
                 $self._onReflow = null;
             }
             if (searchTimer) clearTimeout(searchTimer);
+            overlayWatch.stop();
             if ($suggest) { $suggest.remove(); $suggest = null; }
             /* Both body-mounted layers must go with the widget, or they outlive the dashboard cell. */
             if ($filters) { $filters.remove(); $filters = null; }

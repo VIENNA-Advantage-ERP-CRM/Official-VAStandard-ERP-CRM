@@ -399,6 +399,7 @@
             $filters.find('.vas-dssrch-ferror').text('');
             $filters.addClass('vas-dssrch-open');
             positionFilters();
+            overlayWatch.start();
             $filters.find('input[type=date]').first().focus();
         }
 
@@ -682,8 +683,17 @@
             } catch (e) { /* zoom is best-effort */ }
         }
 
+        /* Both layers are mounted on <body>, so they outlive the dashboard being hidden - moving to
+           another window would leave them floating over it. The shared watchdog closes them as soon
+           as the bar itself stops being laid out (see VAS_OverlayWatch). */
+        var overlayWatch = VAS.OverlayWatch({
+            anchor: function () { return $bar ? $bar[0] : null; },
+            isOpen: function () { return $panel.hasClass('vas-dssrch-open') || filtersOpen(); },
+            onHidden: function () { closePanel(); closeFilters(); }
+        });
+
         /* ---- Panel helpers ---- */
-        function openPanel() { positionPanel(); $panel.addClass('vas-dssrch-open'); $bar.addClass('vas-dssrch-bar-focus'); }
+        function openPanel() { positionPanel(); $panel.addClass('vas-dssrch-open'); $bar.addClass('vas-dssrch-bar-focus'); overlayWatch.start(); }
         function closePanel() { $panel.removeClass('vas-dssrch-open'); $bar.removeClass('vas-dssrch-bar-focus'); }
         function positionPanel() {
             if (!$bar || !$bar[0]) { return; }
@@ -786,6 +796,7 @@
 
         this._teardown = function () {
             if (debounceTimer) { window.clearTimeout(debounceTimer); }
+            overlayWatch.stop();
             if ($self._onDocClick) { document.removeEventListener('mousedown', $self._onDocClick, true); }
             if ($self._onReflow) {
                 window.removeEventListener('resize', $self._onReflow, true);

@@ -276,9 +276,19 @@
             if (filtersOpen()) { positionFilters(); }
         }
 
+        /* Both layers are mounted on <body>, so they outlive the dashboard being hidden — moving to
+           another window would leave them floating over it. The shared watchdog closes them as soon
+           as the pill itself stops being laid out (see VAS_OverlayWatch). */
+        var overlayWatch = VAS.OverlayWatch({
+            anchor: function () { return $input ? $input.closest('.vas-sics-input')[0] : null; },
+            isOpen: function () { return !!($suggest && $suggest.hasClass('is-open')) || filtersOpen(); },
+            onHidden: function () { closeSuggest(); closeFilters(); }
+        });
+
         function bindReposition() {
             document.addEventListener('scroll', repositionLayers, true);
             window.addEventListener('resize', repositionLayers);
+            overlayWatch.start();
         }
 
         /* Unbound only once BOTH layers are down — either one still open needs the listener. */
@@ -286,6 +296,7 @@
             if ((($suggest && $suggest.hasClass('is-open'))) || filtersOpen()) { return; }
             document.removeEventListener('scroll', repositionLayers, true);
             window.removeEventListener('resize', repositionLayers);
+            overlayWatch.stop();
         }
 
         function openSuggest() {
@@ -855,6 +866,7 @@
             /* Unconditional: unbindReposition would bail while a layer is still marked open. */
             document.removeEventListener('scroll', repositionLayers, true);
             window.removeEventListener('resize', repositionLayers);
+            overlayWatch.stop();
             if (searchTimer) clearTimeout(searchTimer);
             if ($suggest) { $suggest.remove(); $suggest = null; }
             /* Both body-mounted layers must go with the widget, or they outlive the dashboard cell. */
