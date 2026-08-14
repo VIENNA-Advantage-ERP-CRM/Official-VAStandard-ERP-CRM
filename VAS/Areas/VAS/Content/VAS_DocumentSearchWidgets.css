@@ -633,7 +633,9 @@
     height: 2.375em;
     padding: 0 0.25em !important;
     margin: 0 !important;
-    font-size: 1em;
+    /* Filter fields read one step larger than their captions - 1.2em of the 0.75rem row context.
+       The em height/padding above scale with it, so the field grows as a whole. */
+    font-size: 1.2em;
     color: #102C3F;
     background: transparent !important;
     border: 0 none !important;

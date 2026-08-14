@@ -22,9 +22,51 @@ namespace VIS.Controllers
     /// </summary>
     public class ReceiptsController : Controller
     {
+        /// <summary>
+        /// Parses an ISO (yyyy-MM-dd) date sent by the widget's date-range inputs. Returns null for
+        /// an empty / malformed value, so a bad filter simply does not narrow the search rather than
+        /// failing it. Invariant culture - the HTML date input always posts ISO.
+        /// </summary>
+        private static DateTime? ParseIsoDate(string value)
+        {
+            DateTime parsed;
+            if (!string.IsNullOrEmpty(value) &&
+                DateTime.TryParseExact(value.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+            {
+                return parsed.Date;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Parses an amount bound from the widget's amount range. The client reads those through the
+        /// framework VAmountTextBox, whose getValue() already resolves the user's decimal separator
+        /// and returns a plain number - so the wire format is always invariant ("1234.5").
+        /// </summary>
+        private static decimal? ParseAmount(string value)
+        {
+            decimal parsed;
+            if (!string.IsNullOrEmpty(value) &&
+                decimal.TryParse(value.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out parsed))
+            {
+                return parsed;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Free-text receipt search, optionally NARROWED by the widget's funnel filters:
+        ///   acctFrom/acctTo - Account Date  (C_Payment.DateAcct)
+        ///   bankAccountId   - Bank Account  (C_Payment.C_BankAccount_ID)
+        ///   amtFrom/amtTo   - amount band on ABS(PayAmt), as the free-text amount match uses
+        ///   currencyId      - C_Payment.C_Currency_ID
+        /// A filter on its own is a valid search: q may be empty when at least one filter is set.
+        /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult SearchReceipts(string q, int max = 10, int page = 1)
+        public JsonResult SearchReceipts(string q, int max = 10, int page = 1,
+            string acctFrom = null, string acctTo = null, int bankAccountId = 0,
+            string amtFrom = null, string amtTo = null, int currencyId = 0)
         {
             if (Session["ctx"] == null)
             {
@@ -34,8 +76,28 @@ namespace VIS.Controllers
             Ctx ctx = Session["ctx"] as Ctx;
             int clientId = ctx.GetAD_Client_ID();
 
+            /* Filters. The upper date bound becomes the exclusive start of the following day, so
+               the range stays inclusive of that whole day even when the column carries a time. */
+            DateTime? acctFromDate = ParseIsoDate(acctFrom);
+            DateTime? acctToDate   = ParseIsoDate(acctTo);
+            decimal? amtFromValue  = ParseAmount(amtFrom);
+            decimal? amtToValue    = ParseAmount(amtTo);
+            if (currencyId < 0) { currencyId = 0; }
+            if (bankAccountId < 0) { bankAccountId = 0; }
+            /* 0 in BOTH amount bounds means "no amount filter", not "receipts of exactly zero" -
+               otherwise a zeroed-out pair would silently return nothing. */
+            if (amtFromValue.HasValue && amtToValue.HasValue && amtFromValue.Value == 0m && amtToValue.Value == 0m)
+            {
+                amtFromValue = null;
+                amtToValue   = null;
+            }
+            bool hasFilter = acctFromDate.HasValue || acctToDate.HasValue || bankAccountId > 0
+                             || amtFromValue.HasValue || amtToValue.HasValue || currencyId > 0;
+
             q = (q ?? "").Trim();
-            if (q.Length == 0)
+            /* A filter on its own IS a search; only a bare empty term with no filter is a no-op. */
+            bool hasTerm = q.Length > 0;
+            if (!hasTerm && !hasFilter)
             {
                 return Json(JsonConvert.SerializeObject(new { rows = new List<object>() }), JsonRequestBehavior.AllowGet);
             }
@@ -54,9 +116,67 @@ namespace VIS.Controllers
                clause has its own placeholder fed with the same value, and
                @Max (the FETCH bind) is added last after the SQL is assembled. */
             List<SqlParameter> parameters = new List<SqlParameter>();
-            string likeVal = "%" + q.ToUpper() + "%";
-
             List<string> ors = new List<string>();
+            /* Term predicates are built ONLY when there is a term: on a filter-only search the
+               whole OR block is dropped from the SQL, so binding @Like* / @Amt would leave
+               parameters with no placeholder - fatal under Oracle's positional binding. */
+            if (hasTerm)
+            {
+                BuildTermPredicates(q, parameters, ors);
+            }
+
+            string termSql = ors.Count > 0 ? "\n                  AND (" + string.Join(" OR ", ors) + ")" : "";
+
+            /* Filters AND onto the term match (or stand alone when there is none). Date bounds are
+               half-open (>= from, < to+1day): no TRUNC / date_trunc, so the same SQL runs on
+               Oracle and PostgreSQL. The parameters follow the placeholder order below - and all
+               of them precede @Offset / @Max, which are added last. */
+            string filterSql = "";
+            if (acctFromDate.HasValue)
+            {
+                filterSql += "\n                  AND Payment.DateAcct >= @AcctFrom";
+                parameters.Add(new SqlParameter("@AcctFrom", SqlDbType.DateTime) { Value = acctFromDate.Value });
+            }
+            if (acctToDate.HasValue)
+            {
+                filterSql += "\n                  AND Payment.DateAcct < @AcctToExcl";
+                parameters.Add(new SqlParameter("@AcctToExcl", SqlDbType.DateTime) { Value = acctToDate.Value.AddDays(1) });
+            }
+            if (bankAccountId > 0)
+            {
+                filterSql += "\n                  AND Payment.C_BankAccount_ID = @BankAccountId";
+                parameters.Add(new SqlParameter("@BankAccountId", bankAccountId));
+            }
+            /* Band on ABS(PayAmt) - the receipt's own currency, exactly like the free-text amount
+               match and the amount shown in the row. */
+            if (amtFromValue.HasValue)
+            {
+                filterSql += "\n                  AND ABS(Payment.PayAmt) >= @AmtFrom";
+                parameters.Add(new SqlParameter("@AmtFrom", Math.Abs(amtFromValue.Value)));
+            }
+            if (amtToValue.HasValue)
+            {
+                filterSql += "\n                  AND ABS(Payment.PayAmt) <= @AmtTo";
+                parameters.Add(new SqlParameter("@AmtTo", Math.Abs(amtToValue.Value)));
+            }
+            if (currencyId > 0)
+            {
+                filterSql += "\n                  AND Payment.C_Currency_ID = @CurrencyId";
+                parameters.Add(new SqlParameter("@CurrencyId", currencyId));
+            }
+            return SearchReceiptsCore(ctx, clientId, max, page, termSql + filterSql, parameters);
+        }
+
+        /// <summary>
+        /// The free-text half of the WHERE: document no, customer, bank, bank account, currency,
+        /// linked invoice (direct and via C_PaymentAllocate), document-status / reconciled /
+        /// allocated keywords, and an exact amount when the term parses as a number. Each
+        /// predicate is OR'd - they ADD hits rather than narrowing them. Parameters are appended
+        /// in placeholder order (Oracle binds by position).
+        /// </summary>
+        private static void BuildTermPredicates(string q, List<SqlParameter> parameters, List<string> ors)
+        {
+            string likeVal = "%" + q.ToUpper() + "%";
 
             parameters.Add(new SqlParameter("@LikeDocNo", likeVal));
             ors.Add("UPPER(Payment.DocumentNo) LIKE @LikeDocNo");
@@ -135,7 +255,16 @@ namespace VIS.Controllers
                 parameters.Add(new SqlParameter("@Amt", Math.Abs(amt)));
                 ors.Add("(ABS(Payment.PayAmt) = @Amt OR ABS(Payment.PaymentAmount) = @Amt)");
             }
+        }
 
+        /// <summary>
+        /// Runs the assembled search. <paramref name="whereSql"/> is the already-parameterised
+        /// term + filter tail appended to the inner query's WHERE; <paramref name="parameters"/>
+        /// carries its binds in placeholder order (@Offset / @Max are added here, last).
+        /// </summary>
+        private JsonResult SearchReceiptsCore(Ctx ctx, int clientId, int max, int page,
+            string whereSql, List<SqlParameter> parameters)
+        {
             /* Inner query carries no nested C_Invoice subquery in its SELECT, so
                MRole.AddAccessSQL sees only the main physical FROM (C_Payment /
                alias Payment plus its joined lookup tables). The
@@ -166,8 +295,7 @@ namespace VIS.Controllers
                 LEFT OUTER JOIN C_Invoice Invoice ON (Payment.C_Invoice_ID=Invoice.C_Invoice_ID)
                 WHERE Payment.IsReceipt = 'Y'
                   AND Payment.IsActive = 'Y'
-                  AND Payment.AD_Client_ID = " + clientId + @"
-                  AND (" + string.Join(" OR ", ors) + @")";
+                  AND Payment.AD_Client_ID = " + clientId + whereSql;
 
             /* MRole only on the main physical table (C_Payment / alias Payment). */
             innerSelectSql = MRole.GetDefault(ctx).AddAccessSQL(
