@@ -695,6 +695,7 @@
     <Content Include="Areas\VAS\Scripts\app\util\AttributeControl.js" />
     <Content Include="Areas\VAS\Scripts\app\util\VAS_PanelUtil.js" />
     <Content Include="Areas\VAS\Scripts\app\util\VAS_ZoomUtil.js" />
+    <Content Include="Areas\VAS\Scripts\app\util\VAS_OverlayWatch.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AgingReceivablesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AvgDaysToPayWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\InvoicesWidget.js" />
