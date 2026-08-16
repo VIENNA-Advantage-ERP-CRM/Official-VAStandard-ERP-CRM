@@ -38,7 +38,13 @@
 .vas-opencountsheets-label {
     font-family: 'Roboto', sans-serif;
     font-weight: 400;
-    font-size: clamp(16px, 1.1375cqi, 17px);
+    /* Was clamp(16px, 1.1375cqi, 17px) - the only Inventory Count KPI card using the cqi form.
+       cqi resolves against the WIDGET's own inline size (~346px for a 2x1 on a 1600px dashboard),
+       so 1.1375cqi = ~3.9px and the label always bottomed out at the 16px floor, while the other
+       four cards resolved against the DASHBOARD width (1600 * 0.011375 = 18.2px) and hit the 17px
+       ceiling. Result: this card's title rendered one step smaller than its neighbours.
+       Now the global standard form (VA standard/MEMORY.md, Widget Header Specification). */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     color: #102C3F;
     line-height: 1.3;
     margin: 0;
@@ -134,7 +140,9 @@
 
 /* Modal Body Anchor */
 .vas-opencountsheets-modal-body {
-    padding: 1.125em 0.875em;
+    /* Vertical padding trimmed with the row padding so the tighter rows are not left floating in
+       a disproportionately tall body. */
+    padding: 0.75em 0.875em;
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
@@ -172,9 +180,12 @@
     text-align: right;
 }
 
-/* Data Rows */
+/* Data Rows
+   Row padding reduced 0.625em -> 0.375em (2026-08-16, user request: "reduce padding between lines
+   of modal"). Still relative to the modal's font anchor, so it scales; the status chip's own
+   0.3125em vertical padding keeps the row from collapsing below a comfortable touch height. */
 .vas-opencountsheets-data-row {
-    padding: 0.625em 0;
+    padding: 0.375em 0;
     border-bottom: 1px solid #E2EAF1;
     cursor: pointer;
     transition: background-color 0.15s ease;
@@ -235,7 +246,26 @@
     background-color: #EEF6FF;
     color: #0F69AC;
     text-align: center;
+    white-space: nowrap;
 }
+
+    /* The modal now returns three statuses instead of only Draft, so the chip carries a tone per
+       status from the standard chip palette. Without this a "Waiting Confirmation" row would wear
+       the same colour the user reads as "Draft". */
+    .vas-opencountsheets-status-chip.status-dr {
+        background-color: #F1F4F8;
+        color: #41576A;
+    }
+
+    .vas-opencountsheets-status-chip.status-ip {
+        background-color: #EAF8FF;
+        color: #0083DA;
+    }
+
+    .vas-opencountsheets-status-chip.status-wc {
+        background-color: #FFF6E2;
+        color: #9A6500;
+    }
 
 /* Modal Footer & Pager */
 .vas-opencountsheets-modal-footer {
