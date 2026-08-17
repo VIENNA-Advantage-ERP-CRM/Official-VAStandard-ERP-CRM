@@ -48,6 +48,23 @@ namespace VAS.Controllers
     /// Chronological development:
     ///   VAI052      2026-07-22 Created
     ///   VAI052      2026-07-23 Switched to VAS_ContractMaster, then UNION ALL with C_Contract (ASR)
+    ///   VAI052      2026-08-17 ORA-01008 on Oracle: both endpoints failed before a row was
+    ///                          read, so the widget only ever said "Unable to load contracts".
+    ///                          The combined statement embeds the currency CTE and BOTH
+    ///                          contract sources, so every placeholder occurred 2-3 times
+    ///                          (@Client_ID 3x, @ConversionType_ID / @ContractType / @Today /
+    ///                          @Plus31 / @Plus61 / @Plus91 2x, @Bucket 3x) against ONE
+    ///                          parameter each. The app's Oracle layer never sets BindByName,
+    ///                          so ODP.NET binds BY POSITION and a name occurring more often
+    ///                          than the parameter list raises ORA-01008 ("not all variables
+    ///                          bound") - the same defect already fixed in VAS_128 / VAS_099.
+    ///                          The combined statement is now assembled with NO placeholders:
+    ///                          every value in it is server-derived (tenant id, default
+    ///                          conversion type, the 'ASR' constant, the whitelisted bucket
+    ///                          key and the four boundary dates) and is inlined, dates through
+    ///                          ToSqlDate so they stay dialect-correct literals and the SQL
+    ///                          still does no date arithmetic. The standalone currency read
+    ///                          keeps its @Client_ID bind - one occurrence, one parameter.
     /// </summary>
     public class VAS_140_ContractsExpiringWidgetController : Controller
     {
@@ -56,8 +73,17 @@ namespace VAS.Controllers
         private const int WidgetPageSize = 7;
         private const int MaxListPageSize = 25;
 
-        /// <summary>Single-row tenant accounting (display) currency.</summary>
-        private const string SchemaCurrencySql = @"
+        /// <summary>
+        /// Single-row tenant accounting (display) currency. The client id arrives as an SQL
+        /// expression so the same statement serves both callers: "@Client_ID" for the
+        /// standalone read (one placeholder occurrence, one parameter - safe under
+        /// positional binding) and the inlined tenant id when this is embedded in the
+        /// combined statement, which carries no placeholders at all (see the ORA-01008 note
+        /// in the class summary).
+        /// </summary>
+        private static string SchemaCurrencySql(string clientIdSql)
+        {
+            return @"
             SELECT ci.AD_Client_ID AS AD_Client_ID,
                    cs.C_Currency_ID AS Acct_Currency_ID,
                    cur.StdPrecision AS Std_Precision,
@@ -67,37 +93,73 @@ namespace VAS.Controllers
             INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID=ci.C_AcctSchema1_ID AND cs.IsActive = 'Y')
             INNER JOIN C_Currency cur ON (cur.C_Currency_ID=cs.C_Currency_ID AND cur.IsActive = 'Y')
             WHERE ci.IsActive = 'Y'
-              AND ci.AD_Client_ID = @Client_ID";
-
-        /// <summary>
-        /// Mutually-exclusive urgency bucket by the bound boundary dates. The window
-        /// boundaries (@Plus31 / @Plus61 / @Plus91) are computed in C# and bound as
-        /// parameters - never derived with SQL date arithmetic, which is dialect-
-        /// specific and, on PostgreSQL, fails as "timestamp + integer".
-        /// </summary>
-        private string BucketCase()
-        {
-            return @"CASE WHEN c.EndDate < @Plus31 THEN 'LE_30'
-                          WHEN c.EndDate < @Plus61 THEN 'D31_60'
-                          ELSE 'D61_90' END";
+              AND ci.AD_Client_ID = " + clientIdSql;
         }
 
-        /// <summary>Only Accounts Receivable contracts are shown (bound, not inlined).</summary>
+        /// <summary>Only Accounts Receivable contracts are shown.</summary>
         private const string ContractTypeFilter = "ASR";
 
         /// <summary>
-        /// Boundary-date parameters (today, +31, +61, +91) computed in C# so the SQL
-        /// never does date arithmetic. Reused by both endpoints.
+        /// The statement's inlined, server-derived values. Every one of them is produced
+        /// here and never read from request input, which is what lets the combined
+        /// statement be assembled without a single bind placeholder (ORA-01008 - see the
+        /// class summary). The four boundary dates are still computed in C#, so the SQL
+        /// itself never does date arithmetic (dialect-specific, and on PostgreSQL it fails
+        /// as "timestamp + integer").
         /// </summary>
-        private SqlParameter[] DateParams(DateTime today)
+        private class SqlLiterals
         {
-            return new SqlParameter[]
+            public string ClientId;
+            public string ConversionTypeId;
+            public string ContractType;
+            public string Today;
+            public string Plus31;
+            public string Plus61;
+            public string Plus91;
+            /// <summary>Already validated against the known bucket keys by the caller.</summary>
+            public string BucketKey;
+        }
+
+        private static SqlLiterals BuildLiterals(Ctx ctx, int conversionTypeId, DateTime today, string bucketKey)
+        {
+            return new SqlLiterals
             {
-                new SqlParameter("@Today", today),
-                new SqlParameter("@Plus31", today.AddDays(31)),
-                new SqlParameter("@Plus61", today.AddDays(61)),
-                new SqlParameter("@Plus91", today.AddDays(91))
+                ClientId = ctx.GetAD_Client_ID().ToString(CultureInfo.InvariantCulture),
+                ConversionTypeId = conversionTypeId.ToString(CultureInfo.InvariantCulture),
+                ContractType = "'" + ContractTypeFilter + "'",
+                Today = ToSqlDate(today),
+                Plus31 = ToSqlDate(today.AddDays(31)),
+                Plus61 = ToSqlDate(today.AddDays(61)),
+                Plus91 = ToSqlDate(today.AddDays(91)),
+                BucketKey = "'" + (bucketKey ?? "") + "'"
             };
+        }
+
+        /// <summary>
+        /// A whole-day date literal in the connected dialect - the boundary dates are
+        /// inlined rather than bound, so they must be written in a form every supported
+        /// database parses (same helper as ExpectedThisWeekController).
+        /// </summary>
+        private static string ToSqlDate(DateTime date)
+        {
+            DateTime day = date.Date;
+
+            if (DB.IsOracle())
+            {
+                return "TO_DATE('" + day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "','YYYY-MM-DD')";
+            }
+
+            return DB.TO_DATE(day, true);
+        }
+
+        /// <summary>
+        /// Mutually-exclusive urgency bucket by the boundary dates.
+        /// </summary>
+        private static string BucketCase(SqlLiterals lit)
+        {
+            return @"CASE WHEN c.EndDate < " + lit.Plus31 + @" THEN 'LE_30'
+                          WHEN c.EndDate < " + lit.Plus61 + @" THEN 'D31_60'
+                          ELSE 'D61_90' END";
         }
 
         /// <summary>
@@ -110,11 +172,11 @@ namespace VAS.Controllers
         /// type - the VAS table has no C_ConversionType_ID). Owner/contact = Bill_User_ID
         /// (no SalesRep_ID on this table). Alias "c" is the MRole physical table.
         /// </summary>
-        private string VasEligibleSql()
+        private static string VasEligibleSql(SqlLiterals lit)
         {
             string valueConv = @"CASE WHEN c.C_Currency_ID = sc.Acct_Currency_ID THEN COALESCE(c.VAS_ContractAmount, 0)
                                      ELSE CurrencyConvert(COALESCE(c.VAS_ContractAmount, 0), c.C_Currency_ID, sc.Acct_Currency_ID, c.StartDate,
-                                             @ConversionType_ID, c.AD_Client_ID, c.AD_Org_ID) END";
+                                             " + lit.ConversionTypeId + @", c.AD_Client_ID, c.AD_Org_ID) END";
             return @"
                 SELECT 'VAS' AS Source_Type,
                        c.VAS_ContractMaster_ID AS Contract_Id,
@@ -127,7 +189,7 @@ namespace VAS.Controllers
                        c.ContractType AS Contract_Type,
                        c.VAS_Status AS Doc_Status,
                        COALESCE(sr.Name, N'') AS Sales_Rep_Name,
-                       " + BucketCase() + @" AS Bucket,
+                       " + BucketCase(lit) + @" AS Bucket,
                        " + valueConv + @" AS Value_Conv
                 FROM VAS_ContractMaster c
                 INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=c.C_BPartner_ID AND bp.AD_Client_ID=c.AD_Client_ID AND bp.IsActive = 'Y')
@@ -135,15 +197,15 @@ namespace VAS.Controllers
                 LEFT OUTER JOIN AD_User sr ON (sr.AD_User_ID=c.Bill_User_ID AND sr.AD_Client_ID=c.AD_Client_ID AND sr.IsActive = 'Y')
                 WHERE c.IsActive = 'Y'
                   AND c.VAS_Status = 'ARD'
-                  AND c.ContractType = @ContractType
+                  AND c.ContractType = " + lit.ContractType + @"
                   AND COALESCE(c.VAS_IsApproved, 'N') = 'Y'
                   AND COALESCE(c.IsExpiredContracts, 'N') <> 'Y'
                   AND COALESCE(c.VAS_Terminate, 'N') <> 'Y'
                   AND c.C_BPartner_ID IS NOT NULL
                   AND c.EndDate IS NOT NULL
-                  AND c.AD_Client_ID = @Client_ID
-                  AND c.EndDate >= @Today
-                  AND c.EndDate < @Plus91";
+                  AND c.AD_Client_ID = " + lit.ClientId + @"
+                  AND c.EndDate >= " + lit.Today + @"
+                  AND c.EndDate < " + lit.Plus91;
         }
 
         /// <summary>
@@ -153,11 +215,11 @@ namespace VAS.Controllers
         /// C_ConversionType_ID, tenant default as fallback). Owner = SalesRep_ID. Alias
         /// "c" is the MRole physical table.
         /// </summary>
-        private string CoreEligibleSql()
+        private static string CoreEligibleSql(SqlLiterals lit)
         {
             string valueConv = @"CASE WHEN c.C_Currency_ID = sc.Acct_Currency_ID THEN COALESCE(c.GrandTotal, 0)
                                      ELSE CurrencyConvert(COALESCE(c.GrandTotal, 0), c.C_Currency_ID, sc.Acct_Currency_ID, c.StartDate,
-                                             CASE WHEN COALESCE(c.C_ConversionType_ID, 0) = 0 THEN @ConversionType_ID ELSE c.C_ConversionType_ID END,
+                                             CASE WHEN COALESCE(c.C_ConversionType_ID, 0) = 0 THEN " + lit.ConversionTypeId + @" ELSE c.C_ConversionType_ID END,
                                              c.AD_Client_ID, c.AD_Org_ID) END";
             return @"
                 SELECT 'CORE' AS Source_Type,
@@ -171,7 +233,7 @@ namespace VAS.Controllers
                        c.ContractType AS Contract_Type,
                        c.DocStatus AS Doc_Status,
                        COALESCE(sr.Name, N'') AS Sales_Rep_Name,
-                       " + BucketCase() + @" AS Bucket,
+                       " + BucketCase(lit) + @" AS Bucket,
                        " + valueConv + @" AS Value_Conv
                 FROM C_Contract c
                 INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=c.C_BPartner_ID AND bp.AD_Client_ID=c.AD_Client_ID AND bp.IsActive = 'Y')
@@ -179,12 +241,12 @@ namespace VAS.Controllers
                 LEFT OUTER JOIN AD_User sr ON (sr.AD_User_ID=c.SalesRep_ID AND sr.AD_Client_ID=c.AD_Client_ID AND sr.IsActive = 'Y')
                 WHERE c.IsActive = 'Y'
                   AND COALESCE(c.Processed, 'N') = 'Y'
-                  AND c.ContractType = @ContractType
+                  AND c.ContractType = " + lit.ContractType + @"
                   AND c.C_BPartner_ID IS NOT NULL
                   AND c.EndDate IS NOT NULL
-                  AND c.AD_Client_ID = @Client_ID
-                  AND c.EndDate >= @Today
-                  AND c.EndDate < @Plus91";
+                  AND c.AD_Client_ID = " + lit.ClientId + @"
+                  AND c.EndDate >= " + lit.Today + @"
+                  AND c.EndDate < " + lit.Plus91;
         }
 
         /// <summary>
@@ -194,10 +256,10 @@ namespace VAS.Controllers
         /// de-duplicated across the two registers. The high-value threshold is later
         /// computed once over this combined population.
         /// </summary>
-        private string EligibleUnionSql(Ctx ctx)
+        private string EligibleUnionSql(Ctx ctx, SqlLiterals lit)
         {
-            string vas = MRole.GetDefault(ctx).AddAccessSQL(VasEligibleSql(), "c", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            string core = MRole.GetDefault(ctx).AddAccessSQL(CoreEligibleSql(), "c", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            string vas = MRole.GetDefault(ctx).AddAccessSQL(VasEligibleSql(lit), "c", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            string core = MRole.GetDefault(ctx).AddAccessSQL(CoreEligibleSql(lit), "c", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             return vas + @"
                 UNION ALL
                 " + core;
@@ -224,6 +286,7 @@ namespace VAS.Controllers
             {
                 int conversionTypeId = MConversionType.GetDefault(ctx.GetAD_Client_ID());
                 DateTime today = DateTime.Today;
+                SqlLiterals lit = BuildLiterals(ctx, conversionTypeId, today, null);
 
                 // Display currency (always available, even at zero contracts).
                 string currencySymbol = "", isoCode = "";
@@ -231,7 +294,7 @@ namespace VAS.Controllers
                 IDataReader cdr = null;
                 try
                 {
-                    cdr = DB.ExecuteReader(SchemaCurrencySql, new SqlParameter[] { new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()) });
+                    cdr = DB.ExecuteReader(SchemaCurrencySql("@Client_ID"), new SqlParameter[] { new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()) });
                     if (cdr != null && cdr.Read())
                     {
                         currencySymbol = Util.GetValueOfString(cdr["Cur_Symbol"]);
@@ -245,11 +308,11 @@ namespace VAS.Controllers
                 finally { CloseReader(cdr); }
 
                 // VAS Contract Master UNION ALL core C_Contract (MRole per source).
-                string eligibleSql = EligibleUnionSql(ctx);
+                string eligibleSql = EligibleUnionSql(ctx, lit);
 
                 string sql = @"
                     WITH schema_currency AS (
-                        " + SchemaCurrencySql + @"
+                        " + SchemaCurrencySql(lit.ClientId) + @"
                     ),
                     eligible AS (
                         " + eligibleSql + @"
@@ -274,18 +337,11 @@ namespace VAS.Controllers
                 var values = new Dictionary<string, decimal> { { "LE_30", 0 }, { "D31_60", 0 }, { "D61_90", 0 } };
                 var hv = new Dictionary<string, int> { { "LE_30", 0 }, { "D31_60", 0 }, { "D61_90", 0 } };
 
-                List<SqlParameter> bucketParams = new List<SqlParameter>
-                {
-                    new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                    new SqlParameter("@ConversionType_ID", conversionTypeId),
-                    new SqlParameter("@ContractType", SqlDbType.VarChar) { Value = ContractTypeFilter }
-                };
-                bucketParams.AddRange(DateParams(today));
-
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, bucketParams.ToArray());
+                    // No parameters: every value in this statement is inlined (ORA-01008).
+                    dr = DB.ExecuteReader(sql);
                     while (dr != null && dr.Read())
                     {
                         string bucket = Util.GetValueOfString(dr["Bucket"]);
@@ -362,13 +418,14 @@ namespace VAS.Controllers
             {
                 int conversionTypeId = MConversionType.GetDefault(ctx.GetAD_Client_ID());
                 DateTime today = DateTime.Today;
+                SqlLiterals lit = BuildLiterals(ctx, conversionTypeId, today, bucketKey);
 
                 string currencySymbol = "", isoCode = "";
                 int stdPrecision = 2;
                 IDataReader cdr = null;
                 try
                 {
-                    cdr = DB.ExecuteReader(SchemaCurrencySql, new SqlParameter[] { new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()) });
+                    cdr = DB.ExecuteReader(SchemaCurrencySql("@Client_ID"), new SqlParameter[] { new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()) });
                     if (cdr != null && cdr.Read())
                     {
                         currencySymbol = Util.GetValueOfString(cdr["Cur_Symbol"]);
@@ -382,11 +439,11 @@ namespace VAS.Controllers
                 finally { CloseReader(cdr); }
 
                 // VAS Contract Master UNION ALL core C_Contract (MRole per source).
-                string eligibleSql = EligibleUnionSql(ctx);
+                string eligibleSql = EligibleUnionSql(ctx, lit);
 
                 string sql = @"
                     WITH schema_currency AS (
-                        " + SchemaCurrencySql + @"
+                        " + SchemaCurrencySql(lit.ClientId) + @"
                     ),
                     eligible AS (
                         " + eligibleSql + @"
@@ -414,9 +471,9 @@ namespace VAS.Controllers
                            s.Is_HV,
                            COUNT(*) OVER () AS Total_Rows
                     FROM scored s
-                    WHERE (@Bucket = 'ALL_90')
-                       OR (@Bucket = 'HIGH_VALUE' AND s.Is_HV = 1)
-                       OR (s.Bucket = @Bucket)
+                    WHERE (" + lit.BucketKey + @" = 'ALL_90')
+                       OR (" + lit.BucketKey + @" = 'HIGH_VALUE' AND s.Is_HV = 1)
+                       OR (s.Bucket = " + lit.BucketKey + @")
                     ORDER BY s.End_Date ASC,
                              s.Value_Conv DESC,
                              s.Source_Type ASC,
@@ -426,19 +483,11 @@ namespace VAS.Controllers
                 List<object> items = new List<object>();
                 int total = 0;
 
-                List<SqlParameter> rowParams = new List<SqlParameter>
-                {
-                    new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                    new SqlParameter("@ConversionType_ID", conversionTypeId),
-                    new SqlParameter("@ContractType", SqlDbType.VarChar) { Value = ContractTypeFilter },
-                    new SqlParameter("@Bucket", SqlDbType.VarChar) { Value = bucketKey }
-                };
-                rowParams.AddRange(DateParams(today));
-
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, rowParams.ToArray());
+                    // No parameters: every value in this statement is inlined (ORA-01008).
+                    dr = DB.ExecuteReader(sql);
                     while (dr != null && dr.Read())
                     {
                         total = Util.GetValueOfInt(dr["Total_Rows"]);

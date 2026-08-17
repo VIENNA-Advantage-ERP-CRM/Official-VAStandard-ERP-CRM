@@ -150,6 +150,16 @@
         background: rgba(31, 131, 255, 0.05);
     }
 
+    /* A row that resolves to no record (e.g. a lead-backed pipeline account, which has
+       no C_BPartner to open) is rendered inert - it must not offer a click affordance. */
+    .MPC-kpidrill-row-static {
+        cursor: default;
+    }
+
+        .MPC-kpidrill-row-static:hover {
+            background: transparent;
+        }
+
 .MPC-kpidrill-avatar {
     width: 32px;
     height: 32px;

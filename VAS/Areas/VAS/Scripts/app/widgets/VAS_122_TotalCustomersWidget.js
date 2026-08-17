@@ -14,6 +14,13 @@
  *
  * Backend - VAS_122_TotalCustomersWidget/GetTotalCustomers
  *
+ * Routing - 2026-08-17: a drill-through row opens the customer. Hosted on a window
+ *           that navigates the host grid in place (widgetFirevalueChanged); on the
+ *           Home / landing dashboard (windowNo < 0) there is no host grid, so the
+ *           record is opened in the standard Customer window via VAS.ZoomUtil.
+ *           The same change declares CUSTOMER_WINDOW_NAME, which the in-place
+ *           fallback referenced without it ever being defined.
+ *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  # | Current Text                | Message Key
  * ---+-----------------------------+--------------------------------
@@ -30,6 +37,19 @@
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /* Fallback ActionName for the in-place zoom when the resolved host window name is
+       not available (2026-08-17: the name was referenced but never declared here, so
+       the fallback threw and the drill-through row silently did nothing). */
+    var CUSTOMER_WINDOW_NAME = 'Business Partner';
+
+    /* 2026-08-17: zoom target when the widget is NOT hosted inside a window
+       (windowNo < 0 - the Home / landing dashboard). There is no host grid to navigate
+       there, so the record is opened in the standard Customer window; VAS.ZoomUtil
+       resolves the AD_Window_ID from the new name, then the old name, then
+       VAS_ZoomScreenConfig. */
+    var ZOOM_WINDOW_NAME_NEW = 'VAS_CustomerMaster';
+    var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
 
     /* Keep --dash-inline-size on :root equal to the dashboard container width so
        the widget clamp resolves against the dashboard's visible width. */
@@ -60,6 +80,9 @@
         var $card;
         var $value;
         var $meta;
+        /* AD_Window_ID of the Customer window, resolved once on the first Home-page
+           zoom and reused afterwards (0 = not resolved yet). */
+        var zoomWindowId = 0;
 
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
@@ -211,12 +234,22 @@
         }
 
         // Drill-through: the customers behind the count, ranked by lifetime value
-        // (VAS_122 GetCustomers); a row opens the customer record.
+        // (VAS_122 GetCustomers); a row opens the customer record - in the host grid
+        // when the widget sits on a window, otherwise (Home / landing page,
+        // windowNo < 0) in the standard Customer window.
         function zoomToCustomer(bpId) {
             if (!bpId) { return; }
             if (drill) { drill.close(); }
             try {
-                $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                }
+                else {
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", Number(bpId), zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* best-effort */ }
         }
 
