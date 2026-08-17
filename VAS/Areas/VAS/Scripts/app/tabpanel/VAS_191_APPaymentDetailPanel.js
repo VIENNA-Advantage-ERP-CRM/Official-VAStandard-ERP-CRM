@@ -65,7 +65,7 @@
  *     the C_DocType name is used when set)|
  *   Paid / Received                       | VAS_191_Paid / VAS_191_Received
  *   Paid {0} / Received {0}               | VAS_191_PaidOn / VAS_191_ReceivedOn
- *   Business partner                      | VAS_191_BusinessPartner
+ *   Business Partner                      | VAS_191_BusinessPartner
  *     (no partner: bank account instead)  | VAS_191_PaidFrom / VAS_191_ReceivedIn
  *   Fully allocated / Unallocated         | VAS_191_FullyAllocated / VAS_191_Unallocated
  *   Partially allocated                   | VAS_191_PartiallyAllocated
@@ -122,7 +122,7 @@
  *   Due {0}                               | VAS_191_Due
  *   {0} entries                           | VAS_191_EntryCount
  *   Total applied                         | VAS_191_TotalApplied
- *
+ *   Date                                  | VAS_191_SchDate
  *  Allocation Detail
  *   Allocation Detail                     | VAS_191_AllocationDetail
  *   {0} allocation(s)                     | VAS_191_AllocationCount
@@ -1430,8 +1430,8 @@
                 msg("VAS_191_EntryCount", "{0} entries").replace("{0}", rows.length));
 
             var $head = $('<div class="' + CLS + 'pa-head"></div>');
-            $head.append($('<span></span>').text(msg("VAS_191_InvoiceGLJournal", "Invoice / GL journal")));
-            $head.append($('<span></span>').text(msg("VAS_191_Schedule", "Schedule")));
+            $head.append($('<span></span>').text(msg("VAS_191_InvoiceGLJournal", "Invoice / GL Journal")));
+            $head.append($('<span></span>').text(msg("VAS_191_SchDate", "Date")));
             $head.append($('<span class="right"></span>').text(msg("VAS_191_Amount", "Amount")));
             $head.append($('<span class="right"></span>').text(msg("VAS_191_Discount", "Discount")));
             $head.append($('<span class="right"></span>').text(msg("VAS_191_WriteOff", "Write-off")));

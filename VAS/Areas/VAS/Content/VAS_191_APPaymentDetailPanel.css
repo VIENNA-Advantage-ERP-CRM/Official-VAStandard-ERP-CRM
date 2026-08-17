@@ -28,13 +28,20 @@
  *                                  shadow offsets; em for every text size,
  *                                  padding, margin, gap and scalable height
  *
- *                  Sizes follow the approved reference HTML
- *                  (ap_payment_overview_panel.html), converted rem -> em against
- *                  the panel anchor: h1 1.5em/700, sub + ctx 0.875em, eyebrow
- *                  0.6875em uppercase, card value 1.25em/700, block title 1em/700
- *                  (1.1875em on the enlarged details block), table head 0.6875em
- *                  uppercase, row primary 0.9375em/700, row meta 0.75em, button
- *                  0.875em/500.
+ *                  COMPOSITION comes from the approved reference HTML
+ *                  (ap_payment_overview_panel.html); SIZES come from design.md,
+ *                  not from the prototype's rem values - those resolve oversized
+ *                  against the 16-18px panel anchor. Token set in use: panel
+ *                  title on the shared dashboard lever
+ *                  clamp(16px, --dash-inline-size * 0.011375, 17px), section /
+ *                  block title 1em/700, card value 0.9375em/700, eyebrow +
+ *                  card meta + table head 0.6875em, row cells 0.75em, amounts
+ *                  and chips-in-content 0.8125em, chip 0.6875em. Nothing below
+ *                  0.6875em; weights are 400 / 500 / 700 only.
+ *
+ *                  The action-bar buttons are the one deliberate step BELOW the
+ *                  token scale (0.75em, padding 0.375em 0.75em) - see the Action
+ *                  bar block for why.
  * Chronological development:
  *   VAI163   2026-08-17  Created.
  ***********************************************************/
@@ -536,17 +543,18 @@
    four button treatments: filled primary, outlined, ghost (neutral border) and
    a borderless text action pushed to the far end of the row.
 
-   Button METRICS deliberately follow VAS_189_ARInvoiceDetailPanel's .btn
-   (0.8125em / 400, padding 0.5em 0.875em) rather than the reference HTML's
-   larger 0.875em / 500 at 9px 17px: both panels sit on the same windows, and a
-   payment action bar that reads bigger than the invoice one next to it looks
-   like a mistake. The band and the four treatments are kept from the reference. */
+   Button METRICS are deliberately BELOW the Action Pill token (0.8125em,
+   padding 0.5em 0.875em) and below VAS_189's .btn: this bar carries up to five
+   actions on a panel that is mostly dense read-only content, and at the token
+   size it dominated the header. 0.75em with 0.375em vertical padding keeps the
+   control ~28px tall while the label stays on the panel's type scale. The band
+   and the four treatments are kept from the reference layout. */
 .vas_191-actions {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.625em;
-    padding: 0.5em 0.625em;
+    gap: 0.5em;
+    padding: 0.4375em 0.5em;
     background: rgba(238, 246, 255, 0.5);
     border-radius: 12px;
 }
@@ -554,14 +562,14 @@
 .vas_191-pill {
     display: inline-flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.4375em;
     border-radius: 999px;
     border: 1px solid transparent;
     background: #FFFFFF;
     color: var(--p191-action);
-    padding: 0.5em 0.875em;
+    padding: 0.375em 0.75em;
     font-weight: 400;
-    font-size: 0.8125em;
+    font-size: 0.75em;
     line-height: 1.2;
     cursor: pointer;
     transition: background .15s, border-color .15s, color .15s;
@@ -602,7 +610,7 @@
     background: none;
     border-color: transparent;
     color: var(--p191-muted);
-    padding: 0.5em 0.375em;
+    padding: 0.375em 0.375em;
     margin-left: auto;
 }
 .vas_191-pill.vas_191-is-text:hover:not(:disabled) { color: var(--p191-action-deep); }
