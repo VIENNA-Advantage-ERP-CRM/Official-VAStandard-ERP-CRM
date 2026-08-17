@@ -16,6 +16,11 @@
  *           Customer detail reuses the generic VAS_126 endpoint:
  *             VAS_126_OpenTicketsWidget/GetCustomerDetail
  *
+ * Routing - 2026-08-17: hosted on a window, opening the customer navigates the host
+ *           grid in place (widgetFirevalueChanged); on the Home / landing dashboard
+ *           (windowNo < 0) there is no host grid, so the record is opened in the
+ *           standard Customer window via VAS.ZoomUtil.
+ *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  #  | Current Text                       | Message Key
  * ----+------------------------------------+--------------------------------
@@ -46,6 +51,14 @@
     // Customer projects endpoints (built with VAS_135).
     var PROJECT_ENDPOINT = 'VAS_135_ActiveProjectsWidget/';
     var CUSTOMER_WINDOW_NAME = 'Business Partner';
+
+    /* 2026-08-17: zoom target when the widget is NOT hosted inside a window
+       (windowNo < 0 - the Home / landing dashboard). There is no host grid to navigate
+       there, so the record is opened in the standard Customer window; VAS.ZoomUtil
+       resolves the AD_Window_ID from the new name, then the old name, then
+       VAS_ZoomScreenConfig. */
+    var ZOOM_WINDOW_NAME_NEW = 'VAS_CustomerMaster';
+    var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
 
     function ensureDashInlineSizeVar($el) {
         if (window.__vasDashInlineSizeObserver) { return; }
@@ -88,6 +101,10 @@
         // Projects modal state (reuses VAS_135 project endpoints).
         var $proj, $projBody, $projCust, currentProjId = 0, activeProjState = null;
         var PROJECT_STATES = ['delayed', 'ontime', 'ongoing', 'upcoming', 'completed'];
+
+        // AD_Window_ID of the Customer window, resolved once on the first Home-page
+        // zoom and reused afterwards (0 = not resolved yet).
+        var zoomWindowId = 0;
 
         function label(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -487,7 +504,16 @@
             if (!bpId) { return; }
             closeDetail();
             try {
-                $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                }
+                else {
+                    /* Home / landing page: no host grid, so open the standard Customer window. */
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", Number(bpId), zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* best-effort */ }
         }
 
