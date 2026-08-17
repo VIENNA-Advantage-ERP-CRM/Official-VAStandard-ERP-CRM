@@ -22,6 +22,10 @@
  *
  * Routing - Record open + See-all use widgetFirevalueChanged (in-place zoom on the
  *           host window, Prompt_Instructions Scenario 1), mirroring VAS_067/VAS_083.
+ *           2026-08-17 - that path only exists when the widget sits ON a window. From
+ *           the Home / landing dashboard (windowNo < 0) there is no host grid, so the
+ *           record (and the See-all set) is opened in the standard Customer window via
+ *           the shared VAS.ZoomUtil helper, mirroring VAS_067's Home-page branch.
  * Quick actions - 2026-08-10: the standard-actions rule applies - New Task and
  *           New Appointment hand off to the platform's own forms so the UI and
  *           behaviour match the standard everywhere:
@@ -88,6 +92,15 @@
     // host window name first; this is only the fallback ActionName).
     var CUSTOMER_WINDOW_NAME = "Business Partner";
 
+    // 2026-08-17: zoom target when the widget is NOT hosted inside a window
+    // (windowNo < 0 - the Home / landing dashboard). There is no host grid to
+    // navigate there, so the Customer window is opened through VAS.ZoomUtil, which
+    // resolves the AD_Window_ID from the new name, then the old name, then
+    // VAS_ZoomScreenConfig.
+    var ZOOM_TABLE = "C_BPartner";
+    var ZOOM_WINDOW_NAME_NEW = "VAS_CustomerMaster";
+    var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
+
 
     // Own endpoints for the task / appointment popups (AppointmentsInfo).
     var WIDGET_ENDPOINT = "VAS_120_CustomerSearchWidget/";
@@ -111,6 +124,9 @@
         var lastTotal = 0;
         var lastQuery = '';
         var minLength = 2;
+        // AD_Window_ID of the Customer window, resolved once on the first Home-page
+        // zoom and reused afterwards (0 = not resolved yet).
+        var zoomWindowId = 0;
         // AD_Table_ID of C_BPartner, supplied with the search rows. The standard
         // Task / Appointment forms need the record's table context, and a dashboard
         // widget has no framework-supplied table_ID the way a tab panel does.
@@ -518,18 +534,54 @@
             return '';
         }
 
+        // Open the Customer window on a where clause when the widget is NOT hosted on a
+        // window (Home / landing page). The window id is resolved from its name and the
+        // clause is handed to the standard window as a query restriction, so the grid
+        // lands on the same set the host grid would have shown. Best-effort: an
+        // unresolved window or an unavailable framework simply does not navigate.
+        function openCustomerWindowWhere(whereClause) {
+            if (!window.VAS || !VAS.ZoomUtil) { return; }
+            VAS.ZoomUtil.getWindowId(ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                .done(function (id) {
+                    id = Number(id) || 0;
+                    if (id <= 0) { return; }
+                    zoomWindowId = id;
+                    if (!window.VIS || !VIS.viewManager || typeof VIS.viewManager.startWindow !== 'function') { return; }
+
+                    var query = null;
+                    try {
+                        if (typeof VIS.Query === 'function') {
+                            query = new VIS.Query(ZOOM_TABLE);
+                            query.addRestriction(whereClause);
+                        }
+                    } catch (e) { query = null; }
+
+                    try { VIS.viewManager.startWindow(id, query); } catch (e) { /* best-effort */ }
+                });
+        }
+
         // Open one C_BPartner record in place (Prompt_Instructions Scenario 1).
         // The id is numeric, so the where clause carries no user text.
+        // 2026-08-17: on the Home / landing page (windowNo < 0) there is no host grid
+        // to navigate, so the record is opened in the standard Customer window.
         function zoomToCustomer(bpId) {
             if (!bpId) { return; }
             try {
-                $self.widgetFirevalueChanged({
-                    "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId),
-                    "TabLayout": "Y",
-                    "TabIndex": "0",
-                    "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
-                    "ActionType": "W"
-                });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId),
+                        "TabLayout": "Y",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
+                        "ActionType": "W"
+                    });
+                }
+                else {
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", Number(bpId), zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* zoom is best-effort */ }
         }
 
@@ -548,13 +600,19 @@
                 " OR UPPER(C_BPartner.Value) LIKE " + like +
                 " OR UPPER(COALESCE(C_BPartner.EMail,'')) LIKE " + like + ")";
             try {
-                $self.widgetFirevalueChanged({
-                    "TabWhereClause": where,
-                    "TabLayout": "N",
-                    "TabIndex": "0",
-                    "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
-                    "ActionType": "W"
-                });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": where,
+                        "TabLayout": "N",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
+                        "ActionType": "W"
+                    });
+                }
+                else {
+                    /* Home / landing page: open the standard Customer window on the same set. */
+                    openCustomerWindowWhere(where);
+                }
             } catch (e) { /* best-effort */ }
         }
 
