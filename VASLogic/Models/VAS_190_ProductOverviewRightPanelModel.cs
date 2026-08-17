@@ -774,13 +774,26 @@ namespace VASLogic.Models
             // Conversions FROM the product's base unit TO another unit. The
             // divide rate says how many base units one converted unit is worth,
             // which is the direction the panel reads ("Box-10 = 10 Each").
+            // Which unit the product is BOUGHT and SOLD in. Both are optional
+            // columns on M_Product — a schema without them simply flags no row —
+            // and they are what tells the reader which of a product's conversions
+            // is the one its documents will actually be keyed in. Without them
+            // every row read only "product-specific" or "generic", which says how
+            // the conversion is DEFINED, never what it is FOR.
+            bool hasPurchaseUom = ColumnExists("M_Product", "C_UOM_Purchase_ID");
+            bool hasSalesUom    = ColumnExists("M_Product", "C_UOM_Sales_ID");
+            string purchaseUomExpr = hasPurchaseUom ? "p.C_UOM_Purchase_ID" : "NULL";
+            string salesUomExpr    = hasSalesUom    ? "p.C_UOM_Sales_ID"    : "NULL";
+
             string sql = @"SELECT conv.C_UOM_Conversion_ID,
                                   conv.M_Product_ID,
                                   conv.C_UOM_To_ID,
                                   uto.Name AS ConversionUomName,
                                   COALESCE(uto.StdPrecision, 0) AS UomPrecision,
                                   COALESCE(conv.DivideRate, 0) AS DivideRate,
-                                  COALESCE(conv.MultiplyRate, 0) AS MultiplyRate
+                                  COALESCE(conv.MultiplyRate, 0) AS MultiplyRate,
+                                  " + purchaseUomExpr + @" AS PurchaseUomId,
+                                  " + salesUomExpr + @"    AS SalesUomId
                            FROM C_UOM_Conversion conv
                            INNER JOIN M_Product p ON (p.C_UOM_ID=conv.C_UOM_ID)
                            INNER JOIN C_UOM uto ON (uto.C_UOM_ID=conv.C_UOM_To_ID
@@ -815,6 +828,8 @@ namespace VASLogic.Models
                 c.MultiplyRate  = Util.GetValueOfDecimal(r["MultiplyRate"]);
                 c.BaseUomName   = baseUomName;
                 c.IsProductSpecific = Util.GetValueOfInt(r["M_Product_ID"]) > 0;
+                c.IsPurchaseUom = toUom > 0 && Util.GetValueOfInt(r["PurchaseUomId"]) == toUom;
+                c.IsSalesUom    = toUom > 0 && Util.GetValueOfInt(r["SalesUomId"])    == toUom;
 
                 // How many BASE units one converted unit is worth. The divide rate
                 // states it directly; where only a multiply rate is stored it is
@@ -1701,11 +1716,19 @@ namespace VASLogic.Models
         /// <summary>Field-level changes logged against the product (AD_ChangeLog).</summary>
         private void LoadFieldChangeActivity(Ctx ctx, int M_Product_ID, List<ActivityData> list)
         {
+            // The column's REFERENCE travels with the row. AD_ChangeLog stores the
+            // raw stored value, which for a coded column is an id or a code — so
+            // "UOM changed from 100 to 105" and "Product Type from I to S" is what
+            // the panel printed. Knowing the reference is what lets those be
+            // resolved to the names the record screen shows (ResolveChangeValues).
             string sql = @"SELECT cl.AD_ChangeLog_ID,
                                   cl.OldValue,
                                   cl.NewValue,
                                   cl.Created,
                                   COALESCE(col.Name, col.ColumnName) AS FieldName,
+                                  col.ColumnName            AS ColumnName,
+                                  col.AD_Reference_ID       AS RefId,
+                                  col.AD_Reference_Value_ID AS RefValueId,
                                   u.Name AS ActorName
                            FROM AD_ChangeLog cl
                            LEFT OUTER JOIN AD_Column col ON (col.AD_Column_ID=cl.AD_Column_ID)
@@ -1718,18 +1741,136 @@ namespace VASLogic.Models
             DataSet ds = Query(sql, ProductParam(M_Product_ID), "LoadFieldChangeActivity");
             if (ds == null || ds.Tables.Count == 0) return;
 
+            // One entry per FIELD per SAVE. The platform can log the same column
+            // twice for a single save — a callout writing a value the user also
+            // typed, or a re-save that re-states an unchanged field — and both rows
+            // carry the same field, the same move and the same second, so the
+            // timeline printed the identical line twice with nothing to tell them
+            // apart. Keyed on exactly that: field, old, new and the second it
+            // happened in.
+            List<string> seen = new List<string>();
+
             foreach (DataRow r in ds.Tables[0].Rows)
             {
+                string oldRaw = Util.GetValueOfString(r["OldValue"]);
+                string newRaw = Util.GetValueOfString(r["NewValue"]);
+
+                // A row that says nothing moved is not an edit. The platform logs
+                // these when a save rewrites a field with the value it already had.
+                if (string.Equals(oldRaw, newRaw, StringComparison.Ordinal)) continue;
+
+                DateTime? at = Util.GetValueOfDateTime(r["Created"]);
+                string key = Util.GetValueOfString(r["ColumnName"]) + "|" + oldRaw + "|" + newRaw
+                           + "|" + (at.HasValue ? at.Value.ToString("yyyyMMddHHmmss") : "");
+                if (seen.Contains(key)) continue;
+                seen.Add(key);
+
+                string oldText, newText;
+                ResolveChangeValues(ctx,
+                    Util.GetValueOfString(r["ColumnName"]),
+                    Util.GetValueOfInt(r["RefId"]),
+                    Util.GetValueOfInt(r["RefValueId"]),
+                    oldRaw, newRaw, out oldText, out newText);
+
                 list.Add(new ActivityData
                 {
                     Id        = Util.GetValueOfInt(r["AD_ChangeLog_ID"]),
                     Type      = "fieldupdate",
                     Title     = Util.GetValueOfString(r["FieldName"]),
-                    OldValue  = Util.GetValueOfString(r["OldValue"]),
-                    NewValue  = Util.GetValueOfString(r["NewValue"]),
+                    OldValue  = oldText,
+                    NewValue  = newText,
                     Actor     = Util.GetValueOfString(r["ActorName"]),
-                    EventDate = Util.GetValueOfDateTime(r["Created"])
+                    EventDate = at
                 });
+            }
+        }
+
+        /// <summary>
+        /// Turns the RAW stored values of one change-log row into the text the
+        /// record screen would show for them.
+        ///
+        /// AD_ChangeLog keeps what the column holds, not what it displays. For a
+        /// coded column that is an id or a code, so the timeline read "UOM changed
+        /// from 100 to 105" and "Product Type from I to S" — technically accurate
+        /// and useless to a reader.
+        ///
+        /// Two kinds are resolved:
+        ///   * LIST columns (Product Type, and every other reference list) against
+        ///     AD_Ref_List, in the reader's own language;
+        ///   * TABLE / TABLEDIR columns — anything ending "_ID" — against the
+        ///     referenced table's own identifier, taking the first of Name / Value
+        ///     / DocumentNo that the table actually has.
+        ///
+        /// Anything that cannot be resolved is returned EXACTLY as stored. A raw
+        /// id is a poor answer, but inventing one is worse, and a free-text column
+        /// must never be rewritten.
+        /// </summary>
+        private void ResolveChangeValues(Ctx ctx, string columnName, int refId, int refValueId,
+                                         string oldRaw, string newRaw,
+                                         out string oldText, out string newText)
+        {
+            oldText = oldRaw;
+            newText = newRaw;
+            if (string.IsNullOrEmpty(columnName)) return;
+
+            try
+            {
+                // ----- Reference LIST (Product Type, Discontinued reason, ...) -----
+                // A list column names the reference its values come from; without
+                // one there is nothing to resolve against.
+                if (refValueId > 0)
+                {
+                    Dictionary<string, string> labels = LoadRefListLabelsById(ctx, refValueId);
+                    if (labels != null && labels.Count > 0)
+                    {
+                        if (!string.IsNullOrEmpty(oldRaw) && labels.ContainsKey(oldRaw))
+                            oldText = labels[oldRaw];
+                        if (!string.IsNullOrEmpty(newRaw) && labels.ContainsKey(newRaw))
+                            newText = labels[newRaw];
+                        return;
+                    }
+                }
+
+                // ----- Table reference (C_UOM_ID, M_Product_Category_ID, ...) -----
+                if (!columnName.EndsWith("_ID", StringComparison.OrdinalIgnoreCase)) return;
+
+                string table = columnName.Substring(0, columnName.Length - 3);
+                string labelCol = FirstExistingColumn(table,
+                    new string[] { "Name", "Value", "DocumentNo" });
+                if (string.IsNullOrEmpty(labelCol)) return;
+
+                oldText = LookupIdentifier(table, columnName, labelCol, oldRaw) ?? oldRaw;
+                newText = LookupIdentifier(table, columnName, labelCol, newRaw) ?? newRaw;
+            }
+            catch (Exception ex)
+            {
+                // Never lose the entry over a lookup: the raw values still read.
+                _log.Severe("ResolveChangeValues (" + columnName + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// The identifier of one referenced row, or null when the value is not an
+        /// id or names nothing. The id is parsed in managed code and inlined as an
+        /// int — never bound — so a non-numeric stored value can neither reach the
+        /// statement nor abort it on a numeric cast.
+        /// </summary>
+        private string LookupIdentifier(string table, string keyColumn, string labelColumn, string raw)
+        {
+            int id;
+            if (string.IsNullOrEmpty(raw) || !int.TryParse(raw.Trim(), out id) || id <= 0)
+                return null;
+            try
+            {
+                string sql = "SELECT " + labelColumn + " FROM " + table +
+                             " WHERE " + keyColumn + " = " + id;
+                string name = Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
+                return string.IsNullOrEmpty(name) ? null : name;
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LookupIdentifier (" + table + "." + labelColumn + "): " + ex.Message);
+                return null;
             }
         }
 
@@ -1844,6 +1985,86 @@ namespace VASLogic.Models
                 _log.Severe("VAS_190 LoadRefListLabels(" + tableName + "." + columnName + "): " + ex.Message);
             }
             return labels;
+        }
+
+        /// <summary>
+        /// The labels of one reference list, keyed by stored value, addressed by
+        /// the REFERENCE itself rather than by a table + column pair.
+        ///
+        /// The change log knows which reference a column draws on
+        /// (AD_Column.AD_Reference_Value_ID) but has no use for the column's own
+        /// name, so this is the form it needs — and it costs one lookup per
+        /// reference rather than one per column.
+        ///
+        /// Resolved in the reader's own language, falling back to the untranslated
+        /// name and then to the stored value itself.
+        /// </summary>
+        /// <param name="ctx">User context (language).</param>
+        /// <param name="referenceId">AD_Column.AD_Reference_Value_ID.</param>
+        /// <returns>Stored value to label; empty when the reference names nothing.</returns>
+        private Dictionary<string, string> LoadRefListLabelsById(Ctx ctx, int referenceId)
+        {
+            Dictionary<string, string> labels;
+            if (_refListCache.TryGetValue(referenceId, out labels)) return labels;
+
+            labels = new Dictionary<string, string>();
+            try
+            {
+                // Two binds, each occurring once, in the order they appear.
+                string sql = @"SELECT rl.Value,
+                                      COALESCE(rlt.Name, rl.Name, rl.Value) AS DisplayName
+                               FROM AD_Ref_List rl
+                               LEFT OUTER JOIN AD_Ref_List_Trl rlt ON (rlt.AD_Ref_List_ID=rl.AD_Ref_List_ID
+                                                                       AND rlt.AD_Language=@AD_Language
+                                                                       AND rlt.IsActive='Y')
+                               WHERE rl.AD_Reference_ID=@AD_Reference_ID
+                                 AND rl.IsActive='Y'";
+
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Language", ctx == null ? "en_US" : ctx.GetAD_Language()),
+                    new SqlParameter("@AD_Reference_ID", referenceId)
+                };
+
+                DataSet ds = Query(sql, param, "LoadRefListLabelsById(" + referenceId + ")");
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        string code = Util.GetValueOfString(r["Value"]);
+                        if (!string.IsNullOrEmpty(code) && !labels.ContainsKey(code))
+                            labels[code] = Util.GetValueOfString(r["DisplayName"]);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: without labels the panel shows the stored code, which
+                // is still better than showing nothing.
+                _log.Severe("VAS_190 LoadRefListLabelsById(" + referenceId + "): " + ex.Message);
+            }
+
+            _refListCache[referenceId] = labels;
+            return labels;
+        }
+
+        /// <summary>Reference labels already resolved on this request. A product's
+        /// change log revisits the same few references over and over.</summary>
+        private readonly Dictionary<int, Dictionary<string, string>> _refListCache =
+            new Dictionary<int, Dictionary<string, string>>();
+
+        /// <summary>
+        /// The first of the candidate columns that exists on the table, or an empty
+        /// string when it has none of them. Used to pick a referenced table's
+        /// identifier without assuming every table names it the same way.
+        /// </summary>
+        private string FirstExistingColumn(string tableName, string[] candidates)
+        {
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                if (ColumnExists(tableName, candidates[i])) return candidates[i];
+            }
+            return "";
         }
 
         /// <summary>
@@ -2365,6 +2586,13 @@ namespace VASLogic.Models
             /// <summary>How many BASE units one of this unit is worth.</summary>
             public decimal RateToBase        { get; set; }
             public bool    IsProductSpecific { get; set; }
+            /// <summary>This unit is the product's PURCHASE uom
+            /// (M_Product.C_UOM_Purchase_ID) — the unit its purchase documents are
+            /// keyed in. False on a schema without the column.</summary>
+            public bool    IsPurchaseUom     { get; set; }
+            /// <summary>This unit is the product's SALES uom
+            /// (M_Product.C_UOM_Sales_ID).</summary>
+            public bool    IsSalesUom        { get; set; }
         }
 
         public class PricingRowData

@@ -498,9 +498,18 @@
    into a crammed 4-up one. Matches VAS_099_OverviewGRN and VAS_102. */
 @container (max-width: 700px) {
     .vas_098-stats { grid-template-columns:repeat(2, minmax(0, 1fr)) }
-    /* Four columns need proportionally less room before they have to scroll. */
-    .vas_098-itrow { grid-template-columns:minmax(0,1.8fr) minmax(0,1fr) minmax(0,0.6fr) minmax(0,1.1fr); min-width:360px }
-    .vas_098-itrow > :nth-child(5), .vas_098-itrow > :nth-child(6) { display:none }
+    /* The last two columns are NO LONGER DROPPED here. They used to be
+       display:none under 700px, which is every single-record view — so the panel
+       silently lost two of its six item columns exactly where a reader has the
+       record open to study it, with nothing on screen to say they existed.
+
+       The table already scrolls horizontally at any width (.vas_098-items carries
+       overflow-x:auto and the rows a min-width), which is this file's own stated
+       answer to a narrow panel: "the reader scrolls to the last columns instead
+       of losing them off the edge". Keeping all six tracks and raising the row's
+       min-width applies that answer here too — the columns move out of view
+       reachably rather than being deleted. */
+    .vas_098-itrow { min-width:560px }
 }
 @container (max-width: 460px) {
     .vas_098-hdrCard { grid-template-columns:1fr }

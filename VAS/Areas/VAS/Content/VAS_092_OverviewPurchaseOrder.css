@@ -130,6 +130,18 @@
  *                        vas_092- prefix too. Sharing a name with a base-theme
  *                        rule meant the base design won and repainted the
  *                        panel; scoping them to the panel ends that.
+ *   VAI163   2026-08-14  - A vendor contact bit (.vas_092-contactBit) can now
+ *                          SHRINK and break inside itself. A flex item's default
+ *                          min-width is the widest its content can be, so a long
+ *                          e-mail address refused to narrow, overflowed the 40%
+ *                          vendor column and printed over the terms column beside
+ *                          it — visible in the single-record view, where the
+ *                          panel is narrow enough for the address to exceed its
+ *                          column. The icon now holds to the first line rather
+ *                          than centring against a wrapped address.
+ *                        - Added .vas_092-flagMark / -flag-on / -flag-off: the
+ *                          tick / cross a yes-no header field (Drop Shipment) is
+ *                          drawn as.
  ***********************************************************/
 
 .vas_092-root {
@@ -419,10 +431,51 @@
     font-size: 0.75em;
     color: var(--vaspo-text);
     margin-top: 0.375em;
+    min-width: 0;
 }
 
-.vas_092-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
-.vas_092-contactBit .vas_092-ic { color: var(--vaspo-action); }
+/* A contact bit must be allowed to SHRINK. A flex item defaults to
+   min-width:auto, which is the widest its content can be — so a long e-mail
+   address (akshay.kumar+12@viennasolutions.com) refused to narrow, pushed past
+   the 40% vendor column and printed straight over the terms column beside it.
+   The single-record view is where it shows, because that is where the panel is
+   narrow enough for the address to exceed its column.
+
+   min-width:0 lets the bit shrink, max-width caps it at the column, and the
+   address breaks inside itself — it has no space to wrap at, so a plain wrap
+   would not help. The icon holds to the first line (align-items:flex-start)
+   rather than centring itself against a two-line address. */
+.vas_092-contactBit {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 0.4375em;
+    min-width: 0;
+    max-width: 100%;
+}
+.vas_092-contactBit .vas_092-ic { color: var(--vaspo-action); margin-top: 0.15em; }
+.vas_092-contactBit > span {
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
+}
+
+/* ----------------------------------------------------------- */
+/*  Yes / no marker (Drop Shipment)                             */
+/* ----------------------------------------------------------- */
+/* A tick or a cross rather than the words. The header's terms column runs two
+   fields wide in a side panel, and "Yes" / "No" carry no more meaning than a
+   mark does while taking a whole field's line to say it. The word still travels
+   as the field's tooltip and the mark's aria-label, so the glyph is never the
+   only statement of what it means. */
+.vas_092-flagMark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.125em;
+}
+.vas_092-flagMark.vas_092-flag-on  { color: var(--vaspo-success-tx); }
+.vas_092-flagMark.vas_092-flag-off { color: var(--vaspo-muted); opacity: .7; }
 
 .vas_092-ic { display: inline-flex; align-items: center; flex: none; }
 .vas_092-ic svg { display: block; }
@@ -763,19 +816,30 @@
     line-height: 1.35;
 }
 
-/* The headline (note text / e-mail subject) and, for an e-mail, the recipient
-   beneath it. Each line clips on its own so the row height stays predictable. */
+/* The headline (note text / e-mail subject) and, for an e-mail, the recipients
+   beneath it. The headline clips to one line so the row height stays predictable
+   — it has a tooltip carrying the whole of it. */
 .vas_092-actLead,
 .vas_092-actSub {
     display: block;
+}
+.vas_092-actLead {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* The recipient line WRAPS instead of clipping: it lists the mail's addresses
+   in full, and an address cut off mid-domain identifies nobody. break-word
+   rather than a plain wrap, since a single long address has no space in it to
+   break at. */
 .vas_092-actSub {
     font-size: 0.8462em; /* ~0.6875em against the body anchor */
     color: var(--vaspo-muted);
     margin-top: 0.125em;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
 }
 
 /* An activity carrying a body (e-mail) opens on click. */
@@ -804,10 +868,14 @@
     line-height: 1.55;
 }
 .vas_092-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+/* The opened message's From / To / Cc / Bcc lines break on the address too, so
+   a long recipient list stays inside the panel. */
 .vas_092-actMeta {
     font-size: 0.8462em;
     color: var(--vaspo-muted);
     margin-bottom: 0.3125em;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 [dir="rtl"] .vas_092-actBody { padding-left: 0.875em; padding-right: 2.5em; }

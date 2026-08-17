@@ -3,7 +3,7 @@
  * Purpose        : Sales Order Overview tab panel. Renders a review-and-act
  *                  overview of the selected sales order (C_Order, IsSOTrx = 'Y'):
  *                  header identity, customer + addresses, created-from origin
- *                  documents, KPI strip, a 6-stage order progress stepper and
+ *                  documents, KPI strip, a 7-stage order progress stepper and
  *                  collapsible sections — Order Lines (with per-line contract
  *                  flow), Delivery Readiness, Deliveries, Invoices, Notes and
  *                  Activity, each drawn only when it has something to show. Data
@@ -238,6 +238,88 @@
  *                          says so beside the state that got it there, instead of
  *                          only in the Order Progress heading. Still drawn only once
  *                          the order IS posted.
+ *   VAI163   2026-08-17  - The progress line runs SEVEN stages: Partial Delivered
+ *                          joins it between Shipped and Delivered, done once
+ *                          anything has gone out against a stock line and counted
+ *                          in lines (started / total) like Delivered beside it. An
+ *                          order spends most of its delivery in that state and the
+ *                          line jumped straight from Shipped to Delivered.
+ *                          fulfilment() gained `started` for it.
+ *                        - The Disc column is drawn only when a line actually
+ *                          carries a discount (hasDiscountLines). An order sold at
+ *                          list price spent a column on a blank in every row; the
+ *                          table now runs one track narrower
+ *                          (vas_106-no-discount), and the change-history drawer
+ *                          drops the column with it so its figures stay under the
+ *                          right headings.
+ *                        - The Delivered cell puts its status line on TOP and the
+ *                          delivered / ordered ratio (.vas_106-progQty) beneath it,
+ *                          rather than the two sharing a row where the ratio was
+ *                          what a narrow column squeezed out.
+ *                        - The unit price carries the line's LIST price
+ *                          (C_OrderLine.PriceList, model side) on a hover tooltip.
+ *                          What the line was sold at is the figure the table is
+ *                          for; what it would have cost at list is the context, and
+ *                          it does not need a column of its own.
+ *                        - Delivery Readiness reports "Partially Delivered" for a
+ *                          line part of which has already shipped (model side).
+ *                          "Ready to ship" and "Short by n" are both statements
+ *                          about STOCK and neither says the delivery is under way.
+ *                          The quantities behind it are on the pill's tooltip.
+ *   VAI163   2026-08-17  - Created From gains the CONTRACT chip: the contract
+ *                          master on the header or the service contract behind a
+ *                          line, whichever the order carries (ContractTable says
+ *                          which, so the chip opens the right record). The model
+ *                          has read it since 12 Aug but nothing drew it, so an
+ *                          order raised against a contract still read "Manual".
+ *                        - The Project chip names the project by its NUMBER
+ *                          (C_Project.Value), with the name on its tooltip: the
+ *                          strip identifies documents, and the name was the one
+ *                          thing on it that is not an identifier.
+ *                        - The per-line history toggle moved out of the product
+ *                          name into an action column of its own, straight after
+ *                          Delivered (.vas_106-itAct) — the PO overview's shape.
+ *                          Inside the name it competed with the product for the
+ *                          widest cell in the table and shifted from row to row
+ *                          with the length of the name it followed. The column is
+ *                          drawn on every row, empty where a line was never edited.
+ *                        - Delivery Readiness gives the UOM a COLUMN of its own
+ *                          after the product name. It used to lead the name on the
+ *                          same line, where it read as part of it and gave the
+ *                          reader no column to scan when rows are counted in
+ *                          different units.
+ *   VAI163   2026-08-17  - Delivery Readiness tags ONLY a shortage. A pill on every
+ *                          row is no signal at all; the one state that asks
+ *                          something of the reader is stock the warehouse cannot
+ *                          cover, so Fully delivered / Partially Delivered / Ready
+ *                          to ship leave the cell blank. The shortage names its
+ *                          unit, and every quantity in the section is now the
+ *                          PRODUCT's base unit (model side) — this is a stock
+ *                          question, and stock is counted in base units.
+ *                        - Shipped and Delivered are dated by when the delivery
+ *                          RECORD was raised (M_InOut.Created, model side) rather
+ *                          than by its movement date, which a user can back-date.
+ *                        - A delivery stage with nothing delivered reads "Pending"
+ *                          instead of "0/1": the count is carried only once
+ *                          something has actually shipped, so a bare zero cannot
+ *                          pose as a measured result.
+ *                        - Section headings are the title alone — no leading icon,
+ *                          no trailing count badge (collapsible() takes id + title
+ *                          now, and documentsSummary() is gone with the caption it
+ *                          built). The badges counted rows the reader can see.
+ *                        - Each order line states Drop Shipment: Yes / No as a
+ *                          third detail under the unit (C_OrderLine.IsDropShip,
+ *                          model side). Drawn on every line: which lines we are
+ *                          expected to ship is the point of the answer, so a line
+ *                          that is NOT dropped has to say so.
+ *                        - Activity reports edits FIELD BY FIELD: an "Updated" row
+ *                          per changed column (AD_ChangeLog, model side) headlining
+ *                          with the field's name, so the feed reads "Updated
+ *                          <field> · <when> · by <who>". The completed-order
+ *                          milestone is typed "Completed" now — "Updated" means an
+ *                          edit.
+ *                        - A shipment reports the value it DELIVERED in the
+ *                          Documents Amount column (model side); it was blank.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -528,12 +610,22 @@
         }
 
         // Fulfilment: fully-delivered stock lines / total stock lines.
+        //
+        // `started` counts the lines something has gone out against, whether or not
+        // it finished them. That is the Partial Delivered stage of the progress
+        // line: an order can sit there for as long as its deliveries take, and
+        // `full` alone cannot tell that state from one where nothing has shipped.
         function fulfilment() {
-            var st = stockLines(), full = 0;
+            var st = stockLines(), full = 0, started = 0;
             for (var i = 0; i < st.length; i++) {
-                if (st[i].QtyOrdered > 0 && st[i].QtyDelivered >= st[i].QtyOrdered) full++;
+                var ord = +st[i].QtyOrdered || 0, del = +st[i].QtyDelivered || 0;
+                if (ord > 0 && del >= ord) full++;
+                if (del > 0) started++;
             }
-            return { full: full, total: st.length, pct: st.length ? Math.round(full / st.length * 100) : 0 };
+            return {
+                full: full, started: started, total: st.length,
+                pct: st.length ? Math.round(full / st.length * 100) : 0
+            };
         }
 
         // Invoiced: Σ invoice grand totals vs order grand total + payment state.
@@ -791,10 +883,39 @@
                     "VAS_Opportunity", data.OpportunityId));
                 any = true;
             }
+            // The project this order was raised for, named by its NUMBER
+            // (C_Project.Value): the strip identifies documents, and it was showing
+            // the project's name — which is the one thing on it that is not an
+            // identifier. The name moves onto the chip's tooltip.
             if (data.ProjectId) {
-                $chips.append(originChip("folder", getMsg("VAS_106_Project", "Project"),
-                    data.ProjectName || ("#" + data.ProjectId), null, "muted",
-                    "C_Project", data.ProjectId));
+                var $proj = originChip("folder", getMsg("VAS_106_Project", "Project"),
+                    data.ProjectNo || data.ProjectName || ("#" + data.ProjectId), null, "muted",
+                    "C_Project", data.ProjectId);
+                if (data.ProjectName) $proj.attr("title", data.ProjectName);
+                $chips.append($proj);
+                any = true;
+            }
+            // The contract this order references: the contract master on the header
+            // (C_Order.VAS_ContractMaster_ID) or the service contract behind one of
+            // the lines (C_OrderLine.C_Contract_ID), whichever the order carries —
+            // ContractTable says which, so the chip opens the right record. An order
+            // raised against a contract reported no origin at all and the strip
+            // called it "Manual".
+            //
+            // No window is named: a contract's screen belongs to a module and cannot
+            // be hard-coded here, so openRecord falls through to asking the server
+            // which window the TABLE opens in.
+            if (data.ContractId > 0 && data.ContractTable) {
+                var contractNo = data.ContractNo || ("#" + data.ContractId);
+                var $con = originChip("fileText", getMsg("VAS_106_Contract", "Contract"),
+                    contractNo, null, "info", data.ContractTable, data.ContractId);
+                // Several lines can each carry their own contract; the chip names the
+                // first and its tooltip says how many there are.
+                if (data.ContractCount > 1) {
+                    $con.attr("title", contractNo + " +" + (data.ContractCount - 1) + " " +
+                        getMsg("VAS_106_MoreContracts", "more"));
+                }
+                $chips.append($con);
                 any = true;
             }
             if (!any) {
@@ -898,14 +1019,20 @@
         //  Order Progress stepper                                            //
         // ----------------------------------------------------------------- //
 
-        // The latest delivery raised against this order — the moment the goods
-        // actually went out, for the Delivered stage. Taken as the maximum
-        // movement date rather than the first row, so the stage does not depend on
-        // the order the server happened to return them in.
+        // The latest delivery raised against this order, for the Shipped and
+        // Delivered stages. Taken as the maximum rather than the first row, so the
+        // stage does not depend on the order the server happened to return them in.
+        //
+        // Dated by when the delivery RECORD was created (M_InOut.Created), not by
+        // its movement date: the movement date is a document field a user can
+        // back-date or set forward, so the stage could report a day on which nothing
+        // had yet been entered. It is a real timestamp, so it is read as UTC and
+        // rendered in the viewer's own zone; MovementDate remains the fallback for a
+        // shipment whose create stamp cannot be read.
         function lastDeliveryDate() {
             var dv = data.Deliveries || [], best = null;
             for (var i = 0; i < dv.length; i++) {
-                var d = parseDbDate(dv[i].MovementDate, false);
+                var d = parseDbDate(dv[i].Created, true) || parseDbDate(dv[i].MovementDate, false);
                 if (d && (!best || d > best)) best = d;
             }
             return best;
@@ -916,6 +1043,12 @@
             var completed = isCompleted();
             var shipped = dv.length > 0;
             var delivered = f.total > 0 ? (f.full >= f.total) : shipped;
+            // Partial Delivered is a stage the order PASSES THROUGH, not a state it
+            // is either in or out of: an order that is delivered in full reached
+            // this point on the way, so the stage stays done behind it. Anything
+            // shipped against a stock line puts the order here; an order with no
+            // stock lines at all follows its shipments, as Delivered does.
+            var partDelivered = f.total > 0 ? (f.started > 0 || delivered) : shipped;
             var invd = iv.amount > 0;
             var paid = inv.length > 0 && iv.state === getMsg("VAS_106_Paid", "paid");
             var lastDelivery = lastDeliveryDate();
@@ -929,10 +1062,21 @@
                 { key: "VAS_106_Completed", label: "Completed", done: completed,
                   date: completed ? (data.CompletedDate || data.DateOrdered) : null },
                 { key: "VAS_106_Shipped",   label: "Shipped",   done: shipped,   date: lastDelivery },
+                // Delivery in progress: some of the order has gone out, the rest has
+                // not. Counted in LINES, like Delivered beside it — the lines
+                // anything has shipped against, out of the stock lines there are.
+                //
+                // The count is only carried once something HAS shipped. A stage that
+                // nothing has reached yet showed "0/1", which reads as a measured
+                // result; with no count the stepper says "Pending", which is what a
+                // stage waiting on a delivery that does not exist actually means.
+                { key: "VAS_106_PartialDelivered", label: "Partial Delivered",
+                  done: partDelivered, date: partDelivered ? lastDelivery : null,
+                  meta: (f.total && f.started > 0) ? (f.started + "/" + f.total) : null },
                 // Dated by the LATEST delivery raised against the order — the
                 // delivery that carried it to this state.
                 { key: "VAS_106_Delivered", label: "Delivered", done: delivered, date: lastDelivery,
-                  meta: (f.total ? (f.full + "/" + f.total) : null) },
+                  meta: (f.total && f.full > 0) ? (f.full + "/" + f.total) : null },
                 { key: "VAS_106_Invoiced",  label: "Invoiced",  done: invd,      date: null,
                   meta: invd ? (iv.pct + "%") : null },
                 { key: "VAS_106_Paid",      label: "Paid",      done: paid,      date: null }
@@ -1002,22 +1146,23 @@
         //  Section shell                                                     //
         // ----------------------------------------------------------------- //
 
-        // A headed section: icon, title, optional count badge, then its body.
+        // A headed section: the title, then its body.
         //
-        // It no longer collapses. The chevron and the click that drove it are
-        // gone, and the header is a plain div rather than a button — every section
-        // is simply open, always. Collapsing was a control the reader had to
-        // operate to see what they came for, and a section that has nothing to
-        // show is now not drawn at all, so there is nothing left worth folding
-        // away. The `id` still lands on the section as data-sec, which is what
-        // identifies it in the DOM.
-        function collapsible(id, iconName, title, badgeText) {
+        // Just the title. The icon that led it and the count badge that followed it
+        // are both gone: the icon decorated a heading that already names itself, and
+        // the badge counted rows the reader can see — a number restating the table
+        // under it, and on Documents a second summary of the same rows. The headings
+        // read as headings now.
+        //
+        // It does not collapse either. The chevron and the click that drove it went
+        // earlier, and the header is a plain div rather than a button — every
+        // section is simply open, always. A section with nothing to show is not
+        // drawn at all, so there is nothing left worth folding away. The `id` still
+        // lands on the section as data-sec, which is what identifies it in the DOM.
+        function collapsible(id, title) {
             var $sec = $('<section class="vas_106-dsec"></section>').attr("data-sec", id);
             var $head = $('<div class="vas_106-dsecHead"></div>');
-            $head.append($('<span class="vas_106-tIc"></span>').append(svgIcon(iconName)));
             $head.append($('<span class="vas_106-dsecTitle"></span>').text(title));
-            if (badgeText != null && badgeText !== "")
-                $head.append($('<span class="vas_106-badge"></span>').text(badgeText));
             var $bodyWrap = $('<div class="vas_106-dsecBody"></div>');
             $sec.append($head).append($bodyWrap);
             $body.append($sec);
@@ -1049,21 +1194,45 @@
             return false;
         }
 
+        // True when at least one line was actually discounted
+        // (C_OrderLine.Discount). An order sold at list price carries a zero in
+        // every one of those cells, and a column of blanks says nothing that the
+        // line total does not already say — so the column is not drawn at all and
+        // the table runs one track narrower (vas_106-no-discount). The change
+        // history drawer follows the same decision, so its figures stay under the
+        // columns of the line they hang beneath.
+        function hasDiscountLines() {
+            var lines = data.Lines || [];
+            for (var i = 0; i < lines.length; i++) {
+                if (+lines[i].Discount) return true;
+            }
+            return false;
+        }
+
         function renderOrderLines() {
             var lines = data.Lines || [];
             if (!lines.length) return;
-            var $wrap = collapsible("lines", "list", getMsg("VAS_106_OrderLines", "Order Lines"), lines.length);
+            var $wrap = collapsible("lines", getMsg("VAS_106_OrderLines", "Order Lines"));
 
             var showContract = hasContractLines();
+            var showDiscount = hasDiscountLines();
             var $tbl = $('<div class="vas_106-table vas_106-linesTable"></div>');
             if (!showContract) $tbl.addClass("vas_106-no-contract");
+            if (!showDiscount) $tbl.addClass("vas_106-no-discount");
             var $h = $('<div class="vas_106-tRow vas_106-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_106_ProductService", "Product / Service")));
             $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_Qty", "Qty")));
             $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_UnitPrice", "Unit price")));
-            $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_Disc", "Disc")));
+            if (showDiscount) {
+                $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_Disc", "Disc")));
+            }
             $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_LineTotal", "Line total")));
             $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_Delivered", "Delivered")));
+            // Action column, straight after Delivered: the per-line history toggle.
+            // Deliberately unlabelled — the button carries its own tooltip — and
+            // always present, so every row sits on the same grid whether or not its
+            // line was ever edited. Follows VAS_092.
+            $h.append($('<span></span>'));
             if (showContract) {
                 $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_Contract", "Contract")));
             }
@@ -1105,8 +1274,8 @@
                 $tbl.find(".vas_106-tBody, .vas_106-lineHist").remove();
                 for (var i = start; i < end; i++) {
                     var hist = histByLine[lines[i].C_OrderLine_ID] || [];
-                    $foot.before(buildLineRow(lines[i], showContract, hist));
-                    if (hist.length) $foot.before(buildLineHistory(lines[i], hist));
+                    $foot.before(buildLineRow(lines[i], showContract, showDiscount, hist));
+                    if (hist.length) $foot.before(buildLineHistory(lines[i], hist, showDiscount));
                 }
 
                 buildPager($pager, linesPage, pageCount, lines.length, start, end,
@@ -1134,9 +1303,10 @@
             return byLine;
         }
 
-        // The per-line affordance: an icon button at the end of the item cell that
-        // opens the drawer sitting immediately beneath the row. Icon-only keeps the
-        // cell narrow, so the tooltip carries the meaning and the change count.
+        // The per-line affordance: an icon button in the action column after
+        // Delivered that opens the drawer sitting immediately beneath the row.
+        // Icon-only keeps the column narrow, so the tooltip (and the aria-label)
+        // carries the meaning and the change count.
         function buildHistToggle(ln, hist) {
             var open = !!lineHistOpen[ln.C_OrderLine_ID];
 
@@ -1173,7 +1343,7 @@
         // timestamp in place of the item (the item is the line it hangs under),
         // then Qty, Unit price, Disc and Line total exactly as the line renders
         // them, and finally who made the change in the Delivered column's track.
-        function buildLineHistory(ln, rows) {
+        function buildLineHistory(ln, rows, showDiscount) {
             var $wrap = $('<div class="vas_106-lineHist"></div>');
             if (!lineHistOpen[ln.C_OrderLine_ID]) $wrap.hide();
 
@@ -1183,18 +1353,23 @@
             $h.append($('<span></span>').text(getMsg("VAS_106_ChangedOn", "Changed on")));
             $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_Qty", "Qty")));
             $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_UnitPrice", "Unit price")));
-            $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_Disc", "Disc")));
+            // Disc only when the table above carries it: the drawer sits on the
+            // lines table's own tracks, so a column here that the line has not got
+            // would put every figure under the wrong heading.
+            if (showDiscount) {
+                $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_Disc", "Disc")));
+            }
             $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_LineTotal", "Line total")));
             $h.append($('<span class="vas_106-ta-r"></span>').text(getMsg("VAS_106_UpdatedBy", "Updated by")));
             $tbl.append($h);
 
-            for (var i = 0; i < rows.length; i++) $tbl.append(buildLineHistoryRow(rows[i]));
+            for (var i = 0; i < rows.length; i++) $tbl.append(buildLineHistoryRow(rows[i], showDiscount));
 
             $wrap.append($tbl);
             return $wrap;
         }
 
-        function buildLineHistoryRow(h) {
+        function buildLineHistoryRow(h, showDiscount) {
             var $r = $('<div class="vas_106-tRow vas_106-tBody"></div>');
 
             // Local system time (formatDateTime converts the UTC-stored value),
@@ -1212,8 +1387,10 @@
 
             $r.append($('<span class="vas_106-ta-r"></span>').text(formatAmount(
                 +h.PriceEntered || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
-            $r.append($('<span class="vas_106-ta-c"></span>').text(
-                (+h.Discount ? formatNumber(+h.Discount, 0) + "%" : "")));
+            if (showDiscount) {
+                $r.append($('<span class="vas_106-ta-c"></span>').text(
+                    (+h.Discount ? formatNumber(+h.Discount, 0) + "%" : "")));
+            }
             $r.append($('<span class="vas_106-ta-r"></span>').text(formatAmount(
                 +h.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
 
@@ -1225,7 +1402,7 @@
             return $r;
         }
 
-        function buildLineRow(ln, showContract, hist) {
+        function buildLineRow(ln, showContract, showDiscount, hist) {
             var $tr = $('<div class="vas_106-tRow vas_106-tBody"></div>').attr("data-line", ln.C_OrderLine_ID);
 
             // Product / service identity: name, the attribute set instance it was
@@ -1237,10 +1414,11 @@
             var pname = ln.ProductName || "";
             var $name = $('<div class="vas_106-itName"></div>').text(pname);
             if (pname) $name.attr("title", pname);
-            // The history button rides at the end of the name line, so the drawer
-            // it opens is reachable from the line it belongs to without spending a
-            // column of the table on an affordance most lines do not carry.
-            if (hist && hist.length) $name.append(buildHistToggle(ln, hist));
+            // The history button no longer rides at the end of the name: it has its
+            // own action column after Delivered (see below), where the PO overview
+            // puts it. Sitting inside the name it competed with the product for the
+            // widest cell in the table, and moved from row to row with the length of
+            // the name it followed.
             $item.append($name);
 
             // Lot / serial / attributes sit directly under the product name — the
@@ -1264,18 +1442,52 @@
             if (uomLabel) sub += (sub ? " · " : "") + uomLabel;
             else if (ln.LineType === "charge" && ln.ChargeName) sub += " · " + ln.ChargeName;
             if (sub) $item.append($('<div class="vas_106-itSku"></div>').text(sub).attr("title", sub));
+
+            // A third line: whether the goods on this line go straight to the
+            // customer (C_OrderLine.IsDropShip). Stated on EVERY line, Yes or No —
+            // drawn only for a line that is dropped, the reader could not tell a
+            // line that is not from one the panel had nothing to say about, and
+            // which lines we are expected to ship is the point of the answer.
+            var dropLabel = getMsg("VAS_106_DropShipment", "Drop Shipment") + ": " +
+                (ln.IsDropShip ? getMsg("VAS_106_Yes", "Yes") : getMsg("VAS_106_No", "No"));
+            var $drop = $('<div class="vas_106-itDrop"></div>').text(dropLabel).attr("title", dropLabel);
+            if (ln.IsDropShip) $drop.addClass("vas_106-is-drop");
+            $item.append($drop);
             $tr.append($item);
 
             var uomP = +ln.UOMPrecision || 0;
             $tr.append($('<span class="vas_106-ta-c"></span>').text(formatNumber(+ln.QtyOrdered || 0, uomP)));
-            $tr.append($('<span class="vas_106-ta-r"></span>').text(formatAmount(+ln.PriceActual || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
-            $tr.append($('<span class="vas_106-ta-c"></span>').text((+ln.Discount ? formatNumber(+ln.Discount, 0) + "%" : "")));
+
+            // Unit price, with the line's LIST price on its hover tooltip
+            // (C_OrderLine.PriceList, model side). What a line was sold at is the
+            // figure the table is for; what it would have cost at list is the
+            // context for it, and it costs a column of its own to print. A line
+            // carrying no list price simply has no tooltip.
+            var $price = $('<span class="vas_106-ta-r"></span>')
+                .text(formatAmount(+ln.PriceActual || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision));
+            if (+ln.PriceList) {
+                $price.addClass("vas_106-hasTip").attr("title",
+                    getMsg("VAS_106_ListPrice", "List price") + ": " +
+                    formatAmount(+ln.PriceList, data.CurSymbol, data.ISO_Code, data.StdPrecision));
+            }
+            $tr.append($price);
+
+            // Disc only when some line on the order carries one.
+            if (showDiscount) {
+                $tr.append($('<span class="vas_106-ta-c"></span>').text((+ln.Discount ? formatNumber(+ln.Discount, 0) + "%" : "")));
+            }
             $tr.append($('<span class="vas_106-ta-r"></span>').text(formatAmount(+ln.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
 
             // Delivered — stockable lines only; a service / charge line is not
             // delivered at all, so its cell is left EMPTY rather than dashed. A
             // dash reads as a value that could not be worked out; nothing reads as
             // "this does not apply here", which is the truth.
+            //
+            // The status line sits ON TOP with the delivered / ordered ratio under
+            // it, rather than the two sharing a row. Side by side, the bar took the
+            // width the figures needed and the ratio was the first thing to be
+            // squeezed out of a narrow column; stacked, each gets the cell's full
+            // width and the line reads as the heading for the figure below it.
             if (ln.LineType === "product") {
                 var ordered = +ln.QtyOrdered || 0, delivered = +ln.QtyDelivered || 0;
                 var pct = ordered > 0 ? Math.round(delivered / ordered * 100) : 0;
@@ -1283,11 +1495,20 @@
                 var $bar = $('<span class="vas_106-progBar"><i></i></span>');
                 $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
                 $prog.append($bar);
-                $prog.append(document.createTextNode(formatNumber(delivered, uomP) + "/" + formatNumber(ordered, uomP)));
+                $prog.append($('<span class="vas_106-progQty"></span>').text(
+                    formatNumber(delivered, uomP) + "/" + formatNumber(ordered, uomP)));
                 $tr.append($prog);
             } else {
                 $tr.append($('<span class="vas_106-ta-r"></span>'));
             }
+
+            // The action column, immediately after Delivered: the history toggle for
+            // a line that was edited, an empty cell for one that was not — so the
+            // grid is the same on every row. The drawer it opens is this row's next
+            // sibling, which is what the toggle looks for.
+            var $act = $('<span class="vas_106-itAct"></span>');
+            if (hist && hist.length) $act.append(buildHistToggle(ln, hist));
+            $tr.append($act);
 
             // Contract — only when the order HAS a service line to carry one.
             if (showContract) $tr.append(buildContractCell(ln));
@@ -1347,13 +1568,16 @@
         function renderDeliveryReadiness() {
             var rows = data.DeliveryReadiness || [];
             if (!rows.length) return;
-            var rd = readiness();
-            var badge = rd.shortCount > 0 ? (rd.shortCount + " " + getMsg("VAS_106_Short", "short")) : rows.length;
-            var $wrap = collapsible("readiness", "cube", getMsg("VAS_106_DeliveryReadiness", "Delivery Readiness"), badge);
+            var $wrap = collapsible("readiness", getMsg("VAS_106_DeliveryReadiness", "Delivery Readiness"));
 
             var $tbl = $('<div class="vas_106-table vas_106-rdTable"></div>');
             var $h = $('<div class="vas_106-tRow vas_106-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_106_Item", "Item")));
+            // The unit has a column of its own, straight after the product. It used
+            // to lead the product name on the same line, which read as part of the
+            // name and gave the reader no column to scan down when the rows are
+            // counted in different units.
+            $h.append($('<span></span>').text(getMsg("VAS_106_UOM", "UOM")));
             $h.append($('<span></span>').text(getMsg("VAS_106_Warehouse", "Warehouse")));
             $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_PendingToDeliver", "Pending to Deliver")));
             $h.append($('<span class="vas_106-ta-c"></span>').text(getMsg("VAS_106_OnHand", "On Hand")));
@@ -1386,26 +1610,20 @@
             var $note = $('<div class="vas_106-note"></div>');
             $note.append(svgIcon("info"));
             $note.append($('<span></span>').text(getMsg("VAS_106_ReadinessNote",
-                "On Hand = physical stock in the warehouse right now · Service lines excluded — readiness tracks stockable items against the next delivery")));
+                "On Hand = physical stock in the warehouse right now · Quantities are in the product's base unit · Service lines excluded — readiness tracks stockable items against the next delivery")));
             $wrap.append($note);
         }
 
         function buildReadinessRow(rd) {
             var $tr = $('<div class="vas_106-tRow vas_106-tBody"></div>');
-            // The UOM leads the product name on the SAME line — "EACH · Bolt M8" —
-            // rather than sitting on a sub-line under it. The quantities in this
-            // table are the whole point of the row, so the unit they are counted in
-            // reads first, with the product it belongs to after it.
-            //
-            // Only the NAME ellipsises: the unit is short and holds its width, so a
-            // long product name is what gives way. Both are on the line's tooltip.
+            // The product NAME leads the row, on its own, and the unit follows in a
+            // column of its own. The unit used to sit in front of the name on the
+            // same line, where it read as part of the name.
             var $item = $('<span class="vas_106-itItem"></span>');
             var rname = rd.ProductName || "";
             var ruom = (rd.UOMName || "").trim();
-            var $rn = $('<div class="vas_106-itName"></div>');
-            if (ruom) $rn.append($('<span class="vas_106-uomTag"></span>').text(ruom));
-            $rn.append($('<span class="vas_106-nameTxt"></span>').text(rname));
-            $rn.attr("title", ruom ? ruom + " · " + rname : rname);
+            var $rn = $('<div class="vas_106-itName"></div>').text(rname);
+            if (rname) $rn.attr("title", rname);
             $item.append($rn);
 
             // Lot / serial / attributes stay under the name — they qualify WHICH
@@ -1415,30 +1633,35 @@
                 $item.append($('<div class="vas_106-itAttr"></div>').text(rasi).attr("title", rasi));
             }
             $tr.append($item);
+            // The product's unit of measure — what every quantity on this row is
+            // counted in.
+            $tr.append($('<span class="vas_106-rdUom"></span>').text(ruom).attr("title", ruom));
             $tr.append($('<span></span>').text(rd.WarehouseName || ""));
             $tr.append($('<span class="vas_106-ta-c"></span>').text(formatNumber(+rd.PendingQty || 0, 0)));
             $tr.append($('<span class="vas_106-ta-c"></span>').text(formatNumber(+rd.QtyOnHand || 0, 0)));
 
-            // Ready / Short only. "Awaited" is gone: it was the fallback state for
-            // a line the server had not classified, and it read as though the goods
-            // were on their way when in fact the warehouse simply does not hold
-            // enough of them — which is exactly what SHORT means. Anything not
-            // ready is now reported as short, by how much.
-            var tag, tone, dot = true;
-            var shortBy = (+rd.PendingQty || 0) - (+rd.QtyOnHand || 0);
-            if (rd.Readiness === "ready") { tag = getMsg("VAS_106_FullyDelivered", "Fully delivered"); tone = "vas_106-ready"; }
-            else if (rd.Readiness === "instock") { tag = getMsg("VAS_106_Ready", "Ready to ship"); tone = "vas_106-ready"; }
-            else {
-                tag = getMsg("VAS_106_ShortBy", "Short by") + " " +
-                      formatNumber(shortBy > 0 ? shortBy : (+rd.PendingQty || 0), 0);
-                tone = "vas_106-short";
-            }
-
+            // ONLY a shortage is tagged.
+            //
+            // The column used to name every state — Fully delivered, Partially
+            // Delivered, Ready to ship, Short by n — which is a pill on every row
+            // and no signal at all. The one state that asks anything of the reader
+            // is the one the warehouse cannot cover, so that is the only one drawn;
+            // the rest leave the cell blank, and the quantities two columns to the
+            // left already say where the line stands.
+            //
+            // The other states are still classified server-side — the Delivery
+            // Readiness KPI card is derived from the same rows.
             var $rt = $('<span class="vas_106-ta-r"></span>');
-            var $pill = $('<span class="vas_106-rdTag"></span>').addClass(tone);
-            if (dot) $pill.append($('<span class="vas_106-rdDot"></span>'));
-            $pill.append($('<span></span>').text(tag));
-            $rt.append($pill);
+            if (rd.Readiness === "short") {
+                var shortBy = (+rd.PendingQty || 0) - (+rd.QtyOnHand || 0);
+                var $pill = $('<span class="vas_106-rdTag vas_106-short"></span>');
+                $pill.append($('<span class="vas_106-rdDot"></span>'));
+                $pill.append($('<span></span>').text(
+                    getMsg("VAS_106_ShortBy", "Short by") + " " +
+                    formatNumber(shortBy > 0 ? shortBy : (+rd.PendingQty || 0), 0) +
+                    (ruom ? " " + ruom : "")));
+                $rt.append($pill);
+            }
             $tr.append($rt);
             return $tr;
         }
@@ -1463,8 +1686,7 @@
             var rows = (data && data.Documents) || [];
             if (!rows.length) return;
 
-            var $wrap = collapsible("documents", "fileText",
-                getMsg("VAS_106_Documents", "Documents"), documentsSummary(rows));
+            var $wrap = collapsible("documents", getMsg("VAS_106_Documents", "Documents"));
 
             var $tbl = $('<div class="vas_106-table vas_106-docTable"></div>');
             var $h = $('<div class="vas_106-tRow vas_106-tHead"></div>');
@@ -1484,20 +1706,9 @@
             $wrap.append($tbl);
         }
 
-        // "2 shipments · 1 invoices" — only the kinds actually present count.
-        function documentsSummary(rows) {
-            var dl = 0, inv = 0, rc = 0;
-            for (var i = 0; i < rows.length; i++) {
-                if (rows[i].Type === "delivery") dl++;
-                else if (rows[i].Type === "invoice") inv++;
-                else if (rows[i].Type === "receipt") rc++;
-            }
-            var bits = [];
-            if (dl)  bits.push(dl + " " + getMsg("VAS_106_ShipmentsCount", "shipments"));
-            if (inv) bits.push(inv + " " + getMsg("VAS_106_InvoicesCount", "invoices"));
-            if (rc)  bits.push(rc + " " + getMsg("VAS_106_ReceiptsCount", "receipts"));
-            return bits.join(" · ");
-        }
+        // documentsSummary() is gone with the section's count badge: it built the
+        // "2 shipments · 1 invoices" caption that headed the table, which counted
+        // rows the reader can see and see the kind of.
 
         function buildDocumentRow(d) {
             var $tr = $('<div class="vas_106-tRow vas_106-tBody"></div>');
@@ -1541,8 +1752,11 @@
             $tr.append($('<span></span>').text(formatDate(d.DocDate) || ""));
             $tr.append($('<span></span>').append(docStatusPill(d.DocStatus)));
 
-            // A shipment carries no amount of its own — the model sends null for
-            // it, which is not the same as a zero.
+            // A shipment has no total of its own, so the model values what it
+            // DELIVERED and sends that (each shipped line at its share of the order
+            // line's net amount) — the column was blank against every shipment. It
+            // still sends null where a document values to nothing at all, which is
+            // not the same as a zero, and a null renders as an empty cell.
             var $amt = $('<span class="vas_106-ta-r"></span>');
             $amt.text((d.Amount === null || d.Amount === undefined)
                 ? ""
@@ -1561,18 +1775,21 @@
         // e-mail rows, and two badges carrying the same envelope in one feed said
         // the opposite of what the badges are for.
         var ACT_TYPES = {
-            Note:     { tone: "info",    icon: "note",  label: "Note" },
-            Email:    { tone: "purple",  icon: "mail",  label: "Email" },
-            Delivery: { tone: "success", icon: "truck", label: "Delivery" },
-            Invoice:  { tone: "warning", icon: "fileText", label: "Invoice" },
-            Created:  { tone: "neutral", icon: "plus",  label: "Created" },
-            Updated:  { tone: "purple",  icon: "pencil", label: "Updated" }
+            Note:      { tone: "info",    icon: "note",  label: "Note" },
+            Email:     { tone: "purple",  icon: "mail",  label: "Email" },
+            Delivery:  { tone: "success", icon: "truck", label: "Delivery" },
+            Invoice:   { tone: "warning", icon: "fileText", label: "Invoice" },
+            Created:   { tone: "neutral", icon: "plus",  label: "Created" },
+            // The order reaching Completed. It used to be typed "Updated", which now
+            // means what it says: a field was edited.
+            Completed: { tone: "success", icon: "check", label: "Completed" },
+            Updated:   { tone: "purple",  icon: "pencil", label: "Updated" }
         };
 
         function renderActivity() {
             var rows = data.Activity || [];
             if (!rows.length) return;
-            var $wrap = collapsible("activity", "clock", getMsg("VAS_106_Activity", "Activity"), rows.length);
+            var $wrap = collapsible("activity", getMsg("VAS_106_Activity", "Activity"));
 
             var $card = $('<div class="vas_106-panelcard"></div>');
             $wrap.append($card);
@@ -1774,8 +1991,18 @@
                 return getMsg("VAS_106_ActDeliveryTxt", "Delivery") + " " + (a.Title || "");
             if (a.EventType === "Created")
                 return getMsg("VAS_106_ActCreatedTxt", "Order created") + (a.Title ? " " + a.Title : "");
-            if (a.EventType === "Updated")
-                return getMsg("VAS_106_ActConfirmedTxt", "Order confirmed") + (a.Title ? " " + a.Title : "");
+            if (a.EventType === "Completed")
+                return getMsg("VAS_106_ActCompletedTxt", "Order completed") + (a.Title ? " " + a.Title : "");
+            // A field-level edit headlines with the FIELD that changed: the badge
+            // beside it already says "Updated", and the field is what tells one edit
+            // apart from the next. When and by whom follow in the usual place, so
+            // the row reads "Updated <field> · <when> · by <who>". A row that names
+            // no field (change logging off for the table) keeps the generic wording.
+            if (a.EventType === "Updated") {
+                return a.FieldName
+                    ? getMsg("VAS_106_ActFieldUpdated", "Updated") + " " + a.FieldName
+                    : getMsg("VAS_106_ActUpdatedTxt", "Order updated") + (a.Title ? " " + a.Title : "");
+            }
             return a.Title || "";
         }
 
@@ -1786,7 +2013,7 @@
         function renderNotes() {
             var rows = data.Notes || [];
             if (!rows.length) return;
-            var $wrap = collapsible("notes", "note", getMsg("VAS_106_Notes", "Notes"), rows.length);
+            var $wrap = collapsible("notes", getMsg("VAS_106_Notes", "Notes"));
 
             var $card = $('<div class="vas_106-panelcard vas_106-notesCard"></div>');
             var $notes = $('<div class="vas_106-notesBody"></div>');
