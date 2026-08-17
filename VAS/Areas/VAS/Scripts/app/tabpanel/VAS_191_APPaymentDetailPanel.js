@@ -200,6 +200,11 @@
            dropped instead of painting over the newer one. */
         var fetchToken = 0;
         var pendingFetch = null;
+        /* A request is on the wire. Together with pendingFetch and shownRecordId
+           this is what lets the panel tell "already loading this record" from
+           "idle", so the two host entry points cannot each start their own load
+           for the same selection. */
+        var inFlight = false;
 
         /* Per-section page state, keyed by section key. Paging one section never
            touches another, and a record change resets every one of them. */
@@ -484,11 +489,36 @@
                 clearTimeout(pendingFetch);
                 pendingFetch = null;
             }
+            /* A superseded request may still be on the wire, but its reply is
+               already condemned by the token bump - it no longer counts as the
+               load in progress. */
+            inFlight = false;
         }
 
         this.abortPendingFetch = invalidateFetch;
 
+        /* True when the panel is already showing, waiting to load, or loading this
+           exact record.
+
+           The host drives the panel from TWO independent entry points for one
+           selection - refreshPanelData() and the tab's dataStatusChanged event -
+           and their order is not guaranteed. Without this test the pair fetched
+           the same payment twice on open: the data-status event got there first,
+           started a load, and refreshPanelData then scheduled a second one
+           regardless. The first reply was discarded by the token check, so the
+           screen was right and only the server saw the duplicate. */
+        function isCurrent(recordID) {
+            var id = +recordID || 0;
+            return id > 0 && id === shownRecordId
+                   && (data !== null || inFlight || pendingFetch !== null);
+        }
+
+        /* An explicit reload (the platform Refresh button, the return from the
+           allocation form, the refresh after a document action) calls fetchData
+           directly and so is never blocked by the guard above. */
         this.scheduleFetch = function (recordID) {
+            if (isCurrent(recordID)) return;
+
             invalidateFetch();
             var token = fetchToken;
             /* Claimed now, not when the timer fires: shownRecordId means "showing
@@ -523,6 +553,7 @@
                 $body.show();
             }
             showBusy(true);
+            inFlight = true;
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/VAS_191_APPaymentDetailPanel/GetPaymentOverview",
                 type: "GET",
@@ -530,8 +561,10 @@
                 data: { C_Payment_ID: recordID },
                 success: function (raw) {
                     /* Reply for a payment the panel has already left. Whoever
-                       superseded us owns the busy indicator now. */
+                       superseded us owns the busy indicator now - and owns the
+                       in-flight flag too, so this reply must not clear it. */
                     if (token !== fetchToken) return;
+                    inFlight = false;
                     data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     pages = {};                // every section back to page 1
                     render();
@@ -539,6 +572,7 @@
                 },
                 error: function (err) {
                     if (token !== fetchToken) return;
+                    inFlight = false;
                     if (window.console) console.log(err);
                     data = null;
                     render();
@@ -588,9 +622,14 @@
                 }
                 return;
             }
+            /* Routed through scheduleFetch, not straight to fetchData, so this
+               entry point goes through the same "already showing / already
+               loading" guard and the same debounce as refreshPanelData. The two
+               can now fire in either order for one selection and still produce a
+               single request. */
             if (rid !== shownRecordId) {
                 $self.record_ID = rid;
-                $self.fetchData(rid);
+                $self.scheduleFetch(rid);
             }
         }
 
@@ -1148,7 +1187,9 @@
                 C_Payment_ID: data.C_Payment_ID,
                 C_Currency_ID: data.C_Currency_ID,
                 DateAcct: data.DateAcct,
-                IsReceipt: data.IsReceipt ? "Y" : "N"
+                IsReceipt: data.IsReceipt ? "Y" : "N",
+                AllocationFrom: "P",
+                AllocationTo: "I"
             };
 
             try {
