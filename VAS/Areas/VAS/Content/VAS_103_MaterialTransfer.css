@@ -50,6 +50,22 @@
  *                        to (.vas_103-toast). The action bar (.vas_103-actions /
  *                        .vas_103-btn) is gone with the Print and Receive
  *                        Transfer buttons it held.
+ *   VAI163   2026-08-14  - The route (.vas_103-route) moved to the header card's
+ *                          RIGHT column, spanning both of its field tracks
+ *                          (grid-column: 1 / -1), and is drawn a size down
+ *                          throughout — smaller node padding, radius, gap and
+ *                          warehouse type. It is reference detail beside the
+ *                          document fields, and at the old size it dominated a
+ *                          card it merely sits in.
+ *                        - The confirmation toggle's tick
+ *                          (.vas_103-cfBtn .vas_103-ic svg) goes 0.85em -> 1.25em,
+ *                          with the pill's padding raised to match so the target
+ *                          grows with the glyph rather than the glyph crowding
+ *                          its own border.
+ *                        - Added .vas_103-actSub: the line an activity edit landed
+ *                          on, taking a row of its own inside the wrapping
+ *                          .vas_103-actMain so the "when · by whom" stays up on
+ *                          the headline's line.
  ***********************************************************/
 
 .vas_103-root {
@@ -287,23 +303,27 @@
 /* ----------------------------------------------------------- */
 /*  Route strip (From -> To)                                    */
 /* ----------------------------------------------------------- */
-/* The route lives INSIDE the header card's left column now, beside the transfer
-   type — it is transfer identity, not a section of its own. Nested in a card it
-   drops the card frame and padding it used to carry as a standalone strip. */
+/* The route lives INSIDE the header card's RIGHT column, closing it under the
+   document fields and spanning both of their tracks. Nested in a card it drops
+   the card frame and padding it carried as a standalone strip, and it is drawn
+   a size down from that strip throughout: the warehouse pair is reference
+   detail beside the document fields, and at the old size it dominated a card it
+   merely sits in. */
 .vas_103-route {
+    grid-column: 1 / -1;     /* both field tracks of .vas_103-hdrColR */
     display: flex;
     align-items: stretch;
-    gap: 0.5em;
-    margin-top: 0.75em;
+    gap: 0.375em;
+    margin-top: 0.125em;
 }
 
 .vas_103-routeNode {
     flex: 1 1 0;
     min-width: 0;
-    border-radius: 10px;
+    border-radius: 8px;
     background: #F5F9FD;
     border: 1px solid var(--mt-row-div);
-    padding: 0.625em 0.75em;
+    padding: 0.4375em 0.625em;
 }
 .vas_103-routeLbl {
     font-size: 0.6875em;
@@ -313,10 +333,10 @@
     color: var(--mt-muted);
 }
 .vas_103-routeWh {
-    font-size: 0.9375em;
+    font-size: 0.875em;
     font-weight: 700;
     color: var(--mt-text);
-    margin-top: 0.25em;
+    margin-top: 0.125em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -646,7 +666,7 @@
     flex: none;
     display: inline-flex;
     align-items: center;
-    padding: 0.125em 0.3125em;
+    padding: 0.25em 0.4375em;
     border: 1px solid var(--mt-card-bd);
     border-radius: 999px;
     line-height: 1;
@@ -655,7 +675,11 @@
     cursor: pointer;
     user-select: none;
 }
-.vas_103-cfBtn .vas_103-ic svg { width: 0.85em; height: 0.85em; }
+/* The tick is the only thing marking a line as confirmed, and it is the control
+   the reader clicks to open the figures — at 0.85em it read as a speck beside
+   the product name. Sized up with the pill's padding so the target grows with
+   it rather than the glyph crowding its own border. */
+.vas_103-cfBtn .vas_103-ic svg { width: 1.25em; height: 1.25em; }
 .vas_103-cfBtn:hover { border-color: var(--mt-action); color: var(--mt-action); }
 .vas_103-cfBtn.vas_103-is-open {
     background: var(--mt-success-bg);
@@ -832,6 +856,22 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+/* The line an edit landed on, beneath the headline and its stamp. flex-basis
+   100% gives it a row of its own inside the wrapping .vas_103-actMain, so the
+   "when · by whom" stays up on the headline's line where every other activity
+   row carries it. It wraps and breaks inside a word: a product name has no
+   space to break at and must not be cut off mid-name. */
+.vas_103-actSub {
+    flex: 0 0 100%;
+    min-width: 0;
+    font-size: 0.6875em;
+    color: var(--mt-muted);
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
 .vas_103-actWhen {
     flex: none;
     margin-left: auto;

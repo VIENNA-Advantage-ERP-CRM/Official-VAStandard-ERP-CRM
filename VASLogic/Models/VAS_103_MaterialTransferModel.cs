@@ -55,6 +55,23 @@
 ///                          goods were received) and PostedDate (the Created stamp
 ///                          of the movement's Fact_Acct rows).
 ///                        - Added Notes (LoadNotes) and Activity (LoadActivity).
+///   VAI163   2026-08-14  - Added DocTypeName (M_Movement.C_DocType_ID ->
+///                          C_DocType.Name) for the header's right column.
+///                          C_DocType was already joined for IsInTransit, so
+///                          naming it costs nothing.
+///                        - Activity reports edits FIELD BY FIELD
+///                          (LoadChangeActivity / AddChangeRow): one "Updated" row
+///                          per AD_ChangeLog entry, naming the column that
+///                          changed, who changed it and when, for the transfer
+///                          header AND its lines — a transfer's substantive edits
+///                          are its moved quantities and locators, and those live
+///                          on the lines. Until this the feed carried no edit
+///                          trail at all: the nearest thing was the "Completed"
+///                          milestone, dated from M_Movement.Updated, which is
+///                          only ever the LAST save and says nothing about what it
+///                          touched. The table name is matched with UPPER, since
+///                          an equality on the stored spelling fails silently and
+///                          reads exactly like the loader was never written.
 /// </summary>
 
 using System;
@@ -141,6 +158,7 @@ namespace VASLogic.Models
                               creator.Name     AS CreatedByName,
                               " + incotermExpr   + @" AS IncotermName,
                               " + inTransitExpr  + @" AS IsConfirmationDocType,
+                              dt.Name          AS DocTypeName,
                               CASE WHEN " + srcWhExpr + @" = m.M_Warehouse_ID
                                    THEN 'INTRA' ELSE 'INTER' END          AS TransferTypeCode,
                               (SELECT COUNT(*)
@@ -203,6 +221,10 @@ namespace VASLogic.Models
             result.IncotermName     = Util.GetValueOfString(r["IncotermName"]);
             result.IsConfirmationDocType =
                 Util.GetValueOfString(r["IsConfirmationDocType"]) == "Y";
+            // The document type the transfer was raised on, for the header's right
+            // column. C_DocType is already LEFT joined for IsInTransit, so naming
+            // it costs nothing and a transfer without one simply shows no value.
+            result.DocTypeName      = Util.GetValueOfString(r["DocTypeName"]);
             result.TransferTypeCode = Util.GetValueOfString(r["TransferTypeCode"]);
 
             // ----- KPI aggregates -----
@@ -696,6 +718,12 @@ namespace VASLogic.Models
             LoadNoteActivity(M_Movement_ID, activity);
             LoadMilestoneActivity(M_Movement_ID, activity);
             LoadConfirmActivity(M_Movement_ID, activity);
+            // What was actually edited, field by field. Until this the feed said
+            // only that the transfer had been created, completed or confirmed —
+            // the "Completed" milestone above is dated from M_Movement.Updated, so
+            // the nearest thing to an edit trail was one row carrying the LAST
+            // save's timestamp and nothing about what it touched.
+            LoadChangeActivity(M_Movement_ID, activity);
 
             activity.Sort((a, b) =>
                 b.EventTime.GetValueOrDefault(DateTime.MinValue)
@@ -740,6 +768,142 @@ namespace VASLogic.Models
             {
                 _log.Severe("LoadNoteActivity (M_Movement_ID=" + M_Movement_ID + "): " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// One "Updated" row per FIELD the user changed, read from the platform's
+        /// change log (AD_ChangeLog). Each row names the field (the dictionary's
+        /// display name for the column, falling back to the raw column name), who
+        /// changed it and when — so the trail says which field moved rather than
+        /// only that something did.
+        ///
+        /// Both the header (M_Movement) and its LINES (M_MovementLine) are read. A
+        /// transfer's substantive edits are its MOVED QUANTITIES and its locators,
+        /// and those live on the lines — a header-only trail would report almost
+        /// nothing. A line row is labelled with its line number and product so the
+        /// reader can tell which row moved.
+        ///
+        /// The table name is matched with UPPER so a dictionary holding it in
+        /// another case still resolves: an equality on the stored spelling fails
+        /// SILENTLY, which reads exactly like the loader was never written.
+        ///
+        /// Silently degrades when change logging is off for the ROLE that made the
+        /// edit (AD_Role.IsChangeLog) — the platform writes no AD_ChangeLog rows at
+        /// all in that case. That is a dictionary setting, not something this can
+        /// fix. Follows VAS_092.
+        /// </summary>
+        /// <param name="M_Movement_ID">Selected material transfer id.</param>
+        /// <param name="list">Activity list being populated.</param>
+        private void LoadChangeActivity(int M_Movement_ID, List<ActivityData> list)
+        {
+            // ----- Header edits (M_Movement) -----
+            try
+            {
+                // AD_Column is LEFT joined so a log row whose column has since been
+                // removed from the dictionary still reports its change.
+                string sql = @"SELECT cl.Created      AS EventOn,
+                                      u.Name          AS UserName,
+                                      col.Name        AS FieldLabel,
+                                      col.ColumnName  AS FieldColumn
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_Column col
+                                        ON (col.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                        ON (u.AD_User_ID = cl.CreatedBy)
+                                WHERE cl.Record_ID = @M_Movement_ID
+                                  AND UPPER(adt.TableName) = 'M_MOVEMENT'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
+                                ORDER BY cl.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, MovementParam(M_Movement_ID), null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows) AddChangeRow(r, "", list);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadChangeActivity/header (M_Movement_ID=" + M_Movement_ID + "): " + ex.Message);
+            }
+
+            // ----- Line edits (M_MovementLine) -----
+            //
+            // The line ids are reached through a join rather than a sub-select on
+            // the same parameter, so the statement carries its bind name exactly
+            // once: Oracle binds positionally, and a repeated name becomes a
+            // second, unfilled placeholder.
+            try
+            {
+                string sql = @"SELECT cl.Created      AS EventOn,
+                                      u.Name          AS UserName,
+                                      col.Name        AS FieldLabel,
+                                      col.ColumnName  AS FieldColumn,
+                                      l.Line          AS LineNo,
+                                      p.Name          AS ProductName
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                INNER JOIN M_MovementLine l
+                                        ON (l.M_MovementLine_ID = cl.Record_ID)
+                                 LEFT OUTER JOIN M_Product p
+                                        ON (p.M_Product_ID = l.M_Product_ID)
+                                 LEFT OUTER JOIN AD_Column col
+                                        ON (col.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                        ON (u.AD_User_ID = cl.CreatedBy)
+                                WHERE UPPER(adt.TableName) = 'M_MOVEMENTLINE'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
+                                  AND l.M_Movement_ID = @M_Movement_ID
+                                ORDER BY cl.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, MovementParam(M_Movement_ID), null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        // "#10 Steel Bolt M8" — the line number identifies the row,
+                        // the product says what it is without a second lookup.
+                        string scope = "#" + Util.GetValueOfInt(r["LineNo"]);
+                        string prod  = Util.GetValueOfString(r["ProductName"]);
+                        if (!string.IsNullOrEmpty(prod)) scope += " " + prod.Trim();
+                        AddChangeRow(r, scope, list);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadChangeActivity/lines (M_Movement_ID=" + M_Movement_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Turns one AD_ChangeLog row into an "Updated" activity entry. A change
+        /// whose column the dictionary cannot name is skipped: it would render as
+        /// a bare "Updated" identifying nothing, which is what naming the field
+        /// exists to stop.
+        /// </summary>
+        /// <param name="r">Change-log row.</param>
+        /// <param name="scope">Which record the edit landed on: "" for the header,
+        /// else the line's number and product.</param>
+        /// <param name="list">Activity list being populated.</param>
+        private void AddChangeRow(DataRow r, string scope, List<ActivityData> list)
+        {
+            DateTime? at = Util.GetValueOfDateTime(r["EventOn"]);
+            if (!at.HasValue) return;
+
+            string field = Util.GetValueOfString(r["FieldLabel"]);
+            if (string.IsNullOrEmpty(field))
+                field = Util.GetValueOfString(r["FieldColumn"]);
+            if (string.IsNullOrEmpty(field)) return;
+
+            list.Add(new ActivityData
+            {
+                EventType   = "Updated",
+                FieldName   = field,
+                ChangeScope = scope,
+                ActorName   = Util.GetValueOfString(r["UserName"]),
+                EventTime   = at
+            });
         }
 
         private void LoadMilestoneActivity(int M_Movement_ID, List<ActivityData> list)
@@ -883,6 +1047,10 @@ namespace VASLogic.Models
                          WHERE UPPER(t.TableName) = UPPER(@TableName)
                            AND tb.IsActive        = 'Y'
                            AND t.IsActive         = 'Y'
+                           AND tb.SeqNo = (SELECT MIN(tb2.SeqNo)
+                                             FROM AD_Tab tb2
+                                            WHERE tb2.AD_Window_ID = tb.AD_Window_ID
+                                              AND tb2.IsActive     = 'Y')
                          ORDER BY tb.SeqNo, tb.AD_Tab_ID";
                 ds = DB.ExecuteDataset(
                     sql, new SqlParameter[] { new SqlParameter("@TableName", name) }, null);
@@ -1093,6 +1261,14 @@ namespace VASLogic.Models
             public string    Title     { get; set; }
             public string    ActorName { get; set; }
             public DateTime? EventTime { get; set; }
+            /// <summary>For an "Updated" row: the dictionary's label for the
+            /// column that changed.</summary>
+            public string    FieldName   { get; set; }
+            /// <summary>For an "Updated" row: which record the edit landed on —
+            /// "" for the transfer header, else the line's number and product
+            /// ("#10 Steel Bolt M8"). A transfer's substantive edits are its moved
+            /// quantities and locators, and those live on the lines.</summary>
+            public string    ChangeScope { get; set; }
         }
 
         public class MaterialTransferOverviewData
@@ -1122,6 +1298,10 @@ namespace VASLogic.Models
             /// stage at all, and the panel shows neither the card nor the stages.
             /// </summary>
             public bool      IsConfirmationDocType  { get; set; }
+            /// <summary>The document type the transfer was raised on
+            /// (M_Movement.C_DocType_ID -> C_DocType.Name), for the header's right
+            /// column. "" when the movement names none.</summary>
+            public string    DocTypeName            { get; set; }
             /// <summary>True once one of the transfer's confirmations has been
             /// completed.</summary>
             public bool      IsConfirmationCompleted { get; set; }

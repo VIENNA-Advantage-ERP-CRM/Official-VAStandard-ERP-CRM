@@ -297,6 +297,26 @@
  *                          clear or newer fetch invalidates, shownRecordId tracks
  *                          "showing or loading", and clear() drops the busy
  *                          indicator a discarded reply used to strand.
+ *   VAI163   2026-08-14  - The progress line drops Submitted. It was dated by the
+ *                          COMPLETION stamp — the same moment the stage beside it
+ *                          reports — and its condition was satisfied by every
+ *                          status Completed is, so the two lit up together and
+ *                          read as one event told twice. LIFECYCLE_STAGES falls
+ *                          to 4 with it.
+ *                        - Activity reports edits FIELD BY FIELD: an "updated" row
+ *                          per changed column (model side), headlined "Updated
+ *                          <field>" with the line it landed on beneath it and
+ *                          "when · by whom" where every other row carries it. The
+ *                          feed's only account of a change used to be the single
+ *                          "status" milestone, derived from M_Requisition.Updated
+ *                          — the LAST save, saying nothing about what it touched.
+ *                        - An e-mail's recipient line lists every address on the
+ *                          mail (To, Cc and Bcc, each labelled) in full instead of
+ *                          naming the To list and counting the rest as "+n more".
+ *                          That count could only be resolved by opening the
+ *                          message, which a mail stored without a body cannot do.
+ *                          allRecipients / countAddresses went with it, as did the
+ *                          sub-line's tooltip.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -969,41 +989,63 @@
 
         // "2 purchase orders · 1 RFQs" — only the kinds actually present count.
         function documentsSummary(rows) {
-            var ord = 0, rfq = 0, mov = 0;
+            var ord = 0, rfq = 0, mov = 0, blk = 0, iuse = 0;
             for (var i = 0; i < rows.length; i++) {
                 if (rows[i].Type === "order") ord++;
+                else if (rows[i].Type === "blanket") blk++;
                 else if (rows[i].Type === "rfq") rfq++;
                 else if (rows[i].Type === "movement") mov++;
+                else if (rows[i].Type === "internaluse") iuse++;
             }
             var bits = [];
             if (ord) bits.push(ord + " " + msg("PurchaseOrdersCount", "purchase orders"));
+            if (blk) bits.push(blk + " " + msg("BlanketOrdersCount", "blanket orders"));
             if (rfq) bits.push(rfq + " " + msg("RFQsCount", "RFQs"));
             if (mov) bits.push(mov + " " + msg("TransfersCount", "material transfers"));
+            if (iuse) bits.push(iuse + " " + msg("InternalUseCount", "inventory issues"));
             return bits.join(" · ");
         }
+
+        // Document type -> the icon it leads with, the kind it calls itself, and
+        // the window it opens where that is not the table's own. A blanket order
+        // shares C_Order with an ordinary purchase order, so only the row's TYPE
+        // can tell them apart — and each opens its own screen.
+        var DOC_TYPES = {
+            order:       { icon: "doc",      key: "PurchaseOrder",   text: "Purchase Order" },
+            blanket:     { icon: "doc",      key: "BlanketOrder",    text: "Blanket Purchase Order",
+                           window: "VAS_BlanketPurchaseOrder" },
+            rfq:         { icon: "rfq",      key: "RFQ",             text: "RFQ" },
+            movement:    { icon: "transfer", key: "MaterialTransfer", text: "Material Transfer" },
+            internaluse: { icon: "transfer", key: "InternalUse",     text: "Inventory Use",
+                           window: "VAS_InternalUseInventory" }
+        };
 
         function documentRow(d) {
             var $r = $('<div class="vas_098-docRow vas_098-itbody"></div>');
 
             var canOpen = d.TableName && +d.RecordId > 0;
+            var meta = DOC_TYPES[d.Type] || DOC_TYPES.order;
+
             if (canOpen) {
                 $r.addClass("vas_098-is-link")
                     .attr("data-open-table", d.TableName)
                     .attr("data-open-id", d.RecordId);
+                // A blanket order and an inventory-use issue each open a screen
+                // that is NOT their table's default: C_Order's zoom target is the
+                // ordinary purchase order window, and M_Inventory's is the physical
+                // count. Naming the window on the row is the only way to tell them
+                // apart — the table alone cannot.
+                if (meta.window) $r.attr("data-open-window", meta.window);
             }
 
             // Identity: doc number + kind, with the open affordance on the right.
             var $item = $('<span class="vas_098-docItem"></span>');
-            var icon = d.Type === "rfq" ? "rfq" : (d.Type === "movement" ? "transfer" : "doc");
-            $item.append(svgIcon(icon));
+            $item.append(svgIcon(meta.icon));
 
             var $txt = $('<span class="vas_098-docTxt"></span>');
             $txt.append($('<div class="vas_098-itname"></div>').text(d.DocumentNo || DASH));
 
-            var sub;
-            if (d.Type === "rfq") sub = msg("RFQ", "RFQ");
-            else if (d.Type === "movement") sub = msg("MaterialTransfer", "Material Transfer");
-            else sub = msg("PurchaseOrder", "Purchase Order");
+            var sub = msg(meta.key, meta.text);
             if (d.LineCount) sub += " · " + d.LineCount + " " + msg("Lines");
             $txt.append($('<div class="vas_098-itsku"></div>').text(sub));
 
@@ -1036,7 +1078,11 @@
             $root.on("click", ".vas_098-chip.vas_098-is-link, .vas_098-is-link[data-open-table]", function (e) {
                 e.preventDefault();
                 openRecord($(this).attr("data-open-table"), $(this).attr("data-open-id"),
-                    $(this).attr("data-open-sotrx") === "Y");
+                    $(this).attr("data-open-sotrx") === "Y",
+                    // A row may name the window itself where its TABLE cannot
+                    // choose one — a blanket order and an ordinary purchase order
+                    // are both C_Order, and open different screens.
+                    $(this).attr("data-open-window"));
             });
         }
 
@@ -1143,14 +1189,21 @@
         // zoom target, else the window the DICTIONARY says the table opens in.
         // Either way the window is started with an equal-query on the table's key
         // column. Degrades to a toast so a click never throws.
-        function openRecord(tableName, recordId, isSOTrx) {
+        function openRecord(tableName, recordId, isSOTrx, namedWindow) {
             if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
             try {
-                // A sales-transaction record takes its own window name where the
-                // table has one; everything else takes the plain mapping.
-                var windowName = (isSOTrx && WINDOW_NAME_BY_TABLE_SOTRX[tableName])
-                    ? WINDOW_NAME_BY_TABLE_SOTRX[tableName]
-                    : WINDOW_NAME_BY_TABLE[tableName];
+                // A window named on the ROW wins over both maps: it is the only
+                // thing that can tell two records of the same table apart, which is
+                // exactly the blanket-order case (C_Order opens either the purchase
+                // order window or the blanket one, depending on the record).
+                //
+                // Failing that, a sales-transaction record takes its own window
+                // name where the table has one; everything else takes the plain
+                // mapping.
+                var windowName = namedWindow ||
+                    ((isSOTrx && WINDOW_NAME_BY_TABLE_SOTRX[tableName])
+                        ? WINDOW_NAME_BY_TABLE_SOTRX[tableName]
+                        : WINDOW_NAME_BY_TABLE[tableName]);
                 var windowId = resolveWindowIdByName(windowName);
 
                 if (windowId <= 0 &&
@@ -1291,7 +1344,6 @@
         // back- or forward-dated).
         function progressStages() {
             var s = data.StatusCode;
-            var submitted  = data.Processed || s === "IP" || s === "AP" || s === "CO" || s === "CL";
             var completed  = s === "CO" || s === "CL" || data.IsConverted;
             var converted  = data.IsConverted;
             // In fulfilment once a purchase order raised from this requisition has
@@ -1308,29 +1360,34 @@
             // pending for the life of the document — where posting is something
             // every completed requisition does, and is the fact a reader is
             // actually looking for at the end of the line.
+            // Submitted is gone. It was dated by the COMPLETION stamp — the same
+            // moment the stage next to it reports — and its own condition was
+            // satisfied by every status Completed is, so the two lit up together
+            // and read as one event told twice. Nothing is lost: a requisition that
+            // has been submitted is a requisition in progress, which the status
+            // pill above already says.
             return [
                 { key: "vas_098-c1", label: msg("Drafted"),      done: true,        sub: formatStampDateShort(data.Created) },
-                { key: "vas_098-c2", label: msg("Submitted"),    done: submitted,   sub: formatStampDateShort(data.CompletedDate) },
-                { key: "vas_098-c3", label: msg("Completed"),    done: completed,   sub: formatStampDateShort(data.CompletedDate) },
-                { key: "vas_098-c4", label: msg("Converted"),    done: converted,   sub: formatStampDateShort(data.ConvertedDate) },
-                { key: "vas_098-c5", label: msg("InFulfilment"), done: fulfilment,  sub: formatStampDateShort(data.FulfilmentDate) },
-                { key: "vas_098-c6", label: msg("Posted"),       done: !!data.Posted, sub: formatStampDateShort(data.PostedDate) }
+                { key: "vas_098-c2", label: msg("Completed"),    done: completed,   sub: formatStampDateShort(data.CompletedDate) },
+                { key: "vas_098-c3", label: msg("Converted"),    done: converted,   sub: formatStampDateShort(data.ConvertedDate) },
+                { key: "vas_098-c4", label: msg("InFulfilment"), done: fulfilment,  sub: formatStampDateShort(data.FulfilmentDate) },
+                { key: "vas_098-c5", label: msg("Posted"),       done: !!data.Posted, sub: formatStampDateShort(data.PostedDate) }
             ];
         }
 
         // How many of the stages above form the requisition's LIFECYCLE CHAIN —
         // the run in which reaching one stage means every earlier one was reached
-        // too. The first five do: a converted requisition was completed, and a
-        // completed one was submitted.
+        // too. The first four do: a requisition in fulfilment was converted, and a
+        // converted one was completed.
         //
-        // Posted (the sixth) does not belong to that chain. Posting follows
+        // Posted (the fifth) does not belong to that chain. Posting follows
         // COMPLETION, so it is routinely true while Converted and In Fulfilment
         // are still ahead — and under the chain rule a posted requisition would
         // light up every stage before it, reporting purchase orders that do not
         // exist. It is therefore marked from its own flag alone, and never
         // back-fills the stages before it. (Closed, which it replaced, was safely
         // terminal and needed none of this.)
-        var LIFECYCLE_STAGES = 5;
+        var LIFECYCLE_STAGES = 4;
 
         function renderProgress() {
             var stages = progressStages();
@@ -1670,8 +1727,14 @@
             submit:  { cls: "vas_098-submit",  key: "ActSubmit"  },
             link:    { cls: "vas_098-link",    key: "ActLinked"  },
             comment: { cls: "vas_098-comment", key: "ActComment" },
+            // One row per FIELD that changed, not one per save (model side).
+            updated: { cls: "vas_098-status",  key: "ActUpdated", fallback: "Updated" },
             // Downstream lifecycle documents.
             po:          { cls: "vas_098-po",  key: "ActPO",          fallback: "PO"  },
+            // Documents created FROM the requisition, each naming itself.
+            rfqcreated:         { cls: "vas_098-link", key: "ActRFQ",         fallback: "RFQ" },
+            movementcreated:    { cls: "vas_098-link", key: "ActTransfer",    fallback: "Transfer" },
+            internalusecreated: { cls: "vas_098-link", key: "ActInternalUse", fallback: "Issue" },
             grn:         { cls: "vas_098-grn", key: "ActGRN",         fallback: "GRN" },
             grncomplete: { cls: "vas_098-grn", key: "ActGRNComplete", fallback: "GRN" },
             // E-mails sent against the requisition (MailAttachment1).
@@ -1760,15 +1823,21 @@
             $wrap.append($('<span class="vas_098-attime"></span>').text(when).attr("title", when));
             $main.append($wrap);
 
-            // An e-mail names its recipients under the subject: the To list, plus a
-            // count of the Cc / Bcc addresses so the reader can see at a glance
-            // that others were copied. Every address is listed in the body.
+            // An e-mail names its recipients under the subject — every address on
+            // the To, Cc and Bcc lists, in full. No tooltip: the line is no longer
+            // an abridgement of something the reader has to hover to see.
             if (a.Type === "email") {
                 var to = recipientSummary(a);
-                if (to) {
-                    $main.append($('<div class="vas_098-actsub"></div>')
-                        .text(to).attr("title", allRecipients(a) || to));
-                }
+                if (to) $main.append($('<div class="vas_098-actsub"></div>').text(to));
+            }
+
+            // A line edit names the line it landed on, on the same sub-line. The
+            // headline stays "Updated <field>" — which field moved is the question,
+            // and the row it moved on qualifies it. Dropped for a header edit,
+            // which has no line to name.
+            if (a.Type === "updated" && a.ChangeScope) {
+                $main.append($('<div class="vas_098-actsub"></div>')
+                    .text(a.ChangeScope).attr("title", a.ChangeScope));
             }
             $row.append($main);
 
@@ -1817,36 +1886,47 @@
                 .text(msg(key, fallback) + " " + String(value).trim()));
         }
 
-        // Row sub-line: the To list, plus "+n more" covering the Cc / Bcc
-        // addresses. Counting by comma / semicolon is enough for a summary — the
-        // body lists the addresses verbatim.
+        // Row sub-line: every address the mail went to, written out in full — To,
+        // then Cc, then Bcc, each behind its own label.
+        //
+        // It used to name the To list and count the rest as "+n more". That count
+        // could only be resolved by opening the message, and a mail stored without
+        // a body cannot be opened at all — so on those rows the Cc and Bcc
+        // addresses were unreachable. The sub-line wraps rather than ellipsising
+        // (stylesheet), so a long list is read on the row itself.
+        //
+        // A label with nothing behind it is left out entirely rather than printed
+        // against a dash: this line lists recipients, and an empty Cc is not one.
         function recipientSummary(a) {
-            var to = (a.MailTo || "").trim();
-            var extra = countAddresses(a.MailCc) + countAddresses(a.MailBcc);
-            if (!to && !extra) return "";
-            var s = msg("MailTo", "To:") + " " + (to || msg("NA"));
-            if (extra > 0) s += " +" + extra + " " + msg("MoreRecipients", "more");
-            return s;
-        }
-
-        // Every address on the mail, for the row's hover tooltip.
-        function allRecipients(a) {
             var bits = [];
-            if (a.MailTo)  bits.push(msg("MailTo",  "To:")  + " " + a.MailTo);
-            if (a.MailCc)  bits.push(msg("MailCc",  "Cc:")  + " " + a.MailCc);
-            if (a.MailBcc) bits.push(msg("MailBcc", "Bcc:") + " " + a.MailBcc);
-            return bits.join("\n");
+            appendAddressBit(bits, "MailTo",  "To:",  a.MailTo);
+            appendAddressBit(bits, "MailCc",  "Cc:",  a.MailCc);
+            appendAddressBit(bits, "MailBcc", "Bcc:", a.MailBcc);
+            return bits.join(" · ");
         }
 
-        function countAddresses(value) {
-            if (!value || !String(value).trim()) return 0;
-            var parts = String(value).split(/[;,]/);
-            var n = 0;
-            for (var i = 0; i < parts.length; i++) {
-                if (parts[i].trim()) n++;
-            }
-            return n;
+        function appendAddressBit(bits, key, fallback, value) {
+            var text = (value === null || value === undefined) ? "" : String(value).trim();
+            if (!text) return;
+            bits.push(msg(key, fallback) + " " + text);
         }
+
+        // allRecipients (the row's hover tooltip) and countAddresses (the "+n more"
+        // tally) are gone with the abridged sub-line they served: the row now
+        // writes every address out, so there is nothing left to count or to recover
+        // on hover.
+
+        // Every "a document was created from this requisition" row, and the
+        // sentence it headlines with. Adding a document kind to the feed means
+        // adding it here and to ACT_BADGE — nothing else changes.
+        var DOC_CREATED_TEXT = {
+            po:                 { key: "POCreated",           text: "PO Created" },
+            grn:                { key: "GRNCreated",          text: "GRN Created" },
+            grncomplete:        { key: "GRNCompleted",        text: "GRN Completed" },
+            rfqcreated:         { key: "RFQCreated",          text: "RFQ Created" },
+            movementcreated:    { key: "TransferCreated",     text: "Material Transfer Created" },
+            internalusecreated: { key: "InternalUseCreated",  text: "Inventory Use Created" }
+        };
 
         // The row's headline: WHAT happened. Who did it and when is written once,
         // by activityRow, in the row's own "when · by whom" slot — so none of the
@@ -1859,13 +1939,12 @@
                 return msg("RequisitionMarked") + " " + statusMeta().label;
 
             // Downstream documents name themselves, so the row reads
-            // "PO Created — PO-000123".
-            if (a.Type === "po" || a.Type === "grn" || a.Type === "grncomplete") {
-                var label;
-                if (a.Type === "po") label = msg("POCreated", "PO Created");
-                else if (a.Type === "grn") label = msg("GRNCreated", "GRN Created");
-                else label = msg("GRNCompleted", "GRN Completed");
-
+            // "PO Created — PO-000123": WHAT was created and WHICH document it is.
+            // Who created it and when sit in the row's own "when · by whom" slot,
+            // as on every other row.
+            if (DOC_CREATED_TEXT.hasOwnProperty(a.Type)) {
+                var d = DOC_CREATED_TEXT[a.Type];
+                var label = msg(d.key, d.text);
                 if (a.DocumentNo) label += " — " + a.DocumentNo;
                 return label;
             }
@@ -1874,6 +1953,14 @@
             // and the sender sits with the timestamp, as on every other row.
             if (a.Type === "email") {
                 return (a.Text || "").trim() || msg("NoSubject", "(no subject)");
+            }
+
+            // A field-level edit headlines with the FIELD that changed — the row's
+            // badge already says "Updated", and the field is what tells one edit
+            // apart from the next. Which record it landed on rides on the sub-line
+            // beneath (activityRow).
+            if (a.Type === "updated" && a.FieldName) {
+                return msg("ActFieldUpdated", "Updated") + " " + a.FieldName;
             }
 
             return a.Text || msg("ActComment");

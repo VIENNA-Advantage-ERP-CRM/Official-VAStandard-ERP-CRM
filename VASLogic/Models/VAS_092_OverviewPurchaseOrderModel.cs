@@ -233,6 +233,50 @@
 ///                          flag now only orders the result. NVL gave way to
 ///                          COALESCE so the statement reads the same on Oracle
 ///                          and PostgreSQL.
+///   VAI163   2026-08-13  - The Blanket Order origin moved to its own
+///                          LoadBlanketOrigin and no longer hides behind
+///                          ColumnExists("C_Order","C_Order_Blanket"). That
+///                          dictionary guard was the single point at which the
+///                          chip failed on BOTH databases: the column is written
+///                          by the platform (MOrder.SetC_Order_Blanket), but a
+///                          deployment whose AD_Column lacks a row for it — or
+///                          whose AD_Table carries more than one row named
+///                          C_Order, which made the guard's scalar sub-select
+///                          raise rather than answer — reported it absent and the
+///                          chip never appeared however good the data was. The
+///                          statement is now attempted, with a once-per-process
+///                          flag so a schema that really has no such column
+///                          reports it once instead of per order. IsBlanketTrx is
+///                          no longer selected either: a second optional column
+///                          was only more failure surface. Matches VAS_106.
+///                        - The Blanket Order origin now also resolves through
+///                          the LINES (LoadBlanketOriginFromLines:
+///                          C_OrderLine.C_OrderLine_Blanket_ID -> the blanket's
+///                          line -> its order) when the header column names
+///                          nothing. The two records of the link are written by
+///                          DIFFERENT code: C_Order.C_Order_Blanket is stamped
+///                          only by the CreateReleaseDocFromBO process, while the
+///                          line reference is written by MOrder.CopyFrom for ANY
+///                          document type that IsReleaseDocument(). A release
+///                          order raised through any other path recorded its
+///                          blanket on the lines ONLY, so a panel reading just
+///                          the header found nothing — on every database, which
+///                          is why this presented as neither an Oracle nor a
+///                          PostgreSQL fault.
+///                        - Unit labels fall back to C_UOM.Name when UOMSymbol is
+///                          blank (UomLabelExpr), on the line rows, the line
+///                          history and the order-wide common unit. A unit set up
+///                          with a name and no symbol printed no unit at all.
+///                        - Activity reports header edits FIELD BY FIELD: one
+///                          "updated" row per AD_ChangeLog entry, naming the
+///                          column that changed, who changed it and when. It used
+///                          to collapse a save to one row carrying only a column
+///                          COUNT, which said something moved but never what.
+///   VAI163   2026-08-14  - Surfaced C_Order.IsDropShip so the header can report
+///                          whether the vendor ships straight to the customer
+///                          (drop shipment) rather than into our warehouse. The
+///                          panel showed a Warehouse against a drop-ship order
+///                          with nothing saying the goods never arrive there.
 /// </summary>
 
 using System;
@@ -283,6 +327,7 @@ namespace VASLogic.Models
                               o.POReference,
                               o.PriorityRule,
                               o.Posted,
+                              o.IsDropShip,
                               o.IsBudgetViolated,
                               o.MaxBudgetViolationAmount,
                               o.Ref_Order_ID,
@@ -395,6 +440,9 @@ namespace VASLogic.Models
             result.POReference   = Util.GetValueOfString(r["POReference"]);
             result.PriorityRule  = Util.GetValueOfString(r["PriorityRule"]);
             result.Posted        = Util.GetValueOfString(r["Posted"]) == "Y";
+            // Drop shipment: the goods are shipped by the vendor straight to the
+            // customer instead of into our own warehouse (C_Order.IsDropShip).
+            result.IsDropShip    = Util.GetValueOfString(r["IsDropShip"]) == "Y";
 
             result.VendorName    = Util.GetValueOfString(r["VendorName"]);
             result.ContactName   = Util.GetValueOfString(r["ContactName"]);
@@ -698,9 +746,9 @@ namespace VASLogic.Models
                                                 AND ol.QtyDelivered >= ol.QtyOrdered
                                            THEN 1 ELSE 0 END)  AS FullyReceivedLineCount,
                                   MIN(CASE WHEN p.ProductType = 'I'
-                                           THEN uom.UOMSymbol END) AS MinUOMSymbol,
+                                           THEN " + UomLabelExpr + @" END) AS MinUOMSymbol,
                                   MAX(CASE WHEN p.ProductType = 'I'
-                                           THEN uom.UOMSymbol END) AS MaxUOMSymbol,
+                                           THEN " + UomLabelExpr + @" END) AS MaxUOMSymbol,
                                   MAX(CASE WHEN p.ProductType = 'I'
                                            THEN uom.StdPrecision ELSE 0 END) AS QtyPrecision
                                FROM C_OrderLine ol
@@ -763,7 +811,7 @@ namespace VASLogic.Models
                               p.Value           AS ProductValue,
                               p.ProductType     AS ProductType,
                               ch.Name           AS ChargeName,
-                              uom.UOMSymbol     AS UOMSymbol,
+                              " + UomLabelExpr + @" AS UOMSymbol,
                               uom.StdPrecision  AS UOMPrecision,
                               asi.Description   AS AttributeSetInstance,
                               NVL(pl.PricePrecision, 2) AS PricePrecision,
@@ -1051,43 +1099,145 @@ namespace VASLogic.Models
             //  stale reference to a non-blanket order cannot show up here.
             //  C_Order_Blanket is guarded — it is a module column and does not
             //  exist in every schema.
-            if (ColumnExists("C_Order", "C_Order_Blanket"))
+            LoadBlanketOrigin(C_Order_ID, d);
+
+            // --- MRP plan run (module-optional VAMRP_PlanRun_ID). ---
+            LoadPlanOrigin(C_Order_ID, d);
+        }
+
+        /// <summary>
+        /// Remembers whether the blanket lookup is usable against this schema, so
+        /// a database that genuinely has no C_Order_Blanket column reports its
+        /// error once rather than on every order the panel opens.
+        /// Null = not tried yet, false = the statement failed, true = it ran.
+        /// </summary>
+        private static bool? _blanketLookupUsable;
+
+        /// <summary>
+        /// The blanket purchase order this PO was released against
+        /// (C_Order.C_Order_Blanket -> the blanket, itself a C_Order), for the
+        /// Reference section's Blanket Order chip.
+        ///
+        /// The statement is ATTEMPTED rather than gated on ColumnExists. The
+        /// dictionary guard was the single point at which this feature failed on
+        /// both Oracle and PostgreSQL: C_Order_Blanket is written by the platform
+        /// (MOrder.SetC_Order_Blanket, used by CreateReleaseDocFromBO), but a
+        /// deployment whose AD_Column has no row for it — or whose AD_Table
+        /// carries more than one row named C_Order, which made the guard's scalar
+        /// sub-select raise instead of answer — reported "no such column" and the
+        /// chip never appeared, however good the data was. Running the query and
+        /// letting a genuinely missing column throw once is both more accurate and
+        /// cheaper than asking the dictionary to describe the schema.
+        ///
+        /// IsBlanketTrx is neither required NOR selected: the release order's own
+        /// reference is the part of the link the platform always writes, and
+        /// reading a second optional flag only added another way for the statement
+        /// to fail. Matches VAS_106's sales-side LoadBlanketOrigin.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected purchase order id.</param>
+        /// <param name="d">Overview being populated.</param>
+        private void LoadBlanketOrigin(int C_Order_ID, PurchaseOrderOverviewData d)
+        {
+            // The header reference first — it names the blanket outright.
+            if (_blanketLookupUsable != false)
             {
                 try
                 {
-                    // IsBlanketTrx is REPORTED, not required. Requiring it hid the
-                    // chip wherever the flag is not carried on the parent order —
-                    // the release order's own C_Order_Blanket reference is what
-                    // says the document was released against a blanket, and it is
-                    // the only part of the link the platform always writes.
                     // COALESCE, not NVL: this statement has to read the same on
                     // Oracle and PostgreSQL.
-                    string sql = @"SELECT bo.C_Order_ID  AS BlanketId,
-                                          bo.DocumentNo  AS BlanketNo,
-                                          COALESCE(bo.IsBlanketTrx, 'N') AS IsBlanketTrx
+                    string sql = @"SELECT bo.C_Order_ID AS BlanketId,
+                                          bo.DocumentNo AS BlanketNo
                                      FROM C_Order o
-                                     INNER JOIN C_Order bo
+                                    INNER JOIN C_Order bo
                                             ON (bo.C_Order_ID = o.C_Order_Blanket)
                                     WHERE o.C_Order_ID = @C_Order_ID
-                                      AND COALESCE(o.C_Order_Blanket, 0) > 0
-                                      AND COALESCE(bo.IsActive, 'Y')     = 'Y'
-                                    ORDER BY COALESCE(bo.IsBlanketTrx, 'N') DESC";
+                                      AND COALESCE(bo.IsActive, 'Y') = 'Y'";
                     DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                    _blanketLookupUsable = true;
                     if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                     {
-                        DataRow r0 = ds.Tables[0].Rows[0];
-                        d.BlanketOrderId = Util.GetValueOfInt(r0["BlanketId"]);
-                        d.BlanketOrderNo = Util.GetValueOfString(r0["BlanketNo"]);
+                        DataRow r = ds.Tables[0].Rows[0];
+                        d.BlanketOrderId = Util.GetValueOfInt(r["BlanketId"]);
+                        d.BlanketOrderNo = Util.GetValueOfString(r["BlanketNo"]);
+                        return;
                     }
                 }
                 catch (Exception ex)
                 {
-                    _log.Severe("LoadOrigins/BlanketOrder (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                    // Almost certainly "no such column" on a schema without the
+                    // blanket module. Recorded so the next order skips the attempt.
+                    _blanketLookupUsable = false;
+                    _log.Severe("LoadBlanketOrigin/header (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
                 }
             }
 
-            // --- MRP plan run (module-optional VAMRP_PlanRun_ID). ---
-            LoadPlanOrigin(C_Order_ID, d);
+            LoadBlanketOriginFromLines(C_Order_ID, d);
+        }
+
+        /// <summary>
+        /// Remembers whether the line-level blanket lookup is usable against this
+        /// schema, so a database without C_OrderLine_Blanket_ID reports it once
+        /// rather than on every order the panel opens.
+        /// </summary>
+        private static bool? _blanketLineLookupUsable;
+
+        /// <summary>
+        /// The blanket this PO was released against, resolved through its LINES
+        /// (C_OrderLine.C_OrderLine_Blanket_ID -> the blanket's own order line ->
+        /// that line's order).
+        ///
+        /// This is the fallback that makes the Blanket Order chip appear for
+        /// release orders the header column does not describe, and it is not a
+        /// rare case: the two records of the link are written by DIFFERENT code.
+        /// The header column C_Order.C_Order_Blanket is stamped only by the
+        /// CreateReleaseDocFromBO process (which sets it explicitly after copying),
+        /// whereas the LINE reference is written by MOrder.CopyFrom for ANY
+        /// document whose type IsReleaseDocument(). A release order raised through
+        /// any other path therefore records its blanket on the lines ONLY, and a
+        /// panel reading just the header found nothing to show — on every database,
+        /// which is why this looked like neither an Oracle nor a PostgreSQL bug.
+        ///
+        /// Distinct blanket orders are counted so a release drawing on more than
+        /// one blanket reports the first with a "+n more" tally, exactly as the
+        /// requisition / RFQ / project origins already do. Ordered by id so the
+        /// choice is stable between loads.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected purchase order id.</param>
+        /// <param name="d">Overview being populated.</param>
+        private void LoadBlanketOriginFromLines(int C_Order_ID, PurchaseOrderOverviewData d)
+        {
+            if (_blanketLineLookupUsable == false) return;
+
+            try
+            {
+                string sql = @"SELECT bo.C_Order_ID AS BlanketId,
+                                      MAX(bo.DocumentNo) AS BlanketNo
+                                 FROM C_OrderLine ol
+                                INNER JOIN C_OrderLine bol
+                                        ON (bol.C_OrderLine_ID = ol.C_OrderLine_Blanket_ID)
+                                INNER JOIN C_Order bo
+                                        ON (bo.C_Order_ID = bol.C_Order_ID)
+                                WHERE ol.C_Order_ID = @C_Order_ID
+                                  AND COALESCE(ol.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(bo.IsActive, 'Y') = 'Y'
+                                GROUP BY bo.C_Order_ID
+                                ORDER BY bo.C_Order_ID";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                _blanketLineLookupUsable = true;
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                d.BlanketOrderId    = Util.GetValueOfInt(r["BlanketId"]);
+                d.BlanketOrderNo    = Util.GetValueOfString(r["BlanketNo"]);
+                d.BlanketOrderCount = ds.Tables[0].Rows.Count;
+            }
+            catch (Exception ex)
+            {
+                // A schema without C_OrderLine_Blanket_ID simply has no line-level
+                // link to read. Recorded so the next order skips the attempt.
+                _blanketLineLookupUsable = false;
+                _log.Severe("LoadBlanketOrigin/lines (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
         }
 
         /// <summary>
@@ -1199,7 +1349,7 @@ namespace VASLogic.Models
                                       olh.Description  AS LineDescription,
                                       p.Name           AS ProductName,
                                       ch.Name          AS ChargeName,
-                                      uom.UOMSymbol    AS UOMSymbol,
+                                      " + UomLabelExpr + @" AS UOMSymbol,
                                       NVL(uom.StdPrecision, 0) AS UOMPrecision,
                                       cur.StdPrecision AS StdPrecision
                                  FROM C_OrderLineHistory olh
@@ -1555,6 +1705,21 @@ namespace VASLogic.Models
             }
         }
 
+        /// <summary>
+        /// The unit label to print against a quantity: C_UOM.UOMSymbol, falling
+        /// back to C_UOM.Name when the symbol is blank. Plenty of units are set up
+        /// with a name and no symbol, and those quantities were rendering with no
+        /// unit at all.
+        ///
+        /// Written as a CASE rather than COALESCE/NULLIF so it reads the same on
+        /// both databases: Oracle treats '' AS NULL (so TRIM(x) IS NULL catches an
+        /// empty or all-space symbol there) while PostgreSQL keeps it as an empty
+        /// string (caught by the = '' arm). Assumes the C_UOM alias is "uom".
+        /// </summary>
+        private const string UomLabelExpr =
+            "CASE WHEN TRIM(uom.UOMSymbol) IS NULL OR TRIM(uom.UOMSymbol) = '' " +
+            "THEN uom.Name ELSE uom.UOMSymbol END";
+
         private bool ColumnExists(string tableName, string columnName)
         {
             try
@@ -1863,9 +2028,15 @@ namespace VASLogic.Models
 
         /// <summary>
         /// Field-level edits to the order header, read from the platform's change
-        /// log (AD_ChangeLog for C_Order / this record) and collapsed to one row
-        /// per save — a single edit touching five columns is one event to a
-        /// reader, not five. The column count travels in the row's text.
+        /// log (AD_ChangeLog for C_Order / this record) as ONE ROW PER FIELD: each
+        /// names the field that changed (the dictionary's display name for the
+        /// column, falling back to the raw column name), who changed it and when,
+        /// so a reader can track a single field through the order's life.
+        ///
+        /// This used to collapse a save to one row carrying only a column COUNT
+        /// ("Order updated · 5 fields changed"), which said that something moved
+        /// but never what — the reader had to open the record's own change log to
+        /// find out.
         ///
         /// Silently degrades when change logging is off for the table (no rows).
         /// </summary>
@@ -1873,29 +2044,39 @@ namespace VASLogic.Models
         {
             try
             {
-                string sql = @"SELECT MAX(cl.Created)   AS EventOn,
-                                      MAX(u.Name)       AS UserName,
-                                      COUNT(*)          AS FieldCount
+                // AD_Column is LEFT joined so a log row whose column has since been
+                // removed from the dictionary still reports its change.
+                string sql = @"SELECT cl.Created      AS EventOn,
+                                      u.Name          AS UserName,
+                                      col.Name        AS FieldLabel,
+                                      col.ColumnName  AS FieldColumn
                                  FROM AD_ChangeLog cl
                                  INNER JOIN AD_Table adt
                                          ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_Column col
+                                         ON (col.AD_Column_ID = cl.AD_Column_ID)
                                  LEFT OUTER JOIN AD_User u
                                          ON (u.AD_User_ID = cl.CreatedBy)
                                 WHERE cl.Record_ID = @C_Order_ID
                                   AND adt.TableName = 'C_Order'
                                   AND NVL(cl.IsActive, 'Y') = 'Y'
-                                GROUP BY cl.AD_Session_ID, cl.CreatedBy,
-                                         CAST(cl.Created AS DATE)
-                                ORDER BY MAX(cl.Created)";
+                                ORDER BY cl.Created";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
 
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
+                    string field = Util.GetValueOfString(r["FieldLabel"]);
+                    if (string.IsNullOrEmpty(field))
+                        field = Util.GetValueOfString(r["FieldColumn"]);
+                    // A row that can name no field renders as a bare "Updated"
+                    // with nothing to identify it — worse than not showing it.
+                    if (string.IsNullOrEmpty(field)) continue;
+
                     list.Add(new ActivityData
                     {
                         Type       = "updated",
-                        Count      = Util.GetValueOfInt(r["FieldCount"]),
+                        FieldName  = field,
                         UserName   = Util.GetValueOfString(r["UserName"]),
                         Created    = Util.GetValueOfDateTime(r["EventOn"])
                     });
@@ -2775,6 +2956,9 @@ namespace VASLogic.Models
             public string    Text            { get; set; }   // note text / e-mail subject
             public string    DocumentNo      { get; set; }   // related document (grn / invoice / payment)
             public int       Count           { get; set; }   // grn line count (0 otherwise)
+            /// <summary>For an "updated" row: the display name of the field that
+            /// changed. One row per field, so the trail says what moved.</summary>
+            public string    FieldName       { get; set; }
             public DateTime? Created         { get; set; }
 
             // E-mail (MailAttachment1) — the body is revealed on click.
@@ -2815,6 +2999,7 @@ namespace VASLogic.Models
             public string    POReference     { get; set; }
             public string    PriorityRule    { get; set; }   // C_Order.PriorityRule (1/3/5/7/9)
             public bool      Posted          { get; set; }   // C_Order.Posted = 'Y'
+            public bool      IsDropShip      { get; set; }   // C_Order.IsDropShip = 'Y' (drop shipment)
             public bool      IsBudgetViolated         { get; set; }   // C_Order.IsBudgetViolated = 'Y'
             public decimal   MaxBudgetViolationAmount { get; set; }   // C_Order.MaxBudgetViolationAmount (acct currency)
 
@@ -2885,10 +3070,16 @@ namespace VASLogic.Models
             public string    ProjectNo            { get; set; }   // C_Project.Value (else Name)
             public string    ProjectName          { get; set; }
             public int       ProjectCount         { get; set; }
-            /// <summary>Blanket order this PO was released against —
-            /// C_Order.C_Order_Blanket, where the parent has IsBlanketTrx = 'Y'.</summary>
+            /// <summary>Blanket order this PO was released against. Read from the
+            /// header reference (C_Order.C_Order_Blanket), falling back to the
+            /// line-level one (C_OrderLine.C_OrderLine_Blanket_ID) that the copy
+            /// path writes for every release document.</summary>
             public int       BlanketOrderId       { get; set; }
             public string    BlanketOrderNo       { get; set; }
+            /// <summary>Distinct blanket orders the lines were released against;
+            /// &gt; 1 when a single release draws on several. 0 / 1 for the header
+            /// reference, which can only name one.</summary>
+            public int       BlanketOrderCount    { get; set; }
 
             // 7-stage progress
             public bool      IsCompleted        { get; set; }

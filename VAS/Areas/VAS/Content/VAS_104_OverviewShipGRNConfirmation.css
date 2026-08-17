@@ -688,6 +688,39 @@
     align-items: baseline;
 }
 .vas_104-actTitle { min-width: 0; font-size: 0.8125em; color: var(--gc-text); }
+
+/* "was X → now Y" under the field's name, for a field-change row. The two
+   values are what the reader came for, so they carry the row's colour while the
+   arrow between them stays muted; both wrap rather than clip, since a truncated
+   value is no value.
+
+   order + full basis put it on its OWN line BELOW the first: .vas_104-actMain is
+   a space-between flex row, so without the ordering the delta would land between
+   the headline and the timestamp and push the timestamp onto a third line. */
+.vas_104-actDelta {
+    order: 3;
+    flex: 0 0 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25em 0.375em;
+    margin-top: 0.125em;
+    font-size: 0.8462em; /* ~0.6875em against the body anchor */
+}
+.vas_104-cvOld {
+    color: var(--gc-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+.vas_104-cvArrow { flex: none; color: var(--gc-muted); }
+.vas_104-cvNew {
+    color: var(--gc-text);
+    font-weight: 700;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
 /* A NOTE's headline is the comment itself: it wraps (to three lines) rather
    than running off the row, since that text is what the reader came for. */
 .vas_104-actTitle.vas_104-multiline {
