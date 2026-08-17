@@ -66,6 +66,56 @@
 ///                          milestone derived from M_Inventory.Updated, which could
 ///                          only ever report the LAST save and never said what it
 ///                          touched.
+///   VAI163   2026-08-14  - Added the VA075 work order origin
+///                          (LoadVA075WorkOrder): the maintenance work order the
+///                          count's lines were raised against
+///                          (M_InventoryLine.VA075_WorkOrder_ID, falling back to
+///                          the work order behind VA075_WorkOrderComponent_ID for
+///                          rows saved before that column was stamped). The panel
+///                          lists it in Related Documents and opens the work order
+///                          screen from it; a count carrying one used to name no
+///                          source at all. Ported from VAS_102, including its
+///                          lesson: the statements are ATTEMPTED rather than gated
+///                          on ColumnExists, because VA075 is not part of this
+///                          solution and the dictionary guard answers "absent" for
+///                          a table it cannot find. A once-per-process flag keeps
+///                          an install genuinely without VA075 to one log line.
+///                        - Lines carry the PRODUCT'S BASE UOM (BaseUOMName /
+///                          BaseUOMPrecision, M_Product.C_UOM_ID). On Hand
+///                          (M_InventoryLine.QtyBook) is written straight from
+///                          M_Storage.QtyOnHand, so it is always in that unit —
+///                          but the table labelled it with the LINE's C_UOM_ID,
+///                          which need not be the same one. The panel now names
+///                          the base unit beside the figure.
+///                        - Added GetWindowIdByTable (ported from VAS_102): the
+///                          record-open path's last resort, for a table whose
+///                          screen cannot be named on the client. The work order
+///                          needs it — VA075 ships its own window and the
+///                          browser-side zoom lookup only knows tables the client
+///                          has cached.
+///   VAI163   2026-08-14  Every AD_Table lookup in the activity loaders matches the
+///                        name with UPPER (and the chat note's scalar sub-select
+///                        became an IN). An equality on the stored spelling was the
+///                        single point at which the field-level trail could return
+///                        nothing while AD_ChangeLog was full of good rows, and the
+///                        chat sub-select would RAISE rather than answer where the
+///                        dictionary holds more than one row for the name — both
+///                        failing silently, which reads exactly like the loader was
+///                        never written. Same treatment LoadEmailActivity already
+///                        carried for this table in VAS_102.
+///   VAI163   2026-08-14  Activity follows VAS_092. Added LoadCountWorkflowActivity
+///                        (+ WorkflowActivityType): the count's document lifecycle,
+///                        one row per completed workflow node — prepare, complete,
+///                        re-activate, void, close, approve / reject — carrying the
+///                        node's own name, who ran it and when. The single derived
+///                        "completed" milestone could not report a re-activation at
+///                        all and showed only the LAST completion, so it now stands
+///                        in ONLY where the workflow named nothing
+///                        (LoadCountMilestones' addCompletion). Field-level edits
+///                        emit Type "updated" rather than "changed", the type
+///                        VAS_092 uses, so both panels tag and headline the row the
+///                        same way; ChangeScope and the old / new values ride along
+///                        as extra sub-lines the client drops when empty.
 /// </summary>
 
 using System;
@@ -242,6 +292,9 @@ namespace VASLogic.Models
 
             // ----- Related documents, notes and the audit trail -----
             LoadProjectRef(M_Inventory_ID, result);
+            // The maintenance work order the count's lines were raised against.
+            // Silent on an install without VA075 (see LoadVA075WorkOrder).
+            LoadVA075WorkOrder(M_Inventory_ID, result);
             result.Notes    = LoadNotes(M_Inventory_ID, result.Description);
             result.Activity = LoadActivity(M_Inventory_ID, result.StatusCode);
 
@@ -278,6 +331,138 @@ namespace VASLogic.Models
             {
                 _log.Severe("LoadProjectRef (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// Remembers whether each VA075 lookup is usable against this schema, so a
+        /// database without the module reports it once per process rather than on
+        /// every count the panel opens.
+        /// Null = not tried, false = the statement failed, true = it ran.
+        /// </summary>
+        private static bool? _va075DirectUsable;
+        private static bool? _va075ComponentUsable;
+
+        /// <summary>
+        /// Fills VA075_WorkOrder_ID / WorkOrderNo / WorkOrderRef from the VA075
+        /// maintenance work order the count's lines were raised against, for the
+        /// panel's Related Documents section.
+        ///
+        /// The link is M_InventoryLine.VA075_WorkOrder_ID. Rows saved before that
+        /// column was stamped carry only VA075_WorkOrderComponent_ID, so the
+        /// component's own work order is accepted as a fallback — that is what
+        /// keeps existing documents from naming no source at all.
+        ///
+        /// The statements are ATTEMPTED rather than gated on ColumnExists. VA075 is
+        /// NOT part of this solution, so its AD_Table / AD_Column rows are whatever
+        /// the module's own install left behind — and the dictionary guard answers
+        /// "absent" for a table it cannot find, or raises (which the catch turns
+        /// into "absent") when AD_Table holds more than one row for the name. Either
+        /// way the panel reported no work order however good the id on the line was.
+        /// Ported from VAS_102, where exactly that guard was the fault.
+        /// </summary>
+        /// <param name="M_Inventory_ID">Selected inventory count id.</param>
+        /// <param name="result">Overview payload being populated.</param>
+        private void LoadVA075WorkOrder(int M_Inventory_ID, InventoryCountOverviewData result)
+        {
+            // "Work order reference" is named differently across VA075 revisions;
+            // take the first one this schema actually has. A dictionary that names
+            // none simply yields no reference caption — the row itself does not
+            // depend on it.
+            string refCol = FirstExistingColumn("VA075_WorkOrder", new string[]
+            {
+                "VA075_ReferenceNo", "Reference", "POReference", "Description", "Name"
+            });
+            string refExpr = string.IsNullOrEmpty(refCol)
+                ? "CAST(NULL AS VARCHAR(255))" : "wo." + refCol;
+
+            // The work order stamped straight onto the count line — the link the
+            // panel is really about.
+            if (_va075DirectUsable != false)
+            {
+                string inner = @"SELECT l.VA075_WorkOrder_ID AS WO_ID
+                                   FROM M_InventoryLine l
+                                  WHERE l.M_Inventory_ID = " + M_Inventory_ID + @"
+                                    AND l.IsActive       = 'Y'
+                                    AND COALESCE(l.VA075_WorkOrder_ID, 0) > 0";
+                if (RunWorkOrderLookup(inner, refExpr, result, ref _va075DirectUsable,
+                                       "direct", M_Inventory_ID))
+                {
+                    return;
+                }
+            }
+
+            // Older rows carry only the spare-part component; its own work order
+            // stands in.
+            if (_va075ComponentUsable != false)
+            {
+                string inner = @"SELECT c.VA075_WorkOrder_ID AS WO_ID
+                                   FROM M_InventoryLine l
+                                  INNER JOIN VA075_WorkOrderComponent c
+                                          ON (c.VA075_WorkOrderComponent_ID = l.VA075_WorkOrderComponent_ID)
+                                  WHERE l.M_Inventory_ID = " + M_Inventory_ID + @"
+                                    AND l.IsActive       = 'Y'
+                                    AND COALESCE(l.VA075_WorkOrderComponent_ID, 0) > 0";
+                RunWorkOrderLookup(inner, refExpr, result, ref _va075ComponentUsable,
+                                   "component", M_Inventory_ID);
+            }
+        }
+
+        /// <summary>
+        /// Runs one VA075 work-order lookup and fills the payload from it.
+        ///
+        /// The count id is inlined rather than bound: the caller's sub-select and
+        /// this statement would otherwise need the same bind name twice, which
+        /// Oracle's positional binding does not allow — the second occurrence
+        /// becomes an unfilled placeholder. It is an int, so nothing can be
+        /// injected.
+        /// </summary>
+        /// <returns>True when a work order was found and the payload filled.</returns>
+        private bool RunWorkOrderLookup(string innerSql, string refExpr,
+                                        InventoryCountOverviewData result,
+                                        ref bool? usable, string which, int M_Inventory_ID)
+        {
+            try
+            {
+                string sql = @"SELECT wo.VA075_WorkOrder_ID,
+                                      wo.DocumentNo,
+                                      " + refExpr + @" AS WorkOrderRef
+                                 FROM VA075_WorkOrder wo
+                                WHERE wo.VA075_WorkOrder_ID IN (" + innerSql + @")
+                                ORDER BY wo.DocumentNo";
+                DataSet ds = DB.ExecuteDataset(sql, null, null);
+                usable = true;
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return false;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                result.VA075_WorkOrder_ID = Util.GetValueOfInt(r["VA075_WorkOrder_ID"]);
+                result.WorkOrderNo        = Util.GetValueOfString(r["DocumentNo"]);
+                result.WorkOrderRef       = Util.GetValueOfString(r["WorkOrderRef"]);
+                result.WorkOrderCount     = ds.Tables[0].Rows.Count;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // Almost certainly "no such table / column" on an install without
+                // VA075. Recorded so the next count skips the attempt.
+                usable = false;
+                _log.Severe("LoadVA075WorkOrder/" + which +
+                            " (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Returns the first of the candidate columns that exists on the table, or
+        /// an empty string when the table has none of them.
+        /// </summary>
+        private string FirstExistingColumn(string tableName, string[] candidates)
+        {
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                if (ColumnExists(tableName, candidates[i])) return candidates[i];
+            }
+            return "";
         }
 
         /// <summary>
@@ -358,7 +543,15 @@ namespace VASLogic.Models
             const int MAX_ENTRIES = 200;
 
             List<ActivityData> activity = new List<ActivityData>();
-            LoadCountMilestones(M_Inventory_ID, docStatus, activity);
+
+            // The count's document lifecycle, one row per completed workflow node
+            // — prepared / completed / re-activated / voided / closed / approved /
+            // rejected. Run FIRST so the milestone loader below knows whether the
+            // completion has already been reported properly and can skip its own
+            // derived stand-in. Follows VAS_092.
+            int wfRows = LoadCountWorkflowActivity(M_Inventory_ID, activity);
+
+            LoadCountMilestones(M_Inventory_ID, docStatus, activity, wfRows == 0);
             // What was actually edited, field by field. This is what the reader
             // wants from an audit trail — the coarse "updated" milestone
             // LoadCountMilestones used to add could only report the LAST save and
@@ -387,7 +580,7 @@ namespace VASLogic.Models
         /// stamp when there is one, else the last change.
         /// </summary>
         private void LoadCountMilestones(
-            int M_Inventory_ID, string docStatus, List<ActivityData> list)
+            int M_Inventory_ID, string docStatus, List<ActivityData> list, bool addCompletion)
         {
             try
             {
@@ -419,7 +612,11 @@ namespace VASLogic.Models
                 // edit at all, and it never said what was changed. The change log
                 // answers both (LoadFieldChangeActivity).
 
-                if (docStatus == "CO" || docStatus == "CL")
+                // Only when the workflow named no lifecycle node of its own. Where
+                // it did, this row would restate a completion the workflow has
+                // already reported — with a worse timestamp and, on a count
+                // re-activated and re-completed, only the last one of them.
+                if (addCompletion && (docStatus == "CO" || docStatus == "CL"))
                 {
                     DateTime? completedAt = GetCompletedDate(M_Inventory_ID);
                     list.Add(new ActivityData
@@ -438,6 +635,96 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// The count's document lifecycle, one activity row per completed workflow
+        /// node (AD_WF_Process -> AD_WF_Activity -> AD_WF_Node, WFState 'CC')
+        /// against this M_Inventory: prepare, complete, re-activate, void, close,
+        /// approve / reject — each with the node's own name, the user who ran it
+        /// and when.
+        ///
+        /// This is what the single derived "completed" milestone could not do. That
+        /// row came from the LAST DocComplete stamp, so a count re-activated and
+        /// re-counted showed one completion and no re-activation at all — the
+        /// reader could not see that the document had been reopened.
+        ///
+        /// The node's own NAME is the headline, so a tenant that renamed its
+        /// workflow nodes reads the trail in its own words. Ported from VAS_092.
+        /// </summary>
+        /// <param name="M_Inventory_ID">Selected inventory count id.</param>
+        /// <param name="list">Activity list being populated.</param>
+        /// <returns>How many lifecycle rows were added.</returns>
+        private int LoadCountWorkflowActivity(int M_Inventory_ID, List<ActivityData> list)
+        {
+            int added = 0;
+            try
+            {
+                string sql = @"SELECT wfa.Created              AS EventOn,
+                                      COALESCE(wfn.Name, wfn.Value) AS NodeName,
+                                      UPPER(TRIM(wfn.Value))   AS NodeValue,
+                                      u.Name                   AS UserName
+                                 FROM AD_WF_Process wfp
+                                INNER JOIN AD_WF_Activity wfa
+                                        ON (wfa.AD_WF_Process_ID = wfp.AD_WF_Process_ID)
+                                INNER JOIN AD_WF_Node wfn
+                                        ON (wfn.AD_WF_Node_ID = wfa.AD_WF_Node_ID)
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = wfp.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                        ON (u.AD_User_ID = wfa.CreatedBy)
+                                WHERE wfp.Record_ID = @M_Inventory_ID
+                                  AND UPPER(adt.TableName) = 'M_INVENTORY'
+                                  AND wfp.IsActive  = 'Y'
+                                  AND wfa.IsActive  = 'Y'
+                                  AND wfn.IsActive  = 'Y'
+                                  AND wfa.WFState   = 'CC'
+                                ORDER BY wfa.Created";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return 0;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    string type = WorkflowActivityType(Util.GetValueOfString(r["NodeValue"]));
+                    if (type == null) continue;      // routing / non-document node
+
+                    list.Add(new ActivityData
+                    {
+                        Type     = type,
+                        Text     = Util.GetValueOfString(r["NodeName"]),
+                        UserName = Util.GetValueOfString(r["UserName"]),
+                        Created  = Util.GetValueOfDateTime(r["EventOn"])
+                    });
+                    added++;
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadCountWorkflowActivity (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+            return added;
+        }
+
+        /// <summary>
+        /// Maps a workflow node value to an activity type the client can tag, or
+        /// null for nodes that are pure routing (start / end / split) and carry no
+        /// meaning for a reader. Ported from VAS_092.
+        /// </summary>
+        private static string WorkflowActivityType(string nodeValue)
+        {
+            if (string.IsNullOrEmpty(nodeValue)) return null;
+            string v = nodeValue.Replace("(", "").Replace(")", "").Replace("_", "").Trim();
+
+            if (v.Contains("REACTIVATE")) return "reactivated";   // before COMPLETE
+            if (v.Contains("COMPLETE"))   return "completed";
+            if (v.Contains("REJECT"))     return "rejected";
+            if (v.Contains("APPROV"))     return "approval";
+            if (v.Contains("VOID"))       return "voided";
+            if (v.Contains("REVERSE"))    return "reversed";
+            if (v.Contains("CLOSE"))      return "closed";
+            if (v.Contains("PREPARE"))    return "prepared";
+            if (v.Contains("INVALID"))    return "invalidated";
+            return null;
+        }
+
+        /// <summary>
         /// The count's field-level edit history, read from the platform's change
         /// log (AD_ChangeLog): one row per changed COLUMN carrying the dictionary's
         /// label for it, the value it held before and the value it holds now, when
@@ -453,8 +740,16 @@ namespace VASLogic.Models
         /// this panel is asked for exactly what changed, so a save touching three
         /// columns is three rows.
         ///
-        /// Silently degrades when change logging is off for the table — there are
-        /// simply no rows, and the feed keeps its milestones.
+        /// Silently degrades when change logging is off for the ROLE that made the
+        /// edit (AD_Role.IsChangeLog) — the platform writes no AD_ChangeLog rows at
+        /// all in that case, so there is nothing to report and the feed keeps its
+        /// milestones. That is a dictionary setting, not something this can fix.
+        ///
+        /// The table is matched with UPPER so a dictionary holding the name in
+        /// another case still resolves. An equality on the stored spelling is the
+        /// single point at which this whole loader returns nothing while the change
+        /// log is full of good rows — and it fails silently, which reads exactly
+        /// like "the field-level trail was never implemented".
         /// </summary>
         /// <param name="M_Inventory_ID">Selected inventory count id.</param>
         /// <param name="list">Activity list being populated.</param>
@@ -473,7 +768,7 @@ namespace VASLogic.Models
                                  LEFT OUTER JOIN AD_Column c ON (c.AD_Column_ID = cl.AD_Column_ID)
                                  LEFT OUTER JOIN AD_User  u  ON (u.AD_User_ID   = cl.CreatedBy)
                                 WHERE cl.Record_ID = @M_Inventory_ID
-                                  AND adt.TableName = 'M_Inventory'
+                                  AND UPPER(adt.TableName) = 'M_INVENTORY'
                                   AND COALESCE(cl.IsActive, 'Y') = 'Y'
                                 ORDER BY cl.Created DESC";
                 AddChangeRows(DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null), "", list);
@@ -504,7 +799,7 @@ namespace VASLogic.Models
                                  LEFT OUTER JOIN M_Product p ON (p.M_Product_ID  = l.M_Product_ID)
                                  LEFT OUTER JOIN AD_Column c ON (c.AD_Column_ID  = cl.AD_Column_ID)
                                  LEFT OUTER JOIN AD_User  u  ON (u.AD_User_ID    = cl.CreatedBy)
-                                WHERE adt.TableName = 'M_InventoryLine'
+                                WHERE UPPER(adt.TableName) = 'M_INVENTORYLINE'
                                   AND COALESCE(cl.IsActive, 'Y') = 'Y'
                                   AND l.M_Inventory_ID = @M_Inventory_ID
                                 ORDER BY cl.Created DESC";
@@ -546,7 +841,10 @@ namespace VASLogic.Models
 
             list.Add(new ActivityData
             {
-                Type        = "changed",
+                // "updated", not "changed": the same type VAS_092 emits for a
+                // field-level edit, so the two panels tag and headline the row
+                // identically ("Updated <field>").
+                Type        = "updated",
                 FieldName   = field,
                 OldValue    = ChangeValue(Util.GetValueOfString(r["OldValue"])),
                 NewValue    = ChangeValue(Util.GetValueOfString(r["NewValue"])),
@@ -587,7 +885,7 @@ namespace VASLogic.Models
                                         ON (adt.AD_Table_ID = wfp.AD_Table_ID)
                                  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = wfa.AD_User_ID)
                                 WHERE wfp.Record_ID = @M_Inventory_ID
-                                  AND adt.TableName = 'M_Inventory'
+                                  AND UPPER(adt.TableName) = 'M_INVENTORY'
                                   AND wfp.IsActive  = 'Y'
                                   AND wfa.IsActive  = 'Y'
                                   AND wfa.WFState   = 'CC'";
@@ -617,7 +915,7 @@ namespace VASLogic.Models
                                 INNER JOIN AD_Table adt ON (adt.AD_Table_ID = fa.AD_Table_ID)
                                  LEFT OUTER JOIN AD_User u ON (fa.CreatedBy = u.AD_User_ID)
                                 WHERE fa.Record_ID  = @M_Inventory_ID
-                                  AND adt.TableName = 'M_Inventory'
+                                  AND UPPER(adt.TableName) = 'M_INVENTORY'
                                 ORDER BY fa.Created";
                 DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
@@ -656,8 +954,9 @@ namespace VASLogic.Models
                                 INNER JOIN CM_Chat ch      ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
                                  LEFT OUTER JOIN AD_User u  ON (ce.AD_User_ID = u.AD_User_ID)
                                  LEFT OUTER JOIN AD_User cu ON (ce.CreatedBy  = cu.AD_User_ID)
-                                WHERE ch.AD_Table_ID =
-                                      (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'M_Inventory')
+                                WHERE ch.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'M_INVENTORY')
                                   AND ch.Record_ID = @M_Inventory_ID
                                   AND ce.IsActive  = 'Y'";
                 DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
@@ -878,6 +1177,70 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// Resolves the window a TABLE's records open in: the table's own zoom
+        /// target (AD_Table.AD_Window_ID), falling back to the first window that
+        /// has a tab on the table.
+        ///
+        /// This is the record-open path's last resort, for a row whose screen
+        /// cannot be named in the client's map. The work order needs it: VA075
+        /// ships its own window and is not part of this solution, so no name can be
+        /// hard-coded for it, and the browser-side zoom lookup only knows tables
+        /// the client has already cached. The dictionary knows it either way.
+        ///
+        /// Each statement carries a single bind name, occurring once: positional
+        /// binding gives a repeated name a second, unfilled placeholder.
+        /// Ported from VAS_102.
+        /// </summary>
+        /// <param name="ctx">User context (unused today; kept for symmetry with
+        /// <see cref="GetWindowId"/>, which filters by client).</param>
+        /// <param name="tableName">Physical table name, e.g. "VA075_WorkOrder".</param>
+        /// <returns>The window id, or 0 when the table has no window at all.</returns>
+        public int GetWindowIdByTable(Ctx ctx, string tableName)
+        {
+            if (string.IsNullOrEmpty(tableName)) return 0;
+            string name = tableName.Trim();
+            try
+            {
+                string sql = @"SELECT t.AD_Window_ID
+                                 FROM AD_Table t
+                                WHERE UPPER(t.TableName) = UPPER(@TableName)
+                                  AND t.IsActive         = 'Y'
+                                  AND COALESCE(t.AD_Window_ID, 0) > 0";
+                DataSet ds = DB.ExecuteDataset(
+                    sql, new SqlParameter[] { new SqlParameter("@TableName", name) }, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    int id = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+                    if (id > 0) return id;
+                }
+
+                // No zoom target on the table itself — take the window whose first
+                // tab sits on this table, which is the screen that maintains it.
+                sql = @"SELECT tb.AD_Window_ID
+                          FROM AD_Tab tb
+                         INNER JOIN AD_Table t ON (t.AD_Table_ID = tb.AD_Table_ID)
+                         WHERE UPPER(t.TableName) = UPPER(@TableName)
+                           AND tb.IsActive        = 'Y'
+                           AND t.IsActive         = 'Y'
+                           AND tb.SeqNo = (SELECT MIN(tb2.SeqNo)
+                                             FROM AD_Tab tb2
+                                            WHERE tb2.AD_Window_ID = tb.AD_Window_ID
+                                              AND tb2.IsActive     = 'Y')
+                         ORDER BY tb.SeqNo, tb.AD_Tab_ID";
+                ds = DB.ExecuteDataset(
+                    sql, new SqlParameter[] { new SqlParameter("@TableName", name) }, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return 0;
+                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetWindowIdByTable (" + name + "): " + ex.Message);
+                return 0;
+            }
+        }
+
+        /// <summary>
         /// Builds the unit-rate SQL expression from whichever optional cost columns
         /// exist on M_InventoryLine, ending at 0.
         ///
@@ -946,11 +1309,19 @@ namespace VASLogic.Models
                               COALESCE(loc.LocatorCombination, loc.Bin, loc.Value) AS LocatorName,
                               u.Name            AS UOMName,
                               NVL(u.StdPrecision, 0) AS UOMPrecision,
+                              -- The PRODUCT's own unit. QtyBook is written straight
+                              -- from M_Storage.QtyOnHand (MInventoryLine.SetQtyBook),
+                              -- so the On Hand figure is always in THIS unit — never
+                              -- in the line's C_UOM_ID, which the table used to label
+                              -- it with. The panel names it beside the figure.
+                              bu.Name           AS BaseUOMName,
+                              NVL(bu.StdPrecision, 0) AS BaseUOMPrecision,
                               " + rateExpr + @"                       AS UnitRate,
                               NVL(l.QtyCount, 0) * " + rateExpr + @"   AS LineValue
                            FROM M_InventoryLine l
                            LEFT OUTER JOIN M_Product p   ON (p.M_Product_ID   = l.M_Product_ID)
                            LEFT OUTER JOIN C_UOM     u   ON (u.C_UOM_ID        = l.C_UOM_ID)
+                           LEFT OUTER JOIN C_UOM     bu  ON (bu.C_UOM_ID       = p.C_UOM_ID)
                            LEFT OUTER JOIN M_Locator loc ON (loc.M_Locator_ID  = l.M_Locator_ID)
                            -- Only a REAL instance is joined: id 0 is the
                            -- dictionary's no-attributes row, whose description is
@@ -989,6 +1360,8 @@ namespace VASLogic.Models
                 ln.LocatorName        = Util.GetValueOfString(r["LocatorName"]);
                 ln.UOMName            = Util.GetValueOfString(r["UOMName"]);
                 ln.UOMPrecision       = Util.GetValueOfInt(r["UOMPrecision"]);
+                ln.BaseUOMName        = Util.GetValueOfString(r["BaseUOMName"]);
+                ln.BaseUOMPrecision   = Util.GetValueOfInt(r["BaseUOMPrecision"]);
                 ln.UnitRate           = Util.GetValueOfDecimal(r["UnitRate"]);
                 ln.LineValue          = Util.GetValueOfDecimal(r["LineValue"]);
 
@@ -1040,7 +1413,10 @@ namespace VASLogic.Models
         /// <summary>One entry in the count's audit trail.</summary>
         public class ActivityData
         {
-            /// <summary>created | changed | completed | posted | note | email</summary>
+            /// <summary>The lifecycle and event types the client tags, matching
+            /// VAS_092's set: created | prepared | completed | reactivated |
+            /// rejected | approval | voided | reversed | closed | invalidated |
+            /// updated (one per changed field) | posted | note | email.</summary>
             public string    Type       { get; set; }
             public string    UserName   { get; set; }   // actor / mail sender
             public DateTime? Created    { get; set; }   // when
@@ -1081,6 +1457,11 @@ namespace VASLogic.Models
             public string   LocatorName        { get; set; }
             public string   UOMName            { get; set; }
             public int      UOMPrecision       { get; set; }
+            /// <summary>The PRODUCT's own unit (M_Product.C_UOM_ID), which the On
+            /// Hand quantity is stored and reported in — QtyBook is copied from
+            /// M_Storage.QtyOnHand, never restated into the line's unit.</summary>
+            public string   BaseUOMName        { get; set; }
+            public int      BaseUOMPrecision   { get; set; }
             public decimal  SystemQty          { get; set; }   // QtyBook
             public decimal  CountedQty         { get; set; }   // QtyCount
             public decimal  VarianceQty        { get; set; }   // counted - system
@@ -1127,6 +1508,19 @@ namespace VASLogic.Models
             public int       C_Project_ID   { get; set; }
             public string    ProjectNo      { get; set; }   // C_Project.Value
             public string    ProjectName    { get; set; }
+
+            // Related documents — the VA075 maintenance work order the count's
+            // lines were raised against (M_InventoryLine.VA075_WorkOrder_ID, or the
+            // work order behind VA075_WorkOrderComponent_ID on older rows). All
+            // zero / empty on an install without VA075.
+            public int       VA075_WorkOrder_ID { get; set; }
+            public string    WorkOrderNo        { get; set; }   // VA075_WorkOrder.DocumentNo
+            /// <summary>The work order's own reference, under whichever column name
+            /// this VA075 revision carries it. "" when it names none.</summary>
+            public string    WorkOrderRef       { get; set; }
+            /// <summary>How many distinct work orders the count's lines name; the
+            /// panel shows the first and counts the rest.</summary>
+            public int       WorkOrderCount     { get; set; }
 
             // Collections
             public List<InventoryCountLineData> Lines    { get; set; }

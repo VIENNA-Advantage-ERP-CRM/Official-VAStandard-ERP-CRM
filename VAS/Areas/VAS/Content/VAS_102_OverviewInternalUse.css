@@ -896,14 +896,33 @@
 .vas_102-actLead,
 .vas_102-actSub {
     display: block;
+}
+.vas_102-actLead {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* The recipient line WRAPS instead of clipping: it lists the mail's addresses
+   in full, and an address cut off mid-domain identifies nobody. break-word
+   rather than a plain wrap, since a single long address has no space in it to
+   break at. */
 .vas_102-actSub {
     font-size: 0.8462em; /* ~0.6875em against the body anchor */
     color: var(--iu-muted);
     margin-top: 0.125em;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
+}
+
+/* The base unit named after the on-hand figure. Muted and a size down, so the
+   quantity still reads first. */
+.vas_102-baseUom {
+    margin-left: 0.3125em;
+    color: var(--iu-muted);
+    font-size: 0.9231em;
+    font-weight: 400;
 }
 
 .vas_102-actWhen {

@@ -47,6 +47,55 @@
  *                        -pgCtrls / -pgPos / -pgBtn, plus its RTL chevron
  *                        mirror), modelled on the VAS_106 pager, and the Notes
  *                        card (.vas_100-noteCard) for the entered description.
+ *   VAI163   2026-08-14  - The Product / Service cell's third and fourth lines:
+ *                          .vas_100-itAttr (the attributes, a notch darker than
+ *                          the code line — it qualifies WHICH stock went out) and
+ *                          .vas_100-itDrop (drop shipment, muted while it reads
+ *                          "No" and taking the accent via .vas_100-is-drop when
+ *                          it reads "Yes").
+ *                        - Added the Documents table (.vas_100-docRow / -docItem
+ *                          / -docTxt, rows clickable via .vas_100-is-link) and
+ *                          the Activity feed (.vas_100-actList / -actRow /
+ *                          -actTag with its own .vas_100-tone-* set / -actTitle /
+ *                          -actLead / -actSub / -actWhen, the openable row and
+ *                          its caret / body / meta). The status tag gained the
+ *                          tone-* vocabulary the Documents rows need, where the
+ *                          line table's own tag has only Full / Partial / Short.
+ *                        - The pager fits itself to the panel rather than
+ *                          wrapping onto a second line: under 520px the
+ *                          "Showing a-b of N" caption goes and the controls take
+ *                          the row alone, under 360px the button labels go and
+ *                          the chevrons stand by themselves. In the single-record
+ *                          view the controls used to drop below the caption,
+ *                          putting the buttons furthest from the table.
+ *   VAI163   2026-08-14  Quality confirmation, ported from VAS_099:
+ *                        - The snapshot runs THREE-up under .vas_100-has-qc, so
+ *                          the set forms even rows once the two confirmation
+ *                          cards join it, and gained the tone accents those cards
+ *                          need (-quality / -accepted / -rejected).
+ *                        - The line table takes a seventh track for the Quality
+ *                          column under .vas_100-has-q — added only when a line
+ *                          actually has QA parameters, so the table reserves no
+ *                          room for a column that is not drawn. The item column
+ *                          gives up the width.
+ *                        - Added the line marker (.vas_100-qMark / -q-on / -q-off),
+ *                          the expand caret (.vas_100-qpToggle, rotating 90deg
+ *                          when open) and the parameter drawer
+ *                          (.vas_100-qpDrawer / -qpNote / -qpMini / -qpMiniRow /
+ *                          -qpMiniHead / -qpName), a full-width SIBLING of the
+ *                          line row so it is not trapped in one grid cell, plus
+ *                          the verdict pills (.vas_100-q-pass / -q-fail / -q-wait).
+ *   VAI163   2026-08-14  - The customer block takes the Sales Order overview's
+ *                          shape: labelled address lines (.vas_100-addrLabel /
+ *                          -addrVal, each inside the existing .vas_100-vendAddr)
+ *                          and the contact as a row of icon-led bits
+ *                          (.vas_100-custContact / -contactBit) rather than three
+ *                          labelled field boxes.
+ *                        - Added .vas_100-shipCard: the new Shipment Details
+ *                          section reuses .vas_100-hdrCard wholesale so it reads
+ *                          as part of the same panel, and only has to drop the
+ *                          top margin, its own section heading providing the
+ *                          spacing above it.
  ***********************************************************/
 
 .vas_100-root {
@@ -273,9 +322,45 @@
 }
 .vas_100-vendAddr .vas_100-ic { color: var(--do-muted); margin-top: 0.15em; }
 
-/* Customer detail fields (location / first name / e-mail) under the identity
-   line. Two across while there is room — the column is already the narrower
-   half of the card, so it drops to a single stack early. */
+/* Bill to / Ship to each take their own line, and each is introduced by its own
+   label so the reader is never left guessing WHICH address they are looking at.
+   The label is a separate element rather than text prefixed into the address, so
+   it can carry its own weight without the address inheriting it. */
+.vas_100-addrLabel {
+    flex: none;
+    font-weight: 700;
+    color: var(--do-sub);
+}
+.vas_100-addrVal {
+    min-width: 0;
+    overflow-wrap: break-word;
+}
+
+/* The contact as one row of icon-led bits — name, phone, e-mail — rather than
+   three labelled field boxes. It reads as one person that way instead of as
+   three separate facts. Wraps rather than clipping: a phone number or an
+   address cut in half identifies nobody. */
+.vas_100-custContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25em 0.875em;
+    margin-top: 0.5em;
+    font-size: 0.75em;
+    color: var(--do-sub);
+}
+.vas_100-contactBit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+.vas_100-contactBit .vas_100-ic { flex: none; color: var(--do-action); }
+
+/* Customer detail fields under the identity line. Two across while there is
+   room — the column is already the narrower half of the card, so it drops to a
+   single stack early. */
 .vas_100-custFields {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -287,6 +372,15 @@
 @container (max-width: 620px) {
     .vas_100-custFields { grid-template-columns: 1fr; }
 }
+
+/* ----------------------------------------------------------- */
+/*  Shipment Details                                            */
+/* ----------------------------------------------------------- */
+/* The header card's own layout, reused under the lines so the section reads as
+   part of the same panel rather than as a different kind of thing. It sits
+   inside a section, which already carries the heading and the spacing above it,
+   so the card only has to drop the top margin the header's copy carries. */
+.vas_100-shipCard { margin-top: 0; }
 
 /* ----------------------------------------------------------- */
 /*  Reference (Generated From chip strip)                       */
@@ -399,10 +493,17 @@
     padding: 0.75em 0.875em;
 }
 
+/* With the confirmation cards in play the grid runs THREE-up, so the set forms
+   even rows instead of leaving one card alone at the end of a four-up row. */
+.vas_100-snap.vas_100-has-qc { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
 .vas_100-metric.vas_100-tone-total    { border-left-color: var(--do-info-tx); }
 .vas_100-metric.vas_100-tone-lines    { border-left-color: var(--do-neutral-tx); }
 .vas_100-metric.vas_100-tone-received { border-left-color: var(--do-success-tx); }
 .vas_100-metric.vas_100-tone-order    { border-left-color: var(--do-purple-tx); }
+.vas_100-metric.vas_100-tone-quality  { border-left-color: var(--do-action); }
+.vas_100-metric.vas_100-tone-accepted { border-left-color: var(--do-success-tx); }
+.vas_100-metric.vas_100-tone-rejected { border-left-color: var(--do-risk-tx); }
 
 .vas_100-mHead {
     display: flex;
@@ -427,6 +528,9 @@
 .vas_100-metric.vas_100-tone-lines    .vas_100-mHead .vas_100-ic { color: var(--do-neutral-tx); }
 .vas_100-metric.vas_100-tone-received .vas_100-mHead .vas_100-ic { color: var(--do-success-tx); }
 .vas_100-metric.vas_100-tone-order    .vas_100-mHead .vas_100-ic { color: var(--do-purple-tx); }
+.vas_100-metric.vas_100-tone-quality  .vas_100-mHead .vas_100-ic { color: var(--do-action); }
+.vas_100-metric.vas_100-tone-accepted .vas_100-mHead .vas_100-ic { color: var(--do-success-tx); }
+.vas_100-metric.vas_100-tone-rejected .vas_100-mHead .vas_100-ic { color: var(--do-risk-tx); }
 
 .vas_100-mVal {
     font-size: 1.25em;
@@ -455,10 +559,12 @@
    single-record view is exactly that narrow, which is what left the summary
    crushed on one line. Matching VAS_099, the wide row only holds from 700px. */
 @container (max-width: 700px) {
-    .vas_100-snap { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .vas_100-snap,
+    .vas_100-snap.vas_100-has-qc { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container (max-width: 340px) {
-    .vas_100-snap { grid-template-columns: minmax(0, 1fr); }
+    .vas_100-snap,
+    .vas_100-snap.vas_100-has-qc { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ----------------------------------------------------------- */
@@ -559,7 +665,20 @@
     align-items: center;
     gap: 0.625em;
     padding: 0.625em 0.875em;
-    grid-template-columns: 2.6fr 0.7fr 0.9fr 1.1fr 1.1fr 0.9fr;
+    grid-template-columns:
+        minmax(0, 2.6fr) minmax(0, 0.7fr) minmax(0, 0.9fr)
+        minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+
+/* A seventh track for the Quality marker, added only when at least one line of
+   the delivery has QA parameters — the panel does not draw the column at all
+   otherwise, so the table must not reserve room for it either. The item column
+   gives up the width: it is the widest track and the one that ellipsises most
+   gracefully. */
+.vas_100-table.vas_100-has-q .vas_100-tRow {
+    grid-template-columns:
+        minmax(0, 2.2fr) minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 1.1fr)
+        minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 0.7fr);
 }
 
 .vas_100-tHead {
@@ -601,6 +720,36 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* The Product / Service cell reads down in four lines: name, attributes, code +
+   locator, drop shipment. Each clips to its own line and carries its full text
+   as a tooltip, so the row height is the same whatever any one of them holds. */
+
+/* Line 2 — the lot / serial / attribute set, when the product carries one. A
+   notch darker than the code line beneath it: the attribute qualifies WHICH
+   stock went out, which is closer to the product's identity than to its
+   reference data. */
+.vas_100-itAttr {
+    font-size: 0.9231em;
+    color: var(--do-sub);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Line 4 — drop shipment. Muted while it reads "No", which is the ordinary
+   case and should not draw the eye; a drop-shipped line takes the accent, since
+   goods that never pass through our warehouse are the exception worth seeing. */
+.vas_100-itDrop {
+    font-size: 0.9231em;
+    color: var(--do-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_100-itDrop.vas_100-is-drop { color: var(--do-action-dk); font-weight: 700; }
 
 /* Delivered cell (mini bar + value) */
 .vas_100-recv {
@@ -660,7 +809,117 @@
 @container (max-width: 620px) {
     .vas_100-table { overflow-x: auto; }
     .vas_100-tRow { min-width: 560px; }
+    .vas_100-table.vas_100-has-q .vas_100-tRow { min-width: 640px; }
+    /* The drawer carries the row min-width too, so its tint runs the full
+       scrolled width instead of stopping at the visible edge. */
+    .vas_100-table.vas_100-has-q .vas_100-qpDrawer { min-width: 640px; }
+    .vas_100-qpDrawer { min-width: 560px; }
 }
+
+/* ----------------------------------------------------------- */
+/*  Quality: the line marker and the per-line parameter drawer  */
+/* ----------------------------------------------------------- */
+/* The expand caret, on the product name of a line that has parameters. Rotates
+   a quarter turn when its drawer is open. */
+.vas_100-qpToggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    margin-right: 0.3125em;
+    color: var(--do-muted);
+    cursor: pointer;
+    user-select: none;
+    transition: transform .15s ease, color .15s ease;
+}
+.vas_100-qpToggle:hover { color: var(--do-action); }
+.vas_100-qpToggle.vas_100-is-open { transform: rotate(90deg); color: var(--do-action); }
+
+/* Tick / cross in the Quality column. The word travels as the cell's tooltip
+   and aria-label, so the mark is never the only statement of what it means. */
+.vas_100-qMark { display: inline-flex; align-items: center; justify-content: center; }
+.vas_100-qMark.vas_100-q-on  { color: var(--do-success-tx); }
+.vas_100-qMark.vas_100-q-off { color: var(--do-muted); opacity: .65; }
+
+/* A SIBLING of the line row, not a child, so it spans the table's full width
+   instead of being trapped in one grid cell. */
+.vas_100-qpDrawer {
+    border-bottom: 1px solid var(--do-row-div);
+    background: #F7FAFD;
+    padding: 0.5em 0.875em 0.75em 2.25em;
+}
+
+/* Said once above the table rather than left for the reader to infer from a
+   column of Pending tags. */
+.vas_100-qpNote {
+    font-size: 0.75em;
+    color: var(--do-muted);
+    font-style: italic;
+    margin-bottom: 0.4375em;
+}
+
+.vas_100-qpMini {
+    border: 1px solid var(--do-card-bd);
+    border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
+}
+
+/* Parameter | To Verify | Acceptable | Actual Value | QA Date | Status. */
+.vas_100-qpMiniRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.5em 0.75em;
+    grid-template-columns:
+        minmax(0, 1.6fr) minmax(0, 0.8fr) minmax(0, 1fr)
+        minmax(0, 1fr)   minmax(0, 1fr)   minmax(0, 0.9fr);
+    font-size: 0.8125em;
+    color: var(--do-text);
+    border-bottom: 1px solid var(--do-row-div);
+}
+.vas_100-qpMiniRow:last-child { border-bottom: none; }
+.vas_100-qpMiniRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* To Verify is a quantity, so it is held to the right edge of its track in the
+   head and the body alike. Stated as justify-self as well as text-align: the
+   drawer is a grid inside the line table, and a grid item placed at the end of
+   its track sits right whatever a competing rule does to text-align. */
+.vas_100-qpMini .vas_100-qpMiniRow > span.vas_100-ta-r {
+    justify-self: end;
+    max-width: 100%;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.vas_100-qpMini .vas_100-qpMiniRow > span.vas_100-ta-c {
+    justify-self: center;
+    max-width: 100%;
+    text-align: center;
+}
+
+.vas_100-qpMiniHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--do-card-bd);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--do-muted);
+}
+
+.vas_100-qpName {
+    font-weight: 700;
+    color: var(--do-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Verdict pills. Pending is a parameter not yet inspected, not a failure, so it
+   reads neutral rather than warning. */
+.vas_100-tag.vas_100-q-pass { background: var(--do-success-bg); color: var(--do-success-tx); }
+.vas_100-tag.vas_100-q-fail { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
+.vas_100-tag.vas_100-q-wait { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
 
 /* ----------------------------------------------------------- */
 /*  Lines pager                                                 */
@@ -704,6 +963,177 @@
     cursor: default;
     pointer-events: none;
     color: var(--do-muted);
+}
+
+/* The pager fits itself to the panel instead of wrapping onto a second line.
+   In the single-record view the panel is narrow enough that the "Showing 1-25
+   of 60" caption and the Previous / Page / Next controls cannot share a line,
+   and the controls dropped below the caption — the buttons a reader is reaching
+   for ended up furthest from the table.
+
+   Narrow: the caption goes (the "Page n of m" between the buttons already says
+   where the reader is) and the controls take the row on their own. Narrower
+   still: the button LABELS go and the chevrons stand alone, which is the last
+   thing that can shrink before the controls would have to wrap again. */
+@container (max-width: 520px) {
+    .vas_100-pager   { flex-wrap: nowrap; justify-content: flex-end; }
+    .vas_100-pgRange { display: none; }
+}
+@container (max-width: 360px) {
+    .vas_100-pgBtn span:not(.vas_100-ic) { display: none; }
+    .vas_100-pgBtn { padding: 0.3125em 0.5em; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Documents raised against the delivery                       */
+/* ----------------------------------------------------------- */
+/* Reuses the line table's frame with four tracks of its own: Document | Date |
+   Status | Amount. Every track is minmax(0, Nfr) so a long document number
+   clips inside its own column instead of widening the track and pushing the
+   right-hand ones out of the frame. */
+.vas_100-docRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.625em 0.875em;
+    grid-template-columns:
+        minmax(0, 2.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+.vas_100-docRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* A row that opens its document reads as a link and lifts on hover. */
+.vas_100-docRow.vas_100-is-link { cursor: pointer; }
+.vas_100-docRow.vas_100-is-link:hover { background: var(--do-info-bg); }
+.vas_100-docRow.vas_100-is-link:hover .vas_100-itName { color: var(--do-link); }
+
+.vas_100-docItem { display: flex; align-items: center; gap: 0.5em; min-width: 0; }
+.vas_100-docTxt  { min-width: 0; flex: 1; }
+.vas_100-docItem > .vas_100-ic { flex: none; color: var(--do-action); }
+
+/* ----------------------------------------------------------- */
+/*  Activity (audit trail)                                      */
+/* ----------------------------------------------------------- */
+.vas_100-actList {
+    border: 1px solid var(--do-card-bd);
+    border-radius: var(--do-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+/* tag | headline | right-aligned "when · by whom". The three wrap as a group on
+   a narrow panel rather than each clipping to nothing. */
+.vas_100-actRow {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.25em 0.625em;
+    padding: 0.625em 0.875em;
+    border-bottom: 1px solid var(--do-row-div);
+    font-size: 0.8125em;
+    color: var(--do-text);
+}
+.vas_100-actRow:last-child { border-bottom: none; }
+
+.vas_100-actTag {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.8462em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.vas_100-actTag.vas_100-tone-info    { background: var(--do-info-bg);    color: var(--do-info-tx); }
+.vas_100-actTag.vas_100-tone-success { background: var(--do-success-bg); color: var(--do-success-tx); }
+.vas_100-actTag.vas_100-tone-warning { background: var(--do-warning-bg); color: var(--do-warning-tx); }
+.vas_100-actTag.vas_100-tone-risk    { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
+.vas_100-actTag.vas_100-tone-purple  { background: var(--do-purple-bg);  color: var(--do-purple-tx); }
+.vas_100-actTag.vas_100-tone-neutral { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
+
+/* The Documents status tag borrows the same tone vocabulary as the header pill,
+   where the line table's own tag has only Full / Partial / Short. */
+.vas_100-tag.vas_100-tone-info    { background: var(--do-info-bg);    color: var(--do-info-tx); }
+.vas_100-tag.vas_100-tone-success { background: var(--do-success-bg); color: var(--do-success-tx); }
+.vas_100-tag.vas_100-tone-warning { background: var(--do-warning-bg); color: var(--do-warning-tx); }
+.vas_100-tag.vas_100-tone-risk    { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
+.vas_100-tag.vas_100-tone-purple  { background: var(--do-purple-bg);  color: var(--do-purple-tx); }
+.vas_100-tag.vas_100-tone-neutral { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
+
+.vas_100-actTitle { flex: 1; min-width: 0; }
+
+/* The headline clips to one line — it has a tooltip carrying the whole of it —
+   except a note, whose text IS what the reader came for and wraps to three. */
+.vas_100-actLead {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_100-actLead.vas_100-multiline {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+/* The recipient list and the line an edit landed on. Both WRAP instead of
+   clipping: an address cut off mid-domain identifies nobody, and break-word
+   because a single long address has no space to break at. */
+.vas_100-actSub {
+    display: block;
+    font-size: 0.8462em;
+    color: var(--do-muted);
+    margin-top: 0.125em;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
+}
+
+.vas_100-actWhen {
+    flex: none;
+    margin-left: auto;
+    max-width: 100%;
+    font-size: 0.8462em;
+    color: var(--do-muted);
+    white-space: nowrap;
+}
+
+/* A row carrying an e-mail body opens it on click; the caret shows the state. */
+.vas_100-actRow.vas_100-is-openable { cursor: pointer; }
+.vas_100-actRow.vas_100-is-openable:hover { background: var(--do-info-bg); }
+.vas_100-actCaret { flex: none; color: var(--do-muted); transition: transform .15s ease; }
+.vas_100-actRow.vas_100-is-open .vas_100-actCaret { transform: rotate(90deg); }
+
+.vas_100-actBody {
+    padding: 0.625em 0.875em 0.875em 2.5em;
+    border-bottom: 1px solid var(--do-row-div);
+    background: #F7FAFD;
+    font-size: 0.8125em;
+    color: var(--do-text);
+}
+.vas_100-actBody p {
+    margin: 0.5em 0 0;
+    line-height: 1.55;
+    /* The body is text flattened from the mail — keep its line breaks. */
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+.vas_100-actMeta {
+    font-size: 0.9231em;
+    color: var(--do-muted);
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+@container (max-width: 620px) {
+    .vas_100-docRow { min-width: 520px; }
+    /* The stamp drops to its own line rather than squeezing the headline out. */
+    .vas_100-actWhen { margin-left: 0; }
 }
 
 /* ----------------------------------------------------------- */

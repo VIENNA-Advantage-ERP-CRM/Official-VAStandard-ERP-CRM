@@ -268,6 +268,41 @@
  *                        zone designator, so a receipt entered late in the
  *                        evening used to date to the next morning. Drafted
  *                        carries the same marker; it always read C_Order.Created.
+ *   VAI163   2026-08-13  - Activity reports edits FIELD BY FIELD: an "updated"
+ *                          row carries the name of the column that changed
+ *                          (a.FieldName) and headlines with it, so the trail
+ *                          reads "Updated <field> · <when> · by <who>". The old
+ *                          "Order updated · 5 fields changed" wording (and its
+ *                          VAS_092_FieldsChanged key) went with it — a count said
+ *                          something moved but never what.
+ *                        - An e-mail's recipient line lists every address on the
+ *                          mail (To, Cc and Bcc, each labelled) in full instead
+ *                          of naming the To list and counting the rest as
+ *                          "+n more". The count could only be resolved by opening
+ *                          the message, which a mail stored without a body cannot
+ *                          do. allRecipients / countAddresses went with it, as did
+ *                          the sub-line's tooltip. Ported from VAS_099.
+ *   VAI163   2026-08-14  - The header's terms column carries a Drop Shipment
+ *                          field (C_Order.IsDropShip), reading Yes or No like the
+ *                          GRN overview's. It sits under Warehouse, which on a
+ *                          drop-shipped order names a place the goods never reach
+ *                          — the vendor delivers straight to the customer — and
+ *                          nothing on the panel said so.
+ *   VAI163   2026-08-14  - Drop Shipment reads as a TICK or a CROSS rather than as
+ *                          "Yes" / "No" (headerFlagField). Neither word says more
+ *                          than the mark does, and each took a whole field's line
+ *                          to say it in a column that runs two fields wide. The
+ *                          word travels as the field's tooltip and the mark's
+ *                          aria-label, so the glyph is never the only statement of
+ *                          what it means.
+ *                        - The vendor contact's e-mail no longer prints OVER the
+ *                          terms column beside it (stylesheet). A contact bit is a
+ *                          flex item, and a flex item's default min-width is the
+ *                          widest its content can be — so a long address refused
+ *                          to narrow and overflowed the 40% vendor column. It
+ *                          shows in the single-record view because that is where
+ *                          the panel is narrow enough for the address to exceed
+ *                          its column.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -367,6 +402,9 @@
             VAS_092_PaymentTerms: "Payment Term",
             VAS_092_Pricelist: "Pricelist",
             VAS_092_Currency: "Currency",
+            VAS_092_DropShipment: "Drop Shipment",
+            VAS_092_Yes: "Yes",
+            VAS_092_No: "No",
             // Priority (C_Order.PriorityRule)
             VAS_092_UrgentPriority: "Urgent priority",
             VAS_092_HighPriority: "High priority",
@@ -522,7 +560,6 @@
             VAS_092_MailCc: "Cc",
             VAS_092_MailBcc: "Bcc",
             VAS_092_MailFrom: "From",
-            VAS_092_MoreRecipients: "more",
             VAS_092_ShowMailBody: "Show message",
             VAS_092_HideMailBody: "Hide message",
             VAS_092_TagGRN: "GRN",
@@ -546,7 +583,7 @@
             VAS_092_TagInvalidated: "Invalid",
             VAS_092_TagUpdated: "Updated",
             VAS_092_ActUpdated: "Order updated",
-            VAS_092_FieldsChanged: "fields changed",
+            VAS_092_ActFieldUpdated: "Updated",
             VAS_092_RecentActivity: "Activity",
             VAS_092_Updates: "updates",
             VAS_092_OpenRecord: "Open"
@@ -862,7 +899,7 @@
             if (!data.VendorName && !data.VendorAddress &&
                 !data.ContactName && !data.ContactPhone && !data.ContactEmail &&
                 !data.PaymentTermName && !data.PriceListName && !data.WarehouseName &&
-                !data.OrgName && !data.ISO_Code) {
+                !data.OrgName && !data.ISO_Code && !data.IsDropShip) {
                 return;
             }
 
@@ -895,6 +932,15 @@
             var cur = (data.ISO_Code || "") + (data.CurSymbol ? " (" + data.CurSymbol + ")" : "");
             if (cur.trim())           $right.append(headerField(getMsg("VAS_092_Currency"), cur));
             if (data.WarehouseName) $right.append(headerField(getMsg("VAS_092_ShipTo"), data.WarehouseName));
+            // Drop Shipment (C_Order.IsDropShip) — always shown, Yes or No: "No"
+            // is as much of an answer as "Yes" here, and the reader is looking at
+            // a Warehouse right above it that a drop-shipped order never reaches.
+            // Shown as a MARK rather than as the word: neither "Yes" nor "No"
+            // carries more meaning than a tick or a cross does, and each took a
+            // whole field's line to say it in a column that runs two fields wide.
+            // The word travels as the field's tooltip and the mark's aria-label,
+            // so the glyph is never the only statement of what it means.
+            $right.append(headerFlagField(getMsg("VAS_092_DropShipment"), !!data.IsDropShip));
             //if (data.OrgName) $right.append(headerField(getMsg("VAS_092_BillTo"), data.OrgName));
             if ($right.children().length) $card.append($right);
 
@@ -914,6 +960,26 @@
             var $f = $('<div class="vas_092-hdrField"></div>');
             $f.append($('<div class="vas_092-fLabel"></div>').text(label));
             $f.append($('<div class="vas_092-fVal"></div>').text(value));
+            return $f;
+        }
+
+        // A header field whose value is a yes / no FLAG, drawn as a tick or a
+        // cross. The word it stands for is carried on the field's tooltip and on
+        // the mark's aria-label, so a reader who cannot read the glyph — or a
+        // screen reader — still gets the answer in words.
+        function headerFlagField(label, on) {
+            var word = on ? getMsg("VAS_092_Yes") : getMsg("VAS_092_No");
+            var $f = $('<div class="vas_092-hdrField"></div>')
+                .attr("title", label + ": " + word);
+            $f.append($('<div class="vas_092-fLabel"></div>').text(label));
+
+            var $v = $('<div class="vas_092-fVal"></div>');
+            $v.append($('<span class="vas_092-flagMark"></span>')
+                .addClass(on ? "vas_092-flag-on" : "vas_092-flag-off")
+                .attr("role", "img")
+                .attr("aria-label", word)
+                .append(svgIcon(on ? "check" : "cross")));
+            $f.append($v);
             return $f;
         }
 
@@ -991,9 +1057,14 @@
             // (C_Order.C_Order_Blanket). Opened on the purchase side: the blanket
             // is itself a C_Order, so isSOTrx stays false.
             if (data.BlanketOrderId > 0) {
+                var blanketVal = data.BlanketOrderNo || ("#" + data.BlanketOrderId);
+                // A release can draw on more than one blanket when the link is
+                // read from the lines; the first is named and the rest counted.
+                if (data.BlanketOrderCount > 1) {
+                    blanketVal += " +" + (data.BlanketOrderCount - 1) + " " + getMsg("VAS_092_More");
+                }
                 $chips.append(originChip("calendar", getMsg("VAS_092_BlanketOrder"),
-                    data.BlanketOrderNo || ("#" + data.BlanketOrderId),
-                    null, "success", "C_Order", data.BlanketOrderId, false));
+                    blanketVal, null, "success", "C_Order", data.BlanketOrderId, false));
                 any = true;
             }
 
@@ -2294,14 +2365,13 @@
             $title.append($('<span class="vas_092-actLead"></span>')
                 .text(title).attr("title", title));
 
-            // An e-mail names its recipients under the subject: the To list, plus
-            // a count of the Cc / Bcc addresses so a reader can see at a glance
-            // that others were copied. Every address itself is listed in the body.
+            // An e-mail names its recipients under the subject — every address on
+            // the To, Cc and Bcc lists, in full. No tooltip: the line is no
+            // longer an abridgement of something the reader has to hover to see.
             if (a.Type === "email") {
                 var to = recipientSummary(a);
                 if (to) {
-                    $title.append($('<small class="vas_092-actSub"></small>')
-                        .text(to).attr("title", allRecipients(a) || to));
+                    $title.append($('<small class="vas_092-actSub"></small>').text(to));
                 }
             }
             $row.append($title);
@@ -2357,33 +2427,28 @@
         // Row sub-line: the To list, plus "+n more" covering the Cc / Bcc
         // addresses. Counting by comma / semicolon is enough for a summary — the
         // body lists the addresses verbatim.
+        // Every address the mail went to, written out in full and labelled: To,
+        // then Cc, then Bcc. It used to name the To list and count the rest as
+        // "+n more", which could only be resolved by opening the message — and a
+        // mail stored without a body cannot be opened at all. Ported from VAS_099.
         function recipientSummary(a) {
-            var to = (a.MailTo || "").trim();
-            var extra = countAddresses(a.MailCc) + countAddresses(a.MailBcc);
-            if (!to && !extra) return "";
-            var s = getMsg("VAS_092_MailTo") + " " + (to || "—");
-            if (extra > 0) s += " +" + extra + " " + getMsg("VAS_092_MoreRecipients");
-            return s;
-        }
-
-        // Every address on the mail, for the row's hover tooltip.
-        function allRecipients(a) {
             var bits = [];
-            if (a.MailTo)  bits.push(getMsg("VAS_092_MailTo")  + " " + a.MailTo);
-            if (a.MailCc)  bits.push(getMsg("VAS_092_MailCc")  + " " + a.MailCc);
-            if (a.MailBcc) bits.push(getMsg("VAS_092_MailBcc") + " " + a.MailBcc);
-            return bits.join("\n");
+            appendAddressBit(bits, "VAS_092_MailTo",  a.MailTo);
+            appendAddressBit(bits, "VAS_092_MailCc",  a.MailCc);
+            appendAddressBit(bits, "VAS_092_MailBcc", a.MailBcc);
+            return bits.join(" · ");
         }
 
-        function countAddresses(value) {
-            if (!value || !String(value).trim()) return 0;
-            var parts = String(value).split(/[;,]/);
-            var n = 0;
-            for (var i = 0; i < parts.length; i++) {
-                if (parts[i].trim()) n++;
-            }
-            return n;
+        function appendAddressBit(bits, key, value) {
+            var text = (value === null || value === undefined) ? "" : String(value).trim();
+            if (!text) return;
+            bits.push(getMsg(key) + " " + text);
         }
+
+        // allRecipients (the row's hover tooltip) and countAddresses (the "+n
+        // more" tally) are gone with the abridged sub-line they served: the row
+        // now writes every address out, so there is nothing left to count or to
+        // recover on hover.
 
         function activityTag(meta) {
             var $t = $('<span class="vas_092-actTag"></span>').addClass("vas_092-tone-" + meta.tone);
@@ -2397,14 +2462,17 @@
             // untitled one falls back to what its tag says it is.
             if (!meta.titleKey) return a.Text || getMsg(meta.tagKey);
 
+            // A field-level edit headlines with the FIELD that changed — the row's
+            // tag already says "Updated", and the field is what tells one edit
+            // apart from the next. Rows with no field (change logging off) keep
+            // the generic wording.
+            if (a.Type === "updated" && a.FieldName) {
+                return getMsg("VAS_092_ActFieldUpdated") + " " + a.FieldName;
+            }
+
             var s = getMsg(meta.titleKey);
             if (a.Type === "grn" && a.Count > 0) {
                 s += " · " + a.Count + " " + getMsg("VAS_092_Lines");
-            }
-            // A header edit says how much of it changed, so one save touching
-            // five columns reads as one event rather than an unqualified "Updated".
-            if (a.Type === "updated" && a.Count > 0) {
-                s += " · " + a.Count + " " + getMsg("VAS_092_FieldsChanged");
             }
             if (a.DocumentNo) s += " (" + a.DocumentNo + ")";
             return s;
@@ -2540,6 +2608,8 @@
             coins:    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5"/><path d="M14.5 4.2a5 5 0 0 1 0 15.6"/><path d="M7 18.7a5 5 0 0 0 6 0"/></svg>',
             info:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
             check:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+            // The "no" half of a yes / no header flag (Drop Shipment).
+            cross:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
             chevUp:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>',
             doc:      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>',
             clipboardCheck: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>',

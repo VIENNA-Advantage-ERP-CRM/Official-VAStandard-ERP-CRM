@@ -49,6 +49,17 @@
 ///                          the confirmation's own note and its line notes, and a
 ///                          feed of chat entries (CM_ChatEntry) merged with the
 ///                          document's create / complete milestones.
+///   VAI163   2026-08-13  - Activity gains the confirmation's field-level edit
+///                          history (LoadFieldChangeActivity, AD_ChangeLog): one
+///                          "Changed" row per changed column carrying its label,
+///                          its old value and its new one, for the header AND its
+///                          LINES — a confirmation's meaningful edits are its
+///                          confirmed / scrapped quantities, and those live on
+///                          the lines, so a header-only trail reported almost
+///                          nothing. Line rows are scoped with the source line
+///                          number and product. The feed previously said only
+///                          WHEN the document was last saved (the Completed
+///                          milestone's Updated stamp) and never what changed.
 /// </summary>
 
 using System;
@@ -762,6 +773,7 @@ namespace VASLogic.Models
 
             LoadNoteActivity(M_InOutConfirm_ID, activity);
             LoadMilestoneActivity(M_InOutConfirm_ID, activity);
+            LoadFieldChangeActivity(M_InOutConfirm_ID, activity);
 
             activity.Sort((a, b) =>
                 b.EventTime.GetValueOrDefault(DateTime.MinValue)
@@ -846,6 +858,141 @@ namespace VASLogic.Models
             {
                 _log.Severe("LoadMilestoneActivity (M_InOutConfirm_ID=" + M_InOutConfirm_ID + "): " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// The confirmation's field-level edit history, read from the platform's
+        /// change log (AD_ChangeLog): one row per changed COLUMN carrying the
+        /// dictionary's label for it, the value it held before and the value it
+        /// holds now, when the change was saved and who saved it.
+        ///
+        /// Both the header (M_InOutConfirm) and its LINES (M_InOutLineConfirm) are
+        /// read. A confirmation's meaningful edits are its confirmed / scrapped
+        /// quantities, and those live on the lines — a header-only trail would
+        /// report almost nothing. A line change is labelled with its source line
+        /// number and product so the reader can tell which row moved.
+        ///
+        /// Rows are NOT collapsed to one per save: the panel is asked for exactly
+        /// what changed, so a save touching three columns is three rows. This is
+        /// what replaces reading the single M_InOutConfirm.Updated stamp, which
+        /// could only ever report the LAST save and never said what it touched.
+        ///
+        /// Silently degrades when change logging is off for the table — there are
+        /// simply no rows, and the feed keeps its milestones.
+        /// </summary>
+        /// <param name="M_InOutConfirm_ID">Selected confirmation id.</param>
+        /// <param name="list">Activity list being populated.</param>
+        private void LoadFieldChangeActivity(int M_InOutConfirm_ID, List<ActivityData> list)
+        {
+            // ----- Header edits -----
+            try
+            {
+                string sql = @"SELECT cl.Created,
+                                      cl.OldValue,
+                                      cl.NewValue,
+                                      COALESCE(col.Name, col.ColumnName) AS FieldName,
+                                      u.Name AS UserName
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_Column col ON (col.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User  u    ON (u.AD_User_ID     = cl.CreatedBy)
+                                WHERE cl.Record_ID = @M_InOutConfirm_ID
+                                  AND adt.TableName = 'M_InOutConfirm'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
+                                ORDER BY cl.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, ConfirmParam(M_InOutConfirm_ID), null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows) AddChangeRow(r, "", list);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadFieldChangeActivity/header (M_InOutConfirm_ID="
+                            + M_InOutConfirm_ID + "): " + ex.Message);
+            }
+
+            // ----- Line edits -----
+            //
+            // The confirm-line ids are reached through the join rather than a
+            // second bind, so the statement carries its bind name exactly once:
+            // positional binding gives a repeated name a second, unfilled
+            // placeholder.
+            try
+            {
+                string sql = @"SELECT cl.Created,
+                                      cl.OldValue,
+                                      cl.NewValue,
+                                      COALESCE(col.Name, col.ColumnName) AS FieldName,
+                                      u.Name  AS UserName,
+                                      il.Line AS LineNo,
+                                      p.Name  AS ProductName
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                INNER JOIN M_InOutLineConfirm lc
+                                        ON (lc.M_InOutLineConfirm_ID = cl.Record_ID)
+                                 LEFT OUTER JOIN M_InOutLine il ON (il.M_InOutLine_ID = lc.M_InOutLine_ID)
+                                 LEFT OUTER JOIN M_Product   p  ON (p.M_Product_ID    = il.M_Product_ID)
+                                 LEFT OUTER JOIN AD_Column   col ON (col.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User     u   ON (u.AD_User_ID     = cl.CreatedBy)
+                                WHERE adt.TableName = 'M_InOutLineConfirm'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
+                                  AND lc.M_InOutConfirm_ID = @M_InOutConfirm_ID
+                                ORDER BY cl.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, ConfirmParam(M_InOutConfirm_ID), null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        int lineNo = Util.GetValueOfInt(r["LineNo"]);
+                        string scope = lineNo > 0 ? "#" + lineNo : "";
+                        string prod  = Util.GetValueOfString(r["ProductName"]);
+                        if (!string.IsNullOrEmpty(prod))
+                            scope = (scope.Length > 0 ? scope + " " : "") + prod.Trim();
+                        AddChangeRow(r, scope, list);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadFieldChangeActivity/lines (M_InOutConfirm_ID="
+                            + M_InOutConfirm_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Turns one AD_ChangeLog row into an activity entry. A change whose column
+        /// cannot be resolved through the dictionary is skipped: without a field
+        /// name the row says only that "something" changed, which is what this
+        /// whole loader exists to stop reporting.
+        /// </summary>
+        private void AddChangeRow(DataRow r, string scope, List<ActivityData> list)
+        {
+            string field = Util.GetValueOfString(r["FieldName"]);
+            if (string.IsNullOrEmpty(field)) return;
+
+            list.Add(new ActivityData
+            {
+                EventType   = "Changed",
+                FieldName   = field,
+                OldValue    = ChangeValue(Util.GetValueOfString(r["OldValue"])),
+                NewValue    = ChangeValue(Util.GetValueOfString(r["NewValue"])),
+                ChangeScope = scope,
+                ActorName   = Util.GetValueOfString(r["UserName"]),
+                EventTime   = Util.GetValueOfDateTime(r["Created"])
+            });
+        }
+
+        /// <summary>
+        /// Tidies one side of a change for display: the platform writes an unset
+        /// value as the literal "NULL", which reads as a value of its own rather
+        /// than as an empty field.
+        /// </summary>
+        private static string ChangeValue(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return "";
+            string v = raw.Trim();
+            return string.Equals(v, "NULL", StringComparison.OrdinalIgnoreCase) ? "" : v;
         }
 
         /// <summary>
@@ -938,10 +1085,19 @@ namespace VASLogic.Models
         /// renders: Note | Created | Completed.</summary>
         public class ActivityData
         {
+            /// <summary>Note | Created | Completed | Changed</summary>
             public string    EventType { get; set; }
             public string    Title     { get; set; }
             public string    ActorName { get; set; }
             public DateTime? EventTime { get; set; }
+
+            // Field-level change ("Changed"): which field moved, and from what to
+            // what. ChangeScope names the line when it was a line that changed,
+            // and is empty for a header edit.
+            public string    FieldName   { get; set; }
+            public string    OldValue    { get; set; }
+            public string    NewValue    { get; set; }
+            public string    ChangeScope { get; set; }
         }
 
         public class ShipGRNConfirmationOverviewData

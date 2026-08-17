@@ -228,6 +228,18 @@
 ///                        it several times directly beneath it. The single
 ///                        generic "updated" row built from the header stamp
 ///                        survives only where change logging is off for M_InOut.
+///   VAI163   2026-08-14  Those field-by-field rows now cover the LINES as well as
+///                        the header (LoadChangeActivity reads AD_ChangeLog for
+///                        M_InOutLine too, joined to this receipt's lines). A
+///                        receipt's substantive edits are its received quantities,
+///                        and those live on the lines — reading only M_InOut
+///                        reported nothing at all for the change a reader most
+///                        wants to trace, so a corrected quantity left no trail.
+///                        Each row carries the line it landed on (ChangeScope:
+///                        line number + product) so the reader can tell which row
+///                        moved. Both passes share AddChangeRow, which keeps the
+///                        completion-save and unnamed-column exclusions in one
+///                        place. Matches VAS_101, which reads the same pair.
 /// </summary>
 
 using System;
@@ -1168,10 +1180,20 @@ namespace VASLogic.Models
         /// confirmation will raise, marked <see cref="GRNQualityParamData.IsPlanned"/>
         /// and Pending, so the panel can say it is showing what is expected rather
         /// than what was found.
+        ///
+        /// PUBLIC because the DELIVERY ORDER overview (VAS_100) reads the same
+        /// rows. Every table this touches — M_InOut, M_InOutLine,
+        /// M_InOutLineConfirm, VA010_* — is shared by shipments and receipts
+        /// alike, and none of it looks at IsSOTrx: the VA010 rules are about the
+        /// document's lines, not about which side of the trade it sits on. The
+        /// alternative was a second copy of this loader and the six helpers behind
+        /// it (planned-vs-recorded fallback, checking bands, display-column
+        /// probing) — several hundred lines of intricate logic to keep in step by
+        /// hand. One implementation, called from both panels, cannot drift.
         /// </summary>
-        /// <param name="M_InOut_ID">Owning goods receipt id.</param>
+        /// <param name="M_InOut_ID">Owning shipment / receipt id.</param>
         /// <returns>Ordered list of inspection rows (empty when VA010 is absent).</returns>
-        private List<GRNQualityParamData> LoadQualityParams(int M_InOut_ID)
+        public List<GRNQualityParamData> LoadQualityParams(int M_InOut_ID)
         {
             List<GRNQualityParamData> rows = new List<GRNQualityParamData>();
 
@@ -1942,6 +1964,8 @@ namespace VASLogic.Models
         private int LoadChangeActivity(int M_InOut_ID, List<GRNActivityData> list)
         {
             int added = 0;
+
+            // ----- Header edits (M_InOut) -----
             try
             {
                 // AD_Column is LEFT joined so a log row whose column has since been
@@ -1962,38 +1986,111 @@ namespace VASLogic.Models
                                   AND NVL(cl.IsActive, 'Y') = 'Y'
                                 ORDER BY cl.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
-                if (ds == null || ds.Tables.Count == 0) return 0;
-
-                foreach (DataRow r in ds.Tables[0].Rows)
+                if (ds != null && ds.Tables.Count > 0)
                 {
-                    DateTime? at = Util.GetValueOfDateTime(r["Created"]);
-                    if (!at.HasValue) continue;
-                    if (IsSameMoment(at, _lastCompletedAt)) continue;   // completion save
-
-                    string field = Util.GetValueOfString(r["FieldLabel"]);
-                    if (string.IsNullOrEmpty(field))
-                        field = Util.GetValueOfString(r["FieldColumn"]);
-                    // A row that can name no field at all would render as a bare
-                    // "Updated" with nothing to identify it — the generic milestone
-                    // row already says that much.
-                    if (string.IsNullOrEmpty(field)) continue;
-
-                    list.Add(new GRNActivityData
-                    {
-                        Type      = "updated",
-                        FieldName = field,
-                        UserName  = Util.GetValueOfString(r["UserName"]),
-                        Created   = at
-                    });
-                    added++;
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                        if (AddChangeRow(r, "", list)) added++;
                 }
             }
             catch (Exception ex)
             {
                 // Change logging is optional; without it the header stamp stands in.
-                _log.Severe("LoadChangeActivity (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
+                _log.Severe("LoadChangeActivity/header (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
             }
+
+            // ----- Line edits (M_InOutLine) -----
+            //
+            // A receipt's substantive edits are its RECEIVED QUANTITIES, and those
+            // live on the lines. Reading the header alone reported nothing at all
+            // for the change a reader most wants to trace, so a corrected quantity
+            // left no trail. Each row is labelled with the line it landed on so the
+            // reader can tell which one moved.
+            //
+            // The line ids are reached through a join rather than a sub-select on
+            // the same parameter, so the statement carries its bind name exactly
+            // once: Oracle binds positionally, and a repeated name becomes a
+            // second, unfilled placeholder.
+            try
+            {
+                string sql = @"SELECT cl.Created,
+                                      u.Name  AS UserName,
+                                      col.Name       AS FieldLabel,
+                                      col.ColumnName AS FieldColumn,
+                                      l.Line  AS LineNo,
+                                      p.Name  AS ProductName
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                INNER JOIN M_InOutLine l
+                                        ON (l.M_InOutLine_ID = cl.Record_ID)
+                                 LEFT OUTER JOIN M_Product p
+                                        ON (p.M_Product_ID  = l.M_Product_ID)
+                                 LEFT OUTER JOIN AD_Column col
+                                        ON (col.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                        ON (u.AD_User_ID = cl.CreatedBy)
+                                WHERE adt.TableName = 'M_InOutLine'
+                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                  AND l.M_InOut_ID = @M_InOut_ID
+                                ORDER BY cl.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        // "#10 Steel Bolt M8" — the line number identifies the row,
+                        // the product says what it is without a second lookup.
+                        string scope = "#" + Util.GetValueOfInt(r["LineNo"]);
+                        string prod  = Util.GetValueOfString(r["ProductName"]);
+                        if (!string.IsNullOrEmpty(prod)) scope += " " + prod.Trim();
+                        if (AddChangeRow(r, scope, list)) added++;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadChangeActivity/lines (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
+            }
+
             return added;
+        }
+
+        /// <summary>
+        /// Turns one AD_ChangeLog row into an "updated" activity entry.
+        ///
+        /// Two rows are refused. A change stamped at the COMPLETION moment is the
+        /// completion save (DocStatus / Processed / DocAction), which the
+        /// "completed" milestone already reports once — without this it would be
+        /// restated several times directly beneath it. And a change whose column
+        /// the dictionary cannot name would render as a bare "Updated" identifying
+        /// nothing, which is what naming the field exists to stop.
+        /// </summary>
+        /// <param name="r">Change-log row (Created / UserName / FieldLabel /
+        /// FieldColumn).</param>
+        /// <param name="scope">Which record the edit landed on: "" for the receipt
+        /// header, else the line's number and product.</param>
+        /// <param name="list">Feed being built; the row is appended.</param>
+        /// <returns>True when an entry was added.</returns>
+        private bool AddChangeRow(DataRow r, string scope, List<GRNActivityData> list)
+        {
+            DateTime? at = Util.GetValueOfDateTime(r["Created"]);
+            if (!at.HasValue) return false;
+            if (IsSameMoment(at, _lastCompletedAt)) return false;   // completion save
+
+            string field = Util.GetValueOfString(r["FieldLabel"]);
+            if (string.IsNullOrEmpty(field))
+                field = Util.GetValueOfString(r["FieldColumn"]);
+            if (string.IsNullOrEmpty(field)) return false;
+
+            list.Add(new GRNActivityData
+            {
+                Type        = "updated",
+                FieldName   = field,
+                ChangeScope = scope,
+                UserName    = Util.GetValueOfString(r["UserName"]),
+                Created     = at
+            });
+            return true;
         }
 
         /// <summary>
@@ -2827,6 +2924,11 @@ namespace VASLogic.Models
             /// changed. Empty on the generic header-stamp row that stands in when
             /// change logging is off.</summary>
             public string    FieldName  { get; set; }
+            /// <summary>For an "updated" row: which record the edit landed on —
+            /// "" for the receipt header, else the line's number and product
+            /// ("#10 Steel Bolt M8"). A receipt's substantive edits are its
+            /// received quantities, and those live on the lines.</summary>
+            public string    ChangeScope { get; set; }
 
             // E-mail (MailAttachment1) — the body is revealed on click.
             public string    Body       { get; set; }   // TextMsg (flattened to text)

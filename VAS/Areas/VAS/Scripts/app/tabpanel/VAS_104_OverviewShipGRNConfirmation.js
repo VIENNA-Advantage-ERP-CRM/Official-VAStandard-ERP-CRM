@@ -84,6 +84,17 @@
  *                        the list card so the controls keep their place while
  *                        the rows are replaced underneath them, and the
  *                        section's count badge still counts the WHOLE feed.
+ *   VAI163   2026-08-13  - Confirmation Type moved from the identity column to
+ *                          the FIELD column on the right of the details card. It
+ *                          sat under the party name, which it has nothing to do
+ *                          with; it belongs beside the source document.
+ *                        - Activity reports edits FIELD BY FIELD ("Changed"
+ *                          rows): the field's name headlines the row — prefixed
+ *                          with the line it happened on when a line changed — and
+ *                          the value move (old struck through, new in weight)
+ *                          runs beneath it on its own line (changeDelta). The
+ *                          feed used to say only when the document was last
+ *                          saved, via the Completed row's Updated stamp.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -440,7 +451,6 @@
             var $left = $('<div class="vas_104-hdrColL"></div>');
             $left.append($('<div class="vas_104-fLabel"></div>').text(VIS.Msg.getMsg("VAS_104_Party")));
             $left.append($('<div class="vas_104-vendName"></div>').text(na(data.PartyName)));
-            $left.append(headerField(VIS.Msg.getMsg("VAS_104_ConfirmationType"), confirmTypeLabel(), false));
 
             var $contact = $('<div class="vas_104-vendContact"></div>');
             appendContactBit($contact, "warehouse", data.WarehouseName);
@@ -450,14 +460,17 @@
 
             // Confirmation No and Warehouse are gone from this column: the title
             // strip above already carries the confirmation number, and the left
-            // column already carries the warehouse. What is left is the one field
-            // that appears nowhere else — the document this confirmation was
-            // raised against, which OPENS it.
+            // column already carries the warehouse. What is left is the document
+            // this confirmation was raised against (which OPENS it) and the
+            // confirmation's own type — the latter moved here off the identity
+            // column, where it sat under the party name it has nothing to do with.
             var $right = $('<div class="vas_104-hdrColR"></div>');
             var $srcLabel = (data.SourceTypeCode === "SHP")
                 ? getMsg("VAS_104_SourceDeliveryOrder", "Delivery Order")
                 : getMsg("VAS_104_SourceGRN", "Goods Receipt Note");
             $right.append(sourceLinkField($srcLabel));
+            $right.append(headerField(VIS.Msg.getMsg("VAS_104_ConfirmationType"),
+                confirmTypeLabel(), false));
             $card.append($right);
 
             $body.append($card);
@@ -865,7 +878,9 @@
         var ACT_TYPES = {
             Note:      { tone: "info",    icon: "note",  label: "Note" },
             Created:   { tone: "neutral", icon: "plus",  label: "Created" },
-            Completed: { tone: "success", icon: "check", label: "Completed" }
+            Completed: { tone: "success", icon: "check", label: "Completed" },
+            // One row per FIELD that changed, not one per save.
+            Changed:   { tone: "info",    icon: "note",  label: "Changed" }
         };
 
         // Maximum activity rows shown per page; the feed paginates beyond this.
@@ -959,6 +974,11 @@
             if (a.EventType === "Note") $title.addClass("vas_104-multiline");
             $main.append($title);
 
+            // A field change shows the move itself under the field's name: what
+            // the value was, and what it became. That is the whole point of a
+            // change row — a bare "updated" without it is what this replaced.
+            if (a.EventType === "Changed") $main.append(changeDelta(a));
+
             // "when · by whom", the same two parts in the same place on every row.
             var when = formatDateTime(a.EventTime);
             if (a.ActorName) {
@@ -970,8 +990,26 @@
             return $row;
         }
 
+        // The old → new pair, on the sub-line beneath the field's name.
+        function changeDelta(a) {
+            var $d = $('<small class="vas_104-actDelta"></small>');
+            var blank = "—";
+            $d.append($('<span class="vas_104-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_104-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_104-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
+        }
+
         function activityTitle(a) {
             if (a.EventType === "Note") return a.Title || getMsg("VAS_104_ActNote", "Note");
+            // A field change is headlined by the FIELD, prefixed with the line it
+            // happened on when it was a line that changed. The values go on the
+            // sub-line beneath (changeDelta).
+            if (a.EventType === "Changed") {
+                var name = a.FieldName || getMsg("VAS_104_Field", "Field");
+                return a.ChangeScope ? a.ChangeScope + " · " + name : name;
+            }
             if (a.EventType === "Created")
                 return getMsg("VAS_104_ActCreatedTxt", "Confirmation created") +
                        (a.Title ? " " + a.Title : "");

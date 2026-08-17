@@ -149,6 +149,46 @@
  *   VAI163   2026-08-12  The details card drops its Warehouse field — the
  *                        Issued From block on the left of the same card already
  *                        names the warehouse, so the card carried it twice.
+ *   VAI163   2026-08-13  - New Record / Copy Record now empty the panel reliably.
+ *                          The insert guard alone was not enough: the framework
+ *                          can call refreshPanelData BEFORE GridTable raises its
+ *                          insert flag, so isTabInserting() answered "no" at that
+ *                          instant and the previous (or copied-from) record was
+ *                          loaded anyway. The fetch is now scheduled behind
+ *                          REFRESH_DELAY_MS and the decision re-made when it
+ *                          fires, and every fetch carries a token so a reply that
+ *                          lands after the panel has moved on is dropped rather
+ *                          than painted. The data-status handler also clears
+ *                          unconditionally instead of only when record_ID was
+ *                          still set. Ported from VAS_106.
+ *                        - Activity reports edits FIELD BY FIELD: an "updated"
+ *                          row carries the name of the column that changed
+ *                          (a.FieldName) and headlines with it.
+ *                        - An e-mail's recipient line lists every address (To, Cc
+ *                          and Bcc, each labelled) in full instead of naming the
+ *                          To list and counting the rest as "+n more".
+ *                          allRecipients / countAddresses went with it.
+ *                        - On hand is shown in the product's BASE uom with that
+ *                          unit named beside it; it used to be restated into the
+ *                          line's entered uom (model side).
+ *   VAI163   2026-08-14  Those "updated" rows now also cover edits to the LINES
+ *                        (model side). An issue's substantive edits are its
+ *                        issued quantities, and those live on the lines, so a
+ *                        header-only trail reported nothing for the change a
+ *                        reader most wants to trace. A line row names the line it
+ *                        landed on (a.ChangeScope — line number + product) on the
+ *                        same sub-line the e-mail recipients use, so the headline
+ *                        stays "Updated <field>".
+ *   VAI163   2026-08-14  The Work Order chip is drawn from the work order's ID,
+ *                        not from its document NUMBER. A VA075 revision that
+ *                        names its work orders through some column other than
+ *                        DocumentNo left the number empty (model side), so an
+ *                        issue whose lines carried a perfectly good
+ *                        VA075_WorkOrder_ID drew no chip and the Reference strip
+ *                        fell through to "Manual Issue". A work order the panel
+ *                        cannot name is still a work order — workOrderLabel now
+ *                        falls back to "#<id>", so the chip always has something
+ *                        to read and always opens the record.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -221,11 +261,12 @@
             }
 
             if (inserting || rid <= 0) {
-                // New (unsaved) record — nothing to show against it.
-                if ($self.record_ID) {
-                    $self.record_ID = 0;
-                    $self.clear();
-                }
+                // New (unsaved) record — nothing to show against it. Cleared
+                // unconditionally: gating this on record_ID left the previous
+                // record on screen whenever it had already been zeroed by another
+                // path while its data was still painted (the Copy Record case).
+                $self.record_ID = 0;
+                $self.clear();
                 return;
             }
             if (rid !== $self.record_ID) {
@@ -250,6 +291,34 @@
         var LINES_PER_PAGE = 25;
         var linesPage = 0;
         var activityPage = 0;   // current Activity page (0-based, like linesPage)
+
+        // How long refreshPanelData holds before it actually fetches.
+        // On New Record / Copy Record the framework can call refreshPanelData
+        // BEFORE GridTable raises its insert flag, so isTabInserting() asked at
+        // that instant still answers "no" and the panel loads (or keeps) the
+        // record the user has just moved off — which is exactly what a copy shows
+        // as "the previous record's details". Asking again after this pause gets
+        // the truth. It also collapses a burst of arrow-key row changes into one
+        // request instead of one per row. Ported from VAS_106.
+        var REFRESH_DELAY_MS = 150;
+        // Raised by every fetch, every scheduled fetch and every clear. A reply
+        // carrying a token that is no longer the current one belongs to a record
+        // the panel has already moved off, so it is dropped instead of painting.
+        // This is what stops a slow FIRST response landing on top of the empty
+        // panel that New Record had already cleared — the delay above cannot do
+        // it, because the response can arrive at any time.
+        var fetchToken = 0;
+        var pendingFetch = null;    // timer handle of a scheduled fetch, if any
+
+        // Drops any fetch that is on its way or already scheduled. Called by
+        // everything that changes which record the panel is meant to be showing.
+        function cancelPendingFetch() {
+            fetchToken++;
+            if (pendingFetch) {
+                clearTimeout(pendingFetch);
+                pendingFetch = null;
+            }
+        }
 
         this.init = function () {
             $root = $('<div class="vas_102-root"></div>');
@@ -279,6 +348,10 @@
         }
 
         this.fetchData = function (recordID) {
+            // This fetch owns the panel from here; anything already in flight is
+            // for a record the user has moved off.
+            cancelPendingFetch();
+            var myToken = fetchToken;
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_102_OverviewInternalUse/GetInternalUseOverview",
@@ -286,6 +359,10 @@
                 dataType: "json",
                 data: { M_Inventory_ID: recordID },
                 success: function (raw) {
+                    // A reply for a record the panel has since left — most often
+                    // the one New Record / Copy Record cleared while it was on the
+                    // wire. Painting it would put the old record back on screen.
+                    if (myToken !== fetchToken) return;
                     var parsed = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     data = parsed;
                     linesPage = 0;
@@ -294,16 +371,40 @@
                     showBusy(false);
                 },
                 error: function (err) {
+                    if (myToken !== fetchToken) return;
                     console.log(err);
                     showBusy(false);
                 }
             });
         };
 
+        // Waits REFRESH_DELAY_MS, then fetches only if the tab is still sitting
+        // on a saved record. The pause is the point: it lets GridTable raise its
+        // insert flag before the decision is made.
+        this.scheduleFetch = function (recordID) {
+            cancelPendingFetch();
+            var myToken = fetchToken;
+            pendingFetch = setTimeout(function () {
+                pendingFetch = null;
+                if (myToken !== fetchToken) return;
+                if (isTabInserting($self.curTab)) {
+                    // It WAS a new / copied row after all.
+                    $self.record_ID = 0;
+                    $self.clear();
+                    return;
+                }
+                $self.fetchData(recordID);
+            }, REFRESH_DELAY_MS);
+        };
+
         this.clear = function () {
+            // Kill any held or in-flight fetch first: its reply would otherwise
+            // land on the panel this call is emptying.
+            cancelPendingFetch();
             data = null;
             linesPage = 0;
             activityPage = 0;
+            showBusy(false);
             render();
         };
 
@@ -552,7 +653,14 @@
             // Work order first — it is the stronger origin when both are present.
             // Its own reference rides along as a trailing pill, the way the PO
             // panel marks a requisition reached "via RFQ".
-            if (data.WorkOrderNo) {
+            // Gated on the ID, not on the document number. The number is what the
+            // chip READS, but the id is what makes this an origin at all — and a
+            // VA075 revision that names its work orders through some column other
+            // than DocumentNo left the number empty, so an issue with a perfectly
+            // good VA075_WorkOrder_ID on its lines drew no chip and the strip fell
+            // through to "Manual Issue". A work order the panel cannot name is
+            // still a work order; it reads "#<id>" (workOrderLabel).
+            if (data.VA075_WorkOrder_ID > 0) {
                 $chips.append(originChip("wrench",
                     msg("VAS_102_WorkOrder", "Work Order"), workOrderLabel(),
                     data.WorkOrderRef ? chipPill(data.WorkOrderRef, "neutral") : null,
@@ -650,10 +758,15 @@
 
         // The work order the issue services. As with requisitions, several can
         // feed one issue — the first is named and the rest counted ("WO-1 +2").
+        // The work order chip's value: its document number, falling back to "#id"
+        // where this VA075 revision names its work orders through a column the
+        // model could not find. The chip is drawn from the ID, so the label must
+        // always have something to say.
         function workOrderLabel() {
-            if (!data || !data.WorkOrderNo) return "";
+            if (!data || !(data.VA075_WorkOrder_ID > 0)) return "";
+            var no = (data.WorkOrderNo || "").trim() || ("#" + data.VA075_WorkOrder_ID);
             var extra = (data.WorkOrderCount || 0) - 1;
-            return extra > 0 ? (data.WorkOrderNo + " +" + extra) : data.WorkOrderNo;
+            return extra > 0 ? (no + " +" + extra) : no;
         }
 
         // The project chip's value: the project's search key, falling back to its
@@ -945,8 +1058,21 @@
             // Issued
             $tr.append($('<span class="vas_102-ta-r"></span>').text(formatNumber(+ln.IssuedQty || 0, prec)));
 
-            // Available
-            $tr.append($('<span class="vas_102-ta-r"></span>').text(formatNumber(+ln.AvailableQty || 0, prec)));
+            // On hand — always in the PRODUCT'S BASE UOM, the unit stock is held
+            // in, whatever unit the line was keyed in. The unit is named beside
+            // the figure (and on the cell's tooltip) because that scale can differ
+            // from the Requested / Issued columns either side of it, and a bare
+            // number would silently invite the wrong comparison.
+            var basePrec  = (ln.BaseUOMPrecision != null) ? +ln.BaseUOMPrecision : prec;
+            var baseQty   = formatNumber(+ln.AvailableQty || 0, basePrec);
+            var baseUnit  = (ln.BaseUOMName || "").trim();
+            var $avail    = $('<span class="vas_102-ta-r"></span>');
+            $avail.append(document.createTextNode(baseQty));
+            if (baseUnit) {
+                $avail.append($('<span class="vas_102-baseUom"></span>').text(baseUnit));
+                $avail.attr("title", baseQty + " " + baseUnit);
+            }
+            $tr.append($avail);
 
             // Value
             $tr.append($('<span class="vas_102-ta-r"></span>').text(
@@ -1081,15 +1207,23 @@
             $title.append($('<span class="vas_102-actLead"></span>')
                 .text(title).attr("title", title));
 
-            // An e-mail names its recipients under the subject: the To list, plus
-            // a count of the Cc / Bcc addresses so a reader can see at a glance
-            // that others were copied. Every address itself is listed in the body.
+            // An e-mail names its recipients under the subject — every address on
+            // the To, Cc and Bcc lists, in full (recipientSummary). The line wraps
+            // rather than ellipsising, so a long list is read on the row itself.
             if (a.Type === "email") {
                 var to = recipientSummary(a);
                 if (to) {
-                    $title.append($('<small class="vas_102-actSub"></small>')
-                        .text(to).attr("title", allRecipients(a) || to));
+                    $title.append($('<small class="vas_102-actSub"></small>').text(to));
                 }
+            }
+
+            // A line edit names the line it landed on, on the sub-line the e-mail
+            // recipients use. The headline stays "Updated <field>" — which field
+            // moved is the question, and the row it moved on qualifies it rather
+            // than competing with it for the one line that clips.
+            if (a.Type === "updated" && a.ChangeScope) {
+                $title.append($('<small class="vas_102-actSub"></small>')
+                    .text(a.ChangeScope).attr("title", a.ChangeScope));
             }
             $row.append($title);
 
@@ -1127,6 +1261,13 @@
             if (a.Type === "email") {
                 return (a.Text || "").trim() || msg("VAS_102_NoSubject", "(no subject)");
             }
+            // A field-level edit headlines with the FIELD that changed — the row's
+            // tag already says "Updated", and the field is what tells one edit
+            // apart from the next. Rows with no field (change logging off) keep
+            // the generic wording.
+            if (a.Type === "updated" && a.FieldName) {
+                return msg("VAS_102_ActFieldUpdated", "Updated") + " " + a.FieldName;
+            }
             var title = meta.titleKey ? msg(meta.titleKey, meta.titleText) : (meta.titleText || "");
             if (a.DocumentNo) title += " — " + a.DocumentNo;
             return title;
@@ -1162,33 +1303,28 @@
         // Row sub-line: the To list, plus "+n more" covering the Cc / Bcc
         // addresses. Counting by comma / semicolon is enough for a summary — the
         // body lists the addresses verbatim.
+        // Every address the mail went to, written out in full and labelled: To,
+        // then Cc, then Bcc. It used to name the To list and count the rest as
+        // "+n more", which could only be resolved by opening the message — and a
+        // mail stored without a body cannot be opened at all. Ported from VAS_099.
         function recipientSummary(a) {
-            var to = (a.MailTo || "").trim();
-            var extra = countAddresses(a.MailCc) + countAddresses(a.MailBcc);
-            if (!to && !extra) return "";
-            var s = msg("VAS_102_MailTo", "To:") + " " + (to || VIS.Msg.getMsg("VAS_102_NA"));
-            if (extra > 0) s += " +" + extra + " " + msg("VAS_102_MoreRecipients", "more");
-            return s;
-        }
-
-        // Every address on the mail, for the row's hover tooltip.
-        function allRecipients(a) {
             var bits = [];
-            if (a.MailTo)  bits.push(msg("VAS_102_MailTo",  "To:")  + " " + a.MailTo);
-            if (a.MailCc)  bits.push(msg("VAS_102_MailCc",  "Cc:")  + " " + a.MailCc);
-            if (a.MailBcc) bits.push(msg("VAS_102_MailBcc", "Bcc:") + " " + a.MailBcc);
-            return bits.join("\n");
+            appendAddressBit(bits, "VAS_102_MailTo",  "To:",  a.MailTo);
+            appendAddressBit(bits, "VAS_102_MailCc",  "Cc:",  a.MailCc);
+            appendAddressBit(bits, "VAS_102_MailBcc", "Bcc:", a.MailBcc);
+            return bits.join(" · ");
         }
 
-        function countAddresses(value) {
-            if (!value || !String(value).trim()) return 0;
-            var parts = String(value).split(/[;,]/);
-            var n = 0;
-            for (var i = 0; i < parts.length; i++) {
-                if (parts[i].trim()) n++;
-            }
-            return n;
+        function appendAddressBit(bits, key, fallback, value) {
+            var text = (value === null || value === undefined) ? "" : String(value).trim();
+            if (!text) return;
+            bits.push(msg(key, fallback) + " " + text);
         }
+
+        // allRecipients (the row's hover tooltip) and countAddresses (the "+n
+        // more" tally) are gone with the abridged sub-line they served: the row
+        // now writes every address out, so there is nothing left to count or to
+        // recover on hover.
 
         // Issue Stock / Post Inventory are not repeated here — both actions are
         // available on the window's header panel.
@@ -1477,7 +1613,10 @@
         }
         this.record_ID = recordID;
         this.selectedRow = selectedRow;
-        this.fetchData(recordID);
+        // Scheduled, not immediate: the insert flag above is not always raised
+        // yet when the framework calls this, so the decision is re-made after a
+        // short pause. See REFRESH_DELAY_MS.
+        this.scheduleFetch(recordID);
     };
 
     /* Set width as per window width */
@@ -1487,6 +1626,11 @@
 
     /* Release variables from memory */
     VAS.VAS_102_OverviewInternalUse.prototype.dispose = function () {
+        // Kill any held fetch first — its timer would otherwise fire against a
+        // panel that no longer exists.
+        if (typeof this.clear === "function") {
+            try { this.clear(); } catch (e) { }
+        }
         if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
             try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
         }

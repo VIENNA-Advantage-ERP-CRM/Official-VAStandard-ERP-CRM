@@ -96,6 +96,57 @@
  *                          single "Inventory count updated" row, which came from
  *                          M_Inventory.Updated and so could only ever report the
  *                          LAST save, without saying what it touched.
+ *   VAI163   2026-08-14  Activity follows VAS_092. The feed is now the count's
+ *                        whole LIFECYCLE — one row per completed workflow node
+ *                        (prepared / completed / re-activated / voided / closed /
+ *                        approved / rejected, model side), headlined by the node's
+ *                        own name so a renamed workflow reads in the tenant's
+ *                        words. A count re-activated and re-counted used to show
+ *                        one completion and no re-activation at all, because that
+ *                        row was derived from the LAST DocComplete stamp; the
+ *                        derived row now only stands in where the workflow named
+ *                        nothing. Field edits carry VAS_092's type and wording
+ *                        ("updated", headlined "Updated <field>") in place of the
+ *                        panel's own "changed" / "Changed", so the two trails read
+ *                        identically. The line the edit landed on and the old ->
+ *                        new value stay as sub-lines beneath: VAS_092 logs the
+ *                        header only and carries no value move, so those are
+ *                        additions to its row shape rather than departures from
+ *                        it, and each is dropped when it has nothing to say.
+ *   VAI163   2026-08-14  - Related Documents leads with the maintenance work order
+ *                          the count's lines were raised against (model side,
+ *                          M_InventoryLine.VA075_WorkOrder_ID): document no, the
+ *                          work order's own reference beneath it, and a click that
+ *                          opens the work order screen. A count raised against one
+ *                          named no source at all.
+ *                        - openRecord gains a third and final step for it: when
+ *                          neither a named window nor the client's zoom target
+ *                          resolves, the server is asked which window the TABLE
+ *                          opens in (GetWindowIdByTable). VA075 is not part of
+ *                          this solution, so its screen cannot be named here, and
+ *                          the browser-side zoom lookup only knows tables the
+ *                          client has cached — without this every click on the row
+ *                          ended at the "Cannot open" toast. Ported from VAS_102.
+ *                        - On Hand is shown in the PRODUCT'S BASE UOM with that
+ *                          unit named beside it. QtyBook is copied straight from
+ *                          M_Storage.QtyOnHand, so the figure was already on that
+ *                          scale — but the UOM column beside it names the LINE's
+ *                          unit, which need not be the same, so a line keyed in
+ *                          BOX labelled an EA count as boxes.
+ *                        - New Record / Copy Record now empty the panel reliably.
+ *                          The insert guard alone was not enough: the framework
+ *                          can call refreshPanelData BEFORE GridTable raises its
+ *                          insert flag, so isTabInserting() answered "no" at that
+ *                          instant and the previous (or copied-from) record was
+ *                          loaded anyway. The fetch is now scheduled behind
+ *                          REFRESH_DELAY_MS and the decision re-made when it
+ *                          fires, and every fetch carries a token so a reply that
+ *                          lands after the panel has moved on is dropped rather
+ *                          than painted. The data-status handler asks what is on
+ *                          screen or loading (shownRecordId / data) instead of
+ *                          record_ID, which refreshPanelData sets before its
+ *                          scheduled fetch has resolved. Ported from VAS_106 via
+ *                          VAS_092 / VAS_102.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -168,14 +219,18 @@
             }
 
             if (inserting || rid <= 0) {
-                // New (unsaved) record — nothing to show against it.
-                if ($self.record_ID) {
+                // New (unsaved) record — nothing to show against it. The guard is
+                // on what is ON SCREEN OR LOADING (shownRecordId / data), not on
+                // record_ID: refreshPanelData sets record_ID and then schedules,
+                // so a panel mid-fetch could carry a live id here and be left to
+                // paint the record the user has just moved off.
+                if (shownRecordId || data) {
                     $self.record_ID = 0;
                     $self.clear();
                 }
                 return;
             }
-            if (rid !== $self.record_ID) {
+            if (rid !== shownRecordId) {
                 $self.record_ID = rid;
                 $self.fetchData(rid);
             }
@@ -191,6 +246,32 @@
         var data = null;
         var variancesOnly = false;   // Count-lines filter state.
         var activityPage = 0;        // current Activity page (0-based)
+
+        // The M_Inventory_ID the panel is currently showing (or loading). 0 =
+        // nothing on screen. Used to tell a real record change from the stream of
+        // data-status events the tab fires while a record is being edited — the
+        // panel's own record_ID cannot, because refreshPanelData sets it before
+        // the fetch it schedules has resolved.
+        var shownRecordId = 0;
+
+        // How long refreshPanelData holds before it actually fetches.
+        //
+        // On New Record / Copy Record the framework can call refreshPanelData
+        // BEFORE GridTable raises its insert flag, so isTabInserting() asked at
+        // that instant still answers "no" and the panel would load the record the
+        // user has just moved off. Asking again after this pause gets the truth.
+        // It also collapses a burst of arrow-key row changes into one request
+        // instead of one per row.
+        var REFRESH_DELAY_MS = 150;
+
+        // Raised by every fetch, every scheduled fetch and every clear. A reply
+        // carrying a token that is no longer the current one belongs to a record
+        // the panel has already moved off, so it is dropped instead of painting.
+        // This is what stops a slow FIRST response from landing on top of the
+        // empty panel New Record had already cleared — the delay above cannot do
+        // it, because the response can arrive at any time.
+        var fetchToken = 0;
+        var pendingFetch = null;    // timer handle of a scheduled fetch, if any
 
         this.init = function () {
             $root = $('<div class="vas_101-root"></div>');
@@ -254,8 +335,50 @@
             }
         }
 
-        // Opens the record's window filtered to that row: the window named for this
-        // table when it has one, else the table's default zoom target, then started
+        // Table -> AD_Window_ID, for the last-resort lookup below. Same caching
+        // rule as windowIdByName: a table the dictionary cannot place is cached as
+        // -1 so the miss is not repeated on every click.
+        var windowIdByTable = {};
+
+        // Asks the SERVER which window a table's records open in
+        // (GetWindowIdByTable -> AD_Table.AD_Window_ID, else the first window with
+        // a tab on the table).
+        //
+        // The work order needs this. VA075 ships its own window and is not part of
+        // this solution, so its screen cannot be named in the map above, and the
+        // browser-side zoom lookup only knows tables the client has already
+        // cached — so every click on the row would end at the "Cannot open" toast.
+        // The dictionary knows it either way. Ported from VAS_102.
+        function resolveWindowIdByTable(tableName) {
+            if (!tableName) return 0;
+            if (windowIdByTable.hasOwnProperty(tableName)) {
+                return windowIdByTable[tableName] > 0 ? windowIdByTable[tableName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_101_OverviewInventoryCount/GetWindowIdByTable", tableName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) {
+                    windowIdByTable[tableName] = -1;
+                    console.log("resolveWindowIdByTable: no window for table " + tableName);
+                    return 0;
+                }
+                windowIdByTable[tableName] = id;
+                return id;
+            } catch (e) {
+                windowIdByTable[tableName] = -1;
+                console.log(e);
+                return 0;
+            }
+        }
+
+        // Opens the record's window filtered to that row, in three steps: the
+        // window named for this table when it has one, else the table's default
+        // zoom target, else the dictionary's window for the table. Then started
         // with an equal-query on the table's key column. Degrades to a toast so a
         // click never throws.
         function openRecord(tableName, recordId) {
@@ -266,6 +389,7 @@
                     VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
                     windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, false) || 0;
                 }
+                if (windowId <= 0) windowId = resolveWindowIdByTable(tableName);
                 if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === "function") {
                     var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
                     VIS.viewManager.startWindow(windowId, zoomQuery);
@@ -304,7 +428,48 @@
             $busy[0].style.visibility = show ? "visible" : "hidden";
         }
 
+        // Drops whatever the panel was loading: cancels a fetch still waiting on
+        // its delay and invalidates the token of one already on the wire, so
+        // neither can paint over what the caller is about to put on screen.
+        function invalidateFetch() {
+            fetchToken++;
+            if (pendingFetch) {
+                clearTimeout(pendingFetch);
+                pendingFetch = null;
+            }
+        }
+
+        // Same thing, reachable from dispose so a timer cannot outlive the panel.
+        this.abortPendingFetch = invalidateFetch;
+
+        // Waits REFRESH_DELAY_MS, re-asks the tab whether it is inserting, and
+        // only then fetches. See REFRESH_DELAY_MS for why the wait is needed.
+        this.scheduleFetch = function (recordID) {
+            invalidateFetch();
+            var token = fetchToken;
+            // Claim the record now, not when the timer fires: shownRecordId means
+            // "showing or loading", and leaving it stale through the wait would
+            // let the data-status listener fire a second fetch for the same row.
+            shownRecordId = +recordID || 0;
+            // Feedback while we hold — clear() / fetchData() own it from here.
+            showBusy(true);
+            pendingFetch = setTimeout(function () {
+                pendingFetch = null;
+                if (token !== fetchToken) return;   // superseded while waiting
+                // The insert flag may only have been raised during the wait.
+                if (isTabInserting($self.curTab)) {
+                    $self.record_ID = 0;
+                    $self.clear();
+                    return;
+                }
+                $self.fetchData(recordID);
+            }, REFRESH_DELAY_MS);
+        };
+
         this.fetchData = function (recordID) {
+            invalidateFetch();
+            var token = fetchToken;
+            shownRecordId = +recordID || 0;
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_101_OverviewInventoryCount/GetInventoryCountOverview",
@@ -312,6 +477,10 @@
                 dataType: "json",
                 data: { M_Inventory_ID: recordID },
                 success: function (raw) {
+                    // Reply for a record the panel has already left (a New Record
+                    // cleared it, or a newer row was selected). Whoever superseded
+                    // us owns the busy indicator now, so leave it be.
+                    if (token !== fetchToken) return;
                     var parsed = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     data = parsed;
                     variancesOnly = false;
@@ -320,17 +489,23 @@
                     showBusy(false);
                 },
                 error: function (err) {
+                    if (token !== fetchToken) return;
                     console.log(err);
                     showBusy(false);
                 }
             });
         };
 
+        // Empties the panel back to its "no count selected" state, dropping any
+        // fetch still in flight with it.
         this.clear = function () {
+            invalidateFetch();
             data = null;
+            shownRecordId = 0;
             variancesOnly = false;
             activityPage = 0;
             render();
+            showBusy(false);
         };
 
         function render() {
@@ -790,8 +965,24 @@
             // UOM
             $tr.append($('<span></span>').text(na(ln.UOMName)));
 
-            // System (book) qty
-            $tr.append($('<span class="vas_101-ta-r"></span>').text(formatNumber(+ln.SystemQty || 0, prec)));
+            // On Hand — always in the PRODUCT'S BASE UOM, the unit stock is held
+            // in, whatever unit the line was keyed in. QtyBook is copied straight
+            // from M_Storage.QtyOnHand (MInventoryLine.SetQtyBook), so the figure
+            // was ALREADY on that scale — but the UOM column beside it names the
+            // LINE's unit, which need not be the same one, so a line keyed in BOX
+            // labelled an EA count as boxes. The unit is now named on the figure
+            // itself, and on the cell's tooltip.
+            var basePrec = (ln.BaseUOMPrecision !== null && ln.BaseUOMPrecision !== undefined)
+                ? +ln.BaseUOMPrecision : prec;
+            var baseQty  = formatNumber(+ln.SystemQty || 0, basePrec);
+            var baseUnit = (ln.BaseUOMName || "").trim();
+            var $onHand  = $('<span class="vas_101-ta-r"></span>');
+            $onHand.append(document.createTextNode(baseQty));
+            if (baseUnit) {
+                $onHand.append($('<span class="vas_101-baseUom"></span>').text(baseUnit));
+                $onHand.attr("title", baseQty + " " + baseUnit);
+            }
+            $tr.append($onHand);
 
             // Counted qty
             $tr.append($('<span class="vas_101-ta-r"></span>').text(formatNumber(+ln.CountedQty || 0, prec)));
@@ -831,6 +1022,34 @@
         // shows no section rather than an empty frame.
         function renderRelatedDocuments() {
             var rows = [];
+
+            // The maintenance work order the count's lines were raised against
+            // (M_InventoryLine.VA075_WorkOrder_ID, model side). It leads the
+            // section: a count raised against a work order is the work order's
+            // count first and the project's second. Clicking opens the work order
+            // screen — VA075 is not part of this solution, so the window is
+            // resolved from the dictionary (see resolveWindowIdByTable).
+            if (data.VA075_WorkOrder_ID > 0) {
+                var woVal = (data.WorkOrderNo || "").trim() || ("#" + data.VA075_WorkOrder_ID);
+                // A count can draw on more than one work order across its lines;
+                // the first is named and the rest counted, as the origin chips on
+                // the Purchase Order overview do.
+                if (data.WorkOrderCount > 1) {
+                    woVal += " +" + (data.WorkOrderCount - 1) + " " + msg("VAS_101_More", "more");
+                }
+                rows.push({
+                    icon:  "wrench",
+                    label: msg("VAS_101_WorkOrder", "Work Order"),
+                    value: woVal,
+                    // The work order's own reference, when this VA075 revision
+                    // carries one — it says what the job is where the document no
+                    // only identifies it.
+                    sub:   (data.WorkOrderRef || "").trim(),
+                    table: "VA075_WorkOrder",
+                    id:    data.VA075_WorkOrder_ID
+                });
+            }
+
             if (data.C_Project_ID > 0) {
                 rows.push({
                     icon:  "folder",
@@ -910,16 +1129,30 @@
         // ---------- Activity (audit trail) ---------- //
 
         // Activity type -> tag label + tone + icon, and the sentence shown for it.
+        // The same type set VAS_092 tags, so the two panels read alike: the
+        // document's whole lifecycle (one row per completed workflow node) plus
+        // the field-level edits, notes, e-mails and posting.
+        //
+        // A type with no titleKey headlines with its OWN text — for a lifecycle
+        // row that is the workflow node's name, so a tenant that renamed its nodes
+        // reads the trail in its own words; for a note the comment, for an e-mail
+        // the subject.
         var ACT_TYPES = {
-            created:   { tone: "neutral", icon: "user",  tagKey: "VAS_101_TagCreated",   tagText: "Created",   titleKey: "VAS_101_ActCreated",   titleText: "Inventory count created" },
-            // One row per FIELD that changed, not one per save. "updated" is kept
-            // only so an older cached payload still renders.
-            changed:   { tone: "info",    icon: "pencil", tagKey: "VAS_101_TagChanged",  tagText: "Changed",   titleKey: null,                   titleText: "" },
-            updated:   { tone: "info",    icon: "pencil", tagKey: "VAS_101_TagUpdated",  tagText: "Updated",   titleKey: "VAS_101_ActUpdated",   titleText: "Inventory count updated" },
-            completed: { tone: "success", icon: "check", tagKey: "VAS_101_TagCompleted", tagText: "Completed", titleKey: "VAS_101_ActCompleted", titleText: "Inventory count completed" },
-            posted:    { tone: "purple",  icon: "coins", tagKey: "VAS_101_TagPosted",    tagText: "Posted",    titleKey: "VAS_101_ActPosted",    titleText: "Posted to accounting" },
-            note:      { tone: "neutral", icon: "note",  tagKey: "VAS_101_TagNote",      tagText: "Note",      titleKey: null,                   titleText: "" },
-            email:     { tone: "purple",  icon: "mail",  tagKey: "VAS_101_TagEmail",     tagText: "Email",     titleKey: null,                   titleText: "" }
+            created:     { tone: "neutral", icon: "user",   tagKey: "VAS_101_TagCreated",     tagText: "Created",      titleKey: "VAS_101_ActCreated", titleText: "Inventory count created" },
+            prepared:    { tone: "neutral", icon: "note",   tagKey: "VAS_101_TagPrepared",    tagText: "Prepared",     titleKey: null, titleText: "" },
+            completed:   { tone: "success", icon: "check",  tagKey: "VAS_101_TagCompleted",   tagText: "Completed",    titleKey: "VAS_101_ActCompleted", titleText: "Inventory count completed" },
+            reactivated: { tone: "warning", icon: "pencil", tagKey: "VAS_101_TagReactivated", tagText: "Re-activated", titleKey: null, titleText: "" },
+            rejected:    { tone: "risk",    icon: "alert",  tagKey: "VAS_101_TagRejected",    tagText: "Rejected",     titleKey: null, titleText: "" },
+            approval:    { tone: "purple",  icon: "check",  tagKey: "VAS_101_TagApproval",    tagText: "Approved",     titleKey: null, titleText: "" },
+            voided:      { tone: "risk",    icon: "alert",  tagKey: "VAS_101_TagVoided",      tagText: "Voided",       titleKey: null, titleText: "" },
+            reversed:    { tone: "risk",    icon: "alert",  tagKey: "VAS_101_TagReversed",    tagText: "Reversed",     titleKey: null, titleText: "" },
+            closed:      { tone: "neutral", icon: "check",  tagKey: "VAS_101_TagClosed",      tagText: "Closed",       titleKey: null, titleText: "" },
+            invalidated: { tone: "warning", icon: "alert",  tagKey: "VAS_101_TagInvalidated", tagText: "Invalid",      titleKey: null, titleText: "" },
+            // One row per FIELD that changed, not one per save.
+            updated:     { tone: "info",    icon: "pencil", tagKey: "VAS_101_TagUpdated",     tagText: "Updated",      titleKey: "VAS_101_ActUpdated", titleText: "Inventory count updated" },
+            posted:      { tone: "purple",  icon: "coins",  tagKey: "VAS_101_TagPosted",      tagText: "Posted",       titleKey: "VAS_101_ActPosted", titleText: "Posted to accounting" },
+            note:        { tone: "neutral", icon: "note",   tagKey: "VAS_101_TagNote",        tagText: "Note",         titleKey: null, titleText: "" },
+            email:       { tone: "purple",  icon: "mail",   tagKey: "VAS_101_TagEmail",       tagText: "Email",        titleKey: null, titleText: "" }
         };
 
         // Maximum activity rows shown per page; the feed paginates beyond this.
@@ -994,11 +1227,18 @@
                 if (to) $title.append($('<small class="vas_101-actSub"></small>').text(to));
             }
 
-            // A field change shows the move itself under the field's name: what the
-            // value was, and what it became. That is the whole point of a change
-            // row — "updated" without it is the thing this replaced.
-            if (a.Type === "changed") {
-                $title.append(changeDelta(a));
+            // A field edit shows, under the field's name, which record it landed
+            // on and the move itself: what the value was and what it became.
+            // VAS_092 has neither — it logs the header only, and carries no old /
+            // new value — so these are additions to its shape, not departures
+            // from it: the headline, tag and right-hand "when · by whom" are
+            // identical, and each sub-line is dropped when it has nothing to say.
+            if (a.Type === "updated") {
+                if (a.ChangeScope) {
+                    $title.append($('<small class="vas_101-actSub"></small>')
+                        .text(a.ChangeScope).attr("title", a.ChangeScope));
+                }
+                if (a.OldValue || a.NewValue) $title.append(changeDelta(a));
             }
             $row.append($title);
 
@@ -1030,19 +1270,25 @@
             return $row;
         }
 
+        // Follows VAS_092's rule exactly.
         function activityTitle(a, meta) {
-            if (a.Type === "note") return (a.Text || "").trim();
             if (a.Type === "email") {
                 return (a.Text || "").trim() || msg("VAS_101_NoSubject", "(no subject)");
             }
-            // A field change is headlined by the FIELD, prefixed with the line it
-            // happened on when it was a line that changed. The values go on the
-            // sub-line beneath (changeDelta).
-            if (a.Type === "changed") {
-                var name = a.FieldName || msg("VAS_101_Field", "Field");
-                return a.ChangeScope ? a.ChangeScope + " · " + name : name;
+            // Free-text types (note, and every workflow lifecycle row) headline
+            // with their own text; an untitled one falls back to what its tag
+            // says it is.
+            if (!meta.titleKey) return (a.Text || "").trim() || msg(meta.tagKey, meta.tagText);
+
+            // A field-level edit headlines with the FIELD that changed — the row's
+            // tag already says "Updated", and the field is what tells one edit
+            // apart from the next. Which record it landed on and the value move
+            // go on the sub-lines beneath (changeScope / changeDelta). Rows with
+            // no field (change logging off) keep the generic wording.
+            if (a.Type === "updated" && a.FieldName) {
+                return msg("VAS_101_ActFieldUpdated", "Updated") + " " + a.FieldName;
             }
-            return meta.titleKey ? msg(meta.titleKey, meta.titleText) : (meta.titleText || "");
+            return msg(meta.titleKey, meta.titleText);
         }
 
         // "was X → now Y" under the field's name. A value the log recorded as empty
@@ -1154,6 +1400,8 @@
             note:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h6"/></svg>',
             mail:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
             folder:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2Z"/></svg>',
+            // The maintenance work order in Related Documents.
+            wrench:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1 5.3 5.3l-8.3 8.3a2.8 2.8 0 0 1-4-4l8.3-8.3Z"/><path d="M14.7 6.3 11 2.6a4 4 0 0 0-5.3 5.3l3.7 3.7"/></svg>',
             arrowUpRight: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>',
             chevLeft: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
             chevRight:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>'
@@ -1275,7 +1523,12 @@
         }
         this.record_ID = recordID;
         this.selectedRow = selectedRow;
-        this.fetchData(recordID);
+        // Scheduled, not fetched: the framework can reach here BEFORE GridTable
+        // raises its insert flag, so the guard above can answer "no" for a New /
+        // Copy Record that has not been flagged yet. scheduleFetch re-asks after
+        // REFRESH_DELAY_MS, and its token drops a reply that lands after the
+        // panel has moved on.
+        this.scheduleFetch(recordID);
     };
 
     /* Set width as per window width */
@@ -1285,6 +1538,10 @@
 
     /* Release variables from memory */
     VAS.VAS_101_OverviewInventoryCount.prototype.dispose = function () {
+        // A scheduled fetch must not outlive the panel it would paint into.
+        if (typeof this.abortPendingFetch === "function") {
+            try { this.abortPendingFetch(); } catch (e) { }
+        }
         if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
             try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
         }
