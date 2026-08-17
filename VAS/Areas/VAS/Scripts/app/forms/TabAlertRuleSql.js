@@ -2116,8 +2116,30 @@
                                     getEventColumn(result.TabID);
                                     txtFiledColumn.setValue(result.ColumnID);
                                     UpdateColumnCtrl.show();
-                                } else {
+                                }
+                                else {
                                     UpdateColumnCtrl.hide();
+                                }
+
+                                if (result.IsUpdate) {
+                                    txtIsDelete.setReadOnly(true);
+                                    txtIsInsert.setReadOnly(true);
+                                    txtIsUpdate.setReadOnly(false);
+                                }
+                                else if (result.IsDelete) {
+                                    txtIsDelete.setReadOnly(false);
+                                    txtIsInsert.setReadOnly(true);
+                                    txtIsUpdate.setReadOnly(true);
+                                }
+                                else if (result.IsInsert) {
+                                    txtIsDelete.setReadOnly(true);
+                                    txtIsInsert.setReadOnly(false);
+                                    txtIsUpdate.setReadOnly(true);
+                                }
+                                else {
+                                    txtIsDelete.setReadOnly(false);
+                                    txtIsInsert.setReadOnly(false);
+                                    txtIsUpdate.setReadOnly(false);
                                 }
                                 EventTable = result.TableID;
                                 $SQLMainDiv.hide();
@@ -2349,7 +2371,7 @@
                 setBusy(true);
                 OnChange(e.newValue, 'S');
                 setBusy(false);
-            };            
+            };
 
             //txtWindowTab.fireValueChanged = function (e) {
             //    isProcessing = false;
@@ -2461,6 +2483,14 @@
                 isProcessing = false;
                 return false;
             }
+
+            if (!txtIsInsert.getValue() && !txtIsUpdate.getValue() && !txtIsDelete.getValue()) {
+                setBusy(false);
+                VIS.ADialog.error("", "", VIS.Msg.getMsg("VAS_SelectEvent"));
+                isProcessing = false;
+                return false;
+            }
+
             var ColumnIds = '';
             if (txtIsUpdate.getValue()) {
                 if (txtFiledColumn.getValue() == null || txtFiledColumn.getValue().trim().length == 0) {
@@ -2486,11 +2516,12 @@
             $.ajax({
                 url: VIS.Application.contextUrl + "AlertSQLGenerate/SaveAlertRule",
                 type: "POST",
-                data: obj,                
+                data: obj,
                 success: function (result) {
                     result = JSON.parse(result);
                     if (result == 'Saved Successfully') {
                         lblBottomMsg.text('Saved Successfully');
+                        $self.curTab.dataRefreshAll();
                     }
                     else {
                         lblBottomMsg.text(result);
@@ -2520,7 +2551,7 @@
             if (tabID > 0) {
                 $.ajax({
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/GetTable",
-                    type: "POST",                    
+                    type: "POST",
                     data: { tabID: tabID, windowNo: $self.windowNo },
                     success: function (result) {
                         result = JSON.parse(result);
@@ -2561,7 +2592,7 @@
             if (tabID > 0) {
                 $.ajax({
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/GetTable",
-                    type: "POST",                    
+                    type: "POST",
                     data: { tabID: tabID, windowNo: $self.windowNo },
                     success: function (result) {
                         result = JSON.parse(result);
