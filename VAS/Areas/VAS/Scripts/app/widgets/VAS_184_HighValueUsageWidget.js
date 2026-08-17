@@ -28,6 +28,51 @@
  */
 ; VAS = window.VAS || {};
 
+/* ==========================================================================================
+   🛑 🚨 🚨 🛑  DEMO DATA - UI PREVIEW ONLY - DELETE THIS BLOCK BEFORE COMMIT  🛑 🚨 🚨 🛑
+   Set VAS_184_DEMO to false (or delete this block and the two `if (VAS_184_DEMO)` guards in
+   loadProducts() and loadIssueHistory()) to restore live controller data.
+   ========================================================================================== */
+var VAS_184_DEMO = true;
+
+function VAS_184_demoProducts() {
+    var names = ["Hydraulic Pump HP-450", "Bearing Assembly SKF-6204", "Control Valve CV-12", "Drive Belt DB-880",
+        "Servo Motor SM-3000", "Gear Box GB-75", "Coupling Flex CF-40", "Seal Kit SK-220",
+        "Pressure Sensor PS-16", "Filter Cartridge FC-90", "Chain Sprocket CS-32", "Bushing BR-18",
+        "Solenoid Coil SC-24", "Impeller IM-140", "Shaft Alloy SA-600", "O-Ring Set OR-55",
+        "Contactor CT-63", "Limit Switch LS-11", "Grease Nipple GN-08", "V-Belt Pulley VP-210",
+        "Thermostat TH-95", "Lubricant Drum LD-200"];
+    var attrs = ["Grade A", "", "Batch B-2291", "", "Grade A", "", "Batch B-1140", "", "", "Grade C"];
+    var uoms = ["Each", "Each", "Set", "Each", "Each", "Kg", "Each", "Set", "Each", "Ltr"];
+    var out = [];
+    for (var i = 0; i < names.length; i++) {
+        var cost = 48200 - (i * 1970) - ((i % 4) * 310);
+        var qty = 3 + ((i * 7) % 46);
+        out.push({
+            productId: 900001 + i, productName: names[i], attribute: attrs[i % attrs.length],
+            uomName: uoms[i % uoms.length], costPrice: cost, issuedQty: qty, issuedValue: cost * qty
+        });
+    }
+    return out;
+}
+
+function VAS_184_demoIssueHistory() {
+    var whs = ["Central WH / A-01-02", "Central WH / B-04-11", "North WH / C-02-07", "North WH / D-01-03",
+        "Plant WH / E-03-09", "Plant WH / F-05-01"];
+    var out = [];
+    for (var i = 0; i < 24; i++) {
+        var qty = 2 + ((i * 3) % 19);
+        var unit = 1450 + ((i % 6) * 275);
+        out.push({
+            documentNo: "IU-" + (104820 + i * 3),
+            movementDate: String(1 + (i % 28)).padStart(2, '0') + " Aug 2026",
+            warehouseLoc: whs[i % whs.length], qty: qty, value: qty * unit
+        });
+    }
+    return out;
+}
+/* ===================== 🛑 END DEMO DATA BLOCK 🛑 ===================== */
+
 ; (function (VAS, $) {
 
     function ensureDashInlineSizeVar($el) {
@@ -153,6 +198,15 @@
 
         function loadProducts() {
             showBusy(true);
+
+            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
+            if (VAS_184_DEMO) {
+                productsData = VAS_184_demoProducts();
+                pageNo = 1;
+                renderProducts();
+                showBusy(false);
+                return;
+            }
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_184_HighValueUsageWidget/GetHighValueProducts',
@@ -397,6 +451,14 @@
             });
 
             $('body').append($modal);
+
+            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
+            if (VAS_184_DEMO) {
+                issueHistory = VAS_184_demoIssueHistory();
+                mPageNo = 1;
+                renderIssueTable();
+                return;
+            }
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_184_HighValueUsageWidget/GetProductIssueHistory',

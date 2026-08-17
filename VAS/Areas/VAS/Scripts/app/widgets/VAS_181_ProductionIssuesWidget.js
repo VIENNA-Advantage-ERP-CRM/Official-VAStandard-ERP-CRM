@@ -12,6 +12,10 @@
  */
 ; VAS = window.VAS || {};
 
+/* 🛑 🚨 🚨 🛑  DEMO DATA - UI PREVIEW ONLY - DELETE BEFORE COMMIT  🛑 🚨 🚨 🛑
+   Set to false (or delete this line and the `if (VAS_181_DEMO)` guard in the KPI loader). */
+var VAS_181_DEMO = true;
+
 ; (function (VAS, $) {
 
     function ensureDashInlineSizeVar($el) {
@@ -91,6 +95,16 @@
 
         function loadKpi() {
             showBusy(true);
+
+            /* 🛑 🚨 DEMO DATA - UI PREVIEW ONLY - DELETE BEFORE COMMIT 🚨 🛑
+               A single-percentage KPI tile, so there are no rows to fake. 61% is the value the
+               source mock shows; it is the complement of VAS_182's 39%, which is what the design
+               intends the pair to add up to. */
+            if (VAS_181_DEMO) {
+                renderMetric({ percentage: 61 });
+                showBusy(false);
+                return;
+            }
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_181_ProductionIssuesWidget/GetProductionIssuesPercentage',

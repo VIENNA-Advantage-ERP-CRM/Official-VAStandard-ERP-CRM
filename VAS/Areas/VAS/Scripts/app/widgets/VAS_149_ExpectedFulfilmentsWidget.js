@@ -341,7 +341,7 @@
                 field3(lbl('VAS_149_EXF_Warehouse', 'Warehouse'), '<select class="vas-exf-f vas-exf-f-wh">' + optionList(modalData.warehouses, 'id', 'name', selectedWarehouseId) + '</select>') +
                 '</div>';
 
-            var note = '<div class="vas-exf-note">' + fileIcon() + '<span>' + escapeHtml(lbl('VAS_149_EXF_Instruction', 'Check the lines to include, adjust quantities if needed, then generate the delivery order. Short lines may be available from another warehouse.')) + '</span></div>';
+            var note = '<div class="vas-exf-note"><span>' + escapeHtml(lbl('VAS_149_EXF_Instruction', 'Check the lines to include, adjust quantities if needed, then generate the delivery order. Short lines may be available from another warehouse.')) + '</span></div>';
 
             var shipment =
                 '<div class="vas-exf-shhead">' + escapeHtml(lbl('VAS_149_EXF_Shipment', 'Shipment')) + '</div>' +
@@ -410,8 +410,7 @@
             var locOpts = optionList(modalData.locators, 'locatorId', 'locatorName', line.locatorId);
             return '<div class="' + rowCls + '" data-id="' + escapeHtml(line.orderLineId) + '">' +
                 '<button type="button" class="vas-exf-chk' + (line.checked ? ' on' : '') + '" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="Include ' + escapeHtml(line.productName) + '">' + (line.checked ? checkIcon() : '') + '</button>' +
-                '<span class="vas-exf-lfi">' + fileIcon() + '</span>' +
-                '<span class="vas-exf-lname" title="' + escapeHtml(line.productName) + '">' + escapeHtml(line.productName) + '</span>' +
+                                '<span class="vas-exf-lname" title="' + escapeHtml(line.productName) + '">' + escapeHtml(line.productName) + '</span>' +
                 badgeFor(line) +
                 '<select class="vas-exf-loc" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="Locator for ' + escapeHtml(line.productName) + '"' + disabled + '>' + locOpts + '</select>' +
                 '<span class="vas-exf-qtywrap"><input type="number" min="1" class="vas-exf-qty" data-id="' + escapeHtml(line.orderLineId) + '" value="' + escapeHtml(line.qty) + '" aria-label="Quantity for ' + escapeHtml(line.productName) + '"' + disabled + ' />' +

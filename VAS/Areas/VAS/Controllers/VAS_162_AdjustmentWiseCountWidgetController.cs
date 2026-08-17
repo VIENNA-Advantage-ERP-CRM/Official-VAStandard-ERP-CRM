@@ -175,9 +175,17 @@ namespace VAS.Controllers
                     typeFilter = " AND il.AdjustmentType = 'D'";
                 }
 
-                string sql = @"SELECT p.Name AS ProductName, 
-                                       COALESCE(asi.Description, N'Standard') AS AttributeDesc, 
-                                       COALESCE(il.QtyBook, 0) AS QtyBook, 
+                // asi.Description is selected raw. It was COALESCE(asi.Description, N'Standard'),
+                // which printed "Standard" on every line that simply has no attribute set. The
+                // source prompt already specifies "Attribute = M_AttributeSetInstance.Description,
+                // or an EMPTY display when attribute ID is null/0"; the user confirmed the same.
+                // Raw select also avoids the ORA-12704 charset trap the N'' prefix was working
+                // around (see VAS_163 / VAS_165), and keeps the query portable to PostgreSQL,
+                // which has no N'' literal.
+                string sql = @"SELECT p.Name AS ProductName,
+                                       asi.Description AS AttributeDesc,
+                                       i.DocumentNo AS DocumentNo,
+                                       COALESCE(il.QtyBook, 0) AS QtyBook,
                                        COALESCE(il.DifferenceQty, COALESCE(il.QtyCount, 0) - COALESCE(il.QtyBook, 0)) AS DiffQty, 
                                        COALESCE(il.AsOnDateCount, COALESCE(il.QtyCount, COALESCE(il.QtyBook, 0) + COALESCE(il.DifferenceQty, 0))) AS AsOnDateCount, 
                                        i.MovementDate
@@ -201,7 +209,10 @@ namespace VAS.Controllers
                     details.Add(new
                     {
                         product = Util.GetValueOfString(dr["ProductName"]),
+                        // Empty string when the line carries no attribute set instance - no
+                        // "Standard" placeholder.
                         attribute = Util.GetValueOfString(dr["AttributeDesc"]),
+                        documentNo = Util.GetValueOfString(dr["DocumentNo"]),
                         qty = Util.GetValueOfDecimal(dr["QtyBook"]),
                         diffQty = Util.GetValueOfDecimal(dr["DiffQty"]),
                         asOnDateCount = Util.GetValueOfDecimal(dr["AsOnDateCount"])

@@ -320,6 +320,22 @@ namespace VAS.Controllers
                     return Fail("Delivery Order document type was not found.");
                 }
 
+                // The header below is hardcoded as an outbound customer shipment
+                // (IsSOTrx = true, IsReturnTrx = false, MovementType = Customer Shipment).
+                // If the caller supplies a document type that is a RETURN, the saved document is
+                // internally contradictory - doc type says receipt, header says shipment - and the
+                // document either refuses to save or cannot be completed afterwards. That is what
+                // "unable to create a goods receipt from here" looked like: the dropdown was
+                // offering "MM Customer Return" as its default, so a receipt document type was
+                // being posted into a shipment-only code path.
+                // Validate server-side; the dropdown filter alone is not enough, because docTypeId
+                // arrives from the browser.
+                if (!IsValidShipmentDocType(ctx, docTypeId))
+                {
+                    trx.Rollback();
+                    return Fail("The selected document type is not a delivery/shipment document type.");
+                }
+
                 MInOut ship = new MInOut(order, docTypeId, DateTime.Now);
                 ship.SetAD_Client_ID(ctx.GetAD_Client_ID());
                 ship.SetAD_Org_ID(order.GetAD_Org_ID());
@@ -493,6 +509,7 @@ namespace VAS.Controllers
                 SELECT dt.C_DocType_ID, dt.Name
                 FROM C_DocType dt
                 WHERE dt.IsActive = 'Y' AND dt.IsSOTrx = 'Y' AND dt.DocBaseType = 'MMS'
+                  AND COALESCE(dt.IsReturnTrx, 'N') = 'N'
                   AND dt.AD_Client_ID IN (0, @AD_Client_ID)
                 ORDER BY dt.Name";
             return ReadIdName(ctx, sql, "C_DocType_ID", true);
@@ -667,12 +684,37 @@ namespace VAS.Controllers
             return list;
         }
 
+        /// <summary>
+        /// True when the document type is an outbound sales shipment for this tenant: base type
+        /// MMS, IsSOTrx = 'Y' and NOT a return. Mirrors the filter used to build the dropdown, so
+        /// the server enforces the same rule the screen shows.
+        /// </summary>
+        private bool IsValidShipmentDocType(Ctx ctx, int docTypeId)
+        {
+            string sql = @"
+                SELECT COUNT(*)
+                FROM C_DocType dt
+                WHERE dt.C_DocType_ID = @C_DocType_ID
+                  AND dt.IsActive = 'Y'
+                  AND dt.IsSOTrx = 'Y'
+                  AND dt.DocBaseType = 'MMS'
+                  AND COALESCE(dt.IsReturnTrx, 'N') = 'N'
+                  AND dt.AD_Client_ID IN (0, @AD_Client_ID)";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@C_DocType_ID", docTypeId),
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            }, null)) > 0;
+        }
+
         private int GetShipmentDocTypeId(Ctx ctx, int orgId)
         {
             string sql = @"
                 SELECT dt.C_DocType_ID
                 FROM C_DocType dt
                 WHERE dt.IsActive = 'Y' AND dt.IsSOTrx = 'Y' AND dt.DocBaseType = 'MMS'
+                  AND COALESCE(dt.IsReturnTrx, 'N') = 'N'
                   AND dt.AD_Client_ID = @AD_Client_ID
                   AND dt.AD_Org_ID IN (0, @AD_Org_ID)
                 ORDER BY dt.AD_Org_ID DESC, dt.C_DocType_ID ASC";

@@ -1,5 +1,5 @@
 /**
- * WH wise Count Widget & Detail Modal (Physical Inventory / Inventory Count Dashboard)
+ * Warehouse wise count Widget & Detail Modal (Physical Inventory / Inventory Count Dashboard)
  * Purpose - 4x2 glass card showing warehouse-wise inventory counts, locators, and counted quantities.
  *           Clicking a row opens a detailed breakdown modal of all count lines for that warehouse.
  * Prefix  - VAS_161_
@@ -7,7 +7,7 @@
  * Labels / Message Keys Table:
  *  #  | Fallback Text                                    | Message Key
  * ----+--------------------------------------------------+-----------------------------------
- *  1  | WH wise Count                                    | VAS_161_WHWiseCount
+ *  1  | Warehouse wise count                             | VAS_161_WHWiseCount
  *  2  | Warehouse                                        | VAS_161_Warehouse
  *  3  | Locators                                         | VAS_161_Locators
  *  4  | Count Sessions                                   | VAS_161_CountSessions
@@ -26,6 +26,13 @@
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    // Message-key lookup with a fallback, matching the other VAS widgets. This file had none, which
+    // is why its title was a hardcoded literal.
+    function lbl(key, fallback) {
+        var t = VIS.Msg.getMsg(key);
+        return (t && t.charAt(0) !== '[') ? t : fallback;
+    }
 
     function ensureDashInlineSizeVar($el) {
         var container = $el.closest('.vis-widget-container, [data-dashboard-container], .vis-widget-body, body')[0] || document.documentElement;
@@ -80,7 +87,9 @@
             var $leftCluster = $('<div class="vas-whwisecount-left-cluster">');
             var $iconWell = $('<div class="vas-whwisecount-icon-well"><i class="fa fa-building-o"></i></div>');
             var $titleBlock = $('<div class="vas-whwisecount-title-block">');
-            var $title = $('<h3 class="vas-whwisecount-title">WH wise Count</h3>');
+            // Renamed "WH wise Count" -> "Warehouse wise count" (2026-08-16, user request).
+            // Routed through the message key instead of a hardcoded literal (Rule 8).
+            var $title = $('<h3 class="vas-whwisecount-title"></h3>').text(lbl("VAS_161_WHWiseCount", "Warehouse wise count"));
             $subtitle = $('<span class="vas-whwisecount-subtitle">Warehouses with active count locators</span>');
             $titleBlock.append($title).append($subtitle);
             $leftCluster.append($iconWell).append($titleBlock);

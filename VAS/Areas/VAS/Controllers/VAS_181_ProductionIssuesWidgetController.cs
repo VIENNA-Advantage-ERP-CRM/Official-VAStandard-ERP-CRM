@@ -45,6 +45,39 @@ namespace VIS.Controllers
             }
         }
 
+        /// <summary>
+        /// The line-level production-order column, per the source specification
+        /// (03-use-c-production-issues-copilot-prompt.txt, "DATABASE TABLE MAPPING"):
+        ///   "Production order on line: M_InventoryLine.VAMFG_M_WorkOrder_ID"
+        ///   "Use the production order on the line level only ... Do not use the production-order
+        ///    field from M_Inventory header."
+        /// </summary>
+        private const string ProductionOrderColumn = "VAMFG_M_WorkOrder_ID";
+
+        /// <summary>
+        /// Returns the line-level production-order column if this installation actually has it,
+        /// otherwise null.
+        ///
+        /// The column ships with the manufacturing module, so it is absent on an installation that
+        /// does not have that module - it does not exist on DB 1, for example. Naming it
+        /// unconditionally makes the whole query die with ORA-00904 instead of the widget simply
+        /// reporting no production issues, so the spec's column is verified against the dictionary
+        /// first and any other work-order column is accepted as a fallback.
+        /// </summary>
+        private static string ResolveProductionOrderColumn()
+        {
+            string sql = @"
+                SELECT MAX(c.ColumnName) KEEP (DENSE_RANK FIRST ORDER BY CASE WHEN UPPER(c.ColumnName) = UPPER('" + ProductionOrderColumn + @"') THEN 0 ELSE 1 END, c.ColumnName)
+                FROM AD_Column c
+                INNER JOIN AD_Table t ON t.AD_Table_ID = c.AD_Table_ID
+                WHERE t.TableName = 'M_InventoryLine'
+                  AND c.IsActive = 'Y'
+                  AND UPPER(c.ColumnName) LIKE '%WORKORDER%'";
+
+            string column = Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
+            return string.IsNullOrEmpty(column) ? null : column;
+        }
+
         private int GetProductionIssuesPercentageData(Ctx ctx)
         {
             if (ctx == null) { return 0; }
@@ -55,14 +88,37 @@ namespace VIS.Controllers
             string msl = ToSqlDate(monthStart);
             string nmsl = ToSqlDate(nextMonthStart);
 
+            string productionOrderColumn = ResolveProductionOrderColumn();
+            if (productionOrderColumn == null)
+            {
+                // Nothing on the issue line records a production order, so no line can honestly be
+                // classified as a production issue. Report 0 rather than inventing a proxy - the
+                // previous "C_Charge_ID IS NOT NULL OR M_RequisitionLine_ID IS NOT NULL" test was
+                // exactly such a proxy and had nothing to do with production.
+                Log.Log(Level.WARNING, "VAS_181_ProductionIssuesWidget: M_InventoryLine has no work-order column in this installation; production issues cannot be classified.");
+                return 0;
+            }
+
+            // Confirmed business rule from the spec, followed exactly:
+            //   "Use the production order on the line level only: VAMFG_M_WorkOrder_ID IS NOT NULL"
+            //   "Issued line value = COALESCE(QtyInternalUse,0) * COALESCE(CurrentCostPrice,0)"
+            //   "Lines with null CurrentCostPrice contribute zero value. Do not substitute another
+            //    cost field."  <- which is why there is no PriceCost / VA024_CostPrice fallback here.
+            string productionTest = "line." + productionOrderColumn + " IS NOT NULL";
+            const string lineValue = "(COALESCE(line.QtyInternalUse, 0) * COALESCE(line.CurrentCostPrice, 0))";
+
             string sql = @"
-                SELECT 
-                  COALESCE(SUM(CASE WHEN line.C_CHARGE_ID IS NOT NULL OR line.M_REQUISITIONLINE_ID IS NOT NULL THEN (line.QtyInternalUse * NVL(line.CurrentCostPrice, line.PriceCost)) ELSE 0 END), 0) AS ProductionValue,
-                  COALESCE(SUM(line.QtyInternalUse * NVL(line.CurrentCostPrice, line.PriceCost)), 0) AS TotalValue
+                SELECT
+                  COALESCE(SUM(CASE WHEN " + productionTest + " THEN " + lineValue + @" ELSE 0 END), 0) AS ProductionValue,
+                  COALESCE(SUM(" + lineValue + @"), 0) AS TotalValue
                 FROM M_InventoryLine line
                 INNER JOIN M_Inventory inv ON inv.M_Inventory_ID = line.M_Inventory_ID
                 WHERE inv.IsActive = 'Y'
+                  AND line.IsActive = 'Y'
+                  AND inv.IsInternalUse = 'Y'
                   AND inv.DocStatus IN ('CO', 'CL')
+                  AND line.M_Product_ID IS NOT NULL
+                  AND COALESCE(line.QtyInternalUse, 0) > 0
                   AND inv.MovementDate >= " + msl + @"
                   AND inv.MovementDate < " + nmsl;
 

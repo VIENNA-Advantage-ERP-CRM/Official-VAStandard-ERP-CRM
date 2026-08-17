@@ -38,8 +38,14 @@ namespace VIS.Controllers
                 DateTime nextMonthStart = monthStart.AddMonths(1);
                 string msl = ToSqlDate(monthStart);
                 string nmsl = ToSqlDate(nextMonthStart);
+                // Value is qty x the line's CurrentCostPrice, matching the cost basis the user set
+                // for this dashboard. The old COALESCE(CurrentCostPrice, PriceCost, VA024_CostPrice)
+                // fallback chain mixed three different price columns into one figure.
+                // The trailing ", 0" is kept HERE (unlike VAS_184, which excludes unpriced lines):
+                // this widget ranks by QUANTITY, so a genuinely top-issued product must not fall out
+                // of the ranking just because some of its lines carry no cost.
                 string orderBy = (measure == "val")
-                    ? "SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)) DESC"
+                    ? "SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) DESC"
                     : "SUM(line.QtyInternalUse) DESC";
 
                 // Role access is applied to the inner header SELECT; applying it to this wrapped
@@ -55,7 +61,7 @@ namespace VIS.Controllers
                         pc.Name AS CategoryName,
                         uom.Name AS UomName,
                         SUM(line.QtyInternalUse) AS TotalQty,
-                        SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)) AS TotalValue
+                        SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) AS TotalValue
                       FROM M_InventoryLine line
                       INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                       INNER JOIN M_Product p ON p.M_Product_ID = line.M_Product_ID
@@ -120,7 +126,7 @@ namespace VIS.Controllers
                       wh.Name AS WarehouseName,
                       loc.Value AS LocatorCode,
                       line.QtyInternalUse,
-                      (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)) AS LineValue
+                      (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, 0)) AS LineValue
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                     LEFT JOIN M_Locator loc ON loc.M_Locator_ID = line.M_Locator_ID
@@ -161,11 +167,17 @@ namespace VIS.Controllers
         /// </summary>
         private static string BuildAccessibleInventorySql(Ctx ctx, string periodStart, string periodEnd)
         {
+            // Source design (top-used-products-widget.md section 3): "Exclude documents with
+            // DocStatus = Drafted (not yet actual consumption). Posted, Completed, and In Process
+            // count." The previous IN ('CO','CL') silently dropped every In Process document, so
+            // material already issued against an IP document never appeared in the ranking.
+            // Voided ('VO') and Reversed ('RE') stay excluded - they are not consumption either,
+            // which is why this is an explicit include-list rather than DocStatus <> 'DR'.
             string sql = @"
                     SELECT inv.M_Inventory_ID, inv.DocumentNo, inv.MovementDate
                     FROM M_Inventory inv
                     WHERE inv.IsActive = 'Y'
-                      AND inv.DocStatus IN ('CO', 'CL')
+                      AND inv.DocStatus IN ('CO', 'CL', 'IP')
                       AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
                       AND inv.MovementDate >= " + periodStart + @"
                       AND inv.MovementDate < " + periodEnd;

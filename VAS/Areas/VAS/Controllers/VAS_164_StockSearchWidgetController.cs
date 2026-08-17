@@ -186,16 +186,23 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                string sql = @"SELECT loc.Value AS LocatorCode, 
-                                      w.Name AS WarehouseName, 
-                                      SUM(s.QtyOnHand) AS QtyOnHand 
-                               FROM M_Storage s 
-                               JOIN M_Locator loc ON (s.M_Locator_ID = loc.M_Locator_ID) 
-                               JOIN M_Warehouse w ON (loc.M_Warehouse_ID = w.M_Warehouse_ID) 
+                // Attribute added to the locator breakdown (user request 2026-08-16). Stock is held
+                // per attribute set instance, so it belongs in the GROUP BY - without it two
+                // different batches in one locator collapse into a single untraceable row.
+                // asi.Description is NVARCHAR2: selected raw, never COALESCE'd against a literal
+                // (that raises ORA-12704 - see VAS_161 / VAS_163 / VAS_165). Blank when absent.
+                string sql = @"SELECT loc.Value AS LocatorCode,
+                                      w.Name AS WarehouseName,
+                                      asi.Description AS AttributeDesc,
+                                      SUM(s.QtyOnHand) AS QtyOnHand
+                               FROM M_Storage s
+                               JOIN M_Locator loc ON (s.M_Locator_ID = loc.M_Locator_ID)
+                               JOIN M_Warehouse w ON (loc.M_Warehouse_ID = w.M_Warehouse_ID)
+                               LEFT JOIN M_AttributeSetInstance asi ON (s.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
                                WHERE s.IsActive = 'Y' AND s.M_Product_ID = " + productId;
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "s", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                sql += " GROUP BY loc.Value, w.Name ORDER BY QtyOnHand DESC, loc.Value ASC";
+                sql += " GROUP BY loc.Value, w.Name, asi.Description ORDER BY QtyOnHand DESC, loc.Value ASC";
 
                 dr = DB.ExecuteReader(sql, null, null);
                 while (dr != null && dr.Read())
@@ -204,6 +211,7 @@ namespace VAS.Controllers
                     {
                         locator = Util.GetValueOfString(dr["LocatorCode"]),
                         warehouse = Util.GetValueOfString(dr["WarehouseName"]),
+                        attribute = Util.GetValueOfString(dr["AttributeDesc"]),
                         qty = Util.GetValueOfDecimal(dr["QtyOnHand"])
                     });
                 }
@@ -222,6 +230,89 @@ namespace VAS.Controllers
             }
 
             return Json(new { locators = list, totalLocators = list.Count }, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// Previous inventory counts for a product - the modal's second tab. One row per count line,
+        /// newest first, carrying the parent M_Inventory_ID so the row can navigate to the
+        /// VAS_PhysicalInventory record.
+        /// Physical counts only (IsInternalUse = 'N'); internal-use documents are not counts.
+        /// </summary>
+        [HttpGet]
+        public JsonResult GetProductCountHistory(int productId)
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null)
+            {
+                return Json(new { error = "Unauthorized context." }, JsonRequestBehavior.AllowGet);
+            }
+
+            List<object> list = new List<object>();
+            IDataReader dr = null;
+            try
+            {
+                // asi.Description selected raw - see the note in GetProductLocators.
+                string sql = @"SELECT i.M_Inventory_ID,
+                                      i.DocumentNo,
+                                      i.MovementDate,
+                                      i.DocStatus,
+                                      w.Name AS WarehouseName,
+                                      loc.Value AS LocatorCode,
+                                      asi.Description AS AttributeDesc,
+                                      COALESCE(il.QtyBook, 0) AS QtyBook,
+                                      COALESCE(il.QtyCount, 0) AS QtyCount
+                               FROM M_InventoryLine il
+                               JOIN M_Inventory i ON (il.M_Inventory_ID = i.M_Inventory_ID)
+                               LEFT JOIN M_Locator loc ON (il.M_Locator_ID = loc.M_Locator_ID)
+                               LEFT JOIN M_Warehouse w ON (loc.M_Warehouse_ID = w.M_Warehouse_ID)
+                               LEFT JOIN M_AttributeSetInstance asi ON (il.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
+                               WHERE i.IsActive = 'Y'
+                                 AND il.IsActive = 'Y'
+                                 AND COALESCE(i.IsInternalUse, 'N') = 'N'
+                                 AND il.M_Product_ID = " + productId;
+
+                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql += " ORDER BY i.MovementDate DESC, i.M_Inventory_ID DESC";
+
+                dr = DB.ExecuteReader(sql, null, null);
+                while (dr != null && dr.Read())
+                {
+                    DateTime? movementDate = Util.GetValueOfDateTime(dr["MovementDate"]);
+                    decimal qtyBook = Util.GetValueOfDecimal(dr["QtyBook"]);
+                    decimal qtyCount = Util.GetValueOfDecimal(dr["QtyCount"]);
+
+                    list.Add(new
+                    {
+                        inventoryId = Util.GetValueOfInt(dr["M_Inventory_ID"]),
+                        documentNo = Util.GetValueOfString(dr["DocumentNo"]),
+                        movementDate = (movementDate.HasValue && movementDate.Value != DateTime.MinValue)
+                            ? movementDate.Value.ToString("dd MMM yyyy") : "",
+                        docStatus = Util.GetValueOfString(dr["DocStatus"]),
+                        warehouse = Util.GetValueOfString(dr["WarehouseName"]),
+                        locator = Util.GetValueOfString(dr["LocatorCode"]),
+                        attribute = Util.GetValueOfString(dr["AttributeDesc"]),
+                        qtyBook = qtyBook,
+                        qtyCount = qtyCount,
+                        // Computed, never M_InventoryLine.DifferenceQty - that column is
+                        // sign-inverted on this data (see VAS_159 / VAS_160).
+                        variance = qtyCount - qtyBook
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("VAS_164_StockSearchWidgetController.GetProductCountHistory: " + ex.Message);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+
+            return Json(new { counts = list, totalCounts = list.Count }, JsonRequestBehavior.AllowGet);
         }
 
         private string GetProductTypeLabel(string code)

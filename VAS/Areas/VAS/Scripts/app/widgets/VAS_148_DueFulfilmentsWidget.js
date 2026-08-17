@@ -342,7 +342,7 @@
                 field3(lbl('VAS_148_DUF_Warehouse', 'Warehouse'), '<select class="vas-duf-f vas-duf-f-wh">' + optionList(modalData.warehouses, 'id', 'name', selectedWarehouseId) + '</select>') +
                 '</div>';
 
-            var note = '<div class="vas-duf-note">' + fileIcon() + '<span>' + escapeHtml(lbl('VAS_148_DUF_Instruction', 'Check the lines to include, adjust quantities if needed, then generate the delivery order. Short lines may be available from another warehouse.')) + '</span></div>';
+            var note = '<div class="vas-duf-note"><span>' + escapeHtml(lbl('VAS_148_DUF_Instruction', 'Check the lines to include, adjust quantities if needed, then generate the delivery order. Short lines may be available from another warehouse.')) + '</span></div>';
 
             var shipment =
                 '<div class="vas-duf-shhead">' + escapeHtml(lbl('VAS_148_DUF_Shipment', 'Shipment')) + '</div>' +
@@ -411,8 +411,7 @@
             var locOpts = optionList(modalData.locators, 'locatorId', 'locatorName', line.locatorId);
             return '<div class="' + rowCls + '" data-id="' + escapeHtml(line.orderLineId) + '">' +
                 '<button type="button" class="vas-duf-chk' + (line.checked ? ' on' : '') + '" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="Include ' + escapeHtml(line.productName) + '">' + (line.checked ? checkIcon() : '') + '</button>' +
-                '<span class="vas-duf-lfi">' + fileIcon() + '</span>' +
-                '<span class="vas-duf-lname" title="' + escapeHtml(line.productName) + '">' + escapeHtml(line.productName) + '</span>' +
+                                '<span class="vas-duf-lname" title="' + escapeHtml(line.productName) + '">' + escapeHtml(line.productName) + '</span>' +
                 badgeFor(line) +
                 '<select class="vas-duf-loc" data-id="' + escapeHtml(line.orderLineId) + '" aria-label="Locator for ' + escapeHtml(line.productName) + '"' + disabled + '>' + locOpts + '</select>' +
                 '<span class="vas-duf-qtywrap"><input type="number" min="1" class="vas-duf-qty" data-id="' + escapeHtml(line.orderLineId) + '" value="' + escapeHtml(line.qty) + '" aria-label="Quantity for ' + escapeHtml(line.productName) + '"' + disabled + ' />' +

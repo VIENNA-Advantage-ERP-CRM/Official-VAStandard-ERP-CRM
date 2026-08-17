@@ -29,6 +29,67 @@
  */
 ; VAS = window.VAS || {};
 
+/* ==========================================================================================
+   🛑 🚨 🚨 🛑  DEMO DATA - UI PREVIEW ONLY - DELETE THIS BLOCK BEFORE COMMIT  🛑 🚨 🚨 🛑
+   Set VAS_188_DEMO to false (or delete this block and the two `if (VAS_188_DEMO)` guards in
+   loadTopProducts() and the usage-detail loader) to restore live controller data.
+
+   NOTE ON ROW COUNT: this widget gets exactly 10 products, not 20. Its source design
+   (top-used-products-widget.md section 3 "Return a maximum of 10 products", and section 8
+   "Never renders more than 10 products regardless of data volume") caps the dataset at 10, and
+   the controller enforces it with ROWNUM <= 10. Feeding it 20 would render a state the widget
+   can never reach in production, which is worse than useless for a UI review. The drill-down
+   modal has no such cap, so it gets 22 rows.
+   Values are seeded from month + year so changing the filters visibly changes the ranking.
+   ========================================================================================== */
+var VAS_188_DEMO = true;
+
+function VAS_188_demoSeed(month, year) {
+    return (Number(month) || 1) * 17 + ((Number(year) || 2026) % 100) * 3;
+}
+
+function VAS_188_demoTopProducts(month, year) {
+    var seed = VAS_188_demoSeed(month, year);
+    var names = ["4 mm Screws", "Descaling Chemicals", "Cotton Waste", "Welding Rod 3.2mm",
+        "Grease Cartridge", "Emery Paper 120", "Cable Tie 200mm", "Air Filter AF-12",
+        "Gasket Sheet GS-3", "Hydraulic Oil ISO 46"];
+    var cats = ["Fasteners", "Cleaning Supplies", "Consumables", "Welding", "Lubricants",
+        "Tooling", "Electrical", "Filters", "Seals & Gaskets", "Lubricants"];
+    var attrs = ["M8", "Grade A", "", "3.2 mm", "", "120 Grit", "", "Batch B-2291", "", "ISO 46"];
+    var uoms = ["Each", "Ltr", "Kg", "Box", "Each", "Sheet", "Each", "Each", "Sheet", "Ltr"];
+    var out = [];
+    for (var i = 0; i < names.length; i++) {
+        var qty = 940 - (i * 78) - ((seed + i * 13) % 45);
+        out.push({
+            productId: 910001 + i, productName: names[i], attribute: attrs[i],
+            categoryName: cats[i], uomName: uoms[i],
+            totalQty: qty, totalValue: qty * (18 + ((seed + i * 23) % 240))
+        });
+    }
+    return out;
+}
+
+function VAS_188_demoUsageDetails(productId, month, year) {
+    var seed = VAS_188_demoSeed(month, year) + (Number(productId) || 0) % 31;
+    var whs = ["Central WH / A-01-02", "North WH / C-02-07", "Plant WH / E-03-09",
+        "Central WH / B-04-11", "Spares WH / G-02-05"];
+    var mn = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    var label = mn[Math.max(0, Math.min(11, (Number(month) || 1) - 1))] + " " + (Number(year) || 2026);
+    var out = [];
+    for (var i = 0; i < 22; i++) {
+        var qty = 6 + ((seed + i * 9) % 88);
+        out.push({
+            documentNo: "IU-" + (105610 + i * 4),
+            movementDate: String(1 + (i % 28)).padStart(2, '0') + " " + label,
+            whLoc: whs[i % whs.length],
+            qty: qty,
+            value: qty * (22 + ((seed + i * 31) % 190))
+        });
+    }
+    return out;
+}
+/* ===================== 🛑 END DEMO DATA BLOCK 🛑 ===================== */
+
 ; (function (VAS, $) {
 
     function ensureDashInlineSizeVar($el) {
@@ -158,6 +219,15 @@
 
         function loadTopProducts() {
             showBusy(true);
+
+            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
+            if (VAS_188_DEMO) {
+                productsData = VAS_188_demoTopProducts(selectedMonth, selectedYear);
+                pageNo = 1;
+                renderProducts();
+                showBusy(false);
+                return;
+            }
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_188_TopUsedProductsWidget/GetTopProducts',
@@ -373,6 +443,15 @@
             });
 
             $('body').append($modal);
+
+            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
+            if (VAS_188_DEMO) {
+                usageLines = VAS_188_demoUsageDetails(pid, selectedMonth, selectedYear);
+                $modal.find('.vas-tup-m-lines-cnt').text(usageLines.length);
+                mPageNo = 1;
+                renderLinesTable();
+                return;
+            }
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_188_TopUsedProductsWidget/GetProductUsageDetails',

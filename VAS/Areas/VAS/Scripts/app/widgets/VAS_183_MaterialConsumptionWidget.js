@@ -29,6 +29,71 @@
  */
 ; VAS = window.VAS || {};
 
+/* ==========================================================================================
+   🛑 🚨 🚨 🛑  DEMO DATA - UI PREVIEW ONLY - DELETE THIS BLOCK BEFORE COMMIT  🛑 🚨 🚨 🛑
+   Set VAS_183_DEMO to false (or delete this block and the three `if (VAS_183_DEMO)` guards in
+   loadWarehouses(), loadLocatorSummary() and the locator-detail loader) to restore live data.
+   Numbers are seeded from warehouse + month + year so changing any filter visibly changes the
+   list - that is what makes the filter fix checkable without a database.
+   ========================================================================================== */
+var VAS_183_DEMO = true;
+
+function VAS_183_demoWarehouses() {
+    return [
+        { warehouseId: 5001, shortName: "Central WH", name: "Central Warehouse" },
+        { warehouseId: 5002, shortName: "North WH", name: "North Warehouse" },
+        { warehouseId: 5003, shortName: "Plant WH", name: "Plant Warehouse" },
+        { warehouseId: 5004, shortName: "Spares WH", name: "Spares Warehouse" }
+    ];
+}
+
+function VAS_183_demoSeed(whId, month, year) {
+    return ((Number(whId) || 0) % 97) + (Number(month) || 1) * 13 + ((Number(year) || 2026) % 100);
+}
+
+function VAS_183_demoLocators(whId, month, year) {
+    var seed = VAS_183_demoSeed(whId, month, year);
+    var aisles = ["A", "B", "C", "D", "E", "F"];
+    var zones = ["Bulk Store", "Pick Face", "Quarantine", "Staging", "Returns", "Bonded"];
+    var out = [];
+    for (var i = 0; i < 21; i++) {
+        var qty = 40 + ((seed + i * 17) % 380);
+        out.push({
+            locatorId: 700001 + i,
+            locatorCode: aisles[i % aisles.length] + "-" + String(1 + (i % 9)).padStart(2, '0') + "-" + String(1 + ((i * 3) % 12)).padStart(2, '0'),
+            locatorName: zones[i % zones.length],
+            totalQty: qty,
+            totalValue: qty * (85 + ((seed + i * 29) % 640))
+        });
+    }
+    out.sort(function (a, b) { return b.totalQty - a.totalQty; });
+    return out;
+}
+
+function VAS_183_demoLocatorDetail(whId, locatorId, month, year) {
+    var seed = VAS_183_demoSeed(whId, month, year) + (Number(locatorId) || 0) % 23;
+    var products = ["Descaling Chemicals", "4 mm Screws", "Hydraulic Oil ISO 46", "Bearing SKF-6204",
+        "Drive Belt DB-880", "Gasket Sheet GS-3", "Welding Rod 3.2mm", "Cotton Waste",
+        "Grease Cartridge", "Air Filter AF-12", "Cable Tie 200mm", "Emery Paper 120"];
+    var uoms = ["Each", "Kg", "Ltr", "Set", "Box"];
+    var attrs = ["Grade A", "", "Batch B-2291", "", "Lot 77-C", ""];
+    var items = [];
+    var totalQty = 0, totalValue = 0;
+    for (var i = 0; i < 20; i++) {
+        var qty = 3 + ((seed + i * 11) % 64);
+        totalQty += qty;
+        totalValue += qty * (95 + ((seed + i * 37) % 520));
+        items.push({
+            productName: products[i % products.length],
+            consumedQty: qty,
+            uomName: uoms[i % uoms.length],
+            attributes: attrs[i % attrs.length]
+        });
+    }
+    return { items: items, totalQty: totalQty, totalValue: totalValue, distinctItemCount: items.length };
+}
+/* ===================== 🛑 END DEMO DATA BLOCK 🛑 ===================== */
+
 ; (function (VAS, $) {
 
     function ensureDashInlineSizeVar($el) {
@@ -61,7 +126,12 @@
         var $prevBtn;
         var $nextBtn;
         var $whBtn;
+        var $whLbl;
+        var $whMenu;
         var $monthBtn;
+        var $monthLbl;
+        var $monthMenu;
+        var monthOptions = [];
         var $busy;
         var $modal;
 
@@ -149,6 +219,14 @@
         function loadWarehouses() {
             showBusy(true);
 
+            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
+            if (VAS_183_DEMO) {
+                warehouses = VAS_183_demoWarehouses();
+                populateWarehouseOptions();
+                loadLocatorSummary();
+                return;
+            }
+
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_183_MaterialConsumptionWidget/GetWarehouses',
                 type: 'GET',
@@ -156,19 +234,168 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     warehouses = data.warehouses || [];
-                    if (warehouses.length > 0) {
-                        selectedWarehouse = warehouses[0];
-                        if ($whBtn) { $whBtn.text(selectedWarehouse.shortName); }
-                    }
+                    populateWarehouseOptions();
                     loadLocatorSummary();
                 },
                 error: function () { loadLocatorSummary(); }
             });
         }
 
+        /* ---- Header filter dropdowns ----------------------------------------------------------
+           Both menus are appended to <body> rather than next to their button. .vas-mcw-card sets
+           overflow:hidden (widgets must have no inner scrollbars), which would clip a menu
+           positioned inside the card. Body-appending + fixed positioning from the button's
+           bounding rect is the pattern already used by VAS_164_StockSearchWidget for exactly this
+           reason, and it keeps the menu looking the way the design specifies. */
+
+        function buildFilterMenus() {
+            $whMenu = $('<div class="vas-mcw-menu vas-mcw-wh-menu" role="menu">');
+            $monthMenu = $('<div class="vas-mcw-menu vas-mcw-month-menu" role="menu">');
+            $('body').append($whMenu).append($monthMenu);
+
+            buildMonthOptions();
+            renderWarehouseMenu();
+            renderMonthMenu();
+
+            $whBtn.on('click', function (e) {
+                e.stopPropagation();
+                closeMenu($monthMenu, $monthBtn);
+                toggleMenu($whMenu, $whBtn);
+            });
+
+            $monthBtn.on('click', function (e) {
+                e.stopPropagation();
+                closeMenu($whMenu, $whBtn);
+                toggleMenu($monthMenu, $monthBtn);
+            });
+
+            $whMenu.on('click', 'button', function (e) {
+                e.stopPropagation();
+                var whId = Number($(this).data('whid') || 0);
+                for (var i = 0; i < warehouses.length; i++) {
+                    if (Number(warehouses[i].warehouseId) === whId) { selectedWarehouse = warehouses[i]; break; }
+                }
+                closeMenu($whMenu, $whBtn);
+                renderWarehouseMenu();
+                pageNo = 1;
+                loadLocatorSummary();
+            });
+
+            $monthMenu.on('click', 'button', function (e) {
+                e.stopPropagation();
+                var idx = Number($(this).data('midx') || 0);
+                var opt = monthOptions[idx];
+                if (!opt) { return; }
+                selectedMonth = opt.month;
+                selectedYear = opt.year;
+                if ($monthLbl) { $monthLbl.text(formatMonthLabel(selectedMonth, selectedYear)); }
+                closeMenu($monthMenu, $monthBtn);
+                renderMonthMenu();
+                pageNo = 1;
+                loadLocatorSummary();
+            });
+
+            // One menu open at a time; clicking anywhere outside closes both.
+            $self._onDocClickMcw = function () {
+                closeMenu($whMenu, $whBtn);
+                closeMenu($monthMenu, $monthBtn);
+            };
+            $self._onReflowMcw = function () {
+                if ($whMenu.hasClass('vas-mcw-menu-open')) { positionMenu($whMenu, $whBtn); }
+                if ($monthMenu.hasClass('vas-mcw-menu-open')) { positionMenu($monthMenu, $monthBtn); }
+            };
+            document.addEventListener('mousedown', $self._onDocClickMcw, true);
+            window.addEventListener('resize', $self._onReflowMcw, true);
+            window.addEventListener('scroll', $self._onReflowMcw, true);
+        }
+
+        function positionMenu($menu, $btn) {
+            if (!$btn || !$btn[0]) { return; }
+            var rect = $btn[0].getBoundingClientRect();
+            // Right-aligned to the button, as in the source design.
+            $menu.css({
+                top: Math.round(rect.bottom + 4) + 'px',
+                left: Math.round(rect.right - $menu.outerWidth()) + 'px',
+                // Inherit the card's fluid font size so menu text scales with the widget.
+                'font-size': $card.length ? window.getComputedStyle($card[0]).fontSize : ''
+            });
+        }
+
+        function toggleMenu($menu, $btn) {
+            if ($menu.hasClass('vas-mcw-menu-open')) { closeMenu($menu, $btn); return; }
+            $menu.addClass('vas-mcw-menu-open');
+            positionMenu($menu, $btn);
+            $btn.attr('aria-expanded', 'true');
+        }
+
+        function closeMenu($menu, $btn) {
+            if (!$menu) { return; }
+            $menu.removeClass('vas-mcw-menu-open');
+            if ($btn) { $btn.attr('aria-expanded', 'false'); }
+        }
+
+        /* Last 12 months, newest first - the only period control this widget has. */
+        function buildMonthOptions() {
+            monthOptions = [];
+            var now = new Date();
+            for (var i = 0; i < 12; i++) {
+                var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                monthOptions.push({ month: d.getMonth() + 1, year: d.getFullYear() });
+            }
+        }
+
+        function renderMonthMenu() {
+            if (!$monthMenu) { return; }
+            var html = '';
+            for (var i = 0; i < monthOptions.length; i++) {
+                var opt = monthOptions[i];
+                var isOn = (opt.month === selectedMonth && opt.year === selectedYear);
+                html += '<button type="button" role="menuitem" data-midx="' + i + '"' +
+                    (isOn ? ' class="vas-mcw-menu-on"' : '') + '>' +
+                    escapeHtml(formatMonthLabel(opt.month, opt.year)) + '</button>';
+            }
+            $monthMenu.html(html);
+        }
+
+        /* Fills the warehouse menu from whatever GetWarehouses returned and selects the first entry.
+           Called after the fetch resolves, because the menu exists from createWidget() but the list
+           does not. */
+        function populateWarehouseOptions() {
+            selectedWarehouse = warehouses.length > 0 ? warehouses[0] : null;
+            renderWarehouseMenu();
+        }
+
+        function renderWarehouseMenu() {
+            if ($whLbl) {
+                $whLbl.text(selectedWarehouse
+                    ? (selectedWarehouse.shortName || selectedWarehouse.name || '')
+                    : label("VAS_NoWarehouse", "No warehouse"));
+            }
+            if (!$whMenu) { return; }
+
+            var html = '';
+            for (var i = 0; i < warehouses.length; i++) {
+                var wh = warehouses[i];
+                var isOn = selectedWarehouse && Number(wh.warehouseId) === Number(selectedWarehouse.warehouseId);
+                html += '<button type="button" role="menuitem" data-whid="' + Number(wh.warehouseId) + '"' +
+                    (isOn ? ' class="vas-mcw-menu-on"' : '') + '>' +
+                    escapeHtml(wh.shortName || wh.name || ('#' + wh.warehouseId)) + '</button>';
+            }
+            $whMenu.html(html);
+        }
+
         function loadLocatorSummary() {
             showBusy(true);
             var whId = selectedWarehouse ? selectedWarehouse.warehouseId : 0;
+
+            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
+            if (VAS_183_DEMO) {
+                locatorsData = VAS_183_demoLocators(whId, selectedMonth, selectedYear);
+                pageNo = 1;
+                renderLocatorList();
+                showBusy(false);
+                return;
+            }
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_183_MaterialConsumptionWidget/GetLocatorSummary',
@@ -389,6 +616,18 @@
 
             $('body').append($modal);
 
+            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
+            if (VAS_183_DEMO) {
+                var demo = VAS_183_demoLocatorDetail(whId, locatorId, selectedMonth, selectedYear);
+                $modal.find('.vas-mcw-m-qty').text(formatQty(demo.totalQty));
+                $modal.find('.vas-mcw-m-val').text(formatINR(demo.totalValue));
+                $modal.find('.vas-mcw-m-items').text(demo.distinctItemCount);
+                modalItemData = demo.items;
+                modalPageNo = 1;
+                renderModalTable();
+                return;
+            }
+
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_183_MaterialConsumptionWidget/GetLocatorDetails',
                 type: 'GET',
@@ -418,14 +657,31 @@
                 '<span class="vas-mcw-ico" aria-hidden="true">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>' +
                 '</span>' +
-                '<div>' +
+                // Classed so it can carry min-width:0; as an unstyled flex child it would hold the
+                // header open at the title's nowrap width and push the three filters over it -
+                // the same defect that was reported on VAS_186.
+                '<div class="vas-mcw-head-text">' +
                 '<div class="vas-mcw-title">' + escapeHtml(title) + '</div>' +
                 '<div class="vas-mcw-sub">' + escapeHtml(sub) + '</div>' +
                 '</div>' +
                 '</div>' +
+                // Two pill buttons with chevrons, exactly as the source design specifies. They were
+                // already here and correct - what was missing was that neither had a single click
+                // handler bound to it, so the menus they are supposed to toggle never existed.
                 '<div class="vas-mcw-controls">' +
-                '<button type="button" class="vas-mcw-pill-btn vas-mcw-wh-btn">Main</button>' +
-                '<button type="button" class="vas-mcw-pill-btn vas-mcw-month-btn">' + escapeHtml(formatMonthLabel(selectedMonth, selectedYear)) + '</button>' +
+                '<div class="vas-mcw-dd">' +
+                '<button type="button" class="vas-mcw-pill-btn vas-mcw-wh-btn" aria-haspopup="true" aria-expanded="false">' +
+                '<span class="vas-mcw-wh-lbl"></span>' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
+                '</button>' +
+                '</div>' +
+                '<div class="vas-mcw-dd">' +
+                '<button type="button" class="vas-mcw-pill-btn vas-mcw-month-btn" aria-haspopup="true" aria-expanded="false" title="' + escapeHtml(label("VAS_Month", "Month")) + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
+                '<span class="vas-mcw-month-lbl">' + escapeHtml(formatMonthLabel(selectedMonth, selectedYear)) + '</span>' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
+                '</button>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
                 '<div class="vas-mcw-body"></div>' +
@@ -446,7 +702,11 @@
             $prevBtn = $card.find('.vas-mcw-prev');
             $nextBtn = $card.find('.vas-mcw-next');
             $whBtn = $card.find('.vas-mcw-wh-btn');
+            $whLbl = $card.find('.vas-mcw-wh-lbl');
             $monthBtn = $card.find('.vas-mcw-month-btn');
+            $monthLbl = $card.find('.vas-mcw-month-lbl');
+
+            buildFilterMenus();
 
             $prevBtn.on('click', function () {
                 if (pageNo > 1) { pageNo--; renderLocatorList(); }
@@ -476,6 +736,14 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
+            // The two menus live on <body>, so they must be removed explicitly with their
+            // document/window listeners - detaching $root alone would leak both.
+            document.removeEventListener('mousedown', $self._onDocClickMcw, true);
+            window.removeEventListener('resize', $self._onReflowMcw, true);
+            window.removeEventListener('scroll', $self._onReflowMcw, true);
+            if ($whMenu) { $whMenu.remove(); }
+            if ($monthMenu) { $monthMenu.remove(); }
+
             $(document).off("keydown.vas-mcw-modal"); if ($modal) { $modal.remove(); }
             $root.remove();
         };

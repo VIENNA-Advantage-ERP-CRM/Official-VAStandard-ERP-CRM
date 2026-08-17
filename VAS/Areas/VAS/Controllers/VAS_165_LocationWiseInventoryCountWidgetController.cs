@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -166,27 +167,39 @@ namespace VAS.Controllers
                 DateTime startDate = new DateTime(year, month, 1);
                 DateTime endDate = startDate.AddMonths(1).AddDays(-1);
 
-                string sql = @"SELECT p.Name AS ProductName, 
-                                      COALESCE(asi.Description, 'Standard') AS AttributeDesc, 
-                                      loc.Value AS LocatorValue, 
-                                      CASE WHEN il.C_Charge_ID IS NOT NULL THEN 'Charge Account' ELSE 'Inventory Difference' END AS InventoryType, 
-                                      il.QtyCount AS Qty, 
-                                      i.M_Inventory_ID 
-                               FROM M_InventoryLine il 
-                               JOIN M_Inventory i ON (il.M_Inventory_ID = i.M_Inventory_ID) 
-                               JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID) 
-                               JOIN M_Locator loc ON (il.M_Locator_ID = loc.M_Locator_ID) 
-                               LEFT JOIN M_AttributeSetInstance asi ON (il.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID) 
-                               WHERE i.IsActive = 'Y' 
-                                 AND i.DocStatus IN ('CO', 'CL') 
-                                 AND loc.Value = '" + locatorCode + @"' 
-                                 AND i.MovementDate >= " + DB.TO_DATE(startDate, true) + @" 
+                // asi.Description is NVARCHAR2 (national character set); 'Standard' is a plain
+                // literal. COALESCE across the two raises ORA-12704 "character set mismatch", the
+                // statement fails, the catch below swallows it, and the endpoint returns an empty
+                // list - which the modal renders as a blank popup. Reproduced on DB 2.
+                // The fallback is applied in C# below instead; that also stays portable to
+                // PostgreSQL, which has neither Oracle's N'' literal nor a to_char(text) overload.
+                //
+                // locatorCode is now a bind parameter. It arrives straight from the query string and
+                // was being concatenated into the WHERE clause, so a value containing a quote both
+                // broke the statement and was injectable.
+                string sql = @"SELECT p.Name AS ProductName,
+                                      asi.Description AS AttributeDesc,
+                                      loc.Value AS LocatorValue,
+                                      CASE WHEN il.C_Charge_ID IS NOT NULL THEN 'Charge Account' ELSE 'Inventory Difference' END AS InventoryType,
+                                      il.QtyCount AS Qty,
+                                      i.M_Inventory_ID
+                               FROM M_InventoryLine il
+                               JOIN M_Inventory i ON (il.M_Inventory_ID = i.M_Inventory_ID)
+                               JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
+                               JOIN M_Locator loc ON (il.M_Locator_ID = loc.M_Locator_ID)
+                               LEFT JOIN M_AttributeSetInstance asi ON (il.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
+                               WHERE i.IsActive = 'Y'
+                                 AND i.DocStatus IN ('CO', 'CL')
+                                 AND loc.Value = @LocatorCode
+                                 AND i.MovementDate >= " + DB.TO_DATE(startDate, true) + @"
                                  AND i.MovementDate <= " + DB.TO_DATE(endDate, true);
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                 sql += " ORDER BY p.Name ASC";
 
-                dr = DB.ExecuteReader(sql, null, null);
+                SqlParameter[] parameters = { new SqlParameter("@LocatorCode", locatorCode ?? "") };
+
+                dr = DB.ExecuteReader(sql, parameters);
                 while (dr != null && dr.Read())
                 {
                     int invId = Util.GetValueOfInt(dr["M_Inventory_ID"]);
@@ -195,10 +208,16 @@ namespace VAS.Controllers
                     sessionIds.Add(invId);
                     totalQty += qty;
 
+                    string attribute = Util.GetValueOfString(dr["AttributeDesc"]);
+                    if (string.IsNullOrEmpty(attribute))
+                    {
+                        attribute = Msg.GetMsg(ctx, "VAS_Standard") ?? "Standard";
+                    }
+
                     lines.Add(new
                     {
                         product = Util.GetValueOfString(dr["ProductName"]),
-                        attribute = Util.GetValueOfString(dr["AttributeDesc"]),
+                        attribute = attribute,
                         locator = Util.GetValueOfString(dr["LocatorValue"]),
                         inventoryType = Util.GetValueOfString(dr["InventoryType"]),
                         qty = qty

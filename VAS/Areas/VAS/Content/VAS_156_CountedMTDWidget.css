@@ -92,3 +92,223 @@
 .vas-counted-mtd-hidden {
     display: none !important;
 }
+
+/* ============================================================================
+   Drill-down modal (added 2026-08-16 at user request).
+   Tokens mirror VAS_158_OpenCountSheetsWidget so the two count-sheet popups are
+   visually identical: 56px chrome header, shared CSS grid for header + data rows,
+   divider hierarchy #C5D2DD > #D9E2EB > #E2EAF1, canonical 24px/14px pager.
+   Row padding uses the reduced 0.375em already adopted on VAS_158.
+   ============================================================================ */
+.vas-counted-mtd-clickable {
+    cursor: pointer;
+}
+
+    .vas-counted-mtd-clickable:hover,
+    .vas-counted-mtd-clickable:focus-visible {
+        border-color: #BFE4FF;
+        box-shadow: 0 10px 24px rgba(31, 131, 255, 0.10);
+        outline: none;
+    }
+
+.vas-counted-mtd-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.45);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.vas-counted-mtd-modal-dialog {
+    width: min(720px, 100%);
+    max-height: calc(100dvh - 48px);
+    background: #FFFFFF;
+    border-radius: 16px;
+    border: 1px solid #D9E2EB;
+    box-shadow: 0 24px 48px rgba(15, 61, 97, 0.18);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Roboto', sans-serif;
+    container-type: inline-size;
+    font-size: clamp(18px, 1vw, 20px);
+}
+
+.vas-counted-mtd-modal-header {
+    height: 56px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid #D9E2EB;
+}
+
+.vas-counted-mtd-modal-title {
+    font-size: 0.85em;
+    font-weight: 500;
+    color: #102C3F;
+}
+
+.vas-counted-mtd-modal-close {
+    border: 0;
+    background: transparent;
+    color: #5F7283;
+    font-size: 1.1em;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.15em 0.35em;
+    border-radius: 0.35em;
+}
+
+    .vas-counted-mtd-modal-close:hover {
+        background: #EEF6FF;
+        color: #0083DA;
+    }
+
+.vas-counted-mtd-modal-body {
+    padding: 0.75em 0.875em;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    overflow: hidden;
+    flex: 1;
+}
+
+/* Shared grid template - header row and every data row use the identical template so
+   the columns line up exactly. */
+.vas-counted-mtd-grid-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 2fr) minmax(0, 1fr) minmax(0, 0.7fr) minmax(0, 0.8fr) minmax(0, 1.1fr);
+    column-gap: 0.5em;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.vas-counted-mtd-header-row {
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid #C5D2DD;
+    background: transparent;
+}
+
+.vas-counted-mtd-th {
+    font-weight: 500;
+    font-size: 0.6875em;
+    color: #5F7283;
+    text-transform: uppercase;
+}
+
+.vas-counted-mtd-th-right {
+    text-align: right;
+}
+
+.vas-counted-mtd-data-row {
+    padding: 0.375em 0;
+    border-bottom: 1px solid #E2EAF1;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+    .vas-counted-mtd-data-row:last-child {
+        border-bottom: none;
+    }
+
+    .vas-counted-mtd-data-row:hover {
+        background-color: #F8FAFC;
+    }
+
+.vas-counted-mtd-cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+    font-size: 0.75em;
+    color: #41576A;
+}
+
+.vas-counted-mtd-cell-doc {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-counted-mtd-cell-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #102C3F;
+}
+
+.vas-counted-mtd-status-chip {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-weight: 500;
+    font-size: 0.6875em;
+    background-color: #E7F7EF;
+    color: #0B6B45;
+    white-space: nowrap;
+}
+
+.vas-counted-mtd-empty {
+    padding: 2em 1em;
+    text-align: center;
+    font-size: 0.75em;
+    color: #5F7283;
+}
+
+.vas-counted-mtd-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #D9E2EB;
+    padding-top: 0.5em;
+    margin-top: auto;
+    flex: 0 0 auto;
+}
+
+.vas-counted-mtd-footer-text {
+    font-size: 0.75em;
+    color: #748494;
+}
+
+.vas-counted-mtd-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.vas-counted-mtd-pager-btn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    background: #FFFFFF;
+    border-radius: 0.4em;
+    color: #0083DA;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-counted-mtd-pager-btn:hover:not(:disabled) {
+        background: #EEF6FF;
+        box-shadow: inset 0 0 0 1px #0083DA;
+    }
+
+    .vas-counted-mtd-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-counted-mtd-pager-info {
+    font-size: 0.75em;
+    font-weight: 500;
+    color: #102C3F;
+    min-width: 3.5em;
+    text-align: center;
+}

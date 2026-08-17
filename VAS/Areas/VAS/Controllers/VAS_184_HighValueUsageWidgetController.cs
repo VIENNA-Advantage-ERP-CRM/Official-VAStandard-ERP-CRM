@@ -43,6 +43,13 @@ namespace VIS.Controllers
                 // aggregate would append the predicate outside the subquery (ORA-00907).
                 string invAccessSql = BuildAccessibleInventorySql(ctx, msl, nmsl);
 
+                // Cost is line.CurrentCostPrice ONLY. The previous
+                // COALESCE(CurrentCostPrice, PriceCost, VA024_CostPrice, 0) fallback chain silently
+                // substituted a different price whenever the line carried no current cost, and the
+                // final ", 0" turned a line with no price at all into a zero-value row that still
+                // occupied one of the ten slots. Lines with no CurrentCostPrice are now excluded
+                // outright, which is also what keeps zero-value products off the widget:
+                // CurrentCostPrice > 0 is false for NULL as well as for 0.
                 string sql = @"
                     SELECT * FROM (
                       SELECT
@@ -50,9 +57,9 @@ namespace VIS.Controllers
                         p.Name AS ProductName,
                         asi.Description AS Attribute,
                         uom.Name AS UomName,
-                        MAX(COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)) AS CostPrice,
+                        MAX(line.CurrentCostPrice) AS CostPrice,
                         SUM(line.QtyInternalUse) AS TotalIssuedQty,
-                        SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)) AS TotalIssuedValue
+                        SUM(line.QtyInternalUse * line.CurrentCostPrice) AS TotalIssuedValue
                       FROM M_InventoryLine line
                       INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                       INNER JOIN M_Product p ON p.M_Product_ID = line.M_Product_ID
@@ -60,9 +67,11 @@ namespace VIS.Controllers
                       LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = line.M_AttributeSetInstance_ID
                       WHERE line.IsActive = 'Y'
                         AND COALESCE(line.QtyInternalUse, 0) > 0
+                        AND line.CurrentCostPrice > 0
                       GROUP BY p.M_Product_ID, p.Name, asi.Description, uom.Name
-                      ORDER BY MAX(COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)) DESC,
-                               SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)) DESC
+                      HAVING SUM(line.QtyInternalUse * line.CurrentCostPrice) > 0
+                      ORDER BY MAX(line.CurrentCostPrice) DESC,
+                               SUM(line.QtyInternalUse * line.CurrentCostPrice) DESC
                     ) WHERE ROWNUM <= 10";
 
                 using (IDataReader dr = DB.ExecuteReader(sql, null, null))
@@ -110,6 +119,8 @@ namespace VIS.Controllers
 
                 string invAccessSql = BuildAccessibleInventorySql(ctx, msl, nmsl);
 
+                // Same cost rule and same zero exclusion as GetHighValueProducts - if the two drifted,
+                // the modal's line values would no longer add up to the total shown on the row.
                 string sql = @"
                     SELECT
                       ai.DocumentNo,
@@ -117,13 +128,14 @@ namespace VIS.Controllers
                       wh.Name AS WarehouseName,
                       loc.Value AS LocatorCode,
                       line.QtyInternalUse,
-                      (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)) AS LineValue
+                      (line.QtyInternalUse * line.CurrentCostPrice) AS LineValue
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                     LEFT JOIN M_Locator loc ON loc.M_Locator_ID = line.M_Locator_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = loc.M_Warehouse_ID
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
+                      AND line.CurrentCostPrice > 0
                       AND line.M_Product_ID = " + productId + @"
                     ORDER BY ai.MovementDate DESC, ai.DocumentNo DESC";
 

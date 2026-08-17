@@ -33,6 +33,52 @@
  */
 ; VAS = window.VAS || {};
 
+/* ==========================================================================================
+   🛑 🚨 🚨 🛑  DEMO DATA - UI PREVIEW ONLY - DELETE THIS BLOCK BEFORE COMMIT  🛑 🚨 🚨 🛑
+   Set VAS_186_DEMO to false (or delete this block and the two `if (VAS_186_DEMO)` guards in
+   loadCategoryUsage() and the drill-down loader) to restore live controller data.
+   ========================================================================================== */
+var VAS_186_DEMO = true;
+
+function VAS_186_demoCategories() {
+    var names = ["Standard", "Accessories", "Spare Parts", "Lubricants", "Electrical", "Hydraulics",
+        "Fasteners", "Bearings", "Safety Gear", "Tooling", "Consumables", "Filters",
+        "Seals & Gaskets", "Pneumatics", "Instrumentation", "Packaging", "Cleaning Supplies",
+        "Welding", "Cutting Tools", "Adhesives", "Pipes & Fittings", "Cables"];
+    var out = [];
+    for (var i = 0; i < names.length; i++) {
+        var val = 34900 - (i * 1420) - ((i % 5) * 260);
+        out.push({
+            categoryId: 800001 + i, categoryName: names[i],
+            totalQty: 12 + ((i * 11) % 190), totalValue: val > 0 ? val : 180
+        });
+    }
+    return out;
+}
+
+function VAS_186_demoIssueLines() {
+    var products = ["Hydraulic Pump HP-450", "Bearing Assembly SKF-6204", "Control Valve CV-12",
+        "Drive Belt DB-880", "Servo Motor SM-3000", "Gear Box GB-75", "Seal Kit SK-220",
+        "Filter Cartridge FC-90"];
+    var attrs = ["Grade A", "", "Batch B-2291", "", "", "Grade C", "", "Batch B-1140"];
+    var uoms = ["Each", "Set", "Kg", "Ltr"];
+    var whs = ["Central WH / A-01-02", "North WH / C-02-07", "Plant WH / E-03-09", "Central WH / B-04-11"];
+    var out = [];
+    for (var i = 0; i < 22; i++) {
+        out.push({
+            documentNo: "IU-" + (104820 + i * 3),
+            productName: products[i % products.length],
+            attribute: attrs[i % attrs.length],
+            uomName: uoms[i % uoms.length],
+            whLoc: whs[i % whs.length],
+            qty: 2 + ((i * 5) % 27),
+            movementDate: String(1 + (i % 28)).padStart(2, '0') + " Aug 2026"
+        });
+    }
+    return out;
+}
+/* ===================== 🛑 END DEMO DATA BLOCK 🛑 ===================== */
+
 ; (function (VAS, $) {
 
     function ensureDashInlineSizeVar($el) {
@@ -161,6 +207,15 @@
 
         function loadCategoryUsage() {
             showBusy(true);
+
+            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
+            if (VAS_186_DEMO) {
+                categoriesData = VAS_186_demoCategories();
+                pageNo = 1;
+                renderCategories();
+                showBusy(false);
+                return;
+            }
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_186_ProductCategoryUsageWidget/GetCategoryUsage',
@@ -446,6 +501,14 @@
 
             $('body').append($modal);
 
+            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
+            if (VAS_186_DEMO) {
+                issueLines = VAS_186_demoIssueLines();
+                mPageNo = 1;
+                renderLinesTable();
+                return;
+            }
+
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_186_ProductCategoryUsageWidget/GetCategoryIssueLines',
                 type: 'GET',
@@ -471,7 +534,11 @@
                 '<span class="vas-pcu-ico" aria-hidden="true">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>' +
                 '</span>' +
-                '<div>' +
+                // Needs its own class: as an unstyled flex child this wrapper defaulted to
+                // min-width:auto, so it refused to shrink below the title's nowrap width and
+                // pushed the filter controls out over the header instead of letting the
+                // title's own ellipsis do the work.
+                '<div class="vas-pcu-head-text">' +
                 '<div class="vas-pcu-title">' + escapeHtml(title) + '</div>' +
                 '<div class="vas-pcu-sub">' + escapeHtml(sub) + '</div>' +
                 '</div>' +

@@ -217,9 +217,15 @@ namespace VAS.Controllers
                 DateTime startDate = new DateTime(year, month, 1);
                 DateTime endDate = startDate.AddMonths(1).AddDays(-1);
 
-                string sql = @"SELECT p.Name AS ProductName, 
-                                      COALESCE(asi.Description, 'Standard') AS AttributeDesc, 
-                                      loc.Value AS LocatorValue, 
+                // asi.Description is NVARCHAR2 (national character set); 'Standard' is a plain
+                // literal. COALESCE across the two raises ORA-12704 "character set mismatch", the
+                // statement fails, the catch below swallows it and the endpoint returns an empty
+                // list - which the modal renders as a blank popup. Reproduced on DB 2.
+                // Selected raw; the attribute is left BLANK when the line has none, per the user's
+                // instruction not to display a "Standard" placeholder.
+                string sql = @"SELECT p.Name AS ProductName,
+                                      asi.Description AS AttributeDesc,
+                                      loc.Value AS LocatorValue,
                                       CASE WHEN il.C_Charge_ID IS NOT NULL THEN 'Charge Account' ELSE 'Inventory Difference' END AS InventoryType, 
                                       il.QtyCount AS Qty, 
                                       i.M_Inventory_ID 

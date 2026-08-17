@@ -17,6 +17,10 @@
 
 ; (function (VAS, $) {
 
+    // Window name/search key for the Inventory Count screen, same target VAS_158 navigates to.
+    var COUNT_WINDOW_NAME = "VAS_PhysicalInventory";
+    var MODAL_PAGE_SIZE = 8;
+
     VAS.VAS_156_CountedMTDWidget = function () {
 
         this.frame;
@@ -29,6 +33,10 @@
         var $metaEl;
         var $busy;
         var widgetObserver = null;
+        var $modal = null;
+        var detailRows = [];
+        var modalPageNo = 1;
+        var modalTotalPages = 1;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -126,9 +134,178 @@
             }
         }
 
+        /* ---- Drill-down modal ------------------------------------------------------------------
+           Mirrors VAS_158_OpenCountSheetsWidget: same dialog chrome, same shared CSS grid for the
+           header and data rows, same 24px/14px pager, row click navigates to VAS_PhysicalInventory
+           at that document.
+
+           NOTE: the source prompt (01-counted-mtd-claude-prompt.txt) says "This widget is
+           non-interactive. Do not add a click action, hover lift, modal, row navigation, or button
+           cursor." The user requested the modal on 2026-08-16; user instruction wins. */
+
+        function hostWindowName() {
+            try {
+                var l = $self.listener;
+                for (var i = 0; i < 6 && l; i++) {
+                    if (l.apanel && l.apanel.gridWindow && l.apanel.gridWindow.getName) {
+                        return l.apanel.gridWindow.getName();
+                    }
+                    if (l.gridWindow && l.gridWindow.getName) { return l.gridWindow.getName(); }
+                    l = l.listener;
+                }
+            } catch (e) { }
+            return '';
+        }
+
+        function openInventoryRecord(inventoryId) {
+            if (!inventoryId) { return; }
+            $self.widgetFirevalueChanged({
+                "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                "TabLayout": "Y",
+                "TabIndex": "0",
+                "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
+                "ActionType": "W"
+            });
+        }
+
+        function statusLabel(code) {
+            if (code === 'CO') { return lbl("Completed", "Completed"); }
+            if (code === 'CL') { return lbl("Closed", "Closed"); }
+            return code || '';
+        }
+
+        function renderModalPage() {
+            if (!$modal) { return; }
+
+            var $tbody = $modal.find('.vas-counted-mtd-rows');
+            var total = detailRows.length;
+            modalTotalPages = Math.max(1, Math.ceil(total / MODAL_PAGE_SIZE));
+            if (modalPageNo > modalTotalPages) { modalPageNo = modalTotalPages; }
+            if (modalPageNo < 1) { modalPageNo = 1; }
+
+            if (total === 0) {
+                $tbody.html('<div class="vas-counted-mtd-empty">' +
+                    escapeHtml(lbl("VAS_156_NoProductsCounted", "No products counted yet this month")) + '</div>');
+                $modal.find('.vas-counted-mtd-footer-text').text('');
+                $modal.find('.vas-counted-mtd-pager').hide();
+                return;
+            }
+
+            var start = (modalPageNo - 1) * MODAL_PAGE_SIZE;
+            var end = Math.min(total, start + MODAL_PAGE_SIZE);
+            var html = '';
+
+            for (var i = start; i < end; i++) {
+                var r = detailRows[i];
+                html +=
+                    '<div class="vas-counted-mtd-grid-row vas-counted-mtd-data-row" data-invid="' + Number(r.InventoryId) + '">' +
+                    '<div class="vas-counted-mtd-cell vas-counted-mtd-cell-doc" title="' + escapeHtml(r.DocumentNo) + '">' + escapeHtml(r.DocumentNo) + '</div>' +
+                    '<div class="vas-counted-mtd-cell" title="' + escapeHtml(r.Warehouse) + '">' + escapeHtml(r.Warehouse) + '</div>' +
+                    '<div class="vas-counted-mtd-cell">' + escapeHtml(r.MovementDate) + '</div>' +
+                    '<div class="vas-counted-mtd-cell vas-counted-mtd-cell-num">' + formatCount(r.Lines) + '</div>' +
+                    '<div class="vas-counted-mtd-cell vas-counted-mtd-cell-num">' + formatCount(r.Products) + '</div>' +
+                    '<div class="vas-counted-mtd-cell"><span class="vas-counted-mtd-status-chip">' + escapeHtml(statusLabel(r.DocStatus)) + '</span></div>' +
+                    '</div>';
+            }
+
+            $tbody.html(html);
+            $modal.find('.vas-counted-mtd-footer-text').text(
+                (start + 1) + '–' + end + ' ' + lbl("VAS_Of", "of") + ' ' + total);
+            $modal.find('.vas-counted-mtd-pager-info').text(modalPageNo + ' / ' + modalTotalPages);
+            $modal.find('.vas-counted-mtd-prev').prop('disabled', modalPageNo <= 1);
+            $modal.find('.vas-counted-mtd-next').prop('disabled', modalPageNo >= modalTotalPages);
+            $modal.find('.vas-counted-mtd-pager').toggle(modalTotalPages > 1);
+        }
+
+        function openDetailModal() {
+            $(document).off('keydown.vas-counted-mtd');
+            if ($modal) { $modal.remove(); }
+
+            $modal = $(
+                '<div class="vas-counted-mtd-modal-overlay" role="dialog" aria-modal="true">' +
+                '<div class="vas-counted-mtd-modal-dialog">' +
+                '<div class="vas-counted-mtd-modal-header">' +
+                '<div class="vas-counted-mtd-modal-title">' + escapeHtml(lbl("VAS_156_CountedMTD", "Counted MTD")) + '</div>' +
+                '<button type="button" class="vas-counted-mtd-modal-close" aria-label="' + escapeHtml(lbl("VAS_Close", "Close")) + '">&times;</button>' +
+                '</div>' +
+                '<div class="vas-counted-mtd-modal-body">' +
+                '<div class="vas-counted-mtd-grid-row vas-counted-mtd-header-row">' +
+                '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_DocNo", "Document No")) + '</div>' +
+                '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_Warehouse", "Warehouse")) + '</div>' +
+                '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_Date", "Date")) + '</div>' +
+                '<div class="vas-counted-mtd-th vas-counted-mtd-th-right">' + escapeHtml(lbl("VAS_Lines", "Lines")) + '</div>' +
+                '<div class="vas-counted-mtd-th vas-counted-mtd-th-right">' + escapeHtml(lbl("VAS_Products", "Products")) + '</div>' +
+                '<div class="vas-counted-mtd-th">' + escapeHtml(lbl("VAS_Status", "Status")) + '</div>' +
+                '</div>' +
+                '<div class="vas-counted-mtd-rows"></div>' +
+                '<div class="vas-counted-mtd-modal-footer">' +
+                '<div class="vas-counted-mtd-footer-text"></div>' +
+                '<div class="vas-counted-mtd-pager">' +
+                '<button type="button" class="vas-counted-mtd-pager-btn vas-counted-mtd-prev">&lsaquo;</button>' +
+                '<span class="vas-counted-mtd-pager-info">1 / 1</span>' +
+                '<button type="button" class="vas-counted-mtd-pager-btn vas-counted-mtd-next">&rsaquo;</button>' +
+                '</div>' +
+                '</div>' +
+                '</div>' +
+                '</div>' +
+                '</div>'
+            );
+
+            function closeModal() {
+                $(document).off('keydown.vas-counted-mtd');
+                if ($modal) { $modal.remove(); $modal = null; }
+            }
+
+            // Close button and scrim need separate handlers: the button's own glyph is the event
+            // target, so an `e.target === this` guard on a combined handler makes it a dead zone.
+            $modal.find('.vas-counted-mtd-modal-close').on('click', function (e) {
+                e.stopPropagation();
+                closeModal();
+            });
+            $modal.on('click', function (e) { if (e.target === this) { closeModal(); } });
+            $(document).on('keydown.vas-counted-mtd', function (e) {
+                if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
+            });
+
+            $modal.find('.vas-counted-mtd-prev').on('click', function () {
+                if (modalPageNo > 1) { modalPageNo--; renderModalPage(); }
+            });
+            $modal.find('.vas-counted-mtd-next').on('click', function () {
+                if (modalPageNo < modalTotalPages) { modalPageNo++; renderModalPage(); }
+            });
+
+            $modal.on('click', '.vas-counted-mtd-data-row', function () {
+                var invId = Number($(this).data('invid') || 0);
+                closeModal();
+                openInventoryRecord(invId);
+            });
+
+            $('body').append($modal);
+            $modal.find('.vas-counted-mtd-rows').html(
+                '<div class="vas-counted-mtd-empty">' + escapeHtml(lbl("VAS_Loading", "Loading...")) + '</div>');
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_156_CountedMTDWidget/GetCountedMTDDetails',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = res;
+                    if (typeof data === 'string') { data = JSON.parse(data); }
+                    if (typeof data === 'string') { data = JSON.parse(data); }
+                    detailRows = (data && data.data) ? data.data : [];
+                    modalPageNo = 1;
+                    renderModalPage();
+                },
+                error: function () {
+                    detailRows = [];
+                    renderModalPage();
+                }
+            });
+        }
+
         function createWidget() {
             var $card = $(
-                '<div class="vas-counted-mtd-card">' +
+                '<div class="vas-counted-mtd-card vas-counted-mtd-clickable" role="button" tabindex="0">' +
                 '<div class="vas-counted-mtd-label">' + escapeHtml(lbl("VAS_156_CountedMTD", "Counted MTD")) + '</div>' +
                 '<div class="vas-counted-mtd-value">—</div>' +
                 '<div class="vas-counted-mtd-meta"></div>' +
@@ -137,6 +314,14 @@
 
             $valueEl = $card.find('.vas-counted-mtd-value');
             $metaEl = $card.find('.vas-counted-mtd-meta');
+
+            $card.on('click', function () { openDetailModal(); });
+            $card.on('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault();
+                    openDetailModal();
+                }
+            });
 
             $root.append($card);
 
@@ -158,8 +343,20 @@
                 widgetObserver.disconnect();
                 widgetObserver = null;
             }
+            // The modal lives on <body>, so detaching $wrapper alone would leak it.
+            $(document).off('keydown.vas-counted-mtd');
+            if ($modal) { $modal.remove(); $modal = null; }
             $wrapper.remove();
         };
+    };
+
+    // Required for the drill-down navigation channel; neither existed on this widget before.
+    VAS.VAS_156_CountedMTDWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) { this.listener.widgetFirevalueChanged(value); }
+    };
+
+    VAS.VAS_156_CountedMTDWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
     };
 
     VAS.VAS_156_CountedMTDWidget.prototype.init = function (windowNo, frame) {

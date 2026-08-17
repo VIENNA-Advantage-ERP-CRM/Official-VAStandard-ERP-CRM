@@ -36,7 +36,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: .5em;
+    gap: .4em;
     flex: 0 0 auto;
     margin-bottom: .4em;
 }
@@ -45,7 +45,16 @@
     display: flex;
     align-items: center;
     gap: .5em;
+    /* Takes the leftover width and yields it back: without flex-shrink + min-width:0 the title
+       block sets the header's min-content width and the controls are pushed over the title. */
+    flex: 1 1 auto;
     min-width: 0;
+}
+
+/* The title/subtitle stack. min-width:0 is what lets .vas-pcu-title's ellipsis engage. */
+.vas-pcu-head-text {
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 .vas-pcu-ico {
@@ -76,12 +85,16 @@
     font-weight: 400;
     color: #717182;
     line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vas-pcu-controls {
     display: flex;
     align-items: center;
-    gap: .375em;
+    gap: .25em;
+    /* Never shrink (the values must stay readable) and never grow past their content. */
     flex: 0 0 auto;
 }
 
@@ -89,9 +102,17 @@
    right of the control, and without a min-width the box is sized to content -- together those
    clipped the last digit of a 4-digit year ("2026" losing its 6). Arrow removed, value centred,
    min-width guarantees room for four digits. */
+/* Footprint reduced 2026-08-16: at 4.5em each plus .75em side padding the four controls claimed
+   more of the header than the title did, and the title was clipped to "Product Category Usag".
+   Widths are now set per control from its own longest value -- three letters for the month, four
+   digits for the year -- instead of one shared blanket minimum.
+   NOTE: this diverges from the global Rule 13 minimums (month 7.5em / year 5.2em), which are sized
+   for FULL month names; this widget renders short names ("Aug"), so those minimums would only be
+   reserving empty space. If the month list is ever switched to full names, restore Rule 13's values
+   and drop the subtitle instead. */
 .vas-pcu-select {
     font-family: inherit;
-    font-size: .6875em;
+    font-size: .625em;
     font-weight: 500;
     color: #41576A;
     background: #fff;
@@ -103,22 +124,37 @@
     background-image: none !important;
     text-align: center;
     text-align-last: center;
-    padding: 0.35em 0.75em;
-    min-width: 4.5em;
+    padding: 0.3em 0.45em;
     outline: none;
     cursor: pointer;
 }
+
+    /* Widest short month name is "Sep"/"Aug"; four digits for the year. */
+    .vas-pcu-select.vas-pcu-m-sel {
+        min-width: 3.5em;
+    }
+
+    .vas-pcu-select.vas-pcu-y-sel {
+        min-width: 4.2em;
+    }
 
     /* Centre each option row too, so the open list matches the closed control. */
     .vas-pcu-select option {
         text-align: center;
     }
 
+    /* Standard select hover tint (was missing on this widget). */
+    .vas-pcu-select:hover {
+        background-color: #EEF8FF;
+        border-color: #0083DA;
+    }
+
 .vas-pcu-divider {
     width: 1px;
-    height: 1.25em;
+    height: 1.1em;
     background: #C5D2DD;
-    margin: 0 .25em;
+    margin: 0 .15em;
+    flex: 0 0 auto;
 }
 
 .vas-pcu-toggle-grp {
@@ -129,15 +165,16 @@
 
 .vas-pcu-pill {
     font-family: inherit;
-    font-size: .6875em;
+    font-size: .625em;
     font-weight: 500;
-    padding: .25em .625em;
+    padding: .22em .5em;
     border-radius: 999px;
     border: 1px solid #D9E2EB;
     background: #fff;
     color: #5F7283;
     cursor: pointer;
     outline: none;
+    white-space: nowrap;
 }
 
     .vas-pcu-pill.active {

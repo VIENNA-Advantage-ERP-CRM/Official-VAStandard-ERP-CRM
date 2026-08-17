@@ -210,9 +210,15 @@ namespace VAS.Controllers
                     ageClause = " AND " + ageExpr + " > 180";
                 }
 
-                string sql = @"SELECT p.Name AS ProductName, 
-                                      COALESCE(asi.Description, 'Standard') AS AttributeDesc, 
-                                      w.Name AS WarehouseName, 
+                // asi.Description is NVARCHAR2 (national character set); 'Standard' is a plain
+                // literal. COALESCE across the two raises ORA-12704 "character set mismatch", the
+                // whole statement fails, the catch below swallows it and the endpoint returns an
+                // empty list - which the modal renders as a blank popup. The fallback is applied in
+                // C# instead: no charset mixing, and it stays portable to PostgreSQL (which has
+                // neither Oracle's N'' literal nor a to_char(text) overload).
+                string sql = @"SELECT p.Name AS ProductName,
+                                      asi.Description AS AttributeDesc,
+                                      w.Name AS WarehouseName,
                                       loc.Value AS LocatorValue, 
                                       s.QtyOnHand, 
                                       " + ageExpr + @" AS AgeDays
@@ -229,10 +235,16 @@ namespace VAS.Controllers
                 dr = DB.ExecuteReader(sql, null, null);
                 while (dr != null && dr.Read())
                 {
+                    string attribute = Util.GetValueOfString(dr["AttributeDesc"]);
+                    if (string.IsNullOrEmpty(attribute))
+                    {
+                        attribute = Msg.GetMsg(ctx, "VAS_Standard") ?? "Standard";
+                    }
+
                     lines.Add(new
                     {
                         product = Util.GetValueOfString(dr["ProductName"]),
-                        attribute = Util.GetValueOfString(dr["AttributeDesc"]),
+                        attribute = attribute,
                         warehouse = Util.GetValueOfString(dr["WarehouseName"]),
                         locator = Util.GetValueOfString(dr["LocatorValue"]),
                         qty = Util.GetValueOfDecimal(dr["QtyOnHand"]),

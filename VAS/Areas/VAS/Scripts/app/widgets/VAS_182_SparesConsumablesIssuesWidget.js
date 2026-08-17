@@ -12,6 +12,10 @@
  */
 ; VAS = window.VAS || {};
 
+/* 🛑 🚨 🚨 🛑  DEMO DATA - UI PREVIEW ONLY - DELETE BEFORE COMMIT  🛑 🚨 🚨 🛑
+   Set to false (or delete this line and the `if (VAS_182_DEMO)` guard in loadKpi). */
+var VAS_182_DEMO = true;
+
 ; (function (VAS, $) {
 
     function ensureDashInlineSizeVar($el) {
@@ -92,6 +96,15 @@
         function loadKpi() {
             showBusy(true);
 
+            /* 🛑 🚨 DEMO DATA - UI PREVIEW ONLY - DELETE BEFORE COMMIT 🚨 🛑
+               This tile renders a single percentage, so there are no rows to fake; the value below
+               just replaces the live 0% while the classification question is open. */
+            if (VAS_182_DEMO) {
+                renderMetric({ percentage: 39 });
+                showBusy(false);
+                return;
+            }
+
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_182_SparesConsumablesIssuesWidget/GetSparesConsumablesPercentage',
                 type: 'GET',
@@ -128,14 +141,54 @@
             if ($card) { $card.prop('disabled', true); }
         }
 
+        // The framework navigates IN-PLACE (no new window, no half-drawn screen) only when the
+        // payload's ActionName equals the name of the window currently HOSTING this widget;
+        // otherwise VIS.dynamicWidget resolves ActionName through UserPreference/GetWindowID and
+        // opens a second window. Resolve the host window name from the listener chain.
+        // Established pattern - see VAS_091_MaterialReceiptSearchWidget.js zoomTo() (also 067/069/070/128).
+        function hostWindowName() {
+            try {
+                var l = $self.listener;
+                for (var i = 0; i < 6 && l; i++) {
+                    if (l.apanel && l.apanel.gridWindow && l.apanel.gridWindow.getName) {
+                        return l.apanel.gridWindow.getName();
+                    }
+                    if (l.gridWindow && l.gridWindow.getName) {
+                        return l.gridWindow.getName();
+                    }
+                    l = l.listener;
+                }
+            } catch (e) { }
+            return '';
+        }
+
+        // Drill to the EXACT documents behind the KPI: completed internal-use documents for the
+        // current month that carry at least one spares / consumables line. The EXISTS predicate
+        // mirrors the line-level classification in GetSparesConsumablesPercentageData() one-for-one,
+        // so the list can never drift from the percentage on the tile.
+        // Portability: only columns present on every target DB are used here - the work-order
+        // columns (VA075_WorkOrder_ID / VAMFG_M_WorkOrder_ID) are module-specific and absent on
+        // DB 1, and an unresolved column makes the grid query throw instead of opening.
         function openSparesConsumablesList() {
-            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL') AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
-            var windowParam = {
+            var where =
+                "M_Inventory.IsActive = 'Y'" +
+                " AND M_Inventory.IsInternalUse = 'Y'" +
+                " AND M_Inventory.DocStatus IN ('CO', 'CL')" +
+                " AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM')" +
+                " AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)" +
+                " AND EXISTS (SELECT 1 FROM M_InventoryLine scl" +
+                " WHERE scl.M_Inventory_ID = M_Inventory.M_Inventory_ID" +
+                " AND scl.IsActive = 'Y'" +
+                " AND scl.C_Charge_ID IS NULL" +
+                " AND scl.M_RequisitionLine_ID IS NULL)";
+
+            $self.widgetFirevalueChanged({
                 "TabWhereClause": where,
-                "TabLayout": "N",
-                "TabIndex": "0"
-            };
-            $self.widgetFirevalueChanged(windowParam);
+                "TabLayout": "Y",
+                "TabIndex": "0",
+                "ActionName": hostWindowName() || "VAS_InternalUseInventory",
+                "ActionType": "W"
+            });
         }
 
         function createWidget() {
