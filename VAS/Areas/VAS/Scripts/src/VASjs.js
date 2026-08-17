@@ -324,3 +324,8 @@ import "../app/widgets/VAS_171_InitiatedMTDWidget.js";
 import "../app/widgets/VAS_172_PendingTransferConfirmationWidget.js";
 import "../app/widgets/VAS_173_TransfersByWarehouseWidget.js";
 import "../app/widgets/VAS_174_TransferQueueWidget.js";
+import "../app/widgets/VAS_199_WarehouseDocumentStatusWidget.js";
+import "../app/widgets/VAS_192_NewPurchaseOrderWidget.js";
+import "../app/widgets/VAS_202_POPendingForPaymentWidget.js";
+import "../app/widgets/VAS_204_POQueueWidget.js";
+import "../app/widgets/VAS_205_OpenRequisitionsWidget.js";

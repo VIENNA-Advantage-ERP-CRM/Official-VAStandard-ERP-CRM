@@ -922,6 +922,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_172_PendingTransferConfirmationWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_173_TransfersByWarehouseWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_174_TransferQueueWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_199_WarehouseDocumentStatusWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_156_CountedMTDWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_156_CountedMTDWidget.js" />
     <Content Include="Areas\VAS\Content\VAS_157_VarianceLinesWidget.css" />
@@ -982,6 +983,21 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_172_PendingTransferConfirmationWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_173_TransfersByWarehouseWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_174_TransferQueueWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_199_WarehouseDocumentStatusWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_199_WarehouseDocumentStatusWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_192_NewPurchaseOrderWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_192_NewPurchaseOrderWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_192_NewPurchaseOrderWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_202_POPendingForPaymentWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_202_POPendingForPaymentWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_202_POPendingForPaymentWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_204_POQueueWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_204_POQueueWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_204_POQueueWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_205_OpenRequisitionsWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_205_OpenRequisitionsWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_205_OpenRequisitionsWidget.js" />
+
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>

@@ -1,0 +1,733 @@
+/* ============================================================
+   VAS_202_POPendingForPaymentWidget.css
+   Purchase Order Dashboard — Widget 12: PO Pending for Payment
+   Grid size: 6 columns x 2 rows (6x2 Wide Grid Queue Widget)
+   ============================================================ */
+
+.vas-202-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    container-type: inline-size;
+    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: clamp(14px, calc(var(--widget-inline-size, var(--dash-inline-size, 800px)) * 0.022), 20px);
+    color: #102C3F;
+}
+
+.vas-202-root *,
+.vas-202-root *::before,
+.vas-202-root *::after {
+    box-sizing: border-box;
+}
+
+/* ---------- 6x2 GLASS WIDGET CARD ---------- */
+.vas-202-card {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    padding: 0.85em;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    font-family: inherit;
+    color: inherit;
+    text-align: left;
+    position: relative;
+}
+
+/* Head */
+.vas-202-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5em;
+    flex: none;
+    margin-bottom: 0.65em;
+}
+
+.vas-202-head-txt {
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-202-title {
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+    margin: 0;
+    font-size: clamp(15px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-sub {
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin: 2px 0 0 0;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Header stat pill */
+.vas-202-hpill {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.375em 0.75em;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    flex: none;
+}
+
+.vas-202-hpill-danger {
+    background: #FFE4E4;
+    color: #A33F3F;
+}
+
+.vas-202-hpill-info {
+    background: #EEF6FF;
+    color: #0F69AC;
+}
+
+.vas-202-hpill-success {
+    background: #DDF4E8;
+    color: #0B6B45;
+}
+
+/* ---------- IN-WIDGET TABLE (6x2) ---------- */
+.vas-202-tbl {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-202-thead {
+    display: grid;
+    gap: 0.75em;
+    padding: 0.4em 0.5em;
+    align-items: center;
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    border-bottom: 1px solid #C5D2DD;
+    flex: none;
+}
+
+.vas-202-tbody {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-202-trow {
+    display: grid;
+    gap: 0.75em;
+    padding: 0.25em 0.5em;
+    align-items: center;
+    font-size: 0.75em;
+    border-bottom: 1px solid #E2EAF1;
+    flex: 1 1 0;
+    min-height: 0;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vas-202-trow:last-child {
+    border-bottom: 0;
+}
+
+.vas-202-trow:hover {
+    background: #F4FAFF;
+    box-shadow: inset 0 0 0 1px #0083DA;
+}
+
+.vas-202-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    line-height: 1.2;
+}
+
+.vas-202-cell.vas-202-right {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.vas-202-c-prim {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-202-c-std {
+    color: #5F7283;
+}
+
+.vas-202-c-dark {
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas-202-c-emph {
+    font-weight: 700;
+    color: #0083DA;
+}
+
+.vas-202-c-link {
+    font-weight: 700;
+    color: #0083DA;
+}
+
+.vas-202-lnk {
+    border: 0;
+    background: none;
+    padding: 0;
+    margin: 0;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    color: #0083DA;
+    text-decoration: none;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    text-align: left;
+}
+
+.vas-202-lnk:hover {
+    color: #0069AE;
+}
+
+.vas-202-sub-txt {
+    font-size: 0.85em;
+    color: #5F7283;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 400;
+}
+
+/* ---------- CHIPS ---------- */
+.vas-202-chip {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.85em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas-202-chip-risk {
+    background: #FCEFEF;
+    color: #A33F3F;
+}
+
+.vas-202-chip-warn {
+    background: #FFF6E2;
+    color: #9A6500;
+}
+
+.vas-202-chip-ok {
+    background: #E7F7EF;
+    color: #0B6B45;
+}
+
+.vas-202-chip-info {
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+.vas-202-chip-neutral {
+    background: #F1F4F8;
+    color: #41576A;
+    font-weight: 500;
+}
+
+.vas-202-chip-prop {
+    background: #EFEEFF;
+    color: #5F4AA6;
+}
+
+/* ---------- WIDGET FOOTER PAGER ---------- */
+.vas-202-wfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding-top: 0.45em;
+    margin-top: 0.4em;
+}
+
+.vas-202-helper {
+    font-size: 0.75em;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-202-pager {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+}
+
+.vas-202-pbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #FFFFFF;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.vas-202-pbtn:hover:not(:disabled) {
+    background: #EEF8FF;
+    border-color: #BFE4FF;
+}
+
+.vas-202-pbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+    background: #F8FAFC;
+    border-color: #E2EAF1;
+}
+
+.vas-202-pbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-202-ptxt {
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
+    min-width: 3.4em;
+    text-align: center;
+}
+
+/* ---------- EMPTY / ERROR / LOADING STATES ---------- */
+.vas-202-empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1em;
+    color: #748494;
+    font-size: 0.8125em;
+    text-align: center;
+}
+
+.vas-202-error-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    padding: 1em;
+    color: #A33F3F;
+    font-size: 0.8125em;
+    text-align: center;
+}
+
+.vas-202-retry-btn {
+    border: 1px solid #0083DA;
+    border-radius: 999px;
+    background: #FFFFFF;
+    color: #0083DA;
+    padding: 0.35em 0.85em;
+    font-size: 0.8125em;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease;
+}
+
+.vas-202-retry-btn:hover {
+    background: #EEF8FF;
+}
+
+/* Busy overlay */
+.vas-202-busy {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.72);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+}
+
+.vas-202-hidden {
+    display: none !important;
+}
+
+/* ============================================================
+   CANONICAL MODAL ENGINE
+   ============================================================ */
+.vas-202-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 38, 64, 0.34);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: min(4vh, 28px) min(3vw, 28px);
+    box-sizing: border-box;
+}
+
+.vas-202-mask.vas-202-open {
+    display: flex;
+}
+
+.vas-202-modal {
+    width: min(1240px, 94vw);
+    max-height: min(880px, 90dvh);
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 16px;
+    box-shadow: 0 28px 64px rgba(15, 61, 97, 0.26);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.vas-202-modal-sm {
+    width: min(760px, 94vw);
+}
+
+.vas-202-modal-md {
+    width: min(1000px, 94vw);
+}
+
+.vas-202-modal-header {
+    height: 56px;
+    flex: none;
+    padding: 0 16px;
+    border-bottom: 1px solid #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #FFFFFF;
+}
+
+.vas-202-htxt-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-202-htxt {
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-202-mtitle {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 400;
+    color: #141414;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-msub {
+    font-size: 0.8125em;
+    color: #717182;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-hact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+}
+
+.vas-202-xbtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    color: #141414;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease;
+}
+
+.vas-202-xbtn:hover {
+    background: #F1F4F8;
+    color: #0083DA;
+}
+
+.vas-202-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+    container-type: inline-size;
+    --panel-anchor: clamp(14px, 1vw, 20px);
+    font-size: var(--panel-anchor);
+    box-sizing: border-box;
+}
+
+.vas-202-modal-body button,
+.vas-202-modal-body input,
+.vas-202-modal-body select,
+.vas-202-modal-body textarea,
+.vas-202-modal-body optgroup {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+.vas-202-modal-foot {
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #FBFDFF;
+}
+
+.vas-202-foot-note {
+    font-size: 0.8125em;
+    color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-btn {
+    border-radius: 999px;
+    padding: 0.5em 0.875em;
+    font-size: 0.8125em;
+    font-family: inherit;
+    border: 1px solid #0083DA;
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.vas-202-btn:hover {
+    background: #EEF8FF;
+}
+
+.vas-202-btn-primary {
+    background: #0083DA;
+    color: #FFFFFF;
+}
+
+.vas-202-btn-primary:hover {
+    background: #0069AE;
+}
+
+/* Modal stat cards strip */
+.vas-202-mstats {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.5em;
+    flex: none;
+}
+
+@media (max-width: 900px) {
+    .vas-202-mstats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.vas-202-mstat {
+    border: 1px solid #D9E2EB;
+    border-radius: 10px;
+    padding: 0.4em 0.6em;
+    background: #FBFDFF;
+    min-width: 0;
+}
+
+.vas-202-mstat-l {
+    font-size: 0.6875em;
+    color: #5F7283;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-mstat-v {
+    font-size: 0.875em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+    margin-top: 0.1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-msec {
+    font-size: 0.9375em;
+    font-weight: 500;
+    color: #102C3F;
+    margin: 0.25em 0 0.15em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #E2EAF1;
+    flex: none;
+}
+
+/* Modal paged tables */
+.vas-202-mtwrap {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-202-mtbl {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-202-mrow {
+    display: grid;
+    gap: 0.75em;
+    padding: 0 0.5em;
+    align-items: center;
+}
+
+.vas-202-mhead {
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    padding: 0.5em 0.5em;
+    border-bottom: 1px solid #C5D2DD;
+    position: sticky;
+    top: 0;
+    background: #FFFFFF;
+    z-index: 2;
+    flex: none;
+}
+
+.vas-202-mbody {
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-202-mbody .vas-202-mrow {
+    font-size: 0.75em;
+    padding: 0.45em 0.5em;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.vas-202-mbody .vas-202-mrow:last-child {
+    border-bottom: 0;
+}
+
+.vas-202-mtfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    border-top: 1px solid #D9E2EB;
+    padding-top: 0.5em;
+    margin-top: 0.4em;
+    flex: none;
+}
+
+.vas-202-iconbtn {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #FFFFFF;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    flex: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.vas-202-iconbtn:hover {
+    background: #EEF8FF;
+    border-color: #BFE4FF;
+}
+
+.vas-202-iconbtn svg {
+    width: 0.8em;
+    height: 0.8em;
+}
+
+.vas-202-center {
+    display: flex;
+    justify-content: center;
+}

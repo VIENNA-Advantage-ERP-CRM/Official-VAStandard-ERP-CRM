@@ -1,0 +1,755 @@
+/* ============================================================
+   VAS_199_WarehouseDocumentStatusWidget.css
+   Purchase Order Dashboard - Widget 09: Warehouse wise PO · Document Status
+   ============================================================ */
+
+.vas-199-container {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.vas-199-root {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    font-size: clamp(16px, 1.2cqi, 20px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    padding: 0.85em;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    font-family: 'Roboto', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #102C3F;
+    user-select: none;
+    position: relative;
+}
+
+/* ---------- WIDGET HEADER ---------- */
+.vas-199-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    flex: none;
+}
+
+.vas-199-head-txt {
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-199-title {
+    font-family: inherit;
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+    margin: 0;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------- ARROW-LESS INTERNAL SELECT FILTERS ---------- */
+.vas-199-mfilter {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    flex: none;
+}
+
+.vas-199-msel {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+    font-family: inherit;
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #41576A;
+    background-color: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    padding: 0.35em 0.75em;
+    line-height: 1.1;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(16, 47, 74, 0.04);
+    text-align: center;
+    text-align-last: center;
+    outline: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    box-sizing: border-box;
+}
+
+.vas-199-msel.vas-199-month {
+    min-width: 7.5em;
+}
+
+.vas-199-msel.vas-199-year {
+    min-width: 5.2em;
+}
+
+.vas-199-msel:hover {
+    background-color: #EEF8FF;
+    border-color: #0083DA;
+}
+
+.vas-199-msel:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: 2px;
+}
+
+/* ---------- MATRIX TABLE ---------- */
+.vas-199-tbl {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    margin-top: 0.75em;
+}
+
+.vas-199-trow {
+    display: grid;
+    grid-template-columns: minmax(0, 1.8fr) minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.85fr);
+    gap: 0.5em;
+    padding: 0.45em 0.5em;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.vas-199-thead {
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: uppercase;
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid #C5D2DD;
+    flex: none;
+}
+
+.vas-199-tbody {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-199-tbody .vas-199-trow {
+    font-size: 0.75em;
+    padding-top: 0.45em;
+    padding-bottom: 0.45em;
+    border-bottom: 1px solid #E2EAF1;
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+.vas-199-tbody .vas-199-trow:last-child {
+    border-bottom: none;
+}
+
+.vas-199-pickable {
+    cursor: pointer;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    border-radius: 8px;
+}
+
+.vas-199-pickable:hover,
+.vas-199-pickable:focus-visible {
+    background-color: #F4FAFF;
+    box-shadow: inset 0 0 0 1px #0083DA;
+    outline: none;
+}
+
+.vas-199-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas-199-right {
+    text-align: right;
+}
+
+.vas-199-center {
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.vas-199-c-prim {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-199-c-std {
+    color: #5F7283;
+}
+
+.vas-199-c-dark {
+    color: #102C3F;
+}
+
+.vas-199-c-emph {
+    font-weight: 700;
+    color: #0083DA;
+}
+
+.vas-199-c-link {
+    font-weight: 700;
+    color: #0083DA;
+}
+
+/* ---------- WIDGET FOOTER PAGER ---------- */
+.vas-199-wfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding-top: 0.5em;
+    margin-top: 0.5em;
+    box-sizing: border-box;
+}
+
+.vas-199-helper {
+    font-size: 0.75em;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-199-pager {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+}
+
+.vas-199-pbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background-color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.vas-199-pbtn:hover:not(:disabled) {
+    background-color: #EEF8FF;
+    border-color: #0083DA;
+}
+
+.vas-199-pbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+    border-color: #D9E2EB;
+    background-color: #FFFFFF;
+}
+
+.vas-199-pbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-199-ptxt {
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
+    min-width: 3.4em;
+    text-align: center;
+}
+
+.vas-199-empty,
+.vas-199-loading {
+    padding: 1.5em 0.5em;
+    text-align: center;
+    font-size: 0.75em;
+    color: #5F7283;
+}
+
+/* ---------- BUSY INDICATOR ---------- */
+.vas-199-busy {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    border-radius: 14px;
+}
+
+.vas-199-hidden {
+    display: none !important;
+}
+
+/* ============================================================
+   STATUS CHIPS
+   ============================================================ */
+.vas-199-chip {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    text-align: center;
+}
+
+.vas-199-chip-info {
+    background-color: #EAF8FF;
+    color: #0083DA;
+}
+
+.vas-199-chip-ok {
+    background-color: #E7F7EF;
+    color: #0B6B45;
+}
+
+.vas-199-chip-warn {
+    background-color: #FFF6E2;
+    color: #9A6500;
+}
+
+.vas-199-chip-risk {
+    background-color: #FCEFEF;
+    color: #A33F3F;
+}
+
+.vas-199-chip-neutral {
+    background-color: #F1F4F8;
+    color: #41576A;
+    font-weight: 500;
+}
+
+.vas-199-chip-prop {
+    background-color: #EFEEFF;
+    color: #5F4AA6;
+}
+
+/* ============================================================
+   MODAL DIALOG ENGINE (Matches Global Design Standards)
+   ============================================================ */
+.vas-199-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 38, 64, 0.34);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: min(4vh, 28px) min(3vw, 28px);
+    box-sizing: border-box;
+    font-family: 'Roboto', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.vas-199-mask.vas-199-open {
+    display: flex;
+}
+
+.vas-199-modal {
+    width: min(1240px, 94vw);
+    max-height: min(880px, 90dvh);
+    height: auto;
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 16px;
+    box-shadow: 0 28px 64px rgba(15, 61, 97, 0.26);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.vas-199-modal.vas-199-modal-sm {
+    width: min(760px, 94vw);
+}
+
+.vas-199-modal.vas-199-modal-md {
+    width: min(1000px, 94vw);
+}
+
+/* Modal Header (56px) */
+.vas-199-modal-header {
+    height: 56px;
+    min-height: 56px;
+    flex: none;
+    padding: 0 16px;
+    border-bottom: 2px solid #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    box-sizing: border-box;
+}
+
+.vas-199-htxt-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-199-htxt {
+    min-width: 0;
+}
+
+.vas-199-mtitle {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-199-msub {
+    font-size: 0.8125em;
+    color: #717182;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-199-hact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+}
+
+.vas-199-xbtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #141414;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background-color 0.15s ease;
+}
+
+.vas-199-xbtn:hover {
+    background-color: #F1F4F8;
+}
+
+.vas-199-xbtn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Modal Body */
+.vas-199-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+    container-type: inline-size;
+    font-size: clamp(14px, 1vw, 18px);
+    box-sizing: border-box;
+}
+
+.vas-199-modal-body button,
+.vas-199-modal-body input,
+.vas-199-modal-body select,
+.vas-199-modal-body textarea {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+/* Modal Footer */
+.vas-199-modal-foot {
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #FBFDFF;
+    box-sizing: border-box;
+}
+
+.vas-199-foot-note {
+    font-size: 0.8125em;
+    color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-199-btn {
+    border-radius: 999px;
+    padding: 0.5em 0.875em;
+    font-size: 0.8125em;
+    font-family: inherit;
+    font-weight: 500;
+    border: 1px solid #0083DA;
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.vas-199-btn:hover {
+    background-color: #EEF8FF;
+}
+
+.vas-199-btn-primary {
+    background-color: #0083DA;
+    color: #FFFFFF;
+}
+
+.vas-199-btn-primary:hover {
+    background-color: #0069AE;
+}
+
+/* Modal Stat Strip */
+.vas-199-mstats {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.5em;
+    flex: none;
+}
+
+.vas-199-mstat {
+    border: 1px solid #D9E2EB;
+    border-radius: 10px;
+    padding: 0.4em 0.6em;
+    background: #FBFDFF;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.vas-199-mstat .vas-199-l {
+    font-size: 0.6875em;
+    color: #5F7283;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-199-mstat .vas-199-v {
+    font-size: 0.875em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+    margin-top: 0.1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-199-msec {
+    font-size: 0.9375em;
+    font-weight: 500;
+    color: #102C3F;
+    margin: 0.25em 0 0.35em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #E2EAF1;
+    flex: none;
+}
+
+.vas-199-polink {
+    font-size: 0.75em;
+    color: #5F7283;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex: none;
+}
+
+/* Modal Tables */
+.vas-199-mtwrap {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-199-mtbl {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-199-mrow {
+    display: grid;
+    gap: 0.75em;
+    padding: 0 0.5em;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.vas-199-orders-grid {
+    grid-template-columns: minmax(0, 0.35fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.7fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.95fr) minmax(0, 1.1fr) minmax(0, 1.1fr);
+}
+
+.vas-199-lines-grid {
+    grid-template-columns: minmax(0, 0.3fr) minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 0.5fr) minmax(0, 0.7fr) minmax(0, 0.7fr) minmax(0, 0.7fr) minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 1.05fr);
+}
+
+.vas-199-mhead {
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: uppercase;
+    padding: 0.5em 0.5em;
+    border-bottom: 1px solid #C5D2DD;
+    position: sticky;
+    top: 0;
+    background: #FFFFFF;
+    z-index: 2;
+}
+
+.vas-199-mbody {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-199-mbody .vas-199-mrow {
+    font-size: 0.75em;
+    padding-top: 0.55em;
+    padding-bottom: 0.55em;
+    border-bottom: 1px solid #E2EAF1;
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+.vas-199-mbody .vas-199-mrow:last-child {
+    border-bottom: none;
+}
+
+.vas-199-mtfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    border-top: 1px solid #D9E2EB;
+    padding-top: 0.5em;
+    margin-top: 0.5em;
+    flex: none;
+    box-sizing: border-box;
+}
+
+.vas-199-mtfoot .vas-199-helper {
+    font-size: 0.75em;
+    color: #748494;
+}
+
+.vas-199-mtfoot .vas-199-pager .vas-199-pbtn {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 7px;
+}
+
+.vas-199-mtfoot .vas-199-pager .vas-199-pbtn svg {
+    width: 0.75em;
+    height: 0.75em;
+}
+
+.vas-199-mtfoot .vas-199-ptxt {
+    font-size: 0.8125em;
+}
+
+/* PO Number Link Button */
+.vas-199-lnk {
+    border: none;
+    background: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    color: #0083DA;
+    text-decoration: none;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    text-align: left;
+    transition: color 0.15s ease;
+}
+
+.vas-199-lnk:hover {
+    color: #0069AE;
+}
+
+.vas-199-lnk:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: 2px;
+}
+
+/* Action Icon Button */
+.vas-199-iconbtn {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    flex: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.vas-199-iconbtn:hover {
+    background-color: #EEF8FF;
+    border-color: #0083DA;
+}
+
+.vas-199-iconbtn:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: 2px;
+}
+
+.vas-199-iconbtn svg {
+    width: 0.85em;
+    height: 0.85em;
+}

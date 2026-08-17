@@ -1,0 +1,697 @@
+/* ============================================================
+   VAS_194_POsPendingDeliveryWidget.css
+   Purchase Order Dashboard — Widget 04: POs Pending Delivery
+   3x1 Warning KPI Card with drill-down and lines inspection modals
+   ============================================================ */
+
+.vas-194-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    container-type: inline-size;
+    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 400px)) * 0.045), 22px);
+    color: #102C3F;
+}
+
+.vas-194-root *,
+.vas-194-root *::before,
+.vas-194-root *::after {
+    box-sizing: border-box;
+}
+
+/* ---------- 3x1 KPI CARD ---------- */
+.vas-194-card {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FBE6BD;
+    border-radius: 14px;
+    padding: 0.85em;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    font-family: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    position: relative;
+    outline: none;
+    transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.vas-194-card:hover {
+    box-shadow: 0 14px 30px rgba(15, 61, 97, 0.12);
+    transform: translateY(-1px);
+    border-color: #F8D8A0;
+}
+
+.vas-194-card:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: 2px;
+}
+
+.vas-194-border-warn {
+    border-color: #FBE6BD;
+}
+
+/* Open cue arrow top right */
+.vas-194-opencue {
+    position: absolute;
+    top: 0.85em;
+    right: 0.85em;
+    width: 1em;
+    height: 1em;
+    color: #9AB8CE;
+    pointer-events: none;
+    transition: color 0.15s ease;
+}
+
+.vas-194-card:hover .vas-194-opencue {
+    color: #0083DA;
+}
+
+/* Head */
+.vas-194-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5em;
+    flex: none;
+}
+
+.vas-194-head-txt {
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-194-title {
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+    margin: 0;
+    font-size: clamp(15px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Body row */
+.vas-194-body-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75em;
+    flex: 1;
+    min-height: 0;
+    margin-top: 0.25em;
+}
+
+.vas-194-left-block {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.vas-194-kpi-val {
+    font-size: 1.75em;
+    font-weight: 600;
+    line-height: 1.05;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-194-kpi-val.vas-194-warn {
+    color: #9A6500;
+}
+
+.vas-194-kpi-meta {
+    font-size: 0.6875em;
+    color: #5F7283;
+    line-height: 1.3;
+    margin: 0.35em 0 0 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* KPI Side (Right) */
+.vas-194-kpi-side {
+    text-align: right;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: flex-end;
+}
+
+.vas-194-side-v {
+    font-size: 1.375em;
+    font-weight: 600;
+    color: #41576A;
+    line-height: 1.05;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-194-side-l {
+    font-size: 0.6875em;
+    color: #5F7283;
+    line-height: 1.3;
+    margin-top: 2px;
+    text-align: right;
+}
+
+/* Busy Indicator */
+.vas-194-busy {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    z-index: 5;
+}
+
+.vas-194-hidden {
+    display: none !important;
+}
+
+/* ============================================================
+   MODAL DIALOG & DRILL-DOWN STACK
+   ============================================================ */
+.vas-194-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 38, 64, 0.34);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: min(4vh, 28px) min(3vw, 28px);
+    box-sizing: border-box;
+}
+
+.vas-194-mask.vas-194-open {
+    display: flex;
+}
+
+.vas-194-modal {
+    width: min(1240px, 94vw);
+    max-height: min(880px, 90dvh);
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 16px;
+    box-shadow: 0 28px 64px rgba(15, 61, 97, 0.26);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #102C3F;
+    box-sizing: border-box;
+}
+
+.vas-194-modal.vas-194-modal-sm {
+    width: min(760px, 94vw);
+}
+
+.vas-194-modal.vas-194-modal-md {
+    width: min(1000px, 94vw);
+}
+
+/* Modal Header */
+.vas-194-modal-header {
+    height: 56px;
+    flex: none;
+    padding: 0 16px;
+    border-bottom: 1px solid #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #FFFFFF;
+}
+
+.vas-194-htxt-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-194-htxt {
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-194-mtitle {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 500;
+    color: #141414;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-194-msub {
+    font-size: 0.8125em;
+    color: #717182;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-194-hact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+}
+
+.vas-194-xbtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    color: #141414;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease;
+}
+
+.vas-194-xbtn:hover {
+    background: #F1F4F8;
+}
+
+/* Modal Body */
+.vas-194-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+    container-type: inline-size;
+    --panel-anchor: clamp(18px, 1vw, 20px);
+    font-size: var(--panel-anchor);
+}
+
+.vas-194-modal-body button,
+.vas-194-modal-body input,
+.vas-194-modal-body select,
+.vas-194-modal-body textarea {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+/* Modal Footer */
+.vas-194-modal-foot {
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #FBFDFF;
+}
+
+.vas-194-foot-note {
+    font-size: 0.75em;
+    color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Modal Buttons */
+.vas-194-btn {
+    border-radius: 999px;
+    padding: 0.5em 0.875em;
+    font-size: 0.8125em;
+    font-family: inherit;
+    border: 1px solid #0083DA;
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35em;
+    line-height: 1;
+}
+
+.vas-194-btn:hover {
+    background: #EEF8FF;
+}
+
+.vas-194-btn-primary {
+    background: #0083DA;
+    color: #FFFFFF;
+    border-color: #0083DA;
+}
+
+.vas-194-btn-primary:hover {
+    background: #0069AE;
+    border-color: #0069AE;
+}
+
+/* ---------- STAT STRIP (4 CARDS) ---------- */
+.vas-194-mstats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5em;
+    flex: none;
+}
+
+.vas-194-mstat {
+    border: 1px solid #D9E2EB;
+    border-radius: 10px;
+    padding: 0.4em 0.6em;
+    background: #FBFDFF;
+    min-width: 0;
+}
+
+.vas-194-mstat-l {
+    font-size: 0.6875em;
+    color: #5F7283;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-194-mstat-v {
+    font-size: 0.875em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+    margin-top: 0.1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-194-msec {
+    font-size: 0.9375em;
+    font-weight: 500;
+    color: #102C3F;
+    margin: 0.25em 0 0.1em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #E2EAF1;
+    flex: none;
+}
+
+.vas-194-polink {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: 0.75em;
+    color: #5F7283;
+    flex: none;
+}
+
+/* ---------- PAGED TABLE ---------- */
+.vas-194-mtwrap {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-194-mtwrap.vas-194-fixed {
+    flex: none;
+}
+
+.vas-194-mtbl {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-194-mrow {
+    display: grid;
+    gap: 0.75em;
+    padding: 0 0.5em;
+    align-items: center;
+}
+
+.vas-194-mhead {
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid #C5D2DD;
+    flex: none;
+    background: #FFFFFF;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.vas-194-mbody {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-194-mbody .vas-194-mrow {
+    font-size: 0.75em;
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.vas-194-mbody .vas-194-mrow:last-child {
+    border-bottom: 0;
+}
+
+.vas-194-empty-row {
+    padding: 1.5em 0.5em;
+    font-size: 0.75em;
+    color: #5F7283;
+    text-align: center;
+}
+
+.vas-194-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas-194-cell.vas-194-right {
+    text-align: right;
+}
+
+.vas-194-cell.vas-194-center {
+    display: flex;
+    justify-content: center;
+}
+
+.vas-194-c-prim {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-194-c-std {
+    color: #5F7283;
+}
+
+.vas-194-c-dark {
+    color: #102C3F;
+}
+
+.vas-194-c-emph {
+    font-weight: 700;
+    color: #0083DA;
+}
+
+.vas-194-c-link {
+    font-weight: 700;
+    color: #0083DA;
+}
+
+/* PO Number link button */
+.vas-194-lnk {
+    border: 0;
+    background: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    color: #0083DA;
+    text-decoration: none;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    text-align: left;
+}
+
+.vas-194-lnk:hover {
+    color: #0069AE;
+}
+
+/* Lines Icon Button */
+.vas-194-iconbtn {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #FFFFFF;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    flex: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.vas-194-iconbtn:hover {
+    background: #EEF8FF;
+    border-color: #BFE4FF;
+}
+
+.vas-194-iconbtn svg {
+    width: 0.8em;
+    height: 0.8em;
+}
+
+/* Chips */
+.vas-194-chip {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas-194-chip-info {
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+.vas-194-chip-ok {
+    background: #E7F7EF;
+    color: #0B6B45;
+}
+
+.vas-194-chip-warn {
+    background: #FFF6E2;
+    color: #9A6500;
+}
+
+.vas-194-chip-risk {
+    background: #FCEFEF;
+    color: #A33F3F;
+}
+
+.vas-194-chip-neutral {
+    background: #F1F4F8;
+    color: #41576A;
+    font-weight: 500;
+}
+
+/* Table Footer & Pager */
+.vas-194-mtfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    border-top: 1px solid #D9E2EB;
+    padding-top: 0.5em;
+    margin-top: 0.5em;
+    flex: none;
+}
+
+.vas-194-helper {
+    font-size: 0.75em;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-194-pager {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+}
+
+.vas-194-pbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #FFFFFF;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease;
+}
+
+.vas-194-pbtn:hover:not(:disabled) {
+    background: #EEF8FF;
+}
+
+.vas-194-pbtn:disabled {
+    color: #B8C6D2;
+    border-color: #E2EAF1;
+    cursor: default;
+}
+
+.vas-194-pbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-194-ptxt {
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
+    min-width: 3.4em;
+    text-align: center;
+}
