@@ -192,8 +192,9 @@
 /* ----------------------------------------------------------- */
 /*  Header                                                      */
 /* ----------------------------------------------------------- */
-/* Sizes below follow the approved reference HTML (rem -> em against the panel
-   anchor): h1 1.5em/700, sub and ctx 0.875em. */
+/* Sizes follow design.md's token set, NOT the reference HTML's rem values - the
+   prototype's 1.5rem h1 / 0.875rem sub read oversized once they resolve against
+   the 16-18px panel anchor. See review-checklist.md > Panel HTML Token Audit. */
 .vas_191-head {
     display: flex;
     align-items: flex-start;
@@ -203,11 +204,15 @@
 }
 .vas_191-headLeft { min-width: 0; flex: 1; }
 
+/* Panel title on the shared dashboard title lever: it reads the global
+   --dash-inline-size (the visible content width in px, published on :root by the
+   widget host) and clamps between 16 and 17px, so the panel title lands at the
+   same physical size as every widget title on the same screen. 100vw is the
+   documented fallback for a host that never sets the variable. */
 .vas_191-h1 {
     font-weight: 700;
-    font-size: 1.5em;
-    line-height: 1.2;
-    letter-spacing: -0.2px;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    line-height: 1.3;
     color: var(--p191-text);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -215,9 +220,9 @@
 }
 .vas_191-sub {
     font-weight: 400;
-    font-size: 0.875em;
+    font-size: 0.75em;
     color: var(--p191-muted);
-    margin-top: 0.3125em;
+    margin-top: 0.25em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -261,12 +266,14 @@
 }
 .vas_191-icard.vas_191-amber .vas_191-eyebrow { color: var(--p191-warn-tx); }
 
+/* Stat Grid tile value - 0.9375em Bold. The reference's 1.25rem is the
+   "larger widget-KPI treatment" the token audit calls out as a fail. */
 .vas_191-big {
     font-weight: 700;
-    font-size: 1.25em;
-    line-height: 1.2;
+    font-size: 0.9375em;
+    line-height: 1.3;
     color: var(--p191-text);
-    margin-top: 0.4em;
+    margin-top: 0.25em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -276,9 +283,9 @@
 
 .vas_191-imeta {
     font-weight: 400;
-    font-size: 0.8125em;
-    color: var(--p191-secondary);
-    margin-top: 0.375em;
+    font-size: 0.6875em;
+    color: var(--p191-muted);
+    margin-top: 0.125em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -324,7 +331,7 @@
 .vas_191-banner-tx { min-width: 0; }
 .vas_191-banner-a {
     font-weight: 700;
-    font-size: 0.9375em;
+    font-size: 0.875em;
     color: var(--p191-text);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -332,7 +339,7 @@
 }
 .vas_191-banner-b {
     font-weight: 400;
-    font-size: 0.8125em;
+    font-size: 0.75em;
     color: var(--p191-secondary);
     margin-top: 0.1875em;
     overflow: hidden;
@@ -378,9 +385,10 @@
 
 .vas_191-vc { min-width: 0; padding-bottom: 0.875em; }
 .vas_191-vstep:last-child .vas_191-vc { padding-bottom: 0; }
+/* Step Flow card title / meta tokens. */
 .vas_191-st {
     font-weight: 500;
-    font-size: 0.875em;
+    font-size: 0.8125em;
     color: var(--p191-text);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -429,7 +437,7 @@
 }
 .vas_191-block-r {
     font-weight: 400;
-    font-size: 0.8125em;
+    font-size: 0.75em;
     color: var(--p191-muted);
     white-space: nowrap;
 }
@@ -502,7 +510,7 @@
     flex-shrink: 0;
 }
 .vas_191-kv-v {
-    font-weight: 500;
+    font-weight: 600;
     font-size: 0.8125em;
     color: var(--p191-text);
     text-align: right;
@@ -512,28 +520,33 @@
     white-space: nowrap;
 }
 
-/* Enlarged variant - the reference gives the Payment details block bigger
-   chrome and type than the other blocks (details-lg). */
+/* Roomier variant for the Payment details block. The reference also scales its
+   TYPE up here (block title 1.1875rem, k 0.875rem, v 1.0625rem); those are
+   dropped - the token audit fails a 1.1875em section title - so the variant
+   differs in breathing space only, not in type size. */
 .vas_191-details-lg .vas_191-block-head { padding: 1.125em 1.375em; }
-.vas_191-details-lg .vas_191-block-h { font-size: 1.1875em; }
 .vas_191-details-lg .vas_191-kv { padding: 0.5em 1.375em 1.25em; }
 .vas_191-details-lg .vas_191-kv.vas_191-cols2 { column-gap: 2.125em; }
-.vas_191-details-lg .vas_191-kv-r { padding: 0.8125em 0; }
-.vas_191-details-lg .vas_191-kv-k { font-size: 0.875em; }
-.vas_191-details-lg .vas_191-kv-v { font-size: 1.0625em; }
+.vas_191-details-lg .vas_191-kv-r { padding: 0.6875em 0; }
 
 /* ----------------------------------------------------------- */
 /*  Action bar                                                  */
 /* ----------------------------------------------------------- */
 /* The reference wraps the buttons in a faint blue rounded band, and carries
    four button treatments: filled primary, outlined, ghost (neutral border) and
-   a borderless text action pushed to the far end of the row. */
+   a borderless text action pushed to the far end of the row.
+
+   Button METRICS deliberately follow VAS_189_ARInvoiceDetailPanel's .btn
+   (0.8125em / 400, padding 0.5em 0.875em) rather than the reference HTML's
+   larger 0.875em / 500 at 9px 17px: both panels sit on the same windows, and a
+   payment action bar that reads bigger than the invoice one next to it looks
+   like a mistake. The band and the four treatments are kept from the reference. */
 .vas_191-actions {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 0.625em;
-    padding: 0.625em 0.75em;
+    padding: 0.5em 0.625em;
     background: rgba(238, 246, 255, 0.5);
     border-radius: 12px;
 }
@@ -541,15 +554,15 @@
 .vas_191-pill {
     display: inline-flex;
     align-items: center;
-    gap: 0.4375em;
+    gap: 0.5em;
     border-radius: 999px;
     border: 1px solid transparent;
     background: #FFFFFF;
     color: var(--p191-action);
-    padding: 0.5625em 1.0625em;
-    font-weight: 500;
-    font-size: 0.875em;
-    line-height: 1;
+    padding: 0.5em 0.875em;
+    font-weight: 400;
+    font-size: 0.8125em;
+    line-height: 1.2;
     cursor: pointer;
     transition: background .15s, border-color .15s, color .15s;
 }
@@ -589,7 +602,7 @@
     background: none;
     border-color: transparent;
     color: var(--p191-muted);
-    padding: 0.5625em 0.375em;
+    padding: 0.5em 0.375em;
     margin-left: auto;
 }
 .vas_191-pill.vas_191-is-text:hover:not(:disabled) { color: var(--p191-action-deep); }
@@ -734,21 +747,23 @@
     white-space: nowrap;
 }
 
+/* Data Grid body tokens: row cells 0.75em, the identity cell bold, the amount
+   one step up at 0.8125em so the money column still leads the row. */
 .vas_191-pa-row .p,
 .vas_191-alloc-row .p {
-    font-size: 0.9375em;
+    font-size: 0.75em;
     font-weight: 700;
     color: var(--p191-text);
 }
 .vas_191-pa-row .c,
 .vas_191-alloc-row .c {
-    font-size: 0.8125em;
+    font-size: 0.75em;
     font-weight: 400;
     color: var(--p191-secondary);
 }
 .vas_191-pa-row .amt,
 .vas_191-alloc-row .amt {
-    font-size: 0.9375em;
+    font-size: 0.8125em;
     font-weight: 700;
     color: var(--p191-text);
     text-align: right;
@@ -775,7 +790,7 @@
     white-space: nowrap;
 }
 .vas_191-alloc-row .col-a .s {
-    font-size: 0.75em;
+    font-size: 0.6875em;
     font-weight: 400;
     color: var(--p191-muted);
     margin-top: 0.1875em;
@@ -825,7 +840,7 @@
 }
 .vas_191-je-row .acct .code {
     font-weight: 700;
-    font-size: 0.875em;
+    font-size: 0.75em;
     color: var(--p191-text);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -834,7 +849,7 @@
 /* Second line under the account: what the fact line is for. */
 .vas_191-je-row .acct .nm {
     font-weight: 400;
-    font-size: 0.75em;
+    font-size: 0.6875em;
     color: var(--p191-muted);
     margin-top: 0.1875em;
     overflow: hidden;
@@ -849,7 +864,7 @@
 }
 .vas_191-je-row .num {
     font-weight: 700;
-    font-size: 0.875em;
+    font-size: 0.75em;
     color: var(--p191-text);
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -869,7 +884,7 @@
 }
 .vas_191-je-total .num {
     font-weight: 700;
-    font-size: 0.9375em;
+    font-size: 0.8125em;
     color: var(--p191-text);
     text-align: right;
     font-variant-numeric: tabular-nums;

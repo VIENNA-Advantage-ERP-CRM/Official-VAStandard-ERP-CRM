@@ -113,7 +113,7 @@
  *   Related invoice / Charge              | VAS_191_RelatedInvoice / VAS_191_Charge
  *   Description                           | VAS_191_Description
  *   Yes / No                              | VAS_191_Yes / VAS_191_No
- *
+ *   VAS_191_CheckNo                       | Check No.
  *  Payment Allocate
  *   Payment Allocate                      | VAS_191_PaymentAllocate
  *   Invoice / GL journal                  | VAS_191_InvoiceGLJournal
@@ -1387,7 +1387,7 @@
                 { k: msg("VAS_191_PostedStatus", "Posted status"), v: data.PostedName },
                 { k: msg("VAS_191_Prepayment", "Prepayment"), v: data.IsPrepayment ? msg("VAS_191_Yes", "Yes") : msg("VAS_191_No", "No") },
                 { k: msg("VAS_191_ExecutionStatus", "Execution status"), v: data.ExecutionStatusName },
-                { k: msg("VAS_191_Reference", "Reference"), v: data.CheckNo },
+                { k: msg("VAS_191_CheckNo", "Check No"), v: data.CheckNo },
                 { k: msg("VAS_191_RelatedInvoice", "Related invoice"), v: data.InvoiceDocumentNo },
                 { k: msg("VAS_191_Charge", "Charge"), v: data.ChargeName },
                 { k: msg("VAS_191_Description", "Description"), v: data.Description }
