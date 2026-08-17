@@ -977,6 +977,23 @@
            exists and why it is unavailable. */
         function renderActions() {
             var $row = $('<div class="' + CLS + 'actions"></div>');
+            
+            /* Apply advance is deliberately NOT in this bar. It belongs to the
+               advance banner, which is the element that states there is something
+               left to apply and offers the action next to that statement - the
+               same placement as the reference layout. Repeating it here would give
+               the panel two buttons for one action. */
+
+            /* Send + Download PDF: same print process, same enablement, and the
+               reference's neutral ghost treatment - they are utilities, not
+               document actions. */
+            var canPrint = hasPrintProcess();
+            $row.append(actionPill("send", msg("VAS_191_SendPayment", "Send payment"), function () {
+                sendPaymentEmail();
+            }, "ghost", !canPrint));
+            $row.append(actionPill("download", msg("VAS_191_DownloadPDF", "Download PDF"), function () {
+                downloadPaymentPDF();
+            }, "ghost", !canPrint));
 
             if (data.CanComplete) {
                 $row.append(actionPill("check", msg("VAS_191_Complete", "Complete"), function () {
@@ -1003,22 +1020,6 @@
                     }
                 }));
             }
-            /* Apply advance is deliberately NOT in this bar. It belongs to the
-               advance banner, which is the element that states there is something
-               left to apply and offers the action next to that statement - the
-               same placement as the reference layout. Repeating it here would give
-               the panel two buttons for one action. */
-
-            /* Send + Download PDF: same print process, same enablement, and the
-               reference's neutral ghost treatment - they are utilities, not
-               document actions. */
-            var canPrint = hasPrintProcess();
-            $row.append(actionPill("send", msg("VAS_191_SendPayment", "Send payment"), function () {
-                sendPaymentEmail();
-            }, "ghost", !canPrint));
-            $row.append(actionPill("download", msg("VAS_191_DownloadPDF", "Download PDF"), function () {
-                downloadPaymentPDF();
-            }, "ghost", !canPrint));
 
             /* View ledger entry only exists when there are posted facts to jump
                to. It is the reference's text action and sits at the far end of
