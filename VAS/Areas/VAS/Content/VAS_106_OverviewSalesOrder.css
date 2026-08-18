@@ -135,6 +135,18 @@
  *                        - Added the order line's third detail line,
  *                          .vas_106-itDrop (Drop Shipment: Yes / No), coloured by
  *                          .vas_106-is-drop when the line ships direct.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *                        - Added the Activity field-change delta
+ *                          (.vas_106-actDelta / -cvOld / -cvArrow / -cvNew):
+ *                          "was X → now Y" under the field's name, the old
+ *                          value struck through and the new one carrying the
+ *                          row's colour. Matches VAS_101 / VAS_104.
  ***********************************************************/
 
 .vas_106-root {
@@ -483,14 +495,16 @@
 /* ----------------------------------------------------------- */
 /*  Data tables                                                 */
 /* ----------------------------------------------------------- */
-/* The table scrolls horizontally at ANY width rather than clipping (overflow was
-   `hidden`): the rows carry a min-width, so when the panel is narrower than the
-   columns need — which is exactly what a zoomed-out browser produces, handing the
-   panel an in-between width — the reader scrolls to the last columns instead of
-   losing them off the edge. Matches VAS_099 / VAS_098. */
+/* The table SHRINKS to the panel; it never scrolls sideways. It used to carry a
+   floor width per column set and its own horizontal scrollbar, on the argument
+   that the reader could scroll to the last columns rather than lose them — but a
+   scrollbar inside a card hides those columns just as effectively, since it has
+   to be found and dragged before it says anything is there. The tracks compress
+   instead, each cell keeping its ellipsis and the row's tooltip.
+   Matches VAS_099 / VAS_098. */
 .vas_106-table {
     border: 1px solid var(--vaso-card-bd); border-radius: var(--vaso-card-radius);
-    background: #fff; overflow-x: auto; overflow-y: hidden;
+    background: #fff;
 }
 .vas_106-tRow { display: grid; align-items: center; gap: 0.625em; padding: 0.625em 0.875em; }
 /* Grid items default to min-width:auto, which blocks the ellipsis on the cells
@@ -510,14 +524,12 @@
     grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
                            minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr) 2em
                            minmax(0, 1.4fr);
-    min-width: 650px;
 }
 /* No service line on the order, so no Contract column — the row needs
    proportionally less room before it has to scroll. */
 .vas_106-linesTable.vas_106-no-contract .vas_106-tRow {
     grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
                            minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr) 2em;
-    min-width: 550px;
 }
 /* Nothing on the order was discounted, so no Disc column — the 0.5fr track it
    held comes out and every other column keeps its proportion. Both columns can
@@ -525,12 +537,10 @@
 .vas_106-linesTable.vas_106-no-discount .vas_106-tRow {
     grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
                            minmax(0, 0.9fr) minmax(0, 1fr) 2em minmax(0, 1.4fr);
-    min-width: 600px;
 }
 .vas_106-linesTable.vas_106-no-contract.vas_106-no-discount .vas_106-tRow {
     grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
                            minmax(0, 0.9fr) minmax(0, 1fr) 2em;
-    min-width: 500px;
 }
 /* Delivery Readiness: Item | UOM | Warehouse | Pending | On Hand | Readiness.
    The unit has a column of its own — it used to lead the product name, where it
@@ -538,16 +548,13 @@
 .vas_106-rdTable .vas_106-tRow {
     grid-template-columns: minmax(0, 2fr) minmax(0, 0.7fr) minmax(0, 1.3fr)
                            minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 1.6fr);
-    min-width: 540px;
 }
 .vas_106-dvTable .vas_106-tRow {
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.4fr)
                            minmax(0, 0.7fr) minmax(0, 1fr);
-    min-width: 460px;
 }
 .vas_106-invTable .vas_106-tRow {
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1fr);
-    min-width: 400px;
 }
 /* Line change history, in a drawer under the line it belongs to.
 
@@ -556,10 +563,10 @@
    under the column it belongs to on the line above. It carries the lines table's
    min-width too, so when that table is scrolled sideways the drawer travels with
    it rather than stopping at the edge of the visible box. */
-.vas_106-lineHist { padding: 0 0 0.625em 1.25em; background: var(--vaso-faint-blue); min-width: 650px; }
-.vas_106-linesTable.vas_106-no-contract .vas_106-lineHist { min-width: 550px; }
-.vas_106-linesTable.vas_106-no-discount .vas_106-lineHist { min-width: 600px; }
-.vas_106-linesTable.vas_106-no-contract.vas_106-no-discount .vas_106-lineHist { min-width: 500px; }
+.vas_106-lineHist { padding: 0 0 0.625em 1.25em; background: var(--vaso-faint-blue); }
+/* The drawer no longer carries a floor width per column set: it shares the
+   lines table's tracks, and those now compress with the panel instead of
+   scrolling, so there is no scrolled width for its tint to run out to. */
 .vas_106-lhTable { margin-top: 0.5em; }
 /* Both drawer rules are qualified by .vas_106-linesTable so they outrank the
    table's own variant grids above — the drawer is INSIDE that table, and a
@@ -605,7 +612,6 @@
    four columns, one table for shipments, invoices and receipts alike. */
 .vas_106-docTable .vas_106-tRow {
     grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-    min-width: 440px;
 }
 /* Document identity cell: kind icon + doc no / caption + open affordance. */
 .vas_106-docItem { display: flex; align-items: center; gap: 0.5em; min-width: 0; }
@@ -906,3 +912,23 @@ select.vas_106-ffInput { appearance: none; -webkit-appearance: none; cursor: poi
 [dir="rtl"] .vas_106-prog { align-items: flex-start; }
 [dir="rtl"] .vas_106-tFoot { justify-content: flex-start; }
 [dir="rtl"] .vas_106-hdrColL { border-right: none; border-left: 1px solid var(--vaso-row-div); padding-right: 0; padding-left: 1.25em; }
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value.
+   Matches VAS_101 / VAS_104. */
+.vas_106-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_106-cvOld {
+    color: var(--vaso-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_106-cvArrow { flex: none; color: var(--vaso-muted); }
+.vas_106-cvNew {
+    color: var(--vaso-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}

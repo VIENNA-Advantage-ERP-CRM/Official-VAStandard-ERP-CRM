@@ -96,6 +96,18 @@
  *                          as part of the same panel, and only has to drop the
  *                          top margin, its own section heading providing the
  *                          spacing above it.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *                        - Added the Activity field-change delta
+ *                          (.vas_100-actDelta / -cvOld / -cvArrow / -cvNew):
+ *                          "was X → now Y" under the field's name, the old
+ *                          value struck through and the new one carrying the
+ *                          row's colour. Matches VAS_101 / VAS_104.
  ***********************************************************/
 
 .vas_100-root {
@@ -806,15 +818,12 @@
 .vas_100-tf.vas_100-is-grand { color: var(--do-text); font-weight: 700; }
 .vas_100-tf.vas_100-is-grand b { color: var(--do-action); margin-left: 0.5em; font-size: 1.15em; }
 
-@container (max-width: 620px) {
-    .vas_100-table { overflow-x: auto; }
-    .vas_100-tRow { min-width: 560px; }
-    .vas_100-table.vas_100-has-q .vas_100-tRow { min-width: 640px; }
-    /* The drawer carries the row min-width too, so its tint runs the full
-       scrolled width instead of stopping at the visible edge. */
-    .vas_100-table.vas_100-has-q .vas_100-qpDrawer { min-width: 640px; }
-    .vas_100-qpDrawer { min-width: 560px; }
-}
+/* A narrow panel SHRINKS the table; it never scrolls it sideways. Under 620px
+   the rows used to take a floor width and the card its own horizontal
+   scrollbar — which hides the right-hand columns behind a control the reader
+   has to find and drag. Every track is minmax(0, Nfr) and every cell carries
+   min-width: 0 with an ellipsis, so the columns simply compress and a clipped
+   value stays readable through the row's tooltip. */
 
 /* ----------------------------------------------------------- */
 /*  Quality: the line marker and the per-line parameter drawer  */
@@ -1131,7 +1140,8 @@
 }
 
 @container (max-width: 620px) {
-    .vas_100-docRow { min-width: 520px; }
+    /* The Documents row compresses with everything else — it used to take a
+       floor width here and scroll. */
     /* The stamp drops to its own line rather than squeezing the headline out. */
     .vas_100-actWhen { margin-left: 0; }
 }
@@ -1189,3 +1199,23 @@
 [dir="rtl"] .vas_100-tf.vas_100-is-grand b { margin-left: 0; margin-right: 0.5em; }
 [dir="rtl"] .vas_100-chip .vas_100-pill { margin-left: 0; margin-right: 0.0625em; }
 [dir="rtl"] .vas_100-pgBtn .vas_100-ic svg { transform: scaleX(-1); }
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value.
+   Matches VAS_101 / VAS_104. */
+.vas_100-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_100-cvOld {
+    color: var(--do-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_100-cvArrow { flex: none; color: var(--do-muted); }
+.vas_100-cvNew {
+    color: var(--do-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}

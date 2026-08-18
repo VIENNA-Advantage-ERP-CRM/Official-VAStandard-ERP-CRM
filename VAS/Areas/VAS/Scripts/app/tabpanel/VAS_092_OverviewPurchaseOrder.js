@@ -303,6 +303,23 @@
  *                          shows in the single-record view because that is where
  *                          the panel is narrow enough for the address to exceed
  *                          its column.
+ *   VAI163   2026-08-17  Activity's field-level rows carry the MOVE: "was X →
+ *                        now Y" under the field's name (changeDelta), the old
+ *                        value struck through and a value the log recorded as
+ *                        empty shown as an em dash, so a cleared field is
+ *                        visibly cleared rather than looking like a rendering
+ *                        gap. A row said WHICH field moved but never what it
+ *                        moved from or to.
+ *                        A field edit made on a LINE also names the line it
+ *                        landed on (a.ChangeScope — line number + item), on the
+ *                        sub-line the e-mail recipients use. Both follow
+ *                        VAS_101 / VAS_104.
+ *   VAI163   2026-08-18  Drop Shipment reads as the WORD "Yes" / "No" again
+ *                        (plain headerField), not as a tick / cross. A mark
+ *                        has to be decoded before it answers, and it only
+ *                        answered in words to a reader who found the tooltip
+ *                        or ran a screen reader. headerFlagField and the
+ *                        "cross" icon went with it — nothing else drew one.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -935,12 +952,10 @@
             // Drop Shipment (C_Order.IsDropShip) — always shown, Yes or No: "No"
             // is as much of an answer as "Yes" here, and the reader is looking at
             // a Warehouse right above it that a drop-shipped order never reaches.
-            // Shown as a MARK rather than as the word: neither "Yes" nor "No"
-            // carries more meaning than a tick or a cross does, and each took a
-            // whole field's line to say it in a column that runs two fields wide.
-            // The word travels as the field's tooltip and the mark's aria-label,
-            // so the glyph is never the only statement of what it means.
-            $right.append(headerFlagField(getMsg("VAS_092_DropShipment"), !!data.IsDropShip));
+            // Reads as the WORD, like every other field in this column, so the
+            // answer needs no glyph to be decoded first.
+            $right.append(headerField(getMsg("VAS_092_DropShipment"),
+                data.IsDropShip ? getMsg("VAS_092_Yes") : getMsg("VAS_092_No")));
             //if (data.OrgName) $right.append(headerField(getMsg("VAS_092_BillTo"), data.OrgName));
             if ($right.children().length) $card.append($right);
 
@@ -960,26 +975,6 @@
             var $f = $('<div class="vas_092-hdrField"></div>');
             $f.append($('<div class="vas_092-fLabel"></div>').text(label));
             $f.append($('<div class="vas_092-fVal"></div>').text(value));
-            return $f;
-        }
-
-        // A header field whose value is a yes / no FLAG, drawn as a tick or a
-        // cross. The word it stands for is carried on the field's tooltip and on
-        // the mark's aria-label, so a reader who cannot read the glyph — or a
-        // screen reader — still gets the answer in words.
-        function headerFlagField(label, on) {
-            var word = on ? getMsg("VAS_092_Yes") : getMsg("VAS_092_No");
-            var $f = $('<div class="vas_092-hdrField"></div>')
-                .attr("title", label + ": " + word);
-            $f.append($('<div class="vas_092-fLabel"></div>').text(label));
-
-            var $v = $('<div class="vas_092-fVal"></div>');
-            $v.append($('<span class="vas_092-flagMark"></span>')
-                .addClass(on ? "vas_092-flag-on" : "vas_092-flag-off")
-                .attr("role", "img")
-                .attr("aria-label", word)
-                .append(svgIcon(on ? "check" : "cross")));
-            $f.append($v);
             return $f;
         }
 
@@ -2351,6 +2346,20 @@
             return $pager;
         }
 
+        // "was X → now Y" under the field's name, for a field-level edit. A value
+        // the log recorded as empty reads as an em dash rather than as a blank, so
+        // a cleared field is visibly cleared instead of looking like a rendering
+        // gap. Follows VAS_101 / VAS_104.
+        function changeDelta(a) {
+            var $d = $('<small class="vas_092-actSub vas_092-actDelta"></small>');
+            var blank = "—";
+            $d.append($('<span class="vas_092-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_092-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_092-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
+        }
+
         function activityRow(a) {
             var meta = ACT_TYPES[a.Type] || ACT_TYPES.note;
 
@@ -2373,6 +2382,19 @@
                 if (to) {
                     $title.append($('<small class="vas_092-actSub"></small>').text(to));
                 }
+            }
+
+            // A field edit names the record it landed on — a LINE edit says which
+            // line, on the sub-line the e-mail recipients use — and then the move
+            // itself. The headline stays "Updated <field>": which field moved is the
+            // question, and both of these qualify it rather than competing with it
+            // for the one line that clips.
+            if (a.Type === "updated") {
+                if (a.ChangeScope) {
+                    $title.append($('<small class="vas_092-actSub"></small>')
+                        .text(a.ChangeScope).attr("title", a.ChangeScope));
+                }
+                if (a.OldValue || a.NewValue) $title.append(changeDelta(a));
             }
             $row.append($title);
 
@@ -2608,8 +2630,6 @@
             coins:    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5"/><path d="M14.5 4.2a5 5 0 0 1 0 15.6"/><path d="M7 18.7a5 5 0 0 0 6 0"/></svg>',
             info:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
             check:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
-            // The "no" half of a yes / no header flag (Drop Shipment).
-            cross:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
             chevUp:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>',
             doc:      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>',
             clipboardCheck: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>',

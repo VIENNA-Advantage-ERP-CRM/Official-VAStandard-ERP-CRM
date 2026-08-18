@@ -320,6 +320,17 @@
  *                          edit.
  *                        - A shipment reports the value it DELIVERED in the
  *                          Documents Amount column (model side); it was blank.
+ *   VAI163   2026-08-17  Activity's field-level rows carry the MOVE: "was X →
+ *                        now Y" under the field's name (changeDelta), the old
+ *                        value struck through and a value the log recorded as
+ *                        empty shown as an em dash, so a cleared field is
+ *                        visibly cleared rather than looking like a rendering
+ *                        gap. A row said WHICH field moved but never what it
+ *                        moved from or to.
+ *                        A field edit made on a LINE also names the line it
+ *                        landed on (a.ChangeScope — line number + item), on the
+ *                        sub-line the e-mail recipients use. Both follow
+ *                        VAS_101 / VAS_104.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1858,6 +1869,20 @@
             return $b;
         }
 
+        // "was X → now Y" under the field's name, for a field-level edit. A value
+        // the log recorded as empty reads as an em dash rather than as a blank, so
+        // a cleared field is visibly cleared instead of looking like a rendering
+        // gap. Follows VAS_101 / VAS_104.
+        function changeDelta(a) {
+            var $d = $('<div class="vas_106-actSub vas_106-actDelta"></div>');
+            var blank = "—";
+            $d.append($('<span class="vas_106-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_106-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_106-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
+        }
+
         function activityRow(a) {
             var meta = ACT_TYPES[a.EventType] || ACT_TYPES.Updated;
             var $row = $('<div class="vas_106-actRow"></div>');
@@ -1898,6 +1923,18 @@
                     $main.append($('<div class="vas_106-actSub"></div>')
                         .text(to).attr("title", allRecipients(a) || to));
                 }
+            }
+
+            // A field edit names the record it landed on — a LINE edit says which
+            // line — and then the move itself. The headline stays "Updated <field>":
+            // which field moved is the question, and both of these qualify it
+            // rather than competing with it for the line that clips.
+            if (a.EventType === "Updated") {
+                if (a.ChangeScope) {
+                    $main.append($('<div class="vas_106-actSub"></div>')
+                        .text(a.ChangeScope).attr("title", a.ChangeScope));
+                }
+                if (a.OldValue || a.NewValue) $main.append(changeDelta(a));
             }
             $row.append($main);
 

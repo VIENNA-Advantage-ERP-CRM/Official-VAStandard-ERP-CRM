@@ -142,6 +142,22 @@
  *                        - Added .vas_092-flagMark / -flag-on / -flag-off: the
  *                          tick / cross a yes-no header field (Drop Shipment) is
  *                          drawn as.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *                        - Added the Activity field-change delta
+ *                          (.vas_092-actDelta / -cvOld / -cvArrow / -cvNew):
+ *                          "was X → now Y" under the field's name, the old
+ *                          value struck through and the new one carrying the
+ *                          row's colour. Matches VAS_101 / VAS_104.
+ *   VAI163   2026-08-18  Dropped .vas_092-flagMark / -flag-on / -flag-off:
+ *                        Drop Shipment prints the word "Yes" / "No" as an
+ *                        ordinary header field again, so there is no tick or
+ *                        cross left to paint.
  ***********************************************************/
 
 .vas_092-root {
@@ -459,23 +475,6 @@
     word-break: break-word;
     line-height: 1.45;
 }
-
-/* ----------------------------------------------------------- */
-/*  Yes / no marker (Drop Shipment)                             */
-/* ----------------------------------------------------------- */
-/* A tick or a cross rather than the words. The header's terms column runs two
-   fields wide in a side panel, and "Yes" / "No" carry no more meaning than a
-   mark does while taking a whole field's line to say it. The word still travels
-   as the field's tooltip and the mark's aria-label, so the glyph is never the
-   only statement of what it means. */
-.vas_092-flagMark {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-top: 0.125em;
-}
-.vas_092-flagMark.vas_092-flag-on  { color: var(--vaspo-success-tx); }
-.vas_092-flagMark.vas_092-flag-off { color: var(--vaspo-muted); opacity: .7; }
 
 .vas_092-ic { display: inline-flex; align-items: center; flex: none; }
 .vas_092-ic svg { display: block; }
@@ -980,26 +979,16 @@
     vertical-align: middle;
 }
 
-/* Last resort for a genuinely narrow panel: the seven-column line table (and the
-   history drawer sharing its grid) gets a floor width and scrolls inside its own
-   card, rather than crushing its columns or widening the panel. Everything else
-   on the page keeps its full width. */
-@container (max-width: 380px) {
-    .vas_092-itTable,
-    .vas_092-histTable,
-    .vas_092-docTable,
-    .vas_092-ldTable {
-        overflow-x: auto;
-        overflow-y: hidden;
-    }
-    .vas_092-itTable   .vas_092-tRow,
-    .vas_092-histTable .vas_092-tRow,
-    .vas_092-docTable  .vas_092-tRow,
-    .vas_092-ldTable   .vas_092-tRow { min-width: 360px; }
-    /* The drawer must scroll with its parent table, not on its own, or a past
-       version stops lining up with the line above it. */
-    .vas_092-lhTable { overflow: visible; }
-}
+/* A narrow panel SHRINKS its tables; it never scrolls them sideways.
+   Every track is minmax(0, Nfr) and every cell carries min-width: 0 with an
+   ellipsis, so the columns compress to whatever width the panel has and the text
+   that no longer fits is clipped with its full value on the row's tooltip.
+
+   The floor width + inner scrollbar this used to apply under 380px is gone: a
+   horizontal scrollbar inside a card hides the columns it pushes out — the
+   reader has to find it and drag it to learn there is anything there — where a
+   compressed column is at least visibly present. Nothing else on the page has
+   ever scrolled sideways, and the tables now behave the same way. */
 
 /* ----------------------------------------------------------- */
 /*  Per-line history (drawer under the line it belongs to)      */
@@ -1418,3 +1407,23 @@
 [dir="rtl"] .vas_092-tf b { margin-left: 0; margin-right: 0.375em; }
 [dir="rtl"] .vas_092-tf.vas_092-is-grand b { margin-left: 0; margin-right: 0.5em; }
 [dir="rtl"] .vas_092-ldFoot .vas_092-lf.vas_092-is-grand { margin-left: 0; margin-right: auto; }
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value.
+   Matches VAS_101 / VAS_104. */
+.vas_092-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_092-cvOld {
+    color: var(--vaspo-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_092-cvArrow { flex: none; color: var(--vaspo-muted); }
+.vas_092-cvNew {
+    color: var(--vaspo-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}
