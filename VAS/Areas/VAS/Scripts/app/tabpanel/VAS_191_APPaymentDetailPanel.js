@@ -32,7 +32,9 @@
  *                  The panel serves BOTH directions of C_Payment: it reads
  *                  IsReceipt and labels itself Payment or Receipt, so no AR / AP
  *                  wording is hard-coded and the same panel can be hung on either
- *                  window.
+ *                  window. Every such label goes through isReceiptDoc(), which
+ *                  falls back to C_DocType.DocBaseType ('ARR') when the IsReceipt
+ *                  flag disagrees with the document the payment was booked on.
  *
  *                  There is deliberately NO generic "Allocate" button. Allocation
  *                  runs through Apply Advance, which opens the STANDARD Payment
@@ -63,6 +65,11 @@
  *   VAI145   2026-08-17  Created.
  *   VAI145   2026-08-18  Payment Allocate section hidden for DocStatus
  *                        CO / CL / RE / VO.
+ *   VAI145   2026-08-18  Send action named per direction (Email Remittance /
+ *                        Send Payment Advice); partner card names the BP
+ *                        LOCATION; Withholding Details section added; direction
+ *                        wording moved onto isReceiptDoc() (DocBaseType 'ARR'
+ *                        fallback) so a receipt never reads "Paid".
  *
  * -- Labels / Message Keys ---------------------------------------------------
  *  Panel, header and summary cards
@@ -84,6 +91,8 @@
  *   {0} held as advance                   | VAS_191_HeldAsAdvance
  *   Unapplied from this payment ...       | VAS_191_AdvanceHint
  *     (no partner on the document)        | VAS_191_AdvanceHintNoBP
+ *   Unapplied from this receipt ...       | VAS_191_AdvanceHintReceipt
+ *     (no partner on the document)        | VAS_191_AdvanceHintNoBPReceipt
  *   Apply advance                         | VAS_191_ApplyAdvance
  *
  *  Approval
@@ -93,7 +102,9 @@
  *
  *  Actions
  *   Complete / Reverse                    | VAS_191_Complete / VAS_191_Reverse
- *   Send payment / Download PDF           | VAS_191_SendPayment / VAS_191_DownloadPDF
+ *   Email Remittance (IsReceipt = Y)      | VAS_191_EmailRemittance
+ *   Send Payment Advice (IsReceipt = N)   | VAS_191_SendPaymentAdvice
+ *   Download PDF                          | VAS_191_DownloadPDF
  *   View ledger entry                     | VAS_191_ViewLedgerEntry
  *   Reverse this payment? ...             | VAS_191_ConfirmReverse
  *   Confirm                               | VAS_191_Confirm
@@ -102,13 +113,14 @@
  *   Payment Allocation form not available | VAS_191_AllocationFormMissing
  *
  *  Lifecycle
- *   Payment lifecycle                     | VAS_191_Lifecycle
+ *   Lifecycle                             | VAS_191_Lifecycle
  *   Stage {0} of {1} / Complete           | VAS_191_StageOf / VAS_191_LifecycleComplete
  *   Created / Completed                   | VAS_191_Created / VAS_191_Completed
  *   Allocated / Reconciled                | VAS_191_Allocated / VAS_191_Reconciled
  *
  *  Payment details
- *   Payment details                       | VAS_191_PaymentDetails
+ *   Payment Details (IsReceipt = N)       | VAS_191_PaymentDetails
+ *   Receipt Details (IsReceipt = Y)       | VAS_191_ReceiptDetails
  *   Document no. / Document type          | VAS_191_DocumentNo / VAS_191_DocumentType
  *   Document status / Posted status       | VAS_191_DocumentStatus / VAS_191_PostedStatus
  *   Payment date / Accounting date        | VAS_191_PaymentDate / VAS_191_AccountingDate
@@ -120,6 +132,16 @@
  *   Description                           | VAS_191_Description
  *   Yes / No                              | VAS_191_Yes / VAS_191_No
  *   VAS_191_CheckNo                       | Check No.
+ *
+ *  Withholding
+ *   Withholding Details                   | VAS_191_WithholdingDetails
+ *   Payment amount after withholding {0}  | VAS_191_AfterWithholding
+ *   Receipt amount after withholding {0}  | VAS_191_AfterWithholdingReceipt
+ *   Withholding Type / Base Amount        | VAS_191_WithholdingType / VAS_191_BaseAmount
+ *   Rate / Withholding Amount             | VAS_191_Rate / VAS_191_WithholdingAmount
+ *   Backup withholding                    | VAS_191_BackupWithholding
+ *   Total withheld                        | VAS_191_TotalWithheld
+ *
  *  Payment Allocate
  *   Payment Allocate                      | VAS_191_PaymentAllocate
  *   Invoice / GL journal                  | VAS_191_InvoiceGLJournal
@@ -369,6 +391,17 @@
         function bankAccountText() {
             if (!data) return "";
             return joinBits([data.BankName, data.BankAccountNo]);
+        }
+
+        /* Direction of the document, for every "Paid" / "Received" wording on the
+           panel. C_Payment.IsReceipt is the flag, but the DOCUMENT TYPE is the
+           authority when the two disagree: a payment booked on an AR Receipt type
+           (DocBaseType 'ARR') is money coming IN and must read "Received" even if
+           its flag was never set. The flag alone decides nothing that this test
+           cannot answer, so all three wording spots go through here. */
+        function isReceiptDoc() {
+            if (!data) return false;
+            return !!data.IsReceipt || data.DocBaseType === "ARR";
         }
 
         function isReversedOrVoided() {
@@ -682,6 +715,7 @@
             { key: "info", condition: function () { return true; }, render: renderInfoTrio },
             { key: "life", condition: function () { return true; }, render: renderLifecycle },
             { key: "details", condition: function () { return true; }, render: renderDetails },
+            { key: "withhold", condition: function () { return any(data.Withholding); }, render: renderWithholding },
             { key: "banner", condition: function () { return true; }, render: renderBanner },
             { key: "allocate", condition: function () { return showPaymentAllocate(); }, render: renderPaymentAllocate },
             { key: "detail", condition: function () { return any(data.AllocationDetail); }, render: renderAllocationDetail },
@@ -856,7 +890,7 @@
             var docNo = data.DocumentNo || "—";
             var line = docNo;
             if (data.DateTrx) {
-                line += " · " + (data.IsReceipt
+                line += " · " + (isReceiptDoc()
                     ? msg("VAS_191_ReceivedOn", "Received {0}")
                     : msg("VAS_191_PaidOn", "Paid {0}")).replace("{0}", fmtDate(data.DateTrx));
             }
@@ -887,11 +921,16 @@
                 ? icard({
                     eyebrow: msg("VAS_191_BusinessPartner", "Business partner"),
                     big: data.BPName || "—",
-                    meta: joinBits([data.BPValue, data.OrgName]),
+                    /* The partner LOCATION the money went to / came from - which of
+                       the partner's addresses this payment belongs to is the fact
+                       worth carrying here, not the partner's own code repeated
+                       under its name. A payment that names no location simply has
+                       no second line. */
+                    meta: data.BPLocationName || "",
                     link: true
                 })
                 : icard({
-                    eyebrow: data.IsReceipt
+                    eyebrow: isReceiptDoc()
                         ? msg("VAS_191_ReceivedIn", "Received in")
                         : msg("VAS_191_PaidFrom", "Paid from"),
                     big: bankAccountText() || "—",
@@ -905,10 +944,10 @@
                   currency symbol, and both facts have their own row in the Payment
                   details block - stacking them into this card only truncated it. */
             $info.append(icard({
-                eyebrow: data.IsReceipt
+                eyebrow: isReceiptDoc()
                     ? msg("VAS_191_Received", "Received")
                     : msg("VAS_191_Paid", "Paid"),
-                big: money(data.PayAmt),
+                big: money(data.PaymentAmount),
                 meta: data.DateTrx ? fmtDate(data.DateTrx) : ""
             }));
 
@@ -965,13 +1004,24 @@
             $tx.append($('<div class="' + CLS + 'banner-a"></div>').text(
                 msg("VAS_191_HeldAsAdvance", "{0} held as advance").replace("{0}", money(unallocated))));
             /* The hint names the partner when there is one; without a partner the
-               generic wording is used rather than a sentence with a hole in it. */
-            var hint = hasBPartner()
-                ? msg("VAS_191_AdvanceHint",
-                    "Unapplied from this payment · apply it to an open {0} document")
-                    .replace("{0}", data.BPName)
-                : msg("VAS_191_AdvanceHintNoBP",
-                    "Unapplied from this payment · apply it to an open document");
+               generic wording is used rather than a sentence with a hole in it.
+               Both forms name the DOCUMENT the money is sitting on, so a receipt
+               says "this receipt" and not "this payment". */
+            var hint;
+            if (hasBPartner()) {
+                hint = (isReceiptDoc()
+                    ? msg("VAS_191_AdvanceHintReceipt",
+                        "Unapplied from this receipt · apply it to an open {0} document")
+                    : msg("VAS_191_AdvanceHint",
+                        "Unapplied from this payment · apply it to an open {0} document"))
+                    .replace("{0}", data.BPName);
+            } else {
+                hint = isReceiptDoc()
+                    ? msg("VAS_191_AdvanceHintNoBPReceipt",
+                        "Unapplied from this receipt · apply it to an open document")
+                    : msg("VAS_191_AdvanceHintNoBP",
+                        "Unapplied from this payment · apply it to an open document");
+            }
             $tx.append($('<div class="' + CLS + 'banner-b"></div>').text(hint).attr("title", hint));
             $l.append($tx);
             $b.append($l);
@@ -990,7 +1040,7 @@
         function allocationStatusText() {
             if (data.IsAllocated) return msg("VAS_191_FullyAllocated", "Fully allocated");
             var unallocated = +data.UnallocatedAmount || 0;
-            var pay = Math.abs(+data.PayAmt || 0);
+            var pay = Math.abs(+data.PaymentAmount || 0);
             if (unallocated > 0 && pay > 0 && unallocated < pay) {
                 return msg("VAS_191_PartiallyAllocated", "Partially allocated");
             }
@@ -1044,7 +1094,13 @@
                reference's neutral ghost treatment - they are utilities, not
                document actions. */
             var canPrint = hasPrintProcess();
-            $row.append(actionPill("send", msg("VAS_191_SendPayment", "Send payment"), function () {
+            /* The send action names the document it sends, and that differs by
+               direction: money coming IN is acknowledged with a remittance, money
+               going OUT is announced with a payment advice. */
+            var sendLabel = isReceiptDoc()
+                ? msg("VAS_191_EmailRemittance", "Email Remittance")
+                : msg("VAS_191_SendPaymentAdvice", "Send Payment Advice");
+            $row.append(actionPill("send", sendLabel, function () {
                 sendPaymentEmail();
             }, "ghost", !canPrint));
             $row.append(actionPill("download", msg("VAS_191_DownloadPDF", "Download PDF"), function () {
@@ -1391,7 +1447,7 @@
                 summary = msg("VAS_191_LifecycleComplete", "Complete");
             }
 
-            var $sec = section(msg("VAS_191_Lifecycle", "Payment lifecycle"), summary);
+            var $sec = section(msg("VAS_191_Lifecycle", "Lifecycle"), summary);
 
             var $pipe = $('<div class="' + CLS + 'pipe"></div>');
             var $grid = $('<div class="' + CLS + 'pipeGrid"></div>')
@@ -1460,8 +1516,11 @@
             }
             if (!visible.length) return;
 
-            /* The reference gives this one block the enlarged treatment. */
-            var $sec = block(msg("VAS_191_PaymentDetails", "Payment details"), "", CLS + "details-lg");
+            /* The reference gives this one block the enlarged treatment. The title
+               names the document it details, so a receipt is not headed "Payment". */
+            var $sec = block(isReceiptDoc()
+                ? msg("VAS_191_ReceiptDetails", "Receipt Details")
+                : msg("VAS_191_PaymentDetails", "Payment Details"), "", CLS + "details-lg");
             var $kv = $('<div class="' + CLS + 'kv ' + CLS + 'cols2"></div>');
             for (var j = 0; j < visible.length; j++) {
                 $kv.append($('<div class="' + CLS + 'kv-r"></div>')
@@ -1470,6 +1529,103 @@
                         .text(visible[j].v).attr("title", String(visible[j].v))));
             }
             $sec.append($kv);
+        }
+
+        /* ---------------------------------------------------------------- */
+        /*  4b. Withholding                                                 */
+        /* ---------------------------------------------------------------- */
+
+        /* What the document withheld before the money moved: the withholding leg
+           and the backup-withholding leg, each naming its TYPE, the base it was
+           computed on, the rate and the amount taken. Built as the Allocation
+           table is - same block chrome, same column-head and row treatment - so
+           the two tables read as one family. A payment that withholds nothing has
+           no section.
+
+           The head's right-hand summary states what actually leaves / arrives once
+           the withholding is taken off, since that is the figure the withholding
+           section exists to explain. */
+        function renderWithholding() {
+            var rows = data.Withholding || [];
+            if (!rows.length) return;
+
+            var net = (+data.PayAmt || 0);
+            var $sec = block(
+                msg("VAS_191_WithholdingDetails", "Withholding Details"),
+                (isReceiptDoc()
+                    ? msg("VAS_191_AfterWithholdingReceipt", "Receipt amount after withholding {0}")
+                    : msg("VAS_191_AfterWithholding", "Payment amount after withholding {0}"))
+                    .replace("{0}", money(net)));
+
+            var $head = $('<div class="' + CLS + 'wh-head"></div>');
+            $head.append($('<span></span>').text(msg("VAS_191_WithholdingType", "Withholding Type")));
+            /* The three figure columns carry the table's right-align marker, the
+               same one the allocation tables use for their money columns. */
+            $head.append($('<span class="right"></span>').text(msg("VAS_191_BaseAmount", "Base Amount")));
+            $head.append($('<span class="right"></span>').text(msg("VAS_191_Rate", "Rate")));
+            $head.append($('<span class="right"></span>').text(msg("VAS_191_WithholdingAmount", "Withholding Amount")));
+            $sec.append($head);
+
+            /* Rows live in their own host, exactly as the paginated tables do, so
+               the shared ":last-of-type has no bottom border" rule sees the last
+               ROW and not the footer band that may follow it. */
+            var $host = $('<div></div>');
+            for (var i = 0; i < rows.length; i++) {
+                $host.append(buildWithholdingRow(rows[i]));
+            }
+            $sec.append($host);
+
+            /* One leg names its own amount already; the total only earns a band
+               when the two legs have to be added up. */
+            if (rows.length > 1) {
+                var $foot = $('<div class="' + CLS + 'block-foot"></div>');
+                $foot.append($('<span></span>').text(msg("VAS_191_TotalWithheld", "Total withheld")));
+                $foot.append($('<span></span>').append($('<b></b>').text(money(data.WithholdingTotal))));
+                $sec.append($foot);
+            }
+        }
+
+        function buildWithholdingRow(row) {
+            var $r = $('<div class="' + CLS + 'wh-row"></div>');
+
+            /* The withholding TYPE, never its id - the identity cell of the row,
+               with the same two-line shape the allocation table's reference cell
+               uses. The backup leg says so underneath; both legs otherwise look
+               like the same kind of row. */
+            var name = row.Name || "—";
+            var $type = $('<div class="col-t"></div>');
+            $type.append($('<div class="p"></div>').text(name).attr("title", name));
+            if (row.IsBackup) {
+                var sub = msg("VAS_191_BackupWithholding", "Backup withholding");
+                $type.append($('<div class="s"></div>').text(sub).attr("title", sub));
+            }
+            $r.append($type);
+
+            /* Base and rate travel together: the payment stores no base, so without
+               a percentage on the withholding type there is nothing to derive one
+               from. Both then read as a dash rather than as a zero that would look
+               like a real figure. */
+            var hasRate = (+row.Rate || 0) !== 0;
+            $r.append($('<div class="amt"></div>').text(hasRate ? money(row.BaseAmount) : "—"));
+            $r.append($('<div class="amt"></div>').text(hasRate ? fmtPercent(row.Rate) : "—"));
+            $r.append($('<div class="amt"></div>').text(money(row.Amount)));
+
+            return $r;
+        }
+
+        /* A withholding rate as the percentage it is - "10.00%". Two decimals, so
+           a fractional rate is not rounded away into a different rate. */
+        function fmtPercent(value) {
+            var v = (+value) || 0;
+            var text;
+            try {
+                text = v.toLocaleString(window.navigator.language, {
+                    minimumFractionDigits: 2, maximumFractionDigits: 2
+                });
+            } catch (e) {
+                text = v.toFixed(2);
+            }
+            return text + "%";
         }
 
         /* ---------------------------------------------------------------- */
@@ -1561,7 +1717,7 @@
             var curSymbol = rows[0].CurrencySymbol || rows[0].CurrencyIso;
             var curPrec = rows[0].Precision;
             var $foot = $('<div class="' + CLS + 'block-foot"></div>');
-            $foot.append($('<span></span>').text(data.IsReceipt
+            $foot.append($('<span></span>').text(isReceiptDoc()
                 ? msg("VAS_191_ReceiptAllocation", "Receipt Allocation")
                 : msg("VAS_191_PaymentAllocation", "Payment Allocation")));
             $foot.append($('<span></span>').text(
