@@ -2152,6 +2152,11 @@
             // measure must not change on an existing invoice line. Checked before the meta
             // lookup so it holds even when column meta is absent.
             if (col === "C_UOM_ID" && line && line.values && (line.values.C_InvoiceLine_ID || 0) > 0) return true;
+            // A charge carries no unit of measure of its own: the C_Charge_ID callout sets
+            // the line to the default UOM (Each) and it must not be changed, exactly as on
+            // the standard invoice window. Same placement rationale as above - ahead of the
+            // meta lookup, so it holds even when column meta is absent.
+            if (col === "C_UOM_ID" && line && line.values && (line.values.C_Charge_ID || 0) > 0) return true;
             var m = columnMeta[col];
             if (!m) return false;
             if (m.IsReadOnly) return true;
