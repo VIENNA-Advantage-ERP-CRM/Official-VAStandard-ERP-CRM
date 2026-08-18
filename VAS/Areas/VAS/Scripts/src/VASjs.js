@@ -182,6 +182,7 @@ import "../app/util/CurrencyFormat.js";
 import "../app/util/AttributeControl.js";
 import "../app/util/VAS_PanelUtil.js";
 import "../app/util/VAS_ZoomUtil.js";
+import "../app/util/VAS_PanelShortcuts.js";
 import "../app/widgets/RequestWidget.js";
 import "../app/widgets/AgingReceivablesWidget.js";
 import "../app/widgets/AvgDaysToPayWidget.js";
