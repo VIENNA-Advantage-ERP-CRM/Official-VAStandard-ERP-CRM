@@ -13,7 +13,11 @@
 ///                 - the "Payment Allocate" rows (C_PaymentAllocate — the
 ///                   allocation entries PREPARED on the payment),
 ///                 - the "Allocation Detail" rows (C_AllocationHdr +
-///                   C_AllocationLine — the COMPLETED allocation history), and
+///                   C_AllocationLine — the COMPLETED allocation history),
+///                 - the withholding legs the payment carries (C_Withholding_ID /
+///                   WithholdingAmt and BackupWithholding_ID /
+///                   BackupWithholdingAmount, with the type name and
+///                   C_Withholding.PayPercentage), and
 ///                 - the AD_Form_ID of the standard Payment Allocation form the
 ///                   panel's Apply Advance action opens.
 ///
@@ -45,6 +49,8 @@
 ///               whether or not those modules are installed.
 /// Chronological development:
 ///   VAI145   2026-08-17  Created.
+///   VAI145   2026-08-18  Business-partner LOCATION added to the header; withholding
+///                        legs (C_Withholding / backup withholding) added.
 /// </summary>
 
 using System;
@@ -99,6 +105,7 @@ namespace VASLogic.Models
             PaymentOverviewData result = new PaymentOverviewData();
             result.PaymentAllocate = new List<PaymentAllocateRow>();
             result.AllocationDetail = new List<AllocationDetailRow>();
+            result.Withholding = new List<WithholdingRow>();
 
             if (ctx == null || C_Payment_ID <= 0)
             {
@@ -194,6 +201,8 @@ namespace VASLogic.Models
                                 pay.C_BPartner_ID,
                                 bp.Name AS BPName,
                                 bp.Value AS BPValue,
+                                pay.C_BPartner_Location_ID,
+                                bpl.Name AS BPLocationName,
                                 pay.C_Currency_ID,
                                 pay.C_ConversionType_ID,
                                 cur.ISO_Code AS CurISO,
@@ -205,10 +214,19 @@ namespace VASLogic.Models
                                 ips.DueDate AS ScheduleDueDate,
                                 pay.C_Charge_ID,
                                 chg.Name AS ChargeName,
+                                pay.C_Withholding_ID,
+                                wh.Name AS WithholdingName,
+                                wh.PayPercentage AS WithholdingRate,
+                                pay.WithholdingAmt,
+                                pay.BackupWithholding_ID,
+                                bwh.Name AS BackupWithholdingName,
+                                bwh.PayPercentage AS BackupWithholdingRate,
+                                pay.BackupWithholdingAmount,
                                 pay.C_BankAccount_ID,
                                 ba.AccountNo AS BankAccountNo,
                                 bnk.Name AS BankName,
                                 dt.Name AS DocTypeName,
+                                dt.DocBaseType,
                                 usr.Name AS CreatedByName,
                                 pay.Created,
                                 pay.Updated,
@@ -223,6 +241,9 @@ namespace VASLogic.Models
                          INNER JOIN C_Bank bnk ON (bnk.C_Bank_ID=ba.C_Bank_ID)
                          INNER JOIN C_DocType dt ON (dt.C_DocType_ID=pay.C_DocType_ID)
                          LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=pay.C_BPartner_ID)
+                         LEFT OUTER JOIN C_BPartner_Location bpl ON (bpl.C_BPartner_Location_ID=pay.C_BPartner_Location_ID)
+                         LEFT OUTER JOIN C_Withholding wh ON (wh.C_Withholding_ID=pay.C_Withholding_ID)
+                         LEFT OUTER JOIN C_Withholding bwh ON (bwh.C_Withholding_ID=pay.BackupWithholding_ID)
                          LEFT OUTER JOIN C_Invoice inv ON (inv.C_Invoice_ID=pay.C_Invoice_ID)
                          LEFT OUTER JOIN C_InvoicePaySchedule ips ON (ips.C_InvoicePaySchedule_ID=pay.C_InvoicePaySchedule_ID)
                          LEFT OUTER JOIN C_Charge chg ON (chg.C_Charge_ID=pay.C_Charge_ID)
@@ -298,6 +319,8 @@ namespace VASLogic.Models
             result.C_BPartner_ID = Util.GetValueOfInt(r["C_BPartner_ID"]);
             result.BPName = Util.GetValueOfString(r["BPName"]);
             result.BPValue = Util.GetValueOfString(r["BPValue"]);
+            result.C_BPartner_Location_ID = Util.GetValueOfInt(r["C_BPartner_Location_ID"]);
+            result.BPLocationName = Util.GetValueOfString(r["BPLocationName"]);
 
             result.C_Currency_ID = Util.GetValueOfInt(r["C_Currency_ID"]);
             result.C_ConversionType_ID = Util.GetValueOfInt(r["C_ConversionType_ID"]);
@@ -311,10 +334,17 @@ namespace VASLogic.Models
             result.C_Charge_ID = Util.GetValueOfInt(r["C_Charge_ID"]);
             result.ChargeName = Util.GetValueOfString(r["ChargeName"]);
 
+            result.Withholding = BuildWithholdingRows(r, result.StdPrecision);
+            foreach (WithholdingRow wr in result.Withholding)
+            {
+                result.WithholdingTotal += wr.Amount;
+            }
+
             result.C_BankAccount_ID = Util.GetValueOfInt(r["C_BankAccount_ID"]);
             result.BankAccountNo = MaskedTail(Util.GetValueOfString(r["BankAccountNo"]), 4);
             result.BankName = Util.GetValueOfString(r["BankName"]);
             result.DocTypeName = Util.GetValueOfString(r["DocTypeName"]);
+            result.DocBaseType = Util.GetValueOfString(r["DocBaseType"]);
 
             result.CreatedByName = Util.GetValueOfString(r["CreatedByName"]);
             result.Created = FormatDate(Util.GetValueOfDateTime(r["Created"]));
@@ -326,6 +356,78 @@ namespace VASLogic.Models
             result.ExecutionStatusName = GetListReferenceName(ctx, "C_Payment", "VA009_ExecutionStatus", result.ExecutionStatus);
 
             return result.C_Payment_ID > 0;
+        }
+
+        /// <summary>
+        /// The payment's withholding position, built from the header row that
+        /// LoadPayment already fetched — C_Payment carries both legs itself
+        /// (C_Withholding_ID / WithholdingAmt and BackupWithholding_ID /
+        /// BackupWithholdingAmount), so this needs no second query.
+        ///
+        /// A leg is reported only when it names a withholding type; a type with no
+        /// amount is still reported, because "TDS applies, nothing withheld yet" is
+        /// a fact the panel should show rather than hide.
+        ///
+        /// The RATE is C_Withholding.PayPercentage — the same column the allocation
+        /// code withholds with (amount * PayPercentage / 100) — so the panel can
+        /// never disagree with what was actually taken. C_Payment stores no base
+        /// amount, so the base is derived back from the amount and that rate and is
+        /// left at zero when there is no percentage to derive it from; the panel
+        /// then shows a dash rather than a made-up figure.
+        /// </summary>
+        /// <param name="r">The payment header row.</param>
+        /// <param name="precision">Payment currency precision for rounding.</param>
+        /// <returns>Zero, one or two rows — withholding first, backup withholding second.</returns>
+        private static List<WithholdingRow> BuildWithholdingRows(DataRow r, int precision)
+        {
+            List<WithholdingRow> list = new List<WithholdingRow>();
+
+            AddWithholdingRow(list, false,
+                Util.GetValueOfInt(r["C_Withholding_ID"]),
+                Util.GetValueOfString(r["WithholdingName"]),
+                Util.GetValueOfDecimal(r["WithholdingRate"]),
+                Util.GetValueOfDecimal(r["WithholdingAmt"]),
+                precision);
+
+            AddWithholdingRow(list, true,
+                Util.GetValueOfInt(r["BackupWithholding_ID"]),
+                Util.GetValueOfString(r["BackupWithholdingName"]),
+                Util.GetValueOfDecimal(r["BackupWithholdingRate"]),
+                Util.GetValueOfDecimal(r["BackupWithholdingAmount"]),
+                precision);
+
+            return list;
+        }
+
+        /// <summary>Appends one withholding leg when the payment carries it.</summary>
+        /// <param name="list">Target list.</param>
+        /// <param name="isBackup">True for the backup-withholding leg.</param>
+        /// <param name="withholdingId">C_Withholding_ID of the leg.</param>
+        /// <param name="name">Withholding type name.</param>
+        /// <param name="rate">C_Withholding.PayPercentage.</param>
+        /// <param name="amount">Amount withheld, as stored on the payment.</param>
+        /// <param name="precision">Payment currency precision for rounding.</param>
+        private static void AddWithholdingRow(List<WithholdingRow> list, bool isBackup,
+            int withholdingId, string name, decimal rate, decimal amount, int precision)
+        {
+            if (withholdingId <= 0)
+            {
+                return;
+            }
+
+            WithholdingRow row = new WithholdingRow();
+            row.IsBackup = isBackup;
+            row.C_Withholding_ID = withholdingId;
+            row.Name = name;
+            row.Rate = rate;
+            row.Amount = Round(amount, precision);
+            /* amount = base * rate / 100, so the base is the amount grossed back up.
+               Without a rate there is nothing to divide by and the base stays 0. */
+            row.BaseAmount = rate != 0
+                ? Round((row.Amount * 100m) / rate, precision)
+                : 0;
+
+            list.Add(row);
         }
 
         // ----------------------------------------------------------------- //
@@ -1172,6 +1274,11 @@ namespace VASLogic.Models
             public int C_BPartner_ID { get; set; }
             public string BPName { get; set; }
             public string BPValue { get; set; }
+            /// <summary>The partner LOCATION the payment was made to / received at.
+            /// The panel names this location under the partner instead of repeating
+            /// the partner's code and the booking organisation.</summary>
+            public int C_BPartner_Location_ID { get; set; }
+            public string BPLocationName { get; set; }
 
             public int C_Currency_ID { get; set; }
             public int C_ConversionType_ID { get; set; }
@@ -1193,6 +1300,10 @@ namespace VASLogic.Models
             public string Posted { get; set; }
             public string PostedName { get; set; }
             public string DocTypeName { get; set; }
+            /// <summary>C_DocType.DocBaseType — 'ARR' for an AR receipt, 'APP' for an
+            /// AP payment. The panel's direction wording falls back to this when the
+            /// IsReceipt flag disagrees with the document the payment was booked on.</summary>
+            public string DocBaseType { get; set; }
 
             public string TenderType { get; set; }
             public string TenderTypeName { get; set; }
@@ -1215,6 +1326,14 @@ namespace VASLogic.Models
             public string ScheduleDueDate { get; set; }
             public int C_Charge_ID { get; set; }
             public string ChargeName { get; set; }
+
+            /// <summary>Withholding legs carried by the payment — the withholding and
+            /// the backup withholding — each with its type, rate, derived base and
+            /// the amount withheld. Empty when the payment names neither, and the
+            /// section is then not rendered at all.</summary>
+            public List<WithholdingRow> Withholding { get; set; }
+            /// <summary>Sum of the withheld amounts shown, for the section footer.</summary>
+            public decimal WithholdingTotal { get; set; }
 
             public string CreatedByName { get; set; }
             public string Created { get; set; }
@@ -1254,6 +1373,26 @@ namespace VASLogic.Models
             /// empty when the document is not posted, and the section is then not
             /// rendered at all.</summary>
             public PostedJournalInfo PostedJournal { get; set; }
+        }
+
+        /// <summary>One withholding leg of the payment (C_Payment + C_Withholding).</summary>
+        public class WithholdingRow
+        {
+            /// <summary>True for the BACKUP withholding leg
+            /// (BackupWithholding_ID / BackupWithholdingAmount), false for the
+            /// primary one (C_Withholding_ID / WithholdingAmt).</summary>
+            public bool IsBackup { get; set; }
+            public int C_Withholding_ID { get; set; }
+            /// <summary>C_Withholding.Name — the withholding TYPE ("TDS"), never the id.</summary>
+            public string Name { get; set; }
+            /// <summary>C_Withholding.PayPercentage. 0 when the type is not a
+            /// percentage one, and the panel then shows no rate and no base.</summary>
+            public decimal Rate { get; set; }
+            /// <summary>Amount the payment carries for this leg.</summary>
+            public decimal Amount { get; set; }
+            /// <summary>Amount grossed back up by the rate. Derived — C_Payment
+            /// stores no base — and 0 when there is no rate to derive it from.</summary>
+            public decimal BaseAmount { get; set; }
         }
 
         /// <summary>One prepared allocation entry (C_PaymentAllocate).</summary>
