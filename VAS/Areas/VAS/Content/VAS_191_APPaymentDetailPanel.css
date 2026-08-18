@@ -44,6 +44,9 @@
  *                  bar block for why.
  * Chronological development:
  *   VAI163   2026-08-17  Created.
+ *   VAI163   2026-08-18  Action-bar buttons trimmed (0.6875em / 0.25em padding);
+ *                        Withholding table added to the shared Data Grid rules -
+ *                        same chrome as the Allocation table, no palette of its own.
  ***********************************************************/
 
 /* ----------------------------------------------------------- */
@@ -704,7 +707,8 @@
 .vas_191-pipeLbl.vas_191-blocked { font-weight: 700; color: #D14545; }
 
 /* ----------------------------------------------------------- */
-/*  Tables inside a block (Payment Allocate, Allocation Detail)  */
+/*  Tables inside a block (Payment Allocate, Allocation Detail,  */
+/*  Withholding)                                                 */
 /* ----------------------------------------------------------- */
 /* One shared column template across the header and every body row, every track
    minmax(0, Nfr): a bare Nfr cannot shrink below its content, so one long
@@ -712,7 +716,9 @@
 .vas_191-pa-head,
 .vas_191-pa-row,
 .vas_191-alloc-head,
-.vas_191-alloc-row {
+.vas_191-alloc-row,
+.vas_191-wh-head,
+.vas_191-wh-row {
     display: grid;
     align-items: center;
     gap: 0.75em;
@@ -720,12 +726,14 @@
 }
 
 .vas_191-pa-head,
-.vas_191-alloc-head {
+.vas_191-alloc-head,
+.vas_191-wh-head {
     padding-bottom: 0.625em;
     border-bottom: 1px solid var(--p191-divider);
 }
 .vas_191-pa-head > span,
-.vas_191-alloc-head > span {
+.vas_191-alloc-head > span,
+.vas_191-wh-head > span {
     font-weight: 400;
     font-size: 0.6875em;
     letter-spacing: 0.6px;
@@ -736,20 +744,24 @@
     white-space: nowrap;
 }
 .vas_191-pa-head > span.right,
-.vas_191-alloc-head > span.right { text-align: right; }
+.vas_191-alloc-head > span.right,
+.vas_191-wh-head > span.right { text-align: right; }
 
 /* No font-size on the row itself: each cell carries the reference's own size,
    so nothing compounds. */
 .vas_191-pa-row,
-.vas_191-alloc-row {
+.vas_191-alloc-row,
+.vas_191-wh-row {
     padding: 0.8125em 1.125em;
     border-bottom: 1px solid var(--p191-divider);
 }
 .vas_191-pa-row:last-of-type,
-.vas_191-alloc-row:last-of-type { border-bottom: none; }
+.vas_191-alloc-row:last-of-type,
+.vas_191-wh-row:last-of-type { border-bottom: none; }
 
 .vas_191-pa-row > div,
-.vas_191-alloc-row > div {
+.vas_191-alloc-row > div,
+.vas_191-wh-row > div {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -759,19 +771,22 @@
 /* Data Grid body tokens: row cells 0.75em, the identity cell bold, the amount
    one step up at 0.8125em so the money column still leads the row. */
 .vas_191-pa-row .p,
-.vas_191-alloc-row .p {
+.vas_191-alloc-row .p,
+.vas_191-wh-row .p {
     font-size: 0.75em;
     font-weight: 700;
     color: var(--p191-text);
 }
 .vas_191-pa-row .c,
-.vas_191-alloc-row .c {
+.vas_191-alloc-row .c,
+.vas_191-wh-row .c {
     font-size: 0.75em;
     font-weight: 400;
     color: var(--p191-secondary);
 }
 .vas_191-pa-row .amt,
-.vas_191-alloc-row .amt {
+.vas_191-alloc-row .amt,
+.vas_191-wh-row .amt {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--p191-text);
@@ -791,14 +806,27 @@
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.1fr);
 }
 
-/* The reference cell carries a second line naming what the reference IS. */
-.vas_191-alloc-row .col-a { white-space: normal; }
-.vas_191-alloc-row .col-a .p {
+/* Withholding: type · base amount · rate · withholding amount. The block takes
+   no palette of its own - it is the Allocation table with four columns, so the
+   two read as one family. */
+.vas_191-wh-head,
+.vas_191-wh-row {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
+/* The reference cell carries a second line naming what the reference IS; the
+   withholding type cell carries the same shape for its "Backup withholding"
+   qualifier. */
+.vas_191-alloc-row .col-a,
+.vas_191-wh-row .col-t { white-space: normal; }
+.vas_191-alloc-row .col-a .p,
+.vas_191-wh-row .col-t .p {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.vas_191-alloc-row .col-a .s {
+.vas_191-alloc-row .col-a .s,
+.vas_191-wh-row .col-t .s {
     font-size: 0.6875em;
     font-weight: 400;
     color: var(--p191-muted);
