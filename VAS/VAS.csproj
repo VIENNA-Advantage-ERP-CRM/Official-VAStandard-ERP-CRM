@@ -458,6 +458,7 @@
     <Content Include="Areas\VAS\Content\VAS_172_PendingTransferConfirmationWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_173_TransfersByWarehouseWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_174_TransferQueueWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\util\VAS_PanelShortcuts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_167_NewTransferQuickActionWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_168_OpenTransfersWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_169_UnderConfirmationWidget.js" />
