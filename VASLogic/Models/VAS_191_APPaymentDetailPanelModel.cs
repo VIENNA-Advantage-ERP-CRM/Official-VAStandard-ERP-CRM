@@ -705,8 +705,7 @@ namespace VASLogic.Models
                                 refinvdt.Name AS RefInvoiceDocTypeName,
                                 COALESCE(refinv.IsExpenseInvoice, 'N') AS RefInvoiceIsExpense");
             }
-            sql.Append(@"
-                         FROM C_AllocationLine al
+            sql.Append(@" FROM C_AllocationLine al
                          INNER JOIN C_AllocationHdr ah ON (ah.C_AllocationHdr_ID=al.C_AllocationHdr_ID)
                          INNER JOIN C_Currency acur ON (acur.C_Currency_ID=ah.C_Currency_ID)
                          LEFT OUTER JOIN C_Invoice inv ON (inv.C_Invoice_ID=al.C_Invoice_ID)
@@ -718,13 +717,12 @@ namespace VASLogic.Models
                          LEFT OUTER JOIN C_DocType refpaydt ON (refpaydt.C_DocType_ID=refpay.C_DocType_ID)
                          LEFT OUTER JOIN GL_JournalLine jl ON (jl.GL_JournalLine_ID=al.GL_JournalLine_ID)
                          LEFT OUTER JOIN GL_Journal jnl ON (jnl.GL_Journal_ID=jl.GL_Journal_ID)
-                         LEFT OUTER JOIN C_DocType jnldt ON (jnldt.C_DocType_ID=jnl.C_DocType_ID)");
+                         LEFT OUTER JOIN C_DocType jnldt ON (jnldt.C_DocType_ID=jnl.C_DocType_ID) ");
             sql.Append(@"LEFT OUTER JOIN VA009_PaymentMethod linepaypm ON (linepaypm.VA009_PaymentMethod_ID=linepay.VA009_PaymentMethod_ID)
-                         LEFT OUTER JOIN VA009_PaymentMethod refpaypm ON (refpaypm.VA009_PaymentMethod_ID=refpay.VA009_PaymentMethod_ID)");
+                         LEFT OUTER JOIN VA009_PaymentMethod refpaypm ON (refpaypm.VA009_PaymentMethod_ID=refpay.VA009_PaymentMethod_ID) ");
             if (hasRefInvoice)
             {
-                sql.Append(@"
-                         LEFT OUTER JOIN C_Invoice refinv ON (refinv.C_Invoice_ID=al.Ref_C_Invoice_ID)
+                sql.Append(@"LEFT OUTER JOIN C_Invoice refinv ON (refinv.C_Invoice_ID=al.Ref_C_Invoice_ID)
                          LEFT OUTER JOIN C_DocType refinvdt ON (refinvdt.C_DocType_ID=refinv.C_DocTypeTarget_ID)");
             }
             sql.Append(@"
