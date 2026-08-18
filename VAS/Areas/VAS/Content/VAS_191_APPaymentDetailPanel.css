@@ -546,15 +546,16 @@
    Button METRICS are deliberately BELOW the Action Pill token (0.8125em,
    padding 0.5em 0.875em) and below VAS_189's .btn: this bar carries up to five
    actions on a panel that is mostly dense read-only content, and at the token
-   size it dominated the header. 0.75em with 0.375em vertical padding keeps the
-   control ~28px tall while the label stays on the panel's type scale. The band
-   and the four treatments are kept from the reference layout. */
+   size it dominated the header. 0.6875em with 0.25em vertical padding keeps the
+   control ~22px tall while the label stays on the panel's type scale. The band
+   tightens with it so the bar does not regain in padding what the buttons gave
+   up. The band and the four treatments are kept from the reference layout. */
 .vas_191-actions {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 0.5em;
-    padding: 0.4375em 0.5em;
+    padding: 0.3125em 0.5em;
     background: rgba(238, 246, 255, 0.5);
     border-radius: 12px;
 }
@@ -567,9 +568,9 @@
     border: 1px solid transparent;
     background: #FFFFFF;
     color: var(--p191-action);
-    padding: 0.375em 0.75em;
+    padding: 0.25em 0.75em;
     font-weight: 400;
-    font-size: 0.75em;
+    font-size: 0.6875em;
     line-height: 1.2;
     cursor: pointer;
     transition: background .15s, border-color .15s, color .15s;
@@ -610,7 +611,7 @@
     background: none;
     border-color: transparent;
     color: var(--p191-muted);
-    padding: 0.375em 0.375em;
+    padding: 0.25em 0.375em;
     margin-left: auto;
 }
 .vas_191-pill.vas_191-is-text:hover:not(:disabled) { color: var(--p191-action-deep); }
