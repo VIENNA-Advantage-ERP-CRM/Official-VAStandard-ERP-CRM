@@ -26,20 +26,42 @@ namespace VAS.Controllers
     /// Purpose     : 3x2 ranked list - customers with open opportunities ordered by
     ///               total open pipeline value, each with a bar relative to the top
     ///               customer. The row modal lists the customer's opportunities with
-    ///               status, converted value and expected close, plus a reconciled
-    ///               total. Open opportunity = C_Project.VAS_ProjectStatus IN
-    ///               ('DR','IP') (the deployment's opportunity/pipeline stages; the
-    ///               CRM columns IsOpportunity / VA051_Stage / Probability /
-    ///               ExpectedSalesDate / IsSummary are not present in this schema, so
-    ///               they are not used - the same definition the VAS_125 KPI uses, so
-    ///               the widget total reconciles with that tile). PlannedAmt is
-    ///               converted to the tenant accounting currency via CurrencyConvert
-    ///               (default conversion type, as-of the current business date) so
-    ///               mixed currencies rank on one comparable base. MRole (tenant +
-    ///               org + record access) is applied to the main physical table
-    ///               C_Project only.
+    ///               stage, converted value and expected close, plus a reconciled
+    ///               total. Open opportunity = VAS_Opportunity with VAS_OppStage IN
+    ///               ('10','11','12','13','15') OR VAS_OppStage IS NULL, not yet
+    ///               converted to an order (Ref_Order_ID IS NULL AND C_Order_ID IS
+    ///               NULL) - the stage rule from VA061_056_OpenOpportunitiesModel, and
+    ///               the same definition the VAS_125 KPI uses so the widget total
+    ///               reconciles with that tile. The customer is
+    ///               COALESCE(Ref_BPartner_ID, C_BPartner_ID), because VAS_Opportunity
+    ///               carries the account on Ref_BPartner_ID. PlannedAmt is converted to
+    ///               the tenant accounting currency via CurrencyConvert (default
+    ///               conversion type, as-of the current business date) so mixed
+    ///               currencies rank on one comparable base. MRole (tenant + org +
+    ///               record access) is applied to the main physical table
+    ///               VAS_Opportunity only.
     /// Chronological development:
     ///   VAI052      2026-07-22 Created
+    ///   VAI052      2026-08-10 Source switched from C_Project (VAS_ProjectStatus
+    ///                          'DR'/'IP') to VAS_Opportunity, per the open-stage rule
+    ///                          in VA061_056_OpenOpportunitiesModel
+    ///   VAI052      2026-08-17 ORA-01008 on Oracle: BOTH endpoints failed before a row
+    ///                          was read, so this widget - and the VAS_125 Open Pipeline
+    ///                          drill-through, which reuses GetRows - could only ever
+    ///                          report "unable to load". Each statement embeds the
+    ///                          currency CTE plus the main projection, so @Client_ID
+    ///                          occurred 2x in GetRows and 3x in GetOpportunities (and
+    ///                          @Account_ID 1x more than its parameter) against ONE
+    ///                          parameter each. The app's Oracle layer never sets
+    ///                          BindByName, so ODP.NET binds BY POSITION and a name
+    ///                          occurring more often than the parameter list raises
+    ///                          ORA-01008 ("not all variables bound") - the same defect
+    ///                          already fixed in VAS_140 / VAS_128 / VAS_099. Both
+    ///                          statements are now assembled with NO placeholders: the
+    ///                          tenant id and default conversion type are server-derived,
+    ///                          and the account id is an int the action signature already
+    ///                          model-bound and validated as > 0, so none of them can
+    ///                          carry SQL text.
     /// </summary>
     public class VAS_139_HighValuePipelineWidgetController : Controller
     {
@@ -48,8 +70,14 @@ namespace VAS.Controllers
         private const int WidgetPageSize = 7;
         private const int MaxListPageSize = 25;
 
-        /// <summary>Single-row tenant accounting (reporting) currency.</summary>
-        private const string SchemaCurrencySql = @"
+        /// <summary>
+        /// Single-row tenant accounting (reporting) currency. The tenant id arrives as an
+        /// SQL expression because it is inlined, not bound - see the ORA-01008 note in the
+        /// class summary.
+        /// </summary>
+        private static string SchemaCurrencySql(string clientIdSql)
+        {
+            return @"
             SELECT ci.AD_Client_ID AS AD_Client_ID,
                    cs.C_Currency_ID AS Acct_Currency_ID,
                    cur.StdPrecision AS Std_Precision,
@@ -59,21 +87,49 @@ namespace VAS.Controllers
             INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID=ci.C_AcctSchema1_ID AND cs.IsActive = 'Y')
             INNER JOIN C_Currency cur ON (cur.C_Currency_ID=cs.C_Currency_ID AND cur.IsActive = 'Y')
             WHERE ci.IsActive = 'Y'
-              AND ci.AD_Client_ID = @Client_ID";
+              AND ci.AD_Client_ID = " + clientIdSql;
+        }
+
+        /// <summary>
+        /// An int as an SQL literal. Every value inlined by this controller is either
+        /// server-derived (tenant id, default conversion type) or an int the action
+        /// signature already model-bound and validated, so none can carry SQL text.
+        /// </summary>
+        private static string IntSql(int value)
+        {
+            return value.ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Non-terminal opportunity stages, plus a NULL stage (Open / Unassigned).
+        /// Mirrors OPEN_STAGE_PREDICATE in VA061_056_OpenOpportunitiesModel and the
+        /// VAS_125 KPI, so this list reconciles with that tile.
+        /// </summary>
+        private const string OpenStagePredicate =
+            "(o.VAS_OppStage IN ('10','11','12','13','15') OR o.VAS_OppStage IS NULL)";
+
+        /// <summary>
+        /// The account an opportunity belongs to. VAS_Opportunity carries it on
+        /// Ref_BPartner_ID; C_BPartner_ID is only sporadically populated, so it is a
+        /// fallback rather than the primary link.
+        /// </summary>
+        private const string CustomerIdExpr = "COALESCE(o.Ref_BPartner_ID, o.C_BPartner_ID)";
 
         /// <summary>
         /// Per-opportunity PlannedAmt converted to the tenant accounting currency.
-        /// Same-currency rows short-circuit; foreign currencies use CurrencyConvert
-        /// as-of the current business date with the tenant default conversion type
-        /// (C_Project carries no conversion type). Mirrors the VAS_125 KPI so totals
-        /// reconcile.
+        /// Same-currency rows short-circuit, as do rows with no currency at all - the
+        /// column is optional on VAS_Opportunity and empty on most rows, and
+        /// CurrencyConvert returns NULL for a NULL source currency. Foreign currencies
+        /// use CurrencyConvert as-of the current business date with the tenant default
+        /// conversion type (VAS_Opportunity carries no conversion type). Mirrors the
+        /// VAS_125 KPI so totals reconcile.
         /// </summary>
-        private string ConvertedAmtExpr()
+        private string ConvertedAmtExpr(string conversionTypeSql)
         {
             string conversionDate = DB.IsPostgreSQL() ? "CURRENT_DATE" : "TRUNC(SYSDATE)";
-            return @"CASE WHEN p.C_Currency_ID = sc.Acct_Currency_ID THEN COALESCE(p.PlannedAmt, 0)
-                         ELSE CurrencyConvert(COALESCE(p.PlannedAmt, 0), p.C_Currency_ID, sc.Acct_Currency_ID, "
-                         + conversionDate + @", @ConversionType_ID, p.AD_Client_ID, p.AD_Org_ID) END";
+            return @"CASE WHEN o.C_Currency_ID IS NULL OR o.C_Currency_ID = sc.Acct_Currency_ID THEN COALESCE(o.PlannedAmt, 0)
+                         ELSE CurrencyConvert(COALESCE(o.PlannedAmt, 0), o.C_Currency_ID, sc.Acct_Currency_ID, "
+                         + conversionDate + @", " + conversionTypeSql + @", o.AD_Client_ID, o.AD_Org_ID) END";
         }
 
         /// <summary>
@@ -100,39 +156,61 @@ namespace VAS.Controllers
 
             try
             {
-                int conversionTypeId = MConversionType.GetDefault(ctx.GetAD_Client_ID());
+                // Inlined, never bound: repeated placeholders break Oracle (ORA-01008).
+                string clientIdSql = IntSql(ctx.GetAD_Client_ID());
+                string conversionTypeSql = IntSql(MConversionType.GetDefault(ctx.GetAD_Client_ID()));
 
-                // Open opportunities with converted amount. MRole on the main physical
-                // table alias "p" (CTE rule: main data source only, not the currency CTE).
+                // Open opportunities with converted amount, resolved to an account.
+                // An opportunity may hang off a business partner OR, before the lead is
+                // converted, off C_Lead - and Ref_BPartner_ID can even point at a
+                // partner row that no longer exists. Both joins are therefore LEFT, and
+                // a row survives when EITHER resolves, so the opportunity count here
+                // matches the Open Opportunities KPI (which needs no account at all).
+                // MRole on the main physical table alias "o" (CTE rule: main data
+                // source only, not the currency CTE or the account lookups).
                 string openOppSql = @"
-                    SELECT p.C_BPartner_ID AS C_BPartner_ID,
-                           " + ConvertedAmtExpr() + @" AS Converted_Amt
-                    FROM C_Project p
-                    INNER JOIN schema_currency sc ON (sc.AD_Client_ID=p.AD_Client_ID)
-                    WHERE p.IsActive = 'Y'
-                      AND p.C_BPartner_ID IS NOT NULL
-                      AND p.AD_Client_ID = @Client_ID
-                      AND p.VAS_ProjectStatus IN ('DR', 'IP')";
-                openOppSql = MRole.GetDefault(ctx).AddAccessSQL(openOppSql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                    SELECT CASE WHEN bp.C_BPartner_ID IS NOT NULL THEN 'BP' ELSE 'LEAD' END AS Account_Type,
+                           COALESCE(bp.C_BPartner_ID, 0) AS Customer_Id,
+                           -- Lead id only identifies the account when there is no
+                           -- partner. A partner-backed opportunity may ALSO carry the
+                           -- lead it came from, and those differ per opportunity -
+                           -- grouping on it would split one customer into several rows.
+                           CASE WHEN bp.C_BPartner_ID IS NOT NULL THEN 0 ELSE COALESCE(ld.C_Lead_ID, 0) END AS Lead_Id,
+                           COALESCE(bp.Name, ld.Name) AS Account_Name,
+                           " + ConvertedAmtExpr(conversionTypeSql) + @" AS Converted_Amt
+                    FROM VAS_Opportunity o
+                    INNER JOIN schema_currency sc ON (sc.AD_Client_ID=o.AD_Client_ID)
+                    LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=" + CustomerIdExpr + @" AND bp.AD_Client_ID=o.AD_Client_ID AND bp.IsActive = 'Y')
+                    LEFT OUTER JOIN C_Lead ld ON (ld.C_Lead_ID=o.C_Lead_ID AND ld.AD_Client_ID=o.AD_Client_ID AND ld.IsActive = 'Y')
+                    WHERE o.IsActive = 'Y'
+                      AND o.AD_Client_ID = " + clientIdSql + @"
+                      AND " + OpenStagePredicate + @"
+                      AND o.Ref_Order_ID IS NULL
+                      AND o.C_Order_ID IS NULL
+                      AND (bp.C_BPartner_ID IS NOT NULL OR ld.C_Lead_ID IS NOT NULL)";
+                openOppSql = MRole.GetDefault(ctx).AddAccessSQL(openOppSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
                 string sql = @"
                     WITH schema_currency AS (
-                        " + SchemaCurrencySql + @"
+                        " + SchemaCurrencySql(clientIdSql) + @"
                     ),
                     OpenOpportunity AS (
                         " + openOppSql + @"
                     ),
                     CustomerPipeline AS (
-                        SELECT o.C_BPartner_ID AS C_BPartner_ID,
-                               bp.Name AS Customer_Name,
+                        SELECT o.Account_Type AS Account_Type,
+                               o.Customer_Id AS Customer_Id,
+                               o.Lead_Id AS Lead_Id,
+                               o.Account_Name AS Customer_Name,
                                COUNT(*) AS Open_Opp_Count,
                                COALESCE(SUM(o.Converted_Amt), 0) AS Pipeline_Value
                         FROM OpenOpportunity o
-                        INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=o.C_BPartner_ID AND bp.AD_Client_ID = @Client_ID AND bp.IsActive = 'Y' AND bp.IsCustomer = 'Y')
-                        GROUP BY o.C_BPartner_ID, bp.Name
+                        GROUP BY o.Account_Type, o.Customer_Id, o.Lead_Id, o.Account_Name
                     ),
                     Ranked AS (
-                        SELECT cp.C_BPartner_ID AS C_BPartner_ID,
+                        SELECT cp.Account_Type AS Account_Type,
+                               cp.Customer_Id AS Customer_Id,
+                               cp.Lead_Id AS Lead_Id,
                                cp.Customer_Name AS Customer_Name,
                                cp.Open_Opp_Count AS Open_Opp_Count,
                                cp.Pipeline_Value AS Pipeline_Value,
@@ -141,7 +219,9 @@ namespace VAS.Controllers
                                MAX(cp.Pipeline_Value) OVER () AS Max_Pipeline
                         FROM CustomerPipeline cp
                     )
-                    SELECT r.C_BPartner_ID AS Customer_Id,
+                    SELECT r.Account_Type AS Account_Type,
+                           r.Customer_Id AS Customer_Id,
+                           r.Lead_Id AS Lead_Id,
                            r.Customer_Name AS Customer_Name,
                            r.Open_Opp_Count AS Open_Opp_Count,
                            ROUND(r.Pipeline_Value, sc.Std_Precision) AS Pipeline_Value,
@@ -157,7 +237,8 @@ namespace VAS.Controllers
                     CROSS JOIN schema_currency sc
                     ORDER BY r.Pipeline_Value DESC,
                              r.Customer_Name ASC,
-                             r.C_BPartner_ID ASC
+                             r.Customer_Id ASC,
+                             r.Lead_Id ASC
                     OFFSET " + offset + @" ROWS FETCH NEXT " + limit + @" ROWS ONLY";
 
                 List<object> items = new List<object>();
@@ -169,11 +250,8 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, new SqlParameter[]
-                    {
-                        new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                        new SqlParameter("@ConversionType_ID", conversionTypeId)
-                    });
+                    // No parameters: every value in this statement is inlined (ORA-01008).
+                    dr = DB.ExecuteReader(sql);
                     while (dr != null && dr.Read())
                     {
                         total = Util.GetValueOfInt(dr["Total_Customers"]);
@@ -186,7 +264,12 @@ namespace VAS.Controllers
                         }
                         items.Add(new
                         {
+                            // customerId is 0 for a lead-backed account; the client uses
+                            // that to suppress the "open the customer record" action,
+                            // which has nothing to open.
                             customerId = Util.GetValueOfInt(dr["Customer_Id"]),
+                            leadId = Util.GetValueOfInt(dr["Lead_Id"]),
+                            accountType = Util.GetValueOfString(dr["Account_Type"]),
                             customerName = Util.GetValueOfString(dr["Customer_Name"]),
                             openOpps = Util.GetValueOfInt(dr["Open_Opp_Count"]),
                             pipeline = Util.GetValueOfDecimal(dr["Pipeline_Value"]),
@@ -226,18 +309,21 @@ namespace VAS.Controllers
         /// customer's row pipeline. Tenant/org/record access is reapplied here even
         /// though the id comes from the client.
         /// </summary>
-        /// <param name="C_BPartner_ID">Customer selected from a row.</param>
+        /// <param name="C_BPartner_ID">Customer selected from a row; 0 for a lead row.</param>
+        /// <param name="C_Lead_ID">Lead selected from a row, when the account is a lead
+        /// rather than a business partner.</param>
         /// <returns>JSON { opportunities:[...], currency_* } or { error }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetOpportunities(int C_BPartner_ID)
+        public JsonResult GetOpportunities(int C_BPartner_ID, int C_Lead_ID = 0)
         {
             if (Session["ctx"] == null)
             {
                 return Json(new { error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired" }, JsonRequestBehavior.AllowGet);
             }
 
-            if (C_BPartner_ID <= 0)
+            // Exactly one of the two identifies the account the row was built from.
+            if (C_BPartner_ID <= 0 && C_Lead_ID <= 0)
             {
                 return Json(new { error = "Invalid customer" }, JsonRequestBehavior.AllowGet);
             }
@@ -246,32 +332,53 @@ namespace VAS.Controllers
 
             try
             {
-                int conversionTypeId = MConversionType.GetDefault(ctx.GetAD_Client_ID());
+                // Inlined, never bound: repeated placeholders break Oracle (ORA-01008).
+                string clientIdSql = IntSql(ctx.GetAD_Client_ID());
+                string conversionTypeSql = IntSql(MConversionType.GetDefault(ctx.GetAD_Client_ID()));
 
-                // Per-opportunity projection for this customer. MRole on "p".
+                // Match the account the row was grouped under. A business partner takes
+                // precedence, exactly as in GetRows, so an opportunity that carries both
+                // is not returned twice.
+                // NOT EXISTS rather than NOT IN: the partner id may be NULL (lead-only
+                // opportunity) or dangling, and NOT IN yields UNKNOWN on a NULL left
+                // side, which would silently drop the row.
+                bool byPartner = C_BPartner_ID > 0;
+                string accountIdSql = IntSql(byPartner ? C_BPartner_ID : C_Lead_ID);
+                string accountFilter = byPartner
+                    ? CustomerIdExpr + " = " + accountIdSql
+                    : @"(o.C_Lead_ID = " + accountIdSql + @"
+                         AND NOT EXISTS (SELECT 1 FROM C_BPartner bp2
+                                         WHERE bp2.C_BPartner_ID=" + CustomerIdExpr + @"
+                                           AND bp2.AD_Client_ID=o.AD_Client_ID
+                                           AND bp2.IsActive = 'Y'))";
+
+                // Per-opportunity projection for this customer. MRole on "o".
+                // VAS_DecisionDate is the expected close; VAS_OppStage the stage code.
                 string oppRowsSql = @"
-                    SELECT p.C_Project_ID AS Opp_Id,
-                           p.Value AS Search_Key,
-                           p.Name AS Opp_Name,
-                           COALESCE(owner.Name, N'') AS Owner_Name,
-                           p.VAS_ProjectStatus AS Status_Code,
-                           ROUND(" + ConvertedAmtExpr() + @", sc.Std_Precision) AS Value_Conv,
-                           p.DateFinish AS Close_Date,
+                    SELECT o.VAS_Opportunity_ID AS Opp_Id,
+                           o.Value AS Search_Key,
+                           o.Name AS Opp_Name,
+                           COALESCE(owner.Name, '') AS Owner_Name,
+                           o.VAS_OppStage AS Status_Code,
+                           ROUND(" + ConvertedAmtExpr(conversionTypeSql) + @", sc.Std_Precision) AS Value_Conv,
+                           o.VAS_DecisionDate AS Close_Date,
                            sc.Cur_Symbol AS Cur_Symbol,
                            sc.ISO_Code AS ISO_Code,
                            sc.Std_Precision AS Std_Precision
-                    FROM C_Project p
-                    INNER JOIN schema_currency sc ON (sc.AD_Client_ID=p.AD_Client_ID)
-                    LEFT OUTER JOIN AD_User owner ON (owner.AD_User_ID=p.SalesRep_ID AND owner.AD_Client_ID = @Client_ID AND owner.IsActive = 'Y')
-                    WHERE p.IsActive = 'Y'
-                      AND p.C_BPartner_ID = @BP_ID
-                      AND p.AD_Client_ID = @Client_ID
-                      AND p.VAS_ProjectStatus IN ('DR', 'IP')";
-                oppRowsSql = MRole.GetDefault(ctx).AddAccessSQL(oppRowsSql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                    FROM VAS_Opportunity o
+                    INNER JOIN schema_currency sc ON (sc.AD_Client_ID=o.AD_Client_ID)
+                    LEFT OUTER JOIN AD_User owner ON (owner.AD_User_ID=o.SalesRep_ID AND owner.AD_Client_ID = " + clientIdSql + @" AND owner.IsActive = 'Y')
+                    WHERE o.IsActive = 'Y'
+                      AND o.AD_Client_ID = " + clientIdSql + @"
+                      AND " + accountFilter + @"
+                      AND " + OpenStagePredicate + @"
+                      AND o.Ref_Order_ID IS NULL
+                      AND o.C_Order_ID IS NULL";
+                oppRowsSql = MRole.GetDefault(ctx).AddAccessSQL(oppRowsSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
                 string sql = @"
                     WITH schema_currency AS (
-                        " + SchemaCurrencySql + @"
+                        " + SchemaCurrencySql(clientIdSql) + @"
                     ),
                     opp_rows AS (
                         " + oppRowsSql + @"
@@ -298,12 +405,8 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, new SqlParameter[]
-                    {
-                        new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                        new SqlParameter("@BP_ID", C_BPartner_ID),
-                        new SqlParameter("@ConversionType_ID", conversionTypeId)
-                    });
+                    // No parameters: every value in this statement is inlined (ORA-01008).
+                    dr = DB.ExecuteReader(sql);
                     while (dr != null && dr.Read())
                     {
                         currencySymbol = Util.GetValueOfString(dr["Cur_Symbol"]);

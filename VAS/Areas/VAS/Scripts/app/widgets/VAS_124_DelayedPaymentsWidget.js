@@ -13,6 +13,11 @@
  *
  * Backend - VAS_124_DelayedPaymentsWidget/GetDelayedPayments
  *
+ * Routing - 2026-08-17: a drill-through row opens the customer. Hosted on a window the
+ *           host grid is navigated in place (widgetFirevalueChanged); on the Home /
+ *           landing dashboard (windowNo < 0) there is no host grid, so the record is
+ *           opened in the standard Customer window via VAS.ZoomUtil.
+ *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  # | Current Text                        | Message Key
  * ---+-------------------------------------+--------------------------------
@@ -45,11 +50,15 @@
         write();
     }
 
-    // Currencies of Indian-numbering countries get Indian digit grouping and
-    // Lakh/Crore compact notation; all others get international grouping and K/M/B/T.
-    var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
-
     var CUSTOMER_WINDOW_NAME = 'Business Partner';
+
+    /* 2026-08-17: zoom target when the widget is NOT hosted inside a window
+       (windowNo < 0 - the Home / landing dashboard). There is no host grid to navigate
+       there, so the record is opened in the standard Customer window; VAS.ZoomUtil
+       resolves the AD_Window_ID from the new name, then the old name, then
+       VAS_ZoomScreenConfig. */
+    var ZOOM_WINDOW_NAME_NEW = 'VAS_CustomerMaster';
+    var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
 
     VAS.VAS_124_DelayedPaymentsWidget = function () {
 
@@ -62,6 +71,9 @@
         var $value;
         var $meta;
         var drill;
+        /* AD_Window_ID of the Customer window, resolved once on the first Home-page
+           zoom and reused afterwards (0 = not resolved yet). */
+        var zoomWindowId = 0;
 
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
@@ -69,7 +81,7 @@
         }
 
         function usesIndianNumbering(isoCode) {
-            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+            return VIS.Util.usesIndianNumbering(isoCode);
         }
 
         function currencyLocale(isoCode) {
@@ -85,32 +97,16 @@
             return !isNaN(precision) && precision >= 0 ? precision : 0;
         }
 
-        function trimTrailingZeros(text) {
-            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
-        }
-
-        // Compact currency amount (e.g. ₹3.42 Cr / $34.2M / -$5.3T). The sign sits
-        // BEFORE the currency symbol and compaction is on the absolute value.
-        function formatCompactAmount(value, symbol, isoCode) {
+        // Compact currency amount (e.g. ₹3.42Cr / $34.2M / -$5.3T). The magnitude comes
+        // from VIS.Util.formatCompactAmount, which scales against the base
+        // (accounting-schema) currency's numbering system and renders at the
+        // system-configured standard precision; the sign sits BEFORE the symbol.
+        function formatCompactAmount(value, symbol, isoCode, precision) {
             var number = Number(value || 0);
             if (!isFinite(number)) { number = 0; }
             var sign = number < 0 ? '-' : '';
-            var abs = Math.abs(number);
             var currency = symbol || isoCode || '';
-            var compact;
-            if (usesIndianNumbering(isoCode)) {
-                if (abs >= 10000000) { compact = trimTrailingZeros((abs / 10000000).toFixed(2)) + ' Cr'; }
-                else if (abs >= 100000) { compact = trimTrailingZeros((abs / 100000).toFixed(2)) + ' Lakh'; }
-                else if (abs >= 1000) { compact = trimTrailingZeros((abs / 1000).toFixed(1)) + 'K'; }
-                else { compact = abs.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 }); }
-            } else {
-                if (abs >= 1000000000000) { compact = trimTrailingZeros((abs / 1000000000000).toFixed(1)) + 'T'; }
-                else if (abs >= 1000000000) { compact = trimTrailingZeros((abs / 1000000000).toFixed(1)) + 'B'; }
-                else if (abs >= 1000000) { compact = trimTrailingZeros((abs / 1000000).toFixed(1)) + 'M'; }
-                else if (abs >= 1000) { compact = trimTrailingZeros((abs / 1000).toFixed(1)) + 'K'; }
-                else { compact = abs.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 }); }
-            }
-            return sign + currency + compact;
+            return sign + currency + VIS.Util.formatCompactAmount(number, isoCode, getPrecision(precision));
         }
 
         // Full, precise currency amount for the value tooltip.
@@ -163,7 +159,7 @@
         }
 
         function renderMetric(data) {
-            var compact = formatCompactAmount(data.overdue_amount, data.currency_symbol, data.currency_iso);
+            var compact = formatCompactAmount(data.overdue_amount, data.currency_symbol, data.currency_iso, data.std_precision);
             var full = formatFullAmount(data.overdue_amount, data.currency_symbol, data.currency_iso, data.std_precision);
             var countText = overdueCountText(data.overdue_customer_count);
 
@@ -201,12 +197,22 @@
         }
 
         // Drill-through: the overdue schedules behind the total (reuses the VAS_138
-        // Delayed Payments list endpoint); a row opens the customer record.
+        // Delayed Payments list endpoint); a row opens the customer record - in the host
+        // grid when the widget sits on a window, otherwise (Home / landing page,
+        // windowNo < 0) in the standard Customer window.
         function zoomToCustomer(bpId) {
             if (!bpId) { return; }
             if (drill) { drill.close(); }
             try {
-                $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                }
+                else {
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", Number(bpId), zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* best-effort */ }
         }
 
@@ -222,9 +228,16 @@
                         currency: { symbol: data.currency_symbol || '', iso: data.currency_iso || '', precision: data.std_precision }
                     };
                 },
+                // One row per customer in arrears, so the modal's count reconciles with
+                // the "N clients overdue" sub-line on the tile.
                 mapRow: function (item, cur, h) {
                     var days = Number(item.overdueDays || 0);
-                    var meta = [item.invoice, h.formatCount(days) + 'd ' + label('VAS_124_Overdue', 'overdue')].filter(function (p) { return p; }).join(' · ');
+                    var invoices = Number(item.invoiceCount || 0);
+                    var invoiceWord = invoices === 1 ? label('VAS_124_Invoice', 'invoice') : label('VAS_124_Invoices', 'invoices');
+                    var meta = [
+                        invoices > 0 ? h.formatCount(invoices) + ' ' + invoiceWord : '',
+                        h.formatCount(days) + 'd ' + label('VAS_124_Overdue', 'overdue')
+                    ].filter(function (p) { return p; }).join(' · ');
                     return { bpId: item.customerId, title: item.customerName, meta: meta, valueText: h.formatMoney(item.overdueAmt, cur), valueTone: 'danger' };
                 },
                 navigate: zoomToCustomer

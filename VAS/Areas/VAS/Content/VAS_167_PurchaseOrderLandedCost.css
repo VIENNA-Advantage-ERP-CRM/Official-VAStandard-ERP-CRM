@@ -48,6 +48,18 @@
  *                        It closes the table card under the totals footer and
  *                        borrows that footer's tinted strip, so the two read as one
  *                        base to the card rather than two competing bars.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare (.ta-r,
+ *                        .show, .err, .tone-*, .dist-*, .is-*) now carry the
+ *                        vas_167- prefix too. Sharing a name with a base-theme
+ *                        rule meant the base design won and repainted the
+ *                        panel; scoping them to the panel ends that.
+ *   VAI163   2026-08-07  The title strip is no longer frozen over the body. The
+ *                        scroll moved from .vas_167-body up to .vas_167-root, so
+ *                        the panel scrolls as one piece and .vas_167-head travels
+ *                        with the details it introduces; the body is now
+ *                        `flex: 1 0 auto` (grows with its content, still fills the
+ *                        panel when short) and the scrollbar styling followed the
+ *                        scroll to .vas_167-root.
  ***********************************************************/
 
 .vas_167-root {
@@ -89,9 +101,16 @@
 
     position: relative;
     height: 100%;
-    /* Header fixed, body scrolls: the panel itself never scrolls. */
+    /* The PANEL scrolls, as one piece: the title strip travels with the order's
+       details rather than staying pinned over them. Reading the card means
+       reading the strip's PO number too, and freezing the strip cost the body
+       that much height on every screen without ever being asked to. */
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
+    /* Kept: where the host lays this panel out as a flex item, min-height: 0 is
+       what lets it shrink to the available height instead of growing to its
+       content — without it the scroll above never engages. */
     min-height: 0;
     min-width: 0;
     background: var(--vaselc-white);
@@ -106,9 +125,9 @@
 /* ---------------- Header — title strip ---------------- */
 
 /* Untinted title strip in the PO Overview pattern: title + sub-line on the
-   left, tinted state pills on the right. Unlike that panel's strip this one
-   stays fixed above the scrolling body, so it keeps a hairline rule — the
-   body's content scrolls under it and needs an edge to stop against. */
+   left, tinted state pills on the right. It scrolls away with the body it
+   introduces; the hairline rule stays, now separating the title from the
+   details card rather than marking a frozen edge. */
 .vas_167-head {
     flex: none;
     display: flex;
@@ -177,7 +196,7 @@
     flex: none;
 }
 
-.vas_167-badge.is-generated {
+.vas_167-badge.vas_167-is-generated {
     background: var(--vaselc-success-bg);
     color: var(--vaselc-success-tx);
 }
@@ -232,8 +251,8 @@
 }
 
 /* A field value that opens its own record (the contract reference). */
-.vas_167-fVal.is-link { color: var(--vaselc-link); cursor: pointer; }
-.vas_167-fVal.is-link:hover { text-decoration: underline; }
+.vas_167-fVal.vas_167-is-link { color: var(--vaselc-link); cursor: pointer; }
+.vas_167-fVal.vas_167-is-link:hover { text-decoration: underline; }
 
 .vas_167-vendName {
     font-size: 14px;
@@ -273,16 +292,17 @@
 
 /* ---------------- Scrolling body ---------------- */
 
+/* Grows with its content and never shrinks below it — the scroll belongs to
+   .vas_167-root now. `flex: 1 0 auto` still claims the free space when the
+   content is short, so the white surface fills the panel as it always did. */
 .vas_167-body {
-    flex: 1;
-    min-height: 0;
+    flex: 1 0 auto;
     min-width: 0;
-    overflow-y: auto;
     padding: 14px 18px 20px;
 }
 
-.vas_167-body::-webkit-scrollbar { width: 9px; }
-.vas_167-body::-webkit-scrollbar-thumb {
+.vas_167-root::-webkit-scrollbar { width: 9px; }
+.vas_167-root::-webkit-scrollbar-thumb {
     background: rgba(15, 61, 97, 0.14);
     border-radius: 99px;
 }
@@ -316,8 +336,8 @@
 }
 
 .vas_167-strip .vas_167-ic { flex: none; margin-top: 1px; }
-.vas_167-strip.tone-warn .vas_167-ic { color: var(--vaselc-warn-tx); }
-.vas_167-strip.tone-risk .vas_167-ic { color: var(--vaselc-risk-tx); }
+.vas_167-strip.vas_167-tone-warn .vas_167-ic { color: var(--vaselc-warn-tx); }
+.vas_167-strip.vas_167-tone-risk .vas_167-ic { color: var(--vaselc-risk-tx); }
 
 .vas_167-ic {
     display: inline-flex;
@@ -389,7 +409,7 @@
 
 .vas_167-rowBody:hover { background: #FAFCFE; }
 
-.vas_167-rowBody.is-editing {
+.vas_167-rowBody.vas_167-is-editing {
     background: var(--vaselc-active);
     box-shadow: inset 3px 0 0 var(--vaselc-primary);
 }
@@ -413,7 +433,7 @@
     white-space: nowrap;
 }
 
-.vas_167-sub.is-warn { color: var(--vaselc-risk-tx); }
+.vas_167-sub.vas_167-is-warn { color: var(--vaselc-risk-tx); }
 
 .vas_167-chipWrap { margin-top: 4px; }
 
@@ -436,12 +456,12 @@
     background: currentColor;
 }
 
-.vas_167-distChip.dist-qty   { background: var(--vaselc-qty-bg);     color: var(--vaselc-qty-tx); }
-.vas_167-distChip.dist-value { background: var(--vaselc-value-bg);   color: var(--vaselc-value-tx); }
-.vas_167-distChip.dist-equal { background: var(--vaselc-equal-bg);   color: var(--vaselc-equal-tx); }
-.vas_167-distChip.dist-volume{ background: var(--vaselc-volume-bg);  color: var(--vaselc-volume-tx); }
-.vas_167-distChip.dist-weight{ background: var(--vaselc-weight-bg);  color: var(--vaselc-weight-tx); }
-.vas_167-distChip.dist-other { background: var(--vaselc-neutral-bg); color: var(--vaselc-neutral-tx); }
+.vas_167-distChip.vas_167-dist-qty   { background: var(--vaselc-qty-bg);     color: var(--vaselc-qty-tx); }
+.vas_167-distChip.vas_167-dist-value { background: var(--vaselc-value-bg);   color: var(--vaselc-value-tx); }
+.vas_167-distChip.vas_167-dist-equal { background: var(--vaselc-equal-bg);   color: var(--vaselc-equal-tx); }
+.vas_167-distChip.vas_167-dist-volume{ background: var(--vaselc-volume-bg);  color: var(--vaselc-volume-tx); }
+.vas_167-distChip.vas_167-dist-weight{ background: var(--vaselc-weight-bg);  color: var(--vaselc-weight-tx); }
+.vas_167-distChip.vas_167-dist-other { background: var(--vaselc-neutral-bg); color: var(--vaselc-neutral-tx); }
 
 .vas_167-amt { text-align: right; }
 
@@ -464,8 +484,8 @@
    application carrying a ta-r / ta-c class, not just this panel's cells — the
    one genuinely global rule pair in the tab-panel styles. Every other panel
    already qualifies the same utility with its own root. */
-.vas_167-root .ta-r { text-align: right; }
-.vas_167-root .ta-c { text-align: center; }
+.vas_167-root .vas_167-ta-r { text-align: right; }
+.vas_167-root .vas_167-ta-c { text-align: center; }
 
 /* ---------------- Row actions ---------------- */
 
@@ -494,8 +514,8 @@
     font-family: inherit;
 }
 
-.vas_167-icBtn.is-edit:hover { background: var(--vaselc-info-bg); color: var(--vaselc-link); }
-.vas_167-icBtn.is-rm:hover   { background: var(--vaselc-risk-bg); color: var(--vaselc-risk-tx); }
+.vas_167-icBtn.vas_167-is-edit:hover { background: var(--vaselc-info-bg); color: var(--vaselc-link); }
+.vas_167-icBtn.vas_167-is-rm:hover   { background: var(--vaselc-risk-bg); color: var(--vaselc-risk-tx); }
 .vas_167-icBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 1px; }
 
 .vas_167-linesBtn {
@@ -519,7 +539,7 @@
 .vas_167-linesBtn:hover { background: #CDE9FF; }
 .vas_167-linesBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 1px; }
 .vas_167-linesBtn .vas_167-ic { transition: transform 0.2s ease; }
-.vas_167-linesBtn.is-open .vas_167-ic { transform: rotate(180deg); }
+.vas_167-linesBtn.vas_167-is-open .vas_167-ic { transform: rotate(180deg); }
 
 /* ---------------- Generated lines block ---------------- */
 
@@ -532,7 +552,7 @@
     animation: vas_167-rise 0.28s ease both;
 }
 
-.vas_167-linesWrap.is-closed { display: none; }
+.vas_167-linesWrap.vas_167-is-closed { display: none; }
 
 .vas_167-linesCap {
     display: flex;
@@ -623,7 +643,7 @@
 }
 
 /* Reconciliation warning: the generated lines no longer sum to the entry. */
-.vas_167-tf.is-warn { color: var(--vaselc-risk-tx); font-weight: 700; }
+.vas_167-tf.vas_167-is-warn { color: var(--vaselc-risk-tx); font-weight: 700; }
 
 /* ---------------- Table footer / empty ---------------- */
 
@@ -683,7 +703,7 @@
 }
 .vas_167-pgBtn:hover { background: var(--vaselc-active); border-color: var(--vaselc-pale-bd); }
 .vas_167-pgBtn .vas_167-ic { color: currentColor; }
-.vas_167-pgBtn.is-disabled {
+.vas_167-pgBtn.vas_167-is-disabled {
     opacity: .45;
     cursor: default;
     pointer-events: none;
@@ -714,7 +734,7 @@
 /* The same message standing in for the whole Cost Elements section when the
    order has no expected landed cost — it carries the surface the table would
    have given it, since there is no table around it. */
-.vas_167-empty.is-standalone {
+.vas_167-empty.vas_167-is-standalone {
     background: var(--vaselc-white);
     border: 1px solid var(--vaselc-border);
     border-radius: var(--vaselc-radius);
@@ -805,12 +825,12 @@
 }
 
 input.vas_167-input { cursor: text; }
-.vas_167-input.is-num { text-align: right; }
+.vas_167-input.vas_167-is-num { text-align: right; }
 .vas_167-input::placeholder { color: #9F9F9F; font-weight: 400; }
 
 /* Select caret, drawn on the field rather than boxing the control. */
-.vas_167-ffBody.is-select { position: relative; }
-.vas_167-ffBody.is-select::after {
+.vas_167-ffBody.vas_167-is-select { position: relative; }
+.vas_167-ffBody.vas_167-is-select::after {
     content: '';
     position: absolute;
     right: 2px;
@@ -862,28 +882,28 @@ input.vas_167-input { cursor: text; }
     cursor: pointer;
 }
 
-.vas_167-btn.is-primary {
+.vas_167-btn.vas_167-is-primary {
     border: none;
     background: var(--vaselc-action);
     color: #fff;
 }
 
-.vas_167-btn.is-primary:hover { background: #0069AE; }
+.vas_167-btn.vas_167-is-primary:hover { background: #0069AE; }
 
-.vas_167-btn.is-primary:disabled,
-.vas_167-btn.is-primary:disabled:hover {
+.vas_167-btn.vas_167-is-primary:disabled,
+.vas_167-btn.vas_167-is-primary:disabled:hover {
     background: var(--vaselc-action);
     opacity: 0.45;
     cursor: not-allowed;
 }
 
-.vas_167-btn.is-ghost {
+.vas_167-btn.vas_167-is-ghost {
     border: 1px solid var(--vaselc-action);
     background: #fff;
     color: var(--vaselc-primary);
 }
 
-.vas_167-btn.is-ghost:hover { background: var(--vaselc-faint); }
+.vas_167-btn.vas_167-is-ghost:hover { background: var(--vaselc-faint); }
 .vas_167-btn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 2px; }
 
 /* ---------------- Toast ---------------- */
@@ -904,9 +924,9 @@ input.vas_167-input { cursor: text; }
     z-index: 1000;
 }
 
-.vas_167-toast.show { opacity: 1; transform: translate(-50%, 0); }
-.vas_167-toast.ok  { background: var(--vaselc-success-bg); color: var(--vaselc-success-tx); }
-.vas_167-toast.err { background: var(--vaselc-risk-bg);    color: var(--vaselc-risk-tx); }
+.vas_167-toast.vas_167-show { opacity: 1; transform: translate(-50%, 0); }
+.vas_167-toast.vas_167-ok  { background: var(--vaselc-success-bg); color: var(--vaselc-success-tx); }
+.vas_167-toast.vas_167-err { background: var(--vaselc-risk-bg);    color: var(--vaselc-risk-tx); }
 
 /* ---------------- Motion ---------------- */
 
@@ -919,14 +939,14 @@ input.vas_167-input { cursor: text; }
 
 .vis-rtl .vas_167-amt,
 [dir="rtl"] .vas_167-amt,
-.vis-rtl .vas_167-root .ta-r,
-[dir="rtl"] .vas_167-root .ta-r { text-align: left; }
+.vis-rtl .vas_167-root .vas_167-ta-r,
+[dir="rtl"] .vas_167-root .vas_167-ta-r { text-align: left; }
 
 .vis-rtl .vas_167-acts,
 [dir="rtl"] .vas_167-acts { justify-self: start; }
 
-.vis-rtl .vas_167-ffBody.is-select::after,
-[dir="rtl"] .vas_167-ffBody.is-select::after { right: auto; left: 2px; }
+.vis-rtl .vas_167-ffBody.vas_167-is-select::after,
+[dir="rtl"] .vas_167-ffBody.vas_167-is-select::after { right: auto; left: 2px; }
 
 .vis-rtl .vas_167-hdrColL,
 [dir="rtl"] .vas_167-hdrColL {

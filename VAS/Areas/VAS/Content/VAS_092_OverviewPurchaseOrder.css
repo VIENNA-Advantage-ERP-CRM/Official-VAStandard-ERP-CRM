@@ -125,6 +125,39 @@
  *   VAI163   2026-08-06  The pager now also serves the Recent Activity feed. Inside
  *                        the activity list it drops its top border, since the row
  *                        above it already draws the list's divider.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare
+ *                        (.is-link, .ta-r, .show, .tone-*, .ic-*) now carry the
+ *                        vas_092- prefix too. Sharing a name with a base-theme
+ *                        rule meant the base design won and repainted the
+ *                        panel; scoping them to the panel ends that.
+ *   VAI163   2026-08-14  - A vendor contact bit (.vas_092-contactBit) can now
+ *                          SHRINK and break inside itself. A flex item's default
+ *                          min-width is the widest its content can be, so a long
+ *                          e-mail address refused to narrow, overflowed the 40%
+ *                          vendor column and printed over the terms column beside
+ *                          it — visible in the single-record view, where the
+ *                          panel is narrow enough for the address to exceed its
+ *                          column. The icon now holds to the first line rather
+ *                          than centring against a wrapped address.
+ *                        - Added .vas_092-flagMark / -flag-on / -flag-off: the
+ *                          tick / cross a yes-no header field (Drop Shipment) is
+ *                          drawn as.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *                        - Added the Activity field-change delta
+ *                          (.vas_092-actDelta / -cvOld / -cvArrow / -cvNew):
+ *                          "was X → now Y" under the field's name, the old
+ *                          value struck through and the new one carrying the
+ *                          row's colour. Matches VAS_101 / VAS_104.
+ *   VAI163   2026-08-18  Dropped .vas_092-flagMark / -flag-on / -flag-off:
+ *                        Drop Shipment prints the word "Yes" / "No" as an
+ *                        ordinary header field again, so there is no tick or
+ *                        cross left to paint.
  ***********************************************************/
 
 .vas_092-root {
@@ -250,12 +283,12 @@
     white-space: nowrap;
 }
 
-.vas_092-pill.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
-.vas_092-pill.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
-.vas_092-pill.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
-.vas_092-pill.tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
-.vas_092-pill.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
-.vas_092-pill.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
+.vas_092-pill.vas_092-tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
+.vas_092-pill.vas_092-tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
+.vas_092-pill.vas_092-tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
+.vas_092-pill.vas_092-tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
+.vas_092-pill.vas_092-tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
+.vas_092-pill.vas_092-tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
 
 /* ----------------------------------------------------------- */
 /*  Header — title strip                                        */
@@ -311,12 +344,12 @@
     white-space: nowrap;
 }
 
-.vas_092-hdrPill.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
-.vas_092-hdrPill.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
-.vas_092-hdrPill.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
-.vas_092-hdrPill.tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
-.vas_092-hdrPill.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
-.vas_092-hdrPill.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
+.vas_092-hdrPill.vas_092-tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
+.vas_092-hdrPill.vas_092-tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
+.vas_092-hdrPill.vas_092-tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
+.vas_092-hdrPill.vas_092-tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
+.vas_092-hdrPill.vas_092-tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
+.vas_092-hdrPill.vas_092-tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
 
 .vas_092-hdrPill .vas_092-ic { color: currentColor; }
 
@@ -414,10 +447,34 @@
     font-size: 0.75em;
     color: var(--vaspo-text);
     margin-top: 0.375em;
+    min-width: 0;
 }
 
-.vas_092-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
-.vas_092-contactBit .vas_092-ic { color: var(--vaspo-action); }
+/* A contact bit must be allowed to SHRINK. A flex item defaults to
+   min-width:auto, which is the widest its content can be — so a long e-mail
+   address (akshay.kumar+12@viennasolutions.com) refused to narrow, pushed past
+   the 40% vendor column and printed straight over the terms column beside it.
+   The single-record view is where it shows, because that is where the panel is
+   narrow enough for the address to exceed its column.
+
+   min-width:0 lets the bit shrink, max-width caps it at the column, and the
+   address breaks inside itself — it has no space to wrap at, so a plain wrap
+   would not help. The icon holds to the first line (align-items:flex-start)
+   rather than centring itself against a two-line address. */
+.vas_092-contactBit {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 0.4375em;
+    min-width: 0;
+    max-width: 100%;
+}
+.vas_092-contactBit .vas_092-ic { color: var(--vaspo-action); margin-top: 0.15em; }
+.vas_092-contactBit > span {
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
+}
 
 .vas_092-ic { display: inline-flex; align-items: center; flex: none; }
 .vas_092-ic svg { display: block; }
@@ -476,11 +533,11 @@
 }
 
 .vas_092-chip .vas_092-ic          { color: var(--vaspo-muted); }
-.vas_092-chip.ic-info    .vas_092-ic { color: var(--vaspo-info-tx); }
-.vas_092-chip.ic-success .vas_092-ic { color: var(--vaspo-success-tx); }
-.vas_092-chip.ic-warning .vas_092-ic { color: var(--vaspo-warning-tx); }
-.vas_092-chip.ic-purple  .vas_092-ic { color: var(--vaspo-purple-tx); }
-.vas_092-chip.ic-muted   .vas_092-ic { color: var(--vaspo-muted); }
+.vas_092-chip.vas_092-ic-info    .vas_092-ic { color: var(--vaspo-info-tx); }
+.vas_092-chip.vas_092-ic-success .vas_092-ic { color: var(--vaspo-success-tx); }
+.vas_092-chip.vas_092-ic-warning .vas_092-ic { color: var(--vaspo-warning-tx); }
+.vas_092-chip.vas_092-ic-purple  .vas_092-ic { color: var(--vaspo-purple-tx); }
+.vas_092-chip.vas_092-ic-muted   .vas_092-ic { color: var(--vaspo-muted); }
 
 .vas_092-chipLabel { flex: none; color: var(--vaspo-muted); }
 .vas_092-chipVal   {
@@ -493,13 +550,13 @@
 .vas_092-chip .vas_092-pill { margin-left: 0.0625em; }
 
 /* Clickable origin chip — opens the source record. */
-.vas_092-chip.is-link { cursor: pointer; }
-.vas_092-chip.is-link:hover {
+.vas_092-chip.vas_092-is-link { cursor: pointer; }
+.vas_092-chip.vas_092-is-link:hover {
     border-color: var(--vaspo-action);
     box-shadow: 0 0 0 1px var(--vaspo-action) inset;
 }
-.vas_092-chip.is-link .arrowUpRight,
-.vas_092-chip.is-link > .vas_092-ic:last-child { color: var(--vaspo-action); }
+.vas_092-chip.vas_092-is-link .vas_092-arrowUpRight,
+.vas_092-chip.vas_092-is-link > .vas_092-ic:last-child { color: var(--vaspo-action); }
 
 /* ----------------------------------------------------------- */
 /*  Snapshot (metric grid)                                      */
@@ -520,10 +577,10 @@
     padding: 0.75em 0.875em;
 }
 
-.vas_092-metric.tone-total    { border-left-color: var(--vaspo-info-tx); }
-.vas_092-metric.tone-delivery { border-left-color: var(--vaspo-purple-tx); }
-.vas_092-metric.tone-lines    { border-left-color: var(--vaspo-success-tx); }
-.vas_092-metric.tone-received { border-left-color: #E08A1E; }
+.vas_092-metric.vas_092-tone-total    { border-left-color: var(--vaspo-info-tx); }
+.vas_092-metric.vas_092-tone-delivery { border-left-color: var(--vaspo-purple-tx); }
+.vas_092-metric.vas_092-tone-lines    { border-left-color: var(--vaspo-success-tx); }
+.vas_092-metric.vas_092-tone-received { border-left-color: #E08A1E; }
 
 .vas_092-mHead {
     display: flex;
@@ -544,10 +601,10 @@
     white-space: nowrap;
 }
 
-.vas_092-metric.tone-total    .vas_092-mHead .vas_092-ic { color: var(--vaspo-info-tx); }
-.vas_092-metric.tone-delivery .vas_092-mHead .vas_092-ic { color: var(--vaspo-purple-tx); }
-.vas_092-metric.tone-lines    .vas_092-mHead .vas_092-ic { color: var(--vaspo-success-tx); }
-.vas_092-metric.tone-received .vas_092-mHead .vas_092-ic { color: #E08A1E; }
+.vas_092-metric.vas_092-tone-total    .vas_092-mHead .vas_092-ic { color: var(--vaspo-info-tx); }
+.vas_092-metric.vas_092-tone-delivery .vas_092-mHead .vas_092-ic { color: var(--vaspo-purple-tx); }
+.vas_092-metric.vas_092-tone-lines    .vas_092-mHead .vas_092-ic { color: var(--vaspo-success-tx); }
+.vas_092-metric.vas_092-tone-received .vas_092-mHead .vas_092-ic { color: #E08A1E; }
 
 .vas_092-mVal {
     font-size: 1.25em;
@@ -634,9 +691,9 @@
 .vas_092-step:last-child  .vas_092-stepLine-r { visibility: hidden; }
 
 /* A segment is "filled" once its leading circle is reached. */
-.vas_092-step.is-done   .vas_092-stepLine-r,
-.vas_092-step.is-done   .vas_092-stepLine-l,
-.vas_092-step.is-active .vas_092-stepLine-l { background: #67B98A; }
+.vas_092-step.vas_092-is-done   .vas_092-stepLine-r,
+.vas_092-step.vas_092-is-done   .vas_092-stepLine-l,
+.vas_092-step.vas_092-is-active .vas_092-stepLine-l { background: #67B98A; }
 
 .vas_092-stepDot {
     flex: none;
@@ -655,12 +712,12 @@
 }
 .vas_092-stepDot .vas_092-ic { display: inline-flex; }
 
-.vas_092-step.is-done .vas_092-stepDot {
+.vas_092-step.vas_092-is-done .vas_092-stepDot {
     background: #E4F3EC;
     color: #1F9D5B;
     border-color: #BFE6D2;
 }
-.vas_092-step.is-active .vas_092-stepDot {
+.vas_092-step.vas_092-is-active .vas_092-stepDot {
     background: #fff;
     color: #E08A1E;
     border: 2px solid #F0A93D;
@@ -692,7 +749,7 @@
     margin-top: 0.25em;
     overflow-wrap: anywhere;
 }
-.vas_092-step.is-active .vas_092-stepMeta { color: #E08A1E; font-weight: 600; }
+.vas_092-step.vas_092-is-active .vas_092-stepMeta { color: #E08A1E; font-weight: 600; }
 
 /* ----------------------------------------------------------- */
 /*  Bottom (Notes stacked above Activity)                       */
@@ -744,11 +801,11 @@
 .vas_092-actTag .vas_092-ic { color: currentColor; }
 .vas_092-actTag .vas_092-ic svg { width: 0.9375em; height: 0.9375em; }
 
-.vas_092-actTag.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
-.vas_092-actTag.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
-.vas_092-actTag.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
-.vas_092-actTag.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
-.vas_092-actTag.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
+.vas_092-actTag.vas_092-tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
+.vas_092-actTag.vas_092-tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
+.vas_092-actTag.vas_092-tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
+.vas_092-actTag.vas_092-tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
+.vas_092-actTag.vas_092-tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
 
 .vas_092-actTitle {
     flex: 1 1 auto;
@@ -758,24 +815,35 @@
     line-height: 1.35;
 }
 
-/* The headline (note text / e-mail subject) and, for an e-mail, the recipient
-   beneath it. Each line clips on its own so the row height stays predictable. */
+/* The headline (note text / e-mail subject) and, for an e-mail, the recipients
+   beneath it. The headline clips to one line so the row height stays predictable
+   — it has a tooltip carrying the whole of it. */
 .vas_092-actLead,
 .vas_092-actSub {
     display: block;
+}
+.vas_092-actLead {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* The recipient line WRAPS instead of clipping: it lists the mail's addresses
+   in full, and an address cut off mid-domain identifies nobody. break-word
+   rather than a plain wrap, since a single long address has no space in it to
+   break at. */
 .vas_092-actSub {
     font-size: 0.8462em; /* ~0.6875em against the body anchor */
     color: var(--vaspo-muted);
     margin-top: 0.125em;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
 }
 
 /* An activity carrying a body (e-mail) opens on click. */
-.vas_092-actRow.is-openable { cursor: pointer; }
-.vas_092-actRow.is-openable:hover { background: #F7FBFE; }
+.vas_092-actRow.vas_092-is-openable { cursor: pointer; }
+.vas_092-actRow.vas_092-is-openable:hover { background: #F7FBFE; }
 
 .vas_092-actCaret {
     flex: none;
@@ -784,7 +852,7 @@
     color: var(--vaspo-muted);
     transition: transform .15s ease;
 }
-.vas_092-actRow.is-open .vas_092-actCaret {
+.vas_092-actRow.vas_092-is-open .vas_092-actCaret {
     transform: rotate(90deg);
     color: var(--vaspo-action);
 }
@@ -799,15 +867,19 @@
     line-height: 1.55;
 }
 .vas_092-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+/* The opened message's From / To / Cc / Bcc lines break on the address too, so
+   a long recipient list stays inside the panel. */
 .vas_092-actMeta {
     font-size: 0.8462em;
     color: var(--vaspo-muted);
     margin-bottom: 0.3125em;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 [dir="rtl"] .vas_092-actBody { padding-left: 0.875em; padding-right: 2.5em; }
 [dir="rtl"] .vas_092-actCaret svg { transform: scaleX(-1); }
-[dir="rtl"] .vas_092-actRow.is-open .vas_092-actCaret { transform: rotate(-90deg); }
+[dir="rtl"] .vas_092-actRow.vas_092-is-open .vas_092-actCaret { transform: rotate(-90deg); }
 
 .vas_092-actWhen {
     flex: none;
@@ -888,12 +960,12 @@
    figure would sit off the shared baseline. */
 .vas_092-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .vas_092-tHead > span,
-.vas_092-tRow > span.ta-r,
-.vas_092-tRow > span.ta-c { white-space: nowrap; }
+.vas_092-tRow > span.vas_092-ta-r,
+.vas_092-tRow > span.vas_092-ta-c { white-space: nowrap; }
 
 /* Tabular figures so the numeric columns line up digit for digit instead of
    drifting with proportional glyph widths. */
-.vas_092-table .ta-r,
+.vas_092-table .vas_092-ta-r,
 .vas_092-recvVal { font-variant-numeric: tabular-nums; }
 
 /* A pill in a table cell (distribution method, document status) still hugs its
@@ -907,26 +979,16 @@
     vertical-align: middle;
 }
 
-/* Last resort for a genuinely narrow panel: the seven-column line table (and the
-   history drawer sharing its grid) gets a floor width and scrolls inside its own
-   card, rather than crushing its columns or widening the panel. Everything else
-   on the page keeps its full width. */
-@container (max-width: 380px) {
-    .vas_092-itTable,
-    .vas_092-histTable,
-    .vas_092-docTable,
-    .vas_092-ldTable {
-        overflow-x: auto;
-        overflow-y: hidden;
-    }
-    .vas_092-itTable   .vas_092-tRow,
-    .vas_092-histTable .vas_092-tRow,
-    .vas_092-docTable  .vas_092-tRow,
-    .vas_092-ldTable   .vas_092-tRow { min-width: 360px; }
-    /* The drawer must scroll with its parent table, not on its own, or a past
-       version stops lining up with the line above it. */
-    .vas_092-lhTable { overflow: visible; }
-}
+/* A narrow panel SHRINKS its tables; it never scrolls them sideways.
+   Every track is minmax(0, Nfr) and every cell carries min-width: 0 with an
+   ellipsis, so the columns compress to whatever width the panel has and the text
+   that no longer fits is clipped with its full value on the row's tooltip.
+
+   The floor width + inner scrollbar this used to apply under 380px is gone: a
+   horizontal scrollbar inside a card hides the columns it pushes out — the
+   reader has to find it and drag it to learn there is anything there — where a
+   compressed column is at least visibly present. Nothing else on the page has
+   ever scrolled sideways, and the tables now behave the same way. */
 
 /* ----------------------------------------------------------- */
 /*  Per-line history (drawer under the line it belongs to)      */
@@ -957,7 +1019,7 @@
     cursor: pointer;
 }
 .vas_092-histBtn:hover { background: var(--vaspo-info-bg); border-color: var(--vaspo-action); }
-.vas_092-histBtn.is-open {
+.vas_092-histBtn.vas_092-is-open {
     background: var(--vaspo-info-bg);
     border-color: var(--vaspo-action);
     color: var(--vaspo-action);
@@ -1031,14 +1093,14 @@
 .vas_092-docTxt { min-width: 0; flex: 1; }
 
 /* A whole document row is clickable — the open arrow tints on hover. */
-.vas_092-tBody.is-link { cursor: pointer; }
-.vas_092-tBody.is-link:hover { background: #F2F8FD; }
-.vas_092-tBody.is-link .vas_092-docItem > .vas_092-ic:last-child {
+.vas_092-tBody.vas_092-is-link { cursor: pointer; }
+.vas_092-tBody.vas_092-is-link:hover { background: #F2F8FD; }
+.vas_092-tBody.vas_092-is-link .vas_092-docItem > .vas_092-ic:last-child {
     color: var(--vaspo-muted);
     flex: none;
 }
-.vas_092-tBody.is-link:hover .vas_092-docItem > .vas_092-ic:last-child,
-.vas_092-tBody.is-link:hover .vas_092-itName { color: var(--vaspo-action); }
+.vas_092-tBody.vas_092-is-link:hover .vas_092-docItem > .vas_092-ic:last-child,
+.vas_092-tBody.vas_092-is-link:hover .vas_092-itName { color: var(--vaspo-action); }
 
 .vas_092-tHead {
     background: #F5F8FB;
@@ -1058,8 +1120,8 @@
 .vas_092-tBody:last-of-type { border-bottom: none; }
 .vas_092-tBody:hover { background: #FAFCFE; }
 
-.vas_092-table .ta-r { text-align: right; justify-content: flex-end; }
-.vas_092-table .ta-c { text-align: center; justify-content: center; }
+.vas_092-table .vas_092-ta-r { text-align: right; justify-content: flex-end; }
+.vas_092-table .vas_092-ta-c { text-align: center; justify-content: center; }
 
 /* Item / component identity cell */
 .vas_092-itItem { min-width: 0; }
@@ -1125,17 +1187,17 @@
     flex: none;
 }
 .vas_092-recvBar i { display: block; height: 100%; border-radius: 999px; }
-.vas_092-recv.full i { background: var(--vaspo-success-tx); }
-.vas_092-recv.part i { background: var(--vaspo-warning-tx); }
-.vas_092-recv.none i { background: #CBD5DF; }
-.vas_092-recv.full { color: var(--vaspo-success-tx); font-weight: 500; }
-.vas_092-recv.part { color: var(--vaspo-warning-tx); font-weight: 500; }
-.vas_092-recv.none { color: var(--vaspo-muted); }
+.vas_092-recv.vas_092-full i { background: var(--vaspo-success-tx); }
+.vas_092-recv.vas_092-part i { background: var(--vaspo-warning-tx); }
+.vas_092-recv.vas_092-none i { background: #CBD5DF; }
+.vas_092-recv.vas_092-full { color: var(--vaspo-success-tx); font-weight: 500; }
+.vas_092-recv.vas_092-part { color: var(--vaspo-warning-tx); font-weight: 500; }
+.vas_092-recv.vas_092-none { color: var(--vaspo-muted); }
 
 /* Landed-cost cells */
 .vas_092-ldExp { font-weight: 700; color: var(--vaspo-text); }
 .vas_092-ldAct .vas_092-ldAmt { font-weight: 700; color: var(--vaspo-text); }
-.vas_092-ldAct.is-pending .vas_092-ldAmt { color: var(--vaspo-muted); font-weight: 500; }
+.vas_092-ldAct.vas_092-is-pending .vas_092-ldAmt { color: var(--vaspo-muted); font-weight: 500; }
 .vas_092-ldFlag {
     display: block;
     margin-top: 0.125em;
@@ -1144,17 +1206,17 @@
     letter-spacing: .3px;
     text-transform: uppercase;
 }
-.vas_092-ldFlag.inv { color: var(--vaspo-success-tx); }
-.vas_092-ldFlag.wait {
+.vas_092-ldFlag.vas_092-inv { color: var(--vaspo-success-tx); }
+.vas_092-ldFlag.vas_092-wait {
     color: var(--vaspo-muted);
     font-weight: 600;
     letter-spacing: 0;
     text-transform: none;
 }
 .vas_092-ldVar { font-weight: 700; }
-.vas_092-ldVar.over  { color: var(--vaspo-risk-tx); }
-.vas_092-ldVar.under { color: var(--vaspo-success-tx); }
-.vas_092-ldVar.flat  { color: var(--vaspo-muted); font-weight: 500; }
+.vas_092-ldVar.vas_092-over  { color: var(--vaspo-risk-tx); }
+.vas_092-ldVar.vas_092-under { color: var(--vaspo-success-tx); }
+.vas_092-ldVar.vas_092-flat  { color: var(--vaspo-muted); font-weight: 500; }
 
 /* Per-line distribution breakdown (under a landed-cost component row) */
 .vas_092-ldDist {
@@ -1201,10 +1263,10 @@
 }
 .vas_092-tf { color: var(--vaspo-muted); }
 .vas_092-tf b { color: var(--vaspo-text); font-weight: 700; margin-left: 0.375em; }
-.vas_092-tf b.warn { color: var(--vaspo-warning-tx); }
-.vas_092-tf.is-grand { color: var(--vaspo-text); font-weight: 700; }
-.vas_092-tf.is-grand b { color: var(--vaspo-action); margin-left: 0.5em; font-size: 1.15em; }
-.vas_092-ldFoot .vas_092-lf.is-grand { margin-left: auto; }
+.vas_092-tf b.vas_092-warn { color: var(--vaspo-warning-tx); }
+.vas_092-tf.vas_092-is-grand { color: var(--vaspo-text); font-weight: 700; }
+.vas_092-tf.vas_092-is-grand b { color: var(--vaspo-action); margin-left: 0.5em; font-size: 1.15em; }
+.vas_092-ldFoot .vas_092-lf.vas_092-is-grand { margin-left: auto; }
 
 /* ----------------------------------------------------------- */
 /*  Methodology note (quiet caption)                            */
@@ -1258,8 +1320,8 @@
     transition: opacity .25s ease, transform .25s ease;
     pointer-events: none;
 }
-.vas_092-toast.show { opacity: 1; transform: translate(-50%, 0); }
-.vas_092-toast.err  { background: #B23636; }
+.vas_092-toast.vas_092-show { opacity: 1; transform: translate(-50%, 0); }
+.vas_092-toast.vas_092-err  { background: #B23636; }
 
 /* ----------------------------------------------------------- */
 /*  Line-items pager (Showing a–b of N · prev / page / next)    */
@@ -1339,9 +1401,29 @@
 /* ----------------------------------------------------------- */
 [dir="rtl"] .vas_092-budgetAmt { margin-left: 0; margin-right: auto; }
 [dir="rtl"] .vas_092-hdrColL { border-right: none; border-left: 1px solid var(--vaspo-row-div); padding-right: 0; padding-left: 1.25em; }
-[dir="rtl"] .vas_092-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_092-table .vas_092-ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .vas_092-recv { align-items: flex-start; }
 [dir="rtl"] .vas_092-tFoot { justify-content: flex-start; }
 [dir="rtl"] .vas_092-tf b { margin-left: 0; margin-right: 0.375em; }
-[dir="rtl"] .vas_092-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
-[dir="rtl"] .vas_092-ldFoot .vas_092-lf.is-grand { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .vas_092-tf.vas_092-is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .vas_092-ldFoot .vas_092-lf.vas_092-is-grand { margin-left: 0; margin-right: auto; }
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value.
+   Matches VAS_101 / VAS_104. */
+.vas_092-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_092-cvOld {
+    color: var(--vaspo-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_092-cvArrow { flex: none; color: var(--vaspo-muted); }
+.vas_092-cvNew {
+    color: var(--vaspo-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}

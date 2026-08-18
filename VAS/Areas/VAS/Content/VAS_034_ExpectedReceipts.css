@@ -345,6 +345,28 @@
     white-space: nowrap;
 }
 
+/* Document-number zoom link inside the row title. Rendered as an <a> with no href,
+   so the link affordance has to be declared: action blue, underline on hover, and a
+   focus ring for keyboard use. Colour overrides the dark title tone. */
+.vas-er-doclink {
+    color: #0083DA;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+    .vas-er-doclink:hover,
+    .vas-er-doclink:focus {
+        color: #0069AE;
+        text-decoration: underline;
+    }
+
+    .vas-er-doclink:focus-visible {
+        outline: 2px solid rgba(0, 131, 218, 0.45);
+        outline-offset: 2px;
+        border-radius: 2px;
+    }
+
 /* Secondary metadata line under the row title — xs token, muted. */
 .vas-er-meta {
     margin-top: 0.125em;

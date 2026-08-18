@@ -5,7 +5,8 @@
  *   Formats the *magnitude* of a currency amount into a compact, locale-aware
  *   string. The numbering system depends on the base (accounting-schema) currency:
  *
- *     • INR  → Indian system:        Thousand(K), Lakh(L), Crore(Cr), Arab(Ar)
+ *     • Indian-numbering currencies (INR, PKR, BDT, NPR, BTN, LKR)
+ *            → Indian system:        Thousand(K), Lakh(L), Crore(Cr), Arab(Ar)
  *                                    e.g. 25,000 -> 25K, 2,50,000 -> 2.5L,
  *                                         5,00,00,000 -> 5Cr, 1,00,00,00,000 -> 1Ar
  *     • else → International system: Thousand(K), Million(M), Billion(B), Trillion(T)
@@ -37,11 +38,19 @@
         [1e3, 'K']    //            25,000 -> 25K
     ];
 
+    /* Base currencies whose countries group digits the Indian way (lakh / crore).
+       Any other base currency uses the international K / M / B scale. */
+    var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+    VIS.Util.usesIndianNumbering = function (isoCode) {
+        return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+    };
+
     VIS.Util.formatCompactAmount = function (value, isoCode, precision) {
         if (precision === undefined || precision === null) {
             precision = VIS.Env.getCtx().getStdPrecision();
         }
-        var tiers = (isoCode === 'INR') ? INDIAN_TIERS : INTL_TIERS;
+        var tiers = VIS.Util.usesIndianNumbering(isoCode) ? INDIAN_TIERS : INTL_TIERS;
         var absVal = Math.abs(Number(value) || 0);
 
         for (var i = 0; i < tiers.length; i++) {

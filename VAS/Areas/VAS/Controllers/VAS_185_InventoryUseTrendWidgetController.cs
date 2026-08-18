@@ -21,11 +21,50 @@ namespace VIS.Controllers
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_185_InventoryUseTrendWidgetController).FullName);
 
+        /// <summary>
+        /// The product's CURRENT cost price, as a derived table (M_Product_ID, CurrentCostPrice).
+        /// Picks the M_Cost row whose cost element matches the accounting schema's own costing
+        /// method, so landed-cost and other cost COMPONENT rows are excluded. A plain
+        /// MAX(M_Cost.CurrentCostPrice) is NOT the product cost - on FSMTesting6 it reports
+        /// 'Air Filter (7 micron)' at 80,142.29 (a Landed Cost component) against a true standard
+        /// cost of 2,599.
+        /// </summary>
+        private const string ProductCurrentCostSql = @"
+                    SELECT c.M_Product_ID, MAX(c.CurrentCostPrice) AS CurrentCostPrice
+                    FROM M_Cost c
+                    INNER JOIN M_CostElement ce ON ce.M_CostElement_ID = c.M_CostElement_ID
+                    INNER JOIN C_AcctSchema acs ON acs.C_AcctSchema_ID = c.C_AcctSchema_ID
+                                               AND acs.M_CostType_ID   = c.M_CostType_ID
+                    WHERE c.IsActive = 'Y'
+                      AND ce.CostingMethod IS NOT NULL
+                      AND ce.CostingMethod = acs.CostingMethod
+                    GROUP BY c.M_Product_ID";
+
+
         private class MonthBucket
         {
             public decimal qty;
             public decimal val;
             public int docs;
+        }
+
+
+        /// <summary>
+        /// Three-letter month names for the chart axis.
+        /// Deliberately NOT message keys: no VAS widget translates month names through AD_Message.
+        /// Nine sibling widgets (VAS_161, VAS_165, VAS_183, VAS_184, VAS_186, VAS_188 among them)
+        /// carry the same hardcoded array in JS, and AD_Message holds no month-name keys for VAS at
+        /// all - only phrases like "This Month". Keeping the array matches that.
+        /// </summary>
+        private static readonly string[] MonthShortNames = new string[]
+        {
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        };
+
+        private static string GetMonthShortName(int month)
+        {
+            if (month < 1 || month > 12) { return ""; }
+            return MonthShortNames[month - 1];
         }
 
         /// <summary>Returns monthly trend series for the specified rolling window (3, 6, or 12 months).</summary>
@@ -60,14 +99,20 @@ namespace VIS.Controllers
 
                 invAccessSql = MRole.GetDefault(ctx).AddAccessSQL(invAccessSql, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
+                // NULLIF guards are required, not cosmetic: line.CurrentCostPrice is a literal 0
+                // (not NULL) on many issue lines, so a plain COALESCE returns 0 and never reaches
+                // a fallback - those lines contributed nothing to the value series. Falling back to
+                // the product's current cost recovered 27% of August's value on FSMTesting6
+                // (25,032 -> 31,830) and 5% of July's (3,821,261 -> 4,016,382).
                 string sql = @"
                     SELECT
                       TO_CHAR(ai.MovementDate, 'YYYY-MM') AS MonthBucket,
                       SUM(line.QtyInternalUse) AS TotalQty,
-                      SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)) AS TotalValue,
+                      SUM(line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pc.CurrentCostPrice, 0)) AS TotalValue,
                       COUNT(DISTINCT ai.M_Inventory_ID) AS DocCount
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
+                    LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = line.M_Product_ID
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
                     GROUP BY TO_CHAR(ai.MovementDate, 'YYYY-MM')
@@ -96,13 +141,12 @@ namespace VIS.Controllers
 
             {
                 var series = new List<object>();
-                string[] monthNames = new string[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
                 for (int i = 0; i < windowMonths; i++)
                 {
                     DateTime dt = startMonthStart.AddMonths(i);
                     string key = dt.ToString("yyyy-MM");
-                    string labelName = monthNames[dt.Month - 1] + (windowMonths == 12 ? (" '" + dt.ToString("yy")) : "");
+                    string labelName = GetMonthShortName(dt.Month) + (windowMonths == 12 ? (" '" + dt.ToString("yy")) : "");
 
                     decimal qty = 0;
                     decimal val = 0;
@@ -119,7 +163,7 @@ namespace VIS.Controllers
                     {
                         key = key,
                         label = labelName,
-                        fullMonth = monthNames[dt.Month - 1] + " " + dt.Year,
+                        fullMonth = GetMonthShortName(dt.Month) + " " + dt.Year,
                         qty = qty,
                         val = val,
                         docs = docs

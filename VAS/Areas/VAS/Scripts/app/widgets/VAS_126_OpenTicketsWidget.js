@@ -1,27 +1,33 @@
 /**
  * VAS_126 Open Tickets KPI Widget (Customers module dashboard)
- * Purpose - Clickable 2x1 amber-tint KPI tile. Main value is the count of open
- *           support tickets (R_Request whose R_Status.IsOpen='Y' / IsClosed<>'Y');
- *           the sub-line is the number of distinct KEY-CLIENT customers affected.
- *           Clicking (or Enter/Space) opens a paged triage list of customers with
- *           open tickets - key clients first, then by open-ticket count. Selecting
- *           a row zooms the host window to that C_BPartner record.
+ * Purpose - Clickable 2x1 KPI tile. Main value is the count of open support tickets
+ *           (R_Request whose R_Status.IsOpen='Y' / IsClosed<>'Y'); the sub-line is
+ *           the click affordance. Clicking (or Enter/Space) opens a paged triage
+ *           list of customers with open tickets - key clients first, then by
+ *           open-ticket count. Selecting a row zooms the host window to that
+ *           C_BPartner record.
  * Design  - kpi-open-tickets.html (attached) + Design Specs/dashboard-widgets.md
  *           "KPI And Summary Widget". Reference kpiWidget clickable tile: muted
  *           label + tap arrow on top, big bold value, foot row (sub + "triage"
- *           CTA) at the bottom, amber attention tint. Internal sizing in em against
- *           the widget-root clamp; borders/radii in px. CSS namespaced vas126-*.
+ *           CTA) at the bottom, on the standard glass surface - the spec forbids a
+ *           semantic tint on the widget background, so urgency is carried by the
+ *           "triage" CTA. Internal sizing in em against the widget-root clamp;
+ *           borders/radii in px. CSS namespaced vas126-*.
  *
  * Backend - VAS_126_OpenTicketsWidget/GetOpenTickets       (KPI aggregate)
  *           VAS_126_OpenTicketsWidget/GetAffectedCustomers (paged triage list)
+ *
+ * Routing - 2026-08-17: hosted on a window, a triage row (and "open in browser")
+ *           navigates the host grid in place (widgetFirevalueChanged). On the Home /
+ *           landing dashboard (windowNo < 0) there is no host grid, so the standard
+ *           Customer window is opened via VAS.ZoomUtil - on the picked record, or
+ *           unpositioned for "open in browser" (record id 0).
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  #  | Current Text                   | Message Key
  * ----+--------------------------------+--------------------------------
  *  1  | Open tickets                   | VAS_126_OpenTickets
- *  2  | key clients affected           | VAS_126_KeyClientsAffected
- *  3  | key client affected            | VAS_126_KeyClientAffected
- *  4  | click                          | VAS_126_Click
+ *  2  | click                          | VAS_126_Click
  *  5  | triage                         | VAS_126_Triage
  *  6  | Open triage list.              | VAS_126_OpenTriageList
  *  7  | Unable to load                 | VAS_126_UnableToLoad
@@ -30,6 +36,7 @@
  * 10  | Key client                     | VAS_126_KeyClient
  * 11  | Nothing here right now.        | VAS_126_NothingHere
  * 12  | of                             | VAS_126_Of
+ * 12a | Showing                        | VAS_126_Showing
  * 13  | Close                          | VAS_126_Close
  * ──────────────────────────────────────────────────────────────────────────
  */
@@ -40,6 +47,13 @@
     // Host window to zoom when the widget is not hosted on the Customers window
     // itself (documented for admin confirmation; the resolved host name wins).
     var CUSTOMER_WINDOW_NAME = "Business Partner";
+
+    /* 2026-08-17: zoom target when the widget is NOT hosted inside a window
+       (windowNo < 0 - the Home / landing dashboard). There is no host grid to navigate
+       there, so the Customer window is opened directly; VAS.ZoomUtil resolves the
+       AD_Window_ID from the new name, then the old name, then VAS_ZoomScreenConfig. */
+    var ZOOM_WINDOW_NAME_NEW = "VAS_CustomerMaster";
+    var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
 
     function ensureDashInlineSizeVar($el) {
         if (window.__vasDashInlineSizeObserver) { return; }
@@ -76,15 +90,12 @@
         var $detailSummary;
         var currentDetailId = 0;
         var currentDetailName = '';
-        var $log;
-        var $logCust;
-        var $logText;
-        var $logError;
-        var currentLogBpId = 0;
-        var currentLogType = 'Call';
+
+        /* AD_Window_ID of the Customer window, resolved once on the first Home-page
+           zoom and reused afterwards (0 = not resolved yet). */
+        var zoomWindowId = 0;
 
         var lastCount = 0;
-        var lastKeyClients = 0;
         var pageSize = 7;
         var pageOffset = 0;
         var listTotal = 0;
@@ -141,6 +152,15 @@
             return parsed || {};
         }
 
+        // Projects fact: name the customer's delivery project rather than only
+        // counting it. The server sends the first project name plus the total, so
+        // a customer with several reads "Name +2"; none renders the empty dash.
+        function projectText(name, count, dash) {
+            if (!name) { return dash; }
+            var extra = Number(count || 0) - 1;
+            return escapeHtml(extra > 0 ? name + ' +' + formatCount(extra) : name);
+        }
+
         function formatCount(value) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
@@ -177,17 +197,26 @@
             return '';
         }
 
-        // Compact "ARR"/value in K, matching the reference ($1123K style).
+        // Standard precision of the base currency reported by the endpoint, falling
+        // back to the session context.
+        function currencyPrecision() {
+            var p = Number(searchCurrency.precision);
+            if (!isNaN(p) && p >= 0) { return p; }
+            if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                p = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+            return !isNaN(p) && p >= 0 ? p : 0;
+        }
+
+        // Compact "ARR"/value in the base (accounting-schema) currency. The magnitude
+        // comes from VIS.Util.formatCompactAmount, so the scale follows the base
+        // currency's numbering system (K/M/B or K/L/Cr) at the configured precision.
         function formatArr(value) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             var sign = n < 0 ? '-' : '';
-            var abs = Math.abs(n);
             var symbol = searchCurrency.symbol || searchCurrency.iso || '';
-            var body = abs >= 1000
-                ? Math.round(abs / 1000).toLocaleString(window.navigator.language) + 'K'
-                : abs.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
-            return sign + symbol + body;
+            return sign + symbol + VIS.Util.formatCompactAmount(n, searchCurrency.iso, currencyPrecision());
         }
         function formatArrFull(value) {
             var n = Number(value || 0);
@@ -195,21 +224,28 @@
             var sign = n < 0 ? '-' : '';
             var abs = Math.abs(n);
             var symbol = searchCurrency.symbol || searchCurrency.iso || '';
-            var precision = Number(searchCurrency.precision);
-            if (isNaN(precision) || precision < 0) { precision = 0; }
+            var precision = currencyPrecision();
             var formatted = abs.toLocaleString(window.navigator.language, {
                 minimumFractionDigits: precision, maximumFractionDigits: precision
             });
             return sign + (symbol ? symbol + ' ' + formatted : formatted);
         }
 
-        // "N key clients affected · click" (singular when 1).
-        function subText(keyClients) {
-            var n = Number(keyClients || 0);
-            var word = n === 1
-                ? label('VAS_126_KeyClientAffected', 'key client affected')
-                : label('VAS_126_KeyClientsAffected', 'key clients affected');
-            return formatCount(n) + ' ' + word + ' · ' + label('VAS_126_Click', 'click');
+        // Segment = the marketing target list(s) the customer belongs to. The server
+        // sends the first one plus how many there are in total, so a customer in
+        // several lists reads "West Region Prospect +2" instead of hiding the rest.
+        // No membership at all renders the same em dash the other empty cells use.
+        function segmentText(name, count) {
+            if (!name) { return '—'; }
+            var extra = Number(count || 0) - 1;
+            return extra > 0 ? name + ' +' + formatCount(extra) : name;
+        }
+
+        // Sub-line is the click affordance only. The "N key clients affected" figure
+        // was removed on request; key-client classification stays configuration-driven
+        // and still tags rows inside the triage list.
+        function subText() {
+            return label('VAS_126_Click', 'click');
         }
 
         /* ---------- KPI ---------- */
@@ -234,16 +270,14 @@
 
         function renderMetric(data) {
             lastCount = Number(data.open_ticket_count || 0);
-            lastKeyClients = Number(data.key_clients_affected || 0);
 
             $value.text(formatCount(lastCount)).attr('title', formatCount(lastCount));
-            $sub.text(subText(lastKeyClients));
+            $sub.text(subText());
             setCardLabel(label('VAS_126_OpenTickets', 'Open tickets') + ': ' + formatCount(lastCount) + '. ' + label('VAS_126_OpenTriageList', 'Open triage list.'));
         }
 
         function showError() {
             lastCount = 0;
-            lastKeyClients = 0;
             $value.text('—').removeAttr('title');
             $sub.text(label('VAS_126_UnableToLoad', 'Unable to load'));
             setCardLabel(label('VAS_126_UnableToLoad', 'Unable to load'));
@@ -324,12 +358,16 @@
                 '<span class="is-right">' + escapeHtml(label('VAS_126_Segment', 'Segment')) + '</span>' +
             '</div>';
 
-            var noOwner = label('VAS_126_NoOwner', '—');
+            // Bare em dash for "no owner on this customer". Deliberately NOT read from
+            // the message dictionary: AD_Message.VAS_126_NoOwner is stored double-
+            // encoded in this database and renders as "a EUR ..." mojibake, and a
+            // punctuation placeholder carries nothing to translate anyway.
+            var noOwner = '—';
             var rows = items.map(function (customer) {
                 var name = customer.customerName || '';
                 var contact = customer.contact || '';
                 var owner = customer.rep || noOwner;
-                var segment = customer.segment || '—';
+                var segment = segmentText(customer.segment, customer.segmentCount);
                 var arr = formatArr(customer.value);
                 return '<button type="button" class="vas126-grid-row" data-id="' + Number(customer.customerId) + '">' +
                     '<span class="vas126-c-cust">' +
@@ -356,10 +394,16 @@
             var pages = Math.max(1, Math.ceil(listTotal / pageSize));
             var currentPage = Math.floor(pageOffset / pageSize);
 
+            /* Footer pager (dashboard-widgets.md §"Widget Footer Pager"): helper
+               left, compact prev · "N of M" · next right. */
+            var of = label('VAS_126_Of', 'of');
             $dialogPager.html(
-                '<button type="button" class="vas126-pgbtn" data-dir="prev" ' + (currentPage <= 0 ? 'disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_126_PrevPage', 'Previous')) + '">' + icon('chevL') + '</button>' +
-                '<span class="vas126-pglabel">' + start + '–' + end + ' ' + escapeHtml(label('VAS_126_Of', 'of')) + ' ' + formatCount(listTotal) + '</span>' +
-                '<button type="button" class="vas126-pgbtn" data-dir="next" ' + (currentPage >= pages - 1 ? 'disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_126_NextPage', 'Next')) + '">' + icon('chevR') + '</button>'
+                '<span class="vas126-pglabel">' + escapeHtml(label('VAS_126_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal)) + '</span>' +
+                '<span class="vas126-pgctl">' +
+                    '<button type="button" class="vas126-pgbtn" data-dir="prev" ' + (currentPage <= 0 ? 'disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_126_PrevPage', 'Previous')) + '">' + icon('chevL') + '</button>' +
+                    '<span class="vas126-pgtext">' + escapeHtml((currentPage + 1) + ' ' + of + ' ' + pages) + '</span>' +
+                    '<button type="button" class="vas126-pgbtn" data-dir="next" ' + (currentPage >= pages - 1 ? 'disabled' : '') + ' aria-label="' + escapeHtml(label('VAS_126_NextPage', 'Next')) + '">' + icon('chevR') + '</button>' +
+                '</span>'
             );
         }
 
@@ -374,15 +418,25 @@
 
         // "Open in browser": open the host Customers window so the user can work the
         // full list in the app (best-effort; documented for admin confirmation).
+        // From the Home / landing page (windowNo < 0) the Customer window is opened
+        // unpositioned instead - record id 0 means "no record to land on".
         function openInBrowser() {
             closeTriage();
             try {
-                $self.widgetFirevalueChanged({
-                    "TabLayout": "N",
-                    "TabIndex": "0",
-                    "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
-                    "ActionType": "W"
-                });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabLayout": "N",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
+                        "ActionType": "W"
+                    });
+                }
+                else {
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", 0, zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* best-effort */ }
         }
 
@@ -408,13 +462,22 @@
             if (!bpId) { return; }
             closeTriage();
             try {
-                $self.widgetFirevalueChanged({
-                    "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId),
-                    "TabLayout": "Y",
-                    "TabIndex": "0",
-                    "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
-                    "ActionType": "W"
-                });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId),
+                        "TabLayout": "Y",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
+                        "ActionType": "W"
+                    });
+                }
+                else {
+                    /* Home / landing page: no host grid, so open the standard Customer window. */
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", Number(bpId), zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* zoom is best-effort */ }
         }
 
@@ -488,9 +551,9 @@
                 fact('VAS_126_Owner', 'Owner', escapeHtml(data.rep || dash)) +
                 fact('VAS_126_ARR', 'ARR', escapeHtml(formatArr(data.value))) +
                 fact('VAS_126_OpenTicketsFact', 'Open tickets', escapeHtml(formatCount(data.openTickets || 0))) +
-                fact('VAS_126_Projects', 'Projects', projects > 0 ? escapeHtml(formatCount(projects)) : dash) +
+                fact('VAS_126_Projects', 'Projects', projectText(data.projectName, projects, dash)) +
                 fact('VAS_126_Pipeline', 'Pipeline', pipeline > 0 ? escapeHtml(formatArr(pipeline)) : dash) +
-                fact('VAS_126_Onboarding', 'Onboarding', data.onboarding ? escapeHtml(data.onboarding) : dash) +
+                fact('VAS_126_Onboarding', 'Onboarding', data.onboardingPercent == null ? dash : escapeHtml(formatCount(data.onboardingPercent) + '%')) +
             '</div>';
 
             var signals = '';
@@ -530,109 +593,6 @@
             if (!$dialog || !$dialog.hasClass('is-open')) { $('body').removeClass('vas126-modal-open'); }
         }
 
-        // "Log" — open the Log activity popup for the current customer.
-        function logActivity(bpId) {
-            if (!bpId) { return; }
-            openLogDialog(bpId, currentDetailName);
-        }
-
-        function openLogDialog(bpId, name) {
-            currentLogBpId = bpId;
-            currentLogType = 'Call';
-            $log.find('.vas126-ltype').removeClass('is-active').filter('[data-type="Call"]').addClass('is-active');
-            $logCust.text(name || '');
-            $logText.val('');
-            $logError.hide().text('');
-            $log.addClass('is-open').attr('aria-hidden', 'false');
-            $('body').addClass('vas126-modal-open');
-            window.setTimeout(function () { $logText.focus(); }, 0);
-        }
-
-        function closeLog() {
-            if (!$log) { return; }
-            if (document.activeElement && $log[0].contains(document.activeElement)) { document.activeElement.blur(); }
-            $log.removeClass('is-open').attr('aria-hidden', 'true');
-            if ((!$dialog || !$dialog.hasClass('is-open')) && (!$detail || !$detail.hasClass('is-open'))) {
-                $('body').removeClass('vas126-modal-open');
-            }
-        }
-
-        function saveLog() {
-            var summary = ($logText.val() || '').trim();
-            if (!summary) {
-                $logError.text(label('VAS_126_SummaryRequired', 'Please enter a summary.')).show();
-                return;
-            }
-
-            var $save = $log.find('[data-log-save]');
-            $save.prop('disabled', true);
-            $logError.hide().text('');
-
-            $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_126_OpenTicketsWidget/SaveActivityLog',
-                type: 'POST',
-                data: { C_BPartner_ID: currentLogBpId, activityType: currentLogType, summary: summary },
-                success: function (response) {
-                    var data = parseResponse(response);
-                    if (data && data.error) {
-                        $logError.text(data.error).show();
-                        $save.prop('disabled', false);
-                        return;
-                    }
-                    $save.prop('disabled', false);
-                    closeLog();
-                },
-                error: function () {
-                    $logError.text(label('VAS_126_LogSaveFailed', 'Could not save the activity.')).show();
-                    $save.prop('disabled', false);
-                }
-            });
-        }
-
-        function createLogDialog() {
-            var types = ['Call', 'Note', 'Meeting', 'Email'].map(function (t) {
-                return '<button type="button" class="vas126-ltype' + (t === 'Call' ? ' is-active' : '') + '" data-type="' + t + '">' + escapeHtml(label('VAS_126_Type' + t, t)) + '</button>';
-            }).join('');
-
-            $log = $(
-                '<div class="vas126-log" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(label('VAS_126_LogActivity', 'Log activity')) + '">' +
-                    '<div class="vas126-scrim" data-log-close></div>' +
-                    '<section class="vas126-lpanel">' +
-                        '<header class="vas126-dhead">' +
-                            '<h2 class="vas126-panel-title">' + escapeHtml(label('VAS_126_LogActivity', 'Log activity')) + '</h2>' +
-                            '<div class="vas126-dhead-right">' +
-                                '<span class="vas126-lcust"></span>' +
-                                '<button type="button" class="vas126-close" data-log-close aria-label="' + escapeHtml(label('VAS_126_Close', 'Close')) + '">' + icon('close') + '</button>' +
-                            '</div>' +
-                        '</header>' +
-                        '<div class="vas126-lbody">' +
-                            '<div class="vas126-ltypes">' + types + '</div>' +
-                            '<label class="vas126-llabel">' + escapeHtml(label('VAS_126_Summary', 'Summary')) + '</label>' +
-                            '<textarea class="vas126-ltext" placeholder="' + escapeHtml(label('VAS_126_SummaryPlaceholder', 'What happened / next step…')) + '"></textarea>' +
-                            '<div class="vas126-lerror"></div>' +
-                        '</div>' +
-                        '<footer class="vas126-dfoot">' +
-                            '<button type="button" class="vas126-btn vas126-btn-ghost" data-log-close>' + escapeHtml(label('VAS_126_Cancel', 'Cancel')) + '</button>' +
-                            '<button type="button" class="vas126-btn vas126-btn-primary" data-log-save>' + icon('check') + escapeHtml(label('VAS_126_Save', 'Save')) + '</button>' +
-                        '</footer>' +
-                    '</section>' +
-                '</div>'
-            );
-            $('body').append($log);
-            $logCust = $log.find('.vas126-lcust');
-            $logText = $log.find('.vas126-ltext');
-            $logError = $log.find('.vas126-lerror');
-            $logError.hide();
-
-            $log.on('click', '[data-log-close]', closeLog);
-            $log.on('click', '.vas126-ltype', function () {
-                currentLogType = $(this).attr('data-type');
-                $log.find('.vas126-ltype').removeClass('is-active');
-                $(this).addClass('is-active');
-            });
-            $log.on('click', '[data-log-save]', saveLog);
-        }
-
         function createDetailDialog() {
             $detail = $(
                 '<div class="vas126-detail" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(label('VAS_126_CustomerDetails', 'Customer details')) + '">' +
@@ -647,7 +607,6 @@
                         '</header>' +
                         '<div class="vas126-dbody"></div>' +
                         '<footer class="vas126-dfoot">' +
-                            '<button type="button" class="vas126-btn vas126-btn-ghost" data-detail-act="log">' + icon('phone') + escapeHtml(label('VAS_126_Log', 'Log')) + '</button>' +
                             '<button type="button" class="vas126-btn vas126-btn-primary" data-detail-act="open">' + icon('arrow') + escapeHtml(label('VAS_126_OpenRecord', 'Open record')) + '</button>' +
                         '</footer>' +
                     '</section>' +
@@ -662,9 +621,6 @@
                 var id = currentDetailId;
                 closeDetail();
                 zoomToCustomer(id);
-            });
-            $detail.on('click', '[data-detail-act="log"]', function () {
-                logActivity(currentDetailId);
             });
         }
 
@@ -736,11 +692,9 @@
             $root.append($card);
             createDialog();
             createDetailDialog();
-            createLogDialog();
 
             $(document).on('keydown.MPCvas126', function (event) {
                 if (event.key !== 'Escape') { return; }
-                if ($log && $log.hasClass('is-open')) { closeLog(); }
                 else if ($detail && $detail.hasClass('is-open')) { closeDetail(); }
                 else if ($dialog.hasClass('is-open')) { closeTriage(); }
             });
@@ -758,7 +712,6 @@
             $(document).off('keydown.MPCvas126');
             if ($dialog) { $dialog.remove(); $dialog = null; }
             if ($detail) { $detail.remove(); $detail = null; }
-            if ($log) { $log.remove(); $log = null; }
             $('body').removeClass('vas126-modal-open');
             $root.remove();
         };

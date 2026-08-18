@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VAS_183_MaterialConsumptionWidget
  * 3x2 Summary & Breakdown Widget for Inventory Use dashboard.
  * Displays warehouse/locator-wise consumption with progress bars, compact INR values,
@@ -7,25 +7,25 @@
  * Summary Message Table
  *  # | Current Text                           | Message Key
  * ---+----------------------------------------+-----------------------------------
- *  1 | Consumption                            | VAS_Consumption
- *  2 | Warehouse / locator wise              | VAS_WarehouseLocatorWise
- *  3 | Consumption by item                    | VAS_ConsumptionByItem
- *  4 | Distinct items                         | VAS_DistinctItems
- *  5 | No consumption records                 | VAS_NoConsumptionRecords
- *  6 | Close                                  | VAS_Close
- *  7 | Month                                  | VAS_Month
- *  8 | Consumed Qty                           | VAS_ConsumedQty
- *  9 | Consumption Value                      | VAS_ConsumptionValue
- * 10 | Item                                   | VAS_Item
- * 11 | Consumed                               | VAS_Consumed
- * 12 | UoM                                    | VAS_UoM
- * 13 | Attributes                             | VAS_Attributes
- * 14 | Each                                   | VAS_Each
- * 15 | Loading...                             | VAS_Loading
- * 16 | No items found                         | VAS_NoItemsFound
- * 17 | of                                     | VAS_Of
- * 18 | Page                                   | VAS_Page
- * 19 | lines                                  | VAS_Lines
+ *  1 | Consumption                            | VAS_183_Consumption
+ *  2 | Warehouse / locator wise              | VAS_183_WarehouseLocatorWise
+ *  3 | Consumption by item                    | VAS_183_ConsumptionByItem
+ *  4 | Distinct items                         | VAS_183_DistinctItems
+ *  5 | No consumption records                 | VAS_183_NoConsumptionRecords
+ *  6 | Close                                  | VAS_183_Close
+ *  7 | Month                                  | VAS_183_Month
+ *  8 | Consumed Qty                           | VAS_183_ConsumedQty
+ *  9 | Consumption Value                      | VAS_183_ConsumptionValue
+ * 10 | Item                                   | VAS_183_Item
+ * 11 | Consumed                               | VAS_183_Consumed
+ * 12 | UoM                                    | VAS_183_UoM
+ * 13 | Attributes                             | VAS_183_Attributes
+ * 14 | Each                                   | VAS_183_Each
+ * 15 | Loading...                             | VAS_183_Loading
+ * 16 | No items found                         | VAS_183_NoItemsFound
+ * 17 | of                                     | VAS_183_Of
+ * 18 | Page                                   | VAS_183_Page
+ * 19 | lines                                  | VAS_183_Lines
  */
 ; VAS = window.VAS || {};
 
@@ -196,7 +196,7 @@
             if (pageNo > totalPages) { pageNo = totalPages; }
 
             if (locatorsData.length === 0) {
-                $body.html('<div class="vas-mcw-empty">' + escapeHtml(label("VAS_NoConsumptionRecords", "No consumption records")) + '</div>');
+                $body.html('<div class="vas-mcw-empty">' + escapeHtml(label("VAS_183_NoConsumptionRecords", "No consumption records")) + '</div>');
                 if ($footHelper) { $footHelper.text(formatMonthLabel(selectedMonth, selectedYear) + ' - 0 locators'); }
                 if ($pagerText) { $pagerText.text('1 of 1'); }
                 if ($prevBtn) { $prevBtn.prop('disabled', true); }
@@ -257,32 +257,32 @@
                 '<h3 class="vas-mcw-modal-title" title="' + escapeHtml(whName + ' - ' + locatorCode + ' ' + locatorName) + '">' + escapeHtml(whName + ' - ' + locatorCode + ' ' + locatorName) + '</h3>' +
                 '<span class="vas-mcw-modal-badge">' + escapeHtml(monthLabel) + '</span>' +
                 '</div>' +
-                '<button type="button" class="vas-mcw-modal-close" aria-label="' + escapeHtml(label("VAS_Close", "Close")) + '">' +
+                '<button type="button" class="vas-mcw-modal-close" aria-label="' + escapeHtml(label("VAS_183_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
                 '</button>' +
                 '</div>' +
                 '<div class="vas-mcw-modal-body">' +
                 '<div class="vas-mcw-summary-grid">' +
-                '<div class="vas-mcw-summary-field"><div class="vas-mcw-field-lbl">' + escapeHtml(label("VAS_Month", "Month")) + '</div><div class="vas-mcw-field-val">' + escapeHtml(monthLabel) + '</div></div>' +
-                '<div class="vas-mcw-summary-field"><div class="vas-mcw-field-lbl">' + escapeHtml(label("VAS_ConsumedQty", "Consumed Qty")) + '</div><div class="vas-mcw-field-val vas-mcw-m-qty">—</div></div>' +
-                '<div class="vas-mcw-summary-field"><div class="vas-mcw-field-lbl">' + escapeHtml(label("VAS_ConsumptionValue", "Consumption Value")) + '</div><div class="vas-mcw-field-val vas-mcw-m-val">—</div></div>' +
-                '<div class="vas-mcw-summary-field"><div class="vas-mcw-field-lbl">' + escapeHtml(label("VAS_DistinctItems", "Distinct Items")) + '</div><div class="vas-mcw-field-val vas-mcw-m-items">—</div></div>' +
+                '<div class="vas-mcw-summary-field"><div class="vas-mcw-field-lbl">' + escapeHtml(label("VAS_183_Month", "Month")) + '</div><div class="vas-mcw-field-val">' + escapeHtml(monthLabel) + '</div></div>' +
+                '<div class="vas-mcw-summary-field"><div class="vas-mcw-field-lbl">' + escapeHtml(label("VAS_183_ConsumedQty", "Consumed Qty")) + '</div><div class="vas-mcw-field-val vas-mcw-m-qty">—</div></div>' +
+                '<div class="vas-mcw-summary-field"><div class="vas-mcw-field-lbl">' + escapeHtml(label("VAS_183_ConsumptionValue", "Consumption Value")) + '</div><div class="vas-mcw-field-val vas-mcw-m-val">—</div></div>' +
+                '<div class="vas-mcw-summary-field"><div class="vas-mcw-field-lbl">' + escapeHtml(label("VAS_183_DistinctItems", "Distinct Items")) + '</div><div class="vas-mcw-field-val vas-mcw-m-items">—</div></div>' +
                 '</div>' +
-                '<div class="vas-mcw-table-head-title">' + escapeHtml(label("VAS_ConsumptionByItem", "Consumption by item")) + '</div>' +
+                '<div class="vas-mcw-table-head-title">' + escapeHtml(label("VAS_183_ConsumptionByItem", "Consumption by item")) + '</div>' +
                 '<table class="vas-mcw-mini-table">' +
                 '<thead><tr>' +
-                '<th>' + escapeHtml(label("VAS_Item", "Item")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Consumed", "Consumed")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_UoM", "UoM")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Attributes", "Attributes")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_183_Item", "Item")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_183_Consumed", "Consumed")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_183_UoM", "UoM")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_183_Attributes", "Attributes")) + '</th>' +
                 '</tr></thead>' +
-                '<tbody class="vas-mcw-m-tbody"><tr><td colspan="4" class="vas-mcw-m-msgcell">' + escapeHtml(label("VAS_Loading", "Loading...")) + '</td></tr></tbody>' +
+                '<tbody class="vas-mcw-m-tbody"><tr><td colspan="4" class="vas-mcw-m-msgcell">' + escapeHtml(label("VAS_183_Loading", "Loading...")) + '</td></tr></tbody>' +
                 '</table>' +
                 '<div class="vas-mcw-foot vas-mcw-modal-foot">' +
-                '<div class="vas-mcw-foot-helper vas-mcw-modal-helper">' + escapeHtml('0 ' + label("VAS_Of", "of") + ' 0 ' + label("VAS_Lines", "lines")) + '</div>' +
+                '<div class="vas-mcw-foot-helper vas-mcw-modal-helper">' + escapeHtml('0 ' + label("VAS_183_Of", "of") + ' 0 ' + label("VAS_183_Lines", "lines")) + '</div>' +
                 '<div class="vas-mcw-pager">' +
                 '<button type="button" class="vas-mcw-pager-btn vas-mcw-m-prev" disabled>&lsaquo;</button>' +
-                '<span class="vas-mcw-pager-txt vas-mcw-m-pager-txt">' + escapeHtml(label("VAS_Page", "Page") + ' 1 ' + label("VAS_Of", "of") + ' 1') + '</span>' +
+                '<span class="vas-mcw-pager-txt vas-mcw-m-pager-txt">' + escapeHtml(label("VAS_183_Page", "Page") + ' 1 ' + label("VAS_183_Of", "of") + ' 1') + '</span>' +
                 '<button type="button" class="vas-mcw-pager-btn vas-mcw-m-next" disabled>&rsaquo;</button>' +
                 '</div>' +
                 '</div>' +
@@ -305,9 +305,9 @@
                 var $mPrev = $modal.find('.vas-mcw-m-prev');
                 var $mNext = $modal.find('.vas-mcw-m-next');
 
-                var ofTxt = label("VAS_Of", "of");
-                var linesTxt = label("VAS_Lines", "lines");
-                var pageTxt = label("VAS_Page", "Page");
+                var ofTxt = label("VAS_183_Of", "of");
+                var linesTxt = label("VAS_183_Lines", "lines");
+                var pageTxt = label("VAS_183_Page", "Page");
 
                 /* The popup is exactly one page tall, so every page must render modalPageSize rows.
                    Pages holding fewer records are padded with spacer rows to stop the modal from
@@ -324,7 +324,7 @@
 
                 if (modalItemData.length === 0) {
                     $tbody.html('<tr><td colspan="4" class="vas-mcw-m-msgcell">' +
-                        escapeHtml(label("VAS_NoItemsFound", "No items found")) + '</td></tr>' +
+                        escapeHtml(label("VAS_183_NoItemsFound", "No items found")) + '</td></tr>' +
                         fillerRows(modalPageSize - 1));
                     $mHelper.text('0 ' + ofTxt + ' 0 ' + linesTxt);
                     $mPagerTxt.text(pageTxt + ' 1 ' + ofTxt + ' 1');
@@ -343,7 +343,7 @@
                         '<tr>' +
                         '<td class="vas-mcw-item-col" title="' + escapeHtml(item.productName) + '">' + escapeHtml(item.productName) + '</td>' +
                         '<td>' + escapeHtml(formatQty(item.consumedQty)) + '</td>' +
-                        '<td>' + escapeHtml(item.uomName || label("VAS_Each", "Each")) + '</td>' +
+                        '<td>' + escapeHtml(item.uomName || label("VAS_183_Each", "Each")) + '</td>' +
                         '<td class="vas-mcw-attr-col" title="' + escapeHtml(item.attributes || "-") + '">' + escapeHtml(item.attributes || "-") + '</td>' +
                         '</tr>';
                 }
@@ -408,8 +408,8 @@
         }
 
         function createWidget() {
-            var title = label("VAS_Consumption", "Consumption");
-            var sub = label("VAS_WarehouseLocatorWise", "Warehouse / locator wise");
+            var title = label("VAS_183_Consumption", "Consumption");
+            var sub = label("VAS_183_WarehouseLocatorWise", "Warehouse / locator wise");
 
             $card = $(
                 '<div class="vas-mcw-card vas-widget-bg">' +

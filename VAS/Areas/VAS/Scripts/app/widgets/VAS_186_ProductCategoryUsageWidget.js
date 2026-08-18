@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VAS_186_ProductCategoryUsageWidget
  * 4x2 Horizontal Bar Chart Widget for Inventory Use dashboard.
  * Displays internal-use consumption grouped by product category for selected period,
@@ -8,32 +8,38 @@
  * Summary Message Table
  *  # | Current Text                           | Message Key
  * ---+----------------------------------------+-----------------------------------
- *  1 | Product Category Usage                 | VAS_ProductCategoryUsage
- *  2 | Internal use by category              | VAS_InternalUseByCategory
- *  3 | Qty                                    | VAS_Qty
- *  4 | Value                                  | VAS_Value
- *  5 | Couldn't load                           | VAS_CouldntLoad
- *  6 | Products issued                        | VAS_ProductsIssued
- *  7 | Close                                  | VAS_Close
- *  8 | Doc No.                                | VAS_DocNo
- *  9 | Product                                | VAS_Product
- * 10 | UoM                                    | VAS_UoM
- * 11 | WH + Loc                               | VAS_WarehouseLocator
- * 12 | Date                                   | VAS_Date
- * 13 | Each                                   | VAS_Each
- * 14 | Loading...                             | VAS_Loading
- * 15 | No lines for this period.              | VAS_NoLinesForPeriod
- * 16 | of                                     | VAS_Of
- * 17 | Page                                   | VAS_Page
- * 18 | lines                                  | VAS_Lines
- * 19 | categories                             | VAS_Categories
- * 20 | categories shown                       | VAS_CategoriesShown
- * 21 | Others                                 | VAS_Others
- * 22 | All                                    | VAS_All
+ *  1 | Product Category Usage                 | VAS_186_ProductCategoryUsage
+ *  2 | Internal use by category              | VAS_186_InternalUseByCategory
+ *  3 | Qty                                    | VAS_186_Qty
+ *  4 | Value                                  | VAS_186_Value
+ *  5 | Couldn't load                           | VAS_186_CouldntLoad
+ *  6 | Products issued                        | VAS_186_ProductsIssued
+ *  7 | Close                                  | VAS_186_Close
+ *  8 | Doc No.                                | VAS_186_DocNo
+ *  9 | Product                                | VAS_186_Product
+ * 10 | UoM                                    | VAS_186_UoM
+ * 11 | WH + Loc                               | VAS_186_WarehouseLocator
+ * 12 | Date                                   | VAS_186_Date
+ * 13 | Each                                   | VAS_186_Each
+ * 14 | Loading...                             | VAS_186_Loading
+ * 15 | No lines for this period.              | VAS_186_NoLinesForPeriod
+ * 16 | of                                     | VAS_186_Of
+ * 17 | Page                                   | VAS_186_Page
+ * 18 | lines                                  | VAS_186_Lines
+ * 19 | categories                             | VAS_186_Categories
+ * 20 | categories shown                       | VAS_186_CategoriesShown
+ * 21 | Others                                 | VAS_186_Others
+ * 22 | All                                    | VAS_186_All
  */
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /* Design height of one category row, in em against the body's font size.
+       MUST stay in sync with  min-height: 2em  on .vas-pcu-row in
+       VAS_186_ProductCategoryUsageWidget.css - the stylesheet enforces the floor, this constant
+       decides how many rows fit. See recalcPageSize() for why the rendered height is not used. */
+    var VAS_PCU_ROW_MIN_EM = 2;
 
     function ensureDashInlineSizeVar($el) {
         if (window.__vasDashInlineSizeObserver) { return; }
@@ -250,16 +256,16 @@
                 var restMeasure = activePeriodTotal - shownTotalMeasure;
                 var restPct = activePeriodTotal > 0 ? Math.round((restMeasure / activePeriodTotal) * 100) : 0;
                 var restStr = activeMeasure === "val" ? formatINR(restMeasure) : (formatQty(restMeasure) + ' units');
-                $footnote.text(shownCount + ' ' + label("VAS_Of", "of") + ' ' + categoriesData.length +
-                    ' ' + label("VAS_Categories", "categories") + ' · ' +
-                    label("VAS_Others", "Others") + ': ' + restStr + ' (' + restPct + '%)');
+                $footnote.text(shownCount + ' ' + label("VAS_186_Of", "of") + ' ' + categoriesData.length +
+                    ' ' + label("VAS_186_Categories", "categories") + ' · ' +
+                    label("VAS_186_Others", "Others") + ': ' + restStr + ' (' + restPct + '%)');
             } else {
-                $footnote.text(label("VAS_All", "All") + ' ' + categoriesData.length + ' ' +
-                    label("VAS_CategoriesShown", "categories shown"));
+                $footnote.text(label("VAS_186_All", "All") + ' ' + categoriesData.length + ' ' +
+                    label("VAS_186_CategoriesShown", "categories shown"));
             }
 
             if ($pagerText) {
-                $pagerText.text(label("VAS_Page", "Page") + ' ' + pageNo + ' ' + label("VAS_Of", "of") + ' ' + totalPages);
+                $pagerText.text(label("VAS_186_Page", "Page") + ' ' + pageNo + ' ' + label("VAS_186_Of", "of") + ' ' + totalPages);
             }
             if ($prevBtn) { $prevBtn.prop('disabled', pageNo <= 1); }
             if ($nextBtn) { $nextBtn.prop('disabled', pageNo >= totalPages); }
@@ -284,10 +290,13 @@
             var bodyH = $body[0].clientHeight;
             if (bodyH <= 0) { return false; }
 
-            var $firstRow = $body.children('.vas-pcu-row').first();
-            if (!$firstRow.length) { return false; }
-
-            var rowH = $firstRow[0].getBoundingClientRect().height;
+            /* Rows are flex: 1 1 0 so they STRETCH to fill the body. Measuring a rendered row
+               would therefore measure the stretch, not the content, and feed that back into this
+               calculation - a loop that locks the row count to whatever it happened to be first.
+               Use the design row height instead (VAS_PCU_ROW_MIN_EM, mirrored by min-height on
+               .vas-pcu-row in the stylesheet) so the count depends only on the body height. */
+            var bodyFontPx = parseFloat(window.getComputedStyle($body[0]).fontSize) || 16;
+            var rowH = VAS_PCU_ROW_MIN_EM * bodyFontPx;
             if (rowH <= 0) { return false; }
 
             // .vas-pcu-body uses a .25em flex gap, which sits between rows but not after the last.
@@ -304,7 +313,7 @@
 
             var monthFull = formatMonthName(selectedMonth) + ' ' + selectedYear;
 
-            var showingNone = '0 ' + label("VAS_Of", "of") + ' 0 ' + label("VAS_Lines", "lines");
+            var showingNone = '0 ' + label("VAS_186_Of", "of") + ' 0 ' + label("VAS_186_Lines", "lines");
 
             $modal = $(
                 '<div class="vas-pcu-modal-overlay" role="dialog" aria-modal="true">' +
@@ -312,29 +321,29 @@
                 '<div class="vas-pcu-modal-head">' +
                 '<div class="vas-pcu-modal-headtext">' +
                 '<h3 class="vas-pcu-modal-title" title="' + escapeHtml(categoryName) + '">' + escapeHtml(categoryName) + '</h3>' +
-                '<div class="vas-pcu-modal-sub">' + escapeHtml(label("VAS_ProductsIssued", "Products issued") + ' · ' + monthFull) + '</div>' +
+                '<div class="vas-pcu-modal-sub">' + escapeHtml(label("VAS_186_ProductsIssued", "Products issued") + ' · ' + monthFull) + '</div>' +
                 '</div>' +
-                '<button type="button" class="vas-pcu-modal-close" aria-label="' + escapeHtml(label("VAS_Close", "Close")) + '">' +
+                '<button type="button" class="vas-pcu-modal-close" aria-label="' + escapeHtml(label("VAS_186_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
                 '</button>' +
                 '</div>' +
                 '<div class="vas-pcu-modal-body">' +
                 '<table class="vas-pcu-lines-table">' +
                 '<thead><tr>' +
-                '<th>' + escapeHtml(label("VAS_DocNo", "Doc No.")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Product", "Product")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_UoM", "UoM")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_WarehouseLocator", "WH + Loc")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Qty", "Qty")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Date", "Date")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_186_DocNo", "Doc No.")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_186_Product", "Product")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_186_UoM", "UoM")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_186_WarehouseLocator", "WH + Loc")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_186_Qty", "Qty")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_186_Date", "Date")) + '</th>' +
                 '</tr></thead>' +
-                '<tbody class="vas-pcu-m-tbody"><tr><td colspan="6" class="vas-pcu-m-msgcell">' + escapeHtml(label("VAS_Loading", "Loading...")) + '</td></tr></tbody>' +
+                '<tbody class="vas-pcu-m-tbody"><tr><td colspan="6" class="vas-pcu-m-msgcell">' + escapeHtml(label("VAS_186_Loading", "Loading...")) + '</td></tr></tbody>' +
                 '</table>' +
                 '<div class="vas-pcu-modal-foot">' +
                 '<div class="vas-pcu-m-helper">' + escapeHtml(showingNone) + '</div>' +
                 '<div class="vas-pcu-modal-pager">' +
                 '<button type="button" class="vas-pcu-pager-btn vas-pcu-m-prev" disabled>&lsaquo;</button>' +
-                '<span class="vas-pcu-m-pager-txt">' + escapeHtml(label("VAS_Page", "Page") + ' 1 ' + label("VAS_Of", "of") + ' 1') + '</span>' +
+                '<span class="vas-pcu-m-pager-txt">' + escapeHtml(label("VAS_186_Page", "Page") + ' 1 ' + label("VAS_186_Of", "of") + ' 1') + '</span>' +
                 '<button type="button" class="vas-pcu-pager-btn vas-pcu-m-next" disabled>&rsaquo;</button>' +
                 '</div>' +
                 '</div>' +
@@ -357,7 +366,7 @@
                 var $mPrev = $modal.find('.vas-pcu-m-prev');
                 var $mNext = $modal.find('.vas-pcu-m-next');
 
-                var ofTxt = label("VAS_Of", "of");
+                var ofTxt = label("VAS_186_Of", "of");
 
                 /* The popup is exactly one page tall, so every page must render mPageSize rows.
                    Pages holding fewer records are padded with spacer rows to stop the modal from
@@ -376,10 +385,10 @@
                    numbers larger than the six rows actually rendered. */
                 if (issueLines.length === 0) {
                     $tbody.html('<tr><td colspan="6" class="vas-pcu-m-msgcell">' +
-                        escapeHtml(label("VAS_NoLinesForPeriod", "No lines for this period.")) + '</td></tr>' +
+                        escapeHtml(label("VAS_186_NoLinesForPeriod", "No lines for this period.")) + '</td></tr>' +
                         fillerRows(mPageSize - 1));
-                    $mHelper.text('0 ' + ofTxt + ' 0 ' + label("VAS_Lines", "lines"));
-                    $mPagerTxt.text(label("VAS_Page", "Page") + ' 1 ' + ofTxt + ' 1');
+                    $mHelper.text('0 ' + ofTxt + ' 0 ' + label("VAS_186_Lines", "lines"));
+                    $mPagerTxt.text(label("VAS_186_Page", "Page") + ' 1 ' + ofTxt + ' 1');
                     $mPrev.prop('disabled', true);
                     $mNext.prop('disabled', true);
                     return;
@@ -398,7 +407,7 @@
                         '<span class="vas-pcu-m-product">' + escapeHtml(rec.productName) + '</span>' +
                         (rec.attribute ? ('<span class="vas-pcu-m-attr">' + escapeHtml(rec.attribute) + '</span>') : '') +
                         '</td>' +
-                        '<td>' + escapeHtml(rec.uomName || label("VAS_Each", "Each")) + '</td>' +
+                        '<td>' + escapeHtml(rec.uomName || label("VAS_186_Each", "Each")) + '</td>' +
                         '<td title="' + escapeHtml(rec.whLoc) + '">' + escapeHtml(rec.whLoc) + '</td>' +
                         '<td>' + escapeHtml(formatQty(rec.qty)) + '</td>' +
                         '<td>' + escapeHtml(rec.movementDate) + '</td>' +
@@ -406,8 +415,8 @@
                 }
 
                 $tbody.html(tbodyHtml + fillerRows(mPageSize - (mEnd - mStart)));
-                $mHelper.text((mEnd - mStart) + ' ' + ofTxt + ' ' + issueLines.length + ' ' + label("VAS_Lines", "lines"));
-                $mPagerTxt.text(label("VAS_Page", "Page") + ' ' + mPageNo + ' ' + ofTxt + ' ' + mTotalPages);
+                $mHelper.text((mEnd - mStart) + ' ' + ofTxt + ' ' + issueLines.length + ' ' + label("VAS_186_Lines", "lines"));
+                $mPagerTxt.text(label("VAS_186_Page", "Page") + ' ' + mPageNo + ' ' + ofTxt + ' ' + mTotalPages);
                 $mPrev.prop('disabled', mPageNo <= 1);
                 $mNext.prop('disabled', mPageNo >= mTotalPages);
             }
@@ -461,8 +470,8 @@
         }
 
         function createWidget() {
-            var title = label("VAS_ProductCategoryUsage", "Product Category Usage");
-            var sub = label("VAS_InternalUseByCategory", "Internal use by category");
+            var title = label("VAS_186_ProductCategoryUsage", "Product Category Usage");
+            var sub = label("VAS_186_InternalUseByCategory", "Internal use by category");
 
             $card = $(
                 '<div class="vas-pcu-card vas-widget-bg">' +
@@ -491,7 +500,7 @@
                 '<div class="vas-pcu-footnote"></div>' +
                 '<div class="vas-pcu-pager">' +
                 '<button type="button" class="vas-pcu-pager-btn vas-pcu-prev" disabled>&lsaquo;</button>' +
-                '<span class="vas-pcu-pager-txt">' + escapeHtml(label("VAS_Page", "Page") + ' 1 ' + label("VAS_Of", "of") + ' 1') + '</span>' +
+                '<span class="vas-pcu-pager-txt">' + escapeHtml(label("VAS_186_Page", "Page") + ' 1 ' + label("VAS_186_Of", "of") + ' 1') + '</span>' +
                 '<button type="button" class="vas-pcu-pager-btn vas-pcu-next" disabled>&rsaquo;</button>' +
                 '</div>' +
                 '</div>' +

@@ -22,6 +22,131 @@
  *                        modelled on the VAS_099 material-lines pager. It is a
  *                        sibling of the list card, so the controls keep their place
  *                        while the card's rows are replaced underneath them.
+ *   VAI163   2026-08-07  Modifier classes that were still written bare
+ *                        (.is-link, .ta-r, .primary, .tone-*, .ic-*) now carry
+ *                        the vas_106- prefix too. Sharing a name with a
+ *                        base-theme rule meant the base design won and
+ *                        repainted the panel; scoping them to the panel ends
+ *                        that.
+ *   VAI163   2026-08-12  - The layout holds at 80% browser zoom, which reports
+ *                          ~1.25x more CSS pixels for the same physical width and
+ *                          so left the panel narrower than its own tracks needed.
+ *                          Every flexible track is minmax(0, Nfr) instead of a
+ *                          bare Nfr, which cannot shrink below its content — one
+ *                          long product name or address used to widen its track
+ *                          and push the row past the panel (-hdrCard, -snap,
+ *                          -formGrid and all four data tables). The data tables
+ *                          take their own horizontal scroll (overflow-x on
+ *                          .vas_106-table, was `hidden`) with a per-table row
+ *                          min-width, so a narrow panel scrolls to the last
+ *                          columns instead of clipping them away. The KPI strip
+ *                          goes two-up from 700px rather than 620px, matching
+ *                          VAS_099 / VAS_098.
+ *                        - Bill to / Ship to are one address per line
+ *                          (.vas_106-addrLabel / -addrVal).
+ *                        - The action bar is gone from the panel, so
+ *                          .vas_106-actionbar / -cvNote / -cvOk / -cvActions style
+ *                          nothing any more. They are left in place: .vas_106-btn
+ *                          and its -primary / -sm states are still worn by the
+ *                          contract form's Create button.
+ *   VAI163   2026-08-12  Added the Documents table (.vas_106-docTable / -docItem
+ *                        / -docTxt), which replaces the separate Deliveries and
+ *                        Invoices ones — .vas_106-dvTable and -invTable are left
+ *                        in place but style nothing now. Added the line's
+ *                        Attribute Set Instance sub-line (.vas_106-itAttr).
+ *   VAI163   2026-08-12  - Sections no longer collapse: .vas_106-dsecHead is a
+ *                        plain heading (no pointer, no hover state), and the
+ *                        chevron / collapsed rules (.vas_106-dsecChev,
+ *                        .vas_106-collapsed and the RTL chevron mirror) are gone
+ *                        with the control they served.
+ *                        - The contract switch is a read-only indicator, so it
+ *                        drops its pointer cursor.
+ *                        - Added .vas_106-linesTable.vas_106-no-contract: the
+ *                        six-track grid for an order with no service line, whose
+ *                        Contract column is not drawn.
+ *                        - Activity rows wrap between the headline and the
+ *                        "when · by whom" stamp (.vas_106-atWrap), which now
+ *                        carries the actor's name on every row; a comment's
+ *                        headline wraps to three lines
+ *                        (.vas_106-at.vas_106-multiline).
+ *   VAI163   2026-08-12  Delivery Readiness puts the unit in front of the product
+ *                        name on one line (.vas_106-uomTag + .vas_106-nameTxt,
+ *                        with .vas_106-rdTable .vas_106-itName turned into a flex
+ *                        row so the ellipsis moves onto the name).
+ *   VAI163   2026-08-12  - The PANEL never scrolls sideways: .vas_106-root gains
+ *                          width / max-width / overflow-x: hidden, .vas_106-body
+ *                          and its children min-width: 0, and a Created From chip
+ *                          truncates its value instead of dragging the strip. A
+ *                          single wide child used to pull the whole panel
+ *                          horizontally — what an 80% zoom exposes, the panel
+ *                          measuring ~1.25x more CSS pixels for the same physical
+ *                          width. A table that cannot fit still takes its own
+ *                          inner scroll. Matches VAS_098 / VAS_099.
+ *                        - Added the per-line change-history drawer
+ *                          (.vas_106-lineHist / -lhTable / -lhWhen / -lhBy) and
+ *                          its toggle (.vas_106-histBtn). The drawer sits on the
+ *                          lines table's own tracks and carries its min-width, so
+ *                          it travels with the table when that scrolls sideways.
+ *   VAI163   2026-08-12  Activity rows can carry an e-mail: the recipient sits
+ *                        under the subject (.vas_106-actSub) and the message
+ *                        itself opens on click — the row turns into a control
+ *                        (.vas_106-actRow.vas_106-is-openable / -is-open) with a
+ *                        caret (.vas_106-actCaret) and a collapsed panel beneath
+ *                        it (.vas_106-actBody / -actMeta). The row divider is
+ *                        drawn between ADJACENT rows, so a row following an opened
+ *                        message is given the border that rule cannot reach.
+ *   VAI163   2026-08-17  - Added .vas_106-linesTable.vas_106-no-discount (and its
+ *                          pairing with -no-contract): the lines table drops the
+ *                          Disc column on an order where nothing was discounted,
+ *                          so the row runs one track — or two — narrower. The
+ *                          history drawer follows both, min-widths included, since
+ *                          it sits on the same tracks.
+ *                        - The Delivered cell STACKS: the status line on top, the
+ *                          delivered / ordered ratio (.vas_106-progQty) beneath it.
+ *                          Side by side, the bar took the width the figures needed
+ *                          and the ratio was the first thing a narrow column
+ *                          squeezed out. The bar now takes the cell's width up to
+ *                          64px, and the RTL mirror flips the CROSS axis, which is
+ *                          the one that carries the alignment in a stacked cell.
+ *                        - Added .vas_106-rdTag.vas_106-partial: the Delivery
+ *                          Readiness state for a line part of which has shipped.
+ *                          Blue, not the amber SHORT wears — the delivery is under
+ *                          way, it is simply not finished.
+ *                        - Added .vas_106-hasTip (help cursor), for the unit price
+ *                          cell, which carries the line's list price on its hover.
+ *   VAI163   2026-08-17  - The lines table gains a fixed 2em ACTION track after
+ *                          Delivered (.vas_106-itAct) for the per-line history
+ *                          toggle, on all four column variants. .vas_106-histBtn
+ *                          loses the inline margin it needed inside the product
+ *                          name and becomes a round icon button, as in VAS_092.
+ *                        - Both drawer grids are now qualified by
+ *                          .vas_106-linesTable so they outrank the table's own
+ *                          variant grids: the drawer sits INSIDE that table, and a
+ *                          two-class rule lost to the three-class -no-contract /
+ *                          -no-discount selectors, which put the drawer's figures
+ *                          on the line row's tracks.
+ *                        - Delivery Readiness runs six columns: the unit has one of
+ *                          its own (.vas_106-rdUom) after the product name.
+ *                          .vas_106-uomTag / -nameTxt and the flex .vas_106-itName
+ *                          they needed are gone with the one-line layout.
+ *   VAI163   2026-08-17  - Section headings are the title alone: .vas_106-tIc (the
+ *                          leading icon) and .vas_106-badge (the trailing count)
+ *                          are no longer rendered and their rules are gone.
+ *                        - Added the order line's third detail line,
+ *                          .vas_106-itDrop (Drop Shipment: Yes / No), coloured by
+ *                          .vas_106-is-drop when the line ships direct.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *                        - Added the Activity field-change delta
+ *                          (.vas_106-actDelta / -cvOld / -cvArrow / -cvNew):
+ *                          "was X → now Y" under the field's name, the old
+ *                          value struck through and the new one carrying the
+ *                          row's colour. Matches VAS_101 / VAS_104.
  ***********************************************************/
 
 .vas_106-root {
@@ -45,7 +170,15 @@
 
     position: relative;
     height: 100%;
+    width: 100%;
+    max-width: 100%;
     overflow-y: auto;
+    /* The PANEL itself never scrolls sideways — a table that cannot fit takes its
+       own inner overflow-x instead. Without this a single wide child dragged the
+       whole panel horizontally, which is what a zoomed-out browser exposes: at 80%
+       the panel measures ~1.25x more CSS pixels for the same physical width, so
+       content that just fitted no longer does. Matches VAS_098 / VAS_099. */
+    overflow-x: hidden;
     color: var(--vaso-text);
     font-family: Roboto, "Segoe UI", Arial, sans-serif;
     container-type: inline-size;
@@ -61,7 +194,12 @@
     display: flex;
     flex-direction: column;
     gap: 0.875em;
+    /* A flex item defaults to min-width:auto and so refuses to shrink below its
+       content; every section below would otherwise widen the column instead of
+       fitting inside it. */
+    min-width: 0;
 }
+.vas_106-body > * { min-width: 0; max-width: 100%; }
 
 .vas_106-empty {
     padding: 40px 18px;
@@ -78,12 +216,12 @@
     border-radius: 999px; padding: 0.1875em 0.5em;
     font-size: 0.6875em; font-weight: 700; line-height: 1.3; white-space: nowrap;
 }
-.vas_106-pill.tone-info    { background: var(--vaso-info-bg);    color: var(--vaso-info-tx); }
-.vas_106-pill.tone-success { background: var(--vaso-success-bg); color: var(--vaso-success-tx); }
-.vas_106-pill.tone-warning { background: var(--vaso-warning-bg); color: var(--vaso-warning-tx); }
-.vas_106-pill.tone-risk    { background: var(--vaso-risk-bg);    color: var(--vaso-risk-tx); }
-.vas_106-pill.tone-purple  { background: var(--vaso-purple-bg);  color: var(--vaso-purple-tx); }
-.vas_106-pill.tone-neutral { background: var(--vaso-neutral-bg); color: var(--vaso-neutral-tx); }
+.vas_106-pill.vas_106-tone-info    { background: var(--vaso-info-bg);    color: var(--vaso-info-tx); }
+.vas_106-pill.vas_106-tone-success { background: var(--vaso-success-bg); color: var(--vaso-success-tx); }
+.vas_106-pill.vas_106-tone-warning { background: var(--vaso-warning-bg); color: var(--vaso-warning-tx); }
+.vas_106-pill.vas_106-tone-risk    { background: var(--vaso-risk-bg);    color: var(--vaso-risk-tx); }
+.vas_106-pill.vas_106-tone-purple  { background: var(--vaso-purple-bg);  color: var(--vaso-purple-tx); }
+.vas_106-pill.vas_106-tone-neutral { background: var(--vaso-neutral-bg); color: var(--vaso-neutral-tx); }
 
 /* Status tag (with leading dot) */
 .vas_106-tag {
@@ -92,16 +230,16 @@
     font-size: 0.6875em; font-weight: 700; line-height: 1; white-space: nowrap;
 }
 .vas_106-tag .vas_106-dot { width: 0.4375em; height: 0.4375em; border-radius: 50%; }
-.vas_106-tag.approved  { background: var(--vaso-success-bg); color: var(--vaso-success-tx); }
-.vas_106-tag.approved .vas_106-dot { background: var(--vaso-success-tx); }
-.vas_106-tag.sent      { background: var(--vaso-info-bg); color: var(--vaso-info-tx); }
-.vas_106-tag.sent .vas_106-dot { background: var(--vaso-info-tx); }
-.vas_106-tag.partial   { background: var(--vaso-warning-bg); color: var(--vaso-warning-tx); }
-.vas_106-tag.partial .vas_106-dot { background: var(--vaso-warning-tx); }
-.vas_106-tag.draft     { background: var(--vaso-neutral-bg); color: var(--vaso-neutral-tx); }
-.vas_106-tag.draft .vas_106-dot { background: var(--vaso-neutral-tx); }
-.vas_106-tag.cancelled { background: var(--vaso-risk-bg); color: var(--vaso-risk-tx); }
-.vas_106-tag.cancelled .vas_106-dot { background: var(--vaso-risk-tx); }
+.vas_106-tag.vas_106-approved  { background: var(--vaso-success-bg); color: var(--vaso-success-tx); }
+.vas_106-tag.vas_106-approved .vas_106-dot { background: var(--vaso-success-tx); }
+.vas_106-tag.vas_106-sent      { background: var(--vaso-info-bg); color: var(--vaso-info-tx); }
+.vas_106-tag.vas_106-sent .vas_106-dot { background: var(--vaso-info-tx); }
+.vas_106-tag.vas_106-partial   { background: var(--vaso-warning-bg); color: var(--vaso-warning-tx); }
+.vas_106-tag.vas_106-partial .vas_106-dot { background: var(--vaso-warning-tx); }
+.vas_106-tag.vas_106-draft     { background: var(--vaso-neutral-bg); color: var(--vaso-neutral-tx); }
+.vas_106-tag.vas_106-draft .vas_106-dot { background: var(--vaso-neutral-tx); }
+.vas_106-tag.vas_106-cancelled { background: var(--vaso-risk-bg); color: var(--vaso-risk-tx); }
+.vas_106-tag.vas_106-cancelled .vas_106-dot { background: var(--vaso-risk-tx); }
 
 .vas_106-ic { display: inline-flex; align-items: center; flex: none; }
 .vas_106-ic svg { display: block; }
@@ -124,11 +262,11 @@
     border-radius: 999px; padding: 0.3125em 0.625em;
     font-size: 0.6875em; font-weight: 700; line-height: 1; white-space: nowrap;
 }
-.vas_106-hdrPill.tone-info    { background: var(--vaso-info-bg);    color: var(--vaso-info-tx); }
-.vas_106-hdrPill.tone-success { background: var(--vaso-success-bg); color: var(--vaso-success-tx); }
-.vas_106-hdrPill.tone-warning { background: var(--vaso-warning-bg); color: var(--vaso-warning-tx); }
-.vas_106-hdrPill.tone-risk    { background: var(--vaso-risk-bg);    color: var(--vaso-risk-tx); }
-.vas_106-hdrPill.tone-neutral { background: var(--vaso-neutral-bg); color: var(--vaso-neutral-tx); }
+.vas_106-hdrPill.vas_106-tone-info    { background: var(--vaso-info-bg);    color: var(--vaso-info-tx); }
+.vas_106-hdrPill.vas_106-tone-success { background: var(--vaso-success-bg); color: var(--vaso-success-tx); }
+.vas_106-hdrPill.vas_106-tone-warning { background: var(--vaso-warning-bg); color: var(--vaso-warning-tx); }
+.vas_106-hdrPill.vas_106-tone-risk    { background: var(--vaso-risk-bg);    color: var(--vaso-risk-tx); }
+.vas_106-hdrPill.vas_106-tone-neutral { background: var(--vaso-neutral-bg); color: var(--vaso-neutral-tx); }
 .vas_106-hdrPill .vas_106-ic { color: currentColor; }
 .vas_106-hdrDot { width: 0.5em; height: 0.5em; border-radius: 50%; background: currentColor; flex: none; }
 
@@ -139,7 +277,10 @@
    so short fields sit in rows instead of stacking into a tall column that
    leaves the identity half empty. */
 .vas_106-hdrCard {
-    display: grid; grid-template-columns: 40% 1fr; gap: 0.875em 1.75em;
+    /* minmax(0, 1fr), not a bare 1fr: a bare fr track cannot shrink below its
+       content, so one long address or field value widened the column and pushed
+       the card past the panel instead of wrapping inside it. */
+    display: grid; grid-template-columns: 40% minmax(0, 1fr); gap: 0.875em 1.75em;
     border: 1px solid var(--vaso-card-bd); border-radius: var(--vaso-card-radius);
     background: #fff; padding: 0.875em 1em;
 }
@@ -166,6 +307,11 @@
     font-size: 0.75em; color: var(--vaso-sub); line-height: 1.45; margin-top: 0.25em;
 }
 .vas_106-custAddr .vas_106-ic { color: var(--vaso-muted); margin-top: 0.15em; }
+/* Bill to / Ship to, one per line. The label holds its own width so the two
+   addresses start at the same column; the address itself takes the rest of the
+   line and wraps within it, with the whole of it on the line's tooltip. */
+.vas_106-addrLabel { flex: none; font-weight: 700; color: var(--vaso-muted); }
+.vas_106-addrVal { min-width: 0; overflow-wrap: break-word; }
 .vas_106-custContact {
     display: flex; flex-wrap: wrap; gap: 0.375em 1.125em;
     font-size: 0.75em; color: var(--vaso-text); margin-top: 0.4375em;
@@ -196,18 +342,23 @@
 }
 .vas_106-gfChips { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5em; min-width: 0; }
 
+/* A chip caps at the strip's width and truncates its VALUE inside it, so one
+   long document number cannot drag the strip past the panel. */
 .vas_106-chip {
-    display: inline-flex; align-items: center; gap: 0.4375em;
+    display: inline-flex; align-items: center; gap: 0.4375em; max-width: 100%; min-width: 0;
     background: #fff; border: 1px solid var(--vaso-card-bd); border-radius: 9px;
     padding: 0.375em 0.625em; font-size: 0.75em; line-height: 1.3; white-space: nowrap;
 }
-.vas_106-chip.is-link { cursor: pointer; }
-.vas_106-chip.is-link:hover { border-color: #BFE4FF; background: var(--vaso-faint-blue); }
+.vas_106-chip.vas_106-is-link { cursor: pointer; }
+.vas_106-chip.vas_106-is-link:hover { border-color: #BFE4FF; background: var(--vaso-faint-blue); }
 .vas_106-chip .vas_106-ic { color: var(--vaso-muted); }
-.vas_106-chip.ic-info    .vas_106-ic { color: var(--vaso-info-tx); }
-.vas_106-chip.ic-success .vas_106-ic { color: var(--vaso-success-tx); }
-.vas_106-chipLabel { color: var(--vaso-muted); }
-.vas_106-chipVal   { color: var(--vaso-text); font-weight: 700; }
+.vas_106-chip.vas_106-ic-info    .vas_106-ic { color: var(--vaso-info-tx); }
+.vas_106-chip.vas_106-ic-success .vas_106-ic { color: var(--vaso-success-tx); }
+.vas_106-chipLabel { color: var(--vaso-muted); flex: none; }
+.vas_106-chipVal   {
+    color: var(--vaso-text); font-weight: 700;
+    min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* ----------------------------------------------------------- */
 /*  Workflow action bar                                         */
@@ -227,27 +378,27 @@
     font-size: 0.8125em; font-weight: 500; font-family: inherit; cursor: pointer;
     display: inline-flex; align-items: center; gap: 0.4375em; white-space: nowrap; border: none;
 }
-.vas_106-btn.primary { background: var(--vaso-action); color: #fff; }
-.vas_106-btn.primary:hover { background: var(--vaso-action-dk); }
-.vas_106-btn.secondary { background: #fff; color: var(--vaso-primary); border: 1px solid var(--vaso-action); }
-.vas_106-btn.secondary:hover { background: var(--vaso-faint-blue); }
-.vas_106-btn.sm { height: 1.875em; padding: 0 0.8125em; font-size: 0.78em; }
+.vas_106-btn.vas_106-primary { background: var(--vaso-action); color: #fff; }
+.vas_106-btn.vas_106-primary:hover { background: var(--vaso-action-dk); }
+.vas_106-btn.vas_106-secondary { background: #fff; color: var(--vaso-primary); border: 1px solid var(--vaso-action); }
+.vas_106-btn.vas_106-secondary:hover { background: var(--vaso-faint-blue); }
+.vas_106-btn.vas_106-sm { height: 1.875em; padding: 0 0.8125em; font-size: 0.78em; }
 .vas_106-btn:disabled { opacity: .45; cursor: not-allowed; }
-.vas_106-btn.primary:disabled:hover { background: var(--vaso-action); }
+.vas_106-btn.vas_106-primary:disabled:hover { background: var(--vaso-action); }
 
 /* ----------------------------------------------------------- */
 /*  KPI strip                                                   */
 /* ----------------------------------------------------------- */
-.vas_106-snap { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75em; }
+.vas_106-snap { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75em; }
 .vas_106-metric {
     min-width: 0; border: 1px solid var(--vaso-card-bd);
     border-left: 3px solid var(--vaso-neutral-tx); border-radius: var(--vaso-card-radius);
     background: #fff; padding: 0.75em 0.875em;
 }
-.vas_106-metric.tone-total     { border-left-color: var(--vaso-action); }
-.vas_106-metric.tone-fulfil    { border-left-color: #D78B10; }
-.vas_106-metric.tone-invoiced  { border-left-color: #20A464; }
-.vas_106-metric.tone-readiness { border-left-color: #8B7CFF; }
+.vas_106-metric.vas_106-tone-total     { border-left-color: var(--vaso-action); }
+.vas_106-metric.vas_106-tone-fulfil    { border-left-color: #D78B10; }
+.vas_106-metric.vas_106-tone-invoiced  { border-left-color: #20A464; }
+.vas_106-metric.vas_106-tone-readiness { border-left-color: #8B7CFF; }
 
 .vas_106-mHead { display: flex; align-items: center; gap: 0.375em; margin-bottom: 0.375em; }
 .vas_106-mLabel {
@@ -255,22 +406,27 @@
     text-transform: uppercase; color: var(--vaso-muted);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.vas_106-metric.tone-total     .vas_106-mHead .vas_106-ic { color: var(--vaso-action); }
-.vas_106-metric.tone-fulfil    .vas_106-mHead .vas_106-ic { color: #D78B10; }
-.vas_106-metric.tone-invoiced  .vas_106-mHead .vas_106-ic { color: #20A464; }
-.vas_106-metric.tone-readiness .vas_106-mHead .vas_106-ic { color: #8B7CFF; }
+.vas_106-metric.vas_106-tone-total     .vas_106-mHead .vas_106-ic { color: var(--vaso-action); }
+.vas_106-metric.vas_106-tone-fulfil    .vas_106-mHead .vas_106-ic { color: #D78B10; }
+.vas_106-metric.vas_106-tone-invoiced  .vas_106-mHead .vas_106-ic { color: #20A464; }
+.vas_106-metric.vas_106-tone-readiness .vas_106-mHead .vas_106-ic { color: #8B7CFF; }
 
 .vas_106-mVal { font-size: 1.2em; font-weight: 700; color: var(--vaso-text); line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vas_106-mSub { font-size: 0.6875em; color: var(--vaso-muted); margin-top: 0.25em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vas_106-mBar { margin-top: 0.5em; height: 5px; border-radius: 999px; background: #E7EEF4; overflow: hidden; }
 .vas_106-mBar i { display: block; height: 100%; border-radius: 999px; }
-.vas_106-metric.tone-total     .vas_106-mBar i { background: var(--vaso-action); }
-.vas_106-metric.tone-fulfil    .vas_106-mBar i { background: #D78B10; }
-.vas_106-metric.tone-invoiced  .vas_106-mBar i { background: #20A464; }
-.vas_106-metric.tone-readiness .vas_106-mBar i { background: #8B7CFF; }
+.vas_106-metric.vas_106-tone-total     .vas_106-mBar i { background: var(--vaso-action); }
+.vas_106-metric.vas_106-tone-fulfil    .vas_106-mBar i { background: #D78B10; }
+.vas_106-metric.vas_106-tone-invoiced  .vas_106-mBar i { background: #20A464; }
+.vas_106-metric.vas_106-tone-readiness .vas_106-mBar i { background: #8B7CFF; }
 
-@container (max-width: 620px) { .vas_106-snap { grid-template-columns: repeat(2, 1fr); } }
-@container (max-width: 340px) { .vas_106-snap { grid-template-columns: 1fr; } }
+/* The four-across row needs real room: each card carries an uppercase label, a
+   large figure and a caption. Two-up from 700px, matching VAS_099 / VAS_098 —
+   the old 620px threshold was one a zoomed-out browser slipped past, leaving a
+   crushed 4-up strip at the width where the sibling panels had already
+   reflowed. */
+@container (max-width: 700px) { .vas_106-snap { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 340px) { .vas_106-snap { grid-template-columns: minmax(0, 1fr); } }
 
 /* ----------------------------------------------------------- */
 /*  Section header (progress + generic)                         */
@@ -290,8 +446,8 @@
     background: var(--vaso-neutral-bg); color: var(--vaso-neutral-tx);
 }
 .vas_106-postBadge::before { content: ''; width: 0.375em; height: 0.375em; border-radius: 50%; background: #9FB1C0; }
-.vas_106-postBadge.posted { background: var(--vaso-success-bg); color: var(--vaso-success-tx); }
-.vas_106-postBadge.posted::before { background: var(--vaso-success-tx); }
+.vas_106-postBadge.vas_106-posted { background: var(--vaso-success-bg); color: var(--vaso-success-tx); }
+.vas_106-postBadge.vas_106-posted::before { background: var(--vaso-success-tx); }
 
 /* ----------------------------------------------------------- */
 /*  Order Progress stepper                                      */
@@ -302,54 +458,167 @@
 .vas_106-stepLine { flex: 1 1 auto; height: 2px; background: #D9E6F2; }
 .vas_106-step:first-child .vas_106-stepLine-l,
 .vas_106-step:last-child  .vas_106-stepLine-r { visibility: hidden; }
-.vas_106-step.is-done   .vas_106-stepLine-r,
-.vas_106-step.is-done   .vas_106-stepLine-l,
-.vas_106-step.is-active .vas_106-stepLine-l { background: #67B98A; }
+.vas_106-step.vas_106-is-done   .vas_106-stepLine-r,
+.vas_106-step.vas_106-is-done   .vas_106-stepLine-l,
+.vas_106-step.vas_106-is-active .vas_106-stepLine-l { background: #67B98A; }
 .vas_106-stepDot {
     flex: none; width: 2em; height: 2em; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-size: 0.8125em; font-weight: 700; line-height: 1;
     background: #EEF2F6; color: #8A99A8; border: 1.5px solid #DCE5EE;
 }
-.vas_106-step.is-done .vas_106-stepDot { background: #E4F3EC; color: #1F9D5B; border-color: #BFE6D2; }
-.vas_106-step.is-active .vas_106-stepDot { background: #fff; color: #E08A1E; border: 2px solid #F0A93D; }
+.vas_106-step.vas_106-is-done .vas_106-stepDot { background: #E4F3EC; color: #1F9D5B; border-color: #BFE6D2; }
+.vas_106-step.vas_106-is-active .vas_106-stepDot { background: #fff; color: #E08A1E; border: 2px solid #F0A93D; }
 .vas_106-stepLabel { margin-top: 0.5em; text-align: center; padding: 0 0.25em; min-width: 0; }
 .vas_106-stepTitle { font-size: 0.8125em; font-weight: 700; color: var(--vaso-text); }
 .vas_106-stepMeta { font-size: 0.6875em; color: var(--vaso-muted); margin-top: 0.25em; }
-.vas_106-step.is-active .vas_106-stepMeta { color: #E08A1E; font-weight: 600; }
+.vas_106-step.vas_106-is-active .vas_106-stepMeta { color: #E08A1E; font-weight: 600; }
 
 /* ----------------------------------------------------------- */
 /*  Collapsible detail section                                  */
 /* ----------------------------------------------------------- */
 .vas_106-dsec { display: block; }
+/* A section heading, not a control: the sections no longer collapse, so the
+   header is a plain div with no pointer cursor and no hover state. */
 .vas_106-dsecHead {
     display: flex; align-items: center; gap: 0.5625em; width: 100%;
     padding: 0.625em 0.125em; background: none; border: none;
-    border-bottom: 1px solid var(--vaso-card-bd); cursor: pointer; font-family: inherit; text-align: left;
+    border-bottom: 1px solid var(--vaso-card-bd); font-family: inherit; text-align: left;
 }
-.vas_106-tIc { display: flex; color: var(--vaso-primary); }
 .vas_106-dsecTitle { font-size: 0.9375em; font-weight: 700; color: #141414; letter-spacing: .15px; }
-.vas_106-dsecHead:hover .vas_106-dsecTitle { color: var(--vaso-action-dk); }
-.vas_106-badge {
-    height: 1.25em; min-width: 1.75em; padding: 0 0.5em; border-radius: 999px;
-    background: var(--vaso-primary); color: #fff; font-size: 0.75em; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-}
-.vas_106-dsecChev { margin-left: auto; display: flex; color: var(--vaso-primary); transition: transform .2s ease; }
-.vas_106-dsec.collapsed .vas_106-dsecChev { transform: rotate(180deg); }
+/* The heading is the title alone. .vas_106-tIc (the leading icon) and
+   .vas_106-badge (the trailing count) are no longer rendered, so their rules are
+   gone with them — as are the chevron and collapsed state before them
+   (.vas_106-dsecChev / .vas_106-collapsed). A section is simply open, and named. */
 .vas_106-dsecBody { padding-top: 0.75em; }
-.vas_106-dsec.collapsed .vas_106-dsecBody { display: none; }
 
 /* ----------------------------------------------------------- */
 /*  Data tables                                                 */
 /* ----------------------------------------------------------- */
-.vas_106-table { border: 1px solid var(--vaso-card-bd); border-radius: var(--vaso-card-radius); background: #fff; overflow: hidden; }
+/* The table SHRINKS to the panel; it never scrolls sideways. It used to carry a
+   floor width per column set and its own horizontal scrollbar, on the argument
+   that the reader could scroll to the last columns rather than lose them — but a
+   scrollbar inside a card hides those columns just as effectively, since it has
+   to be found and dragged before it says anything is there. The tracks compress
+   instead, each cell keeping its ellipsis and the row's tooltip.
+   Matches VAS_099 / VAS_098. */
+.vas_106-table {
+    border: 1px solid var(--vaso-card-bd); border-radius: var(--vaso-card-radius);
+    background: #fff;
+}
 .vas_106-tRow { display: grid; align-items: center; gap: 0.625em; padding: 0.625em 0.875em; }
+/* Grid items default to min-width:auto, which blocks the ellipsis on the cells
+   below from ever kicking in. */
+.vas_106-tRow > * { min-width: 0; }
 
-.vas_106-linesTable .vas_106-tRow { grid-template-columns: 2.2fr 0.5fr 0.9fr 0.5fr 0.9fr 1fr 1.4fr; }
-.vas_106-rdTable    .vas_106-tRow { grid-template-columns: 2fr 1.3fr 1.1fr 0.9fr 1.6fr; }
-.vas_106-dvTable    .vas_106-tRow { grid-template-columns: 1.4fr 1fr 1.4fr 0.7fr 1fr; }
-.vas_106-invTable   .vas_106-tRow { grid-template-columns: 1.6fr 1.1fr 1.1fr 1fr; }
+/* Every track is minmax(0, Nfr). A bare Nfr track cannot shrink below its
+   content, so one long product name or amount pushed the row wider than the
+   table and the right-hand columns were clipped away entirely — the layout fault
+   that showed up at 80% browser zoom, where the panel measures ~1.25x more CSS
+   pixels for the same physical width and the content no longer fits the tracks.
+
+   The 2em track after Delivered is the ACTION column: the per-line history
+   toggle, at a fixed width so it takes nothing from the columns carrying data
+   and stays in the same place down the table. */
+.vas_106-linesTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
+                           minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr) 2em
+                           minmax(0, 1.4fr);
+}
+/* No service line on the order, so no Contract column — the row needs
+   proportionally less room before it has to scroll. */
+.vas_106-linesTable.vas_106-no-contract .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
+                           minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr) 2em;
+}
+/* Nothing on the order was discounted, so no Disc column — the 0.5fr track it
+   held comes out and every other column keeps its proportion. Both columns can
+   be absent at once, which is the last row below. */
+.vas_106-linesTable.vas_106-no-discount .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
+                           minmax(0, 0.9fr) minmax(0, 1fr) 2em minmax(0, 1.4fr);
+}
+.vas_106-linesTable.vas_106-no-contract.vas_106-no-discount .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
+                           minmax(0, 0.9fr) minmax(0, 1fr) 2em;
+}
+/* Delivery Readiness: Item | UOM | Warehouse | Pending | On Hand | Readiness.
+   The unit has a column of its own — it used to lead the product name, where it
+   read as part of it. */
+.vas_106-rdTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 0.7fr) minmax(0, 1.3fr)
+                           minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 1.6fr);
+}
+.vas_106-dvTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.4fr)
+                           minmax(0, 0.7fr) minmax(0, 1fr);
+}
+.vas_106-invTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1fr);
+}
+/* Line change history, in a drawer under the line it belongs to.
+
+   Its table sits on the SAME six tracks as the lines table (minus the Contract
+   column, which a past version has nothing to say about), so every figure lands
+   under the column it belongs to on the line above. It carries the lines table's
+   min-width too, so when that table is scrolled sideways the drawer travels with
+   it rather than stopping at the edge of the visible box. */
+.vas_106-lineHist { padding: 0 0 0.625em 1.25em; background: var(--vaso-faint-blue); }
+/* The drawer no longer carries a floor width per column set: it shares the
+   lines table's tracks, and those now compress with the panel instead of
+   scrolling, so there is no scrolled width for its tint to run out to. */
+.vas_106-lhTable { margin-top: 0.5em; }
+/* Both drawer rules are qualified by .vas_106-linesTable so they outrank the
+   table's own variant grids above — the drawer is INSIDE that table, and a
+   two-class rule here would lose to the three-class .no-contract / .no-discount
+   selectors and put the drawer's six figures on the line row's tracks. */
+.vas_106-linesTable .vas_106-lhTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
+                           minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr);
+    min-width: 0;
+}
+/* The drawer drops its Disc column with the table above it, so its figures stay
+   under the same headings. */
+.vas_106-linesTable.vas_106-no-discount .vas_106-lhTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
+                           minmax(0, 0.9fr) minmax(0, 1fr);
+    min-width: 0;
+}
+/* When the change was made, with that version's own note under it. */
+.vas_106-lhWhen { min-width: 0; display: flex; flex-direction: column; }
+.vas_106-lhWhen small {
+    color: var(--vaso-muted); font-size: 0.85em; margin-top: 0.125em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vas_106-lhBy { color: var(--vaso-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The action column after Delivered, holding the per-line history toggle. Empty
+   on a line that was never edited, so every row keeps the same grid. */
+.vas_106-itAct { display: flex; align-items: center; justify-content: center; min-width: 0; }
+
+/* The per-line history toggle. Icon-only: the tooltip carries the meaning and
+   the change count. */
+.vas_106-histBtn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.75em; height: 1.75em;
+    padding: 0; border: none; border-radius: 50%;
+    background: none; color: var(--vaso-muted); cursor: pointer; font-family: inherit;
+    transition: transform .12s ease, color .12s ease;
+}
+.vas_106-histBtn:hover { background: var(--vaso-faint-blue); color: var(--vaso-primary); }
+.vas_106-histBtn.vas_106-is-open { color: var(--vaso-primary); }
+
+/* Documents: Document | Date | Status | Amount — the Purchase Order overview's
+   four columns, one table for shipments, invoices and receipts alike. */
+.vas_106-docTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+/* Document identity cell: kind icon + doc no / caption + open affordance. */
+.vas_106-docItem { display: flex; align-items: center; gap: 0.5em; min-width: 0; }
+.vas_106-docTxt { min-width: 0; flex: 1; }
+.vas_106-docItem > .vas_106-ic:last-child { color: var(--vaso-muted); flex: none; }
+.vas_106-tBody.vas_106-is-link:hover .vas_106-docItem > .vas_106-ic:last-child,
+.vas_106-tBody.vas_106-is-link:hover .vas_106-itName { color: var(--vaso-primary); }
 
 .vas_106-tHead {
     background: var(--vaso-faint-blue); border-bottom: 1px solid var(--vaso-card-bd);
@@ -358,25 +627,58 @@
 .vas_106-tBody { border-bottom: 1px solid var(--vaso-row-div); font-size: 0.8125em; color: var(--vaso-text); }
 .vas_106-tBody:last-of-type { border-bottom: none; }
 .vas_106-tBody:hover { background: #FAFCFE; }
-.vas_106-tBody.is-link { cursor: pointer; }
-.vas_106-table .ta-r { text-align: right; justify-content: flex-end; }
-.vas_106-table .ta-c { text-align: center; justify-content: center; }
+.vas_106-tBody.vas_106-is-link { cursor: pointer; }
+.vas_106-table .vas_106-ta-r { text-align: right; justify-content: flex-end; }
+.vas_106-table .vas_106-ta-c { text-align: center; justify-content: center; }
 
 .vas_106-itItem { min-width: 0; }
 .vas_106-itName { font-size: 1.0769em; font-weight: 700; color: var(--vaso-text); line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vas_106-itSku  { font-size: 0.9231em; color: var(--vaso-muted); margin-top: 0.125em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Attribute Set Instance (lot / serial / size ...), directly under the product
+   name — the attribute qualifies WHICH stock was sold. Darker than the unit
+   line below it: it identifies the goods, where that only labels the count. */
+.vas_106-itAttr { font-size: 0.9231em; color: var(--vaso-sub); margin-top: 0.125em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Drop Shipment: Yes / No — the line's third detail, under the unit. Muted like
+   the sub-line above it when the answer is No, and coloured when it is Yes: a
+   line that ships direct is the one worth spotting down the column. */
+.vas_106-itDrop { font-size: 0.9231em; color: var(--vaso-muted); margin-top: 0.125em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas_106-itDrop.vas_106-is-drop { color: var(--vaso-info-tx); font-weight: 600; }
+
+/* Delivery Readiness: the unit has a COLUMN of its own after the product name.
+   It used to lead the name on the same line (.vas_106-uomTag / -nameTxt, with
+   .vas_106-itName turned into a flex row), where it read as part of the name and
+   left no column to scan down when the rows are counted in different units. */
+.vas_106-rdUom {
+    font-size: 0.9231em; font-weight: 700; letter-spacing: .3px;
+    text-transform: uppercase; color: var(--vaso-sub);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .vas_106-naDash { color: var(--vaso-muted); }
 
-/* Delivered progress cell */
-.vas_106-prog { display: inline-flex; align-items: center; gap: 0.4375em; justify-content: flex-end; font-size: 0.9231em; }
-.vas_106-progBar { width: 40px; height: 5px; border-radius: 999px; background: #E7EEF4; overflow: hidden; flex: none; }
+/* A cell whose hover carries more than it prints — the unit price, which holds
+   the line's list price on its tooltip. The help cursor is the only hint: a
+   figure that changes appearance to advertise a tooltip stops reading as a
+   figure. */
+.vas_106-hasTip { cursor: help; }
+
+/* Delivered progress cell.
+   The status line sits ON TOP of the delivered / ordered ratio rather than
+   beside it: side by side, the bar took the width the figures needed and the
+   ratio was squeezed out of a narrow column first. Stacked, each has the whole
+   cell, and the bar reads as the heading for the figure under it. */
+.vas_106-prog {
+    display: inline-flex; flex-direction: column; align-items: flex-end;
+    justify-content: center; gap: 0.25em; font-size: 0.9231em; line-height: 1.2;
+}
+.vas_106-progQty { white-space: nowrap; }
+.vas_106-progBar { width: 100%; max-width: 64px; height: 5px; border-radius: 999px; background: #E7EEF4; overflow: hidden; flex: none; }
 .vas_106-progBar i { display: block; height: 100%; border-radius: 999px; }
-.vas_106-prog.full i { background: var(--vaso-success-tx); }
-.vas_106-prog.part i { background: var(--vaso-warning-tx); }
-.vas_106-prog.none i { background: #CBD5DF; }
-.vas_106-prog.full { color: var(--vaso-success-tx); font-weight: 500; }
-.vas_106-prog.part { color: var(--vaso-warning-tx); font-weight: 500; }
-.vas_106-prog.none { color: var(--vaso-muted); }
+.vas_106-prog.vas_106-full i { background: var(--vaso-success-tx); }
+.vas_106-prog.vas_106-part i { background: var(--vaso-warning-tx); }
+.vas_106-prog.vas_106-none i { background: #CBD5DF; }
+.vas_106-prog.vas_106-full { color: var(--vaso-success-tx); font-weight: 500; }
+.vas_106-prog.vas_106-part { color: var(--vaso-warning-tx); font-weight: 500; }
+.vas_106-prog.vas_106-none { color: var(--vaso-muted); }
 
 /* Totals footer */
 .vas_106-tFoot {
@@ -385,24 +687,26 @@
 }
 .vas_106-tf { color: var(--vaso-sub); }
 .vas_106-tf b { color: var(--vaso-text); font-weight: 600; margin-left: 0.375em; }
-.vas_106-tf.is-grand { color: var(--vaso-text); font-weight: 700; }
-.vas_106-tf.is-grand b { color: var(--vaso-primary); margin-left: 0.5em; font-size: 1.15em; }
+.vas_106-tf.vas_106-is-grand { color: var(--vaso-text); font-weight: 700; }
+.vas_106-tf.vas_106-is-grand b { color: var(--vaso-primary); margin-left: 0.5em; font-size: 1.15em; }
 
 /* ----------------------------------------------------------- */
 /*  Line-level contract toggle + link                           */
 /* ----------------------------------------------------------- */
 .vas_106-lineContract { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.5em; flex-wrap: wrap; }
+/* Read-only state indicator, not a control — no pointer cursor, and every switch
+   the panel renders carries .vas_106-locked. */
 .vas_106-switch {
     width: 34px; height: 18px; border-radius: 999px; background: #CBD5DF; position: relative;
-    cursor: pointer; flex: none; transition: background .15s;
+    flex: none; transition: background .15s;
 }
 .vas_106-switch::after {
     content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
     border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2);
 }
-.vas_106-switch.on { background: var(--vaso-action); }
-.vas_106-switch.on::after { left: 18px; }
-.vas_106-switch.locked { pointer-events: none; opacity: .55; }
+.vas_106-switch.vas_106-on { background: var(--vaso-action); }
+.vas_106-switch.vas_106-on::after { left: 18px; }
+.vas_106-switch.vas_106-locked { pointer-events: none; opacity: .55; }
 .vas_106-swLabel { font-size: 0.6875em; color: var(--vaso-muted); }
 .vas_106-ctrLink {
     display: none; align-items: center; gap: 0.3125em; height: 1.5em; padding: 0 0.625em;
@@ -410,7 +714,7 @@
     font-size: 0.72em; font-weight: 700; text-decoration: none; white-space: nowrap;
 }
 .vas_106-ctrLink:hover { background: #CDE9FF; text-decoration: underline; }
-.vas_106-ctrLink.show { display: inline-flex; }
+.vas_106-ctrLink.vas_106-show { display: inline-flex; }
 
 .vas_106-ccHint { display: flex; align-items: center; gap: 0.375em; font-size: 0.72em; color: var(--vaso-sub); margin-top: 0.5em; }
 .vas_106-ccHint .vas_106-ic { color: var(--vaso-primary); }
@@ -419,29 +723,29 @@
 /*  Inline contract form                                        */
 /* ----------------------------------------------------------- */
 .vas_106-contractForm { display: none; background: var(--vaso-faint-blue); border-bottom: 1px solid var(--vaso-row-div); padding: 0.875em 1.125em 1.125em; }
-.vas_106-contractForm.open { display: block; }
+.vas_106-contractForm.vas_106-open { display: block; }
 .vas_106-cfCap { display: flex; align-items: center; gap: 0.4375em; font-size: 0.6875em; letter-spacing: .4px; text-transform: uppercase; color: #106AB0; margin-bottom: 0.875em; }
-.vas_106-formGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1em 1.375em; }
-@container (max-width: 620px) { .vas_106-formGrid { grid-template-columns: repeat(2, 1fr); } }
-@container (max-width: 340px) { .vas_106-formGrid { grid-template-columns: 1fr; } }
+.vas_106-formGrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1em 1.375em; }
+@container (max-width: 700px) { .vas_106-formGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 340px) { .vas_106-formGrid { grid-template-columns: minmax(0, 1fr); } }
 
 .vas_106-ff { display: flex; align-items: flex-start; gap: 0.6875em; padding-bottom: 0.5em; border-bottom: 1px solid #D7D7D7; }
 .vas_106-ff:hover { border-bottom-color: var(--vaso-primary); }
 .vas_106-ffContent { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.375em; }
 .vas_106-ffContent label { font-size: 0.75em; color: var(--vaso-sub); }
-.vas_106-ffContent label.req span { color: #ED1C24; margin-left: 2px; }
+.vas_106-ffContent label.vas_106-req span { color: #ED1C24; margin-left: 2px; }
 .vas_106-ffInput {
     font-family: inherit; font-size: 0.875em; font-weight: 500; color: var(--vaso-text);
     background: transparent; border: none; outline: none; width: 100%; padding: 0; min-height: 1.0625em;
 }
 .vas_106-ffInput::placeholder { color: #9F9F9F; font-weight: 400; }
 .vas_106-ffInput:disabled { color: var(--vaso-sub); }
-.vas_106-ffInput.num { text-align: right; }
+.vas_106-ffInput.vas_106-num { text-align: right; }
 select.vas_106-ffInput { appearance: none; -webkit-appearance: none; cursor: pointer; }
 
 .vas_106-cfFoot { display: flex; justify-content: flex-end; align-items: center; gap: 0.75em; margin-top: 1em; }
 .vas_106-cfNote { font-size: 0.72em; color: var(--vaso-sub); }
-.vas_106-cfCreate.done { background: var(--vaso-success-tx); }
+.vas_106-cfCreate.vas_106-done { background: var(--vaso-success-tx); }
 
 /* ----------------------------------------------------------- */
 /*  Delivery readiness tags                                     */
@@ -451,12 +755,16 @@ select.vas_106-ffInput { appearance: none; -webkit-appearance: none; cursor: poi
     padding: 0.25em 0.5625em; font-size: 0.6875em; font-weight: 700; line-height: 1; white-space: nowrap;
 }
 .vas_106-rdDot { width: 0.375em; height: 0.375em; border-radius: 50%; }
-.vas_106-rdTag.ready   { background: var(--vaso-success-bg); color: var(--vaso-success-tx); }
-.vas_106-rdTag.ready .vas_106-rdDot { background: var(--vaso-success-tx); }
-.vas_106-rdTag.short   { background: var(--vaso-warning-bg); color: var(--vaso-warning-tx); }
-.vas_106-rdTag.short .vas_106-rdDot { background: var(--vaso-warning-tx); }
-.vas_106-rdTag.awaited { background: var(--vaso-risk-bg); color: var(--vaso-risk-tx); }
-.vas_106-rdTag.awaited .vas_106-rdDot { background: var(--vaso-risk-tx); }
+.vas_106-rdTag.vas_106-ready   { background: var(--vaso-success-bg); color: var(--vaso-success-tx); }
+.vas_106-rdTag.vas_106-ready .vas_106-rdDot { background: var(--vaso-success-tx); }
+.vas_106-rdTag.vas_106-short   { background: var(--vaso-warning-bg); color: var(--vaso-warning-tx); }
+.vas_106-rdTag.vas_106-short .vas_106-rdDot { background: var(--vaso-warning-tx); }
+/* Part of the line has shipped. Blue, not the amber SHORT wears: the delivery is
+   under way and nothing is wrong with it — it simply is not finished. */
+.vas_106-rdTag.vas_106-partial { background: var(--vaso-info-bg); color: var(--vaso-info-tx); }
+.vas_106-rdTag.vas_106-partial .vas_106-rdDot { background: var(--vaso-info-tx); }
+.vas_106-rdTag.vas_106-awaited { background: var(--vaso-risk-bg); color: var(--vaso-risk-tx); }
+.vas_106-rdTag.vas_106-awaited .vas_106-rdDot { background: var(--vaso-risk-tx); }
 
 .vas_106-note { display: flex; align-items: flex-start; gap: 0.5em; margin-top: 0.625em; font-size: 0.72em; color: var(--vaso-muted); line-height: 1.5; }
 .vas_106-note .vas_106-ic { color: var(--vaso-primary); margin-top: 0.1em; }
@@ -472,15 +780,68 @@ select.vas_106-ffInput { appearance: none; -webkit-appearance: none; cursor: poi
     padding: 0.25em 0.5em; font-size: 0.6875em; font-weight: 700; flex: none;
 }
 .vas_106-actBadge .vas_106-ic svg { width: 0.85em; height: 0.85em; }
-.vas_106-actBadge.tone-info    { background: #E8F2FC; color: var(--vaso-info-tx); }
-.vas_106-actBadge.tone-success { background: #E4F5EC; color: var(--vaso-success-tx); }
-.vas_106-actBadge.tone-warning { background: var(--vaso-warning-bg); color: var(--vaso-warning-tx); }
-.vas_106-actBadge.tone-purple  { background: var(--vaso-purple-bg); color: var(--vaso-purple-tx); }
-.vas_106-actBadge.tone-neutral { background: #EEF3F8; color: var(--vaso-neutral-tx); }
+.vas_106-actBadge.vas_106-tone-info    { background: #E8F2FC; color: var(--vaso-info-tx); }
+.vas_106-actBadge.vas_106-tone-success { background: #E4F5EC; color: var(--vaso-success-tx); }
+.vas_106-actBadge.vas_106-tone-warning { background: var(--vaso-warning-bg); color: var(--vaso-warning-tx); }
+.vas_106-actBadge.vas_106-tone-purple  { background: var(--vaso-purple-bg); color: var(--vaso-purple-tx); }
+.vas_106-actBadge.vas_106-tone-neutral { background: #EEF3F8; color: var(--vaso-neutral-tx); }
 .vas_106-actMain { flex: 1; min-width: 0; }
-.vas_106-atWrap { display: flex; justify-content: space-between; gap: 0.75em; align-items: baseline; }
-.vas_106-at { font-size: 0.8125em; color: var(--vaso-text); }
-.vas_106-actTime { font-size: 0.6875em; color: var(--vaso-muted); white-space: nowrap; flex: none; }
+/* Headline left, "when · by whom" right — wrapping when the two cannot share a
+   line. The stamp carries the actor's name on every row, so it is long enough to
+   have squeezed the headline out otherwise. */
+.vas_106-atWrap {
+    display: flex; justify-content: space-between; flex-wrap: wrap;
+    gap: 0.125em 0.75em; align-items: baseline;
+}
+.vas_106-at { font-size: 0.8125em; color: var(--vaso-text); min-width: 0; }
+/* A COMMENT's headline is the comment itself: it wraps (to three lines) rather
+   than running off the row, since that text is what the reader came for. */
+.vas_106-at.vas_106-multiline {
+    overflow-wrap: break-word; word-break: break-word; line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+/* margin-left:auto keeps it right-aligned when it wraps onto a line of its own. */
+.vas_106-actTime {
+    font-size: 0.6875em; color: var(--vaso-muted); white-space: nowrap;
+    flex: none; margin-left: auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* An e-mail's recipient, under its subject. One line: the addresses in full are
+   in the message the row opens, and its tooltip carries them meanwhile. */
+.vas_106-actSub {
+    display: block; margin-top: 0.125em;
+    font-size: 0.6875em; color: var(--vaso-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* An activity carrying a message (an e-mail) opens on click. */
+.vas_106-actRow.vas_106-is-openable { cursor: pointer; }
+.vas_106-actRow.vas_106-is-openable:hover { background: var(--vaso-faint-blue); }
+.vas_106-actCaret {
+    flex: none; display: inline-flex; align-items: center;
+    color: var(--vaso-muted); margin-top: 0.15em;
+    transition: transform .15s ease;
+}
+.vas_106-actRow.vas_106-is-open .vas_106-actCaret { transform: rotate(90deg); }
+
+/* The message itself, tucked under its row. pre-wrap keeps the paragraphs the
+   server's flattening left behind; break-word keeps a long URL inside the panel,
+   which never scrolls sideways. */
+.vas_106-actBody {
+    background: #F7FAFD;
+    border-top: 1px solid var(--vaso-row-div);
+    padding: 0.625em 0.875em 0.75em 2.5em;
+    font-size: 0.75em; line-height: 1.55; color: var(--vaso-text);
+}
+.vas_106-actBody p { margin: 0; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; }
+.vas_106-actMeta { font-size: 0.85em; color: var(--vaso-muted); margin-bottom: 0.3125em; }
+/* The row divider is drawn between ADJACENT rows, so a row following an opened
+   message has to be given the one that rule cannot reach. */
+.vas_106-actBody + .vas_106-actRow { border-top: 1px solid var(--vaso-row-div); }
+
+[dir="rtl"] .vas_106-actBody { padding-left: 0.875em; padding-right: 2.5em; }
+[dir="rtl"] .vas_106-actCaret svg { transform: scaleX(-1); }
+[dir="rtl"] .vas_106-actRow.vas_106-is-open .vas_106-actCaret { transform: rotate(-90deg); }
 
 /* Activity pager — a sibling of the list card, so the controls keep their place
    while the card's rows are replaced underneath them. Modelled on the VAS_099
@@ -516,7 +877,7 @@ select.vas_106-ffInput { appearance: none; -webkit-appearance: none; cursor: poi
 }
 .vas_106-pgBtn:hover { background: var(--vaso-faint-blue); border-color: var(--vaso-action); }
 .vas_106-pgBtn .vas_106-ic { color: currentColor; }
-.vas_106-pgBtn.is-disabled {
+.vas_106-pgBtn.vas_106-is-disabled {
     opacity: .45;
     cursor: default;
     pointer-events: none;
@@ -539,15 +900,35 @@ select.vas_106-ffInput { appearance: none; -webkit-appearance: none; cursor: poi
     color: #fff; background: #2A3A47; box-shadow: 0 8px 22px rgba(15,61,97,0.22);
     opacity: 0; transition: opacity .25s ease, transform .25s ease; z-index: 1000; pointer-events: none;
 }
-.vas_106-toast.show { opacity: 1; transform: translate(-50%, 0); }
-.vas_106-toast.err { background: #8F2D2D; }
-.vas_106-toast.ok  { background: #0C5D38; }
+.vas_106-toast.vas_106-show { opacity: 1; transform: translate(-50%, 0); }
+.vas_106-toast.vas_106-err { background: #8F2D2D; }
+.vas_106-toast.vas_106-ok  { background: #0C5D38; }
 
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
-[dir="rtl"] .vas_106-table .ta-r { text-align: left; justify-content: flex-start; }
-[dir="rtl"] .vas_106-prog { justify-content: flex-start; }
+[dir="rtl"] .vas_106-table .vas_106-ta-r { text-align: left; justify-content: flex-start; }
+/* The cell stacks, so it is the CROSS axis that has to flip. */
+[dir="rtl"] .vas_106-prog { align-items: flex-start; }
 [dir="rtl"] .vas_106-tFoot { justify-content: flex-start; }
-[dir="rtl"] .vas_106-dsecChev { margin-left: 0; margin-right: auto; }
 [dir="rtl"] .vas_106-hdrColL { border-right: none; border-left: 1px solid var(--vaso-row-div); padding-right: 0; padding-left: 1.25em; }
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value.
+   Matches VAS_101 / VAS_104. */
+.vas_106-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_106-cvOld {
+    color: var(--vaso-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_106-cvArrow { flex: none; color: var(--vaso-muted); }
+.vas_106-cvNew {
+    color: var(--vaso-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}

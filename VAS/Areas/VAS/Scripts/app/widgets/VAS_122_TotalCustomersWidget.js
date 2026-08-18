@@ -14,6 +14,13 @@
  *
  * Backend - VAS_122_TotalCustomersWidget/GetTotalCustomers
  *
+ * Routing - 2026-08-17: a drill-through row opens the customer. Hosted on a window
+ *           that navigates the host grid in place (widgetFirevalueChanged); on the
+ *           Home / landing dashboard (windowNo < 0) there is no host grid, so the
+ *           record is opened in the standard Customer window via VAS.ZoomUtil.
+ *           The same change declares CUSTOMER_WINDOW_NAME, which the in-place
+ *           fallback referenced without it ever being defined.
+ *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  # | Current Text                | Message Key
  * ---+-----------------------------+--------------------------------
@@ -22,11 +29,27 @@
  *  3 | Combined ARR                | VAS_122_CombinedARR
  *  4 | Active customers            | VAS_122_ActiveCustomers
  *  5 | Unable to load customer total | VAS_122_UnableToLoad
+ *  6 | Customers                   | VAS_122_DrillTitle
+ *  7 | No contact                  | VAS_122_NoContact
+ *  8 | more                        | VAS_122_MoreContacts
  * ──────────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /* Fallback ActionName for the in-place zoom when the resolved host window name is
+       not available (2026-08-17: the name was referenced but never declared here, so
+       the fallback threw and the drill-through row silently did nothing). */
+    var CUSTOMER_WINDOW_NAME = 'Business Partner';
+
+    /* 2026-08-17: zoom target when the widget is NOT hosted inside a window
+       (windowNo < 0 - the Home / landing dashboard). There is no host grid to navigate
+       there, so the record is opened in the standard Customer window; VAS.ZoomUtil
+       resolves the AD_Window_ID from the new name, then the old name, then
+       VAS_ZoomScreenConfig. */
+    var ZOOM_WINDOW_NAME_NEW = 'VAS_CustomerMaster';
+    var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
 
     /* Keep --dash-inline-size on :root equal to the dashboard container width so
        the widget clamp resolves against the dashboard's visible width. */
@@ -46,10 +69,6 @@
         write();
     }
 
-    // Currencies of Indian-numbering countries get Indian digit grouping and
-    // Lakh/Crore compact notation; all others get international grouping and K/M/B.
-    var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
-
     VAS.VAS_122_TotalCustomersWidget = function () {
 
         this.frame;
@@ -61,6 +80,9 @@
         var $card;
         var $value;
         var $meta;
+        /* AD_Window_ID of the Customer window, resolved once on the first Home-page
+           zoom and reused afterwards (0 = not resolved yet). */
+        var zoomWindowId = 0;
 
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
@@ -68,7 +90,7 @@
         }
 
         function usesIndianNumbering(isoCode) {
-            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+            return VIS.Util.usesIndianNumbering(isoCode);
         }
 
         function currencyLocale(isoCode) {
@@ -84,10 +106,6 @@
             return !isNaN(precision) && precision >= 0 ? precision : 0;
         }
 
-        function trimTrailingZeros(text) {
-            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
-        }
-
         // Full, precise integer count for the main value (localized, no compaction).
         function formatCount(value) {
             var number = Number(value || 0);
@@ -95,30 +113,17 @@
             return Math.round(number).toLocaleString(window.navigator.language);
         }
 
-        // Compact currency amount for the sub-line (e.g. ₹3.42 Cr / $34.2M / -$5.3T).
-        // The sign sits BEFORE the currency symbol ("-$5.3T", not "$-5.3T"), and
-        // compaction is computed on the absolute value so grouping is correct for
-        // negative combined values too.
-        function formatCompactAmount(value, symbol, isoCode) {
+        // Compact currency amount for the sub-line (e.g. ₹3.42Cr / $34.2M / -$5.3T).
+        // The magnitude comes from VIS.Util.formatCompactAmount, which scales against
+        // the base (accounting-schema) currency's numbering system and renders at the
+        // system-configured standard precision. Composition stays local: the sign sits
+        // BEFORE the currency symbol ("-$5.3T", not "$-5.3T").
+        function formatCompactAmount(value, symbol, isoCode, precision) {
             var number = Number(value || 0);
             if (!isFinite(number)) { number = 0; }
             var sign = number < 0 ? '-' : '';
-            var abs = Math.abs(number);
             var currency = symbol || isoCode || '';
-            var compact;
-            if (usesIndianNumbering(isoCode)) {
-                if (abs >= 10000000) { compact = trimTrailingZeros((abs / 10000000).toFixed(2)) + ' Cr'; }
-                else if (abs >= 100000) { compact = trimTrailingZeros((abs / 100000).toFixed(2)) + ' Lakh'; }
-                else if (abs >= 1000) { compact = trimTrailingZeros((abs / 1000).toFixed(1)) + 'K'; }
-                else { compact = abs.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 }); }
-            } else {
-                if (abs >= 1000000000000) { compact = trimTrailingZeros((abs / 1000000000000).toFixed(1)) + 'T'; }
-                else if (abs >= 1000000000) { compact = trimTrailingZeros((abs / 1000000000).toFixed(1)) + 'B'; }
-                else if (abs >= 1000000) { compact = trimTrailingZeros((abs / 1000000).toFixed(1)) + 'M'; }
-                else if (abs >= 1000) { compact = trimTrailingZeros((abs / 1000).toFixed(1)) + 'K'; }
-                else { compact = abs.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 }); }
-            }
-            return sign + currency + compact;
+            return sign + currency + VIS.Util.formatCompactAmount(number, isoCode, getPrecision(precision));
         }
 
         // Full, precise currency amount for the sub-line tooltip. The sign sits
@@ -142,6 +147,22 @@
             if (typeof parsed === 'string' && parsed.length) { parsed = JSON.parse(parsed); }
             if (typeof parsed === 'string' && parsed.length) { parsed = JSON.parse(parsed); }
             return parsed || {};
+        }
+
+        // Drill-through row meta: the customer's contact people, all of them when there
+        // is more than one. The server caps the listed names and reports the full
+        // count, so a long address book collapses to "…· +N more". The row's title
+        // attribute carries the whole string, so truncation loses nothing.
+        function contactMeta(item) {
+            var contacts = (item.contacts || []).filter(function (name) { return name; });
+            if (!contacts.length) { return label('VAS_122_NoContact', 'No contact'); }
+
+            var meta = contacts.join(' · ');
+            var hidden = Number(item.contactCount || 0) - contacts.length;
+            if (hidden > 0) {
+                meta += ' · +' + formatCount(hidden) + ' ' + label('VAS_122_MoreContacts', 'more');
+            }
+            return meta;
         }
 
         function valueModeLabel(mode) {
@@ -180,7 +201,7 @@
                 return;
             }
 
-            var compact = formatCompactAmount(data.total_customer_value, data.currency_symbol, data.currency_iso);
+            var compact = formatCompactAmount(data.total_customer_value, data.currency_symbol, data.currency_iso, data.std_precision);
             var full = formatFullAmount(data.total_customer_value, data.currency_symbol, data.currency_iso, data.std_precision);
             var subLabel = valueModeLabel(mode);
 
@@ -213,12 +234,22 @@
         }
 
         // Drill-through: the customers behind the count, ranked by lifetime value
-        // (VAS_122 GetCustomers); a row opens the customer record.
+        // (VAS_122 GetCustomers); a row opens the customer record - in the host grid
+        // when the widget sits on a window, otherwise (Home / landing page,
+        // windowNo < 0) in the standard Customer window.
         function zoomToCustomer(bpId) {
             if (!bpId) { return; }
             if (drill) { drill.close(); }
             try {
-                $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                }
+                else {
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", Number(bpId), zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* best-effort */ }
         }
 
@@ -235,8 +266,7 @@
                     };
                 },
                 mapRow: function (item, cur, h) {
-                    var meta = item.ownerName || label('VAS_122_NoOwner', 'No owner');
-                    return { bpId: item.customerId, title: item.customerName, meta: meta, valueText: h.formatMoney(item.customerValue, cur) };
+                    return { bpId: item.customerId, title: item.customerName, meta: contactMeta(item), valueText: h.formatMoney(item.customerValue, cur) };
                 },
                 navigate: zoomToCustomer
             });

@@ -7,13 +7,18 @@
  *           project phases, plus each project with its activity breakdown, progress
  *           bar, status tag and due date. "All ->" opens the full server-paged list.
  * Design  - active-projects.html (attached) + Design Specs/dashboard-widgets.md
- *           "Grid Data Widget". Glass surface, icon-well header, paged rows (3),
+ *           "Grid Data Widget". Glass surface, icon-well header, paged rows (5),
  *           circular pager, activity-state stat cells. Internal sizing in em against
  *           the widget-root clamp; borders/radii in px. CSS namespaced vas135-*.
  *
  * Backend - VAS_135_ActiveProjectsWidget/GetList            (paged customer rows + totals)
  *           VAS_135_ActiveProjectsWidget/GetProjects        (one customer's projects)
  *           VAS_135_ActiveProjectsWidget/GetActivityDetail  (phases in one state)
+ *
+ * Routing - 2026-08-17: hosted on a window, opening the customer navigates the host
+ *           grid in place (widgetFirevalueChanged); on the Home / landing dashboard
+ *           (windowNo < 0) there is no host grid, so the record is opened in the
+ *           standard Customer window via VAS.ZoomUtil.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  #  | Current Text            | Message Key
@@ -41,6 +46,9 @@
  * 21  | Customers with active projects | VAS_135_AllTitle
  * 22  | Close                   | VAS_135_Close
  * 23  | Open record             | VAS_135_OpenRecord
+ * 24  | Showing                 | VAS_135_Showing
+ * 25  | Previous page           | VAS_135_PrevPage
+ * 26  | Next page               | VAS_135_NextPage
  * ──────────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -48,6 +56,14 @@
 ; (function (VAS, $) {
 
     var CUSTOMER_WINDOW_NAME = 'Business Partner';
+
+    /* 2026-08-17: zoom target when the widget is NOT hosted inside a window
+       (windowNo < 0 - the Home / landing dashboard). There is no host grid to navigate
+       there, so the record is opened in the standard Customer window; VAS.ZoomUtil
+       resolves the AD_Window_ID from the new name, then the old name, then
+       VAS_ZoomScreenConfig. */
+    var ZOOM_WINDOW_NAME_NEW = 'VAS_CustomerMaster';
+    var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
 
     function ensureDashInlineSizeVar($el) {
         if (window.__vasDashInlineSizeObserver) { return; }
@@ -69,7 +85,9 @@
         var $root = $('<div class="vas135-root">');
         var $sub, $body;
 
-        var pageSize = 3;
+        // 5 rows per page (was 3) — the card is tall enough for five and the body
+        // grid below spreads them through its full height. Matches VAS_127.
+        var pageSize = 5;
         var pageOffset = 0;
         var listTotal = 0;
         var rowsSeq = 0;
@@ -81,6 +99,10 @@
         var $modal, $modalBody, $modalTitle, currentModalId = 0, activeState = null;
 
         var STATES = ['delayed', 'ontime', 'ongoing', 'upcoming', 'completed'];
+
+        // AD_Window_ID of the Customer window, resolved once on the first Home-page
+        // zoom and reused afterwards (0 = not resolved yet).
+        var zoomWindowId = 0;
 
         function label(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -191,25 +213,33 @@
             '</div>';
         }
 
+        /* Footer pager (Design Specs/dashboard-widgets.md §"Widget Footer Pager"):
+           "Showing X–Y of Z" helper on the left, compact prev · "N of M" · next
+           control on the right. The control stays visible on a single page with
+           both arrows disabled, so the footer height never shifts. */
         function pagerHtml(offset, size, total) {
             var start = offset + 1;
             var pages = Math.max(1, Math.ceil(total / size));
             var current = Math.floor(offset / size);
             var end = Math.min(offset + size, total);
-            var lbl = start + '–' + end + ' ' + label('VAS_135_Of', 'of') + ' ' + formatCount(total);
-            if (pages > 1) {
-                return '<div class="vas135-pager">' +
-                    '<button type="button" class="vas135-pgbtn" data-dir="prev" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas135-pglabel">' + escapeHtml(lbl) + '</span>' +
-                    '<button type="button" class="vas135-pgbtn" data-dir="next" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
-                '</div>';
-            }
-            return '<div class="vas135-pager"><span></span><span class="vas135-pglabel">' + escapeHtml(lbl) + '</span><span></span></div>';
+            var of = label('VAS_135_Of', 'of');
+            var helper = label('VAS_135_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(total);
+            var pageText = (current + 1) + ' ' + of + ' ' + pages;
+            return '<div class="vas135-pager">' +
+                '<span class="vas135-pglabel">' + escapeHtml(helper) + '</span>' +
+                '<span class="vas135-pgctl">' +
+                    '<button type="button" class="vas135-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_135_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
+                    '<span class="vas135-pgtext">' + escapeHtml(pageText) + '</span>' +
+                    '<button type="button" class="vas135-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_135_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
+                '</span>' +
+            '</div>';
         }
 
         function renderRows(items) {
             if (!items.length) { renderState(label('VAS_135_NothingHere', 'Nothing here right now.')); return; }
-            $body.html('<div class="vas135-list">' + items.map(rowHtml).join('') + '</div>' + pagerHtml(pageOffset, pageSize, listTotal));
+            // Divide the body into pageSize equal rows so records fill the widget
+            // top-to-bottom; partial pages stay top-aligned (empty tracks below).
+            $body.html('<div class="vas135-list" style="grid-template-rows: repeat(' + pageSize + ', minmax(0, 1fr))">' + items.map(rowHtml).join('') + '</div>' + pagerHtml(pageOffset, pageSize, listTotal));
         }
 
         function turnPage(direction) {
@@ -390,7 +420,16 @@
             if (!bpId) { return; }
             closeProjects();
             try {
-                $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                }
+                else {
+                    /* Home / landing page: no host grid, so open the standard Customer window. */
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", Number(bpId), zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* best-effort */ }
         }
 

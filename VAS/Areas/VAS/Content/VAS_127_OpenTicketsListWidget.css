@@ -63,7 +63,7 @@
     display: grid;
     place-items: center;
     background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
-    border: 1px solid #E8F2FB;                  /* px */
+    border: 1px solid #BFE4FF;                  /* px */
     color: #0083DA;
 }
 
@@ -237,49 +237,83 @@
 
 .vas127-tag-delayed { background: #FAD7D7; color: #8F2D2D; }
 .vas127-tag-warn { background: #FCEBD3; color: #9A6500; }
-.vas127-tag-key { background: #FBE9D2; color: #9A5B00; }
+.vas127-tag-key { background: #FFF6E2; color: #9A6500; }
 .vas127-tag-violet { background: #EFEAFF; color: #5F4AA6; }
 .vas127-tag-amber { background: #FCEBD3; color: #9A6500; }
 .vas127-tag-info { background: #DFF1FF; color: #0E5DA8; }
 .vas127-tag-neutral { background: #EEF2F6; color: #5F7283; }
 
-/* Pager (widget + modals). */
+/* Footer pager (widget + modals) — dashboard-widgets.md §"Widget Footer Pager":
+   two zones, the result-range helper on the left and a compact
+   prev · "N of M" · next control on the right. 2026-08-06: replaced the
+   solid-blue 2.1em circles (which spread the record range between the arrows)
+   with the shared 1.5em/24px rounded-square buttons and 0.875em/14px chevrons
+   from §Pager Buttons. */
 .vas127-pager {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 1em;
     padding-top: 0.5em;
     margin-top: 0.25em;
     flex-shrink: 0;
 }
 
 .vas127-pglabel {
+    flex: 1 1 auto;
+    min-width: 0;
     font-size: 0.75em;
     color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas127-pgctl {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas127-pgtext {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .vas127-pgbtn {
-    width: 2.1em;
-    height: 2.1em;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-    border: none;
-    background: #1F83FF;
-    color: #FFFFFF;
+    width: 1.5em;                               /* 24px */
+    height: 1.5em;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 6px;                         /* px */
+    background: #FBFDFF;
+    color: #0083DA;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(31, 131, 255, 0.28);
 }
 
+    .vas127-pgbtn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
     .vas127-pgbtn:disabled {
-        background: #C7D6E2;
-        box-shadow: none;
+        color: #B8C6D2;
         cursor: default;
     }
 
     .vas127-pgbtn svg {
-        width: 1.05em;
-        height: 1.05em;
+        width: 0.875em;                         /* 14px */
+        height: 0.875em;
+        stroke: currentColor;
     }
 
 .vas127-state {
@@ -401,7 +435,7 @@
 }
 
     .vas127-close:hover {
-        background: #F2F6FA;
+        background: #F1F4F8;
     }
 
     .vas127-close svg {
@@ -443,7 +477,7 @@
 }
 
     .vas127-btn-primary:hover {
-        background: #1675E6;
+        background: #1F83FF;
     }
 
 /* ── All (full list) modal ────────────────────────────────────────────────── */
@@ -499,9 +533,9 @@
     background: #FBFDFF;
 }
 
+    /* Spec §Alignment Rules: helper stays left, control stays right — the modal
+       footer no longer centres the pager. */
     .vas127-pfoot .vas127-pager {
-        justify-content: center;
-        gap: 14px;                              /* px */
         padding-top: 0;
         margin-top: 0;
     }

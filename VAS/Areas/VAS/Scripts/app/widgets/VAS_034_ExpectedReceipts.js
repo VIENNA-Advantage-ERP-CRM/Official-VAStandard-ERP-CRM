@@ -11,6 +11,13 @@
  * and list; the filter flyout reuses the shared VIS lookup controls (Type / Financial
  * Period / Customer / From / To) opened from a funnel icon in the header.
  *
+ * Each row's document number is a zoom link: it opens the source transaction through
+ * VAS.ZoomUtil — sales orders in VAS_SalesOrder, AR invoices in VAS_ARInvoice. The
+ * endpoint already resolves those AD_Window_IDs (Record_ID / Window_ID / Primary_ID
+ * per row); the window NAMES here are only the fallback for a row that arrives with
+ * Window_ID 0. The row's document type (C_DocType name) leads the metadata line, so a
+ * credit memo is distinguishable from an invoice at a glance.
+ *
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                 | Message Key
  * ----+------------------------------+--------------------------------
@@ -31,6 +38,7 @@
  * 12  | To Date                      | VAS_ToDate
  * 13  | Clear                        | VAS_Clear
  * 14  | Apply                        | VAS_Apply
+ * 15  | Zoom                         | VAS_Zoom
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -105,6 +113,13 @@
         var cBPartnerId = null;
         var fromDate = "";
         var toDate = "";
+
+        /* Zoom targets for the document-number link. The endpoint sends the AD_Window_ID
+           per row; these names are the fallback when it comes back as 0 (ids differ per
+           environment, names do not). resolvedId caches whatever the helper resolved so
+           subsequent clicks on the same kind of record skip the lookup. */
+        var ZOOM_WINDOW_ORDER = { newName: 'VAS_SalesOrder', oldName: 'Sales Order', resolvedId: 0 };
+        var ZOOM_WINDOW_INVOICE = { newName: 'VAS_ARInvoice', oldName: 'Invoice (Customer)', resolvedId: 0 };
 
         var pageNo = 1;
         var pageSize = 6;
@@ -224,21 +239,111 @@
             var methodName = normalizeMethodName(row.PayMethod);
             var amount = formatAmount(row);
             var barClass = getBarClass(methodName, index, row.windowType);
+            var docTypeName = row.DocTypeName || "";
 
-            return $(
+            /* Metadata line: document type first (invoice vs credit memo vs order),
+               then due date and expected payment method. Empty parts are dropped so
+               no stray separator is left behind. */
+            var metaParts = [];
+            if (docTypeName) { metaParts.push(docTypeName); }
+            if (dueDateText) { metaParts.push(dueDateText); }
+            if (methodName) { metaParts.push(methodName); }
+
+            var $row = $(
                 '<div class="vas-er-row">' +
                 '<span class="vas-er-bar ' + barClass + '"></span>' +
                 '<div class="vas-er-info">' +
-                '<div class="vas-er-row-title">' +
-                escapeHtml(documentNo) + ' · ' + escapeHtml(customerName) +
-                '</div>' +
-                '<div class="vas-er-meta">' +
-                escapeHtml(dueDateText) + ' · ' + escapeHtml(methodName) +
+                '<div class="vas-er-row-title"></div>' +
+                '<div class="vas-er-meta" title="' + escapeHtml(metaParts.join(' · ')) + '">' +
+                escapeHtml(metaParts.join(' · ')) +
                 '</div>' +
                 '</div>' +
                 '<span class="vas-er-amount">' + escapeHtml(amount) + '</span>' +
                 '</div>'
             );
+
+            $row.find('.vas-er-row-title')
+                .append(buildDocumentNoCell(row, documentNo))
+                .append(document.createTextNode(customerName ? ' · ' + customerName : ''))
+                .attr('title', documentNo + (customerName ? ' · ' + customerName : ''));
+
+            return $row;
+        }
+
+        /* The document number is a zoom link to the source transaction. A row whose
+           record cannot be identified degrades to plain text — never a dead link. */
+        function buildDocumentNoCell(row, documentNo) {
+            var target = getZoomTarget(row);
+
+            if (!documentNo || !target) {
+                return $('<span>').text(documentNo);
+            }
+
+            var $link = $('<a class="vas-er-doclink" role="link" tabindex="0">')
+                .attr('title', lbl("VAS_Zoom", "Zoom") + ': ' + documentNo)
+                .text(documentNo);
+
+            $link.on('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                zoomToRecord(target);
+            });
+
+            /* An <a> without href gets no implicit key activation. */
+            $link.on('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    zoomToRecord(target);
+                }
+            });
+
+            return $link;
+        }
+
+        /* Builds the zoom descriptor for a row from what the endpoint already sends
+           (Record_ID / Primary_ID / Window_ID). Window_ID may arrive as 0 — the window
+           names are the fallback the shared helper resolves against. */
+        function getZoomTarget(row) {
+            var recordId = Number(row && row.Record_ID || 0);
+
+            if (!recordId || isNaN(recordId) || recordId <= 0) {
+                return null;
+            }
+
+            var isOrder = row.windowType === "Order";
+            var primaryColumn = row.Primary_ID || (isOrder ? "C_Order_ID" : "C_Invoice_ID");
+            var names = isOrder ? ZOOM_WINDOW_ORDER : ZOOM_WINDOW_INVOICE;
+
+            return {
+                recordId: recordId,
+                primaryColumn: primaryColumn,
+                windowId: Number(row.Window_ID || 0) || 0,
+                names: names
+            };
+        }
+
+        function zoomToRecord(target) {
+            if (!target || !VAS.ZoomUtil) {
+                return;
+            }
+
+            /* Zoom is best-effort: an unresolvable window simply does not navigate. */
+            try {
+                VAS.ZoomUtil.zoomToRecord(
+                    target.primaryColumn,
+                    target.recordId,
+                    target.windowId || target.names.resolvedId,
+                    target.names.newName,
+                    target.names.oldName
+                ).done(function (windowId) {
+                    /* Cache the resolved id so later clicks skip the lookup. */
+                    if (windowId > 0) {
+                        target.names.resolvedId = windowId;
+                    }
+                });
+            }
+            catch (e) { /* zoom is best-effort */ }
         }
 
         function normalizeMethodName(name) {

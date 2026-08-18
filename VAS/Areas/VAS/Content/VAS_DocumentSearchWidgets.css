@@ -2,8 +2,8 @@
    VAS Document Search Widgets  -  vas-dssrch-* namespace
 
    Shared styling for the four single-table search-bar widgets:
-     VAS_067 AP Invoice       (chip: invoice)
-     VAS_068 AP Payment       (chip: payment)
+     VAS_067 AP Invoice       (BP initials avatar)
+     VAS_068 AP Payment       (BP initials avatar)
      VAS_069 Cash Journal     (chip: cash)
      VAS_070 GL Journal       (chip: gljournal)
 
@@ -283,14 +283,16 @@
     flex-shrink: 0;
 }
 
-/* ---------- Vendor-first result row (VAS_068) --------------------------
-   An initials avatar and the vendor name lead the row; everything that
-   describes the payment - doc no, type, bank account, currency, invoice,
-   status, flags - shares ONE meta line beneath it, so the row is a fixed
-   two lines tall however many of those fields exist. Amount and date keep
-   the right-hand column rather than joining that line, which is what lets
-   the figures align down the list. The row keeps the shared .vas-dssrch-row
-   flex box; only its children differ from the chip-led variant. */
+/* ---------- Vendor-first result row (VAS_068, VAS_067) -----------------
+   An initials avatar of the business partner leads the row. In VAS_068 the
+   vendor name follows and everything that describes the payment - doc no,
+   type, bank account, currency, invoice, status, flags - shares ONE meta
+   line beneath it, so the row is a fixed two lines tall however many of
+   those fields exist. VAS_067 reuses the avatar in place of its old
+   document-kind chip and keeps its own .vas-dssrch-main body. Amount and
+   date keep the right-hand column rather than joining the text, which is
+   what lets the figures align down the list. Both keep the shared
+   .vas-dssrch-row flex box; only their children differ. */
 .vas-dssrch-avatar {
     width: 2.125rem;
     height: 2.125rem;
@@ -518,6 +520,212 @@
 .vas-dssrch-state svg { width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
 .vas-dssrch-state-error { color: #C0392B; }
 .vas-dssrch-state-error svg { color: #C0392B; }
+
+/* ==========================================================
+   Filter popover (VAS_067, VAS_068) — funnel button in the bar plus a body-mounted panel of
+   filter rows: date ranges, an amount band and full-width lookups (currency; bank account on
+   VAS_068). Only the widgets that render this markup are affected; the shared bar / panel rules
+   above are untouched.
+   ========================================================== */
+
+/* ---------- Funnel button in the search bar ---------- */
+.vas-dssrch-filter {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6em;
+    height: 1.6em;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: #748494;
+    border-radius: 50%;
+    transition: background 0.15s, color 0.15s;
+}
+
+.vas-dssrch-filter:hover { background: #F4F7FA; }
+.vas-dssrch-filter svg { width: 1em; height: 1em; }
+/* Filters applied: accent colour + dot badge. */
+.vas-dssrch-filter.vas-dssrch-filter-on { color: #0083DA; }
+
+.vas-dssrch-filter-dot {
+    display: none;
+    position: absolute;
+    top: 0.15em;
+    right: 0.15em;
+    width: 0.375em;
+    height: 0.375em;
+    border-radius: 50%;
+    background: #0083DA;
+}
+
+.vas-dssrch-filter.vas-dssrch-filter-on .vas-dssrch-filter-dot { display: block; }
+
+/* ---------- Popover (appended to <body>, fixed under the bar) ---------- */
+.vas-dssrch-filters {
+    position: fixed;
+    box-sizing: border-box;
+    width: 22rem;
+    max-width: calc(100vw - 1rem);
+    background: #FFFFFF;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(16, 47, 74, 0.12);
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 0.875rem;
+    color: #102C3F;
+    padding: 0.9rem;
+    /* Stacking, deliberately in a narrow band BELOW 100: above this widget's results panel so the
+       filters overlay it, but under every framework layer the currency lookup needs — its
+       type-ahead menu is jQuery UI .ui-front (100) and its Info window rides .web_dialog_overlay
+       (101) / .vis-PopupWrap (102). Anything higher buries them. */
+    z-index: 95;
+    display: none;
+}
+
+.vas-dssrch-filters.vas-dssrch-open { display: block; }
+
+/* This widget's results panel joins the same band (the shared .vas-dssrch-panel z-index of 99999
+   is left alone for the other search widgets, which have no filter popover / lookup control). */
+.vas-dssrch-panel.vas-dssrch-panel--layered { z-index: 90; }
+
+.vas-dssrch-frow + .vas-dssrch-frow { margin-top: 0.75rem; }
+
+.vas-dssrch-flabel {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-dssrch-fpair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+/* The cell sets the 0.75rem control context; only the caption steps down, so a native date input
+   and a framework control (both 1em) end up exactly the same size. */
+.vas-dssrch-fpair label {
+    display: block;
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #748494;
+}
+
+.vas-dssrch-fpair label span {
+    display: block;
+    font-size: 0.9167em;
+    margin-bottom: 0.25em;
+}
+
+.vas-dssrch-fslot { display: block; }
+
+/* Underline fields (framework borderless style): bottom rule only, no box, no radius. High
+   specificity + !important to defeat the global core input styling, as the bar's input does. */
+.vas-dssrch-filters .vas-dssrch-fpair input[type=date],
+.vas-dssrch-filters .vas-dssrch-fpair input[type=date]:focus,
+.vas-dssrch-filters .vas-dssrch-fctrl,
+.vas-dssrch-filters .vas-dssrch-fctrl:focus {
+    width: 100%;
+    height: 2.375em;
+    padding: 0 0.25em !important;
+    margin: 0 !important;
+    /* Filter fields read one step larger than their captions - 1.2em of the 0.75rem row context.
+       The em height/padding above scale with it, so the field grows as a whole. */
+    font-size: 1.2em;
+    color: #102C3F;
+    background: transparent !important;
+    border: 0 none !important;
+    border-bottom: 1px solid #e4edf4 !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.vas-dssrch-filters .vas-dssrch-fpair input[type=date]:focus,
+.vas-dssrch-filters .vas-dssrch-fctrl:focus {
+    border-bottom-color: #B6DEFB !important;
+}
+
+/* Full-width lookup row (currency, bank account): ONE underlined field spanning the control and
+   its lookup button — the rule belongs to the row, so it runs unbroken beneath both. */
+.vas-dssrch-fcur {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-size: 0.75rem;
+    border-bottom: 1px solid #e4edf4;
+}
+
+.vas-dssrch-fcur:focus-within { border-bottom-color: #B6DEFB; }
+
+.vas-dssrch-fcur .vas-dssrch-fslot,
+.vas-dssrch-fcur > input { flex: 1 1 auto; min-width: 0; }
+
+/* The row owns the underline; the field inside must not draw a second one. */
+.vas-dssrch-filters .vas-dssrch-fcur .vas-dssrch-fctrl,
+.vas-dssrch-filters .vas-dssrch-fcur .vas-dssrch-fctrl:focus {
+    border-bottom: 0 none !important;
+}
+
+.vas-dssrch-fbtnwrap { flex: 0 0 auto; display: flex; align-items: center; }
+
+/* The framework's lookup button keeps its glyph, drops all chrome and takes the accent colour —
+   it reads as the field's trailing affordance. */
+.vas-dssrch-fbtnwrap > * {
+    height: 2.375em;
+    min-width: 1.75em;
+    padding: 0 0.25em;
+    border: 0 none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+.vas-dssrch-fbtnwrap > *:hover { color: #0072BE; }
+
+/* Reversed-range message — the popover stays open until it's fixed. */
+.vas-dssrch-ferror {
+    margin: 0.6rem 0 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #C0392B;
+}
+
+.vas-dssrch-ferror:empty { display: none; }
+
+.vas-dssrch-factions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.9rem;
+}
+
+.vas-dssrch-fbtn {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #102C3F;
+    background: #F4F7FA;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.vas-dssrch-fbtn:hover { background: #E9F1F8; }
+
+.vas-dssrch-fbtn-primary {
+    color: #FFFFFF;
+    background: #0083DA;
+    border-color: #0083DA;
+}
+
+.vas-dssrch-fbtn-primary:hover { background: #0072BE; }
 
 /* Responsive anchor for the in-cell bar (80% centered, like the design) */
 @media (max-width: 1366px) { .vas-dssrch-bar { width: 86%; } }

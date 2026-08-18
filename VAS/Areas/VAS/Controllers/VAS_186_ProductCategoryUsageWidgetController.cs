@@ -1,4 +1,4 @@
-﻿﻿using System.Data.SqlClient;
+using System.Data.SqlClient;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -22,6 +22,27 @@ namespace VIS.Controllers
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_186_ProductCategoryUsageWidgetController).FullName);
 
+        /// <summary>
+        /// The product's CURRENT cost price, as a derived table (M_Product_ID, CurrentCostPrice).
+        /// Picks the M_Cost row whose cost element matches the accounting schema's own costing
+        /// method, so landed-cost and other cost COMPONENT rows are excluded. A plain
+        /// MAX(M_Cost.CurrentCostPrice) is NOT the product cost - on FSMTesting6 it reports
+        /// 'Air Filter (7 micron)' at 80,142.29 (a Landed Cost component) against a true standard
+        /// cost of 2,599.
+        /// </summary>
+        private const string ProductCurrentCostSql = @"
+                    SELECT c.M_Product_ID, MAX(c.CurrentCostPrice) AS CurrentCostPrice
+                    FROM M_Cost c
+                    INNER JOIN M_CostElement ce ON ce.M_CostElement_ID = c.M_CostElement_ID
+                    INNER JOIN C_AcctSchema acs ON acs.C_AcctSchema_ID = c.C_AcctSchema_ID
+                                               AND acs.M_CostType_ID   = c.M_CostType_ID
+                    WHERE c.IsActive = 'Y'
+                      AND ce.CostingMethod IS NOT NULL
+                      AND ce.CostingMethod = acs.CostingMethod
+                    GROUP BY c.M_Product_ID";
+
+
+
         /// <summary>Endpoint A: Category usage aggregates for selected month and year.</summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -44,16 +65,22 @@ namespace VIS.Controllers
                 // Applying it to the aggregate query instead yields ORA-00933.
                 string invAccessSql = BuildAccessibleInventorySql(ctx, msl, nmsl);
 
+                // NULLIF guards are required, not cosmetic: line.CurrentCostPrice is a literal 0
+                // (not NULL) on many issue lines, so a plain COALESCE returns 0 and never reaches
+                // a fallback - those lines added nothing to the Value measure. On FSMTesting6 the
+                // main 'Standard' category for July read 90,941.81 instead of 286,062.81 (3.1x low),
+                // which silently mis-ranked the bars whenever the user switched to Value.
                 string sql = @"
                     SELECT
                       pc.M_Product_Category_ID,
                       pc.Name AS CategoryName,
                       SUM(line.QtyInternalUse) AS TotalQty,
-                      SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)) AS TotalValue
+                      SUM(line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pcst.CurrentCostPrice, 0)) AS TotalValue
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                     INNER JOIN M_Product p ON p.M_Product_ID = line.M_Product_ID
                     INNER JOIN M_Product_Category pc ON pc.M_Product_Category_ID = p.M_Product_Category_ID
+                    LEFT JOIN (" + ProductCurrentCostSql + @") pcst ON pcst.M_Product_ID = line.M_Product_ID
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
                     GROUP BY pc.M_Product_Category_ID, pc.Name
@@ -131,9 +158,9 @@ namespace VIS.Controllers
                         {
                             documentNo = Util.GetValueOfString(dr["DocumentNo"]),
                             productName = Util.GetValueOfString(dr["ProductName"]),
-                            attribute = Util.GetValueOfString(dr["Attribute"]),
+                            attribute = NormalizeAttributes(Util.GetValueOfString(dr["Attribute"])),
                             uomName = Util.GetValueOfString(dr["UomName"]),
-                            whLoc = Util.GetValueOfString(dr["WarehouseName"]) + " / " + Util.GetValueOfString(dr["LocatorCode"]),
+                            whLoc = BuildWarehouseLocator(Util.GetValueOfString(dr["WarehouseName"]), Util.GetValueOfString(dr["LocatorCode"])),
                             qty = Util.GetValueOfDecimal(dr["QtyInternalUse"]),
                             movementDate = Convert.ToDateTime(dr["MovementDate"]).ToString("dd MMM")
                         });
@@ -166,6 +193,42 @@ namespace VIS.Controllers
                       AND inv.MovementDate < " + periodEnd;
 
             return MRole.GetDefault(ctx).AddAccessSQL(sql, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+        }
+
+        /// <summary>
+        /// An attribute set instance with no attributes stores a dash placeholder in Description
+        /// (e.g. "---"). The drill-down modal renders the attribute meta line whenever it is truthy,
+        /// so the placeholder would print as a literal "---" under the product name.
+        /// </summary>
+        private static string NormalizeAttributes(string description)
+        {
+            if (string.IsNullOrWhiteSpace(description)) { return ""; }
+
+            string trimmed = description.Trim();
+            foreach (char c in trimmed)
+            {
+                if (c != '-' && c != '_' && c != '.' && !char.IsWhiteSpace(c))
+                {
+                    return trimmed;
+                }
+            }
+            return "";
+        }
+
+        /// <summary>
+        /// "Warehouse / Bin" for the modal's WH + Loc column. Concatenating unconditionally emits a
+        /// bare " / " when a line has no locator (and therefore no warehouse), so drop the missing
+        /// side rather than rendering the separator on its own.
+        /// </summary>
+        private static string BuildWarehouseLocator(string warehouseName, string locatorCode)
+        {
+            bool hasWarehouse = !string.IsNullOrWhiteSpace(warehouseName);
+            bool hasLocator = !string.IsNullOrWhiteSpace(locatorCode);
+
+            if (hasWarehouse && hasLocator) { return warehouseName + " / " + locatorCode; }
+            if (hasWarehouse) { return warehouseName; }
+            if (hasLocator) { return locatorCode; }
+            return "";
         }
 
         private static string ToSqlDate(DateTime date)

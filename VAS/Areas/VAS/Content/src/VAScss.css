@@ -52,6 +52,7 @@
 @import "../VAS_167_PurchaseOrderLandedCost.css";
 @import "../VAS_098_PurchaseRequisition.css";
 @import "../VAS_099_OverviewGRN.css";
+@import "../VAS_190_ProductOverviewRightPanel.css";
 @import "../VAS_100_OverviewDO.css";
 @import "../VAS_101_OverviewInventoryCount.css";
 @import "../VAS_102_OverviewInternalUse.css";
@@ -197,6 +198,7 @@
 
 @import "../VAS_106_OverviewSalesOrder.css";
 @import "../VAS_189_ARInvoiceDetailPanel.css";
+@import "../VAS_191_APPaymentDetailPanel.css";
 @import "../VAS_156_CountedMTDWidget.css";
 @import "../VAS_157_VarianceLinesWidget.css";
 @import "../VAS_158_OpenCountSheetsWidget.css";

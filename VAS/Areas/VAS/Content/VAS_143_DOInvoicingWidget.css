@@ -23,14 +23,7 @@
 .MPC-dis-card {
     position: relative;
     font-family: Roboto, sans-serif;
-    /* Single dynamic font anchor, viewport-based (vw) so it tracks the SCREEN,
-       not a JS-measured container width - the old clamp's fixed 24px ceiling and
-       its dependency on --dash-inline-size froze the header/footer text from
-       growing past a point. max()+rem floor guards very narrow windows; no
-       ceiling above it, so text keeps scaling at any resolution. This anchor only
-       affects the header/footer em sizes below - the 3 stat blocks have their
-       own independent per-box cqw scaling and are unaffected by this value. */
-    font-size: max(0.9rem, 1.3vw);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -100,8 +93,6 @@
 .MPC-dis-stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    /* Single row that FILLS the body height (not auto), so each box stretches to
-       the full available height and grows with the widget. */
     grid-template-rows: 1fr;
     gap: 0.75em;
     margin-top: 0.75em;
@@ -126,11 +117,6 @@
     min-width: 0;
     width: 100%;
     height: 100%;
-    /* The box is its OWN query container. inline-size (width only) is used on
-       purpose: it never collapses (unlike container-type:size, which needs a
-       definite height and here resolved to ~0, pinning the text to its floor).
-       The label/value/meta below scale with THIS box's width via cqw, so they
-       grow as the widget/box grows - not tied to the shared --dash-inline-size. */
     container-type: inline-size;
 }
 
@@ -150,8 +136,6 @@
 }
 
 .MPC-dis-stat-label {
-    /* cqw = 1% of THIS box's width; all three lines grow with the box. Bounds
-       are em (no px), so text never shrinks below the old size. */
     font-size: clamp(0.75em, 11cqw, 1.15em);
     font-weight: 400;
     color: #5F7283;
@@ -165,6 +149,7 @@
     font-size: clamp(1.5em, 30cqw, 3.5em);
     font-weight: 700;
     line-height: 1.1;
+    font-variant-numeric: tabular-nums;
 }
 
 .MPC-dis-v-raised { color: #106AB0; }
@@ -227,7 +212,9 @@
 
 /* ---- Footer / period switcher ---- */
 .MPC-dis-foot {
-    margin-top: 0.5em;
+    margin-top: auto;
+    padding-top: 0.5em;
+    border-top: 1px solid #EDF2F6;
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -238,6 +225,7 @@
 .MPC-dis-foot-helper {
     font-size: 0.8125em;
     color: #748494;
+    font-weight: 400;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -247,13 +235,13 @@
 .MPC-dis-switcher {
     display: flex;
     align-items: center;
-    gap: .5em;
+    gap: 0.5em;
     flex-shrink: 0;
 }
 
 .MPC-dis-chev {
-    width: 1.5em;
-    height: 1.5em;
+    width: 24px;
+    height: 24px;
     border-radius: 6px;
     border: 1px solid #E4EDF4;
     background: rgba(255, 255, 255, 0.9);
@@ -266,8 +254,8 @@
 }
 
 .MPC-dis-chev svg {
-    width: .875em;
-    height: .875em;
+    width: 14px;
+    height: 14px;
 }
 
 .MPC-dis-chev:hover:not(:disabled) {
@@ -284,6 +272,9 @@
     display: flex;
     align-items: center;
     gap: 0.5em;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 .MPC-dis-period-btn {
@@ -292,14 +283,30 @@
     font-weight: 500;
     color: #748494;
     background: transparent;
-    border: none;
-    padding: 0;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    padding: 0.15em 0.35em;
     cursor: pointer;
+    border-radius: 4px;
+    transition: color 0.15s ease;
+}
+
+.MPC-dis-period-btn:hover,
+.MPC-dis-period-btn:focus,
+.MPC-dis-period-btn:focus-visible,
+.MPC-dis-period-btn:active {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 .MPC-dis-period-btn.MPC-dis-period-active {
     font-weight: 700;
     color: #102C3F;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 /* ---- Modal (Onfinity Panel Foundation) ---- */
@@ -513,7 +520,7 @@
 
 .MPC-dis-m-foot-helper {
     font-weight: 400;
-    font-size: 0.8em;
+    font-size: 0.8125em;
     color: #748494;
     min-width: 0;
     white-space: nowrap;
@@ -524,21 +531,22 @@
 .MPC-dis-pager {
     display: flex;
     align-items: center;
-    gap: 0.4em;
+    gap: 0.5em;
     flex-shrink: 0;
 }
 
 .MPC-dis-pgtext {
-    font-size: 0.75em;
+    font-size: 0.875em;
     font-weight: 500;
     color: #102C3F;
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
 .MPC-dis-pgbtn {
-    width: 1.1em;
-    height: 1.1em;
-    border-radius: 0.4em;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
     border: 1px solid #E4EDF4;
     background: rgba(255, 255, 255, 0.9);
     display: inline-flex;
@@ -550,8 +558,8 @@
 }
 
 .MPC-dis-pgbtn svg {
-    width: 0.65em;
-    height: 0.65em;
+    width: 14px;
+    height: 14px;
 }
 
 .MPC-dis-pgbtn:hover:not(:disabled) {

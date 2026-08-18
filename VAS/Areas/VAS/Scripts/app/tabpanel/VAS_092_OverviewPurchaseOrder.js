@@ -242,6 +242,84 @@
  *                          at all, and the section summary keeps counting the whole
  *                          feed rather than the page. The page resets with the rest
  *                          of the per-record view state on a record change / clear.
+ *   VAI163   2026-08-07  Emits the vas_092-prefixed modifier classes the
+ *                        stylesheet now uses, the runtime-built ones included
+ *                        ("vas_092-tone-" + tone).
+ *   VAI163   2026-08-07  New Record could still leave the previous order on the
+ *                        panel, for two reasons the 2026-08-05 insert guard does
+ *                        not cover. refreshPanelData can run BEFORE GridTable
+ *                        raises its insert flag, so isTabInserting() asked at
+ *                        that instant answers "no" and the panel loads the row
+ *                        just left; and the reply of a fetch already on the wire
+ *                        landed AFTER the clear and repainted it (visible mainly
+ *                        the first time, when that fetch is the slow one).
+ *                        refreshPanelData now goes through scheduleFetch, which
+ *                        holds REFRESH_DELAY_MS and re-asks isTabInserting(),
+ *                        and every fetch carries a token (fetchToken) that a
+ *                        clear or a newer fetch invalidates — a reply holding a
+ *                        stale token is dropped instead of rendering.
+ *                        Ported from VAS_106.
+ *   VAI163   2026-08-11  Order Progress dates its receipt stage from when the
+ *                        GRN was CREATED (model side) rather than the movement
+ *                        date, which a user can back-date. A stage whose date is
+ *                        a stored timestamp is marked stamp:true and rendered
+ *                        with formatStampDate, so the calendar day shown is the
+ *                        viewer's own — the stored value is UTC and carries no
+ *                        zone designator, so a receipt entered late in the
+ *                        evening used to date to the next morning. Drafted
+ *                        carries the same marker; it always read C_Order.Created.
+ *   VAI163   2026-08-13  - Activity reports edits FIELD BY FIELD: an "updated"
+ *                          row carries the name of the column that changed
+ *                          (a.FieldName) and headlines with it, so the trail
+ *                          reads "Updated <field> · <when> · by <who>". The old
+ *                          "Order updated · 5 fields changed" wording (and its
+ *                          VAS_092_FieldsChanged key) went with it — a count said
+ *                          something moved but never what.
+ *                        - An e-mail's recipient line lists every address on the
+ *                          mail (To, Cc and Bcc, each labelled) in full instead
+ *                          of naming the To list and counting the rest as
+ *                          "+n more". The count could only be resolved by opening
+ *                          the message, which a mail stored without a body cannot
+ *                          do. allRecipients / countAddresses went with it, as did
+ *                          the sub-line's tooltip. Ported from VAS_099.
+ *   VAI163   2026-08-14  - The header's terms column carries a Drop Shipment
+ *                          field (C_Order.IsDropShip), reading Yes or No like the
+ *                          GRN overview's. It sits under Warehouse, which on a
+ *                          drop-shipped order names a place the goods never reach
+ *                          — the vendor delivers straight to the customer — and
+ *                          nothing on the panel said so.
+ *   VAI163   2026-08-14  - Drop Shipment reads as a TICK or a CROSS rather than as
+ *                          "Yes" / "No" (headerFlagField). Neither word says more
+ *                          than the mark does, and each took a whole field's line
+ *                          to say it in a column that runs two fields wide. The
+ *                          word travels as the field's tooltip and the mark's
+ *                          aria-label, so the glyph is never the only statement of
+ *                          what it means.
+ *                        - The vendor contact's e-mail no longer prints OVER the
+ *                          terms column beside it (stylesheet). A contact bit is a
+ *                          flex item, and a flex item's default min-width is the
+ *                          widest its content can be — so a long address refused
+ *                          to narrow and overflowed the 40% vendor column. It
+ *                          shows in the single-record view because that is where
+ *                          the panel is narrow enough for the address to exceed
+ *                          its column.
+ *   VAI163   2026-08-17  Activity's field-level rows carry the MOVE: "was X →
+ *                        now Y" under the field's name (changeDelta), the old
+ *                        value struck through and a value the log recorded as
+ *                        empty shown as an em dash, so a cleared field is
+ *                        visibly cleared rather than looking like a rendering
+ *                        gap. A row said WHICH field moved but never what it
+ *                        moved from or to.
+ *                        A field edit made on a LINE also names the line it
+ *                        landed on (a.ChangeScope — line number + item), on the
+ *                        sub-line the e-mail recipients use. Both follow
+ *                        VAS_101 / VAS_104.
+ *   VAI163   2026-08-18  Drop Shipment reads as the WORD "Yes" / "No" again
+ *                        (plain headerField), not as a tick / cross. A mark
+ *                        has to be decoded before it answers, and it only
+ *                        answered in words to a reader who found the tooltip
+ *                        or ran a screen reader. headerFlagField and the
+ *                        "cross" icon went with it — nothing else drew one.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -309,6 +387,23 @@
         // data-status events the tab fires while a record is being edited.
         var shownRecordId = 0;
 
+        // How long refreshPanelData holds before it actually fetches.
+        // On New Record / Copy Record the framework can call refreshPanelData
+        // BEFORE GridTable raises its insert flag, so isTabInserting() asked at
+        // that instant still answers "no" and the panel would load the record
+        // the user has just moved off. Asking again after this pause gets the
+        // truth. It also collapses a burst of arrow-key row changes into one
+        // request instead of one per row.
+        var REFRESH_DELAY_MS = 150;
+        // Raised by every fetch, every scheduled fetch and every clear. A reply
+        // carrying a token that is no longer the current one belongs to a record
+        // the panel has already moved off, so it is dropped instead of painting.
+        // This is what stops a slow FIRST response from landing on top of the
+        // empty panel that New Record had already cleared — the delay above
+        // cannot do it, because the response can arrive at any time.
+        var fetchToken = 0;
+        var pendingFetch = null;    // timer handle of a scheduled fetch, if any
+
         // Some AD_Message keys may not be seeded yet; fall back to a readable
         // English default so the panel never renders raw keys.
         var MSG_DEFAULTS = {
@@ -324,6 +419,9 @@
             VAS_092_PaymentTerms: "Payment Term",
             VAS_092_Pricelist: "Pricelist",
             VAS_092_Currency: "Currency",
+            VAS_092_DropShipment: "Drop Shipment",
+            VAS_092_Yes: "Yes",
+            VAS_092_No: "No",
             // Priority (C_Order.PriorityRule)
             VAS_092_UrgentPriority: "Urgent priority",
             VAS_092_HighPriority: "High priority",
@@ -479,7 +577,6 @@
             VAS_092_MailCc: "Cc",
             VAS_092_MailBcc: "Bcc",
             VAS_092_MailFrom: "From",
-            VAS_092_MoreRecipients: "more",
             VAS_092_ShowMailBody: "Show message",
             VAS_092_HideMailBody: "Hide message",
             VAS_092_TagGRN: "GRN",
@@ -503,7 +600,7 @@
             VAS_092_TagInvalidated: "Invalid",
             VAS_092_TagUpdated: "Updated",
             VAS_092_ActUpdated: "Order updated",
-            VAS_092_FieldsChanged: "fields changed",
+            VAS_092_ActFieldUpdated: "Updated",
             VAS_092_RecentActivity: "Activity",
             VAS_092_Updates: "updates",
             VAS_092_OpenRecord: "Open"
@@ -545,7 +642,47 @@
             $busy[0].style.visibility = show ? "visible" : "hidden";
         }
 
+        // Drops whatever the panel was loading: cancels a fetch still waiting on
+        // its delay and invalidates the token of one already on the wire, so
+        // neither can paint over what the caller is about to put on screen.
+        function invalidateFetch() {
+            fetchToken++;
+            if (pendingFetch) {
+                clearTimeout(pendingFetch);
+                pendingFetch = null;
+            }
+        }
+
+        // Same thing, reachable from dispose so a timer cannot outlive the panel.
+        this.abortPendingFetch = invalidateFetch;
+
+        // Waits REFRESH_DELAY_MS, re-asks the tab whether it is inserting, and
+        // only then fetches. See REFRESH_DELAY_MS for why the wait is needed.
+        this.scheduleFetch = function (recordID) {
+            invalidateFetch();
+            var token = fetchToken;
+            // Claim the record now, not when the timer fires: shownRecordId means
+            // "showing or loading", and leaving it stale through the wait would
+            // let the data-status listener fire a second fetch for the same row.
+            shownRecordId = +recordID || 0;
+            // Feedback while we hold — clear()/fetchData() own it from here.
+            showBusy(true);
+            pendingFetch = setTimeout(function () {
+                pendingFetch = null;
+                if (token !== fetchToken) return;   // superseded while waiting
+                // The insert flag may only have been raised during the wait.
+                if (isTabInserting($self.curTab)) {
+                    $self.record_ID = 0;
+                    $self.clear();
+                    return;
+                }
+                $self.fetchData(recordID);
+            }, REFRESH_DELAY_MS);
+        };
+
         this.fetchData = function (recordID) {
+            invalidateFetch();
+            var token = fetchToken;
             shownRecordId = +recordID || 0;
             showBusy(true);
             $.ajax({
@@ -554,6 +691,10 @@
                 dataType: "json",
                 data: { C_Order_ID: recordID },
                 success: function (raw) {
+                    // Reply for a record the panel has already left (a New
+                    // Record cleared it, or a newer row was selected). Whoever
+                    // superseded us owns the busy indicator now, so leave it be.
+                    if (token !== fetchToken) return;
                     var parsed = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     data = parsed;
                     // Reset per-record view state so a newly selected order starts
@@ -567,6 +708,7 @@
                     showBusy(false);
                 },
                 error: function (err) {
+                    if (token !== fetchToken) return;
                     console.log(err);
                     showBusy(false);
                 }
@@ -577,6 +719,7 @@
         // per-record view state goes with it, so the next order never inherits the
         // page, the open history drawers or the expanded sections of the last one.
         this.clear = function () {
+            invalidateFetch();
             data = null;
             shownRecordId = 0;
             linesPage = 1;
@@ -585,6 +728,7 @@
             lcPage = 1;
             activityPage = 1;
             render();
+            showBusy(false);
         };
 
         // The framework notifies a tab panel when the selected record changes
@@ -687,7 +831,7 @@
         // Status pill (tinted). tone: info | success | warning | risk | neutral | purple
         function pill(label, tone) {
             return $('<span class="vas_092-pill"></span>')
-                .addClass("tone-" + (tone || "neutral"))
+                .addClass("vas_092-tone-" + (tone || "neutral"))
                 .text(label);
         }
 
@@ -772,7 +916,7 @@
             if (!data.VendorName && !data.VendorAddress &&
                 !data.ContactName && !data.ContactPhone && !data.ContactEmail &&
                 !data.PaymentTermName && !data.PriceListName && !data.WarehouseName &&
-                !data.OrgName && !data.ISO_Code) {
+                !data.OrgName && !data.ISO_Code && !data.IsDropShip) {
                 return;
             }
 
@@ -805,6 +949,13 @@
             var cur = (data.ISO_Code || "") + (data.CurSymbol ? " (" + data.CurSymbol + ")" : "");
             if (cur.trim())           $right.append(headerField(getMsg("VAS_092_Currency"), cur));
             if (data.WarehouseName) $right.append(headerField(getMsg("VAS_092_ShipTo"), data.WarehouseName));
+            // Drop Shipment (C_Order.IsDropShip) — always shown, Yes or No: "No"
+            // is as much of an answer as "Yes" here, and the reader is looking at
+            // a Warehouse right above it that a drop-shipped order never reaches.
+            // Reads as the WORD, like every other field in this column, so the
+            // answer needs no glyph to be decoded first.
+            $right.append(headerField(getMsg("VAS_092_DropShipment"),
+                data.IsDropShip ? getMsg("VAS_092_Yes") : getMsg("VAS_092_No")));
             //if (data.OrgName) $right.append(headerField(getMsg("VAS_092_BillTo"), data.OrgName));
             if ($right.children().length) $card.append($right);
 
@@ -813,7 +964,7 @@
 
         function headerPill(label, tone, icon, withDot) {
             var $p = $('<span class="vas_092-hdrPill"></span>')
-                .addClass("tone-" + (tone || "neutral"));
+                .addClass("vas_092-tone-" + (tone || "neutral"));
             if (icon) $p.append(svgIcon(icon));
             if (withDot) $p.append($('<span class="vas_092-hdrDot"></span>'));
             $p.append($('<span></span>').text(label));
@@ -901,9 +1052,14 @@
             // (C_Order.C_Order_Blanket). Opened on the purchase side: the blanket
             // is itself a C_Order, so isSOTrx stays false.
             if (data.BlanketOrderId > 0) {
+                var blanketVal = data.BlanketOrderNo || ("#" + data.BlanketOrderId);
+                // A release can draw on more than one blanket when the link is
+                // read from the lines; the first is named and the rest counted.
+                if (data.BlanketOrderCount > 1) {
+                    blanketVal += " +" + (data.BlanketOrderCount - 1) + " " + getMsg("VAS_092_More");
+                }
                 $chips.append(originChip("calendar", getMsg("VAS_092_BlanketOrder"),
-                    data.BlanketOrderNo || ("#" + data.BlanketOrderId),
-                    null, "success", "C_Order", data.BlanketOrderId, false));
+                    blanketVal, null, "success", "C_Order", data.BlanketOrderId, false));
                 any = true;
             }
 
@@ -939,10 +1095,10 @@
         // value, with an optional trailing status pill. When a table + record id
         // is supplied the chip becomes a link that opens that record.
         function originChip(icon, label, value, $statusPill, iconTone, tableName, recordId, isSOTrx) {
-            var $chip = $('<span class="vas_092-chip"></span>').addClass("ic-" + (iconTone || "muted"));
+            var $chip = $('<span class="vas_092-chip"></span>').addClass("vas_092-ic-" + (iconTone || "muted"));
             var isLink = tableName && recordId && +recordId > 0;
             if (isLink) {
-                $chip.addClass("is-link")
+                $chip.addClass("vas_092-is-link")
                     .attr("data-open-table", tableName)
                     .attr("data-open-id", recordId);
                 // Sales-transaction records (e.g. the originating Sales Order in
@@ -1005,7 +1161,7 @@
         }
 
         function metricCard(tone, icon, label, value, sub, pct) {
-            var $c = $('<div class="vas_092-metric"></div>').addClass("tone-" + tone);
+            var $c = $('<div class="vas_092-metric"></div>').addClass("vas_092-tone-" + tone);
 
             // Label, value and caption each clip to a single line inside the card,
             // so a long figure (the Received pair "delivered / ordered UOM" above
@@ -1047,11 +1203,18 @@
                 ? getMsg("VAS_092_PaymentCompleted")
                 : getMsg("VAS_092_PendingAmount");
             return [
-                { key: "VAS_092_Drafted",          done: true,                     active: data.CurrentStage === 1, date: data.Created || data.DateOrdered },
+                // stamp: true marks a date that is a stored TIMESTAMP (UTC, no
+                // zone designator) rather than a document date field, so it is
+                // rendered in the viewer's own zone — otherwise a record created
+                // late in the local evening reports the following UTC day.
+                { key: "VAS_092_Drafted",          done: true,                     active: data.CurrentStage === 1, date: data.Created || data.DateOrdered, stamp: true },
                 { key: "VAS_092_Completed",        done: data.IsCompleted,         active: data.CurrentStage === 2, date: data.OrderCompletedDate || data.DateOrdered },
                 { key: "VAS_092_WithVendor",       done: data.IsWithVendor,        active: data.CurrentStage === 3, date: data.OrderCompletedDate || data.DateOrdered },
                 { key: "VAS_092_ExpectedDelivery", done: data.IsExpectedDelivery,  active: data.CurrentStage === 4, date: data.DatePromised, required: true },
-                { key: "VAS_092_PartialDelivered", label: recvLabel, done: data.IsPartialDelivered, active: data.CurrentStage === 5, date: data.LastReceiptDate },
+                // The receipt stage dates from when the GRN was CREATED (model
+                // side), which is a stamp — not the movement date it used to
+                // show, which a user can back-date.
+                { key: "VAS_092_PartialDelivered", label: recvLabel, done: data.IsPartialDelivered, active: data.CurrentStage === 5, date: data.LastReceiptDate, stamp: true },
                 { key: "VAS_092_InvoiceRaised",    done: data.IsInvoiceRaised,     active: data.CurrentStage === 6, date: data.LastInvoiceDate },
                 { key: "VAS_092_PaymentDone",      label: paymentLabel, done: data.IsPaymentDone, active: data.CurrentStage === 7, date: data.LastPaymentDate }
             ];
@@ -1077,14 +1240,14 @@
                 // that has not yet been reached.
                 var stateCls, statusText;
                 if (s.done) {
-                    stateCls = "is-done"; statusText = getMsg("VAS_092_Completed");
+                    stateCls = "vas_092-is-done"; statusText = getMsg("VAS_092_Completed");
                 } else if (s.active) {
-                    stateCls = "is-active"; statusText = getMsg("VAS_092_InProgress");
+                    stateCls = "vas_092-is-active"; statusText = getMsg("VAS_092_InProgress");
                 } else {
-                    stateCls = "is-pending"; statusText = getMsg("VAS_092_Pending");
+                    stateCls = "vas_092-is-pending"; statusText = getMsg("VAS_092_Pending");
                 }
 
-                var dateText = formatDate(s.date);
+                var dateText = s.stamp ? formatStampDate(s.date) : formatDate(s.date);
                 var metaText = statusText;
                 if (s.done && dateText) {
                     metaText = s.required
@@ -1165,7 +1328,7 @@
                 var $tbl = $('<div class="vas_092-table vas_092-budgetTable"></div>');
                 var $h = $('<div class="vas_092-tRow vas_092-tHead"></div>');
                 $h.append($('<span></span>').text(getMsg("VAS_092_Item")));
-                $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_OverBudgetBy")));
+                $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_OverBudgetBy")));
                 $tbl.append($h);
 
                 for (var j = 0; j < lineBreaches.length; j++) {
@@ -1179,7 +1342,7 @@
                         .text(getMsg("VAS_092_Line") + " " + ln.Line));
                     $tr.append($item);
 
-                    $tr.append($('<span class="ta-r vas_092-budgetOver"></span>').text(
+                    $tr.append($('<span class="vas_092-ta-r vas_092-budgetOver"></span>').text(
                         formatAmount(+ln.BudgetViolationAmount || 0, data.CurSymbol,
                             data.ISO_Code, data.StdPrecision)));
                     $tbl.append($tr);
@@ -1234,11 +1397,11 @@
             // and against the totals footer beneath them.
             var $head = $('<div class="vas_092-tRow vas_092-tHead"></div>');
             $head.append($('<span></span>').text(getMsg("VAS_092_Item")));
-            $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
-            $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Qty")));
+            $head.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
+            $head.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Qty")));
             $head.append($('<span></span>').text(getMsg("VAS_092_ExpDelivery")));
-            $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
-            $head.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Received")));
+            $head.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
+            $head.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Received")));
             // Trailing action column (per-line history toggle) — deliberately
             // unlabelled; the button carries its own tooltip.
             $head.append($('<span></span>'));
@@ -1355,7 +1518,7 @@
             }
             $tr.append($item);
 
-            $tr.append($('<span class="ta-r"></span>').text(formatAmount(
+            $tr.append($('<span class="vas_092-ta-r"></span>').text(formatAmount(
                 +ln.PriceActual || 0, data.CurSymbol, data.ISO_Code,
                 ln.PricePrecision != null ? ln.PricePrecision : data.StdPrecision)));
 
@@ -1363,7 +1526,7 @@
             // (C_OrderLine.QtyEntered), labelled with that unit.
             var qtyText = formatNumber(+ln.QtyEntered || 0, +ln.UOMPrecision || 0);
             if (ln.UOMSymbol) qtyText += " " + ln.UOMSymbol;
-            $tr.append($('<span class="ta-r"></span>').text(qtyText));
+            $tr.append($('<span class="vas_092-ta-r"></span>').text(qtyText));
 
             // Delivery and receipt only mean something for a stockable item. A
             // charge line, or a Service / Resource / Expense product, is never
@@ -1378,7 +1541,7 @@
             }
             $tr.append($exp);
 
-            $tr.append($('<span class="ta-r"></span>').text(formatAmount(
+            $tr.append($('<span class="vas_092-ta-r"></span>').text(formatAmount(
                 +ln.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
 
             // Received — the figure on its own line with the progress bar stacked
@@ -1387,13 +1550,13 @@
             // inward by an inline bar. It is the quantity received in the line's
             // ENTERED UOM, the same scale and unit the Qty cell shows; the tooltip
             // spells the pair out in full.
-            var $recv = $('<span class="vas_092-recv ta-r"></span>');
+            var $recv = $('<span class="vas_092-recv vas_092-ta-r"></span>');
             if (deliverable) {
                 var ordered  = +ln.QtyEntered || 0;
                 var received = +ln.QtyReceivedEntered || 0;
                 var prec = +ln.UOMPrecision || 0;
                 var pct = ordered > 0 ? Math.round((received / ordered) * 100) : 0;
-                $recv.addClass(ln.RecvState || "none");
+                $recv.addClass("vas_092-" + (ln.RecvState || "none"));
                 $recv.append($('<span class="vas_092-recvVal"></span>')
                     .text(formatNumber(received, prec)));
                 var $bar = $('<span class="vas_092-recvBar"><i></i></span>');
@@ -1428,14 +1591,14 @@
                 .attr("title", histToggleLabel(open, hist.length))
                 .attr("aria-label", histToggleLabel(open, hist.length));
             $b.append(svgIcon("history"));
-            if (open) $b.addClass("is-open");
+            if (open) $b.addClass("vas_092-is-open");
 
             $b.on("click", function (e) {
                 e.preventDefault();
                 e.stopPropagation();
                 var nowOpen = !lineHistOpen[ln.C_OrderLine_ID];
                 lineHistOpen[ln.C_OrderLine_ID] = nowOpen;
-                $b.toggleClass("is-open", nowOpen)
+                $b.toggleClass("vas_092-is-open", nowOpen)
                   .attr("aria-expanded", nowOpen ? "true" : "false")
                   .attr("title", histToggleLabel(nowOpen, hist.length))
                   .attr("aria-label", histToggleLabel(nowOpen, hist.length));
@@ -1467,13 +1630,13 @@
 
             var $h = $('<div class="vas_092-tRow vas_092-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_092_ChangedOn")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Qty")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Qty")));
             $h.append($('<span></span>').text(getMsg("VAS_092_ExpDelivery")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
             // Who made the change, in the track the line's Received bar occupies —
             // right-aligned like that column so the two sit directly in line.
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_UpdatedBy")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_UpdatedBy")));
             $tbl.append($h);
 
             for (var i = 0; i < rows.length; i++) {
@@ -1496,26 +1659,26 @@
             }
             $r.append($when);
 
-            $r.append($('<span class="ta-r"></span>').text(formatAmount(
+            $r.append($('<span class="vas_092-ta-r"></span>').text(formatAmount(
                 +h.PriceActual || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
 
             var qty = formatNumber(+h.QtyEntered || 0, +h.UOMPrecision || 0);
             if (h.UOMSymbol) qty += " " + h.UOMSymbol;
-            $r.append($('<span class="ta-r"></span>').text(qty));
+            $r.append($('<span class="vas_092-ta-r"></span>').text(qty));
 
             // Same gate as the line above it: a charge / service line is never
             // goods-received, so a promised date is meaningless on any version.
             $r.append($('<span></span>').text(
                 isDeliverableLine(ln) ? formatDate(h.DatePromised) : ""));
 
-            $r.append($('<span class="ta-r"></span>').text(formatAmount(
+            $r.append($('<span class="vas_092-ta-r"></span>').text(formatAmount(
                 +h.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
 
             // Who changed the line (C_OrderLineHistory.UpdatedBy). A snapshot
             // written by a background/platform process can carry no resolvable
             // user; the cell is then left blank.
             var by = h.UpdatedByName || "";
-            $r.append($('<span class="vas_092-lhBy ta-r"></span>')
+            $r.append($('<span class="vas_092-lhBy vas_092-ta-r"></span>')
                 .text(by).attr("title", by));
 
             return $r;
@@ -1538,7 +1701,7 @@
 
         function buildTotalBit(label, value, isGrand) {
             var $bit = $('<span class="vas_092-tf"></span>');
-            if (isGrand) $bit.addClass("is-grand");
+            if (isGrand) $bit.addClass("vas_092-is-grand");
             $bit.append(document.createTextNode(label));
             $bit.append($('<b></b>').text(value));
             return $bit;
@@ -1577,9 +1740,9 @@
             var $h = $('<div class="vas_092-tRow vas_092-tHead"></div>');
             $h.append($('<span></span>').text(getMsg("VAS_092_Item")));
             $h.append($('<span></span>').text(getMsg("VAS_092_ChangedOn")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Qty")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Qty")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_UnitPrice")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_LineTotal")));
             // Last column, same position the per-line history drawer puts it in.
             $h.append($('<span></span>').text(getMsg("VAS_092_UpdatedBy")));
             $tbl.append($h);
@@ -1629,10 +1792,10 @@
             // with its unit exactly as the line rows and the drawer show it.
             var histQty = formatNumber(+h.QtyEntered || 0, +h.UOMPrecision || 0);
             if (h.UOMSymbol) histQty += " " + h.UOMSymbol;
-            $tr.append($('<span class="ta-r"></span>').text(histQty));
-            $tr.append($('<span class="ta-r"></span>').text(formatAmount(
+            $tr.append($('<span class="vas_092-ta-r"></span>').text(histQty));
+            $tr.append($('<span class="vas_092-ta-r"></span>').text(formatAmount(
                 +h.PriceActual || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
-            $tr.append($('<span class="ta-r"></span>').text(formatAmount(
+            $tr.append($('<span class="vas_092-ta-r"></span>').text(formatAmount(
                 +h.LineNetAmt || 0, data.CurSymbol, data.ISO_Code, h.StdPrecision)));
             // Who changed the line; a platform/background snapshot leaves no
             // resolvable user, and the cell is then blank.
@@ -1681,7 +1844,7 @@
             $h.append($('<span></span>').text(getMsg("VAS_092_Document")));
             $h.append($('<span></span>').text(getMsg("VAS_092_DocDate")));
             $h.append($('<span></span>').text(getMsg("VAS_092_DocStatus")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Amount")));
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Amount")));
             $tbl.append($h);
 
             for (var i = 0; i < rows.length; i++) {
@@ -1712,7 +1875,7 @@
 
             var canOpen = d.TableName && +d.RecordId > 0;
             if (canOpen) {
-                $tr.addClass("is-link")
+                $tr.addClass("vas_092-is-link")
                     .attr("data-open-table", d.TableName)
                     .attr("data-open-id", d.RecordId);
             }
@@ -1750,7 +1913,7 @@
 
             // Amount: invoices show the grand total; GRNs show the total
             // received value (received qty × order-line price).
-            var $amt = $('<span class="ta-r"></span>');
+            var $amt = $('<span class="vas_092-ta-r"></span>');
             if (d.Amount !== null && d.Amount !== undefined) {
                 $amt.text(formatAmount(+d.Amount || 0, data.CurSymbol,
                     data.ISO_Code, data.StdPrecision));
@@ -1832,11 +1995,11 @@
                 .attr("title", getMsg("VAS_092_TipComponent")));
             $h.append($('<span></span>').text(getMsg("VAS_092_DistributionMethod")));
                 //.attr("title", getMsg("VAS_092_TipMethod")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Expected"))
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Expected"))
                 .attr("title", getMsg("VAS_092_TipExpected")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Actual"))
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Actual"))
                 .attr("title", getMsg("VAS_092_TipActual")));
-            $h.append($('<span class="ta-r"></span>').text(getMsg("VAS_092_Variance"))
+            $h.append($('<span class="vas_092-ta-r"></span>').text(getMsg("VAS_092_Variance"))
                 .attr("title", getMsg("VAS_092_TipVariance")));
             $tbl.append($h);
 
@@ -1925,14 +2088,14 @@
             // inside its track and the cell's tooltip carries the full name.
             var method = methodLabel(c);
             $tr.append($('<span class="vas_092-ldMethod"></span>')
-                .attr("title", method + " — " + getMsg("VAS_092_TipMethod"))
+              //  .attr("title", method + " — " + getMsg("VAS_092_TipMethod"))
                 .append(pill(method, methodTone(c.DistributionCode))));
 
-            $tr.append($('<span class="ta-r vas_092-ldExp"></span>')
+            $tr.append($('<span class="vas_092-ta-r vas_092-ldExp"></span>')
                 .attr("title", getMsg("VAS_092_TipExpected"))
                 .text(formatAmount(+c.ExpectedAmt || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
 
-            var $act = $('<span class="ta-r vas_092-ldAct"></span>');
+            var $act = $('<span class="vas_092-ta-r vas_092-ldAct"></span>');
             if (c.IsInvoiced) {
                 // The tooltip names the invoice the actual came from, so the figure
                 // can be traced without leaving the panel.
@@ -1946,13 +2109,13 @@
                     : getMsg("VAS_092_TipActual"));
                 $act.append($('<span class="vas_092-ldAmt"></span>').text(
                     formatAmount(+c.ActualAmt || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
-                $act.append($('<span class="vas_092-ldFlag inv"></span>')
+                $act.append($('<span class="vas_092-ldFlag vas_092-inv"></span>')
                     .text(getMsg("VAS_092_Invoiced")));
             } else {
-                $act.addClass("is-pending");
+                $act.addClass("vas_092-is-pending");
                 $act.attr("title", getMsg("VAS_092_TipAwaiting"));
                 $act.append($('<span class="vas_092-ldAmt"></span>').text(""));
-                $act.append($('<span class="vas_092-ldFlag wait"></span>')
+                $act.append($('<span class="vas_092-ldFlag vas_092-wait"></span>')
                     .text(getMsg("VAS_092_AwaitingInvoice")));
             }
             $tr.append($act);
@@ -1982,21 +2145,21 @@
         }
 
         function buildVarianceCell(c) {
-            var $v = $('<span class="ta-r vas_092-ldVar"></span>');
+            var $v = $('<span class="vas_092-ta-r vas_092-ldVar"></span>');
             var amt = formatAmount(Math.abs(+c.VarianceAmt || 0),
                 data.CurSymbol, data.ISO_Code, data.StdPrecision);
             // The sign is easy to misread, so the tooltip spells the direction out.
             if (c.VarianceStatus === "over") {
-                $v.addClass("over").text("+" + amt)
+                $v.addClass("vas_092-over").text("+" + amt)
                   .attr("title", getMsg("VAS_092_TipOver") + " " + amt);
             } else if (c.VarianceStatus === "under") {
-                $v.addClass("under").text("−" + amt)
+                $v.addClass("vas_092-under").text("−" + amt)
                   .attr("title", getMsg("VAS_092_TipUnder") + " " + amt);
             } else if (c.VarianceStatus === "on_budget") {
-                $v.addClass("flat").text(getMsg("VAS_092_OnBudget"))
+                $v.addClass("vas_092-flat").text(getMsg("VAS_092_OnBudget"))
                   .attr("title", getMsg("VAS_092_TipOnBudget"));
             } else {
-                $v.addClass("flat").text("")
+                $v.addClass("vas_092-flat").text("")
                   .attr("title", getMsg("VAS_092_TipVariance"));
             }
             return $v;
@@ -2021,10 +2184,10 @@
 
         function buildLandedTotal(label, value, isGrand, isWarn) {
             var $bit = $('<span class="vas_092-tf vas_092-lf"></span>');
-            if (isGrand) $bit.addClass("is-grand");
+            if (isGrand) $bit.addClass("vas_092-is-grand");
             $bit.append(document.createTextNode(label));
             var $b = $('<b></b>').text(value);
-            if (isWarn) $b.addClass("warn");
+            if (isWarn) $b.addClass("vas_092-warn");
             $bit.append($b);
             return $bit;
         }
@@ -2183,6 +2346,20 @@
             return $pager;
         }
 
+        // "was X → now Y" under the field's name, for a field-level edit. A value
+        // the log recorded as empty reads as an em dash rather than as a blank, so
+        // a cleared field is visibly cleared instead of looking like a rendering
+        // gap. Follows VAS_101 / VAS_104.
+        function changeDelta(a) {
+            var $d = $('<small class="vas_092-actSub vas_092-actDelta"></small>');
+            var blank = "—";
+            $d.append($('<span class="vas_092-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_092-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_092-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
+        }
+
         function activityRow(a) {
             var meta = ACT_TYPES[a.Type] || ACT_TYPES.note;
 
@@ -2197,15 +2374,27 @@
             $title.append($('<span class="vas_092-actLead"></span>')
                 .text(title).attr("title", title));
 
-            // An e-mail names its recipients under the subject: the To list, plus
-            // a count of the Cc / Bcc addresses so a reader can see at a glance
-            // that others were copied. Every address itself is listed in the body.
+            // An e-mail names its recipients under the subject — every address on
+            // the To, Cc and Bcc lists, in full. No tooltip: the line is no
+            // longer an abridgement of something the reader has to hover to see.
             if (a.Type === "email") {
                 var to = recipientSummary(a);
                 if (to) {
-                    $title.append($('<small class="vas_092-actSub"></small>')
-                        .text(to).attr("title", allRecipients(a) || to));
+                    $title.append($('<small class="vas_092-actSub"></small>').text(to));
                 }
+            }
+
+            // A field edit names the record it landed on — a LINE edit says which
+            // line, on the sub-line the e-mail recipients use — and then the move
+            // itself. The headline stays "Updated <field>": which field moved is the
+            // question, and both of these qualify it rather than competing with it
+            // for the one line that clips.
+            if (a.Type === "updated") {
+                if (a.ChangeScope) {
+                    $title.append($('<small class="vas_092-actSub"></small>')
+                        .text(a.ChangeScope).attr("title", a.ChangeScope));
+                }
+                if (a.OldValue || a.NewValue) $title.append(changeDelta(a));
             }
             $row.append($title);
 
@@ -2215,15 +2404,15 @@
 
             // Rows carrying a body are clickable; the caret shows the state.
             if (hasActivityBody(a)) {
-                $row.addClass("is-openable");
+                $row.addClass("vas_092-is-openable");
                 $row.attr("title", getMsg("VAS_092_ShowMailBody"));
                 var $caret = $('<span class="vas_092-actCaret"></span>').append(svgIcon("chevRight"));
                 $row.append($caret);
                 $row.on("click", function () {
                     var $panel = $row.next(".vas_092-actBody");
                     if (!$panel.length) return;
-                    var nowOpen = !$row.hasClass("is-open");
-                    $row.toggleClass("is-open", nowOpen)
+                    var nowOpen = !$row.hasClass("vas_092-is-open");
+                    $row.toggleClass("vas_092-is-open", nowOpen)
                         .attr("title", nowOpen ? getMsg("VAS_092_HideMailBody")
                                                : getMsg("VAS_092_ShowMailBody"));
                     $panel.toggle(nowOpen);
@@ -2260,36 +2449,31 @@
         // Row sub-line: the To list, plus "+n more" covering the Cc / Bcc
         // addresses. Counting by comma / semicolon is enough for a summary — the
         // body lists the addresses verbatim.
+        // Every address the mail went to, written out in full and labelled: To,
+        // then Cc, then Bcc. It used to name the To list and count the rest as
+        // "+n more", which could only be resolved by opening the message — and a
+        // mail stored without a body cannot be opened at all. Ported from VAS_099.
         function recipientSummary(a) {
-            var to = (a.MailTo || "").trim();
-            var extra = countAddresses(a.MailCc) + countAddresses(a.MailBcc);
-            if (!to && !extra) return "";
-            var s = getMsg("VAS_092_MailTo") + " " + (to || "—");
-            if (extra > 0) s += " +" + extra + " " + getMsg("VAS_092_MoreRecipients");
-            return s;
-        }
-
-        // Every address on the mail, for the row's hover tooltip.
-        function allRecipients(a) {
             var bits = [];
-            if (a.MailTo)  bits.push(getMsg("VAS_092_MailTo")  + " " + a.MailTo);
-            if (a.MailCc)  bits.push(getMsg("VAS_092_MailCc")  + " " + a.MailCc);
-            if (a.MailBcc) bits.push(getMsg("VAS_092_MailBcc") + " " + a.MailBcc);
-            return bits.join("\n");
+            appendAddressBit(bits, "VAS_092_MailTo",  a.MailTo);
+            appendAddressBit(bits, "VAS_092_MailCc",  a.MailCc);
+            appendAddressBit(bits, "VAS_092_MailBcc", a.MailBcc);
+            return bits.join(" · ");
         }
 
-        function countAddresses(value) {
-            if (!value || !String(value).trim()) return 0;
-            var parts = String(value).split(/[;,]/);
-            var n = 0;
-            for (var i = 0; i < parts.length; i++) {
-                if (parts[i].trim()) n++;
-            }
-            return n;
+        function appendAddressBit(bits, key, value) {
+            var text = (value === null || value === undefined) ? "" : String(value).trim();
+            if (!text) return;
+            bits.push(getMsg(key) + " " + text);
         }
+
+        // allRecipients (the row's hover tooltip) and countAddresses (the "+n
+        // more" tally) are gone with the abridged sub-line they served: the row
+        // now writes every address out, so there is nothing left to count or to
+        // recover on hover.
 
         function activityTag(meta) {
-            var $t = $('<span class="vas_092-actTag"></span>').addClass("tone-" + meta.tone);
+            var $t = $('<span class="vas_092-actTag"></span>').addClass("vas_092-tone-" + meta.tone);
             if (meta.icon) $t.append(svgIcon(meta.icon));
             $t.append($('<span></span>').text(getMsg(meta.tagKey)));
             return $t;
@@ -2300,14 +2484,17 @@
             // untitled one falls back to what its tag says it is.
             if (!meta.titleKey) return a.Text || getMsg(meta.tagKey);
 
+            // A field-level edit headlines with the FIELD that changed — the row's
+            // tag already says "Updated", and the field is what tells one edit
+            // apart from the next. Rows with no field (change logging off) keep
+            // the generic wording.
+            if (a.Type === "updated" && a.FieldName) {
+                return getMsg("VAS_092_ActFieldUpdated") + " " + a.FieldName;
+            }
+
             var s = getMsg(meta.titleKey);
             if (a.Type === "grn" && a.Count > 0) {
                 s += " · " + a.Count + " " + getMsg("VAS_092_Lines");
-            }
-            // A header edit says how much of it changed, so one save touching
-            // five columns reads as one event rather than an unqualified "Updated".
-            if (a.Type === "updated" && a.Count > 0) {
-                s += " · " + a.Count + " " + getMsg("VAS_092_FieldsChanged");
             }
             if (a.DocumentNo) s += " (" + a.DocumentNo + ")";
             return s;
@@ -2319,7 +2506,7 @@
 
         function bindEvents() {
             // Open a linked origin record from a Generated From chip.
-            $root.on("click", ".vas_092-chip.is-link, .is-link[data-open-table]", function (e) {
+            $root.on("click", ".vas_092-chip.vas_092-is-link, .vas_092-is-link[data-open-table]", function (e) {
                 e.preventDefault();
                 openRecord($(this).attr("data-open-table"), $(this).attr("data-open-id"),
                     $(this).attr("data-open-sotrx") === "Y");
@@ -2424,10 +2611,10 @@
         }
 
         function toast(message, isError) {
-            var $t = $('<div class="vas_092-toast"></div>').addClass(isError ? "err" : "ok").text(message);
+            var $t = $('<div class="vas_092-toast"></div>').addClass(isError ? "vas_092-err" : "vas_092-ok").text(message);
             $root.append($t);
-            setTimeout(function () { $t.addClass("show"); }, 10);
-            setTimeout(function () { $t.removeClass("show"); setTimeout(function () { $t.remove(); }, 300); }, 3200);
+            setTimeout(function () { $t.addClass("vas_092-show"); }, 10);
+            setTimeout(function () { $t.removeClass("vas_092-show"); setTimeout(function () { $t.remove(); }, 300); }, 3200);
         }
 
         // ----------------------------------------------------------------- //
@@ -2547,6 +2734,23 @@
             }
         }
 
+        // The calendar day of a stored TIMESTAMP, in the viewer's own zone. The
+        // DB keeps these in UTC and the server emits no zone designator, so
+        // reading one with formatDate (which deliberately does not shift a
+        // date-only field) would print the UTC day — a receipt entered at 9pm
+        // local would date to the following morning.
+        function formatStampDate(value) {
+            var d = parseDbDate(value, true);
+            if (!d) return "";
+            try {
+                return d.toLocaleDateString(window.navigator.language, {
+                    year: "numeric", month: "short", day: "2-digit"
+                });
+            } catch (e) {
+                return d.toDateString();
+            }
+        }
+
         function formatDateTime(value) {
             var d = parseDbDate(value, true);
             if (!d) return "";
@@ -2595,7 +2799,9 @@
         }
         this.record_ID = recordID;
         this.selectedRow = selectedRow;
-        this.fetchData(recordID);
+        // Held rather than fetched outright: the insert flag is not always up
+        // yet when we get here, so scheduleFetch asks once more before loading.
+        this.scheduleFetch(recordID);
     };
 
     /* Set width as per window width */
@@ -2605,6 +2811,11 @@
 
     /* Release variables from memory */
     VAS.VAS_092_OverviewPurchaseOrder.prototype.dispose = function () {
+        // Kill any held fetch first — its timer would otherwise fire against a
+        // panel whose curTab has just been nulled out below.
+        if (typeof this.abortPendingFetch === "function") {
+            try { this.abortPendingFetch(); } catch (e) { }
+        }
         if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
             try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
         }

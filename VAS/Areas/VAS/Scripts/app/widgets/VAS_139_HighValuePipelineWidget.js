@@ -16,6 +16,11 @@
  *           Customer detail reuses the generic VAS_126 endpoint:
  *             VAS_126_OpenTicketsWidget/GetCustomerDetail
  *
+ * Routing - 2026-08-17: hosted on a window, opening the customer navigates the host
+ *           grid in place (widgetFirevalueChanged); on the Home / landing dashboard
+ *           (windowNo < 0) there is no host grid, so the record is opened in the
+ *           standard Customer window via VAS.ZoomUtil.
+ *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  #  | Current Text                       | Message Key
  * ----+------------------------------------+--------------------------------
@@ -26,6 +31,9 @@
  *  5  | opp                                | VAS_139_Opp
  *  6  | opps                               | VAS_139_Opps
  *  7  | of                                 | VAS_139_Of
+ * 7a  | Showing                            | VAS_139_Showing
+ * 7b  | Previous page                      | VAS_139_PrevPage
+ * 7c  | Next page                          | VAS_139_NextPage
  *  8  | Nothing here right now.            | VAS_139_NothingHere
  *  9  | Unable to load pipeline.           | VAS_139_UnableToLoad
  * 10  | Retry                              | VAS_139_Retry
@@ -52,7 +60,14 @@
     // Generic customer detail endpoint (built with VAS_126).
     var CUSTOMER_ENDPOINT = 'VAS_126_OpenTicketsWidget/';
     var CUSTOMER_WINDOW_NAME = 'Business Partner';
-    var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+    /* 2026-08-17: zoom target when the widget is NOT hosted inside a window
+       (windowNo < 0 - the Home / landing dashboard). There is no host grid to navigate
+       there, so the record is opened in the standard Customer window; VAS.ZoomUtil
+       resolves the AD_Window_ID from the new name, then the old name, then
+       VAS_ZoomScreenConfig. */
+    var ZOOM_WINDOW_NAME_NEW = 'VAS_CustomerMaster';
+    var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
 
     function ensureDashInlineSizeVar($el) {
         if (window.__vasDashInlineSizeObserver) { return; }
@@ -84,12 +99,16 @@
         var widgetCurrency = { symbol: '', iso: '', precision: 2 };
 
         // Pipeline (opportunities) modal state.
-        var $pipe, $pipeBody, $pipeCust, currentPipeId = 0, currentPipeName = '';
+        var $pipe, $pipeBody, $pipeCust, currentPipeId = 0, currentPipeLeadId = 0, currentPipeName = '';
         var pipeCurrency = { symbol: '', iso: '', precision: 2 };
 
         // Customer detail modal state (reuses VAS_126 generic endpoint).
         var $detail, $detailBody, $detailSummary, currentDetailId = 0, currentDetailName = '';
         var detailCurrency = { symbol: '', iso: '', precision: 2 };
+
+        // AD_Window_ID of the Customer window, resolved once on the first Home-page
+        // zoom and reused afterwards (0 = not resolved yet).
+        var zoomWindowId = 0;
 
         function label(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -110,30 +129,41 @@
             return parsed || {};
         }
 
+        // Projects fact: name the customer's delivery project rather than only
+        // counting it. The server sends the first project name plus the total, so
+        // a customer with several reads "Name +2"; none renders the empty dash.
+        function projectText(name, count, dash) {
+            if (!name) { return dash; }
+            var extra = Number(count || 0) - 1;
+            return escapeHtml(extra > 0 ? name + ' +' + formatCount(extra) : name);
+        }
+
         function formatCount(value) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             return Math.round(n).toLocaleString(window.navigator.language);
         }
 
-        function usesIndian(iso) { return INDIAN_NUMBERING_CURRENCIES.indexOf(String(iso || '').toUpperCase()) >= 0; }
+        // Standard precision of the supplied base-currency descriptor, falling back to
+        // the session context when the endpoint did not send one.
+        function precisionOf(cur) {
+            var p = Number(cur && cur.precision);
+            if (!isNaN(p) && p >= 0) { return p; }
+            if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                p = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+            return !isNaN(p) && p >= 0 ? p : 0;
+        }
 
+        // Compact money against the base (accounting-schema) currency the endpoint
+        // reported. VIS.Util.formatCompactAmount supplies the scaled magnitude at the
+        // system-configured precision; the sign is composed before the symbol here.
         function formatMoney(value, cur) {
             var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
-            var sign = n < 0 ? '-' : '', abs = Math.abs(n);
+            var sign = n < 0 ? '-' : '';
+            var iso = (cur && cur.iso) || '';
             var symbol = (cur && (cur.symbol || cur.iso)) || '';
-            var body;
-            if (cur && usesIndian(cur.iso)) {
-                if (abs >= 10000000) { body = (abs / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr'; }
-                else if (abs >= 100000) { body = (abs / 100000).toFixed(2).replace(/\.?0+$/, '') + ' Lakh'; }
-                else if (abs >= 1000) { body = (abs / 1000).toFixed(1).replace(/\.?0+$/, '') + 'K'; }
-                else { body = abs.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 }); }
-            } else {
-                if (abs >= 1000000) { body = (abs / 1000000).toFixed(1).replace(/\.?0+$/, '') + 'M'; }
-                else if (abs >= 1000) { body = (abs / 1000).toFixed(1).replace(/\.?0+$/, '') + 'K'; }
-                else { body = abs.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 }); }
-            }
-            return sign + symbol + body;
+            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
         }
 
         function formatDate(iso) {
@@ -145,11 +175,16 @@
             return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
         }
 
+        // VAS_Opportunity.VAS_OppStage codes. 16 (Won) and 17 (Lost/Archived) are
+        // terminal and never reach this list; a blank stage is Open / Unassigned.
         function statusLabel(code) {
-            if (code === 'DR') { return label('VAS_139_StatusDR', 'Draft'); }
-            if (code === 'IP') { return label('VAS_139_StatusIP', 'In progress'); }
-            if (code === 'HD') { return label('VAS_139_StatusHD', 'On hold'); }
-            return code || '';
+            if (code === '10') { return label('VAS_139_Stage10', 'Prospecting'); }
+            if (code === '11') { return label('VAS_139_Stage11', 'Discovery/Design'); }
+            if (code === '12') { return label('VAS_139_Stage12', 'Product Evaluation'); }
+            if (code === '13') { return label('VAS_139_Stage13', 'Proposal'); }
+            if (code === '15') { return label('VAS_139_Stage15', 'Negotiation'); }
+            if (!code) { return label('VAS_139_StageNone', 'Unassigned'); }
+            return code;
         }
 
         function icon(name) {
@@ -233,7 +268,7 @@
             var oppWord = opps === 1 ? label('VAS_139_Opp', 'opp') : label('VAS_139_Opps', 'opps');
             var bar = Math.max(0, Math.min(100, Number(item.barPercent || 0)));
             var name = item.customerName || '';
-            return '<div class="vas139-row" data-id="' + Number(item.customerId) + '">' +
+            return '<div class="vas139-row" data-id="' + Number(item.customerId) + '" data-lead="' + Number(item.leadId || 0) + '">' +
                 '<span class="vas139-avatar" style="background:' + avatarColor(name) + '">' + escapeHtml(initials(name)) + '</span>' +
                 '<span class="vas139-row-main">' +
                     '<span class="vas139-row-title" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>' +
@@ -257,18 +292,20 @@
             var end = pageOffset + items.length;
             var pages = Math.max(1, Math.ceil(listTotal / pageSize));
             var current = Math.floor(pageOffset / pageSize);
-            var lbl = start + '–' + end + ' ' + label('VAS_139_Of', 'of') + ' ' + formatCount(listTotal);
-
-            var pager;
-            if (pages > 1) {
-                pager = '<div class="vas139-pager">' +
-                    '<button type="button" class="vas139-pgbtn" data-dir="prev" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas139-pglabel">' + escapeHtml(lbl) + '</span>' +
-                    '<button type="button" class="vas139-pgbtn" data-dir="next" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
-                '</div>';
-            } else {
-                pager = '<div class="vas139-pager"><span></span><span class="vas139-pglabel">' + escapeHtml(lbl) + '</span><span></span></div>';
-            }
+            /* Footer pager (dashboard-widgets.md §"Widget Footer Pager"): helper
+               left, compact prev · "N of M" · next right. The control stays put
+               on a single page with both arrows disabled, so the widget's row
+               grid never shifts height between pages. */
+            var of = label('VAS_139_Of', 'of');
+            var helper = label('VAS_139_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
+            var pager = '<div class="vas139-pager">' +
+                '<span class="vas139-pglabel">' + escapeHtml(helper) + '</span>' +
+                '<span class="vas139-pgctl">' +
+                    '<button type="button" class="vas139-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_139_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
+                    '<span class="vas139-pgtext">' + escapeHtml((current + 1) + ' ' + of + ' ' + pages) + '</span>' +
+                    '<button type="button" class="vas139-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_139_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
+                '</span>' +
+            '</div>';
             // Divide the body into pageSize equal rows so records fill the widget
             // top-to-bottom; partial pages stay top-aligned (empty tracks below).
             $body.html('<div class="vas139-list" style="grid-template-rows: repeat(' + pageSize + ', minmax(0, 1fr))">' + rows + '</div>' + pager);
@@ -288,17 +325,23 @@
             return ($pipe && $pipe.hasClass('is-open')) || ($detail && $detail.hasClass('is-open'));
         }
 
-        function openPipeline(bpId, name) {
-            if (!bpId) { return; }
+        // An account row is backed by either a business partner or - for an
+        // opportunity still attached to an unconverted lead - a C_Lead. Lead-backed
+        // rows carry bpId 0, so the "open the customer record" actions are hidden;
+        // there is no partner record to open.
+        function openPipeline(bpId, leadId, name) {
+            if (!bpId && !leadId) { return; }
             currentPipeId = bpId;
+            currentPipeLeadId = leadId || 0;
             currentPipeName = name || '';
             $pipeCust.text(currentPipeName);
+            $pipe.toggleClass('is-lead', !bpId);
             $pipe.addClass('is-open').attr('aria-hidden', 'false');
             $('body').addClass('vas139-modal-open');
             $pipeBody.html('<div class="vas139-state">' + escapeHtml(label('Loading', 'Loading…')) + '</div>');
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_139_HighValuePipelineWidget/GetOpportunities',
-                type: 'GET', cache: false, data: { C_BPartner_ID: bpId },
+                type: 'GET', cache: false, data: { C_BPartner_ID: bpId || 0, C_Lead_ID: leadId || 0 },
                 success: function (response) {
                     var data = parseResponse(response);
                     if (data && data.error) { $pipeBody.html('<div class="vas139-state">' + escapeHtml(label('VAS_139_UnableToLoad', 'Unable to load pipeline.')) + '</div>'); return; }
@@ -365,7 +408,16 @@
             closeDetail();
             closePipeline();
             try {
-                $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                }
+                else {
+                    /* Home / landing page: no host grid, so open the standard Customer window. */
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", Number(bpId), zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* best-effort */ }
         }
 
@@ -389,8 +441,10 @@
             $pipeBody = $pipe.find('.vas139-dbody');
             $pipeCust = $pipe.find('.vas139-pcust');
             $pipe.on('click', '[data-pipe-close]', closePipeline);
-            $pipe.on('click', '[data-pipe-act="open"]', function () { zoomToCustomer(currentPipeId); });
-            $pipe.on('click', '[data-pipe-act="customer"]', function () { openCustomer(currentPipeId, currentPipeName); });
+            // Both actions target a business-partner record; they are no-ops (and the
+            // buttons are hidden via .is-lead) when the account is an unconverted lead.
+            $pipe.on('click', '[data-pipe-act="open"]', function () { if (currentPipeId) { zoomToCustomer(currentPipeId); } });
+            $pipe.on('click', '[data-pipe-act="customer"]', function () { if (currentPipeId) { openCustomer(currentPipeId, currentPipeName); } });
         }
 
         /* ---------- Customer detail modal (reuses VAS_126 endpoint) ---------- */
@@ -441,9 +495,9 @@
                 fact(label('VAS_139_Owner', 'Owner'), escapeHtml(data.rep || dash)) +
                 fact(label('VAS_139_ARR', 'ARR'), escapeHtml(formatMoney(data.value, detailCurrency))) +
                 fact(label('VAS_139_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
-                fact(label('VAS_139_Projects', 'Projects'), projects > 0 ? escapeHtml(formatCount(projects)) : dash) +
+                fact(label('VAS_139_Projects', 'Projects'), projectText(data.projectName, projects, dash)) +
                 fact(label('VAS_139_Pipeline', 'Pipeline'), pipeline > 0 ? escapeHtml(formatMoney(pipeline, detailCurrency)) : dash) +
-                fact(label('VAS_139_Onboarding', 'Onboarding'), data.onboarding ? escapeHtml(data.onboarding) : dash) +
+                fact(label('VAS_139_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatCount(data.onboardingPercent) + '%')) +
             '</div>';
 
             var signals = '';
@@ -522,7 +576,9 @@
             $sub = $card.find('.vas139-sub');
             $body = $card.find('.vas139-body');
 
-            $card.on('click', '.vas139-row', function () { openPipeline(Number($(this).attr('data-id')), $(this).find('.vas139-row-title').text()); });
+            $card.on('click', '.vas139-row', function () {
+                openPipeline(Number($(this).attr('data-id')), Number($(this).attr('data-lead')), $(this).find('.vas139-row-title').text());
+            });
             $card.on('click', '.vas139-pgbtn', function () { turnPage($(this).attr('data-dir')); });
             $card.on('click', '.vas139-retry', function () { loadRows(); });
 

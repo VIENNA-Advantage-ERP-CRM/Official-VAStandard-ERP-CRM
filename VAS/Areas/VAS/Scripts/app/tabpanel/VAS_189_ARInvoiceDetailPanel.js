@@ -31,6 +31,7 @@
  *   {0} days overdue / remaining          | VAS_189_DaysOverdue / VAS_189_DaysRemaining
  *   Lifecycle / Stage {0} of {1}          | VAS_189_Lifecycle / VAS_189_StageOf
  *   Complete / Posted / Delivered         | VAS_189_Complete / VAS_189_Posted / VAS_189_Delivered
+ *     (IsReturnTrx: Customer Return)      | VAS_189_CustomerReturn
  *   Payment Due                           | VAS_189_PaymentDue
  *   Eligible to make recurring            | VAS_189_EligibleToRecur
  *   Recurring schedule active             | VAS_189_RecurringActive
@@ -678,7 +679,7 @@
             var hasDelivery = dl && dl.Rows && dl.Rows.length;
             if (hasDelivery) {
                 steps.push({
-                    t: lbl("VAS_189_Delivered", "Delivered"),
+                    t: deliveredStepLabel(),
                     sub: subLine(dl.ShipmentDocumentNo, dl.DeliveredDate),
                     done: true
                 });
@@ -822,6 +823,14 @@
             return data.IsReturnTrx
                 ? lbl("VAS_189_ReturnedQty", "Returned Qty")
                 : lbl("VAS_189_DeliveredQty", "Delivered quantity");
+        }
+
+        /* The movement stage as it reads in the lifecycle stepper and the approval
+           rail: nothing was delivered on a return - the goods came back in. */
+        function deliveredStepLabel() {
+            return data.IsReturnTrx
+                ? lbl("VAS_189_CustomerReturn", "Customer Return")
+                : lbl("VAS_189_Delivered", "Delivered");
         }
 
         /* Invoice details (key/value pairs - only non-empty rows) */
@@ -1359,7 +1368,7 @@
             var dl = data.Delivery;
             if (dl && dl.Rows && dl.Rows.length) {
                 steps.push({
-                    st: lbl("VAS_189_Delivered", "Delivered"),
+                    st: deliveredStepLabel(),
                     mt: fmtDate(dl.DeliveredDate),
                     nt: dl.ShipmentDocumentNo, done: true
                 });
@@ -1787,7 +1796,8 @@
             void $scrim[0].offsetWidth;
             $scrim.addClass("open");
 
-            $scrim.on("click", function (e) { if (e.target === $scrim[0]) closeModal(); });
+            // A click on the scrim deliberately does nothing: the receipt form holds
+            // typed-in amounts, so the modal only closes through Cancel or the X.
             $(document).off("keydown.vas189Modal").on("keydown.vas189Modal", function (e) {
                 if (e.key === "Escape") closeModal();
             });
@@ -2631,7 +2641,7 @@
         function showSuccess(title, message, recapRows) {
             if (!$scrim) return;
             // The document changed -> refresh the panel when the modal closes (Done,
-            // X, Esc and scrim click all funnel through closeModal).
+            // X, Cancel and Esc all funnel through closeModal).
             panelDirty = true;
             $scrim.find(".js-form").hide();
             // Use flex (not .show()'s display:block) so the success body can scroll.
@@ -2989,8 +2999,7 @@
 
             // Description - optional free text carried onto every generated invoice.
             var $descInput = $('<textarea id="' + CLS + 'rec-desc" class="' + CLS + 'rec-textarea js-desc" rows="2" maxlength="255"></textarea>')
-                .attr("placeholder", lbl("VAS_189_DescriptionPlaceholder",
-                    "Note shown on every generated invoice — e.g. Monthly retainer, contract CT-4471"))
+                .attr("placeholder", lbl("VAS_189_DescriptionPlaceholder"," "))
                 .val(stateR.description);
             var $descCard = recFieldCard("b", RSVG.lines,
                 lbl("VAS_189_Description", "Description"), false, CLS + "rec-desc");
@@ -3204,7 +3213,8 @@
 
             $foot.find(".js-rec-cancel").on("click", function () { closeRecurringModal(); });
             $head.find("." + CLS + "rec-x").on("click", function () { closeRecurringModal(); });
-            $recScrim.on("click", function (e) { if (e.target === $recScrim[0]) closeRecurringModal(); });
+            // No close on scrim click - the schedule form is easy to lose by accident,
+            // so Cancel and the X are the only ways out.
             $(document).off("keydown.vas189Recur").on("keydown.vas189Recur", function (e) {
                 if (e.key === "Escape") closeRecurringModal();
             });

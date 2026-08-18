@@ -12,6 +12,11 @@
  * Backend - VAS_137_NeedsAttentionWidget/GetSummary
  *           VAS_137_NeedsAttentionWidget/GetList  (flag=overdue|unresponded|unsegmented|onbIncomplete)
  *
+ * Routing - 2026-08-17: hosted on a window, opening the customer navigates the host
+ *           grid in place (widgetFirevalueChanged); on the Home / landing dashboard
+ *           (windowNo < 0) there is no host grid, so the record is opened in the
+ *           standard Customer window via VAS.ZoomUtil.
+ *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  #  | Current Text                              | Message Key
  * ----+------------------------------------------+--------------------------------
@@ -34,6 +39,9 @@
  * 17  | Retry                                    | VAS_137_Retry
  * 18  | of                                       | VAS_137_Of
  * 19  | Close                                    | VAS_137_Close
+ * 20  | Showing                                  | VAS_137_Showing
+ * 21  | Previous page                            | VAS_137_PrevPage
+ * 22  | Next page                                | VAS_137_NextPage
  * ──────────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -43,7 +51,14 @@
     var CUSTOMER_WINDOW_NAME = 'Business Partner';
     // Generic customer detail / activity-log endpoints (built with VAS_126).
     var CUSTOMER_ENDPOINT = 'VAS_126_OpenTicketsWidget/';
-    var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+    /* 2026-08-17: zoom target when the widget is NOT hosted inside a window
+       (windowNo < 0 - the Home / landing dashboard). There is no host grid to navigate
+       there, so the record is opened in the standard Customer window; VAS.ZoomUtil
+       resolves the AD_Window_ID from the new name, then the old name, then
+       VAS_ZoomScreenConfig. */
+    var ZOOM_WINDOW_NAME_NEW = 'VAS_CustomerMaster';
+    var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
 
     // Tile definitions in the required order.
     var TILES = [
@@ -80,9 +95,11 @@
 
         // Customer detail modal state (reuses VAS_126 generic endpoints).
         var $detail, $detailBody, $detailSummary, currentDetailId = 0, currentDetailName = '';
-        // Log activity popup state (reuses VAS_126 SaveActivityLog).
-        var $log, $logCust, $logText, $logError, currentLogBpId = 0, currentLogType = 'Call';
         var detailCurrency = { symbol: '', iso: '', precision: 0 };
+
+        // AD_Window_ID of the Customer window, resolved once on the first Home-page
+        // zoom and reused afterwards (0 = not resolved yet).
+        var zoomWindowId = 0;
 
         function label(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -100,28 +117,42 @@
             if (typeof parsed === 'string' && parsed.length) { parsed = JSON.parse(parsed); }
             return parsed || {};
         }
+        // Projects fact: name the customer's delivery project rather than only
+        // counting it. The server sends the first project name plus the total, so
+        // a customer with several reads "Name +2"; none renders the empty dash.
+        function projectText(name, count, dash) {
+            if (!name) { return dash; }
+            var extra = Number(count || 0) - 1;
+            return escapeHtml(extra > 0 ? name + ' +' + formatCount(extra) : name);
+        }
+
         function formatCount(value) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             return Math.round(n).toLocaleString(window.navigator.language);
         }
-        function usesIndian(iso) { return INDIAN_NUMBERING_CURRENCIES.indexOf(String(iso || '').toUpperCase()) >= 0; }
-        function formatAmount(value) {
-            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
-            var sign = n < 0 ? '-' : '', abs = Math.abs(n);
-            var symbol = listCurrency.symbol || listCurrency.iso || '';
-            var body;
-            if (usesIndian(listCurrency.iso)) {
-                if (abs >= 10000000) { body = (abs / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr'; }
-                else if (abs >= 100000) { body = (abs / 100000).toFixed(2).replace(/\.?0+$/, '') + ' Lakh'; }
-                else if (abs >= 1000) { body = (abs / 1000).toFixed(1).replace(/\.?0+$/, '') + 'K'; }
-                else { body = abs.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 }); }
-            } else {
-                if (abs >= 1000000) { body = (abs / 1000000).toFixed(1).replace(/\.?0+$/, '') + 'M'; }
-                else if (abs >= 1000) { body = (abs / 1000).toFixed(1).replace(/\.?0+$/, '') + 'K'; }
-                else { body = abs.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 }); }
+        // Standard precision of the supplied base-currency descriptor, falling back to
+        // the session context when the endpoint did not send one.
+        function precisionOf(cur) {
+            var p = Number(cur && cur.precision);
+            if (!isNaN(p) && p >= 0) { return p; }
+            if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                p = Number(VIS.Env.getCtx().getStdPrecision());
             }
-            return sign + symbol + body;
+            return !isNaN(p) && p >= 0 ? p : 0;
+        }
+        // Compact money against a base (accounting-schema) currency descriptor.
+        // VIS.Util.formatCompactAmount supplies the scaled magnitude at the
+        // system-configured precision; the sign is composed before the symbol here.
+        function formatMoney(value, cur) {
+            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
+            var sign = n < 0 ? '-' : '';
+            var iso = (cur && cur.iso) || '';
+            var symbol = (cur && (cur.symbol || cur.iso)) || '';
+            return sign + symbol + VIS.Util.formatCompactAmount(n, iso, precisionOf(cur));
+        }
+        function formatAmount(value) {
+            return formatMoney(value, listCurrency);
         }
 
         function icon(name) {
@@ -253,18 +284,22 @@
             var end = listOffset + items.length;
             var pages = Math.max(1, Math.ceil(listTotal / LIST_PAGE));
             var current = Math.floor(listOffset / LIST_PAGE);
-            var lbl = start + '–' + end + ' ' + label('VAS_137_Of', 'of') + ' ' + formatCount(listTotal);
+            /* Footer pager (dashboard-widgets.md §"Widget Footer Pager"): helper
+               left, compact prev · "N of M" · next right. The control stays put
+               on a single page with both arrows disabled. */
+            var of = label('VAS_137_Of', 'of');
+            var helper = label('VAS_137_Showing', 'Showing') + ' ' + start + '–' + end + ' ' + of + ' ' + formatCount(listTotal);
+            var pageText = (current + 1) + ' ' + of + ' ' + pages;
 
             $listBody.html('<div class="vas137-list">' + rows + '</div>');
-            if (pages > 1) {
-                $listPager.html(
-                    '<button type="button" class="vas137-pgbtn" data-dir="prev" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
-                    '<span class="vas137-pglabel">' + escapeHtml(lbl) + '</span>' +
-                    '<button type="button" class="vas137-pgbtn" data-dir="next" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>'
-                );
-            } else {
-                $listPager.html('<span></span><span class="vas137-pglabel">' + escapeHtml(lbl) + '</span><span></span>');
-            }
+            $listPager.html(
+                '<span class="vas137-pglabel">' + escapeHtml(helper) + '</span>' +
+                '<span class="vas137-pgctl">' +
+                    '<button type="button" class="vas137-pgbtn" data-dir="prev" aria-label="' + escapeHtml(label('VAS_137_PrevPage', 'Previous page')) + '" ' + (current <= 0 ? 'disabled' : '') + '>' + icon('chevL') + '</button>' +
+                    '<span class="vas137-pgtext">' + escapeHtml(pageText) + '</span>' +
+                    '<button type="button" class="vas137-pgbtn" data-dir="next" aria-label="' + escapeHtml(label('VAS_137_NextPage', 'Next page')) + '" ' + (current >= pages - 1 ? 'disabled' : '') + '>' + icon('chev') + '</button>' +
+                '</span>'
+            );
         }
         function turnPage(direction) {
             var next = listOffset + (direction === 'next' ? LIST_PAGE : -LIST_PAGE);
@@ -316,26 +351,12 @@
         }
 
         function anyModalOpen() {
-            return ($list && $list.hasClass('is-open')) || ($detail && $detail.hasClass('is-open')) || ($log && $log.hasClass('is-open'));
+            return ($list && $list.hasClass('is-open')) || ($detail && $detail.hasClass('is-open'));
         }
 
         // Currency formatter for the detail modal (independent of the list currency).
         function formatDetailAmount(value) {
-            var n = Number(value || 0); if (!isFinite(n)) { n = 0; }
-            var sign = n < 0 ? '-' : '', abs = Math.abs(n);
-            var symbol = detailCurrency.symbol || detailCurrency.iso || '';
-            var body;
-            if (usesIndian(detailCurrency.iso)) {
-                if (abs >= 10000000) { body = (abs / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr'; }
-                else if (abs >= 100000) { body = (abs / 100000).toFixed(2).replace(/\.?0+$/, '') + ' Lakh'; }
-                else if (abs >= 1000) { body = (abs / 1000).toFixed(1).replace(/\.?0+$/, '') + 'K'; }
-                else { body = abs.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 }); }
-            } else {
-                if (abs >= 1000000) { body = (abs / 1000000).toFixed(1).replace(/\.?0+$/, '') + 'M'; }
-                else if (abs >= 1000) { body = (abs / 1000).toFixed(1).replace(/\.?0+$/, '') + 'K'; }
-                else { body = abs.toLocaleString(window.navigator.language, { maximumFractionDigits: 2 }); }
-            }
-            return sign + symbol + body;
+            return formatMoney(value, detailCurrency);
         }
 
         function openCustomer(bpId) {
@@ -386,9 +407,9 @@
                 fact(label('VAS_137_Owner', 'Owner'), escapeHtml(data.rep || dash)) +
                 fact(label('VAS_137_ARR', 'ARR'), escapeHtml(formatDetailAmount(data.value))) +
                 fact(label('VAS_137_OpenTicketsFact', 'Open tickets'), escapeHtml(formatCount(data.openTickets || 0))) +
-                fact(label('VAS_137_Projects', 'Projects'), projects > 0 ? escapeHtml(formatCount(projects)) : dash) +
+                fact(label('VAS_137_Projects', 'Projects'), projectText(data.projectName, projects, dash)) +
                 fact(label('VAS_137_Pipeline', 'Pipeline'), pipeline > 0 ? escapeHtml(formatDetailAmount(pipeline)) : dash) +
-                fact(label('VAS_137_Onboarding', 'Onboarding'), data.onboarding ? escapeHtml(data.onboarding) : dash) +
+                fact(label('VAS_137_Onboarding', 'Onboarding'), data.onboardingPercent == null ? dash : escapeHtml(formatCount(data.onboardingPercent) + '%')) +
             '</div>';
 
             var signals = '';
@@ -427,7 +448,16 @@
             closeDetail();
             closeList();
             try {
-                $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                }
+                else {
+                    /* Home / landing page: no host grid, so open the standard Customer window. */
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", Number(bpId), zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* best-effort */ }
         }
 
@@ -441,7 +471,6 @@
                                 '<button type="button" class="vas137-close" data-detail-close aria-label="' + escapeHtml(label('VAS_137_Close', 'Close')) + '">' + icon('close') + '</button></div></header>' +
                         '<div class="vas137-dbody"></div>' +
                         '<footer class="vas137-dfoot">' +
-                            '<button type="button" class="vas137-btn vas137-btn-ghost" data-detail-act="log">' + icon('phone') + escapeHtml(label('VAS_137_Log', 'Log')) + '</button>' +
                             '<button type="button" class="vas137-btn vas137-btn-primary" data-detail-act="open">' + icon('arrow') + escapeHtml(label('VAS_137_OpenRecord', 'Open record')) + '</button>' +
                         '</footer>' +
                     '</section>' +
@@ -452,75 +481,6 @@
             $detailSummary = $detail.find('.vas137-dsummary');
             $detail.on('click', '[data-detail-close]', closeDetail);
             $detail.on('click', '[data-detail-act="open"]', function () { var id = currentDetailId; zoomToCustomer(id); });
-            $detail.on('click', '[data-detail-act="log"]', function () { openLogDialog(currentDetailId, currentDetailName); });
-        }
-
-        /* ---------- Log activity popup (reuses VAS_126 SaveActivityLog) ---------- */
-
-        function openLogDialog(bpId, name) {
-            currentLogBpId = bpId;
-            currentLogType = 'Call';
-            $log.find('.vas137-ltype').removeClass('is-active').filter('[data-type="Call"]').addClass('is-active');
-            $logCust.text(name || '');
-            $logText.val('');
-            $logError.hide().text('');
-            $log.addClass('is-open').attr('aria-hidden', 'false');
-            $('body').addClass('vas137-modal-open');
-            window.setTimeout(function () { $logText.focus(); }, 0);
-        }
-        function closeLog() {
-            if (!$log) { return; }
-            if (document.activeElement && $log[0].contains(document.activeElement)) { document.activeElement.blur(); }
-            $log.removeClass('is-open').attr('aria-hidden', 'true');
-            if (!anyModalOpen()) { $('body').removeClass('vas137-modal-open'); }
-        }
-        function saveLog() {
-            var summary = ($logText.val() || '').trim();
-            if (!summary) { $logError.text(label('VAS_137_SummaryRequired', 'Please enter a summary.')).show(); return; }
-            var $save = $log.find('[data-log-save]');
-            $save.prop('disabled', true);
-            $logError.hide().text('');
-            $.ajax({
-                url: VIS.Application.contextUrl + CUSTOMER_ENDPOINT + 'SaveActivityLog',
-                type: 'POST', data: { C_BPartner_ID: currentLogBpId, activityType: currentLogType, summary: summary },
-                success: function (response) {
-                    var data = parseResponse(response);
-                    if (data && data.error) { $logError.text(data.error).show(); $save.prop('disabled', false); return; }
-                    $save.prop('disabled', false); closeLog();
-                },
-                error: function () { $logError.text(label('VAS_137_LogSaveFailed', 'Could not save the activity.')).show(); $save.prop('disabled', false); }
-            });
-        }
-        function createLogDialog() {
-            var types = ['Call', 'Note', 'Meeting', 'Email'].map(function (t) {
-                return '<button type="button" class="vas137-ltype' + (t === 'Call' ? ' is-active' : '') + '" data-type="' + t + '">' + escapeHtml(label('VAS_137_Type' + t, t)) + '</button>';
-            }).join('');
-            $log = $(
-                '<div class="vas137-log" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(label('VAS_137_LogActivity', 'Log activity')) + '">' +
-                    '<div class="vas137-scrim" data-log-close></div>' +
-                    '<section class="vas137-lpanel">' +
-                        '<header class="vas137-phead"><h2 class="vas137-ptitle">' + escapeHtml(label('VAS_137_LogActivity', 'Log activity')) + '</h2>' +
-                            '<div class="vas137-phead-right"><span class="vas137-lcust"></span>' +
-                                '<button type="button" class="vas137-close" data-log-close aria-label="' + escapeHtml(label('VAS_137_Close', 'Close')) + '">' + icon('close') + '</button></div></header>' +
-                        '<div class="vas137-lbody"><div class="vas137-ltypes">' + types + '</div>' +
-                            '<label class="vas137-llabel">' + escapeHtml(label('VAS_137_Summary', 'Summary')) + '</label>' +
-                            '<textarea class="vas137-ltext" placeholder="' + escapeHtml(label('VAS_137_SummaryPlaceholder', 'What happened / next step…')) + '"></textarea>' +
-                            '<div class="vas137-lerror"></div></div>' +
-                        '<footer class="vas137-dfoot">' +
-                            '<button type="button" class="vas137-btn vas137-btn-ghost" data-log-close>' + escapeHtml(label('VAS_137_Cancel', 'Cancel')) + '</button>' +
-                            '<button type="button" class="vas137-btn vas137-btn-primary" data-log-save>' + icon('check') + escapeHtml(label('VAS_137_Save', 'Save')) + '</button>' +
-                        '</footer>' +
-                    '</section>' +
-                '</div>'
-            );
-            $('body').append($log);
-            $logCust = $log.find('.vas137-lcust');
-            $logText = $log.find('.vas137-ltext');
-            $logError = $log.find('.vas137-lerror');
-            $logError.hide();
-            $log.on('click', '[data-log-close]', closeLog);
-            $log.on('click', '.vas137-ltype', function () { currentLogType = $(this).attr('data-type'); $log.find('.vas137-ltype').removeClass('is-active'); $(this).addClass('is-active'); });
-            $log.on('click', '[data-log-save]', saveLog);
         }
 
         /* ---------- Widget shell ---------- */
@@ -553,10 +513,8 @@
             createWidget();
             createListDialog();
             createDetailDialog();
-            createLogDialog();
             $(document).on('keydown.MPCvas137', function (event) {
                 if (event.key !== 'Escape') { return; }
-                if ($log && $log.hasClass('is-open')) { closeLog(); }
                 else if ($detail && $detail.hasClass('is-open')) { closeDetail(); }
                 else if ($list && $list.hasClass('is-open')) { closeList(); }
             });
@@ -569,7 +527,6 @@
             $(document).off('keydown.MPCvas137');
             if ($list) { $list.remove(); $list = null; }
             if ($detail) { $detail.remove(); $detail = null; }
-            if ($log) { $log.remove(); $log = null; }
             $('body').removeClass('vas137-modal-open');
             $root.remove();
         };
