@@ -237,6 +237,33 @@
     color: #102C3F;
 }
 
+/* Zoom hyperlink — the Receipt No. in the card grid and the Allocation No. in
+   the modal's allocation table. Underlined only on hover / focus so a column
+   of links does not read as a wall of rules; the action colour carries it at
+   rest. */
+.vas-rr-zoom-link {
+    color: #0083DA;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+    .vas-rr-zoom-link:hover,
+    .vas-rr-zoom-link:focus {
+        color: #005FA3;
+        text-decoration: underline;
+    }
+
+    .vas-rr-zoom-link:focus-visible {
+        outline: 0.125em solid #0083DA;
+        outline-offset: 0.125em;
+    }
+
+/* The Receipt No. link doubles as the cell's truncation span, so it has to
+   keep the block display that ellipsis clipping needs. */
+a.vas-rr-truncate.vas-rr-zoom-link {
+    display: block;
+}
+
 .vas-rr-td-customer {
     /* Standard body cell: regular weight, muted secondary tone. */
     font-weight: 400;
@@ -770,17 +797,19 @@
    Tuned per breakpoint below — large (default, > 48em), medium (≤ 48em) and
    small (≤ 36em, where Document amount is hidden). Order:
    Reference · Date · Document amount · Allocated amount. */
-.vas-rr-alloc-table thead th:nth-child(1) { width: 34%; }   /* Reference   */
-.vas-rr-alloc-table thead th:nth-child(2) { width: 18%; }   /* Date        */
-.vas-rr-alloc-table thead th:nth-child(3) { width: 24%; }   /* Doc amount  */
-.vas-rr-alloc-table thead th:nth-child(4) { width: 24%; }   /* Allocated   */
+.vas-rr-alloc-table thead th:nth-child(1) { width: 20%; }   /* Allocation No. */
+.vas-rr-alloc-table thead th:nth-child(2) { width: 28%; }   /* Reference      */
+.vas-rr-alloc-table thead th:nth-child(3) { width: 16%; }   /* Date           */
+.vas-rr-alloc-table thead th:nth-child(4) { width: 18%; }   /* Doc amount     */
+.vas-rr-alloc-table thead th:nth-child(5) { width: 18%; }   /* Allocated      */
 
 /* Reference cell: truncate long doc-numbers that would otherwise force
    the table wider than the dialog card on small viewports. The date cell
    gets the same guard so an unusually long locale date clips instead of
    overlapping the amount column. */
 .vas-rr-alloc-table td:nth-child(1),
-.vas-rr-alloc-table td:nth-child(2) {
+.vas-rr-alloc-table td:nth-child(2),
+.vas-rr-alloc-table td:nth-child(3) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -958,10 +987,11 @@
 
     /* Medium screens: even split for the now full-width modal — give the two
        amount columns a touch more room than on large. */
-    .vas-rr-alloc-table thead th:nth-child(1) { width: 30%; }   /* Reference  */
-    .vas-rr-alloc-table thead th:nth-child(2) { width: 20%; }   /* Date       */
-    .vas-rr-alloc-table thead th:nth-child(3) { width: 25%; }   /* Doc amount */
-    .vas-rr-alloc-table thead th:nth-child(4) { width: 25%; }   /* Allocated  */
+    .vas-rr-alloc-table thead th:nth-child(1) { width: 20%; }   /* Allocation No. */
+    .vas-rr-alloc-table thead th:nth-child(2) { width: 26%; }   /* Reference      */
+    .vas-rr-alloc-table thead th:nth-child(3) { width: 16%; }   /* Date           */
+    .vas-rr-alloc-table thead th:nth-child(4) { width: 19%; }   /* Doc amount     */
+    .vas-rr-alloc-table thead th:nth-child(5) { width: 19%; }   /* Allocated      */
 }
 
 @media (max-width: 36em) {            /* ~576px phone — collapse grid to single column */
@@ -986,16 +1016,18 @@
         padding: 0.625em 0.5em;
     }
 
-    /* Drop the Invoice amount column on phones — Allocated amount stays
-       as the headline number. */
-    .vas-rr-alloc-table thead th:nth-child(3),
-    .vas-rr-alloc-table tbody td:nth-child(3) {
+    /* Drop the Document amount column on phones — Allocated amount stays
+       as the headline number. It is the 4th column now that Allocation No.
+       leads the table. */
+    .vas-rr-alloc-table thead th:nth-child(4),
+    .vas-rr-alloc-table tbody td:nth-child(4) {
         display: none;
     }
 
     /* Small screens: Document amount is hidden above — rebalance the three
        remaining columns so they fill the row (sum = 100%). */
-    .vas-rr-alloc-table thead th:nth-child(1) { width: 42%; }   /* Reference */
-    .vas-rr-alloc-table thead th:nth-child(2) { width: 26%; }   /* Date      */
-    .vas-rr-alloc-table thead th:nth-child(4) { width: 32%; }   /* Allocated */
+    .vas-rr-alloc-table thead th:nth-child(1) { width: 28%; }   /* Allocation No. */
+    .vas-rr-alloc-table thead th:nth-child(2) { width: 32%; }   /* Reference      */
+    .vas-rr-alloc-table thead th:nth-child(3) { width: 18%; }   /* Date           */
+    .vas-rr-alloc-table thead th:nth-child(5) { width: 22%; }   /* Allocated      */
 }

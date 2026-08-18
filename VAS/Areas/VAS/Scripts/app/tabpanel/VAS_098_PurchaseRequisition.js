@@ -70,9 +70,57 @@
  *                        - Priority badge colours match the requisition window.
  *                        - The items footer reports the Budget set for the
  *                          requisition in place of the estimated subtotal.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vasrq- -> vas_098- so the panel's
+ *                          styles cannot collide with another panel's.
+ *   VAI163   2026-08-05  New Record / Copy Record now empty the panel instead
+ *                        of leaving the previously selected record on screen.
+ *                        Both refreshPanelData and a new data-status listener
+ *                        ask isTabInserting(), which reads GridTab.gridTable
+ *                        .getIsInserting() — the flag GridTable.dataNew() raises
+ *                        for both actions. The record id cannot answer it: a
+ *                        copied row carries the source record's key until saved.
+ *                        Ported from VAS_092.
+ *   VAI163   2026-08-06  Activity paginates at 15 rows a page (ACTIVITY_PER_PAGE),
+ *                        reusing the line-items pager. buildPager() is no longer
+ *                        tied to linesPage / LINES_PER_PAGE: it takes the 0-based
+ *                        page and an onGo(page) callback, so the items table and
+ *                        the activity feed page independently. A feed that fits on
+ *                        one page shows no controls, and the section header keeps
+ *                        counting the whole feed. Ported from VAS_092.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
+
+    // True when the tab is sitting on a row that has not been saved yet —
+    // whether it came from New Record or from Copy Record.
+    //
+    // The authority is the GRID TABLE's insert flag: VIS.GridTable.dataNew()
+    // raises it for both actions and clears it again on save, refresh or undo,
+    // and GridTable.getIsInserting() reads it. GridTab does NOT expose that
+    // method — it only holds the table as .gridTable — so asking the tab itself
+    // always answers "no".
+    //
+    // The record id cannot answer this on its own: a copied row carries the
+    // SOURCE record's field values, its key included, so the id handed to the
+    // panel is the record that was copied FROM. Either way the panel would
+    // otherwise show a saved record's details beside an unsaved new one.
+    function isTabInserting(curTab) {
+        if (!curTab) return false;
+        try {
+            if (curTab.gridTable && typeof curTab.gridTable.getIsInserting === "function"
+                && curTab.gridTable.getIsInserting()) {
+                return true;
+            }
+        } catch (e) { }
+
+        var probes = ["getIsInserting", "isInserting", "getIsNew", "isNew"];
+        for (var i = 0; i < probes.length; i++) {
+            try {
+                if (typeof curTab[probes[i]] === "function" && curTab[probes[i]]()) return true;
+            } catch (e2) { }
+        }
+        return false;
+    }
 
     VAS.VAS_098_PurchaseRequisition = function () {
         this.record_ID = 0;
@@ -83,6 +131,50 @@
         this.panelWidth;
 
         var $self = this;
+
+        // The framework notifies a tab panel when the selected record changes
+        // (refreshPanelData) but NOT when the user starts a new one:
+        // GridController.dataNew() never reaches the tab panel, so the panel
+        // would keep showing the previously selected record beside an empty new
+        // one. Listening to the tab's own data-status events closes that gap.
+        function onTabDataStatus(e) {
+            var inserting = false;
+            try {
+                inserting = !!(e && typeof e.getIsInserting === "function" && e.getIsInserting());
+            } catch (ex) {
+                inserting = false;
+            }
+            // The event does not report insert state on every build, and a
+            // COPIED row still carries the source record's key — so ask the tab
+            // as well before trusting the id below.
+            if (!inserting) inserting = isTabInserting($self.curTab);
+
+            var rid = 0;
+            try {
+                if ($self.curTab && typeof $self.curTab.getRecord_ID === "function") {
+                    rid = +$self.curTab.getRecord_ID() || 0;
+                }
+            } catch (ex2) {
+                rid = 0;
+            }
+
+            if (inserting || rid <= 0) {
+                // New (unsaved) record — nothing to show against it.
+                if ($self.record_ID) {
+                    $self.record_ID = 0;
+                    $self.clear();
+                }
+                return;
+            }
+            if (rid !== $self.record_ID) {
+                $self.record_ID = rid;
+                $self.fetchData(rid);
+            }
+        }
+
+        // Registered on the tab in startPanel, removed in dispose. Kept as an
+        // object because the framework calls listener.dataStatusChanged(event).
+        this.tabDataListener = { dataStatusChanged: function (e) { onTabDataStatus(e); } };
         var $root;
         var $busy;
         var $body;
@@ -93,6 +185,7 @@
         // page resets whenever a different record is loaded.
         var LINES_PER_PAGE = 10;
         var linesPage = 0;
+        var activityPage = 0;   // current Activity page (0-based, like linesPage)
 
         // ---- Code maps: status/priority codes -> message key + tone. Labels
         //      are looked up through VIS.Msg (AD_Message VAS_098_*) at render. ---- //
@@ -122,9 +215,9 @@
         };
 
         this.init = function () {
-            $root = $('<div class="MPC-vasrq-root"></div>');
-            $body = $('<div class="MPC-vasrq-body"></div>');
-            $emptyState = $('<div class="MPC-vasrq-empty" style="display:none;"></div>');
+            $root = $('<div class="vas_098-root"></div>');
+            $body = $('<div class="vas_098-body"></div>');
+            $emptyState = $('<div class="vas_098-empty" style="display:none;"></div>');
             $emptyState.text(msg("NoData"));
             $root.append($body).append($emptyState);
             createBusyIndicator();
@@ -158,6 +251,7 @@
                     var parsed = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     data = parsed;
                     linesPage = 0;
+                    activityPage = 0;
                     render();
                     showBusy(false);
                 },
@@ -171,6 +265,7 @@
         this.clear = function () {
             data = null;
             linesPage = 0;
+            activityPage = 0;
             render();
         };
 
@@ -245,8 +340,8 @@
         }
 
         function tag(label, tone) {
-            var $t = $('<span class="MPC-vasrq-tag"></span>').addClass(tone || "draft");
-            $t.append($('<span class="MPC-vasrq-dot"></span>'));
+            var $t = $('<span class="vas_098-tag"></span>').addClass(tone || "draft");
+            $t.append($('<span class="vas_098-dot"></span>'));
             $t.append(document.createTextNode(label));
             return $t;
         }
@@ -262,19 +357,19 @@
             var st = statusMeta();
             var pm = priorityMeta();
 
-            var $head = $('<div class="MPC-vasrq-hdr"></div>');
-            var $top = $('<div class="MPC-vasrq-hdrTop"></div>');
+            var $head = $('<div class="vas_098-hdr"></div>');
+            var $top = $('<div class="vas_098-hdrTop"></div>');
 
-            var $tl = $('<div class="MPC-vasrq-hdrTitleWrap"></div>');
-            $tl.append($('<div class="MPC-vasrq-hdrTitle"></div>').text(
+            var $tl = $('<div class="vas_098-hdrTitleWrap"></div>');
+            $tl.append($('<div class="vas_098-hdrTitle"></div>').text(
                 msg("Requisition") + " — " + (data.DocumentNo || msg("NA"))));
             var subBits = [procurementType()];
             var raised = formatDate(data.DateDoc || data.Created);
             if (raised) subBits.push(msg("Raised") + " " + raised);
-            $tl.append($('<div class="MPC-vasrq-hdrSub"></div>').text(subBits.join(" · ")));
+            $tl.append($('<div class="vas_098-hdrSub"></div>').text(subBits.join(" · ")));
             $top.append($tl);
 
-            var $pills = $('<div class="MPC-vasrq-hdrPills"></div>');
+            var $pills = $('<div class="vas_098-hdrPills"></div>');
             $pills.append(priorityPill(pm));
             if (data.SourceWarehouseName) {
                 // origin / procurement-type chip (design shows a chip here)
@@ -291,7 +386,7 @@
         }
 
         function priorityPill(pm) {
-            var $p = $('<span class="MPC-vasrq-prio"></span>').addClass(pm.tone);
+            var $p = $('<span class="vas_098-prio"></span>').addClass(pm.tone);
             $p.append(svgIcon("chevrons"));
             $p.append(document.createTextNode(pm.label));
             return $p;
@@ -308,12 +403,12 @@
         // left column: the same value is a labelled field in the right column, so
         // it was showing twice in the card.
         function renderDetails() {
-            var $card = $('<div class="MPC-vasrq-hdrCard"></div>');
+            var $card = $('<div class="vas_098-hdrCard"></div>');
 
             // Left: Source Warehouse (the source of goods) + route + people.
-            var $l = $('<div class="MPC-vasrq-hdrColL"></div>');
-            $l.append($('<div class="MPC-vasrq-fLabel"></div>').text(msg("SourceWarehouse")));
-            $l.append($('<div class="MPC-vasrq-srcName"></div>').text(
+            var $l = $('<div class="vas_098-hdrColL"></div>');
+            $l.append($('<div class="vas_098-fLabel"></div>').text(msg("SourceWarehouse")));
+            $l.append($('<div class="vas_098-srcName"></div>').text(
                 data.SourceWarehouseName || msg("ExternalProcurement")));
             var cur = (data.ISO_Code || "") + (data.CurSymbol ? " (" + data.CurSymbol + ")" : "");
             if (cur.replace(/\s/g, "")) $l.append(headerField(msg("Currency"), cur));
@@ -323,18 +418,18 @@
 
             // People — a heading plus a visible role on each name, so it is clear
             // who the names belong to (the role used to be a hover title only).
-            var $people = $('<div class="MPC-vasrq-srcPeople"></div>');
+            var $people = $('<div class="vas_098-srcPeople"></div>');
             appendPersonBit($people, data.RequesterName, msg("Requester"));
             appendPersonBit($people, data.PreparerName, msg("Preparer"));
             if ($people.children().length) {
-                $l.append($('<div class="MPC-vasrq-fLabel MPC-vasrq-peopleLbl"></div>')
+                $l.append($('<div class="vas_098-fLabel vas_098-peopleLbl"></div>')
                     .text(msg("People", "People")));
                 $l.append($people);
             }
             $card.append($l);
 
             // Right: labelled meta fields.
-            var $r = $('<div class="MPC-vasrq-hdrColR"></div>');
+            var $r = $('<div class="vas_098-hdrColR"></div>');
             $r.append(headerField(msg("ProcurementType"), procurementType()));
             $r.append(headerField(msg("PriceList"), data.PriceListName || msg("NA")));
             $r.append(headerField(msg("RequestWarehouse"), data.RequestWarehouseName || msg("NA")));
@@ -353,10 +448,10 @@
         // ambiguous about which of the two it is.
         function appendPersonBit($container, value, role) {
             if (!value) return;
-            var $bit = $('<span class="MPC-vasrq-personBit"></span>').attr("title", role + ": " + value);
+            var $bit = $('<span class="vas_098-personBit"></span>').attr("title", role + ": " + value);
             $bit.append(svgIcon("user"));
-            $bit.append($('<span class="MPC-vasrq-personRole"></span>').text(role));
-            $bit.append($('<span class="MPC-vasrq-personName"></span>').text(value));
+            $bit.append($('<span class="vas_098-personRole"></span>').text(role));
+            $bit.append($('<span class="vas_098-personName"></span>').text(value));
             $container.append($bit);
         }
 
@@ -372,9 +467,9 @@
 
         // Labelled field block (uppercase caption + value) for the right column.
         function headerField(label, value) {
-            var $f = $('<div class="MPC-vasrq-hdrField"></div>');
-            $f.append($('<div class="MPC-vasrq-fLabel"></div>').text(label));
-            $f.append($('<div class="MPC-vasrq-fVal"></div>').text(value));
+            var $f = $('<div class="vas_098-hdrField"></div>');
+            $f.append($('<div class="vas_098-fLabel"></div>').text(label));
+            $f.append($('<div class="vas_098-fVal"></div>').text(value));
             return $f;
         }
 
@@ -383,7 +478,7 @@
         function renderConvert() {
             var canConvert = data.StatusCode === "CO" && !data.IsConverted;
 
-            var $strip = $('<div class="MPC-vasrq-convert"></div>');
+            var $strip = $('<div class="vas_098-convert"></div>');
 
             var noteText, noteOk = false;
             if (data.IsConverted) {
@@ -397,8 +492,8 @@
                 noteText = msg("ConversionAvailable");
             }
 
-            var $note = $('<span class="MPC-vasrq-cvnote"></span>');
-            if (noteOk) $note.append($('<span class="MPC-vasrq-ok"></span>').append(svgIcon("check")));
+            var $note = $('<span class="vas_098-cvnote"></span>');
+            if (noteOk) $note.append($('<span class="vas_098-ok"></span>').append(svgIcon("check")));
             $note.append(document.createTextNode(noteText));
             $strip.append($note);
 
@@ -413,7 +508,7 @@
             // Button labels name the target document only — the "Convert to" /
             // "Create" verb has been dropped from each. New message keys are used
             // so the old seeded ConvertTo* / CreateRFQ text does not resurface.
-            var $actions = $('<div class="MPC-vasrq-cvactions"></div>');
+            var $actions = $('<div class="vas_098-cvactions"></div>');
             $actions.append(convertBtn(msg("MaterialTransfer", "Material Transfer"), "transfer", "primary",
                 canConvert, "ConvertToMaterialTransfer",
                 msg("ConfirmMaterialTransfer",
@@ -435,7 +530,7 @@
         // panel so the status, progress stepper and button states reflect the
         // result. Disabled buttons carry a reason as a tooltip.
         function convertBtn(label, icon, variant, enabled, endpoint, confirmText) {
-            var $b = $('<button type="button" class="MPC-vasrq-btn"></button>').addClass(variant);
+            var $b = $('<button type="button" class="vas_098-btn"></button>').addClass(variant);
             $b.append(svgIcon(icon));
             $b.append(document.createTextNode(label));
 
@@ -489,7 +584,7 @@
 
         // Lightweight self-contained toast.
         function toast(message, isError) {
-            var $t = $('<div class="MPC-vasrq-toast"></div>')
+            var $t = $('<div class="vas_098-toast"></div>')
                 .addClass(isError ? "err" : "ok").text(message);
             $root.append($t);
             setTimeout(function () { $t.addClass("show"); }, 10);
@@ -502,13 +597,13 @@
         // -------------------------- Stat strip --------------------------- //
 
         function renderStats() {
-            var $strip = $('<div class="MPC-vasrq-stats"></div>');
+            var $strip = $('<div class="vas_098-stats"></div>');
 
             // Estimated value (breach-aware)
             var $s1 = statCard(data.IsBudgetBreach ? "breach" : "a-blue", msg("EstimatedValue"));
-            var $v1 = $('<div class="MPC-vasrq-sval"></div>').text(money(data.EstimatedValue));
+            var $v1 = $('<div class="vas_098-sval"></div>').text(money(data.EstimatedValue));
             if (data.IsBudgetBreach) {
-                $v1.append($('<span class="MPC-vasrq-breachic"></span>')
+                $v1.append($('<span class="vas_098-breachic"></span>')
                     .attr("title", msg("BudgetBreached")).append(svgIcon("warn")));
             }
             $s1.append($v1);
@@ -517,13 +612,13 @@
 
             // Required by
             var $s2 = statCard("a-violet", msg("RequiredBy"));
-            $s2.append($('<div class="MPC-vasrq-sval"></div>').text(formatDate(data.DateRequired) || msg("NA")));
+            $s2.append($('<div class="vas_098-sval"></div>').text(formatDate(data.DateRequired) || msg("NA")));
             $s2.append(statSub(requiredSubText(), ""));
             $strip.append($s2);
 
             // Line items
             var $s3 = statCard("a-green", msg("LineItems"));
-            $s3.append($('<div class="MPC-vasrq-sval"></div>').text((data.LineCount || 0) + " " + msg("Lines")));
+            $s3.append($('<div class="vas_098-sval"></div>').text((data.LineCount || 0) + " " + msg("Lines")));
             $s3.append(statSub(formatNumber(data.RequestedUnits) + " " + msg("UnitsRequested"), ""));
             $strip.append($s3);
 
@@ -532,7 +627,7 @@
             // only external procurement, which has no source warehouse, reads N/A.
             var $s4 = statCard("a-amber", msg("SourceAvailability"));
             if (data.HasSourceData) {
-                $s4.append($('<div class="MPC-vasrq-sval"></div>')
+                $s4.append($('<div class="vas_098-sval"></div>')
                     .text(formatNumber(data.SourceStockOnHand || 0)));
                 $s4.append(statSub(
                     msg("OnHandAtSource", "on hand") +
@@ -540,7 +635,7 @@
                     " · " + (data.FullyInStockLines || 0) + " / " + (data.LineCount || 0) + " " +
                     msg("LinesFullyInStock"), ""));
             } else {
-                $s4.append($('<div class="MPC-vasrq-sval"></div>').text(msg("NA")));
+                $s4.append($('<div class="vas_098-sval"></div>').text(msg("NA")));
                 $s4.append(statSub(msg("SourceStockNA"), ""));
             }
             $strip.append($s4);
@@ -549,13 +644,13 @@
         }
 
         function statCard(accent, cap) {
-            var $s = $('<div class="MPC-vasrq-stat"></div>').addClass(accent);
-            $s.append($('<div class="MPC-vasrq-scap"></div>').text(cap));
+            var $s = $('<div class="vas_098-stat"></div>').addClass(accent);
+            $s.append($('<div class="vas_098-scap"></div>').text(cap));
             return $s;
         }
 
         function statSub(text, cls) {
-            return $('<div class="MPC-vasrq-ssub"></div>').addClass(cls || "").text(text);
+            return $('<div class="vas_098-ssub"></div>').addClass(cls || "").text(text);
         }
 
         function budgetSubText() {
@@ -622,13 +717,13 @@
             for (var k = 0; k < reached.length; k++) { if (reached[k]) current = k + 1; }
 
             var st = statusMeta();
-            var $sh = $('<div class="MPC-vasrq-sechead"></div>');
+            var $sh = $('<div class="vas_098-sechead"></div>');
             $sh.append($('<h2></h2>').text(msg("RequisitionProgress")));
-            $sh.append($('<span class="MPC-vasrq-secright"></span>').text(
+            $sh.append($('<span class="vas_098-secright"></span>').text(
                 msg("Stage") + " " + current + " " + msg("Of") + " " + stages.length + " · " + st.label));
             $body.append($sh);
 
-            var $stepper = $('<div class="MPC-vasrq-stepper"></div>');
+            var $stepper = $('<div class="vas_098-stepper"></div>');
             for (var s = 0; s < stages.length; s++) {
                 var stg = stages[s];
                 var stateCls, sub, showCheck;
@@ -647,12 +742,12 @@
         }
 
         function stepEntry(num, stg, stateCls, showCheck, sub) {
-            var $step = $('<div class="MPC-vasrq-step"></div>').addClass(stateCls).addClass(stg.key);
-            var $node = $('<div class="MPC-vasrq-node"></div>');
+            var $step = $('<div class="vas_098-step"></div>').addClass(stateCls).addClass(stg.key);
+            var $node = $('<div class="vas_098-node"></div>');
             if (showCheck) $node.append(svgIcon("check")); else $node.text(num);
             $step.append($node);
-            $step.append($('<div class="MPC-vasrq-slabel"></div>').text(stg.label));
-            if (sub) $step.append($('<div class="MPC-vasrq-ssub2"></div>').text(sub));
+            $step.append($('<div class="vas_098-slabel"></div>').text(stg.label));
+            if (sub) $step.append($('<div class="vas_098-ssub2"></div>').text(sub));
             return $step;
         }
 
@@ -677,9 +772,9 @@
 
         // Section header: title on the left, optional summary on the right.
         function sectionHead(title, summary) {
-            var $sh = $('<div class="MPC-vasrq-sechead MPC-vasrq-lowerhead"></div>');
+            var $sh = $('<div class="vas_098-sechead vas_098-lowerhead"></div>');
             $sh.append($('<h2></h2>').text(title));
-            if (summary) $sh.append($('<span class="MPC-vasrq-secright"></span>').text(summary));
+            if (summary) $sh.append($('<span class="vas_098-secright"></span>').text(summary));
             $body.append($sh);
             return $sh;
         }
@@ -687,10 +782,10 @@
         // ---- Items ---- //
 
         function renderItemsPanel(lines) {
-            var $panel = $('<div class="MPC-vasrq-lowersec"></div>');
-            var $items = $('<div class="MPC-vasrq-items"></div>');
+            var $panel = $('<div class="vas_098-lowersec"></div>');
+            var $items = $('<div class="vas_098-items"></div>');
 
-            var $head = $('<div class="MPC-vasrq-itrow MPC-vasrq-ithead"></div>');
+            var $head = $('<div class="vas_098-itrow vas_098-ithead"></div>');
             $head.append($('<span></span>').text(msg("Item")));
             $head.append($('<span></span>').text(msg("UOM", "UOM")));
             $head.append($('<span class="ta-c"></span>').text(msg("Qty")));
@@ -700,7 +795,7 @@
             $items.append($head);
 
             if (!lines.length) {
-                $items.append($('<div class="MPC-vasrq-itempty"></div>').text(msg("NoLineItems")));
+                $items.append($('<div class="vas_098-itempty"></div>').text(msg("NoLineItems")));
                 $panel.append($items);
                 return $panel;
             }
@@ -713,7 +808,7 @@
             // The pager sits outside the items box: that box takes its own
             // horizontal scroll on narrow panels and the controls must not scroll
             // away with the columns.
-            var $pager = $('<div class="MPC-vasrq-pager"></div>');
+            var $pager = $('<div class="vas_098-pager"></div>');
             if (lines.length > LINES_PER_PAGE) $panel.append($pager);
 
             // Rows are replaced in place, ahead of the footer, so the table's
@@ -726,10 +821,11 @@
                 var start = linesPage * LINES_PER_PAGE;
                 var end = Math.min(lines.length, start + LINES_PER_PAGE);
 
-                $items.find(".MPC-vasrq-itbody").remove();
+                $items.find(".vas_098-itbody").remove();
                 for (var i = start; i < end; i++) $foot.before(itemRow(lines[i]));
 
-                buildPager($pager, lines.length, pageCount, start, end, paintPage);
+                buildPager($pager, linesPage, pageCount, lines.length, start, end,
+                    function (p) { linesPage = p; paintPage(); });
             }
 
             paintPage();
@@ -738,27 +834,32 @@
 
         // Range caption on the left, Previous / page-of / Next on the right.
         // Rebuilt on every page change so the disabled states stay accurate.
-        function buildPager($pager, total, pageCount, start, end, onChange) {
+        //
+        // `page` is the 0-based page being shown and `onGo` is handed the page to
+        // move to, so each paged section owns its own page variable — the line
+        // items and the activity feed page independently of one another. Nothing
+        // is drawn for a single-page list, so a short section shows no controls.
+        function buildPager($pager, page, pageCount, total, start, end, onGo) {
             $pager.empty();
-            if (total <= LINES_PER_PAGE) return;
+            if (pageCount <= 1) return;
 
-            $pager.append($('<span class="MPC-vasrq-pgRange"></span>').text(
+            $pager.append($('<span class="vas_098-pgRange"></span>').text(
                 msg("Showing", "Showing") + " " + (start + 1) + "-" + end + " " +
                 msg("Of") + " " + total));
 
-            var $ctrls = $('<span class="MPC-vasrq-pgCtrls"></span>');
+            var $ctrls = $('<span class="vas_098-pgCtrls"></span>');
             $ctrls.append(pagerButton(msg("Previous", "Previous"), "chevLeft",
-                linesPage <= 0, function () { linesPage--; onChange(); }));
-            $ctrls.append($('<span class="MPC-vasrq-pgPos"></span>').text(
-                msg("Page", "Page") + " " + (linesPage + 1) + " " +
+                page <= 0, function () { onGo(page - 1); }));
+            $ctrls.append($('<span class="vas_098-pgPos"></span>').text(
+                msg("Page", "Page") + " " + (page + 1) + " " +
                 msg("Of") + " " + pageCount));
             $ctrls.append(pagerButton(msg("Next", "Next"), "chevRight",
-                linesPage >= pageCount - 1, function () { linesPage++; onChange(); }));
+                page >= pageCount - 1, function () { onGo(page + 1); }));
             $pager.append($ctrls);
         }
 
         function pagerButton(label, icon, disabled, handler) {
-            var $b = $('<span class="MPC-vasrq-pgBtn"></span>');
+            var $b = $('<span class="vas_098-pgBtn"></span>');
             if (icon === "chevLeft") $b.append(svgIcon(icon));
             $b.append($('<span></span>').text(label));
             if (icon === "chevRight") $b.append(svgIcon(icon));
@@ -768,29 +869,29 @@
         }
 
         function itemRow(ln) {
-            var $r = $('<div class="MPC-vasrq-itrow MPC-vasrq-itbody"></div>');
+            var $r = $('<div class="vas_098-itrow vas_098-itbody"></div>');
 
             var $item = $('<span></span>');
             var pname = ln.ProductName || msg("NA");
-            $item.append($('<div class="MPC-vasrq-itname"></div>').text(pname).attr("title", pname));
+            $item.append($('<div class="vas_098-itname"></div>').text(pname).attr("title", pname));
             // Product search key, shown without the former "SKU" prefix.
             if (ln.ProductValue) {
-                $item.append($('<div class="MPC-vasrq-itsku"></div>').text(ln.ProductValue));
+                $item.append($('<div class="vas_098-itsku"></div>').text(ln.ProductValue));
             } else if (ln.Description) {
-                $item.append($('<div class="MPC-vasrq-itsku"></div>').text(ln.Description));
+                $item.append($('<div class="vas_098-itsku"></div>').text(ln.Description));
             }
             // Attribute Set Instance (lot / serial / size ...), only when the line
             // carries a real instance — a blank or "--" placeholder is not shown.
             var asi = (ln.AttributeSetInstance || "").trim();
             if (asi && asi !== "--" && asi !== "-") {
-                $item.append($('<div class="MPC-vasrq-itattr"></div>').text(asi).attr("title", asi));
+                $item.append($('<div class="vas_098-itattr"></div>').text(asi).attr("title", asi));
             }
             $r.append($item);
 
             // Unit of measure (replaced the product category column).
             var $uom = $('<span></span>');
-            if (ln.UOMName) $uom.append($('<span class="MPC-vasrq-uom"></span>').text(ln.UOMName));
-            else $uom.append($('<span class="MPC-vasrq-na"></span>').text(msg("NA")));
+            if (ln.UOMName) $uom.append($('<span class="vas_098-uom"></span>').text(ln.UOMName));
+            else $uom.append($('<span class="vas_098-na"></span>').text(msg("NA")));
             $r.append($uom);
 
             $r.append($('<span class="ta-c"></span>').text(formatNumber(ln.RequestedQty, ln.UOMPrecision)));
@@ -808,17 +909,17 @@
         function sourceCell(ln) {
             var $c = $('<span class="ta-r"></span>');
             if (!ln.HasSourceData) {
-                $c.append($('<span class="MPC-vasrq-na"></span>').text(msg("NA")));
+                $c.append($('<span class="vas_098-na"></span>').text(msg("NA")));
                 return $c;
             }
             var req = +ln.RequestedQty || 0;
             var onHand = +ln.SourceQtyOnHand || 0;
             var pct = req > 0 ? Math.round((onHand / req) * 100) : (onHand > 0 ? 100 : 0);
             var cls = (req > 0 && onHand >= req) ? "full" : "short";
-            var $src = $('<span class="MPC-vasrq-src"></span>').addClass(cls);
+            var $src = $('<span class="vas_098-src"></span>').addClass(cls);
             $src.attr("title", msg("OnHandAtSource", "on hand") +
                 (data.SourceWarehouseName ? " · " + data.SourceWarehouseName : ""));
-            var $bar = $('<span class="MPC-vasrq-bar"><i></i></span>');
+            var $bar = $('<span class="vas_098-bar"><i></i></span>');
             $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
             $src.append($bar);
             $src.append(document.createTextNode(
@@ -828,7 +929,7 @@
         }
 
         function itemsFooter() {
-            var $f = $('<div class="MPC-vasrq-itfoot"></div>');
+            var $f = $('<div class="vas_098-itfoot"></div>');
             // Budget set for the requisition (VAS_AvailableBudget, written by the
             // "Calculate Budget" process) sits where the subtotal used to, so the
             // estimate can be read straight against it. N/A when no budget has been
@@ -840,7 +941,7 @@
         }
 
         function footBit(label, value, grand) {
-            var $b = $('<span></span>').addClass(grand ? "MPC-vasrq-grand" : "MPC-vasrq-tf");
+            var $b = $('<span></span>').addClass(grand ? "vas_098-grand" : "vas_098-tf");
             $b.append(document.createTextNode(label));
             $b.append($('<b></b>').text(value));
             return $b;
@@ -860,30 +961,58 @@
             grncomplete: { cls: "grn", key: "ActGRNComplete", fallback: "GRN" }
         };
 
+        // Maximum activity rows shown per page; the feed paginates beyond this.
+        // A requisition accumulates every status change and every downstream PO /
+        // GRN, and an unpaged feed made the panel scroll past everything below it.
+        var ACTIVITY_PER_PAGE = 15;
+
         function renderActivityPanel(activity) {
-            var $panel = $('<div class="MPC-vasrq-lowersec"></div>');
-            var $card = $('<div class="MPC-vasrq-panelcard"></div>');
+            var $panel = $('<div class="vas_098-lowersec"></div>');
+            var $card = $('<div class="vas_098-panelcard"></div>');
 
             if (!activity.length) {
-                $card.append($('<div class="MPC-vasrq-itempty"></div>').text(msg("NoActivity")));
-            } else {
-                for (var i = 0; i < activity.length; i++) $card.append(activityRow(activity[i]));
+                $card.append($('<div class="vas_098-itempty"></div>').text(msg("NoActivity")));
+                $panel.append($card);
+                return $panel;
             }
+
             $panel.append($card);
+
+            // The pager is a sibling of the card, exactly as the line-items pager
+            // is a sibling of its items box.
+            var $pager = $('<div class="vas_098-pager"></div>');
+            if (activity.length > ACTIVITY_PER_PAGE) $panel.append($pager);
+
+            function paintPage() {
+                var pageCount = Math.max(1, Math.ceil(activity.length / ACTIVITY_PER_PAGE));
+                if (activityPage >= pageCount) activityPage = pageCount - 1;
+                if (activityPage < 0) activityPage = 0;
+
+                var start = activityPage * ACTIVITY_PER_PAGE;
+                var end = Math.min(activity.length, start + ACTIVITY_PER_PAGE);
+
+                $card.empty();
+                for (var i = start; i < end; i++) $card.append(activityRow(activity[i]));
+
+                buildPager($pager, activityPage, pageCount, activity.length, start, end,
+                    function (p) { activityPage = p; paintPage(); });
+            }
+
+            paintPage();
             return $panel;
         }
 
         function activityRow(a) {
             var meta = ACT_BADGE[a.Type] || ACT_BADGE.comment;
-            var $row = $('<div class="MPC-vasrq-actrow"></div>');
+            var $row = $('<div class="vas_098-actrow"></div>');
 
-            $row.append($('<span class="MPC-vasrq-actbadge"></span>')
+            $row.append($('<span class="vas_098-actbadge"></span>')
                 .addClass(meta.cls).text(msg(meta.key, meta.fallback)));
 
-            var $main = $('<div class="MPC-vasrq-actmain"></div>');
-            var $wrap = $('<div class="MPC-vasrq-atwrap"></div>');
-            $wrap.append($('<span class="MPC-vasrq-at"></span>').text(activityText(a)));
-            $wrap.append($('<span class="MPC-vasrq-attime"></span>').text(formatDateTime(a.Created)));
+            var $main = $('<div class="vas_098-actmain"></div>');
+            var $wrap = $('<div class="vas_098-atwrap"></div>');
+            $wrap.append($('<span class="vas_098-at"></span>').text(activityText(a)));
+            $wrap.append($('<span class="vas_098-attime"></span>').text(formatDateTime(a.Created)));
             $main.append($wrap);
             $row.append($main);
             return $row;
@@ -914,10 +1043,10 @@
         // ---- Notes ---- //
 
         function renderNotesPanel() {
-            var $panel = $('<div class="MPC-vasrq-lowersec"></div>');
-            var $card = $('<div class="MPC-vasrq-panelcard MPC-vasrq-notescard"></div>');
+            var $panel = $('<div class="vas_098-lowersec"></div>');
+            var $card = $('<div class="vas_098-panelcard vas_098-notescard"></div>');
 
-            var $notes = $('<div class="MPC-vasrq-notesbody"></div>');
+            var $notes = $('<div class="vas_098-notesbody"></div>');
             var text = data.Description;
             if (text) {
                 var paras = String(text).split(/\r?\n+/);
@@ -926,7 +1055,7 @@
                     if (t) $notes.append($('<p></p>').text(t));
                 }
             }
-            if (!$notes.children().length) $notes.append($('<p class="MPC-vasrq-na"></p>').text(msg("NoNotes")));
+            if (!$notes.children().length) $notes.append($('<p class="vas_098-na"></p>').text(msg("NoNotes")));
             $card.append($notes);
 
             $panel.append($card);
@@ -953,7 +1082,7 @@
         };
 
         function svgIcon(name) {
-            var $wrap = $('<span class="MPC-vasrq-ic"></span>');
+            var $wrap = $('<span class="vas_098-ic"></span>');
             $wrap[0].innerHTML = SVG_ICONS[name] || "";
             return $wrap;
         }
@@ -1043,11 +1172,21 @@
             this.table_ID = curTab.getAD_Table_ID();
         }
         this.init();
+        // Watch the tab itself so New Record / Copy Record (neither of which
+        // reliably calls refreshPanelData) still empty the panel.
+        if (curTab && typeof curTab.addDataStatusListener === "function") {
+            try { curTab.addDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
     };
 
     /* Update tab panel based on selected record */
     VAS.VAS_098_PurchaseRequisition.prototype.refreshPanelData = function (recordID, selectedRow) {
-        if (selectedRow == undefined || recordID <= 0) {
+        // The insert check is what makes New Record / Copy Record behave:
+        // the id handed in for an unsaved row can still be the previously
+        // selected (or copied-from) record's, so the tab's own insert state
+        // decides, not the id.
+        if (selectedRow == undefined || recordID <= 0 || isTabInserting(this.curTab)) {
+            this.record_ID = 0;
             this.clear();
             return;
         }
@@ -1063,6 +1202,10 @@
 
     /* Release variables from memory */
     VAS.VAS_098_PurchaseRequisition.prototype.dispose = function () {
+        if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
+            try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
+        this.tabDataListener = null;
         this.record_ID = 0;
         this.table_ID = 0;
         this.windowNo = 0;

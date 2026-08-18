@@ -92,11 +92,13 @@ namespace VASLogic.Models
                        Payment.TenderType AS Tender_Type,
                        Payment.IsReceipt AS Is_Receipt,
                        COALESCE(Payment.Description, Payment.CheckNo) AS Payment_Reference,
-                       Invoice.DocumentNo AS Direct_Invoice_Document_No
+                       Invoice.DocumentNo AS Direct_Invoice_Document_No,
+                       PM.VA009_Name AS Payment_Method_Name
                 FROM C_Payment Payment
                 INNER JOIN C_Currency Currency ON (Payment.C_Currency_ID=Currency.C_Currency_ID)
                 INNER JOIN C_BankAccount BankAccount ON (Payment.C_BankAccount_ID=BankAccount.C_BankAccount_ID)
                 INNER JOIN C_Bank Bank ON (BankAccount.C_Bank_ID=Bank.C_Bank_ID)
+                INNER JOIN VA009_PaymentMethod PM ON (Payment.VA009_PaymentMethod_ID=PM.VA009_PaymentMethod_ID)
                 LEFT OUTER JOIN C_BPartner BPartner ON (Payment.C_BPartner_ID=BPartner.C_BPartner_ID)
                 LEFT OUTER JOIN C_Invoice Invoice ON (Payment.C_Invoice_ID=Invoice.C_Invoice_ID)
                 WHERE Payment.IsReceipt = 'Y'
@@ -144,6 +146,7 @@ namespace VASLogic.Models
                        Receipts.Tender_Type,
                        Receipts.Is_Receipt,
                        Receipts.Payment_Reference,
+                       Receipts.Payment_Method_Name,
                        COALESCE(
                            Receipts.Direct_Invoice_Document_No,
                            (
@@ -200,7 +203,8 @@ namespace VASLogic.Models
                         IsReceipt = Util.GetValueOfString(dr["Is_Receipt"]) == "Y",
                         TenderType = Util.GetValueOfString(dr["Tender_Type"]),
                         Reference = Util.GetValueOfString(dr["Payment_Reference"]),
-                        InvoiceDocumentNo = Util.GetValueOfString(dr["Invoice_Document_No"])
+                        InvoiceDocumentNo = Util.GetValueOfString(dr["Invoice_Document_No"]),
+                        PaymentMethodName = Util.GetValueOfString(dr["Payment_Method_Name"])
                     });
                 }
             }
@@ -257,12 +261,14 @@ namespace VASLogic.Models
                        BankAccount.AccountNo AS Account_No,
                        Currency.ISO_Code AS Currency_ISO,
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Cur_Symbol,
-                       Currency.StdPrecision AS Std_Precision
+                       Currency.StdPrecision AS Std_Precision,
+                       PM.VA009_Name AS Payment_Method_Name
                 FROM C_Payment Payment
                 INNER JOIN C_Currency Currency ON (Payment.C_Currency_ID=Currency.C_Currency_ID)
                 INNER JOIN C_BankAccount BankAccount ON (Payment.C_BankAccount_ID=BankAccount.C_BankAccount_ID)
                 INNER JOIN C_Bank Bank ON (BankAccount.C_Bank_ID=Bank.C_Bank_ID)
-                LEFT OUTER JOIN C_BPartner BPartner ON (Payment.C_BPartner_ID=BPartner.C_BPartner_ID)
+                INNER JOIN VA009_PaymentMethod PM ON (Payment.VA009_PaymentMethod_ID=PM.VA009_PaymentMethod_ID)
+                LEFT OUTER JOIN C_BPartner BPartner ON (Payment.C_BPartner_ID=BPartner.C_BPartner_ID)  
                 WHERE Payment.C_Payment_ID = @C_Payment_ID
                   AND Payment.AD_Client_ID = " + clientId;
 
@@ -311,6 +317,7 @@ namespace VASLogic.Models
                     detail.IsAllocated = Util.GetValueOfString(hdr["Is_Allocated"]) == "Y";
                     detail.IsReceipt = Util.GetValueOfString(hdr["Is_Receipt"]) == "Y";
                     detail.TenderType = Util.GetValueOfString(hdr["Tender_Type"]);
+                    detail.PaymentMethodName = Util.GetValueOfString(hdr["Payment_Method_Name"]);
                     detail.Reference = Util.GetValueOfString(hdr["Payment_Reference"]);
                 }
             }
@@ -341,6 +348,7 @@ namespace VASLogic.Models
                isn't confused by a trailing clause. */
             string lineSql = @"
                 SELECT AllocLine.C_AllocationLine_ID AS Alloc_Line_ID,
+                       AllocHdr.C_AllocationHdr_ID AS Alloc_Hdr_ID,
                        AllocHdr.DocumentNo AS Alloc_Document_No,
                        AllocHdr.DateAcct AS Alloc_Date,
                        AllocHdr.DocStatus AS Alloc_Doc_Status,
@@ -459,6 +467,7 @@ namespace VASLogic.Models
                     detail.Lines.Add(new ReceiptAllocationLine
                     {
                         AllocationLineId = Util.GetValueOfInt(ld["Alloc_Line_ID"]),
+                        AllocationHdrId = Util.GetValueOfInt(ld["Alloc_Hdr_ID"]),
                         AllocationDocumentNo = Util.GetValueOfString(ld["Alloc_Document_No"]),
                         AllocationDate = allocDate.HasValue
                             ? allocDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
@@ -593,6 +602,7 @@ namespace VASLogic.Models
             public string TenderType { get; set; }
             public string Reference { get; set; }
             public string InvoiceDocumentNo { get; set; }
+            public string PaymentMethodName { get; set; }   
         }
 
         public class ReceiptAllocationDetail
@@ -612,6 +622,8 @@ namespace VASLogic.Models
             public bool IsAllocated { get; set; }
             public bool IsReceipt { get; set; }
             public string TenderType { get; set; }
+            /// <summary>VA009_PaymentMethod.Name — what the modal shows as the payment method.</summary>
+            public string PaymentMethodName { get; set; }
             public string Reference { get; set; }
             public List<ReceiptAllocationLine> Lines { get; set; }
         }
@@ -619,6 +631,9 @@ namespace VASLogic.Models
         public class ReceiptAllocationLine
         {
             public int AllocationLineId { get; set; }
+            /* Allocation header the line belongs to — the record the
+               Allocation No. column zooms to (window VAS_ViewAllocation). */
+            public int AllocationHdrId { get; set; }
             public string AllocationDocumentNo { get; set; }
             public string AllocationDate { get; set; }
             public string AllocationDocStatus { get; set; }

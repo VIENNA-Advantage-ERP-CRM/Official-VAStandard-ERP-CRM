@@ -43,6 +43,34 @@
 ///               formatting — all formatting happens on the client.
 /// Chronological development:
 ///   VAI163   2026-07-30  Created
+///   VAI163   2026-08-04  Surfaced DefaultConversionTypeId — the rate type a new
+///                        entry comes up on. It is Spot (C_ConversionType.Value
+///                        = 'S', or a rate type named Spot) resolved against the
+///                        tenant's own rows, falling back to the client's default
+///                        rate type in the platform's own order (IsDefault first,
+///                        tenant rows before system rows). The Value column is
+///                        read only where the dictionary carries it.
+///   VAI163   2026-08-04  Entries are writable until the order is COMPLETED, not
+///                        only while it is drafted: IsEditableStatus / IsEditable
+///                        replace the drafted-only test on both the read payload
+///                        and the write guard, locking on CO / CL / VO / RE. The
+///                        generated distribution lines now carry the order line's
+///                        Attribute Set Instance description.
+///   VAI163   2026-08-04  Added the origins the order was raised from — the
+///                        contract (LoadContractReference /
+///                        C_Order.VAS_ContractMaster_ID, read under its own guard
+///                        as the module column it is) and the RFQ
+///                        (LoadRfqReference / C_RfQResponse.C_Order_ID, its
+///                        identifier chosen under a DocumentNo column guard) and
+///                        the project (LoadProjectReference /
+///                        C_ProjectLine.C_OrderPO_ID) and the requisition
+///                        (LoadRequisitionReference /
+///                        M_RequisitionLine.C_OrderLine_ID, walking
+///                        Requisition -> RFQ -> PO when there is no direct link)
+///                        — and GetWindowId, which resolves an AD_Window_ID from
+///                        a window NAME so the panel can open each of them in its
+///                        own window (VAS_ContractMaster / VAS_RFQ / VAS_Project
+///                        / VAS_Requisition).
 /// </summary>
 
 using System;
@@ -64,11 +92,37 @@ namespace VASLogic.Models
 
         #region Constants
 
-        /// <summary>Drafted document status — the only status this panel may write in.</summary>
+        /// <summary>Drafted document status.</summary>
         private const string DOCSTATUS_Drafted = "DR";
 
         /// <summary>Completed document status — entries and their lines are frozen.</summary>
         private const string DOCSTATUS_Completed = "CO";
+
+        /// <summary>
+        /// The document statuses that freeze the expected landed cost. Everything
+        /// before completion — drafted, in progress, invalid, waiting, not
+        /// approved — is still editable: the platform generates the distribution
+        /// lines when the order is completed, so an entry only becomes the
+        /// platform's own output at that point. Closed / voided / reversed orders
+        /// are past that point and are locked with completed ones.
+        /// </summary>
+        private static readonly string[] DOCSTATUS_Locked =
+            new string[] { DOCSTATUS_Completed, "CL", "VO", "RE" };
+
+        /// <summary>
+        /// True while the order's expected landed cost may still be changed —
+        /// any status that is not one of <see cref="DOCSTATUS_Locked"/>. An order
+        /// with no status at all is treated as locked.
+        /// </summary>
+        private static bool IsEditableStatus(string docStatus)
+        {
+            if (string.IsNullOrEmpty(docStatus)) return false;
+            for (int i = 0; i < DOCSTATUS_Locked.Length; i++)
+            {
+                if (DOCSTATUS_Locked[i] == docStatus) return false;
+            }
+            return true;
+        }
 
         /// <summary>
         /// The C_LandedCostDistribution values this panel exposes. The reference
@@ -151,10 +205,11 @@ namespace VASLogic.Models
             result.DocumentCurrencySymbol   = Util.GetValueOfString(r["DocumentCurrencySymbol"]);
             result.DocumentCurrencyPrecision = Util.GetValueOfInt(r["DocumentCurrencyPrecision"]);
 
-            // Editable only while drafted — the client mirrors this, the write
-            // methods below re-check it against the database independently.
+            // Editable until the order is completed — the client mirrors this, the
+            // write methods below re-check it against the database independently.
             result.IsDrafted   = result.DocumentStatus == DOCSTATUS_Drafted;
             result.IsCompleted = result.DocumentStatus == DOCSTATUS_Completed;
+            result.IsEditable  = IsEditableStatus(result.DocumentStatus);
 
             int clientId = Util.GetValueOfInt(r["AD_Client_ID"]);
             int orgId    = Util.GetValueOfInt(r["AD_Org_ID"]);
@@ -163,6 +218,14 @@ namespace VASLogic.Models
             // panel can say "nothing to allocate against" instead of the reader
             // discovering it only when completion fails.
             result.EligibleLineCount = GetEligibleLineCount(C_Order_ID);
+
+            // ----- Origin references the order was raised from -----
+            LoadSalesOrderReference(C_Order_ID, result);
+            LoadContractReference(C_Order_ID, result);
+            LoadRfqReference(C_Order_ID, result);
+            LoadProjectReference(C_Order_ID, result);
+            // After the RFQ: a requisition reached only through it needs that id.
+            LoadRequisitionReference(C_Order_ID, result);
 
             // Reference-list labels for C_LandedCostDistribution, read once and
             // shared by the entry rows and the dropdown below.
@@ -191,6 +254,8 @@ namespace VASLogic.Models
             result.Currencies      = LoadCurrencies(clientId);
             result.ConversionTypes = LoadConversionTypes(clientId);
             result.Distributions   = LoadDistributions(distributionNames);
+            // The rate type a new entry comes up on (Spot where the tenant has it).
+            result.DefaultConversionTypeId = GetDefaultConversionTypeId(clientId);
 
             return result;
         }
@@ -371,6 +436,7 @@ namespace VASLogic.Models
                                   ol.Line                           AS LineNumber,
                                   p.Name                            AS ProductName,
                                   p.Value                           AS ProductCode,
+                                  asi.Description                   AS AttributeSetInstance,
                                   COALESCE(ecd.Base, 0)             AS AllocationBase,
                                   COALESCE(ecd.Qty, 0)              AS LineQuantity,
                                   COALESCE(ecd.Amt, 0)              AS AllocatedAmount
@@ -381,6 +447,12 @@ namespace VASLogic.Models
                                        ON (ol.C_OrderLine_ID = ecd.C_OrderLine_ID)
                                 INNER JOIN M_Product p
                                        ON (p.M_Product_ID = ol.M_Product_ID)
+                                -- Attribute Set Instance of the allocated line, and
+                                -- only a real one: the zero record carries a
+                                -- placeholder description that is not an attribute.
+                                LEFT OUTER JOIN M_AttributeSetInstance asi
+                                       ON (asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
+                                           AND ol.M_AttributeSetInstance_ID > 0)
                                 WHERE ec.C_Order_ID = @C_Order_ID
                                   AND COALESCE(ecd.IsActive, 'Y') = 'Y'
                                   AND COALESCE(ec.IsActive, 'Y')  = 'Y'
@@ -400,6 +472,7 @@ namespace VASLogic.Models
                     g.LineNumber          = Util.GetValueOfInt(r["LineNumber"]);
                     g.ProductName         = Util.GetValueOfString(r["ProductName"]);
                     g.ProductCode         = Util.GetValueOfString(r["ProductCode"]);
+                    g.AttributeSetInstance = Util.GetValueOfString(r["AttributeSetInstance"]);
                     g.AllocationBase      = Util.GetValueOfDecimal(r["AllocationBase"]);
                     g.LineQuantity        = Util.GetValueOfDecimal(r["LineQuantity"]);
                     g.AllocatedAmount     = Util.GetValueOfDecimal(r["AllocatedAmount"]);
@@ -493,6 +566,87 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// The rate type the form comes up on: Spot (C_ConversionType.Value = 'S'
+        /// in the platform's own seed), which is what a landed cost is normally
+        /// converted at. Where Spot cannot be identified — a tenant that renamed
+        /// or re-seeded its rate types — this falls back to the client's default
+        /// rate type, ordered exactly as the platform's own MConversionType
+        /// .GetDefault does (IsDefault first, tenant rows before system rows).
+        /// Returns 0 when there is nothing to preselect.
+        /// </summary>
+        private int GetDefaultConversionTypeId(int clientId)
+        {
+            try
+            {
+                // Value is the seed's stable code; it is read only where the
+                // column exists, so a schema without it still resolves a default.
+                string codeExpr = ColumnExists("C_ConversionType", "Value")
+                    ? "ct.Value" : "NULL";
+
+                string sql = @"SELECT ct.C_ConversionType_ID AS Id,
+                                      " + codeExpr + @"      AS Code,
+                                      ct.Name                AS Name
+                                 FROM C_ConversionType ct
+                                WHERE ct.IsActive = 'Y'
+                                  AND ct.AD_Client_ID IN (0, @AD_Client_ID)
+                                ORDER BY ct.IsDefault DESC, ct.AD_Client_ID DESC,
+                                         ct.C_ConversionType_ID";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID", clientId)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return 0;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    string code = Util.GetValueOfString(r["Code"]);
+                    string name = Util.GetValueOfString(r["Name"]);
+                    if (code == "S" ||
+                        (name != null && name.Trim().StartsWith("Spot",
+                            StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return Util.GetValueOfInt(r["Id"]);
+                    }
+                }
+                // No Spot: the client's default rate type (first row of the order).
+                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["Id"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetDefaultConversionTypeId (AD_Client_ID=" + clientId + "): " + ex.Message);
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// True when the column exists in the dictionary. Used to keep a query off
+        /// a column a given schema may not carry.
+        /// </summary>
+        private bool ColumnExists(string tableName, string columnName)
+        {
+            try
+            {
+                string sql = @"SELECT COUNT(*) FROM AD_Column
+                                WHERE UPPER(ColumnName) = UPPER(@ColumnName)
+                                  AND AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table
+                                                      WHERE UPPER(TableName) = UPPER(@TableName))";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@ColumnName", columnName),
+                    new SqlParameter("@TableName", tableName)
+                };
+                return Util.GetValueOfInt(DB.ExecuteScalar(sql, param, null)) > 0;
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("ColumnExists (" + tableName + "." + columnName + "): " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
         /// The cost distributions this panel exposes, read from the platform's own
         /// reference list (AD_Ref_List) behind C_ExpectedCost.LandedCostDistribution
         /// and narrowed to <see cref="ALLOWED_DISTRIBUTIONS"/>. Codes and labels are
@@ -511,6 +665,275 @@ namespace VASLogic.Models
                 list.Add(new LookupItemData { Code = code, Name = name });
             }
             return list;
+        }
+
+        /// <summary>
+        /// Reads the contract the order was raised under
+        /// (C_Order.VAS_ContractMaster_ID) so the panel can name it and open it.
+        ///
+        /// Read in two independent steps, as the Purchase Order Overview does:
+        /// (1) the id from C_Order alone, so a missing or unreadable
+        /// VAS_ContractMaster table cannot suppress the reference; (2) the human
+        /// DocumentNo enriched separately. The column is module-optional, so both
+        /// steps are guarded and a deployment without it simply shows no contract.
+        /// </summary>
+        private void LoadContractReference(int C_Order_ID, LandedCostPanelData d)
+        {
+            try
+            {
+                string sql = @"SELECT o.VAS_ContractMaster_ID AS ContractId
+                                 FROM C_Order o
+                                WHERE o.C_Order_ID = @C_Order_ID";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    d.ContractMasterId = Util.GetValueOfInt(ds.Tables[0].Rows[0]["ContractId"]);
+            }
+            catch (Exception ex)
+            {
+                // A deployment without the column reaches here; keep the panel
+                // working, just with no contract reference.
+                _log.Severe("LoadContractReference/Id (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+
+            if (d.ContractMasterId <= 0) return;
+
+            try
+            {
+                string sql = @"SELECT cm.DocumentNo AS ContractNo
+                                 FROM VAS_ContractMaster cm
+                                WHERE cm.VAS_ContractMaster_ID = @VAS_ContractMaster_ID";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@VAS_ContractMaster_ID", d.ContractMasterId)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    d.ContractMasterNo = Util.GetValueOfString(ds.Tables[0].Rows[0]["ContractNo"]);
+            }
+            catch (Exception ex)
+            {
+                // The number is a nicety; the reference still opens with its id.
+                _log.Severe("LoadContractReference/No (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Reads the request for quotation the order was raised from, so the panel
+        /// can name it and open it. RfQCreatePO writes the order back onto the
+        /// winning response (C_RfQResponse.C_Order_ID), so the response is what
+        /// ties the two together. C_RfQ carries Name always and DocumentNo only in
+        /// schemas that have it, so the identifier is chosen under a column guard.
+        /// Non-fatal: a failure just leaves the panel without the reference.
+        /// </summary>
+        private void LoadRfqReference(int C_Order_ID, LandedCostPanelData d)
+        {
+            try
+            {
+                string rfqNoExpr = ColumnExists("C_RfQ", "DocumentNo")
+                    ? "NVL(rq.DocumentNo, rq.Name)"
+                    : "rq.Name";
+
+                string sql = @"SELECT rq.C_RfQ_ID        AS RfqId,
+                                      " + rfqNoExpr + @" AS RfqNo
+                                 FROM C_RfQResponse rr
+                                 INNER JOIN C_RfQ rq ON (rq.C_RfQ_ID = rr.C_RfQ_ID)
+                                WHERE rr.C_Order_ID = @C_Order_ID
+                                  AND NVL(rr.IsActive, 'Y') = 'Y'
+                                  AND NVL(rq.IsActive, 'Y') = 'Y'
+                                GROUP BY rq.C_RfQ_ID, " + rfqNoExpr + @"
+                                ORDER BY rq.C_RfQ_ID";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                d.RfqId = Util.GetValueOfInt(r["RfqId"]);
+                d.RfqNo = Util.GetValueOfString(r["RfqNo"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadRfqReference (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Reads the project the order was generated for, so the panel can name it
+        /// and open it. ProjectGenPO stamps the order onto the project line it
+        /// raised (C_ProjectLine.C_OrderPO_ID), so that column is the link. The
+        /// project is identified by its Value, falling back to its Name.
+        /// Non-fatal: a failure just leaves the panel without the reference.
+        /// </summary>
+        private void LoadProjectReference(int C_Order_ID, LandedCostPanelData d)
+        {
+            try
+            {
+                string sql = @"SELECT pj.C_Project_ID        AS ProjectId,
+                                      NVL(pj.Value, pj.Name) AS ProjectNo
+                                 FROM C_ProjectLine pl
+                                 INNER JOIN C_Project pj ON (pj.C_Project_ID = pl.C_Project_ID)
+                                WHERE pl.C_OrderPO_ID = @C_Order_ID
+                                  AND NVL(pl.IsActive, 'Y') = 'Y'
+                                  AND NVL(pj.IsActive, 'Y') = 'Y'
+                                GROUP BY pj.C_Project_ID, NVL(pj.Value, pj.Name)
+                                ORDER BY pj.C_Project_ID";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                d.ProjectId = Util.GetValueOfInt(r["ProjectId"]);
+                d.ProjectNo = Util.GetValueOfString(r["ProjectNo"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadProjectReference (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Reads the requisition the order was raised from, so the panel can name
+        /// it and open it. The direct path is the requisition line the order line
+        /// was converted from (M_RequisitionLine.C_OrderLine_ID). A PO raised from
+        /// an RFQ has no such link of its own, so the chain
+        /// Requisition -> RFQ -> PO is walked through C_RfQ.M_Requisition_ID
+        /// instead — which is why this runs after <see cref="LoadRfqReference"/>.
+        /// Non-fatal: a failure just leaves the panel without the reference.
+        /// </summary>
+        // VAI163 2026-08-05: added LoadSalesOrderReference so the panel can name
+        // and open the sales order behind a PO raised from one.
+
+        /// <summary>
+        /// Reads the sales order this purchase order was raised against
+        /// (C_Order.Ref_Order_ID), so the panel can name it and open it.
+        ///
+        /// Both sides live in C_Order, so the referenced row is required to be a
+        /// sales transaction — a Ref_Order_ID pointing at anything else is not a
+        /// sales-order origin and is left alone. Non-fatal: a failure just leaves
+        /// the panel without the reference.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected purchase order id.</param>
+        /// <param name="d">Panel payload being populated.</param>
+        private void LoadSalesOrderReference(int C_Order_ID, LandedCostPanelData d)
+        {
+            try
+            {
+                string sql = @"SELECT so.C_Order_ID  AS SalesOrderId,
+                                      so.DocumentNo  AS SalesOrderNo
+                                 FROM C_Order o
+                                 INNER JOIN C_Order so ON (so.C_Order_ID = o.Ref_Order_ID)
+                                WHERE o.C_Order_ID = @C_Order_ID
+                                  AND NVL(so.IsSOTrx, 'N') = 'Y'
+                                  AND NVL(so.IsActive, 'Y') = 'Y'";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow r0 = ds.Tables[0].Rows[0];
+                    d.SalesOrderId = Util.GetValueOfInt(r0["SalesOrderId"]);
+                    d.SalesOrderNo = Util.GetValueOfString(r0["SalesOrderNo"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadSalesOrderReference (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        private void LoadRequisitionReference(int C_Order_ID, LandedCostPanelData d)
+        {
+            try
+            {
+                string sql = @"SELECT r.M_Requisition_ID AS RequisitionId,
+                                      r.DocumentNo       AS RequisitionNo
+                                 FROM M_RequisitionLine rl
+                                 INNER JOIN M_Requisition r ON (rl.M_Requisition_ID = r.M_Requisition_ID)
+                                 INNER JOIN C_OrderLine ol  ON (rl.C_OrderLine_ID   = ol.C_OrderLine_ID)
+                                WHERE ol.C_Order_ID = @C_Order_ID
+                                  AND NVL(r.IsActive, 'Y') = 'Y'
+                                GROUP BY r.M_Requisition_ID, r.DocumentNo
+                                ORDER BY r.M_Requisition_ID";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow r0 = ds.Tables[0].Rows[0];
+                    d.RequisitionId = Util.GetValueOfInt(r0["RequisitionId"]);
+                    d.RequisitionNo = Util.GetValueOfString(r0["RequisitionNo"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadRequisitionReference (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+
+            // Nothing direct: walk the rest of the chain through the RFQ.
+            if (d.RequisitionId > 0 || d.RfqId <= 0) return;
+
+            try
+            {
+                string sql = @"SELECT r.M_Requisition_ID AS RequisitionId,
+                                      r.DocumentNo       AS RequisitionNo
+                                 FROM C_RfQ rq
+                                 INNER JOIN M_Requisition r
+                                        ON (r.M_Requisition_ID = rq.M_Requisition_ID)
+                                WHERE rq.C_RfQ_ID = @C_RfQ_ID
+                                  AND NVL(r.IsActive, 'Y') = 'Y'";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@C_RfQ_ID", d.RfqId)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow r0 = ds.Tables[0].Rows[0];
+                    d.RequisitionId = Util.GetValueOfInt(r0["RequisitionId"]);
+                    d.RequisitionNo = Util.GetValueOfString(r0["RequisitionNo"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadRequisitionReference/ViaRfQ (C_Order_ID="
+                            + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Resolves a window's AD_Window_ID from its name (AD_Window.Name) for the
+        /// panel's record-open path — the contract, RFQ, project and requisition
+        /// references open the VAS_ContractMaster / VAS_RFQ / VAS_Project /
+        /// VAS_Requisition windows, named rather than derived from a zoom target.
+        ///
+        /// Restricted to windows this tenant can see (AD_Client_ID 0 or its own),
+        /// preferring the tenant's own row over the system one. Whether the ROLE
+        /// may open it is the platform's call, made when the window is started.
+        /// </summary>
+        /// <param name="ctx">User context (client).</param>
+        /// <param name="windowName">Window name to resolve.</param>
+        /// <returns>The window id, or 0 when the name resolves to nothing.</returns>
+        public int GetWindowId(Ctx ctx, string windowName)
+        {
+            if (string.IsNullOrEmpty(windowName)) return 0;
+            try
+            {
+                string sql = @"SELECT w.AD_Window_ID
+                                 FROM AD_Window w
+                                WHERE w.Name         = @Name
+                                  AND w.IsActive     = 'Y'
+                                  AND w.AD_Client_ID IN (0, @AD_Client_ID)
+                                ORDER BY w.AD_Client_ID DESC";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@Name", windowName.Trim()),
+                    new SqlParameter("@AD_Client_ID", ctx == null ? 0 : ctx.GetAD_Client_ID())
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return 0;
+                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetWindowId (" + windowName + "): " + ex.Message);
+                return 0;
+            }
         }
 
         /// <summary>
@@ -676,10 +1099,10 @@ namespace VASLogic.Models
                         "Expected landed cost applies to purchase orders only.");
                     return result;
                 }
-                if (!guard.IsDrafted)
+                if (!guard.IsEditable)
                 {
-                    result.Message = GetMsg(ctx, "VAS_167_OnlyWhenDrafted",
-                        "Expected landed cost can be changed only while the purchase order is drafted.");
+                    result.Message = GetMsg(ctx, "VAS_167_OnlyBeforeCompleted",
+                        "Expected landed cost can be changed only before the purchase order is completed.");
                     return result;
                 }
 
@@ -774,10 +1197,10 @@ namespace VASLogic.Models
                 }
 
                 OrderGuardData guard = LoadOrderGuard(expectedCost.GetC_Order_ID());
-                if (!guard.Exists || !guard.IsPurchase || !guard.IsDrafted)
+                if (!guard.Exists || !guard.IsPurchase || !guard.IsEditable)
                 {
-                    result.Message = GetMsg(ctx, "VAS_167_OnlyWhenDrafted",
-                        "Expected landed cost can be changed only while the purchase order is drafted.");
+                    result.Message = GetMsg(ctx, "VAS_167_OnlyBeforeCompleted",
+                        "Expected landed cost can be changed only before the purchase order is completed.");
                     return result;
                 }
 
@@ -830,6 +1253,7 @@ namespace VASLogic.Models
                 guard.Exists     = true;
                 guard.IsPurchase = Util.GetValueOfString(r["IsSOTrx"]) == "N";
                 guard.IsDrafted  = Util.GetValueOfString(r["DocStatus"]) == DOCSTATUS_Drafted;
+                guard.IsEditable = IsEditableStatus(Util.GetValueOfString(r["DocStatus"]));
                 guard.ClientId   = Util.GetValueOfInt(r["AD_Client_ID"]);
                 guard.OrgId      = Util.GetValueOfInt(r["AD_Org_ID"]);
             }
@@ -1031,7 +1455,37 @@ namespace VASLogic.Models
             public string    DocumentStatus      { get; set; }
             public bool      IsDrafted           { get; set; }
             public bool      IsCompleted         { get; set; }
+            /// <summary>True while the expected landed cost may still be changed —
+            /// every status before the order is completed (drafted, in progress …).
+            /// This is what the panel's edit affordances are driven by.</summary>
+            public bool      IsEditable          { get; set; }
             public decimal   PurchaseOrderTotal  { get; set; }
+            /// <summary>Contract the order was raised under —
+            /// C_Order.VAS_ContractMaster_ID; 0 when there is none.</summary>
+            public int       ContractMasterId    { get; set; }
+            /// <summary>VAS_ContractMaster.DocumentNo of that contract.</summary>
+            public string    ContractMasterNo    { get; set; }
+            /// <summary>RFQ the order was raised from, reached through the winning
+            /// response (C_RfQResponse.C_Order_ID); 0 when there is none.</summary>
+            public int       RfqId               { get; set; }
+            /// <summary>That RFQ's DocumentNo, or its Name where the schema
+            /// carries no DocumentNo.</summary>
+            public string    RfqNo               { get; set; }
+            /// <summary>Project the order was generated for, via
+            /// C_ProjectLine.C_OrderPO_ID; 0 when there is none.</summary>
+            public int       ProjectId           { get; set; }
+            /// <summary>That project's Value, falling back to its Name.</summary>
+            public string    ProjectNo           { get; set; }
+            /// <summary>Requisition the order was raised from, directly or through
+            /// the RFQ; 0 when there is none.</summary>
+            public int       RequisitionId       { get; set; }
+            /// <summary>That requisition's DocumentNo.</summary>
+            public string    RequisitionNo       { get; set; }
+            /// <summary>Sales order the PO was raised against
+            /// (C_Order.Ref_Order_ID); 0 when there is none.</summary>
+            public int       SalesOrderId        { get; set; }
+            /// <summary>That sales order's DocumentNo.</summary>
+            public string    SalesOrderNo        { get; set; }
 
             // ----- Document currency -----
             public int    DocumentCurrencyId        { get; set; }
@@ -1054,6 +1508,9 @@ namespace VASLogic.Models
             public List<LookupItemData> Currencies      { get; set; }
             public List<LookupItemData> ConversionTypes { get; set; }
             public List<LookupItemData> Distributions   { get; set; }
+            /// <summary>Rate type a new entry comes up on — Spot where the tenant
+            /// has it, else the client's default. 0 = nothing to preselect.</summary>
+            public int DefaultConversionTypeId { get; set; }
 
             public LandedCostPanelData()
             {
@@ -1118,6 +1575,10 @@ namespace VASLogic.Models
             public int     LineNumber           { get; set; }
             public string  ProductName          { get; set; }
             public string  ProductCode          { get; set; }
+            /// <summary>M_AttributeSetInstance.Description of the allocated order
+            /// line (size / lot / serial ...); empty when the line carries no
+            /// instance.</summary>
+            public string  AttributeSetInstance { get; set; }
             public decimal AllocationBase       { get; set; }
             public decimal TotalAllocationBase  { get; set; }
             public decimal LineQuantity         { get; set; }
@@ -1149,6 +1610,8 @@ namespace VASLogic.Models
             public bool Exists     { get; set; }
             public bool IsPurchase { get; set; }
             public bool IsDrafted  { get; set; }
+            /// <summary>Order is not yet completed, so its entries may be written.</summary>
+            public bool IsEditable { get; set; }
             public int  ClientId   { get; set; }
             public int  OrgId      { get; set; }
         }

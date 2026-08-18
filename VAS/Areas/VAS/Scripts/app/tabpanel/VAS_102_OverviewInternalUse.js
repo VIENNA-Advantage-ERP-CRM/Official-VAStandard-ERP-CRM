@@ -51,9 +51,111 @@
  *                          sender sit where every other entry carries them. The
  *                          message body opens on click, headed by the full
  *                          From / To / Cc / Bcc set.
+ *   VAI163   2026-08-05  - Issue lines page at 25 rows instead of 10, matching
+ *                          the Purchase Order overview; the pager only appears
+ *                          once an issue exceeds that.
+ *                        - Notes shows every description entered against the
+ *                          issue: the header's, then the one typed on each
+ *                          line's child tab (payload Notes collection).
+ *                        - No description is shown as a Reference any more. The
+ *                          header card's Reference field no longer falls back to
+ *                          the issue description, and the References section
+ *                          drops the requisition-note row — both put free text
+ *                          where the reader expects a document identifier.
+ *   VAI163   2026-08-05  - Timestamps render in the viewer's local system zone.
+ *                          The DB stores them in UTC and the server emits no
+ *                          zone designator, so the browser was reading them as
+ *                          local and the Activity feed showed the stored UTC
+ *                          clock. parseDbDate tags a bare timestamp "Z"; a
+ *                          date-only field is still parsed as-is so its calendar
+ *                          day can never roll over.
+ *                        - A long locator name ellipsises in its column and
+ *                          carries the full name on a hover tooltip, so the row
+ *                          layout is unchanged.
+ *                        - Completed now reads green (tone success) like Closed.
+ *                        - Issue Timeline's third stage is named "Posted".
+ *                        - The details card drops its Posted field — the header
+ *                          pill and the timeline already carry it.
+ *   VAI163   2026-08-05  - The References card is now a Reference chip strip
+ *                          built like the Purchase Order overview's Generated
+ *                          From: same placement (directly under the header
+ *                          card), same chip design, and every chip opens its
+ *                          source record through the shared openRecord() zoom
+ *                          path. An issue linked to nothing reads "Manual
+ *                          Issue" instead of "no linked documents".
+ *                          The requisition's dates and requester move onto the
+ *                          chip's tooltip — the strip lists documents only.
+ *                        - Line items show the Attribute Set Instance directly
+ *                          under the product name, above the search key.
+ *                        - The details card drops Origin and Reference (both
+ *                          are in the chip strip now) and shows Warehouse where
+ *                          Reference used to be.
+ *   VAI163   2026-08-05  - Removed the Full / Partial / Short / Lines status
+ *                          cards. The KPI snapshot already reports the issued
+ *                          and outstanding quantities and the line count, and
+ *                          every row carries its own status tag.
+ *                        - Header pills run origin, status, then Posted — the
+ *                          order the issue moves through. Posted used to
+ *                          precede the status pill.
+ *                        - Quantities and rates are reported in each line's
+ *                          SELECTED UOM (model side), so a line keyed in mL
+ *                          reads in mL against an mL rate. The line's value is
+ *                          unchanged by the restatement.
+ *                        - A production order origin (VAMFG_M_WorkOrder_ID)
+ *                          gets its own clickable chip labelled "Production
+ *                          Order"; it used to borrow the VA075 service work
+ *                          order's field and read "Work Order".
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vasiu- -> vas_102- so the panel's
+ *                          styles cannot collide with another panel's.
+ *   VAI163   2026-08-05  New Record / Copy Record now empty the panel instead
+ *                        of leaving the previously selected record on screen.
+ *                        Both refreshPanelData and a new data-status listener
+ *                        ask isTabInserting(), which reads GridTab.gridTable
+ *                        .getIsInserting() — the flag GridTable.dataNew() raises
+ *                        for both actions. The record id cannot answer it: a
+ *                        copied row carries the source record's key until saved.
+ *                        Ported from VAS_092.
+ *   VAI163   2026-08-06  Activity paginates at 15 rows a page (ACTIVITY_PER_PAGE),
+ *                        reusing the lines pager. buildPager() is no longer tied to
+ *                        linesPage / LINES_PER_PAGE: it takes the 0-based page and
+ *                        an onGo(page) callback, so the lines table and the activity
+ *                        feed page independently. A feed that fits on one page shows
+ *                        no controls, and the section summary keeps counting the
+ *                        whole feed. Ported from VAS_092.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
+
+    // True when the tab is sitting on a row that has not been saved yet —
+    // whether it came from New Record or from Copy Record.
+    //
+    // The authority is the GRID TABLE's insert flag: VIS.GridTable.dataNew()
+    // raises it for both actions and clears it again on save, refresh or undo,
+    // and GridTable.getIsInserting() reads it. GridTab does NOT expose that
+    // method — it only holds the table as .gridTable — so asking the tab itself
+    // always answers "no".
+    //
+    // The record id cannot answer this on its own: a copied row carries the
+    // SOURCE record's field values, its key included, so the id handed to the
+    // panel is the record that was copied FROM. Either way the panel would
+    // otherwise show a saved record's details beside an unsaved new one.
+    function isTabInserting(curTab) {
+        if (!curTab) return false;
+        try {
+            if (curTab.gridTable && typeof curTab.gridTable.getIsInserting === "function"
+                && curTab.gridTable.getIsInserting()) {
+                return true;
+            }
+        } catch (e) { }
+
+        var probes = ["getIsInserting", "isInserting", "getIsNew", "isNew"];
+        for (var i = 0; i < probes.length; i++) {
+            try {
+                if (typeof curTab[probes[i]] === "function" && curTab[probes[i]]()) return true;
+            } catch (e2) { }
+        }
+        return false;
+    }
 
     VAS.VAS_102_OverviewInternalUse = function () {
         this.record_ID = 0;
@@ -64,6 +166,50 @@
         this.panelWidth;
 
         var $self = this;
+
+        // The framework notifies a tab panel when the selected record changes
+        // (refreshPanelData) but NOT when the user starts a new one:
+        // GridController.dataNew() never reaches the tab panel, so the panel
+        // would keep showing the previously selected record beside an empty new
+        // one. Listening to the tab's own data-status events closes that gap.
+        function onTabDataStatus(e) {
+            var inserting = false;
+            try {
+                inserting = !!(e && typeof e.getIsInserting === "function" && e.getIsInserting());
+            } catch (ex) {
+                inserting = false;
+            }
+            // The event does not report insert state on every build, and a
+            // COPIED row still carries the source record's key — so ask the tab
+            // as well before trusting the id below.
+            if (!inserting) inserting = isTabInserting($self.curTab);
+
+            var rid = 0;
+            try {
+                if ($self.curTab && typeof $self.curTab.getRecord_ID === "function") {
+                    rid = +$self.curTab.getRecord_ID() || 0;
+                }
+            } catch (ex2) {
+                rid = 0;
+            }
+
+            if (inserting || rid <= 0) {
+                // New (unsaved) record — nothing to show against it.
+                if ($self.record_ID) {
+                    $self.record_ID = 0;
+                    $self.clear();
+                }
+                return;
+            }
+            if (rid !== $self.record_ID) {
+                $self.record_ID = rid;
+                $self.fetchData(rid);
+            }
+        }
+
+        // Registered on the tab in startPanel, removed in dispose. Kept as an
+        // object because the framework calls listener.dataStatusChanged(event).
+        this.tabDataListener = { dataStatusChanged: function (e) { onTabDataStatus(e); } };
         var $root;
         var $busy;
         var $body;
@@ -72,16 +218,20 @@
 
         // Issue lines are paged client-side (the whole set arrives in one
         // payload). Page index resets whenever a different record is loaded.
-        var LINES_PER_PAGE = 10;
+        // 25 rows per page, matching the Purchase Order overview's line items:
+        // the pager only appears once an issue actually exceeds that.
+        var LINES_PER_PAGE = 25;
         var linesPage = 0;
+        var activityPage = 0;   // current Activity page (0-based, like linesPage)
 
         this.init = function () {
-            $root = $('<div class="MPC-vasiu-root"></div>');
-            $body = $('<div class="MPC-vasiu-body"></div>');
-            $emptyState = $('<div class="MPC-vasiu-empty" style="display:none;"></div>');
+            $root = $('<div class="vas_102-root"></div>');
+            $body = $('<div class="vas_102-body"></div>');
+            $emptyState = $('<div class="vas_102-empty" style="display:none;"></div>');
             $emptyState.text(VIS.Msg.getMsg("VAS_102_NoData"));
             $root.append($body).append($emptyState);
             createBusyIndicator();
+            bindEvents();
         };
 
         function createBusyIndicator() {
@@ -112,6 +262,7 @@
                     var parsed = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     data = parsed;
                     linesPage = 0;
+                    activityPage = 0;
                     render();
                     showBusy(false);
                 },
@@ -125,6 +276,7 @@
         this.clear = function () {
             data = null;
             linesPage = 0;
+            activityPage = 0;
             render();
         };
 
@@ -143,7 +295,6 @@
             renderHeader();
             renderReferences();
             renderSnapshot();
-            renderStatusCards();
             renderTimeline();
             renderLines();
             renderNotes();
@@ -156,11 +307,11 @@
 
         function section(title, opts, $parent) {
             opts = opts || {};
-            var $sec = $('<section class="MPC-vasiu-sec"></section>');
-            var $head = $('<div class="MPC-vasiu-secHead"></div>');
-            $head.append($('<h2 class="MPC-vasiu-secTitle"></h2>').text(title));
+            var $sec = $('<section class="vas_102-sec"></section>');
+            var $head = $('<div class="vas_102-secHead"></div>');
+            $head.append($('<h2 class="vas_102-secTitle"></h2>').text(title));
             if (opts.summary) {
-                $head.append($('<span class="MPC-vasiu-secSummary"></span>').text(opts.summary));
+                $head.append($('<span class="vas_102-secSummary"></span>').text(opts.summary));
             }
             if (opts.$right) $head.append(opts.$right);
             $sec.append($head);
@@ -207,20 +358,15 @@
             return p;
         }
 
-        // Outstanding quantity on a line: what was requested and has not been
-        // issued/consumed yet. Never negative (over-issue counts as nothing due).
-        function pendingQty(ln) {
-            var diff = (+ln.RequestedQty || 0) - (+ln.IssuedQty || 0);
-            return diff > 0 ? diff : 0;
-        }
-
         // ---------- Status map (DocStatus code -> label + tone) ---------- //
 
         var STATUS_MAP = {
             "DR": { key: "VAS_102_Drafted",             tone: "neutral" },
             "IP": { key: "VAS_102_InProgress",          tone: "info" },
             "AP": { key: "VAS_102_Approved",            tone: "info" },
-            "CO": { key: "VAS_102_Completed",           tone: "info" },
+            // Completed is a good outcome, so it reads green like Closed rather
+            // than the neutral blue an informational state gets.
+            "CO": { key: "VAS_102_Completed",           tone: "success" },
             "CL": { key: "VAS_102_Closed",              tone: "success" },
             "VO": { key: "VAS_102_Voided",              tone: "risk" },
             "RE": { key: "VAS_102_Reversed",            tone: "risk" },
@@ -263,11 +409,11 @@
         function renderHeader() {
             var st = statusMeta(data.StatusCode);
 
-            var $strip = $('<section class="MPC-vasiu-hdr"></section>');
-            var $top = $('<div class="MPC-vasiu-hdrTop"></div>');
+            var $strip = $('<section class="vas_102-hdr"></section>');
+            var $top = $('<div class="vas_102-hdrTop"></div>');
 
-            var $tl = $('<div class="MPC-vasiu-hdrTitleWrap"></div>');
-            $tl.append($('<div class="MPC-vasiu-hdrTitle"></div>').text(
+            var $tl = $('<div class="vas_102-hdrTitleWrap"></div>');
+            $tl.append($('<div class="vas_102-hdrTitle"></div>').text(
                 VIS.Msg.getMsg("VAS_102_InternalUse") +
                 (data.DocumentNo ? " — " + data.DocumentNo : "")));
 
@@ -276,64 +422,66 @@
             if (moved) subBits.push(VIS.Msg.getMsg("VAS_102_MovementDate") + " " + moved);
             if (data.IssuedBy) subBits.push(VIS.Msg.getMsg("VAS_102_IssuedBy") + " " + data.IssuedBy);
             if (subBits.length) {
-                $tl.append($('<div class="MPC-vasiu-hdrSub"></div>').text(subBits.join(" · ")));
+                $tl.append($('<div class="vas_102-hdrSub"></div>').text(subBits.join(" · ")));
             }
             $top.append($tl);
 
-            var $pills = $('<div class="MPC-vasiu-hdrPills"></div>');
+            // Origin, then the document status, then Posted — the order the issue
+            // actually moves through. Posted used to sit ahead of the status pill,
+            // which read as though posting came before completion.
+            var $pills = $('<div class="vas_102-hdrPills"></div>');
             $pills.append(headerPill(originLabel(), "info", "layers", false));
+            $pills.append(headerPill(st.label, st.tone, null, true));
             if (data.Posted) {
                 $pills.append(headerPill(VIS.Msg.getMsg("VAS_102_Posted"), "success", "check", false));
             }
-            $pills.append(headerPill(st.label, st.tone, null, true));
             $top.append($pills);
 
             $strip.append($top);
             $body.append($strip);
 
             // --- Details card: warehouse identity (left) + document fields (right) ---
-            var $card = $('<section class="MPC-vasiu-hdrCard"></section>');
+            var $card = $('<section class="vas_102-hdrCard"></section>');
 
-            var $left = $('<div class="MPC-vasiu-hdrColL"></div>');
-            $left.append($('<div class="MPC-vasiu-fLabel"></div>').text(VIS.Msg.getMsg("VAS_102_IssuedFrom")));
-            $left.append($('<div class="MPC-vasiu-vendName"></div>').text(na(data.WarehouseName)));
+            var $left = $('<div class="vas_102-hdrColL"></div>');
+            $left.append($('<div class="vas_102-fLabel"></div>').text(VIS.Msg.getMsg("VAS_102_IssuedFrom")));
+            $left.append($('<div class="vas_102-vendName"></div>').text(na(data.WarehouseName)));
 
-            var $contact = $('<div class="MPC-vasiu-vendContact"></div>');
+            var $contact = $('<div class="vas_102-vendContact"></div>');
             appendContactBit($contact, "user", data.IssuedBy);
             appendContactBit($contact, "calendar", formatDate(data.MovementDate));
             if ($contact.children().length) $left.append($contact);
             $card.append($left);
 
-            var $right = $('<div class="MPC-vasiu-hdrColR"></div>');
+            var $right = $('<div class="vas_102-hdrColR"></div>');
             $right.append(headerField(VIS.Msg.getMsg("VAS_102_InternalUseNo"), na(data.DocumentNo), false));
-            $right.append(headerField(VIS.Msg.getMsg("VAS_102_Origin"), originLabel(), false));
-            // Reference: the source document the issue was raised against — the
-            // work order, else the requisition; only an issue linked to neither
-            // falls back to the header description.
-            var srcRef = data.WorkOrderNo || requisitionLabel();
-            $right.append(headerField(VIS.Msg.getMsg("VAS_102_Reference"),
-                na(srcRef || data.Description), !!srcRef));
-            $right.append(headerField(VIS.Msg.getMsg("VAS_102_Posted"),
-                data.Posted ? VIS.Msg.getMsg("VAS_102_Posted")
-                            : VIS.Msg.getMsg("VAS_102_NotPosted"), false));
+            // Origin and Reference are deliberately absent: both now live in the
+            // Reference chip strip under this card, which names every source
+            // document and opens it on click. Repeating them as flat fields said
+            // the same thing twice, and less usefully.
+            $right.append(headerField(msg("VAS_102_Warehouse", "Warehouse"),
+                na(data.WarehouseName), false));
+            // Posted is deliberately not a field here: the header pill already
+            // carries it and the Issue Timeline dates it, so a third copy on the
+            // details card only repeated what was on screen twice over.
             $card.append($right);
 
             $body.append($card);
         }
 
         function headerPill(label, tone, icon, withDot) {
-            var $p = $('<span class="MPC-vasiu-hdrPill"></span>')
+            var $p = $('<span class="vas_102-hdrPill"></span>')
                 .addClass("tone-" + (tone || "neutral"));
             if (icon) $p.append(svgIcon(icon));
-            if (withDot) $p.append($('<span class="MPC-vasiu-hdrDot"></span>'));
+            if (withDot) $p.append($('<span class="vas_102-hdrDot"></span>'));
             $p.append($('<span></span>').text(label));
             return $p;
         }
 
         function headerField(label, value, link) {
-            var $f = $('<div class="MPC-vasiu-hdrField"></div>');
-            $f.append($('<div class="MPC-vasiu-fLabel"></div>').text(label));
-            var $v = $('<div class="MPC-vasiu-fVal"></div>').text(value);
+            var $f = $('<div class="vas_102-hdrField"></div>');
+            $f.append($('<div class="vas_102-fLabel"></div>').text(label));
+            var $v = $('<div class="vas_102-fVal"></div>').text(value);
             if (link) $v.addClass("is-link");
             $f.append($v);
             return $f;
@@ -341,7 +489,7 @@
 
         function appendContactBit($container, icon, value) {
             if (!value) return;
-            var $bit = $('<span class="MPC-vasiu-contactBit"></span>');
+            var $bit = $('<span class="vas_102-contactBit"></span>');
             $bit.append(svgIcon(icon));
             $bit.append($('<span></span>').text(value));
             $container.append($bit);
@@ -357,93 +505,107 @@
             return extra > 0 ? (data.RequisitionNo + " +" + extra) : data.RequisitionNo;
         }
 
-        // Where this issue came from: the work order it services (document no +
-        // its own reference, read from VA075_WorkOrder_ID on the lines) and/or the
-        // requisition (number, dates, who raised it, its note).
+        // Where this issue came from, in the Purchase Order overview's "Generated
+        // From" shape: a labelled strip of chips directly under the header card,
+        // one per source document, each opening that record on click.
         //
-        // Only links that actually exist are drawn — a manual issue used to render
-        // a row of five N/A cells, which read as broken rather than as "nothing is
-        // linked". That case now gets a single explanatory line instead.
+        // Only origins that exist are drawn. An issue linked to none of them was
+        // raised by hand and says so — "Manual Issue" is a chip like any other,
+        // not an apology for an empty card.
         function renderReferences() {
-            var items = [];
+            var $strip = $('<section class="vas_102-genfrom"></section>');
+            $strip.append($('<span class="vas_102-gfLabel"></span>')
+                .text(msg("VAS_102_Reference", "Reference")));
+
+            var $chips = $('<div class="vas_102-gfChips"></div>');
+            var any = false;
 
             // Work order first — it is the stronger origin when both are present.
+            // Its own reference rides along as a trailing pill, the way the PO
+            // panel marks a requisition reached "via RFQ".
             if (data.WorkOrderNo) {
-                items.push({ icon: "wrench", link: true,
-                    label: msg("VAS_102_WorkOrderNo", "Work Order"),
-                    value: workOrderLabel() });
+                $chips.append(originChip("wrench",
+                    msg("VAS_102_WorkOrder", "Work Order"), workOrderLabel(),
+                    data.WorkOrderRef ? chipPill(data.WorkOrderRef, "neutral") : null,
+                    "info", "VA075_WorkOrder", data.VA075_WorkOrder_ID, null));
+                any = true;
             }
-            if (data.WorkOrderRef) {
-                items.push({ icon: "tag",
-                    label: msg("VAS_102_WorkOrderRef", "Work Order Reference"),
-                    value: data.WorkOrderRef });
+
+            // Production order (M_InventoryLine.VAMFG_M_WorkOrder_ID) — a
+            // manufacturing document, NOT the VA075 service work order above.
+            // The two used to share one field on the payload, so an issue raised
+            // against a production order was labelled "Work Order".
+            if (data.ProductionOrderNo) {
+                $chips.append(originChip("factory",
+                    msg("VAS_102_ProductionOrder", "Production Order"),
+                    productionOrderLabel(), null, "warning",
+                    "VAMFG_M_WorkOrder", data.VAMFG_M_WorkOrder_ID, null));
+                any = true;
             }
+
             if (data.RequisitionNo) {
-                items.push({ icon: "doc", link: true,
-                    label: msg("VAS_102_RequisitionNo", "Requisition No"),
-                    value: requisitionLabel() });
+                $chips.append(originChip("doc",
+                    msg("VAS_102_Requisition", "Requisition"), requisitionLabel(),
+                    null, "success", "M_Requisition", data.M_Requisition_ID,
+                    requisitionTooltip()));
+                any = true;
             }
+
+            if (!any) {
+                $chips.append(originChip("pencil",
+                    msg("VAS_102_ManualIssue", "Manual Issue"), null, null,
+                    "muted", null, 0, null));
+            }
+
+            $strip.append($chips);
+            $body.append($strip);
+        }
+
+        // Context for the requisition link — its dates and who raised it. Kept on
+        // the chip's tooltip rather than given chips of their own: the strip is a
+        // row of source DOCUMENTS, and a date is not one.
+        function requisitionTooltip() {
+            var bits = [];
             var reqDate = formatDate(data.RequisitionDate);
             if (reqDate) {
-                items.push({ icon: "calendar",
-                    label: msg("VAS_102_RequisitionDate", "Requisition Date"),
-                    value: reqDate });
+                bits.push(msg("VAS_102_RequisitionDate", "Requisition Date") + ": " + reqDate);
             }
             var dueDate = formatDate(data.DateRequired);
             if (dueDate) {
-                items.push({ icon: "calendar",
-                    label: msg("VAS_102_DateRequired", "Date Required"),
-                    value: dueDate });
+                bits.push(msg("VAS_102_DateRequired", "Date Required") + ": " + dueDate);
             }
             if (data.RequestedBy) {
-                items.push({ icon: "user",
-                    label: msg("VAS_102_RequestedBy", "Requested By"),
-                    value: data.RequestedBy });
+                bits.push(msg("VAS_102_RequestedBy", "Requested By") + ": " + data.RequestedBy);
             }
-            // The requisition's own note. The issue's description is not repeated
-            // here — the Notes section below carries it.
-            var note = (data.RequisitionNote || "").trim();
-            if (note) {
-                items.push({ icon: "tag",
-                    label: msg("VAS_102_Reference", "Reference"),
-                    value: note });
-            }
-
-            var $sec = section(msg("VAS_102_References", "References"), null);
-            var $card = $('<div class="MPC-vasiu-refCard"></div>');
-
-            if (!items.length) {
-                $card.addClass("is-empty");
-                var $empty = $('<div class="MPC-vasiu-refEmpty"></div>');
-                $empty.append(svgIcon("link"));
-                $empty.append($('<span></span>').text(
-                    msg("VAS_102_NoReferences", "No linked documents — raised manually")));
-                $card.append($empty);
-            } else {
-                for (var i = 0; i < items.length; i++) $card.append(refItem(items[i]));
-            }
-
-            $sec.append($card);
+            return bits.join("\n");
         }
 
-        // One reference: a tinted icon bubble, the field name and its value. The
-        // value ellipsises with the full text on a tooltip.
-        function refItem(it) {
-            var $row = $('<div class="MPC-vasiu-refItem"></div>');
+        // Origin chip: leading (tinted) icon + grey label + dark value, with an
+        // optional trailing pill. Given a table and a record id it becomes a link
+        // that opens that record, marked with a trailing arrow.
+        function originChip(icon, label, value, $statusPill, iconTone, tableName, recordId, tooltip) {
+            var $chip = $('<span class="vas_102-chip"></span>')
+                .addClass("ic-" + (iconTone || "muted"));
 
-            var $ico = $('<span class="MPC-vasiu-refIco"></span>');
-            $ico.append(svgIcon(it.icon));
-            $row.append($ico);
+            var isLink = tableName && recordId && +recordId > 0;
+            if (isLink) {
+                $chip.addClass("is-link")
+                    .attr("data-open-table", tableName)
+                    .attr("data-open-id", recordId);
+            }
 
-            var $txt = $('<div class="MPC-vasiu-refTxt"></div>');
-            $txt.append($('<div class="MPC-vasiu-fLabel"></div>').text(it.label));
-            var $val = $('<div class="MPC-vasiu-fVal"></div>')
-                .text(it.value).attr("title", it.value);
-            if (it.link) $val.addClass("is-link");
-            $txt.append($val);
-            $row.append($txt);
+            $chip.append(svgIcon(icon));
+            $chip.append($('<span class="vas_102-chipLabel"></span>').text(label));
+            if (value) $chip.append($('<span class="vas_102-chipVal"></span>').text(value));
+            if ($statusPill) $chip.append($statusPill);
+            if (isLink) $chip.append(svgIcon("arrowUpRight"));
+            if (tooltip) $chip.attr("title", tooltip);
+            return $chip;
+        }
 
-            return $row;
+        function chipPill(text, tone) {
+            return $('<span class="vas_102-chipPill"></span>')
+                .addClass("tone-" + (tone || "neutral")).text(text);
         }
 
         // The work order the issue services. As with requisitions, several can
@@ -454,10 +616,18 @@
             return extra > 0 ? (data.WorkOrderNo + " +" + extra) : data.WorkOrderNo;
         }
 
+        // The production order the issue consumed material for, counted the same
+        // way when more than one feeds the issue.
+        function productionOrderLabel() {
+            if (!data || !data.ProductionOrderNo) return "";
+            var extra = (data.ProductionOrderCount || 0) - 1;
+            return extra > 0 ? (data.ProductionOrderNo + " +" + extra) : data.ProductionOrderNo;
+        }
+
         // ---------- Snapshot (KPI metric grid) ---------- //
 
         function renderSnapshot() {
-            var $snap = $('<section class="MPC-vasiu-snap"></section>');
+            var $snap = $('<section class="vas_102-snap"></section>');
             var cur = currencyToken();
 
             // Total issued value.
@@ -485,66 +655,23 @@
         }
 
         function metricCard(tone, icon, label, value, sub) {
-            var $c = $('<div class="MPC-vasiu-metric"></div>').addClass("tone-" + tone);
+            var $c = $('<div class="vas_102-metric"></div>').addClass("tone-" + tone);
 
-            var $head = $('<div class="MPC-vasiu-mHead"></div>');
+            var $head = $('<div class="vas_102-mHead"></div>');
             $head.append(svgIcon(icon));
-            $head.append($('<span class="MPC-vasiu-mLabel"></span>').text(label));
+            $head.append($('<span class="vas_102-mLabel"></span>').text(label));
             $c.append($head);
 
-            $c.append($('<div class="MPC-vasiu-mVal"></div>').text(value));
-            if (sub) $c.append($('<div class="MPC-vasiu-mSub"></div>').text(sub));
+            $c.append($('<div class="vas_102-mVal"></div>').text(value));
+            if (sub) $c.append($('<div class="vas_102-mSub"></div>').text(sub));
             return $c;
         }
 
-        // ---------- Status summary cards (Full / Partial / Short / Lines) ---------- //
-
-        // Full and Lines are line counts; Partial and Short report the quantity
-        // still to be issued/consumed on those lines (the requested-minus-issued
-        // remainder), with the line count as the caption.
-        function renderStatusCards() {
-            var st = summariseLineStatuses();
-            var prec = qtyPrecision();
-            var linesWord = VIS.Msg.getMsg("VAS_102_LinesWord");
-            var pendingWord = msg("VAS_102_QtyPending", "Qty pending");
-
-            var $row = $('<section class="MPC-vasiu-status"></section>');
-            $row.append(statusCard(VIS.Msg.getMsg("VAS_102_Full"), st.full.count + "",
-                "full", linesWord));
-            $row.append(statusCard(VIS.Msg.getMsg("VAS_102_Partial"),
-                formatNumber(st.partial.qty, prec), "partial",
-                pendingWord + " · " + st.partial.count + " " + linesWord));
-            $row.append(statusCard(VIS.Msg.getMsg("VAS_102_Short"),
-                formatNumber(st.short.qty, prec), "short",
-                pendingWord + " · " + st.short.count + " " + linesWord));
-            $row.append(statusCard(VIS.Msg.getMsg("VAS_102_Lines"), (data.LineCount || 0) + "",
-                "neutral", VIS.Msg.getMsg("VAS_102_OnThisIssue")));
-            $body.append($row);
-        }
-
-        // Line count and outstanding quantity per status bucket.
-        function summariseLineStatuses() {
-            var out = {
-                full:    { count: 0, qty: 0 },
-                partial: { count: 0, qty: 0 },
-                short:   { count: 0, qty: 0 }
-            };
-            var lines = (data && data.Lines) || [];
-            for (var i = 0; i < lines.length; i++) {
-                var s = lineStatus(+lines[i].RequestedQty || 0, +lines[i].IssuedQty || 0);
-                out[s].count++;
-                out[s].qty += pendingQty(lines[i]);
-            }
-            return out;
-        }
-
-        function statusCard(label, value, tone, sub) {
-            var $c = $('<div class="MPC-vasiu-statCard"></div>').addClass("tone-" + tone);
-            $c.append($('<div class="MPC-vasiu-statVal"></div>').text(value + ""));
-            $c.append($('<div class="MPC-vasiu-statLbl"></div>').text(label));
-            if (sub) $c.append($('<div class="MPC-vasiu-statSub"></div>').text(sub));
-            return $c;
-        }
+        // The Full / Partial / Short / Lines summary cards that used to sit here
+        // are gone. Every figure they carried is already on screen: the KPI
+        // snapshot above reports the issued and outstanding quantities and the
+        // line count, and each row carries its own Full / Partial / Short tag.
+        // The row restated all of it a second time, in a second shape.
 
         // ---------- Issue timeline (3-node stepper) ---------- //
 
@@ -557,7 +684,9 @@
             var stages = [
                 { key: "VAS_102_Created", done: true,        date: data.CreatedDate },
                 { key: "VAS_102_Issued",  done: issued,      date: data.CompletedDate },
-                { key: "VAS_102_Posting", done: data.Posted, date: data.PostedDate }
+                // "Posted", not "Posting": the stage names the milestone the way
+                // the rest of the panel does, not the activity that reaches it.
+                { key: "VAS_102_Posted",  done: data.Posted, date: data.PostedDate }
             ];
 
             var activeIdx = -1;
@@ -565,7 +694,7 @@
 
             var $sec = section(VIS.Msg.getMsg("VAS_102_IssueTimeline"), null);
 
-            var $tl = $('<div class="MPC-vasiu-stepper"></div>');
+            var $tl = $('<div class="vas_102-stepper"></div>');
             for (var i = 0; i < stages.length; i++) {
                 var s = stages[i];
                 var stateCls, metaText;
@@ -589,19 +718,19 @@
         }
 
         function stepEntry(num, title, meta, done, stateCls) {
-            var $entry = $('<div class="MPC-vasiu-step"></div>').addClass(stateCls || "");
+            var $entry = $('<div class="vas_102-step"></div>').addClass(stateCls || "");
 
-            var $rail = $('<div class="MPC-vasiu-stepRail"></div>');
-            $rail.append($('<span class="MPC-vasiu-stepLine MPC-vasiu-stepLine-l"></span>'));
-            var $dot = $('<span class="MPC-vasiu-stepDot"></span>');
+            var $rail = $('<div class="vas_102-stepRail"></div>');
+            $rail.append($('<span class="vas_102-stepLine vas_102-stepLine-l"></span>'));
+            var $dot = $('<span class="vas_102-stepDot"></span>');
             if (done) { $dot.append(svgIcon("check")); } else { $dot.text(num); }
             $rail.append($dot);
-            $rail.append($('<span class="MPC-vasiu-stepLine MPC-vasiu-stepLine-r"></span>'));
+            $rail.append($('<span class="vas_102-stepLine vas_102-stepLine-r"></span>'));
             $entry.append($rail);
 
-            var $lbl = $('<div class="MPC-vasiu-stepLabel"></div>');
-            $lbl.append($('<div class="MPC-vasiu-stepTitle"></div>').text(title));
-            if (meta) $lbl.append($('<div class="MPC-vasiu-stepMeta"></div>').text(meta));
+            var $lbl = $('<div class="vas_102-stepLabel"></div>');
+            $lbl.append($('<div class="vas_102-stepTitle"></div>').text(title));
+            if (meta) $lbl.append($('<div class="vas_102-stepMeta"></div>').text(meta));
             $entry.append($lbl);
 
             return $entry;
@@ -619,9 +748,9 @@
                 summary: (data.LineCount || 0) + " " + VIS.Msg.getMsg("VAS_102_Items")
             });
 
-            var $tbl = $('<div class="MPC-vasiu-table"></div>');
+            var $tbl = $('<div class="vas_102-table"></div>');
 
-            var $head = $('<div class="MPC-vasiu-tRow MPC-vasiu-tHead"></div>');
+            var $head = $('<div class="vas_102-tRow vas_102-tHead"></div>');
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_102_Item")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_102_Locator")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_102_UOM")));
@@ -633,8 +762,8 @@
             $tbl.append($head);
 
             // Totals footer — always the whole issue, never just the page.
-            var $foot = $('<div class="MPC-vasiu-tFoot"></div>');
-            var $bit = $('<span class="MPC-vasiu-tf is-grand"></span>');
+            var $foot = $('<div class="vas_102-tFoot"></div>');
+            var $bit = $('<span class="vas_102-tf is-grand"></span>');
             $bit.append(document.createTextNode(VIS.Msg.getMsg("VAS_102_TotalIssuedValue")));
             $bit.append($('<b></b>').text(formatAmount(+data.TotalValue || 0, cur, data.StdPrecision)));
             $foot.append($bit);
@@ -645,7 +774,7 @@
             // The pager sits outside the table: the table gets its own horizontal
             // scroll on narrow panels, and the controls must not scroll away with
             // the columns.
-            var $pager = $('<div class="MPC-vasiu-pager"></div>');
+            var $pager = $('<div class="vas_102-pager"></div>');
             if (lines.length > LINES_PER_PAGE) $sec.append($pager);
 
             // Rows are replaced in place, ahead of the totals footer, so the
@@ -658,14 +787,15 @@
                 var start = linesPage * LINES_PER_PAGE;
                 var end = Math.min(lines.length, start + LINES_PER_PAGE);
 
-                $tbl.find(".MPC-vasiu-tBody").remove();
+                $tbl.find(".vas_102-tBody").remove();
                 for (var i = start; i < end; i++) {
                     var ln = lines[i];
                     $foot.before(buildLineRow(
                         ln, lineStatus(+ln.RequestedQty || 0, +ln.IssuedQty || 0), cur));
                 }
 
-                buildPager($pager, lines.length, pageCount, start, end, paintPage);
+                buildPager($pager, linesPage, pageCount, lines.length, start, end,
+                    function (p) { linesPage = p; paintPage(); });
             }
 
             paintPage();
@@ -674,31 +804,36 @@
         // Renders the pager into $pager: a range caption on the left, Previous /
         // page-of / Next on the right. Rebuilt on every page change so the
         // disabled states stay accurate.
-        function buildPager($pager, total, pageCount, start, end, onChange) {
+        //
+        // `page` is the 0-based page being shown and `onGo` is handed the page to
+        // move to, so each paged section owns its own page variable — the lines
+        // table and the activity feed page independently of one another. Nothing
+        // is drawn for a single-page list, so a short section shows no controls.
+        function buildPager($pager, page, pageCount, total, start, end, onGo) {
             $pager.empty();
-            if (total <= LINES_PER_PAGE) return;
+            if (pageCount <= 1) return;
 
-            $pager.append($('<span class="MPC-vasiu-pgRange"></span>').text(
+            $pager.append($('<span class="vas_102-pgRange"></span>').text(
                 msg("VAS_102_Showing", "Showing") + " " + (start + 1) + "-" + end + " " +
                 msg("VAS_102_Of", "of") + " " + total));
 
-            var $ctrls = $('<span class="MPC-vasiu-pgCtrls"></span>');
+            var $ctrls = $('<span class="vas_102-pgCtrls"></span>');
 
             $ctrls.append(pagerButton(msg("VAS_102_Previous", "Previous"), "chevLeft",
-                linesPage <= 0, function () { linesPage--; onChange(); }));
+                page <= 0, function () { onGo(page - 1); }));
 
-            $ctrls.append($('<span class="MPC-vasiu-pgPos"></span>').text(
-                msg("VAS_102_Page", "Page") + " " + (linesPage + 1) + " " +
+            $ctrls.append($('<span class="vas_102-pgPos"></span>').text(
+                msg("VAS_102_Page", "Page") + " " + (page + 1) + " " +
                 msg("VAS_102_Of", "of") + " " + pageCount));
 
             $ctrls.append(pagerButton(msg("VAS_102_Next", "Next"), "chevRight",
-                linesPage >= pageCount - 1, function () { linesPage++; onChange(); }));
+                page >= pageCount - 1, function () { onGo(page + 1); }));
 
             $pager.append($ctrls);
         }
 
         function pagerButton(label, icon, disabled, handler) {
-            var $b = $('<span class="MPC-vasiu-pgBtn"></span>');
+            var $b = $('<span class="vas_102-pgBtn"></span>');
             if (icon === "chevLeft") $b.append(svgIcon(icon));
             $b.append($('<span></span>').text(label));
             if (icon === "chevRight") $b.append(svgIcon(icon));
@@ -711,34 +846,40 @@
         }
 
         function buildLineRow(ln, st, cur) {
-            var $tr = $('<div class="MPC-vasiu-tRow MPC-vasiu-tBody"></div>');
+            var $tr = $('<div class="vas_102-tRow vas_102-tBody"></div>');
 
             // Item: name, product search key, attribute set instance. The name
             // cell ellipsises, so the full product name goes on a hover tooltip —
             // it leaves the layout untouched.
-            var $item = $('<span class="MPC-vasiu-itItem"></span>');
-            var $name = $('<div class="MPC-vasiu-itName"></div>').text(na(ln.ProductName));
+            var $item = $('<span class="vas_102-itItem"></span>');
+            var $name = $('<div class="vas_102-itName"></div>').text(na(ln.ProductName));
             if (ln.ProductName) $name.attr("title", ln.ProductName);
             $item.append($name);
 
-            if (ln.ProductCode) {
-                // The search key alone — no "SKU" prefix.
-                $item.append($('<div class="MPC-vasiu-itSku"></div>').text(ln.ProductCode));
-            } else if (ln.Description) {
-                $item.append($('<div class="MPC-vasiu-itSku"></div>').text(ln.Description));
-            }
-
-            // Lot / serial / attributes, only for a product that carries them.
+            // Lot / serial / attributes sit directly under the product name — the
+            // attribute qualifies WHICH stock was issued, so it belongs with the
+            // name rather than below the search key.
             var asi = (ln.AttributeSetInstance || "").trim();
             if (asi) {
-                $item.append($('<div class="MPC-vasiu-itAttr"></div>').text(asi).attr("title", asi));
+                $item.append($('<div class="vas_102-itAttr"></div>').text(asi).attr("title", asi));
+            }
+
+            if (ln.ProductCode) {
+                // The search key alone — no "SKU" prefix.
+                $item.append($('<div class="vas_102-itSku"></div>').text(ln.ProductCode));
+            } else if (ln.Description) {
+                $item.append($('<div class="vas_102-itSku"></div>').text(ln.Description));
             }
             $tr.append($item);
 
             var prec = +ln.UOMPrecision || 0;
 
-            // Locator
-            $tr.append($('<span></span>').text(na(ln.LocatorName)));
+            // Locator. The cell ellipsises on a narrow panel, so the full locator
+            // name goes on a hover tooltip — the reader gets all of it without the
+            // column widening and pushing the layout around.
+            var $loc = $('<span class="vas_102-itLoc"></span>').text(na(ln.LocatorName));
+            if (ln.LocatorName) $loc.attr("title", ln.LocatorName);
+            $tr.append($loc);
 
             // UOM
             $tr.append($('<span></span>').text(na(ln.UOMName)));
@@ -760,25 +901,50 @@
             var tagKey = st === "full" ? "VAS_102_Full"
                        : (st === "partial" ? "VAS_102_Partial" : "VAS_102_Short");
             var $q = $('<span class="ta-c"></span>');
-            $q.append($('<span class="MPC-vasiu-tag"></span>').addClass("s-" + st)
+            $q.append($('<span class="vas_102-tag"></span>').addClass("s-" + st)
                 .text(VIS.Msg.getMsg(tagKey)));
             $tr.append($q);
 
             return $tr;
         }
 
-        // ---------- Notes (issue header description) ---------- //
+        // ---------- Notes (issue header + line descriptions) ---------- //
 
-        // The description typed on the Inventory Use header. Skipped when blank so
-        // an empty card never trails the panel.
+        // Every description entered against the issue: the one typed on the
+        // Inventory Use header, then the one typed on each line's child tab
+        // (M_InventoryLine.Description), each already labelled server-side with its
+        // line no and product. Skipped entirely when nothing was written, so an
+        // empty card never trails the panel.
+        //
+        // Falls back to the header description alone when the payload predates the
+        // Notes collection, so an older server never blanks the section.
         function renderNotes() {
-            var text = (data.Description || "").trim();
-            if (!text) return;
+            var notes = collectNotes();
+            if (!notes.length) return;
 
-            var $sec = section(msg("VAS_102_Notes", "Notes"), null);
-            var $card = $('<div class="MPC-vasiu-textCard"></div>');
-            $card.append($('<p></p>').text(text));
+            var $sec = section(msg("VAS_102_Notes", "Notes"), {
+                summary: notes.length + " " + msg("VAS_102_NotesCount", "notes")
+            });
+            var $card = $('<div class="vas_102-textCard"></div>');
+            for (var i = 0; i < notes.length; i++) {
+                $card.append($('<p></p>').text(notes[i]));
+            }
             $sec.append($card);
+        }
+
+        function collectNotes() {
+            var out = [];
+            var rows = (data && data.Notes) || null;
+            if (rows && rows.length) {
+                for (var i = 0; i < rows.length; i++) {
+                    var t = (rows[i].Text || "").trim();
+                    if (t) out.push(t);
+                }
+                return out;
+            }
+            var header = (data.Description || "").trim();
+            if (header) out.push(header);
+            return out;
         }
 
         // ---------- Activity (audit trail) ---------- //
@@ -796,6 +962,12 @@
         // The issue's audit trail, newest first: who created it, who changed it and
         // when, when it was completed and posted, plus any notes and e-mails logged
         // against it.
+        // Maximum activity rows shown per page; the feed paginates beyond this.
+        // A document accumulates every mail, status change and linked record, and
+        // an unpaged feed made the panel scroll past everything below it. The
+        // section summary still counts the WHOLE feed, not the page.
+        var ACTIVITY_PER_PAGE = 15;
+
         function renderActivity() {
             var rows = (data && data.Activity) || [];
             if (!rows.length) return;
@@ -804,23 +976,44 @@
                 summary: rows.length + " " + msg("VAS_102_Updates", "updates")
             });
 
-            var $list = $('<div class="MPC-vasiu-actList"></div>');
-            for (var i = 0; i < rows.length; i++) {
-                $list.append(activityRow(rows[i]));
-                // An e-mail's body is heavy — it stays collapsed under its row and
-                // opens only when the reader asks for it.
-                var $mail = activityBody(rows[i]);
-                if ($mail) $list.append($mail);
-            }
+            var $list = $('<div class="vas_102-actList"></div>');
             $sec.append($list);
+
+            // The pager is a sibling of the list card, exactly as the lines pager
+            // is a sibling of its table.
+            var $pager = $('<div class="vas_102-pager"></div>');
+            if (rows.length > ACTIVITY_PER_PAGE) $sec.append($pager);
+
+            function paintPage() {
+                var pageCount = Math.max(1, Math.ceil(rows.length / ACTIVITY_PER_PAGE));
+                if (activityPage >= pageCount) activityPage = pageCount - 1;
+                if (activityPage < 0) activityPage = 0;
+
+                var start = activityPage * ACTIVITY_PER_PAGE;
+                var end = Math.min(rows.length, start + ACTIVITY_PER_PAGE);
+
+                $list.empty();
+                for (var i = start; i < end; i++) {
+                    $list.append(activityRow(rows[i]));
+                    // An e-mail's body is heavy — it stays collapsed under its row
+                    // and opens only when the reader asks for it.
+                    var $mail = activityBody(rows[i]);
+                    if ($mail) $list.append($mail);
+                }
+
+                buildPager($pager, activityPage, pageCount, rows.length, start, end,
+                    function (p) { activityPage = p; paintPage(); });
+            }
+
+            paintPage();
         }
 
         function activityRow(a) {
             var meta = ACT_TYPES[a.Type] || ACT_TYPES.note;
 
-            var $row = $('<div class="MPC-vasiu-actRow"></div>');
+            var $row = $('<div class="vas_102-actRow"></div>');
 
-            var $tag = $('<span class="MPC-vasiu-actTag"></span>').addClass("tone-" + meta.tone);
+            var $tag = $('<span class="vas_102-actTag"></span>').addClass("tone-" + meta.tone);
             $tag.append(svgIcon(meta.icon));
             $tag.append($('<span></span>').text(msg(meta.tagKey, meta.tagText)));
             $row.append($tag);
@@ -829,8 +1022,8 @@
             // subject; for everything else it is the event sentence. A tooltip
             // keeps a long line readable once the cell ellipsises.
             var title = activityTitle(a, meta);
-            var $title = $('<span class="MPC-vasiu-actTitle"></span>');
-            $title.append($('<span class="MPC-vasiu-actLead"></span>')
+            var $title = $('<span class="vas_102-actTitle"></span>');
+            $title.append($('<span class="vas_102-actLead"></span>')
                 .text(title).attr("title", title));
 
             // An e-mail names its recipients under the subject: the To list, plus
@@ -839,7 +1032,7 @@
             if (a.Type === "email") {
                 var to = recipientSummary(a);
                 if (to) {
-                    $title.append($('<small class="MPC-vasiu-actSub"></small>')
+                    $title.append($('<small class="vas_102-actSub"></small>')
                         .text(to).attr("title", allRecipients(a) || to));
                 }
             }
@@ -853,15 +1046,15 @@
                     ? when + " · " + msg("VAS_102_By", "by") + " " + a.UserName
                     : msg("VAS_102_By", "by") + " " + a.UserName;
             }
-            $row.append($('<span class="MPC-vasiu-actWhen"></span>').text(when).attr("title", when));
+            $row.append($('<span class="vas_102-actWhen"></span>').text(when).attr("title", when));
 
             // Rows carrying a body are clickable; the caret shows the state.
             if (hasActivityBody(a)) {
                 $row.addClass("is-openable");
                 $row.attr("title", msg("VAS_102_ShowMailBody", "Click to read the message"));
-                $row.append($('<span class="MPC-vasiu-actCaret"></span>').append(svgIcon("chevRight")));
+                $row.append($('<span class="vas_102-actCaret"></span>').append(svgIcon("chevRight")));
                 $row.on("click", function () {
-                    var $panel = $row.next(".MPC-vasiu-actBody");
+                    var $panel = $row.next(".vas_102-actBody");
                     if (!$panel.length) return;
                     var nowOpen = !$row.hasClass("is-open");
                     $row.toggleClass("is-open", nowOpen)
@@ -896,7 +1089,7 @@
         function activityBody(a) {
             if (!hasActivityBody(a)) return null;
 
-            var $panel = $('<div class="MPC-vasiu-actBody" style="display:none;"></div>');
+            var $panel = $('<div class="vas_102-actBody" style="display:none;"></div>');
             appendMailMeta($panel, "VAS_102_MailFrom", "From:", a.MailFrom);
             appendMailMeta($panel, "VAS_102_MailTo",   "To:",   a.MailTo);
             appendMailMeta($panel, "VAS_102_MailCc",   "Cc:",   a.MailCc);
@@ -907,7 +1100,7 @@
 
         function appendMailMeta($panel, key, fallback, value) {
             if (!value || !String(value).trim()) return;
-            $panel.append($('<div class="MPC-vasiu-actMeta"></div>')
+            $panel.append($('<div class="vas_102-actMeta"></div>')
                 .text(msg(key, fallback) + " " + String(value).trim()));
         }
 
@@ -946,6 +1139,97 @@
         // available on the window's header panel.
 
         // ----------------------------------------------------------------- //
+        //  Events / record navigation                                        //
+        // ----------------------------------------------------------------- //
+
+        // Delegated, so chips rebuilt on every render stay clickable without
+        // being re-bound.
+        function bindEvents() {
+            $root.on("click", ".vas_102-chip.is-link, .is-link[data-open-table]", function (e) {
+                e.preventDefault();
+                openRecord($(this).attr("data-open-table"), $(this).attr("data-open-id"));
+            });
+        }
+
+        // Tables whose record does NOT open in the table's default zoom window,
+        // mapped to the name of the window it does open. Anything absent here
+        // falls through to the table's zoom target, which is what VA075_WorkOrder
+        // relies on — that module ships its own window and is not part of this
+        // solution, so its name cannot be hard-coded here.
+        var WINDOW_NAME_BY_TABLE = {
+            "M_Requisition": "VAS_Requisition"
+        };
+
+        // Window name -> AD_Window_ID, resolved once per name and remembered for
+        // the life of the panel. A name the dictionary does not know is cached as
+        // -1 so a failed lookup is not repeated on every click.
+        var windowIdByName = {};
+
+        // Resolves a window id from its name through the panel's own endpoint.
+        // Returns 0 when it cannot be resolved, which leaves openRecord() to fall
+        // back to the table's zoom target.
+        function resolveWindowIdByName(windowName) {
+            if (!windowName) return 0;
+            if (windowIdByName.hasOwnProperty(windowName)) {
+                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_102_OverviewInternalUse/GetWindow_ID", windowName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) {
+                    windowIdByName[windowName] = -1;
+                    console.log("resolveWindowIdByName: no window named " + windowName);
+                    return 0;
+                }
+                windowIdByName[windowName] = id;
+                return id;
+            } catch (e) {
+                windowIdByName[windowName] = -1;
+                console.log(e);
+                return 0;
+            }
+        }
+
+        // Open the record's window filtered to that row: the window named for this
+        // table when it has one, else the table's default zoom target. Either way
+        // the window is started with an equal-query on the table's key column
+        // (TableName_ID). Degrades to a toast so a click never throws.
+        function openRecord(tableName, recordId) {
+            if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
+            try {
+                var windowId = resolveWindowIdByName(WINDOW_NAME_BY_TABLE[tableName]);
+
+                if (windowId <= 0 &&
+                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
+                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, false) || 0;
+                }
+                if (windowId > 0 && VIS.viewManager &&
+                    typeof VIS.viewManager.startWindow === "function") {
+                    var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
+                    VIS.viewManager.startWindow(windowId, zoomQuery);
+                    return;
+                }
+            } catch (e) { console.log(e); }
+            toast(msg("VAS_102_OpenRecord", "Cannot open") + " " + tableName + " #" + recordId, true);
+        }
+
+        function toast(message, isError) {
+            var $t = $('<div class="vas_102-toast"></div>')
+                .addClass(isError ? "err" : "ok").text(message);
+            $root.append($t);
+            setTimeout(function () { $t.addClass("show"); }, 10);
+            setTimeout(function () {
+                $t.removeClass("show");
+                setTimeout(function () { $t.remove(); }, 300);
+            }, 3200);
+        }
+
+        // ----------------------------------------------------------------- //
         //  Icon helpers                                                      //
         // ----------------------------------------------------------------- //
 
@@ -964,11 +1248,13 @@
             chevRight:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
             wrench:   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg>',
             tag:      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 2.6a2 2 0 0 0-1.4-.6H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.2 8.2a2 2 0 0 0 2.8 0l7.2-7.2a2 2 0 0 0 0-2.8Z"/><circle cx="6.5" cy="6.5" r="1.5"/></svg>',
-            link:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>'
+            link:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
+            arrowUpRight: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>',
+            factory:  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20V9l6 4V9l6 4V9l6 4v7Z"/><path d="M2 20h20"/><path d="M7 20v-4"/><path d="M12 20v-4"/><path d="M17 20v-4"/></svg>'
         };
 
         function svgIcon(name) {
-            var $wrap = $('<span class="MPC-vasiu-ic"></span>');
+            var $wrap = $('<span class="vas_102-ic"></span>');
             $wrap[0].innerHTML = SVG_ICONS[name] || "";
             return $wrap;
         }
@@ -996,10 +1282,39 @@
             return sign + (cur ? cur + " " : "") + formatted;
         }
 
+        // Parses a .NET/Newtonsoft DB value into a Date.
+        //
+        // asUtc = true  → for genuine *timestamps* (Created, activity, completion
+        //   and posting moments). The DB stores these in UTC and Newtonsoft emits
+        //   no timezone designator (e.g. "2026-08-05T10:00:00"), which the browser
+        //   would otherwise read as local — so the feed printed the stored UTC
+        //   clock and every entry looked hours off. Tagging it "Z" makes
+        //   toLocale* render it in the viewer's own system zone.
+        // asUtc = false → for *date-only* fields (movement / requisition / required
+        //   dates). These carry no meaningful time-of-day, so the wall-clock value
+        //   is parsed as-is and never shifted — the calendar day shown always
+        //   matches the day stored, whatever the viewer's zone.
+        // Strings that already carry a "Z" or ±hh:mm offset are left untouched.
+        function parseDbDate(value, asUtc) {
+            if (!value) return null;
+            if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+            var s = String(value);
+            var hasTz = /(z|[+-]\d{2}:?\d{2})$/i.test(s);
+            var isDateTime = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(s);
+            if (asUtc && isDateTime && !hasTz) {
+                s = s.replace(" ", "T") + "Z";
+            } else if (!asUtc && isDateTime) {
+                // Keep the calendar date: drop any timezone marker and parse the
+                // date/time as local so no zone conversion can roll the day over.
+                s = s.replace(" ", "T").replace(/(z|[+-]\d{2}:?\d{2})$/i, "");
+            }
+            var d = new Date(s);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
         function formatDate(value) {
-            if (!value) return "";
-            var d = (value instanceof Date) ? value : new Date(value);
-            if (isNaN(d.getTime())) return "";
+            var d = parseDbDate(value, false);
+            if (!d) return "";
             try {
                 return d.toLocaleDateString(window.navigator.language, {
                     year: "numeric", month: "short", day: "2-digit"
@@ -1009,11 +1324,11 @@
             }
         }
 
-        // Date + time — the audit trail needs the moment, not just the day.
+        // Date + time in the viewer's local system zone — the audit trail needs
+        // the moment, not just the day.
         function formatDateTime(value) {
-            if (!value) return "";
-            var d = (value instanceof Date) ? value : new Date(value);
-            if (isNaN(d.getTime())) return "";
+            var d = parseDbDate(value, true);
+            if (!d) return "";
             try {
                 return d.toLocaleDateString(window.navigator.language, {
                     year: "numeric", month: "short", day: "2-digit"
@@ -1037,11 +1352,21 @@
             this.table_ID = curTab.getAD_Table_ID();
         }
         this.init();
+        // Watch the tab itself so New Record / Copy Record (neither of which
+        // reliably calls refreshPanelData) still empty the panel.
+        if (curTab && typeof curTab.addDataStatusListener === "function") {
+            try { curTab.addDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
     };
 
     /* Update tab panel based on selected record */
     VAS.VAS_102_OverviewInternalUse.prototype.refreshPanelData = function (recordID, selectedRow) {
-        if (selectedRow == undefined || recordID <= 0) {
+        // The insert check is what makes New Record / Copy Record behave:
+        // the id handed in for an unsaved row can still be the previously
+        // selected (or copied-from) record's, so the tab's own insert state
+        // decides, not the id.
+        if (selectedRow == undefined || recordID <= 0 || isTabInserting(this.curTab)) {
+            this.record_ID = 0;
             this.clear();
             return;
         }
@@ -1057,6 +1382,10 @@
 
     /* Release variables from memory */
     VAS.VAS_102_OverviewInternalUse.prototype.dispose = function () {
+        if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
+            try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
+        this.tabDataListener = null;
         this.record_ID = 0;
         this.table_ID = 0;
         this.windowNo = 0;

@@ -3,6 +3,16 @@
  * Purpose        : Account Right Detail Panel — client logic
  * Employee Code  : VAI154
  * Date           : 09-Jun-2026
+ *
+ * Chronological development:
+ *   VAI163   2026-08-06  The Engagement timeline paginates at 15 touches a page
+ *                        (ENGAGEMENT_PER_PAGE), reusing the of-lu-pager shell the
+ *                        Orders / Invoices panels use. Unlike those it pages
+ *                        client-side — the whole timeline already arrives in one
+ *                        payload — so prev/next re-enter renderEngagement rather
+ *                        than re-fetching. The stat strip above the rail still
+ *                        counts every touch, and an account with 15 or fewer shows
+ *                        no controls at all.
  ******************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -39,11 +49,13 @@
         var _ordersOffset     = 0;
         var _invoicesOffset   = 0;
 
+
         // Opps / contracts client-side pagination (5 rows per page)
         var OPP_PAGE_SIZE  = 5;
         var CT_PAGE_SIZE   = 5;
         var _oppsPage      = 0;
         var _contractsPage = 0;
+
 
         // ── Helpers ──────────────────────────────────────────────────────────
         function esc(v) {
@@ -1223,13 +1235,23 @@
                 return;
             }
 
+            // The timeline pages client-side: the stat strip above still counts
+            // every touch, only the rail below it is limited to one page.
+            var engPageCount = Math.max(1, Math.ceil(items.length / ENGAGEMENT_PER_PAGE));
+            if (_engPage >= engPageCount) _engPage = engPageCount - 1;
+            if (_engPage < 0) _engPage = 0;
+            var engStart = _engPage * ENGAGEMENT_PER_PAGE;
+            var engEnd   = Math.min(items.length, engStart + ENGAGEMENT_PER_PAGE);
+
             html += '<div class="vas_105_eng-tl-wrap">';
-            for (var i = 0; i < items.length; i++) {
+            for (var i = engStart; i < engEnd; i++) {
                 var item   = items[i];
                 var bCfg   = BADGE[item.touchType]    || BADGE['NOTE'];
                 var dotClr = DOT_COLOR[item.touchType] || '#94A3B8';
                 var icon   = TYPE_SVG[item.touchType]  || SVG_NOTE;
-                var isLast = (i === items.length - 1);
+                // The connector stops at the last entry ON THIS PAGE, so the rail
+                // never trails off below the final card.
+                var isLast = (i === engEnd - 1);
 
                 var titleText = item.title || '';
                 if (item.touchType === 'NOTE') {
@@ -1309,7 +1331,40 @@
             }
             html += '</div>';
 
+            // Pager — same shell the Orders / Invoices panels use, but the pages
+            // are cut from the payload already in hand rather than re-fetched.
+            if (engPageCount > 1) {
+                var engChevL = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#586575" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+                var engChevR = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#586575" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+                html +=
+                    '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.625em;">' +
+                      '<span class="of-lu-count" style="font-size:0.8125em;color:var(--acct-text-2);">' +
+                        esc(msg('VAS_040_Showing')) + ' <b>' + (engStart + 1) + '&ndash;' + engEnd + '</b> ' +
+                        esc(msg('of')) + ' <b>' + items.length + '</b>' +
+                      '</span>' +
+                      '<nav class="of-lu-pager-controls" role="navigation">' +
+                        '<button type="button" class="of-lu-pager-btn of-lu-prev-btn" data-eng-page="' + (_engPage - 1) + '"' +
+                          (_engPage <= 0 ? ' disabled' : '') + '>' + engChevL + '</button>' +
+                        '<button type="button" class="of-lu-pager-btn of-lu-next-btn" data-eng-page="' + (_engPage + 1) + '"' +
+                          (_engPage >= engPageCount - 1 ? ' disabled' : '') + '>' + engChevR + '</button>' +
+                      '</nav>' +
+                    '</div>';
+            }
+
             el.innerHTML = html;
+
+            // Bound here rather than delegated on $root: the pager has to re-enter
+            // this same function with the same el / data to repaint the rail.
+            if (engPageCount > 1) {
+                $(el).find('[data-eng-page]').on('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var p = parseInt(this.getAttribute('data-eng-page'), 10);
+                    if (isNaN(p) || p < 0 || p > engPageCount - 1) return;
+                    _engPage = p;
+                    renderEngagement(el, data);
+                });
+            }
         }
 
         // ── renderNotes ───────────────────────────────────────────────────────

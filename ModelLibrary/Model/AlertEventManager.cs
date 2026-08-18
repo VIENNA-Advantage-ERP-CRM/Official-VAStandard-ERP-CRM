@@ -267,7 +267,17 @@ namespace VAdvantage.Alert
             //    }
             //}
 
-            VAS_CommonMethod.RefValuesResult outp = VAS_CommonMethod.GetRefValues(document.GetCtx(), windowName, tableName, document.Get_ID());
+            int record_id = 0;
+            if (eventType.Equals("DELETE"))
+            {
+                record_id = document.Get_IDOld();
+            }
+            else
+            {
+                record_id = document.Get_ID();
+            }
+
+            VAS_CommonMethod.RefValuesResult outp = VAS_CommonMethod.GetRefValues(document.GetCtx(), windowName, tableName, record_id);
             refValues = outp?.NewJsonData;
 
             if (refValues == null || refValues.Count == 0)
@@ -319,23 +329,16 @@ namespace VAdvantage.Alert
                     }
                 }
 
-                // FETCH FIELDNAME MAP (ColumnName → FieldName)
+                // FETCH FIELDNAME MAP (ColumnName → FieldName), already ordered by AD_Field.SeqNo
                 Dictionary<string, string> fieldMap = GetFieldNamesByColumnName(document.GetWindowTabID());
-
-                // Create a sorted map: FieldName → ColumnName
-                SortedList<string, string> sortedByFieldName = new SortedList<string, string>();
-                foreach (KeyValuePair<string, string> kv in fieldMap)
-                {
-                    sortedByFieldName[kv.Value] = kv.Key;
-                }
 
                 if (updatedColumn.Count > 0)
                 {
                     subject = Msg.Translate(document.GetCtx(), "VAS_RecordUpdateNotification") + " - " + windowDisplayName;
-                    foreach (KeyValuePair<string, string> kv in sortedByFieldName)
+                    foreach (KeyValuePair<string, string> kv in fieldMap)
                     {
-                        string fieldName = kv.Key;
-                        string colName = kv.Value;
+                        string colName = kv.Key;
+                        string fieldName = kv.Value;
 
                         if (updatedColumn.Contains(colName))
                         {
@@ -604,7 +607,7 @@ namespace VAdvantage.Alert
         <div style='padding: 16px; font-size: 14px; color: #334155;'>
             <p style='margin: 4px 0;'><strong>Window Name:</strong> {windowName}</p>
             <p style='margin: 4px 0;'><strong>Tab Name:</strong> {tabName}</p>
-            <p style='margin: 4px 0;'><strong>Record ID:</strong> {document.Get_ID()}</p>
+            <p style='margin: 4px 0;'><strong>Record ID:</strong> {(eventType.Equals("DELETE") ? document.Get_IDOld() : document.Get_ID())}</p>
         </div>
     </div>";
 

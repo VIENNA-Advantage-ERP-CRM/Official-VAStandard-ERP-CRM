@@ -49,6 +49,27 @@ namespace VAS.Controllers
         }
 
         /// <summary>
+        /// Resolves a window's AD_Window_ID from its name, for the panel's
+        /// record-open path — the contract reference opens the VAS_ContractMaster
+        /// window, named rather than derived from the table's zoom target.
+        /// </summary>
+        /// <param name="fields">Window name (AD_Window.Name), as sent by
+        /// VIS.dataContext.getJSONRecord.</param>
+        /// <returns>The window id, or 0 when the name is unknown to this client.</returns>
+        public JsonResult GetWindow_ID(string fields)
+        {
+            int windowId = 0;
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_167_PurchaseOrderLandedCostModel model =
+                    new VAS_167_PurchaseOrderLandedCostModel();
+                windowId = model.GetWindowId(ctx, fields);
+            }
+            return Json(JsonConvert.SerializeObject(windowId), JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
         /// Creates (C_ExpectedCost_ID = 0) or updates one expected landed cost
         /// entry. Allowed only while the parent purchase order is drafted — the
         /// model verifies that against the database, so a request from a

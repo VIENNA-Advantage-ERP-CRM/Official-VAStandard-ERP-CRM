@@ -1,8 +1,8 @@
 ﻿/************************************************************
  * Module Name : VAS
  * Purpose     : Styles for the Goods Receipt Note (GRN) Overview tab panel
- *               (VAS.VAS_099_OverviewGRN). All classes are MPC-prefixed
- *               (MPC-vasgrn-*) and scoped under the panel root to avoid global
+ *               (VAS.VAS_099_OverviewGRN). All classes are panel-prefixed
+ *               (vas_099-*) and scoped under the panel root to avoid global
  *               collisions. Ports the Onfinity GRN reference design (Roboto,
  *               white/glass surfaces, soft blue borders, chips with leading
  *               dots, KPI tiles with accent rails, pastel stepper, flat table)
@@ -16,28 +16,28 @@
  *                        columns with a divider between them (stacking to a
  *                        bottom rule when narrow), plus its RTL mirror.
  *   VAI163   2026-07-27  Added the line-item Attribute Set Instance sub-line
- *                        (.MPC-vasgrn-itAttr). Enlarged the panel title
- *                        (.MPC-vasgrn-hdrTitle 1.25em -> 1.4em). Root no longer
+ *                        (.vas_099-itAttr). Enlarged the panel title
+ *                        (.vas_099-hdrTitle 1.25em -> 1.4em). Root no longer
  *                        scrolls horizontally (overflow-x hidden) so the panel
  *                        renders correctly at 80% browser zoom; the material
  *                        table keeps its own inner scroll. Added disabled / busy
  *                        action-button states and an action-feedback toast
- *                        (.MPC-vasgrn-toast).
- *   VAI163   2026-07-28  Added the References card (.MPC-vasgrn-refCard), the
- *                        Notes card (.MPC-vasgrn-textCard) and the locator
- *                        tooltip affordance (.MPC-vasgrn-itLoc). The material
+ *                        (.vas_099-toast).
+ *   VAI163   2026-07-28  Added the References card (.vas_099-refCard), the
+ *                        Notes card (.vas_099-textCard) and the locator
+ *                        tooltip affordance (.vas_099-itLoc). The material
  *                        table drops to six columns when the Quality column is
- *                        not rendered (.MPC-vasgrn-table.no-quality).
+ *                        not rendered (.vas_099-table.no-quality).
  *   VAI163   2026-07-28  Quality inspection styling: accepted / rejected metric
  *                        tones, the three-up snapshot grid used when those two
- *                        cards are present (.MPC-vasgrn-snap.has-qc), and the
- *                        Quality Product table (.MPC-vasgrn-qpTable) with its
+ *                        cards are present (.vas_099-snap.has-qc), and the
+ *                        Quality Product table (.vas_099-qpTable) with its
  *                        pass / fail / pending tags.
  *   VAI163   2026-07-28  Received quantity stacks its progress bar under the
  *                        figure so it aligns with Ordered; tabular figures on the
  *                        numeric columns. Added the Activity list
- *                        (.MPC-vasgrn-actList) and the material-lines pager
- *                        (.MPC-vasgrn-pager).
+ *                        (.vas_099-actList) and the material-lines pager
+ *                        (.vas_099-pager).
  *   VAI163   2026-07-31  Header aligned to the VAS_092 Purchase Order Overview
  *                        standard: details card is 40%/1fr (was 1.4fr/1fr) and
  *                        its field column (-hdrColR) is a two-across grid
@@ -53,26 +53,53 @@
  *                        their horizontal scroll and row min-widths at every
  *                        width instead of only under a breakpoint.
  *                        Activity e-mail rows gained a recipient sub-line
- *                        (.MPC-vasgrn-actLead / -actSub) and a message body that
- *                        opens on click (.MPC-vasgrn-actRow.is-openable /
+ *                        (.vas_099-actLead / -actSub) and a message body that
+ *                        opens on click (.vas_099-actRow.is-openable /
  *                        -actCaret / -actBody / -actMeta).
- *   VAI163   2026-08-03  Added the Generated From chip strip (.MPC-vasgrn-genfrom
+ *   VAI163   2026-08-03  Added the Generated From chip strip (.vas_099-genfrom
  *                        / -gfLabel / -gfChips / -chip, with .is-link for a chip
  *                        that opens its source record) and the Documents table
- *                        (.MPC-vasgrn-docTable / -docItem / -docTxt, clickable
- *                        rows via .MPC-vasgrn-tBody.is-link) — both ports of the
+ *                        (.vas_099-docTable / -docItem / -docTxt, clickable
+ *                        rows via .vas_099-tBody.is-link) — both ports of the
  *                        VAS_092 Purchase Order patterns. Document-status tags
- *                        (.MPC-vasgrn-tag.s-*) reuse the header pill's tones.
- *   VAI163   2026-08-03  Added the Generate Invoice dialog (.MPC-vasgrn-modal /
+ *                        (.vas_099-tag.s-*) reuse the header pill's tones.
+ *   VAI163   2026-08-03  Added the Generate Invoice dialog (.vas_099-modal /
  *                        -modalCard / -modalHead / -modalBody / -fld / -input /
  *                        -fldChk / -modalErr / -modalFoot), fixed to the viewport
  *                        so it cannot scroll away with the panel behind it. The
- *                        line-item Attribute Set Instance (.MPC-vasgrn-itAttr) is
+ *                        line-item Attribute Set Instance (.vas_099-itAttr) is
  *                        now an inline suffix to the product name rather than a
  *                        sub-line of its own.
+ *   VAI163   2026-08-05  Class prefix renamed MPC-vasgrn- -> vas_099- so the panel's
+ *                        styles cannot collide with another panel's.
+ *   VAI163   2026-08-06  Zoom / narrow-panel robustness, ported from VAS_092: the
+ *                        snapshot only goes wide (4-up, 3-up with the quality
+ *                        cards) from 700px — at 80% zoom the panel reads ~1.25x
+ *                        more CSS pixels, which used to crush a 2-up row into 4-up
+ *                        and ellipsise the received figure; the Received bar's
+ *                        width is em- not px-based so it can no longer floor its
+ *                        track; stage labels break inside a long word instead of
+ *                        setting the stepper's floor; and a Generated From chip
+ *                        caps at the strip width with its value truncating inside.
+ *   VAI163   2026-08-06  Material table: the UOM cell (2nd track, header and body)
+ *                        gained a trailing inset, so a spelled-out unit no longer
+ *                        runs into the right-aligned Ordered quantity across a
+ *                        single gutter; its track widened 0.7fr -> 0.85fr to match.
+ *                        The rule hangs off a new .vas_099-matTable modifier, since
+ *                        the Documents and Quality Parameters tables share
+ *                        .vas_099-tRow but not its column meanings.
+ *   VAI163   2026-08-06  References card (.vas_099-refCard) dropped with the section
+ *                        it styled. Activity aligned to VAS_092: .vas_099-actRow is
+ *                        a wrapping flex row (was a fixed grid needing a 460px
+ *                        container query to reflow) with .vas_099-actWhen held right
+ *                        by margin-left:auto, and its pager (.vas_099-actPager) sits
+ *                        inside the list card. Added .vas_099-btn.is-blocked — the
+ *                        is-disabled look without pointer-events:none, so a button
+ *                        that cannot run can still carry the reason on hover and
+ *                        answer a click with it.
  ***********************************************************/
 
-.MPC-vasgrn-root {
+.vas_099-root {
     /* Canonical palette */
     --grn-text:        #102C3F;
     --grn-muted:       #5F7283;
@@ -106,10 +133,10 @@
     box-sizing: border-box;
 }
 
-.MPC-vasgrn-root * { box-sizing: border-box; }
+.vas_099-root * { box-sizing: border-box; }
 
 /* The body sets the em anchor — every internal size below is em against this. */
-.MPC-vasgrn-body {
+.vas_099-body {
     font-size: clamp(15px, 2.8cqi, 17px);
     padding: 1.125em 0.875em;
     display: flex;
@@ -117,7 +144,7 @@
     gap: 0.875em;
 }
 
-.MPC-vasgrn-empty {
+.vas_099-empty {
     padding: 40px 18px;
     text-align: center;
     color: var(--grn-muted);
@@ -127,9 +154,9 @@
 /* ----------------------------------------------------------- */
 /*  Section + Section Header                                    */
 /* ----------------------------------------------------------- */
-.MPC-vasgrn-sec { display: block; }
+.vas_099-sec { display: block; }
 
-.MPC-vasgrn-secHead {
+.vas_099-secHead {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -137,7 +164,7 @@
     margin-bottom: 0.5em;
 }
 
-.MPC-vasgrn-secTitle {
+.vas_099-secTitle {
     font-size: 1em;
     font-weight: 700;
     color: var(--grn-text);
@@ -145,7 +172,7 @@
     line-height: 1.2;
 }
 
-.MPC-vasgrn-secSummary {
+.vas_099-secSummary {
     font-size: 0.75em;
     font-weight: 400;
     color: var(--grn-muted);
@@ -155,40 +182,40 @@
 /* ----------------------------------------------------------- */
 /*  Icon wrapper                                               */
 /* ----------------------------------------------------------- */
-.MPC-vasgrn-ic { display: inline-flex; align-items: center; flex: none; }
-.MPC-vasgrn-ic svg { display: block; }
+.vas_099-ic { display: inline-flex; align-items: center; flex: none; }
+.vas_099-ic svg { display: block; }
 
 /* ----------------------------------------------------------- */
 /*  Header — title strip                                        */
 /* ----------------------------------------------------------- */
-.MPC-vasgrn-hdr {
+.vas_099-hdr {
     border-radius: 14px;
     padding: 0.875em 1em;
 }
 
-.MPC-vasgrn-hdrTop {
+.vas_099-hdrTop {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.875em;
 }
 
-.MPC-vasgrn-hdrTitleWrap { min-width: 0; }
+.vas_099-hdrTitleWrap { min-width: 0; }
 
-.MPC-vasgrn-hdrTitle {
+.vas_099-hdrTitle {
     font-size: 1.25em;
     font-weight: 700;
     color: var(--grn-text);
     line-height: 1.2;
 }
 
-.MPC-vasgrn-hdrSub {
+.vas_099-hdrSub {
     font-size: 0.75em;
     color: var(--grn-sub);
     margin-top: 0.3125em;
 }
 
-.MPC-vasgrn-hdrPills {
+.vas_099-hdrPills {
     flex: none;
     display: flex;
     align-items: center;
@@ -197,7 +224,7 @@
     gap: 0.5em;
 }
 
-.MPC-vasgrn-hdrPill {
+.vas_099-hdrPill {
     display: inline-flex;
     align-items: center;
     gap: 0.3125em;
@@ -209,16 +236,16 @@
     white-space: nowrap;
 }
 
-.MPC-vasgrn-hdrPill.tone-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
-.MPC-vasgrn-hdrPill.tone-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
-.MPC-vasgrn-hdrPill.tone-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
-.MPC-vasgrn-hdrPill.tone-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
-.MPC-vasgrn-hdrPill.tone-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
-.MPC-vasgrn-hdrPill.tone-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
+.vas_099-hdrPill.tone-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
+.vas_099-hdrPill.tone-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
+.vas_099-hdrPill.tone-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.vas_099-hdrPill.tone-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
+.vas_099-hdrPill.tone-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
+.vas_099-hdrPill.tone-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
 
-.MPC-vasgrn-hdrPill .MPC-vasgrn-ic { color: currentColor; }
+.vas_099-hdrPill .vas_099-ic { color: currentColor; }
 
-.MPC-vasgrn-hdrDot {
+.vas_099-hdrDot {
     width: 0.5em;
     height: 0.5em;
     border-radius: 50%;
@@ -232,7 +259,7 @@
 /* Identity takes 40% of the card; the fields take the rest and run two across,
    so short fields sit in rows instead of stacking into a tall column that
    leaves the identity half empty. */
-.MPC-vasgrn-hdrCard {
+.vas_099-hdrCard {
     display: grid;
     grid-template-columns: 40% minmax(0, 1fr);
     gap: 0.875em 1.75em;
@@ -242,9 +269,9 @@
     padding: 0.875em 1em;
 }
 
-.MPC-vasgrn-hdrColL { min-width: 0; border-right: 1px solid var(--grn-row-div); padding-right: 1.25em; }
+.vas_099-hdrColL { min-width: 0; border-right: 1px solid var(--grn-row-div); padding-right: 1.25em; }
 
-.MPC-vasgrn-hdrColR {
+.vas_099-hdrColR {
     min-width: 0;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -252,9 +279,9 @@
     align-content: start;
 }
 
-.MPC-vasgrn-hdrField { min-width: 0; }
+.vas_099-hdrField { min-width: 0; }
 
-.MPC-vasgrn-fLabel {
+.vas_099-fLabel {
     font-size: 0.6875em;
     font-weight: 700;
     letter-spacing: .4px;
@@ -263,7 +290,7 @@
     line-height: 1.3;
 }
 
-.MPC-vasgrn-fVal {
+.vas_099-fVal {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--grn-text);
@@ -271,36 +298,36 @@
     margin-top: 0.125em;
     overflow-wrap: break-word;   /* a long value wraps instead of being clipped */
 }
-.MPC-vasgrn-fVal.is-link { color: var(--grn-link); }
+.vas_099-fVal.is-link { color: var(--grn-link); }
 
 /* Narrow panels: stack the two columns and drop the pills below the title. */
 @container (max-width: 460px) {
-    .MPC-vasgrn-hdrCard { grid-template-columns: 1fr; }
-    .MPC-vasgrn-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--grn-row-div); padding-bottom: 0.75em; }
+    .vas_099-hdrCard { grid-template-columns: 1fr; }
+    .vas_099-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--grn-row-div); padding-bottom: 0.75em; }
     /* Two field columns are too cramped this narrow — back to a single stack. */
-    .MPC-vasgrn-hdrColR { grid-template-columns: 1fr; }
-    .MPC-vasgrn-hdrTop  { flex-direction: column; }
-    .MPC-vasgrn-hdrPills { justify-content: flex-start; }
+    .vas_099-hdrColR { grid-template-columns: 1fr; }
+    .vas_099-hdrTop  { flex-direction: column; }
+    .vas_099-hdrPills { justify-content: flex-start; }
 }
 
 /* ----------------------------------------------------------- */
 /*  Vendor identity                                             */
 /* ----------------------------------------------------------- */
-.MPC-vasgrn-vendName {
+.vas_099-vendName {
     font-size: 0.9375em;
     font-weight: 700;
     color: var(--grn-text);
     margin-top: 0.1875em;
 }
 
-.MPC-vasgrn-vendGst {
+.vas_099-vendGst {
     font-size: 0.75em;
     color: var(--grn-text);
     margin-top: 0.25em;
 }
-.MPC-vasgrn-vendGst .MPC-vasgrn-gstLbl { color: var(--grn-muted); font-weight: 700; }
+.vas_099-vendGst .vas_099-gstLbl { color: var(--grn-muted); font-weight: 700; }
 
-.MPC-vasgrn-vendAddr {
+.vas_099-vendAddr {
     display: flex;
     align-items: flex-start;
     gap: 0.5em;
@@ -309,9 +336,9 @@
     line-height: 1.45;
     margin-top: 0.25em;
 }
-.MPC-vasgrn-vendAddr .MPC-vasgrn-ic { color: var(--grn-muted); margin-top: 0.15em; }
+.vas_099-vendAddr .vas_099-ic { color: var(--grn-muted); margin-top: 0.15em; }
 
-.MPC-vasgrn-vendContact {
+.vas_099-vendContact {
     display: flex;
     flex-wrap: wrap;
     gap: 0.375em 1.125em;
@@ -319,15 +346,15 @@
     color: var(--grn-text);
     margin-top: 0.375em;
 }
-.MPC-vasgrn-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
-.MPC-vasgrn-contactBit .MPC-vasgrn-ic { color: var(--grn-action); }
+.vas_099-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.vas_099-contactBit .vas_099-ic { color: var(--grn-action); }
 
 /* ----------------------------------------------------------- */
 /*  Generated From (origin chip strip)                          */
 /* ----------------------------------------------------------- */
 /* Light rounded strip carrying an uppercase caption and one chip per origin
    document (Purchase Order / Reference Invoice / Sales Order). */
-.MPC-vasgrn-genfrom {
+.vas_099-genfrom {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -338,7 +365,7 @@
     padding: 0.625em 0.75em;
 }
 
-.MPC-vasgrn-gfLabel {
+.vas_099-gfLabel {
     flex: none;
     font-size: 0.6875em;
     font-weight: 700;
@@ -347,7 +374,7 @@
     color: var(--grn-muted);
 }
 
-.MPC-vasgrn-gfChips {
+.vas_099-gfChips {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -355,11 +382,16 @@
     min-width: 0;
 }
 
-/* Chip: white pill with a leading (tinted) icon, grey label and dark value. */
-.MPC-vasgrn-chip {
+/* Chip: white pill with a leading (tinted) icon, grey label and dark value.
+   It never outgrows the strip that holds it: the strip already wraps its chips
+   onto new lines, but a single chip whose value is a long document number used to
+   run past the panel edge on its own. It caps at the strip width and the value
+   truncates inside it — the chip carries the full text as a tooltip. */
+.vas_099-chip {
     display: inline-flex;
     align-items: center;
     gap: 0.4375em;
+    max-width: 100%;
     background: #fff;
     border: 1px solid var(--grn-card-bd);
     border-radius: 8px;
@@ -369,49 +401,46 @@
     white-space: nowrap;
 }
 
-.MPC-vasgrn-chip .MPC-vasgrn-ic            { color: var(--grn-muted); }
-.MPC-vasgrn-chip.ic-info    .MPC-vasgrn-ic { color: var(--grn-info-tx); }
-.MPC-vasgrn-chip.ic-success .MPC-vasgrn-ic { color: var(--grn-success-tx); }
-.MPC-vasgrn-chip.ic-warning .MPC-vasgrn-ic { color: var(--grn-warning-tx); }
-.MPC-vasgrn-chip.ic-purple  .MPC-vasgrn-ic { color: var(--grn-purple-tx); }
-.MPC-vasgrn-chip.ic-muted   .MPC-vasgrn-ic { color: var(--grn-muted); }
+.vas_099-chip .vas_099-ic            { color: var(--grn-muted); }
+.vas_099-chip.ic-info    .vas_099-ic { color: var(--grn-info-tx); }
+.vas_099-chip.ic-success .vas_099-ic { color: var(--grn-success-tx); }
+.vas_099-chip.ic-warning .vas_099-ic { color: var(--grn-warning-tx); }
+.vas_099-chip.ic-purple  .vas_099-ic { color: var(--grn-purple-tx); }
+.vas_099-chip.ic-muted   .vas_099-ic { color: var(--grn-muted); }
 
-.MPC-vasgrn-chipLabel { color: var(--grn-muted); }
-.MPC-vasgrn-chipVal   { color: var(--grn-text); font-weight: 700; }
+.vas_099-chipLabel { flex: none; color: var(--grn-muted); }
+.vas_099-chipVal   {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--grn-text);
+    font-weight: 700;
+}
 
 /* Clickable origin chip — opens the source record. */
-.MPC-vasgrn-chip.is-link { cursor: pointer; }
-.MPC-vasgrn-chip.is-link:hover {
+.vas_099-chip.is-link { cursor: pointer; }
+.vas_099-chip.is-link:hover {
     border-color: var(--grn-action);
     box-shadow: 0 0 0 1px var(--grn-action) inset;
 }
-.MPC-vasgrn-chip.is-link > .MPC-vasgrn-ic:last-child { color: var(--grn-action); }
+.vas_099-chip.is-link > .vas_099-ic:last-child { color: var(--grn-action); }
 
-/* ----------------------------------------------------------- */
-/*  References card (PO + linked documents)                     */
-/* ----------------------------------------------------------- */
-.MPC-vasgrn-refCard {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(9.5em, 1fr));
-    gap: 0.75em 1.5em;
-    border: 1px solid var(--grn-card-bd);
-    border-radius: var(--grn-card-radius);
-    background: #fff;
-    padding: 0.875em 1em;
-}
+/* The References card (.vas_099-refCard) was dropped with the section it styled —
+   every field it carried is already on screen as a Generated From chip or a
+   header-card field. */
 
 /* ----------------------------------------------------------- */
 /*  Snapshot (metric grid)                                      */
 /* ----------------------------------------------------------- */
 /* minmax(0, 1fr), not 1fr: a long amount in one tile must not widen its track
    and push the row past the panel. */
-.MPC-vasgrn-snap {
+.vas_099-snap {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.75em;
 }
 
-.MPC-vasgrn-metric {
+.vas_099-metric {
     min-width: 0;
     border: 1px solid var(--grn-card-bd);
     border-left: 3px solid var(--grn-neutral-tx);
@@ -420,21 +449,21 @@
     padding: 0.75em 0.875em;
 }
 
-.MPC-vasgrn-metric.tone-total    { border-left-color: var(--grn-info-tx); }
-.MPC-vasgrn-metric.tone-lines    { border-left-color: var(--grn-neutral-tx); }
-.MPC-vasgrn-metric.tone-received { border-left-color: var(--grn-success-tx); }
-.MPC-vasgrn-metric.tone-quality  { border-left-color: #E08A1E; }
-.MPC-vasgrn-metric.tone-accepted { border-left-color: var(--grn-success-tx); }
-.MPC-vasgrn-metric.tone-rejected { border-left-color: var(--grn-risk-tx); }
+.vas_099-metric.tone-total    { border-left-color: var(--grn-info-tx); }
+.vas_099-metric.tone-lines    { border-left-color: var(--grn-neutral-tx); }
+.vas_099-metric.tone-received { border-left-color: var(--grn-success-tx); }
+.vas_099-metric.tone-quality  { border-left-color: #E08A1E; }
+.vas_099-metric.tone-accepted { border-left-color: var(--grn-success-tx); }
+.vas_099-metric.tone-rejected { border-left-color: var(--grn-risk-tx); }
 
-.MPC-vasgrn-mHead {
+.vas_099-mHead {
     display: flex;
     align-items: center;
     gap: 0.375em;
     margin-bottom: 0.375em;
 }
 
-.MPC-vasgrn-mLabel {
+.vas_099-mLabel {
     min-width: 0;
     font-size: 0.6875em;
     font-weight: 700;
@@ -446,17 +475,17 @@
     white-space: nowrap;
 }
 
-.MPC-vasgrn-metric.tone-total    .MPC-vasgrn-mHead .MPC-vasgrn-ic { color: var(--grn-info-tx); }
-.MPC-vasgrn-metric.tone-lines    .MPC-vasgrn-mHead .MPC-vasgrn-ic { color: var(--grn-neutral-tx); }
-.MPC-vasgrn-metric.tone-received .MPC-vasgrn-mHead .MPC-vasgrn-ic { color: var(--grn-success-tx); }
-.MPC-vasgrn-metric.tone-quality  .MPC-vasgrn-mHead .MPC-vasgrn-ic { color: #E08A1E; }
-.MPC-vasgrn-metric.tone-accepted .MPC-vasgrn-mHead .MPC-vasgrn-ic { color: var(--grn-success-tx); }
-.MPC-vasgrn-metric.tone-rejected .MPC-vasgrn-mHead .MPC-vasgrn-ic { color: var(--grn-risk-tx); }
+.vas_099-metric.tone-total    .vas_099-mHead .vas_099-ic { color: var(--grn-info-tx); }
+.vas_099-metric.tone-lines    .vas_099-mHead .vas_099-ic { color: var(--grn-neutral-tx); }
+.vas_099-metric.tone-received .vas_099-mHead .vas_099-ic { color: var(--grn-success-tx); }
+.vas_099-metric.tone-quality  .vas_099-mHead .vas_099-ic { color: #E08A1E; }
+.vas_099-metric.tone-accepted .vas_099-mHead .vas_099-ic { color: var(--grn-success-tx); }
+.vas_099-metric.tone-rejected .vas_099-mHead .vas_099-ic { color: var(--grn-risk-tx); }
 
-.MPC-vasgrn-metric.tone-accepted .MPC-vasgrn-mVal { color: var(--grn-success-tx); }
-.MPC-vasgrn-metric.tone-rejected .MPC-vasgrn-mVal { color: var(--grn-risk-tx); }
+.vas_099-metric.tone-accepted .vas_099-mVal { color: var(--grn-success-tx); }
+.vas_099-metric.tone-rejected .vas_099-mVal { color: var(--grn-risk-tx); }
 
-.MPC-vasgrn-mVal {
+.vas_099-mVal {
     font-size: 1.25em;
     font-weight: 700;
     color: var(--grn-text);
@@ -466,7 +495,7 @@
     white-space: nowrap;
 }
 
-.MPC-vasgrn-mSub {
+.vas_099-mSub {
     font-size: 0.6875em;
     color: var(--grn-muted);
     margin-top: 0.25em;
@@ -477,28 +506,36 @@
 
 /* With the Accepted / Rejected cards present there are six tiles — three-up keeps
    them in two even rows instead of leaving two orphans on a second row. */
-.MPC-vasgrn-snap.has-qc { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.vas_099-snap.has-qc { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
-/* Narrow panels: 2-up, then single-column. */
-@container (max-width: 620px) {
-    .MPC-vasgrn-snap,
-    .MPC-vasgrn-snap.has-qc { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Narrow panels: 2-up, then single-column.
+
+   The four-across row (three-across with the quality cards) needs real room: each
+   card carries an uppercase label, a 1.25em figure and a caption, all of which
+   clip to one line. At 620px a card is ~145px of content — a received value with
+   its currency ellipsises there. Browser zoom is what exposed this: at 80% the
+   panel measures ~1.25x more CSS pixels for the same physical width, which used
+   to carry it over the old 620px threshold and switch a comfortable 2-up row into
+   a crushed 4-up one. The wide rows only from 700px. */
+@container (max-width: 700px) {
+    .vas_099-snap,
+    .vas_099-snap.has-qc { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container (max-width: 340px) {
-    .MPC-vasgrn-snap,
-    .MPC-vasgrn-snap.has-qc { grid-template-columns: minmax(0, 1fr); }
+    .vas_099-snap,
+    .vas_099-snap.has-qc { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ----------------------------------------------------------- */
 /*  Receipt timeline (horizontal stepper)                       */
 /* ----------------------------------------------------------- */
-.MPC-vasgrn-stepper {
+.vas_099-stepper {
     display: flex;
     align-items: flex-start;
     gap: 0;
 }
 
-.MPC-vasgrn-step {
+.vas_099-step {
     flex: 1 1 0;
     min-width: 0;
     display: flex;
@@ -506,25 +543,25 @@
     align-items: center;
 }
 
-.MPC-vasgrn-stepRail {
+.vas_099-stepRail {
     display: flex;
     align-items: center;
     width: 100%;
 }
 
-.MPC-vasgrn-stepLine {
+.vas_099-stepLine {
     flex: 1 1 auto;
     height: 2px;
     background: #D9E6F2;
 }
-.MPC-vasgrn-step:first-child .MPC-vasgrn-stepLine-l,
-.MPC-vasgrn-step:last-child  .MPC-vasgrn-stepLine-r { visibility: hidden; }
+.vas_099-step:first-child .vas_099-stepLine-l,
+.vas_099-step:last-child  .vas_099-stepLine-r { visibility: hidden; }
 
-.MPC-vasgrn-step.is-done   .MPC-vasgrn-stepLine-r,
-.MPC-vasgrn-step.is-done   .MPC-vasgrn-stepLine-l,
-.MPC-vasgrn-step.is-active .MPC-vasgrn-stepLine-l { background: #67B98A; }
+.vas_099-step.is-done   .vas_099-stepLine-r,
+.vas_099-step.is-done   .vas_099-stepLine-l,
+.vas_099-step.is-active .vas_099-stepLine-l { background: #67B98A; }
 
-.MPC-vasgrn-stepDot {
+.vas_099-stepDot {
     flex: none;
     width: 2em;
     height: 2em;
@@ -539,38 +576,46 @@
     color: #8A99A8;
     border: 1.5px solid #DCE5EE;
 }
-.MPC-vasgrn-stepDot .MPC-vasgrn-ic { display: inline-flex; }
+.vas_099-stepDot .vas_099-ic { display: inline-flex; }
 
-.MPC-vasgrn-step.is-done .MPC-vasgrn-stepDot {
+.vas_099-step.is-done .vas_099-stepDot {
     background: #E4F3EC;
     color: #1F9D5B;
     border-color: #BFE6D2;
 }
-.MPC-vasgrn-step.is-active .MPC-vasgrn-stepDot {
+.vas_099-step.is-active .vas_099-stepDot {
     background: #E4F3EC;
     color: #1F9D5B;
     border: 2px solid #67B98A;
 }
 
-.MPC-vasgrn-stepLabel {
+.vas_099-stepLabel {
     margin-top: 0.5em;
     text-align: center;
     padding: 0 0.25em;
     min-width: 0;
 }
 
-.MPC-vasgrn-stepTitle {
+/* The stages share the panel width, so a step is only ever a fraction of it.
+   min-width:0 lets the step shrink, but a single long stage name ("In Progress",
+   "Completed") is still an unbreakable word — without this the labels set the
+   stepper's floor and the panel overflows (or, with the root's overflow-x hidden,
+   the last stage is clipped away). Breaking inside the word keeps every stage on
+   one rail at any panel width or zoom level. */
+.vas_099-stepTitle {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--grn-text);
+    overflow-wrap: anywhere;
 }
 
-.MPC-vasgrn-stepMeta {
+.vas_099-stepMeta {
     font-size: 0.6875em;
     color: var(--grn-muted);
     margin-top: 0.25em;
+    overflow-wrap: anywhere;
 }
-.MPC-vasgrn-step.is-pending .MPC-vasgrn-stepMeta { color: var(--grn-warning-tx); }
+.vas_099-step.is-pending .vas_099-stepMeta { color: var(--grn-warning-tx); }
 
 /* ----------------------------------------------------------- */
 /*  Material table                                              */
@@ -579,7 +624,7 @@
    rows carry a min-width, so when the panel is narrower than the columns need
    (a zoomed-out browser hands the panel an in-between width) the reader scrolls
    to the Rate / Amount / Quality columns instead of losing them off the edge. */
-.MPC-vasgrn-table {
+.vas_099-table {
     border: 1px solid var(--grn-card-bd);
     border-radius: var(--grn-card-radius);
     background: #fff;
@@ -590,35 +635,51 @@
 /* Every track is minmax(0, Nfr). A bare Nfr track cannot shrink below its
    content, so one long product name or amount pushed the row wider than the
    table and the right-hand columns were clipped away entirely. */
-.MPC-vasgrn-tRow {
+.vas_099-tRow {
     display: grid;
     align-items: center;
     gap: 0.625em;
     padding: 0.625em 0.875em;
     grid-template-columns:
-        minmax(0, 2.4fr) minmax(0, 0.7fr) minmax(0, 0.8fr) minmax(0, 1fr)
-        minmax(0, 0.9fr) minmax(0, 1fr)   minmax(0, 0.9fr);
+        minmax(0, 2.4fr) minmax(0, 0.85fr) minmax(0, 0.8fr) minmax(0, 1fr)
+        minmax(0, 0.9fr) minmax(0, 1fr)    minmax(0, 0.9fr);
     min-width: 560px;
 }
 
 /* No line on the receipt has a quality check applicable — the Quality column is
    not rendered, so the grid runs six columns wide. */
-.MPC-vasgrn-table.no-quality .MPC-vasgrn-tRow {
+.vas_099-table.no-quality .vas_099-tRow {
     grid-template-columns:
-        minmax(0, 2.4fr) minmax(0, 0.7fr) minmax(0, 0.8fr) minmax(0, 1fr)
+        minmax(0, 2.4fr) minmax(0, 0.85fr) minmax(0, 0.8fr) minmax(0, 1fr)
         minmax(0, 0.9fr) minmax(0, 1fr);
     min-width: 480px;
+}
+
+/* UOM is left-aligned and Ordered right-aligned, so a spelled-out unit ("Each",
+   "Kilogram") that fills its track runs straight into the quantity across the
+   single 0.625em gutter between them. The UOM cell (2nd track, header and body
+   alike) carries a trailing inset that widens THAT gutter only; its track grew
+   from 0.7fr to 0.85fr to match, so the unit keeps the room it had.
+
+   The inset sits on the UOM side rather than the Ordered side deliberately: an
+   inset on a right-aligned numeric cell cannot move the figure — it can only
+   clip a long one. Scoped to the material table, since the Documents and Quality
+   Parameters tables share .vas_099-tRow but not its column meanings. */
+.vas_099-matTable .vas_099-tRow > span:nth-child(2) { padding-right: 0.75em; }
+[dir="rtl"] .vas_099-matTable .vas_099-tRow > span:nth-child(2) {
+    padding-right: 0;
+    padding-left: 0.75em;
 }
 
 /* Cells clip inside their own track rather than widening it. The item cell's
    children carry their own ellipsis, and the Received cell is a flex column —
    both are unharmed by the clip. */
-.MPC-vasgrn-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.MPC-vasgrn-tHead > span,
-.MPC-vasgrn-tRow > span.ta-r,
-.MPC-vasgrn-tRow > span.ta-c { white-space: nowrap; }
+.vas_099-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vas_099-tHead > span,
+.vas_099-tRow > span.ta-r,
+.vas_099-tRow > span.ta-c { white-space: nowrap; }
 
-.MPC-vasgrn-tHead {
+.vas_099-tHead {
     background: #F5F8FB;
     border-bottom: 1px solid var(--grn-card-bd);
     font-size: 0.6875em;
@@ -628,24 +689,24 @@
     color: var(--grn-muted);
 }
 
-.MPC-vasgrn-tBody {
+.vas_099-tBody {
     border-bottom: 1px solid var(--grn-row-div);
     font-size: 0.8125em;
     color: var(--grn-text);
 }
-.MPC-vasgrn-tBody:last-of-type { border-bottom: none; }
-.MPC-vasgrn-tBody:hover { background: #FAFCFE; }
+.vas_099-tBody:last-of-type { border-bottom: none; }
+.vas_099-tBody:hover { background: #FAFCFE; }
 
-.MPC-vasgrn-table .ta-r { text-align: right; justify-content: flex-end; }
-.MPC-vasgrn-table .ta-c { text-align: center; justify-content: center; }
+.vas_099-table .ta-r { text-align: right; justify-content: flex-end; }
+.vas_099-table .ta-c { text-align: center; justify-content: center; }
 
 /* Tabular figures so the quantity / amount columns line up digit for digit
    instead of drifting with proportional glyph widths. */
-.MPC-vasgrn-table .ta-r,
-.MPC-vasgrn-recvVal { font-variant-numeric: tabular-nums; }
+.vas_099-table .ta-r,
+.vas_099-recvVal { font-variant-numeric: tabular-nums; }
 
-.MPC-vasgrn-itItem { min-width: 0; }
-.MPC-vasgrn-itName {
+.vas_099-itItem { min-width: 0; }
+.vas_099-itName {
     font-size: 1.0769em; /* ~0.875em against the body anchor */
     font-weight: 700;
     color: var(--grn-text);
@@ -654,7 +715,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.MPC-vasgrn-itSku {
+.vas_099-itSku {
     font-size: 0.9231em; /* ~0.75em against the body anchor */
     color: var(--grn-muted);
     margin-top: 0.125em;
@@ -664,11 +725,11 @@
 }
 /* Locator segment — the full locator name is on its title attribute, so signal
    that hovering reveals something. */
-.MPC-vasgrn-itLoc { cursor: help; }
+.vas_099-itLoc { cursor: help; }
 /* Attribute Set Instance (size / lot / serial ...) — it follows the product name
    on the same line, in the muted weight, so it reads as part of what the product
    is rather than as a second fact about the row. The name line clips as a whole. */
-.MPC-vasgrn-itAttr {
+.vas_099-itAttr {
     margin-left: 0.5em;
     font-size: 0.857em;  /* ~0.75em against the body anchor, inside -itName */
     font-weight: 400;
@@ -678,7 +739,7 @@
 /* Received cell — value on its own line with the progress bar stacked beneath,
    so the figure shares a baseline and right edge with the Ordered column instead
    of being pushed inward by an inline bar. */
-.MPC-vasgrn-recv {
+.vas_099-recv {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -687,25 +748,29 @@
     justify-content: center;
     gap: 0.3em;
 }
-.MPC-vasgrn-recvVal { line-height: 1.25; }
-.MPC-vasgrn-recvBar {
-    width: 40px;
+.vas_099-recvVal { line-height: 1.25; }
+/* Width in em, not px: the bar has to shrink with the panel like the rest of the
+   cell. A fixed 40px cannot, so on a narrow (or zoomed) panel it became the
+   Received track's floor and pushed the row out of its grid. */
+.vas_099-recvBar {
+    width: 3.3em;
+    max-width: 100%;
     height: 5px;
     border-radius: 999px;
     background: #E7EEF4;
     overflow: hidden;
     flex: none;
 }
-.MPC-vasgrn-recvBar i { display: block; height: 100%; border-radius: 999px; }
-.MPC-vasgrn-recv.full i { background: var(--grn-success-tx); }
-.MPC-vasgrn-recv.part i { background: var(--grn-warning-tx); }
-.MPC-vasgrn-recv.none i { background: #CBD5DF; }
-.MPC-vasgrn-recv.full { color: var(--grn-success-tx); font-weight: 500; }
-.MPC-vasgrn-recv.part { color: var(--grn-warning-tx); font-weight: 500; }
-.MPC-vasgrn-recv.none { color: var(--grn-muted); }
+.vas_099-recvBar i { display: block; height: 100%; border-radius: 999px; }
+.vas_099-recv.full i { background: var(--grn-success-tx); }
+.vas_099-recv.part i { background: var(--grn-warning-tx); }
+.vas_099-recv.none i { background: #CBD5DF; }
+.vas_099-recv.full { color: var(--grn-success-tx); font-weight: 500; }
+.vas_099-recv.part { color: var(--grn-warning-tx); font-weight: 500; }
+.vas_099-recv.none { color: var(--grn-muted); }
 
 /* Quality tag */
-.MPC-vasgrn-tag {
+.vas_099-tag {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
@@ -715,59 +780,59 @@
     line-height: 1.3;
     white-space: nowrap;
 }
-.MPC-vasgrn-tag.q-on  { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
-.MPC-vasgrn-tag.q-off { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
+.vas_099-tag.q-on  { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.vas_099-tag.q-off { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
 
 /* Quality Product verdict tags. */
-.MPC-vasgrn-tag.q-pass { background: var(--grn-success-bg); color: var(--grn-success-tx); }
-.MPC-vasgrn-tag.q-fail { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
-.MPC-vasgrn-tag.q-wait { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.vas_099-tag.q-pass { background: var(--grn-success-bg); color: var(--grn-success-tx); }
+.vas_099-tag.q-fail { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
+.vas_099-tag.q-wait { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
 
 /* Document-status tags in the Documents table — same tones as the header pill,
    so one document status reads the same wherever it appears. */
-.MPC-vasgrn-tag.s-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
-.MPC-vasgrn-tag.s-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
-.MPC-vasgrn-tag.s-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
-.MPC-vasgrn-tag.s-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
-.MPC-vasgrn-tag.s-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
-.MPC-vasgrn-tag.s-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
+.vas_099-tag.s-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
+.vas_099-tag.s-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
+.vas_099-tag.s-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.vas_099-tag.s-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
+.vas_099-tag.s-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
+.vas_099-tag.s-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
 
 /* ----------------------------------------------------------- */
 /*  Documents table                                             */
 /* ----------------------------------------------------------- */
 /* Document | Date | Status | Amount. Reuses the material table's frame, rows
    and header; only the column proportions differ. */
-.MPC-vasgrn-docTable .MPC-vasgrn-tRow {
+.vas_099-docTable .vas_099-tRow {
     grid-template-columns:
         minmax(0, 2.3fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.1fr);
     min-width: 420px;
 }
 
 /* Document identity cell: kind icon + doc no / caption + open affordance. */
-.MPC-vasgrn-docItem {
+.vas_099-docItem {
     display: flex;
     align-items: center;
     gap: 0.5em;
     min-width: 0;
 }
-.MPC-vasgrn-docTxt { min-width: 0; flex: 1; }
+.vas_099-docTxt { min-width: 0; flex: 1; }
 
 /* A whole document row is clickable — the open arrow tints on hover. */
-.MPC-vasgrn-tBody.is-link { cursor: pointer; }
-.MPC-vasgrn-tBody.is-link:hover { background: #F2F8FD; }
-.MPC-vasgrn-tBody.is-link .MPC-vasgrn-docItem > .MPC-vasgrn-ic:last-child {
+.vas_099-tBody.is-link { cursor: pointer; }
+.vas_099-tBody.is-link:hover { background: #F2F8FD; }
+.vas_099-tBody.is-link .vas_099-docItem > .vas_099-ic:last-child {
     color: var(--grn-muted);
     flex: none;
 }
-.MPC-vasgrn-tBody.is-link:hover .MPC-vasgrn-docItem > .MPC-vasgrn-ic:last-child,
-.MPC-vasgrn-tBody.is-link:hover .MPC-vasgrn-itName { color: var(--grn-action); }
+.vas_099-tBody.is-link:hover .vas_099-docItem > .vas_099-ic:last-child,
+.vas_099-tBody.is-link:hover .vas_099-itName { color: var(--grn-action); }
 
 /* ----------------------------------------------------------- */
 /*  Quality Product table                                       */
 /* ----------------------------------------------------------- */
 /* Product | Parameter | To Verify | Acceptable | Actual | QA Date | Status |
    Confirmation. Reuses the material table's frame, rows and header. */
-.MPC-vasgrn-qpTable .MPC-vasgrn-tRow {
+.vas_099-qpTable .vas_099-tRow {
     grid-template-columns:
         minmax(0, 1.8fr) minmax(0, 1.5fr) minmax(0, 0.8fr) minmax(0, 1fr)
         minmax(0, 1fr)   minmax(0, 1fr)   minmax(0, 0.9fr) minmax(0, 1fr);
@@ -775,7 +840,7 @@
     min-width: 720px;
 }
 
-.MPC-vasgrn-qpName {
+.vas_099-qpName {
     font-size: 1.0769em; /* ~0.875em against the body anchor */
     font-weight: 700;
     color: var(--grn-text);
@@ -786,7 +851,7 @@
 }
 
 /* A quality check applies but no parameters have been recorded yet. */
-.MPC-vasgrn-qpEmpty {
+.vas_099-qpEmpty {
     border: 1px dashed var(--grn-card-bd);
     border-radius: var(--grn-card-radius);
     background: #fff;
@@ -799,7 +864,7 @@
 /* Totals footer. It carries the rows' min-width so that when the table is
    scrolled the footer's tint and its top rule run the full width of the rows
    above, instead of stopping at the edge of the visible box. */
-.MPC-vasgrn-tFoot {
+.vas_099-tFoot {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -811,14 +876,14 @@
     font-size: 0.8125em;
     min-width: 560px;
 }
-.MPC-vasgrn-table.no-quality .MPC-vasgrn-tFoot { min-width: 480px; }
-.MPC-vasgrn-tf { color: var(--grn-muted); }
-.MPC-vasgrn-tf b { color: var(--grn-text); font-weight: 700; margin-left: 0.375em; }
-.MPC-vasgrn-tf.is-grand { color: var(--grn-text); font-weight: 700; }
-.MPC-vasgrn-tf.is-grand b { color: var(--grn-action); margin-left: 0.5em; font-size: 1.15em; }
+.vas_099-table.no-quality .vas_099-tFoot { min-width: 480px; }
+.vas_099-tf { color: var(--grn-muted); }
+.vas_099-tf b { color: var(--grn-text); font-weight: 700; margin-left: 0.375em; }
+.vas_099-tf.is-grand { color: var(--grn-text); font-weight: 700; }
+.vas_099-tf.is-grand b { color: var(--grn-action); margin-left: 0.5em; font-size: 1.15em; }
 
 /* The table's horizontal scroll and the row min-widths are unconditional (see
-   the .MPC-vasgrn-table rule above) — there is no breakpoint at which columns
+   the .vas_099-table rule above) — there is no breakpoint at which columns
    are allowed to crush or be clipped. */
 
 /* ----------------------------------------------------------- */
@@ -826,7 +891,7 @@
 /* ----------------------------------------------------------- */
 /* Deliberately a sibling of the table, not a child: the table scrolls
    horizontally on narrow panels and the controls must stay put. */
-.MPC-vasgrn-pager {
+.vas_099-pager {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -837,15 +902,15 @@
     color: var(--grn-muted);
 }
 
-.MPC-vasgrn-pgCtrls {
+.vas_099-pgCtrls {
     display: inline-flex;
     align-items: center;
     gap: 0.5em;
 }
 
-.MPC-vasgrn-pgPos { color: var(--grn-text); font-weight: 700; }
+.vas_099-pgPos { color: var(--grn-text); font-weight: 700; }
 
-.MPC-vasgrn-pgBtn {
+.vas_099-pgBtn {
     display: inline-flex;
     align-items: center;
     gap: 0.3125em;
@@ -860,9 +925,9 @@
     user-select: none;
     white-space: nowrap;
 }
-.MPC-vasgrn-pgBtn:hover { background: var(--grn-info-bg); border-color: var(--grn-action); }
-.MPC-vasgrn-pgBtn .MPC-vasgrn-ic { color: currentColor; }
-.MPC-vasgrn-pgBtn.is-disabled {
+.vas_099-pgBtn:hover { background: var(--grn-info-bg); border-color: var(--grn-action); }
+.vas_099-pgBtn .vas_099-ic { color: currentColor; }
+.vas_099-pgBtn.is-disabled {
     opacity: .45;
     cursor: default;
     pointer-events: none;
@@ -872,7 +937,7 @@
 /* ----------------------------------------------------------- */
 /*  Notes (GRN header description)                              */
 /* ----------------------------------------------------------- */
-.MPC-vasgrn-textCard {
+.vas_099-textCard {
     border: 1px solid var(--grn-card-bd);
     border-radius: var(--grn-card-radius);
     background: #fff;
@@ -881,33 +946,38 @@
     color: var(--grn-sub);
     line-height: 1.55;
 }
-.MPC-vasgrn-textCard p { margin: 0; white-space: pre-wrap; word-break: break-word; }
-.MPC-vasgrn-textCard p + p { margin-top: 0.5em; }
+.vas_099-textCard p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.vas_099-textCard p + p { margin-top: 0.5em; }
 
 /* ----------------------------------------------------------- */
 /*  Activity (audit trail)                                      */
 /* ----------------------------------------------------------- */
-.MPC-vasgrn-actList {
+.vas_099-actList {
     border: 1px solid var(--grn-card-bd);
     border-radius: var(--grn-card-radius);
     background: #fff;
     overflow: hidden;
 }
 
-/* tag | what happened | when · by whom */
-.MPC-vasgrn-actRow {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+/* tag | what happened | when · by whom — the VAS_092 Purchase Order layout.
+   A wrapping flex row, not a fixed grid: the timestamp is pushed right with
+   margin-left:auto, so on a narrow panel it drops onto its own line still
+   right-aligned instead of being squeezed or clipped against the panel edge. The
+   grid this replaces needed a container query to reflow and could not give the
+   description its full width back once it did. */
+.vas_099-actRow {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.75em;
+    gap: 0.25em 0.625em;
     padding: 0.5625em 0.875em;
     border-bottom: 1px solid var(--grn-row-div);
     font-size: 0.8125em;
 }
-.MPC-vasgrn-actRow:last-child { border-bottom: none; }
-.MPC-vasgrn-actRow:hover { background: #FAFCFE; }
+.vas_099-actRow:last-child { border-bottom: none; }
+.vas_099-actRow:hover { background: #FAFCFE; }
 
-.MPC-vasgrn-actTag {
+.vas_099-actTag {
     display: inline-flex;
     align-items: center;
     gap: 0.375em;
@@ -919,15 +989,16 @@
     line-height: 1.2;
     white-space: nowrap;
 }
-.MPC-vasgrn-actTag .MPC-vasgrn-ic { color: currentColor; }
-.MPC-vasgrn-actTag.tone-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
-.MPC-vasgrn-actTag.tone-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
-.MPC-vasgrn-actTag.tone-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
-.MPC-vasgrn-actTag.tone-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
-.MPC-vasgrn-actTag.tone-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
-.MPC-vasgrn-actTag.tone-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
+.vas_099-actTag .vas_099-ic { color: currentColor; }
+.vas_099-actTag.tone-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
+.vas_099-actTag.tone-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
+.vas_099-actTag.tone-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.vas_099-actTag.tone-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
+.vas_099-actTag.tone-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
+.vas_099-actTag.tone-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
 
-.MPC-vasgrn-actTitle {
+.vas_099-actTitle {
+    flex: 1 1 auto;
     min-width: 0;
     color: var(--grn-text);
     overflow: hidden;
@@ -936,48 +1007,46 @@
 /* The headline (event sentence / note text / e-mail subject) and, for an
    e-mail, the recipient beneath it. Each line clips on its own so the row
    height stays predictable. */
-.MPC-vasgrn-actLead,
-.MPC-vasgrn-actSub {
+.vas_099-actLead,
+.vas_099-actSub {
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.MPC-vasgrn-actSub {
+.vas_099-actSub {
     font-size: 0.8462em; /* ~0.6875em against the body anchor */
     color: var(--grn-muted);
     margin-top: 0.125em;
 }
 
-.MPC-vasgrn-actWhen {
+.vas_099-actWhen {
     flex: none;
+    margin-left: auto;      /* stays right-aligned, incl. when wrapped to its own line */
+    max-width: 100%;
     text-align: right;
     color: var(--grn-muted);
     font-size: 0.9231em; /* ~0.75em against the body anchor */
     white-space: nowrap;
 }
 
-/* An activity carrying a body (e-mail) opens on click — only those rows make
-   room for the caret, so every other row keeps the three-column layout. */
-.MPC-vasgrn-actRow.is-openable {
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-    cursor: pointer;
-}
-.MPC-vasgrn-actRow.is-openable:hover { background: #F7FBFE; }
+/* An activity carrying a body (e-mail) opens on click. */
+.vas_099-actRow.is-openable { cursor: pointer; }
+.vas_099-actRow.is-openable:hover { background: #F7FBFE; }
 
-.MPC-vasgrn-actCaret {
+.vas_099-actCaret {
     display: inline-flex;
     align-items: center;
     color: var(--grn-muted);
     transition: transform .15s ease;
 }
-.MPC-vasgrn-actRow.is-open .MPC-vasgrn-actCaret {
+.vas_099-actRow.is-open .vas_099-actCaret {
     transform: rotate(90deg);
     color: var(--grn-action);
 }
 
 /* The message body, revealed under its row. */
-.MPC-vasgrn-actBody {
+.vas_099-actBody {
     background: #F7FAFD;
     border-bottom: 1px solid var(--grn-row-div);
     padding: 0.625em 0.875em 0.75em 2.5em;
@@ -985,26 +1054,33 @@
     color: var(--grn-text);
     line-height: 1.55;
 }
-.MPC-vasgrn-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
-.MPC-vasgrn-actMeta {
+.vas_099-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.vas_099-actMeta {
     font-size: 0.8462em;
     color: var(--grn-muted);
     margin-bottom: 0.3125em;
 }
 
-/* Narrow panels: drop the timestamp onto its own line under the description.
-   The caret stays on the first line, beside the subject it opens. */
-@container (max-width: 460px) {
-    .MPC-vasgrn-actRow { grid-template-columns: auto minmax(0, 1fr); }
-    .MPC-vasgrn-actRow.is-openable { grid-template-columns: auto minmax(0, 1fr) auto; }
-    .MPC-vasgrn-actWhen { grid-column: 2; text-align: left; }
-    .MPC-vasgrn-actRow.is-openable .MPC-vasgrn-actCaret { grid-column: 3; grid-row: 1; }
+/* The narrow-panel container query the grid layout needed is gone with it: the
+   row wraps on its own now, at whatever width the content actually runs out of
+   room, rather than at one hard-coded breakpoint. */
+
+/* The caret keeps its place at the end of the first line. */
+.vas_099-actCaret { flex: none; }
+
+/* Activity pager — inside the list card, closing it (the VAS_092 treatment).
+   The material-lines pager stays outside its table, which scrolls sideways. */
+.vas_099-actPager {
+    margin-top: 0;
+    padding: 0.5em 0.875em;
+    background: #F5F8FB;
+    border-top: 1px solid var(--grn-card-bd);
 }
 
 /* ----------------------------------------------------------- */
 /*  Actions (visual buttons)                                    */
 /* ----------------------------------------------------------- */
-.MPC-vasgrn-actions {
+.vas_099-actions {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -1013,7 +1089,7 @@
     padding-top: 0.125em;
 }
 
-.MPC-vasgrn-btn {
+.vas_099-btn {
     display: inline-flex;
     align-items: center;
     gap: 0.4375em;
@@ -1026,29 +1102,38 @@
     cursor: pointer;
     user-select: none;
 }
-.MPC-vasgrn-btn .MPC-vasgrn-ic { color: currentColor; }
+.vas_099-btn .vas_099-ic { color: currentColor; }
 
-.MPC-vasgrn-btn.btn-pri {
+.vas_099-btn.btn-pri {
     background: var(--grn-action);
     border: 1px solid var(--grn-action);
     color: #fff;
 }
-.MPC-vasgrn-btn.btn-pri:hover { background: var(--grn-action-dk); border-color: var(--grn-action-dk); }
+.vas_099-btn.btn-pri:hover { background: var(--grn-action-dk); border-color: var(--grn-action-dk); }
 
-.MPC-vasgrn-btn.btn-sec {
+.vas_099-btn.btn-sec {
     background: #fff;
     border: 1px solid var(--grn-action);
     color: var(--grn-action);
 }
-.MPC-vasgrn-btn.btn-sec:hover { background: var(--grn-info-bg); }
+.vas_099-btn.btn-sec:hover { background: var(--grn-info-bg); }
 
 /* Disabled / in-flight action buttons. */
-.MPC-vasgrn-btn.is-disabled {
+.vas_099-btn.is-disabled {
     opacity: .45;
     cursor: default;
     pointer-events: none;
 }
-.MPC-vasgrn-btn.is-busy {
+/* Same look as is-disabled, but the pointer still reaches it — so the button can
+   carry a tooltip and answer a click with the reason it cannot run. Without this
+   a greyed button is mute: pointer-events:none swallows both. */
+.vas_099-btn.is-blocked {
+    opacity: .45;
+    cursor: not-allowed;
+}
+.vas_099-btn.is-blocked:hover { background: #fff; }
+.vas_099-btn.btn-pri.is-blocked:hover { background: var(--grn-action); }
+.vas_099-btn.is-busy {
     opacity: .7;
     cursor: default;
     pointer-events: none;
@@ -1060,7 +1145,7 @@
 /* Fixed to the viewport, not to the panel: the panel scrolls, and a dialog that
    scrolled away with the content would be asking for input the reader cannot
    see. */
-.MPC-vasgrn-modal {
+.vas_099-modal {
     position: fixed;
     inset: 0;
     z-index: 1200;
@@ -1071,7 +1156,7 @@
     background: rgba(16, 44, 63, 0.45);
 }
 
-.MPC-vasgrn-modalCard {
+.vas_099-modalCard {
     width: 26em;
     max-width: 100%;
     max-height: 100%;
@@ -1082,33 +1167,33 @@
     font-size: 1rem;
 }
 
-.MPC-vasgrn-modalHead {
+.vas_099-modalHead {
     padding: 0.875em 1.125em 0.625em;
     border-bottom: 1px solid var(--grn-row-div);
 }
-.MPC-vasgrn-modalHead h3 {
+.vas_099-modalHead h3 {
     margin: 0;
     font-size: 1em;
     font-weight: 700;
     color: var(--grn-text);
     line-height: 1.25;
 }
-.MPC-vasgrn-modalSub {
+.vas_099-modalSub {
     display: block;
     margin-top: 0.1875em;
     font-size: 0.75em;
     color: var(--grn-muted);
 }
 
-.MPC-vasgrn-modalBody {
+.vas_099-modalBody {
     padding: 0.875em 1.125em;
     display: flex;
     flex-direction: column;
     gap: 0.75em;
 }
 
-.MPC-vasgrn-fld { display: block; }
-.MPC-vasgrn-fldLbl {
+.vas_099-fld { display: block; }
+.vas_099-fldLbl {
     display: block;
     margin-bottom: 0.25em;
     font-size: 0.6875em;
@@ -1118,7 +1203,7 @@
     color: var(--grn-muted);
 }
 
-.MPC-vasgrn-input {
+.vas_099-input {
     width: 100%;
     height: 2.25em;
     padding: 0 0.625em;
@@ -1130,13 +1215,13 @@
     font-size: 0.8125em;
     line-height: 1.3;
 }
-.MPC-vasgrn-input:focus {
+.vas_099-input:focus {
     outline: none;
     border-color: var(--grn-action);
     box-shadow: 0 0 0 2px var(--grn-info-bg);
 }
 
-.MPC-vasgrn-fldChk {
+.vas_099-fldChk {
     display: flex;
     align-items: center;
     gap: 0.5em;
@@ -1145,7 +1230,7 @@
     cursor: pointer;
 }
 
-.MPC-vasgrn-modalErr {
+.vas_099-modalErr {
     border-radius: 6px;
     padding: 0.5em 0.625em;
     background: var(--grn-risk-bg);
@@ -1154,7 +1239,7 @@
     line-height: 1.4;
 }
 
-.MPC-vasgrn-modalFoot {
+.vas_099-modalFoot {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -1164,12 +1249,12 @@
     border-top: 1px solid var(--grn-row-div);
 }
 
-[dir="rtl"] .MPC-vasgrn-modalFoot { justify-content: flex-start; }
+[dir="rtl"] .vas_099-modalFoot { justify-content: flex-start; }
 
 /* ----------------------------------------------------------- */
 /*  Toast (action feedback)                                    */
 /* ----------------------------------------------------------- */
-.MPC-vasgrn-toast {
+.vas_099-toast {
     position: absolute;
     left: 50%;
     bottom: 16px;
@@ -1187,23 +1272,23 @@
     transition: opacity .25s ease, transform .25s ease;
     pointer-events: none;
 }
-.MPC-vasgrn-toast.show { opacity: 1; transform: translate(-50%, 0); }
-.MPC-vasgrn-toast.err  { background: #B23636; }
-.MPC-vasgrn-toast.ok   { background: #0C5D38; }
+.vas_099-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.vas_099-toast.err  { background: #B23636; }
+.vas_099-toast.ok   { background: #0C5D38; }
 
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
-[dir="rtl"] .MPC-vasgrn-hdrColL { border-right: none; border-left: 1px solid var(--grn-row-div); padding-right: 0; padding-left: 1.25em; }
-[dir="rtl"] .MPC-vasgrn-table .ta-r { text-align: left; justify-content: flex-start; }
-[dir="rtl"] .MPC-vasgrn-recv { align-items: flex-start; }
-[dir="rtl"] .MPC-vasgrn-actRow { text-align: right; }
-[dir="rtl"] .MPC-vasgrn-actWhen { text-align: left; }
-[dir="rtl"] .MPC-vasgrn-actBody { padding-left: 0.875em; padding-right: 2.5em; }
-[dir="rtl"] .MPC-vasgrn-actCaret svg { transform: scaleX(-1); }
-[dir="rtl"] .MPC-vasgrn-actRow.is-open .MPC-vasgrn-actCaret { transform: rotate(-90deg); }
-[dir="rtl"] .MPC-vasgrn-pgBtn .MPC-vasgrn-ic svg { transform: scaleX(-1); }
-[dir="rtl"] .MPC-vasgrn-tFoot { justify-content: flex-start; }
-[dir="rtl"] .MPC-vasgrn-tf b { margin-left: 0; margin-right: 0.375em; }
-[dir="rtl"] .MPC-vasgrn-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
-[dir="rtl"] .MPC-vasgrn-actions { justify-content: flex-start; }
+[dir="rtl"] .vas_099-hdrColL { border-right: none; border-left: 1px solid var(--grn-row-div); padding-right: 0; padding-left: 1.25em; }
+[dir="rtl"] .vas_099-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .vas_099-recv { align-items: flex-start; }
+[dir="rtl"] .vas_099-actRow { text-align: right; }
+[dir="rtl"] .vas_099-actWhen { text-align: left; }
+[dir="rtl"] .vas_099-actBody { padding-left: 0.875em; padding-right: 2.5em; }
+[dir="rtl"] .vas_099-actCaret svg { transform: scaleX(-1); }
+[dir="rtl"] .vas_099-actRow.is-open .vas_099-actCaret { transform: rotate(-90deg); }
+[dir="rtl"] .vas_099-pgBtn .vas_099-ic svg { transform: scaleX(-1); }
+[dir="rtl"] .vas_099-tFoot { justify-content: flex-start; }
+[dir="rtl"] .vas_099-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .vas_099-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .vas_099-actions { justify-content: flex-start; }
