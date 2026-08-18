@@ -189,6 +189,13 @@
  *                        cannot name is still a work order — workOrderLabel now
  *                        falls back to "#<id>", so the chip always has something
  *                        to read and always opens the record.
+ *   VAI163   2026-08-17  Activity's field-level rows carry the MOVE: "was X →
+ *                        now Y" under the field's name (changeDelta), the old
+ *                        value struck through and a value the log recorded as
+ *                        empty shown as an em dash, so a cleared field is
+ *                        visibly cleared rather than looking like a rendering
+ *                        gap. A row said WHICH field moved but never what it
+ *                        moved from or to.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1189,6 +1196,20 @@
             paintPage();
         }
 
+        // "was X → now Y" under the field's name, for a field-level edit. A
+        // value the log recorded as empty reads as an em dash rather than as a
+        // blank, so a cleared field is visibly cleared instead of looking like a
+        // rendering gap. Follows VAS_101 / VAS_104.
+        function changeDelta(a) {
+            var $d = $('<small class="vas_102-actSub vas_102-actDelta"></small>');
+            var blank = "—";
+            $d.append($('<span class="vas_102-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_102-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_102-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
+        }
+
         function activityRow(a) {
             var meta = ACT_TYPES[a.Type] || ACT_TYPES.note;
 
@@ -1225,6 +1246,9 @@
                 $title.append($('<small class="vas_102-actSub"></small>')
                     .text(a.ChangeScope).attr("title", a.ChangeScope));
             }
+            // ...and the move itself: what the field held before the edit and
+            // what it holds after, on a sub-line of its own.
+            if (a.OldValue || a.NewValue) $title.append(changeDelta(a));
             $row.append($title);
 
             // "when · by whom" — the audit trail's whole point. For an e-mail that

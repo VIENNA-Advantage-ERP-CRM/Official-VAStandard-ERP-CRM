@@ -66,6 +66,18 @@
  *                          on, taking a row of its own inside the wrapping
  *                          .vas_103-actMain so the "when · by whom" stays up on
  *                          the headline's line.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *                        - Added the Activity field-change delta
+ *                          (.vas_103-actDelta / -cvOld / -cvArrow / -cvNew):
+ *                          "was X → now Y" under the field's name, the old
+ *                          value struck through and the new one carrying the
+ *                          row's colour. Matches VAS_101 / VAS_104.
  ***********************************************************/
 
 .vas_103-root {
@@ -756,12 +768,13 @@
 .vas_103-tf.vas_103-is-grand { color: var(--mt-text); font-weight: 700; margin-right: 0; }
 .vas_103-tf.vas_103-is-grand b { color: var(--mt-action); margin-left: 0.5em; font-size: 1.15em; }
 
+/* A narrow panel SHRINKS the table; it never scrolls it sideways. The rows, the
+   totals footer and the drawer under a line used to take a floor width here and
+   the card its own horizontal scrollbar — which hides the right-hand columns
+   behind a control the reader has to find and drag. Every track is
+   minmax(0, Nfr) and every cell carries min-width: 0 with an ellipsis, so they
+   compress instead and a clipped value stays readable through its tooltip. */
 @container (max-width: 660px) {
-    .vas_103-table { overflow-x: auto; }
-    .vas_103-tRow { min-width: 660px; }
-    .vas_103-tFoot { min-width: 660px; }
-    /* The drawer travels with the rows it belongs to when the table scrolls. */
-    .vas_103-cfDrawer { min-width: 660px; }
     .vas_103-tf { margin-right: 0; }
 }
 
@@ -961,4 +974,24 @@
     cursor: default;
     pointer-events: none;
     color: var(--mt-muted);
+}
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value.
+   Matches VAS_101 / VAS_104. */
+.vas_103-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_103-cvOld {
+    color: var(--mt-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_103-cvArrow { flex: none; color: var(--mt-muted); }
+.vas_103-cvNew {
+    color: var(--mt-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
 }

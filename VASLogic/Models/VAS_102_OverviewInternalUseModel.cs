@@ -198,6 +198,15 @@
 ///                        - LoadPostingActivity resolves the table id the same way:
 ///                          the trail lost its posting entry wherever the timeline
 ///                          lost its posting date, and for the same reason.
+///   VAI163   2026-08-17  Field-level activity carries the OLD and NEW values
+///                        (AD_ChangeLog.OldValue / NewValue). Both are normalised
+///                        through ChangeValue: the literal "null" the platform
+///                        writes for a cleared field reads as empty, not as the
+///                        word. A row whose two values are equal is dropped — a
+///                        save that rewrote a field with the value it already had
+///                        is not an edit, and the platform logs plenty of those.
+///                        The trail said WHICH field moved but never what it moved
+///                        from or to. Follows VAS_101 / VAS_104.
 /// </summary>
 
 using System;
@@ -1525,6 +1534,8 @@ namespace VASLogic.Models
                 // AD_Column is LEFT joined so a log row whose column has since been
                 // removed from the dictionary still reports its change.
                 string sql = @"SELECT cl.Created,
+                                      cl.OldValue,
+                                      cl.NewValue,
                                       u.Name         AS UserName,
                                       col.Name       AS FieldLabel,
                                       col.ColumnName AS FieldColumn
@@ -1562,6 +1573,8 @@ namespace VASLogic.Models
             try
             {
                 string sql = @"SELECT cl.Created,
+                                      cl.OldValue,
+                                      cl.NewValue,
                                       u.Name         AS UserName,
                                       col.Name       AS FieldLabel,
                                       col.ColumnName AS FieldColumn,
@@ -1626,15 +1639,35 @@ namespace VASLogic.Models
                 field = Util.GetValueOfString(r["FieldColumn"]);
             if (string.IsNullOrEmpty(field)) return false;
 
+            // The move itself. A save that rewrites a field with the value it
+            // already had is not an edit, and the platform logs plenty of those.
+            string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
+            string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
+            if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) return false;
+
             list.Add(new InternalUseActivityData
             {
                 Type        = "updated",
                 FieldName   = field,
+                OldValue    = oldValue,
+                NewValue    = newValue,
                 ChangeScope = scope,
                 UserName    = Util.GetValueOfString(r["UserName"]),
                 Created     = at
             });
             return true;
+        }
+
+        /// <summary>
+        /// Normalises a logged value for display. The platform writes the literal
+        /// "null" into AD_ChangeLog for a cleared field, which would otherwise be
+        /// shown to the reader as though it were the text "null". Follows VAS_101.
+        /// </summary>
+        private static string ChangeValue(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            string v = value.Trim();
+            return string.Equals(v, "null", StringComparison.OrdinalIgnoreCase) ? "" : v;
         }
 
         /// <summary>
@@ -2025,6 +2058,12 @@ namespace VASLogic.Models
             /// ("#10 Steel Bolt M8"). An issue's substantive edits are its issued
             /// quantities, and those live on the lines.</summary>
             public string    ChangeScope { get; set; }
+            // The move itself, for an "updated" row: what the field held
+            // before the edit and what it holds after. Either side is empty
+            // where the log recorded no value — a field cleared, or filled
+            // for the first time.
+            public string    OldValue    { get; set; }
+            public string    NewValue    { get; set; }
 
             // E-mail (MailAttachment1) — the body is revealed on click.
             public string    Body       { get; set; }   // TextMsg (flattened to text)

@@ -67,6 +67,13 @@
  *                          frame — On Hand now carries a unit name as well as a
  *                          number, and it is a notch wider (0.9fr -> 1.15fr) for
  *                          it. Follows VAS_099, which took the same treatment.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
  ***********************************************************/
 
 .vas_101-root {
@@ -655,10 +662,12 @@
 .vas_101-tf.vas_101-is-grand { color: var(--ic-text); font-weight: 700; }
 .vas_101-tf.vas_101-is-grand b { color: var(--ic-action); margin-left: 0.5em; font-size: 1.15em; }
 
-@container (max-width: 620px) {
-    .vas_101-table { overflow-x: auto; }
-    .vas_101-tRow { min-width: 620px; }
-}
+/* A narrow panel SHRINKS the table; it never scrolls it sideways. Under 620px
+   the rows used to take a floor width and the card its own horizontal
+   scrollbar, which hides the right-hand columns behind a control the reader has
+   to find and drag. Every track is minmax(0, Nfr) and every cell carries
+   min-width: 0 with an ellipsis, so the columns compress instead and a clipped
+   value stays readable through the row's tooltip. */
 
 /* ----------------------------------------------------------- */
 /*  Related Documents                                           */

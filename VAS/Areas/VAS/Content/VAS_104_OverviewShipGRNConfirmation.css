@@ -49,6 +49,13 @@
  *                        back to (.vas_104-toast). The action bar
  *                        (.vas_104-actions / .vas_104-btn) is gone with the Print
  *                        and Confirm buttons it held.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
  ***********************************************************/
 
 .vas_104-root {
@@ -602,13 +609,12 @@
 .vas_104-tf.vas_104-is-grand { color: var(--gc-text); font-weight: 700; }
 .vas_104-tf.vas_104-is-grand b { color: var(--gc-risk-tx); margin-left: 0.375em; }
 
-@container (max-width: 700px) {
-    .vas_104-table { overflow-x: auto; }
-    .vas_104-tRow,
-    .vas_104-root.vas_104-no-quality .vas_104-tRow { min-width: 700px; }
-    /* The drawer travels with the rows it belongs to when the table scrolls. */
-    .vas_104-qcDrawer { min-width: 700px; }
-}
+/* A narrow panel SHRINKS the table; it never scrolls it sideways. Under 700px
+   the rows and the drawer under a line used to take a floor width and the card
+   its own horizontal scrollbar — which hides the right-hand columns behind a
+   control the reader has to find and drag. Every track is minmax(0, Nfr) and
+   every cell carries min-width: 0 with an ellipsis, so the columns compress
+   instead and a clipped value stays readable through the row's tooltip. */
 
 /* ----------------------------------------------------------- */
 /*  Notes + Activity                                            */
