@@ -490,12 +490,12 @@ namespace VASLogic.Models
         private List<OrderUomItem> LoadUomList(Ctx ctx, int C_Order_ID, Dictionary<string, string> rowVars)
         {
             List<OrderUomItem> list = new List<OrderUomItem>();
-            string uomSql = @"SELECT u.C_UOM_ID, COALESCE(u.UOMSymbol, u.Name) AS UOMName
+            string uomSql = @"SELECT u.C_UOM_ID, u.Name AS UOMName
                               FROM C_UOM u
                               WHERE u.IsActive = 'Y'";
             string uomPred = GetValRulePredicate(ctx, "C_UOM_ID", "C_UOM", "u", C_Order_ID, rowVars);
             if (uomPred.Length > 0) uomSql += " AND (" + uomPred + ")";
-            uomSql += " ORDER BY COALESCE(u.UOMSymbol, u.Name)";
+            uomSql += " ORDER BY u.Name";
             uomSql = MRole.GetDefault(ctx).AddAccessSQL(uomSql, "u", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             DataSet uds = DB.ExecuteDataset(uomSql);
             if (uds != null && uds.Tables.Count > 0)
@@ -834,7 +834,7 @@ namespace VASLogic.Models
             string sql = "SELECT " + cols.ToString() +
                 @"COALESCE(p.Name, N'') AS VASOLDISP_ProductName,
                   COALESCE(ch.Name, N'') AS VASOLDISP_ChargeName,
-                  COALESCE(uom.UOMSymbol, uom.Name, N'') AS VASOLDISP_UOMName,
+                  COALESCE(uom.Name, N'') AS VASOLDISP_UOMName,
                   COALESCE(t.Name, N'') AS VASOLDISP_TaxName,
                   COALESCE(asi.Description, N'') AS VASOLDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASOLDISP_HasAttrSet,
@@ -959,6 +959,84 @@ namespace VASLogic.Models
             otherNet = gNet - pNet;
             otherTax = gTax - pTax;
             otherTcs = gTcs - pTcs;
+        }
+
+        /// <summary>
+        /// Returns the aggregated per-tax breakdown for the whole order from C_OrderTax.
+        /// C_OrderTax is updated by the framework whenever a C_OrderLine is saved, so
+        /// this reflects every saved line across all pages — not just the loaded page.
+        /// The client uses this to display correct individual tax rows in the totals footer.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="C_Order_ID">parent sales order</param>
+        /// <returns>one item per tax plus header totals; empty list when no rows exist yet</returns>
+        public List<OrderTaxBreakdownItem> LoadOrderTaxBreakdown(Ctx ctx, int C_Order_ID)
+        {
+            List<OrderTaxBreakdownItem> result = new List<OrderTaxBreakdownItem>();
+            if (C_Order_ID <= 0) return result;
+
+            // C_Order is the leading (FROM) table so AddAccessSQL correctly identifies
+            // alias "co" as the main table and injects the security predicates.
+            // Previously C_OrderTax was first in FROM but alias "co" was passed to
+            // AddAccessSQL — the AccessSqlParser mismatch logged a SEVERE warning and
+            // skipped all security predicates.
+            //
+            // VA106_TCSTotalAmount is intentionally excluded from this query.
+            // Env.IsModuleInstalled checks the module registry which can be populated
+            // before the column migration runs, so the column may be absent on C_Order
+            // even when the check returns true. TCS is read from C_OrderLine.VA106_TCSAmount
+            // in the second query below where it is reliably present when VA106 is installed.
+            string sql = @"SELECT t.Name AS TaxName, ot.TaxAmt, ot.TaxBaseAmt,
+                                  co.TotalLines, co.GrandTotal, cy.CurSymbol, cy.StdPrecision
+                           FROM C_Order co
+                           INNER JOIN C_OrderTax ot ON (ot.C_Order_ID = co.C_Order_ID)
+                           INNER JOIN C_Tax t ON (t.C_Tax_ID = ot.C_Tax_ID)
+                           INNER JOIN C_Currency cy ON (cy.C_Currency_ID = co.C_Currency_ID)
+                           WHERE co.C_Order_ID = @C_Order_ID
+                           AND ot.IsActive = 'Y'
+                           ORDER BY t.Name";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "co", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            DataSet ds = DB.ExecuteDataset(sql,
+                new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) }, null);
+            if (ds == null || ds.Tables.Count == 0) return result;
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                result.Add(new OrderTaxBreakdownItem
+                {
+                    TaxName      = Util.GetValueOfString(r["TaxName"]),
+                    TaxAmt       = Util.GetValueOfDecimal(r["TaxAmt"]),
+                    TaxBaseAmt   = Util.GetValueOfDecimal(r["TaxBaseAmt"]),
+                    TotalLines   = Util.GetValueOfDecimal(r["TotalLines"]),
+                    GrandTotal   = Util.GetValueOfDecimal(r["GrandTotal"]),
+                    CurSymbol    = Util.GetValueOfString(r["CurSymbol"]),
+                    StdPrecision = Util.GetValueOfInt(r["StdPrecision"])
+                });
+            }
+
+            // SurchargeAmt and VA106_TCSAmount live on C_OrderLine, not C_OrderTax.
+            // Fetch both in one round-trip and store on result[0] so the client can
+            // render them as separate rows in the totals footer.
+            if (result.Count > 0)
+            {
+                bool hasTcs = Env.IsModuleInstalled("VA106_");
+                string tcsCol = hasTcs ? ", COALESCE(SUM(ol.VA106_TCSAmount), 0) AS TotalTCS" : "";
+                string surgSql = @"SELECT COALESCE(SUM(ol.SurchargeAmt), 0) AS TotalSurcharge"
+                                 + tcsCol +
+                                 @" FROM C_OrderLine ol
+                                    WHERE ol.C_Order_ID = @C_Order_ID AND ol.IsActive = 'Y'";
+                surgSql = MRole.GetDefault(ctx).AddAccessSQL(surgSql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                DataSet ds2 = DB.ExecuteDataset(surgSql,
+                    new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) }, null);
+                if (ds2 != null && ds2.Tables.Count > 0 && ds2.Tables[0].Rows.Count > 0)
+                {
+                    DataRow r2 = ds2.Tables[0].Rows[0];
+                    result[0].TotalSurcharge = Util.GetValueOfDecimal(r2["TotalSurcharge"]);
+                    if (hasTcs)
+                        result[0].TCSAmount = Util.GetValueOfDecimal(r2["TotalTCS"]);
+                }
+            }
+
+            return result;
         }
 
         private static decimal RowOrderTcs(OrderLineRow row)
@@ -1367,6 +1445,11 @@ namespace VASLogic.Models
             if (req.C_UOM_ID > 0)
                 line.SetC_UOM_ID(req.C_UOM_ID);
 
+            // MOrderLine.SetC_Charge_ID does not auto-set a UOM (unlike MInvoiceLine).
+            // Apply the system default so C_UOM_ID is never 0 on a charge line.
+            if (req.C_Charge_ID > 0 && line.GetC_UOM_ID() <= 0)
+                line.SetC_UOM_ID(GetDefaultUomId(ctx));
+
             if (req.PriceOverride)
             {
                 line.SetPriceEntered(req.PriceEntered);
@@ -1503,7 +1586,11 @@ namespace VASLogic.Models
             "C_OrderLine_ID", "C_Order_ID", "AD_Client_ID", "AD_Org_ID",
             "Created", "CreatedBy", "Updated", "UpdatedBy", "IsActive",
             "M_Product_ID", "C_Charge_ID", "M_AttributeSetInstance_ID",
-            "QtyOrdered", "C_UOM_ID", "PriceEntered", "PriceActual",
+            // QtyEntered must be blocked alongside QtyOrdered: SetQty() sets both, and
+            // ApplyExtraColumns must not overwrite QtyEntered with the stale client value
+            // (which carries the old DB qty), otherwise the framework's beforeSave uses the
+            // stale QtyEntered to recalculate QtyOrdered — reverting the user's qty change.
+            "QtyOrdered", "QtyEntered", "C_UOM_ID", "PriceEntered", "PriceActual",
             "C_Tax_ID", "Line", "Description"
         };
 
@@ -1600,9 +1687,22 @@ namespace VASLogic.Models
         {
             if (C_UOM_ID <= 0) return "";
             object o = DB.ExecuteScalar(
-                "SELECT COALESCE(UOMSymbol, Name) FROM C_UOM WHERE C_UOM_ID=@id",
+                "SELECT Name FROM C_UOM WHERE C_UOM_ID=@id",
                 new SqlParameter[] { new SqlParameter("@id", C_UOM_ID) }, null);
             return Util.GetValueOfString(o);
+        }
+
+        /// <summary>
+        /// Returns the system-default UOM ID ("Each") by delegating to the framework's
+        /// MUOM.GetDefault_UOM_ID — the same call that MInvoiceLine.SetC_Charge_ID makes
+        /// internally, which is why VAS_074 charge lines always have a UOM. MOrderLine does
+        /// not make this call, so we mirror it here.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <returns>default C_UOM_ID from the framework, or 0 if not found</returns>
+        private int GetDefaultUomId(Ctx ctx)
+        {
+            return MUOM.GetDefault_UOM_ID(ctx);
         }
 
         #endregion
@@ -1893,6 +1993,11 @@ namespace VASLogic.Models
 
                     if (input.C_UOM_ID > 0)
                         line.SetC_UOM_ID(input.C_UOM_ID);
+
+                    // Charge lines: MOrderLine.SetC_Charge_ID does not auto-set a UOM.
+                    // Guard against a missing UOM which would cause MOrderLine.Save to fail.
+                    if (input.C_Charge_ID > 0 && line.GetC_UOM_ID() <= 0)
+                        line.SetC_UOM_ID(GetDefaultUomId(ctx));
 
                     // The panel prices every line via CalcLine, so persist the client-sent price exactly.
                     line.SetPriceEntered(input.PriceEntered);
@@ -2441,4 +2546,26 @@ namespace VASLogic.Models
     }
 
     #endregion
+
+    /// <summary>
+    /// One row returned by LoadOrderTaxBreakdown — a per-tax summary from C_OrderTax
+    /// covering ALL order lines (not just the current page). Used by the JS totals footer.
+    /// </summary>
+    public class OrderTaxBreakdownItem
+    {
+        public string TaxName { get; set; }
+        public decimal TaxAmt { get; set; }
+        public decimal TaxBaseAmt { get; set; }
+        public decimal TotalLines { get; set; }
+        public decimal GrandTotal { get; set; }
+        public string CurSymbol { get; set; }
+        public int StdPrecision { get; set; }
+        public decimal TCSAmount { get; set; }
+        /// <summary>
+        /// Total surcharge across all order lines (SUM of C_OrderLine.SurchargeAmt).
+        /// Only populated on the first item (index 0). The client renders it as a
+        /// separate "Surcharge" row so it is not bundled with the base tax amounts.
+        /// </summary>
+        public decimal TotalSurcharge { get; set; }
+    }
 }

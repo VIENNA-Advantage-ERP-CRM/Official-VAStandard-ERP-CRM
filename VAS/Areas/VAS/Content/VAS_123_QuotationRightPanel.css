@@ -624,6 +624,7 @@
 
 .vas_123_qrp-pipe-grid {
     display: grid;
+    font-size: 0.8125em;
 }
 
 .vas_123_qrp-pipe-col {

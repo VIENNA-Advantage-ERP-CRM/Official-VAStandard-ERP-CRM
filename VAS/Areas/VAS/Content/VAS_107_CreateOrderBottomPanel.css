@@ -72,9 +72,19 @@
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
+    /* overscroll-behavior:auto (NOT contain) so the wheel/trackpad CHAINS to the page once
+       this inner scroller hits its top/bottom. `contain` trapped the scroll here — when the
+       pointer was over the panel and it had reached its boundary, the page would not scroll,
+       so it felt stuck. Chaining lets the page scroll smoothly past the panel (mirrors VAS_074). */
+    overscroll-behavior: auto;
     /*padding: 0.75em;*/
     font-family: var(--cil-font);
+    /* Canonical panel anchor — VIEWPORT-stable so the panel renders at the same physical
+       size on every screen resolution (mirrors VAS_074). All internal em tokens resolve
+       against this anchor; container-type lets inner primitives use cqi if needed. */
+    container-type: inline-size;
+    --panel-anchor: clamp(16px, 1vw, 18px);
+    font-size: var(--panel-anchor);
     color: var(--cil-text);
     /* Bottom panel top-edge divider per windows-and-panels.md (Bottom Panel > Shared Rules) */
     /*border-top: 1px solid #DCE6EE;*/
@@ -110,22 +120,20 @@
 }
 
 /* ---------- panel ---------- */
-/* Panel Foundation Rule 1 — wrapper (windows-and-panels.md § Panel Foundation) */
+/* Panel Foundation Rule 1 — wrapper (windows-and-panels.md § Panel Foundation).
+   Plain block container — no flex layout — so the panel grows with its content and the
+   root's overflow-y:auto scrolls the whole panel (header + lines + totals) as one unit.
+   Mirrors VAS_074 which also has no flex / overflow on the panel wrapper. */
 .vas-obl-panel {
-    container-type: inline-size;
     background: #FFFFFF;
     /*border: 1px solid #D9E2EB;*/
     border-radius: 16px;
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
 }
 
 /* Panel Foundation Rule 2 — header chrome (windows-and-panels.md § Panel Foundation) */
 .vas-obl-panel__header {
-    height: 56px;
-    flex: none;
+    min-height: 56px;
     padding: 0 16px;
     /*border-bottom: 1px solid #D9E2EB;*/
     display: flex;
@@ -261,30 +269,25 @@
 }
 
 /* ---------- table (panel body) ---------- */
-/* Panel Foundation Rule 3 — canonical em anchor (windows-and-panels.md § Panel Foundation).
-   Rule 4 form-control reset follows immediately so chips/inputs inside buttons
-   inherit the anchor instead of the UA default ~13.33px. */
+/* Panel Foundation Rule 3 — the font-size anchor lives on .vas-obl-root (mirrors VAS_074).
+   The table is a plain flex column that grows with its content; the root scrolls it. */
 .vas-obl-table {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
     overflow-x: hidden;
     padding: 0.5em 1.25em 1.125em;
     display: flex;
     flex-direction: column;
     gap: 0;
-    /* Three-line canonical anchor block */
-    container-type: inline-size;
-    --panel-anchor: clamp(16px, 1vw, 18px);
-    font-size: var(--panel-anchor);
 }
 
-/* Panel Foundation Rule 4 — form-control reset */
-.vas-obl-table button,
-.vas-obl-table input,
-.vas-obl-table select,
-.vas-obl-table textarea,
-.vas-obl-table optgroup {
+/* Panel Foundation Rule 4 — form-control reset.
+   Scoped to the root + body-level dialogs (mirrors VAS_074 :where(.vas-cil-root,...))
+   so every button/input/select inside the panel inherits the root's font-size anchor
+   instead of falling back to the UA default (~13.33px in Chrome). */
+:where(.vas-obl-root, .vas-obl-dialog-backdrop) button,
+:where(.vas-obl-root, .vas-obl-dialog-backdrop) input,
+:where(.vas-obl-root, .vas-obl-dialog-backdrop) select,
+:where(.vas-obl-root, .vas-obl-dialog-backdrop) textarea,
+:where(.vas-obl-root, .vas-obl-dialog-backdrop) optgroup {
     font-family: inherit;
     font-size: inherit;
     line-height: inherit;
@@ -823,6 +826,26 @@
     .vas-obl-more-btn.is-open {
         background: var(--cil-blue-soft);
         color: var(--cil-action-blue);
+    }
+    /* Highlighted when the Additional Info modal has at least one value set. */
+    .vas-obl-more-btn.has-values {
+        color: var(--cil-action-blue);
+        background: var(--cil-blue-soft);
+        position: relative;
+    }
+    /* Small filled dot in the top-right corner as a data-present indicator. */
+    .vas-obl-more-btn.has-values::after {
+        content: '';
+        position: absolute;
+        top: 0.15em;
+        right: 0.15em;
+        width: 0.4em;
+        height: 0.4em;
+        border-radius: 50%;
+        background: var(--cil-action-blue);
+    }
+    .vas-obl-more-btn.has-values:hover {
+        background: #d9eeff;
     }
     /* Read-only invoice: the "..." button is disabled -> not-allowed (no hover tint). */
     .vas-obl-more-btn:disabled {
@@ -2009,4 +2032,16 @@
    sibling panels'. Mirrors the identical rule in VAS_074_CreateInvoiceLinePanel.css. */
 .vis-ad-w-p-ap-tp-body-head:has(+ .vas-obl-root) {
     display: none !important;
+}
+
+/* "(Incl. Tax)" second line under the Price column header — shown when the order's
+   price list has IsTaxIncluded = Y. Smaller + muted, stacks below "Price" and
+   right-aligns with it. Mirrors .vas-cil-hdr-price-sub in VAS_074. */
+.vas-obl-hdr-price-sub {
+    display: block;
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.1;
+    margin-top: 0.05em;
+    color: var(--obl-text-subtle, #5F7283);
 }
