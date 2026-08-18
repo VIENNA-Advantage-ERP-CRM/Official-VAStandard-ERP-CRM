@@ -502,12 +502,12 @@ namespace VASLogic.Models
         private List<UomItem> LoadUomList(Ctx ctx, int C_Invoice_ID, Dictionary<string, string> rowVars)
         {
             List<UomItem> list = new List<UomItem>();
-            string uomSql = @"SELECT u.C_UOM_ID, COALESCE(u.UOMSymbol, u.Name) AS UOMName
+            string uomSql = @"SELECT u.C_UOM_ID, COALESCE(u.Name, u.UOMSymbol) AS UOMName
                               FROM C_UOM u
                               WHERE u.IsActive = 'Y'";
             string uomPred = GetValRulePredicate(ctx, "C_UOM_ID", "C_UOM", "u", C_Invoice_ID, rowVars);
             if (uomPred.Length > 0) uomSql += " AND (" + uomPred + ")";
-            uomSql += " ORDER BY COALESCE(u.UOMSymbol, u.Name)";
+            uomSql += " ORDER BY COALESCE(u.Name, u.UOMSymbol)";
             uomSql = MRole.GetDefault(ctx).AddAccessSQL(
                 uomSql, "u", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             DataSet uds = DB.ExecuteDataset(uomSql);
