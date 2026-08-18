@@ -317,6 +317,13 @@
  *                          message, which a mail stored without a body cannot do.
  *                          allRecipients / countAddresses went with it, as did the
  *                          sub-line's tooltip.
+ *   VAI163   2026-08-17  Activity's field-level rows carry the MOVE: "was X →
+ *                        now Y" under the field's name (changeDelta), the old
+ *                        value struck through and a value the log recorded as
+ *                        empty shown as an em dash, so a cleared field is
+ *                        visibly cleared rather than looking like a rendering
+ *                        gap. A row said WHICH field moved but never what it
+ *                        moved from or to.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1788,6 +1795,20 @@
             return $panel;
         }
 
+        // "was X → now Y" under the field's name, for a field-level edit. A
+        // value the log recorded as empty reads as an em dash rather than as a
+        // blank, so a cleared field is visibly cleared instead of looking like a
+        // rendering gap. Follows VAS_101 / VAS_104.
+        function changeDelta(a) {
+            var $d = $('<small class="vas_098-actsub vas_098-actDelta"></small>');
+            var blank = "—";
+            $d.append($('<span class="vas_098-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_098-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_098-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
+        }
+
         function activityRow(a) {
             var meta = ACT_BADGE[a.Type] || ACT_BADGE.comment;
             var $row = $('<div class="vas_098-actrow"></div>');
@@ -1839,6 +1860,9 @@
                 $main.append($('<div class="vas_098-actsub"></div>')
                     .text(a.ChangeScope).attr("title", a.ChangeScope));
             }
+            // ...and the move itself: what the field held before the edit and
+            // what it holds after, on a sub-line of its own.
+            if (a.OldValue || a.NewValue) $main.append(changeDelta(a));
             $row.append($main);
 
             // Rows carrying a body are clickable; the caret shows the state.

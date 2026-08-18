@@ -185,6 +185,18 @@
 ///                          "Completed" rather than "Updated" (which now means an
 ///                          edit) and is dated by the workflow's DocComplete stamp,
 ///                          falling back to the record's last change.
+///   VAI163   2026-08-17  Field-level activity carries the OLD and NEW values
+///                        (AD_ChangeLog.OldValue / NewValue). Both are normalised
+///                        through ChangeValue: the literal "null" the platform
+///                        writes for a cleared field reads as empty, not as the
+///                        word. A row whose two values are equal is dropped — a
+///                        save that rewrote a field with the value it already had
+///                        is not an edit, and the platform logs plenty of those.
+///                        The trail said WHICH field moved but never what it moved
+///                        from or to. Follows VAS_101 / VAS_104.
+///                        The line number and item move out of the field's NAME
+///                        into ChangeScope, where the panel draws them on their
+///                        own sub-line rather than inside the headline.
 /// </summary>
 
 using System;
@@ -1778,11 +1790,15 @@ namespace VASLogic.Models
                 // The line-side rows are reached by Record_ID IN (the order's line
                 // ids) under the C_OrderLine table, and carry that line's number.
                 string sql = @"SELECT cl.Created     AS EventOn,
+                                      cl.OldValue    AS OldValue,
+                                      cl.NewValue    AS NewValue,
                                       u.Name         AS UserName,
                                       col.Name       AS FieldLabel,
                                       col.ColumnName AS FieldColumn,
                                       adt.TableName  AS ChangedTable,
-                                      ol.Line        AS LineNo
+                                      ol.Line        AS LineNo,
+                                      p.Name         AS ProductName,
+                                      ch.Name        AS ChargeName
                                  FROM AD_ChangeLog cl
                                 INNER JOIN AD_Table adt
                                         ON (adt.AD_Table_ID = cl.AD_Table_ID)
@@ -1793,6 +1809,8 @@ namespace VASLogic.Models
                                  LEFT OUTER JOIN C_OrderLine ol
                                         ON (adt.TableName = 'C_OrderLine'
                                             AND ol.C_OrderLine_ID = cl.Record_ID)
+                                 LEFT OUTER JOIN M_Product p  ON (p.M_Product_ID = ol.M_Product_ID)
+                                 LEFT OUTER JOIN C_Charge  ch ON (ch.C_Charge_ID  = ol.C_Charge_ID)
                                 WHERE COALESCE(cl.IsActive, 'Y') = 'Y'
                                   AND ((adt.TableName = 'C_Order'
                                         AND cl.Record_ID = @C_Order_ID)
@@ -1822,16 +1840,33 @@ namespace VASLogic.Models
 
                     // A change made on a LINE names the line it was made on, so an
                     // edit to line 20's price is not read as an edit to the order.
+                    // The line number and its item travel in ChangeScope, beside the
+                    // field rather than inside its name.
+                    string scope = "";
                     int lineNo = Util.GetValueOfInt(r["LineNo"]);
                     if (Util.GetValueOfString(r["ChangedTable"]) == "C_OrderLine" && lineNo > 0)
-                        field = field + " (#" + lineNo + ")";
+                    {
+                        scope = "#" + lineNo;
+                        string item = Util.GetValueOfString(r["ProductName"]);
+                        if (string.IsNullOrEmpty(item)) item = Util.GetValueOfString(r["ChargeName"]);
+                        if (!string.IsNullOrEmpty(item)) scope += " " + item.Trim();
+                    }
+
+                    // The move itself. A save that rewrites a field with the value it
+                    // already had is not an edit, and the platform logs plenty of those.
+                    string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
+                    string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
+                    if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) continue;
 
                     list.Add(new ActivityData
                     {
-                        EventType = "Updated",
-                        FieldName = field,
-                        ActorName = Util.GetValueOfString(r["UserName"]),
-                        EventTime = Util.GetValueOfDateTime(r["EventOn"])
+                        EventType   = "Updated",
+                        FieldName   = field,
+                        OldValue    = oldValue,
+                        NewValue    = newValue,
+                        ChangeScope = scope,
+                        ActorName   = Util.GetValueOfString(r["UserName"]),
+                        EventTime   = Util.GetValueOfDateTime(r["EventOn"])
                     });
                 }
             }
@@ -1841,6 +1876,18 @@ namespace VASLogic.Models
                 // update rows and the rest of the feed is unaffected.
                 _log.Severe("LoadOrderChangeActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// Normalises a logged value for display. The platform writes the literal
+        /// "null" into AD_ChangeLog for a cleared field, which would otherwise be
+        /// shown to the reader as though it were the text "null". Follows VAS_101.
+        /// </summary>
+        private static string ChangeValue(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            string v = value.Trim();
+            return string.Equals(v, "null", StringComparison.OrdinalIgnoreCase) ? "" : v;
         }
 
         /// <summary>
@@ -2408,9 +2455,16 @@ namespace VASLogic.Models
             public string   EventType { get; set; }
             public string   Title     { get; set; }   // the row's headline; an e-mail's subject
             // The field an "Updated" row is about — the dictionary's display name
-            // for the changed column, with the line number when the change was made
-            // on a line. Empty on every other event type.
+            // for the changed column. Empty on every other event type.
             public string   FieldName { get; set; }
+            // The move itself: what the field held before the edit and what it holds
+            // after. Either side is empty where the log recorded no value — a field
+            // cleared, or filled for the first time.
+            public string   OldValue  { get; set; }
+            public string   NewValue  { get; set; }
+            // Which record the edit landed on: "" for the order header, else the
+            // line's number and item ("#20 Bolt M8").
+            public string   ChangeScope { get; set; }
             public string   ActorName { get; set; }
             public decimal  Amount    { get; set; }
             public DateTime? EventTime { get; set; }

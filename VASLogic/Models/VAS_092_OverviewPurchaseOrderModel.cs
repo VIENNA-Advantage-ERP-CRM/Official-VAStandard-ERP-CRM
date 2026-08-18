@@ -277,6 +277,25 @@
 ///                          (drop shipment) rather than into our warehouse. The
 ///                          panel showed a Warehouse against a drop-ship order
 ///                          with nothing saying the goods never arrive there.
+///   VAI163   2026-08-17  Field-level activity carries the OLD and NEW values
+///                        (AD_ChangeLog.OldValue / NewValue). Both are normalised
+///                        through ChangeValue: the literal "null" the platform
+///                        writes for a cleared field reads as empty, not as the
+///                        word. A row whose two values are equal is dropped — a
+///                        save that rewrote a field with the value it already had
+///                        is not an edit, and the platform logs plenty of those.
+///                        The trail said WHICH field moved but never what it moved
+///                        from or to. Follows VAS_101 / VAS_104.
+///                        The LINE change log joins it (C_OrderLine, matched to
+///                        this order): an order's substantive edits are its
+///                        quantities, prices and promised dates, and those live on
+///                        the lines — a header-only trail reported nothing for the
+///                        change a reader most wants to trace. Each line row names
+///                        the line it landed on (ChangeScope), and both passes
+///                        share AddChangeRow. The header table is matched with
+///                        UPPER, which is the single point at which the whole
+///                        loader could return nothing while the log was full of
+///                        good rows.
 /// </summary>
 
 using System;
@@ -2042,11 +2061,17 @@ namespace VASLogic.Models
         /// </summary>
         private void LoadOrderChangeActivity(int C_Order_ID, List<ActivityData> list)
         {
+            // ----- Header edits -----
             try
             {
                 // AD_Column is LEFT joined so a log row whose column has since been
-                // removed from the dictionary still reports its change.
+                // removed from the dictionary still reports its change. The table is
+                // matched with UPPER: an equality on the stored spelling is the
+                // single point at which this whole loader returns nothing while the
+                // change log is full of good rows, and it fails silently.
                 string sql = @"SELECT cl.Created      AS EventOn,
+                                      cl.OldValue     AS OldValue,
+                                      cl.NewValue     AS NewValue,
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
                                       col.ColumnName  AS FieldColumn
@@ -2058,36 +2083,116 @@ namespace VASLogic.Models
                                  LEFT OUTER JOIN AD_User u
                                          ON (u.AD_User_ID = cl.CreatedBy)
                                 WHERE cl.Record_ID = @C_Order_ID
-                                  AND adt.TableName = 'C_Order'
+                                  AND UPPER(adt.TableName) = 'C_ORDER'
                                   AND NVL(cl.IsActive, 'Y') = 'Y'
                                 ORDER BY cl.Created";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
-                if (ds == null || ds.Tables.Count == 0) return;
-
-                foreach (DataRow r in ds.Tables[0].Rows)
+                if (ds != null && ds.Tables.Count > 0)
                 {
-                    string field = Util.GetValueOfString(r["FieldLabel"]);
-                    if (string.IsNullOrEmpty(field))
-                        field = Util.GetValueOfString(r["FieldColumn"]);
-                    // A row that can name no field renders as a bare "Updated"
-                    // with nothing to identify it — worse than not showing it.
-                    if (string.IsNullOrEmpty(field)) continue;
-
-                    list.Add(new ActivityData
-                    {
-                        Type       = "updated",
-                        FieldName  = field,
-                        UserName   = Util.GetValueOfString(r["UserName"]),
-                        Created    = Util.GetValueOfDateTime(r["EventOn"])
-                    });
+                    foreach (DataRow r in ds.Tables[0].Rows) AddChangeRow(r, "", list);
                 }
             }
             catch (Exception ex)
             {
                 // Change logging is optional; a schema without it just shows no
                 // update rows.
-                _log.Severe("LoadOrderChangeActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                _log.Severe("LoadOrderChangeActivity/header (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
             }
+
+            // ----- Line edits -----
+            //
+            // An order's substantive edits are its quantities, prices and promised
+            // dates, and those live on the LINES. Reading only C_Order reported
+            // nothing at all for the change a reader most wants to trace — a
+            // corrected quantity left no record in the trail. Each row names the
+            // line it landed on. Matches VAS_101 / VAS_099.
+            try
+            {
+                string sql = @"SELECT cl.Created      AS EventOn,
+                                      cl.OldValue     AS OldValue,
+                                      cl.NewValue     AS NewValue,
+                                      u.Name          AS UserName,
+                                      col.Name        AS FieldLabel,
+                                      col.ColumnName  AS FieldColumn,
+                                      ol.Line         AS LineNo,
+                                      p.Name          AS ProductName,
+                                      ch.Name         AS ChargeName
+                                 FROM AD_ChangeLog cl
+                                 INNER JOIN AD_Table adt
+                                         ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                 INNER JOIN C_OrderLine ol
+                                         ON (ol.C_OrderLine_ID = cl.Record_ID)
+                                 LEFT OUTER JOIN M_Product p  ON (p.M_Product_ID = ol.M_Product_ID)
+                                 LEFT OUTER JOIN C_Charge  ch ON (ch.C_Charge_ID  = ol.C_Charge_ID)
+                                 LEFT OUTER JOIN AD_Column col
+                                         ON (col.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                         ON (u.AD_User_ID = cl.CreatedBy)
+                                WHERE UPPER(adt.TableName) = 'C_ORDERLINE'
+                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                  AND ol.C_Order_ID = @C_Order_ID
+                                ORDER BY cl.Created";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        string scope = "#" + Util.GetValueOfInt(r["LineNo"]);
+                        string item  = Util.GetValueOfString(r["ProductName"]);
+                        if (string.IsNullOrEmpty(item)) item = Util.GetValueOfString(r["ChargeName"]);
+                        if (!string.IsNullOrEmpty(item)) scope += " " + item.Trim();
+                        AddChangeRow(r, scope, list);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadOrderChangeActivity/lines (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Turns one AD_ChangeLog row into an activity entry, carrying the move
+        /// itself — what the value was and what it became. A change whose column
+        /// cannot be resolved through the dictionary is skipped: without a field
+        /// name the row says only that "something" changed, which is what the
+        /// field-level trail exists to stop reporting.
+        /// </summary>
+        private void AddChangeRow(DataRow r, string scope, List<ActivityData> list)
+        {
+            string field = Util.GetValueOfString(r["FieldLabel"]);
+            if (string.IsNullOrEmpty(field))
+                field = Util.GetValueOfString(r["FieldColumn"]);
+            if (string.IsNullOrEmpty(field)) return;
+
+            string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
+            string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
+            // A save that rewrites a field with the value it already had is not an
+            // edit, and the platform logs plenty of those.
+            if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) return;
+
+            list.Add(new ActivityData
+            {
+                Type        = "updated",
+                FieldName   = field,
+                OldValue    = oldValue,
+                NewValue    = newValue,
+                ChangeScope = scope,
+                UserName    = Util.GetValueOfString(r["UserName"]),
+                Created     = Util.GetValueOfDateTime(r["EventOn"])
+            });
+        }
+
+        /// <summary>
+        /// Normalises a logged value for display. The platform writes the literal
+        /// "null" into AD_ChangeLog for a cleared field, which would otherwise be
+        /// shown to the reader as though it were the text "null". Follows VAS_101.
+        /// </summary>
+        private static string ChangeValue(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            string v = value.Trim();
+            return string.Equals(v, "null", StringComparison.OrdinalIgnoreCase) ? "" : v;
         }
 
         /// <summary>Single-parameter helper for the C_Order-scoped activity queries.</summary>
@@ -2959,6 +3064,15 @@ namespace VASLogic.Models
             /// <summary>For an "updated" row: the display name of the field that
             /// changed. One row per field, so the trail says what moved.</summary>
             public string    FieldName       { get; set; }
+            /// <summary>For an "updated" row: the move itself — what the field held
+            /// before the edit and what it holds after. Either side is empty when
+            /// the log recorded no value, which is a field being cleared or
+            /// filled.</summary>
+            public string    OldValue        { get; set; }
+            public string    NewValue        { get; set; }
+            /// <summary>For an "updated" row made on a LINE: which line it landed
+            /// on ("#20 Bolt M8"). Empty for a header edit.</summary>
+            public string    ChangeScope     { get; set; }
             public DateTime? Created         { get; set; }
 
             // E-mail (MailAttachment1) — the body is revealed on click.

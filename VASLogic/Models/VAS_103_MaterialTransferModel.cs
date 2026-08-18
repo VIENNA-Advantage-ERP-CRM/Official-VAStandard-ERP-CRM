@@ -72,6 +72,15 @@
 ///                          touched. The table name is matched with UPPER, since
 ///                          an equality on the stored spelling fails silently and
 ///                          reads exactly like the loader was never written.
+///   VAI163   2026-08-17  Field-level activity carries the OLD and NEW values
+///                        (AD_ChangeLog.OldValue / NewValue). Both are normalised
+///                        through ChangeValue: the literal "null" the platform
+///                        writes for a cleared field reads as empty, not as the
+///                        word. A row whose two values are equal is dropped — a
+///                        save that rewrote a field with the value it already had
+///                        is not an edit, and the platform logs plenty of those.
+///                        The trail said WHICH field moved but never what it moved
+///                        from or to. Follows VAS_101 / VAS_104.
 /// </summary>
 
 using System;
@@ -802,6 +811,8 @@ namespace VASLogic.Models
                 // AD_Column is LEFT joined so a log row whose column has since been
                 // removed from the dictionary still reports its change.
                 string sql = @"SELECT cl.Created      AS EventOn,
+                                      cl.OldValue     AS OldValue,
+                                      cl.NewValue     AS NewValue,
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
                                       col.ColumnName  AS FieldColumn
@@ -836,6 +847,8 @@ namespace VASLogic.Models
             try
             {
                 string sql = @"SELECT cl.Created      AS EventOn,
+                                      cl.OldValue     AS OldValue,
+                                      cl.NewValue     AS NewValue,
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
                                       col.ColumnName  AS FieldColumn,
@@ -896,14 +909,34 @@ namespace VASLogic.Models
                 field = Util.GetValueOfString(r["FieldColumn"]);
             if (string.IsNullOrEmpty(field)) return;
 
+            // The move itself. A save that rewrites a field with the value it
+            // already had is not an edit, and the platform logs plenty of those.
+            string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
+            string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
+            if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) return;
+
             list.Add(new ActivityData
             {
                 EventType   = "Updated",
                 FieldName   = field,
+                OldValue    = oldValue,
+                NewValue    = newValue,
                 ChangeScope = scope,
                 ActorName   = Util.GetValueOfString(r["UserName"]),
                 EventTime   = at
             });
+        }
+
+        /// <summary>
+        /// Normalises a logged value for display. The platform writes the literal
+        /// "null" into AD_ChangeLog for a cleared field, which would otherwise be
+        /// shown to the reader as though it were the text "null". Follows VAS_101.
+        /// </summary>
+        private static string ChangeValue(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            string v = value.Trim();
+            return string.Equals(v, "null", StringComparison.OrdinalIgnoreCase) ? "" : v;
         }
 
         private void LoadMilestoneActivity(int M_Movement_ID, List<ActivityData> list)
@@ -1269,6 +1302,12 @@ namespace VASLogic.Models
             /// ("#10 Steel Bolt M8"). A transfer's substantive edits are its moved
             /// quantities and locators, and those live on the lines.</summary>
             public string    ChangeScope { get; set; }
+            // The move itself, for an "updated" row: what the field held
+            // before the edit and what it holds after. Either side is empty
+            // where the log recorded no value — a field cleared, or filled
+            // for the first time.
+            public string    OldValue    { get; set; }
+            public string    NewValue    { get; set; }
         }
 
         public class MaterialTransferOverviewData

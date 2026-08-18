@@ -111,6 +111,13 @@
  *                          row is dated from M_Movement.Updated, so the nearest
  *                          thing to an edit trail was one row carrying the LAST
  *                          save's timestamp and nothing about what it touched.
+ *   VAI163   2026-08-17  Activity's field-level rows carry the MOVE: "was X →
+ *                        now Y" under the field's name (changeDelta), the old
+ *                        value struck through and a value the log recorded as
+ *                        empty shown as an em dash, so a cleared field is
+ *                        visibly cleared rather than looking like a rendering
+ *                        gap. A row said WHICH field moved but never what it
+ *                        moved from or to.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1035,6 +1042,20 @@
             return $b;
         }
 
+        // "was X → now Y" under the field's name, for a field-level edit. A
+        // value the log recorded as empty reads as an em dash rather than as a
+        // blank, so a cleared field is visibly cleared instead of looking like a
+        // rendering gap. Follows VAS_101 / VAS_104.
+        function changeDelta(a) {
+            var $d = $('<small class="vas_103-actSub vas_103-actDelta"></small>');
+            var blank = "—";
+            $d.append($('<span class="vas_103-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_103-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_103-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
+        }
+
         function activityRow(a) {
             var meta = ACT_TYPES[a.EventType] || ACT_TYPES.Note;
 
@@ -1069,6 +1090,9 @@
                 $main.append($('<small class="vas_103-actSub"></small>')
                     .text(a.ChangeScope).attr("title", a.ChangeScope));
             }
+            // ...and the move itself: what the field held before the edit and
+            // what it holds after, on a sub-line of its own.
+            if (a.OldValue || a.NewValue) $main.append(changeDelta(a));
             $row.append($main);
             return $row;
         }
