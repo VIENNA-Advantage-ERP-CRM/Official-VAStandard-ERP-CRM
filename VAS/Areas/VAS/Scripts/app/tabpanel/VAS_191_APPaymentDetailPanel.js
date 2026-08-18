@@ -45,7 +45,11 @@
  *                  all: no empty tables, no "no data" rows. An unposted payment
  *                  has no Posted Entry section, a payment with nothing prepared
  *                  has no Payment Allocate section, and one that has never been
- *                  allocated has no Allocation Detail section.
+ *                  allocated has no Allocation Detail section. Payment Allocate
+ *                  is additionally hidden once the payment is Completed, Closed,
+ *                  Reversed or Voided (DocStatus CO / CL / RE / VO) - the
+ *                  prepared rows are spent by then and Allocation Detail is the
+ *                  section that tells the story.
  *
  *                  The panel chrome (shell width, collapse strip, header, close
  *                  button, panel switcher) belongs to the VIS tab-panel host, not
@@ -57,6 +61,8 @@
  * Class Used     : VAS.VAS_191_APPaymentDetailPanel
  * Chronological development:
  *   VAI145   2026-08-17  Created.
+ *   VAI145   2026-08-18  Payment Allocate section hidden for DocStatus
+ *                        CO / CL / RE / VO.
  *
  * -- Labels / Message Keys ---------------------------------------------------
  *  Panel, header and summary cards
@@ -649,6 +655,17 @@
 
         function any(list) { return !!(list && list.length); }
 
+        /* Payment Allocate is what is still only PREPARED on the payment
+           (C_PaymentAllocate). Once the document is completed, closed, reversed
+           or voided that intent has either been turned into real allocations -
+           which the Allocation Detail section shows - or been discarded with the
+           document, so the prepared rows are stale either way. Show the section
+           only while the payment is still open. */
+        function showPaymentAllocate() {
+            if (!any(data.PaymentAllocate)) return false;
+            return !isCompletedOrClosed() && !isReversedOrVoided();
+        }
+
         /* key | when to draw it | what draws it. Rendering iterates this in
            order; nothing else decides which sections exist or where they sit.
            The order follows the panel's reading order: what the payment is ->
@@ -666,7 +683,7 @@
             { key: "life", condition: function () { return true; }, render: renderLifecycle },
             { key: "details", condition: function () { return true; }, render: renderDetails },
             { key: "banner", condition: function () { return true; }, render: renderBanner },
-            { key: "allocate", condition: function () { return any(data.PaymentAllocate); }, render: renderPaymentAllocate },
+            { key: "allocate", condition: function () { return showPaymentAllocate(); }, render: renderPaymentAllocate },
             { key: "detail", condition: function () { return any(data.AllocationDetail); }, render: renderAllocationDetail },
             { key: "approval", condition: function () { return true; }, render: renderApproval },
             { key: "posted", condition: function () { return hasPostedRows(); }, render: renderPostedJournal }
