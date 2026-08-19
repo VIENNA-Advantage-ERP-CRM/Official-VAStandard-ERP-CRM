@@ -779,30 +779,7 @@ namespace VAdvantage.Model
                                     log.Info(" WidgetAcessNotSaved");
                                 }
                             }
-                        }
-
-
-                        /////////Save DocumentActionAcess
-                        dsComm = DB.ExecuteDataset("Select * From AD_Widget_Access WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
-                        if (dsComm != null)
-                        {
-                            for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
-                            {
-                                widgetAcess = new X_AD_Widget_Access(m_ctx, 0, m_trx);
-                                widgetAcess.SetAD_Client_ID(m_client.GetAD_Client_ID());
-                                widgetAcess.SetIsActive(true);
-                                widgetAcess.SetAD_Org_ID(0);
-                                widgetAcess.SetAD_Role_ID(role.GetAD_Role_ID());
-                                if (dsComm.Tables[0].Rows[j]["AD_Widget_ID"] != null && dsComm.Tables[0].Rows[j]["AD_Widget_ID"] != DBNull.Value)
-                                {
-                                    widgetAcess.SetAD_Widget_ID(Util.GetValueOfInt(dsComm.Tables[0].Rows[j]["AD_Widget_ID"]));
-                                }
-                                if (!widgetAcess.Save(m_trx))
-                                {
-                                    log.Info(" DocumentActionAcessNotSaved");
-                                }
-                            }
-                        }
+                        }                        
                     }
                 }
             }
