@@ -52,11 +52,13 @@ namespace VASLogic.Models
         public const string STATUS_NOT_CONFIGURED = "NOTCONFIG";
         public const string STATUS_NO_PERIOD = "NOPERIOD";
 
-        /* C_PeriodControl.PeriodStatus stored codes (list reference). */
-        private const string PERIODSTATUS_Open = "O";
-        private const string PERIODSTATUS_Closed = "C";
-        private const string PERIODSTATUS_NeverOpened = "N";
-        private const string PERIODSTATUS_PermanentlyClosed = "P";
+        /* C_PeriodControl.PeriodStatus stored codes (list reference). Public so the
+           sibling period widgets (VAS_193 Previous Period) count control rows against
+           the same codes instead of restating them. */
+        public const string PERIODSTATUS_Open = "O";
+        public const string PERIODSTATUS_Closed = "C";
+        public const string PERIODSTATUS_NeverOpened = "N";
+        public const string PERIODSTATUS_PermanentlyClosed = "P";
 
         /* C_Period.PeriodType stored code for a standard accounting period. */
         private const string PERIODTYPE_StandardPeriod = "S";
@@ -247,6 +249,8 @@ namespace VASLogic.Models
         /// status the badge shows. Control is maintained per DocBaseType, so the
         /// summary must represent the complete configuration - never one arbitrary
         /// row picked with MAX / MIN / FETCH FIRST.
+        /// Public static so the sibling period widgets (VAS_193 Previous Period)
+        /// summarise a period exactly the same way instead of copying the rule.
         /// </summary>
         /// <param name="openCount">Controls with PeriodStatus 'O'.</param>
         /// <param name="closedCount">Controls with PeriodStatus 'C'.</param>
@@ -254,7 +258,7 @@ namespace VASLogic.Models
         /// <param name="neverOpenedCount">Controls with PeriodStatus 'N'.</param>
         /// <param name="totalCount">Total active controls of the period.</param>
         /// <returns>One of the STATUS_* tokens.</returns>
-        private string SummarizeStatus(int openCount, int closedCount, int permanentlyClosedCount, int neverOpenedCount, int totalCount)
+        public static string SummarizeStatus(int openCount, int closedCount, int permanentlyClosedCount, int neverOpenedCount, int totalCount)
         {
             if (totalCount <= 0) { return STATUS_NOT_CONFIGURED; }
             if (openCount == totalCount) { return STATUS_OPEN; }
