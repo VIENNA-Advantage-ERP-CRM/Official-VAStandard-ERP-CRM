@@ -230,7 +230,7 @@ namespace VASLogic.Models
                                 usr.Name AS CreatedByName,
                                 pay.Created,
                                 pay.Updated,
-                                inv.isexpenseinvoice");
+                                inv.isexpenseinvoice, bpUsr.EMail ");
             sql.Append(@", pay.VA009_PaymentMethod_ID, pm.VA009_Name AS PaymentMethodName");
             sql.Append(@",pay.VA009_ExecutionStatus");
             sql.Append(@"
@@ -242,6 +242,7 @@ namespace VASLogic.Models
                          INNER JOIN C_DocType dt ON (dt.C_DocType_ID=pay.C_DocType_ID)
                          LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=pay.C_BPartner_ID)
                          LEFT OUTER JOIN C_BPartner_Location bpl ON (bpl.C_BPartner_Location_ID=pay.C_BPartner_Location_ID)
+                         LEFT OUTER JOIN AD_User bpUsr ON (bpUsr.C_BPartner_ID=bp.C_BPartner_ID AND bpUsr.EMail IS NOT NULL)
                          LEFT OUTER JOIN C_Withholding wh ON (wh.C_Withholding_ID=pay.C_Withholding_ID)
                          LEFT OUTER JOIN C_Withholding bwh ON (bwh.C_Withholding_ID=pay.BackupWithholding_ID)
                          LEFT OUTER JOIN C_Invoice inv ON (inv.C_Invoice_ID=pay.C_Invoice_ID)
@@ -321,6 +322,7 @@ namespace VASLogic.Models
             result.BPValue = Util.GetValueOfString(r["BPValue"]);
             result.C_BPartner_Location_ID = Util.GetValueOfInt(r["C_BPartner_Location_ID"]);
             result.BPLocationName = Util.GetValueOfString(r["BPLocationName"]);
+            result.BPEMail = Util.GetValueOfString(r["EMail"]);
 
             result.C_Currency_ID = Util.GetValueOfInt(r["C_Currency_ID"]);
             result.C_ConversionType_ID = Util.GetValueOfInt(r["C_ConversionType_ID"]);
@@ -1277,7 +1279,7 @@ namespace VASLogic.Models
             /// the partner's code and the booking organisation.</summary>
             public int C_BPartner_Location_ID { get; set; }
             public string BPLocationName { get; set; }
-
+            public string BPEMail { get; set; }
             public int C_Currency_ID { get; set; }
             public int C_ConversionType_ID { get; set; }
             public string CurISO { get; set; }
