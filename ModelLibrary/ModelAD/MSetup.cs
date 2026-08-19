@@ -12,6 +12,7 @@ using System.IO;
 using System.Data;
 using VAdvantage.Print;
 using System.ServiceModel;
+using ViennaAdvantage.Model;
 
 namespace VAdvantage.Model
 {
@@ -436,7 +437,7 @@ namespace VAdvantage.Model
         //createClient
         private void CreateDefaultRoles(int adminUserID)
         {
-            string sql = @"select * from ad_role where ad_client_id=0 and ad_org_id=0 and name!='Sys Admin' and name!='System Administrator' AND IsForNewTenant='Y'";
+            string sql = @"SELECT * FROM AD_Role WHERE AD_Client_ID=0 AND AD_Org_ID=0 AND Name != 'Sys Admin' AND Name!='System Administrator' AND IsForNewTenant='Y' AND IsActive = 'Y'";
             DataSet ds = DB.ExecuteDataset(sql);
             if (ds != null)
             {
@@ -449,6 +450,7 @@ namespace VAdvantage.Model
                 X_AD_Form_Access formAcess = null;
                 X_AD_Workflow_Access workAccess = null;
                 X_AD_Task_Access taskAcess = null;
+                X_AD_Widget_Access widgetAcess = null;
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
                     role = new MRole(m_ctx, 0, m_trx);
@@ -575,7 +577,7 @@ namespace VAdvantage.Model
                     else
                     {
                         /////////Save OrgAccess
-                        dsComm = DB.ExecuteDataset("Select * From AD_Role_OrgAccess WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Role_OrgAccess WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
                         {
                             for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
@@ -611,7 +613,7 @@ namespace VAdvantage.Model
                             log.Info(role.GetName() + " UserAccessNotSaved");
                         }
                         /////////////Window Access
-                        dsComm = DB.ExecuteDataset("Select * From AD_Window_Access WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Window_Access WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
                         {
                             for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
@@ -640,7 +642,7 @@ namespace VAdvantage.Model
                             }
                         }
                         ////////Save PRocess Acceess
-                        dsComm = DB.ExecuteDataset("Select * From AD_Process_Access WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Process_Access WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
                         {
                             for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
@@ -664,13 +666,13 @@ namespace VAdvantage.Model
                                 }
                                 if (!processAcess.Save(m_trx))
                                 {
-                                    log.Info(" WindowAcessNotSaved");
+                                    log.Info(" ProcessAcessNotSaved");
                                 }
                             }
                         }
 
                         ////////Save FormAccess 
-                        dsComm = DB.ExecuteDataset("Select * From AD_Form_Access WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Form_Access WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
                         {
                             for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
@@ -694,12 +696,12 @@ namespace VAdvantage.Model
                                 }
                                 if (!formAcess.Save(m_trx))
                                 {
-                                    log.Info(" WindowAcessNotSaved");
+                                    log.Info(" FormAcessNotSaved");
                                 }
                             }
                         }
                         /////////////Save WorkFlow Access
-                        dsComm = DB.ExecuteDataset("Select * From AD_Workflow_Access WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Workflow_Access WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
                         {
                             for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
@@ -723,12 +725,12 @@ namespace VAdvantage.Model
                                 }
                                 if (!workAccess.Save(m_trx))
                                 {
-                                    log.Info(" WindowAcessNotSaved");
+                                    log.Info(" WorkflowAcessNotSaved");
                                 }
                             }
                         }
                         /////////Save TaskAcess
-                        dsComm = DB.ExecuteDataset("Select * From AD_Task_Access WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Task_Access WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
                         {
                             for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
@@ -752,10 +754,32 @@ namespace VAdvantage.Model
                                 }
                                 if (!taskAcess.Save(m_trx))
                                 {
-                                    log.Info(" WindowAcessNotSaved");
+                                    log.Info(" TaskAcessNotSaved");
                                 }
                             }
                         }
+
+                        /////////Save WidgetAcess
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Widget_Access WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        if (dsComm != null)
+                        {
+                            for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
+                            {
+                                widgetAcess = new X_AD_Widget_Access(m_ctx, 0, m_trx);
+                                widgetAcess.SetAD_Client_ID(m_client.GetAD_Client_ID());
+                                widgetAcess.SetIsActive(true);
+                                widgetAcess.SetAD_Org_ID(0);
+                                widgetAcess.SetAD_Role_ID(role.GetAD_Role_ID());
+                                if (dsComm.Tables[0].Rows[j]["AD_Widget_ID"] != null && dsComm.Tables[0].Rows[j]["AD_Widget_ID"] != DBNull.Value)
+                                {
+                                    widgetAcess.SetAD_Widget_ID(Util.GetValueOfInt(dsComm.Tables[0].Rows[j]["AD_Widget_ID"]));
+                                }
+                                if (!widgetAcess.Save(m_trx))
+                                {
+                                    log.Info(" WidgetAcessNotSaved");
+                                }
+                            }
+                        }                        
                     }
                 }
             }
