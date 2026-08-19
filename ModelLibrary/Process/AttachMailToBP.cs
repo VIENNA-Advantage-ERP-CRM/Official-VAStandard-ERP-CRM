@@ -32,6 +32,7 @@ namespace VAdvantage.Process
         string sender = string.Empty, userAccount = string.Empty;
         string folderName = "Inbox";
         string isExcludeEmployee = string.Empty, excludedEmails = string.Empty;
+        string isAutoAttach = string.Empty;
         string accessToken = string.Empty, provider = string.Empty, userEmail = string.Empty, userDomain = string.Empty;
         DataSet dsUser = null;
         private Assembly assembly;
@@ -75,8 +76,9 @@ namespace VAdvantage.Process
                                   umail.AD_CLient_ID,
                                   umail.AD_Org_ID,umail.ISAUTOATTACH,umail.TABLEATTACH,umail.IsExcludeEmployee,umail.EMail,
                                   umail.DateLastRun, umail.AD_UserMailConfigration_ID, umail.VA101_Protocol, umail.VAS_ExcludedEmailList,
-                                  ap.VA101_Provider, ac.VA101_APIAuthCredential_ID, ac.VA101_AccessToken, ac.VA101_Email
-                                FROM ad_usermailconfigration umail LEFT JOIN VA101_APIAuthCredential ac
+                                  ap.VA101_Provider, ac.VA101_APIAuthCredential_ID, ac.VA101_AccessToken, ac.VA101_Email"
+                                + (Env.IsModuleInstalled("VAI01_") ? ", VAI01_IsCustomizeAttach, VAI01_AIOrchestration_ID" : "") +
+                                @" FROM ad_usermailconfigration umail LEFT JOIN VA101_APIAuthCredential ac
                                 ON (umail.VA101_APIAuthCredential_ID=ac.VA101_APIAuthCredential_ID AND ac.VA101_IsAuthorized='Y')
                                 LEFT JOIN VA101_AuthProvider ap ON (umail.VA101_AuthProvider_ID=ap.VA101_AuthProvider_ID)
                                 WHERE umail.IsActive ='Y' AND ac.IsActive ='Y' AND umail.VA101_IsAllowAccessEmail='Y'";
@@ -91,11 +93,12 @@ namespace VAdvantage.Process
                                   umail.AD_User_ID,
                                   umail.AD_CLient_ID,
                                   umail.AD_Org_ID,umail.ISAUTOATTACH,umail.TABLEATTACH,umail.IsExcludeEmployee,
-                                  umail.EMail,umail.DateLastRun, AD_UserMailConfigration_ID
-                                FROM ad_usermailconfigration umail
+                                  umail.EMail,umail.DateLastRun, AD_UserMailConfigration_ID"
+                                + (Env.IsModuleInstalled("VAI01_") ? ", VAI01_IsCustomizeAttach, VAI01_AIOrchestration_ID" : "") +
+                                @" FROM ad_usermailconfigration umail
                                 WHERE umail.IsActive ='Y' ";
-
             }
+
             DataSet ds = DB.ExecuteDataset(sql);
             if (ds == null || ds.Tables[0].Rows.Count == 0)
             {
@@ -106,8 +109,9 @@ namespace VAdvantage.Process
             UserInformation user = null;
             for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
             {
-                sender = Convert.ToString(ds.Tables[0].Rows[i]["TABLEATTACH"]).Trim();
+                //sender = Convert.ToString(ds.Tables[0].Rows[i]["TABLEATTACH"]).Trim();
                 isExcludeEmployee = Convert.ToString(ds.Tables[0].Rows[i]["IsExcludeEmployee"]).Trim();
+                isAutoAttach = Convert.ToString(ds.Tables[0].Rows[i]["ISAUTOATTACH"]).Trim();
                 lastRun = null;
 
                 if (ds.Tables[0].Rows[i]["DateLastRun"] != null)
@@ -115,10 +119,10 @@ namespace VAdvantage.Process
                     lastRun = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateLastRun"]);
                 }
 
-                if (Convert.ToString(ds.Tables[0].Rows[i]["ISAUTOATTACH"]).Trim() == "N" && (sender == string.Empty || sender == null))
+                if (isAutoAttach == "N" && Env.IsModuleInstalled("VAI01_") && Convert.ToString(ds.Tables[0].Rows[i]["VAI01_IsCustomizeAttach"]).Trim() == "N")
                 {
                     retVal.Append("Mail Configration EMail Address <=> " + Convert.ToString(ds.Tables[0].Rows[i]["imapusername"]) + Environment.NewLine);
-                    retVal.Append(Utility.Msg.GetMsg(GetCtx(), "IsAutoAttachORTableAttach") + Environment.NewLine);
+                    retVal.Append(Utility.Msg.GetMsg(GetCtx(), "IsAutoAttachORCustAttach") + Environment.NewLine);
                     continue;
                 }
 
@@ -245,12 +249,16 @@ namespace VAdvantage.Process
                         GetMails(user, AD_User_ID, AD_Client_ID, AD_Org_ID);
                     }
                 }
+
                 DB.ExecuteQuery("UPDATE AD_UserMailConfigration SET DateLastRun = " + GlobalVariable.TO_DATE(DateTime.Now.AddDays(-1), true)
                     + " WHERE AD_UserMailConfigration_ID = " + Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_UserMailConfigration_ID"]));
 
-                if (Env.IsModuleInstalled("VAI01_"))
+                if (Env.IsModuleInstalled("VAI01_") && Util.GetValueOfInt(ds.Tables[0].Rows[i]["VAI01_AIOrchestration_ID"]) > 0)
                 {
-                    ExecuteMailSuggestion(AD_Client_ID, "VAI01_AISuggestionOnReceivedMsg", 1000003, 0, AD_User_ID, GetCtx());
+                    string orchestartionkey = Util.GetValueOfString(DB.ExecuteScalar(@"SELECT Value FROM VAI01_AIOrchestration 
+                    WHERE VAI01_AIOrchestration_ID = " + Util.GetValueOfInt(ds.Tables[0].Rows[i]["VAI01_AIOrchestration_ID"])));
+
+                    ExecuteMailSuggestion(AD_Client_ID, orchestartionkey, 1000003, 0, AD_User_ID, GetCtx());
                 }
             }
             return retVal.ToString();
@@ -321,14 +329,17 @@ namespace VAdvantage.Process
                         string mailDomain = from.Contains("@") ? from.Split('@').Last().Trim().ToLower() : string.Empty;
                         string attachType = "I";
 
-                        existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
-                        if (existRec > 0)// Is mail already attached
+                        if (isAutoAttach == "N")
                         {
-                            retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                            existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
+                            if (existRec > 0)// Is mail already attached
+                            {
+                                retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                                continue;
+                            }
+                            AttachMail(mail, 0, 0, attachType, "", "", "");
                             continue;
                         }
-                        AttachMail(mail, 0, 0, attachType, "", "", "");
-                        continue;
 
                         if (!String.IsNullOrEmpty(subJect) && subJect.IndexOf("(●") > -1)
                         {
