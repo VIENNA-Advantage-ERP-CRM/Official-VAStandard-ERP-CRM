@@ -29,6 +29,51 @@
  *                        base-theme rule meant the base design won and
  *                        repainted the panel; scoping them to the panel ends
  *                        that.
+ *   VAI163   2026-08-12  - Added the line's Attribute Set Instance sub-line
+ *                          (.vas_101-itAttr).
+ *                        - Added the three sections now below the lines: Related
+ *                          Documents (.vas_101-docRow / -docItem / -docTxt, rows
+ *                          clickable via .vas_101-is-link), Notes
+ *                          (.vas_101-textCard / -noteLbl) and Activity
+ *                          (.vas_101-actList / -actRow / -actTag with its own
+ *                          .vas_101-tone-* set / -actTitle / -actLead / -actWhen),
+ *                          plus the activity pager (.vas_101-pager / -pgRange /
+ *                          -pgCtrls / -pgPos / -pgBtn) and a toast
+ *                          (.vas_101-toast) for the record-open path.
+ *                        - The Complete / Post adjustments buttons are gone from
+ *                          the panel, so .vas_101-actions and the .vas_101-btn
+ *                          family style nothing now. They are left in place:
+ *                          .vas_101-is-disabled is shared with the pager.
+ *   VAI163   2026-08-12  Added the Activity e-mail rows: the recipient sub-line
+ *                        (.vas_101-actSub, wrapping so addresses read in full), the
+ *                        openable row and its caret (.vas_101-actRow.-is-openable /
+ *                        -is-open / -actCaret) and the message body that opens
+ *                        under it (.vas_101-actBody / -actMeta).
+ *   VAI163   2026-08-12  The count-card row gains a fourth card carrying a MONEY
+ *                        figure (Variance Value), so a status value can now be an
+ *                        amount: .vas_101-statVal-amt takes a notch less size and
+ *                        clips to one line rather than wrapping inside its card.
+ *                        Activity gains field-change rows — the value move under
+ *                        the field's name (.vas_101-actDelta / -cvOld / -cvArrow /
+ *                        -cvNew), with the old value struck through and the new
+ *                        one carrying the weight.
+ *   VAI163   2026-08-14  - Added .vas_101-baseUom: the product's base unit named
+ *                          after the On Hand figure, muted and a size down so the
+ *                          quantity still reads first.
+ *                        - The count table's tracks are minmax(0, Nfr) and its
+ *                          cells clip inside their own track
+ *                          (.vas_101-tRow > span), so a long value can no longer
+ *                          widen a column and push the right-hand ones out of the
+ *                          frame — On Hand now carries a unit name as well as a
+ *                          number, and it is a notch wider (0.9fr -> 1.15fr) for
+ *                          it. Follows VAS_099, which took the same treatment.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
  ***********************************************************/
 
 .vas_101-root {
@@ -349,6 +394,16 @@
     text-align: center;
 }
 .vas_101-statVal { font-size: 1.25em; font-weight: 700; line-height: 1.1; color: var(--ic-text); }
+/* A money figure carries a currency token and two decimals, so it is far longer
+   than a line count — at the count cards' size it would wrap inside its own
+   card. It takes a notch less and clips to one line, with the full figure on the
+   element's tooltip. */
+.vas_101-statVal.vas_101-statVal-amt {
+    font-size: 1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .vas_101-statLbl { font-size: 0.6875em; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--ic-muted); margin-top: 0.25em; }
 
 .vas_101-statCard.vas_101-tone-match  .vas_101-statVal { color: var(--ic-success-tx); }
@@ -482,8 +537,23 @@
     align-items: center;
     gap: 0.625em;
     padding: 0.625em 0.875em;
-    grid-template-columns: 2.4fr 0.7fr 0.9fr 0.9fr 0.9fr 1.1fr 0.9fr;
+    /* On Hand (3rd) is a notch wider than the quantity columns beside it: it
+       carries the base unit's name after the figure, where they carry a figure
+       alone. Every track is minmax(0, Nfr) so a long value clips inside its own
+       column instead of widening the track and pushing the right-hand columns
+       out of the frame. */
+    grid-template-columns:
+        minmax(0, 2.4fr) minmax(0, 0.7fr) minmax(0, 1.15fr) minmax(0, 0.9fr)
+        minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 0.9fr);
 }
+
+/* Cells clip inside their own track rather than widening it — the counterpart to
+   the minmax(0, Nfr) tracks above. The item cell's children carry their own
+   ellipsis, so it is unharmed by the clip. */
+.vas_101-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vas_101-tHead > span,
+.vas_101-tRow > span.vas_101-ta-r,
+.vas_101-tRow > span.vas_101-ta-c { white-space: nowrap; }
 
 .vas_101-tHead {
     background: #F5F8FB;
@@ -503,6 +573,15 @@
 .vas_101-tBody:last-of-type { border-bottom: none; }
 .vas_101-tBody:hover { background: #FAFCFE; }
 
+/* The base unit named after the On Hand figure. Muted and a size down, so the
+   quantity still reads first and the unit qualifies it. */
+.vas_101-baseUom {
+    margin-left: 0.3125em;
+    color: var(--ic-muted);
+    font-size: 0.9231em;
+    font-weight: 400;
+}
+
 .vas_101-table .vas_101-ta-r { text-align: right; justify-content: flex-end; }
 .vas_101-table .vas_101-ta-c { text-align: center; justify-content: center; }
 
@@ -519,6 +598,18 @@
 .vas_101-itSku {
     font-size: 0.9231em;
     color: var(--ic-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Attribute Set Instance (lot / serial / size ...), directly under the product
+   name — the attribute qualifies WHICH stock was counted. Darker than the
+   search-key / locator line below it: it identifies the goods, where that only
+   locates them. */
+.vas_101-itAttr {
+    font-size: 0.9231em;
+    color: var(--ic-sub, var(--ic-text));
     margin-top: 0.125em;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -571,14 +662,184 @@
 .vas_101-tf.vas_101-is-grand { color: var(--ic-text); font-weight: 700; }
 .vas_101-tf.vas_101-is-grand b { color: var(--ic-action); margin-left: 0.5em; font-size: 1.15em; }
 
-@container (max-width: 620px) {
-    .vas_101-table { overflow-x: auto; }
-    .vas_101-tRow { min-width: 620px; }
-}
+/* A narrow panel SHRINKS the table; it never scrolls it sideways. Under 620px
+   the rows used to take a floor width and the card its own horizontal
+   scrollbar, which hides the right-hand columns behind a control the reader has
+   to find and drag. Every track is minmax(0, Nfr) and every cell carries
+   min-width: 0 with an ellipsis, so the columns compress instead and a clipped
+   value stays readable through the row's tooltip. */
 
 /* ----------------------------------------------------------- */
-/*  Actions (visual buttons)                                    */
+/*  Related Documents                                           */
 /* ----------------------------------------------------------- */
+/* Reuses the count table's frame with one full-width track: the section lists
+   documents, not columns of figures. */
+.vas_101-docRow {
+    display: flex; align-items: center; gap: 0.625em;
+    padding: 0.625em 0.875em; min-width: 0;
+}
+.vas_101-docItem { display: flex; align-items: center; gap: 0.5em; min-width: 0; flex: 1; }
+.vas_101-docTxt { min-width: 0; flex: 1; }
+/* A whole row is clickable — the open arrow and the identifier tint on hover. */
+.vas_101-docRow.vas_101-is-link { cursor: pointer; }
+.vas_101-docRow.vas_101-is-link:hover { background: #F2F8FD; }
+.vas_101-docRow.vas_101-is-link .vas_101-docItem > .vas_101-ic:last-child { color: var(--ic-muted); flex: none; }
+.vas_101-docRow.vas_101-is-link:hover .vas_101-docItem > .vas_101-ic:last-child,
+.vas_101-docRow.vas_101-is-link:hover .vas_101-itName { color: var(--ic-action); }
+
+/* ----------------------------------------------------------- */
+/*  Notes                                                       */
+/* ----------------------------------------------------------- */
+.vas_101-textCard {
+    border: 1px solid var(--ic-card-bd); border-radius: var(--ic-card-radius);
+    background: #fff; padding: 0.875em 1em;
+    font-size: 0.8125em; color: var(--ic-text); line-height: 1.55;
+}
+.vas_101-textCard p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.vas_101-textCard p + p { margin-top: 0.625em; }
+/* Caption above a LINE's own note ("Line 10 — Steel Bolt M8"), so a reader knows
+   which row it annotates. */
+.vas_101-noteLbl {
+    margin-top: 0.875em; font-size: 0.8462em; font-weight: 700; letter-spacing: .3px;
+    text-transform: uppercase; color: var(--ic-muted); line-height: 1.3;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vas_101-noteLbl + p { margin-top: 0.1875em; }
+.vas_101-textCard > .vas_101-noteLbl:first-child { margin-top: 0; }
+
+/* ----------------------------------------------------------- */
+/*  Activity                                                    */
+/* ----------------------------------------------------------- */
+.vas_101-actList {
+    border: 1px solid var(--ic-card-bd); border-radius: var(--ic-card-radius);
+    background: #fff; padding: 0 0.875em;
+}
+/* A wrapping flex row: the badge, the headline, then "when · by whom" held right
+   by margin-left:auto — which keeps its place when the row wraps on a narrow
+   panel. */
+.vas_101-actRow {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 0.625em;
+    padding: 0.5625em 0; border-bottom: 1px solid var(--ic-row-div); font-size: 0.8125em;
+}
+.vas_101-actRow:last-child { border-bottom: none; }
+.vas_101-actTag {
+    display: inline-flex; align-items: center; gap: 0.375em; flex: none;
+    border-radius: 999px; padding: 0.25em 0.625em;
+    font-size: 0.8462em; font-weight: 700; line-height: 1.2; white-space: nowrap;
+}
+.vas_101-actTag .vas_101-ic { color: currentColor; }
+/* Tag tones. Scoped to the tag so they cannot collide with the header pill's own
+   .vas_101-tone-* rules, which are scoped the same way. */
+.vas_101-actTag.vas_101-tone-neutral { background: var(--ic-neutral-bg); color: var(--ic-neutral-tx); }
+.vas_101-actTag.vas_101-tone-info    { background: var(--ic-info-bg);    color: var(--ic-info-tx); }
+.vas_101-actTag.vas_101-tone-success { background: var(--ic-success-bg); color: var(--ic-success-tx); }
+.vas_101-actTag.vas_101-tone-warning { background: var(--ic-warning-bg); color: var(--ic-warning-tx); }
+.vas_101-actTag.vas_101-tone-risk    { background: var(--ic-risk-bg);    color: var(--ic-risk-tx); }
+.vas_101-actTag.vas_101-tone-purple  { background: #EFEAFF;              color: #5F4AA6; }
+.vas_101-actTitle { flex: 1 1 auto; min-width: 0; color: var(--ic-text); overflow: hidden; }
+.vas_101-actLead { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A NOTE's headline is the comment itself: it wraps (to three lines) rather than
+   ellipsising, since that text is what the reader came for. */
+.vas_101-actLead.vas_101-multiline {
+    white-space: normal; overflow-wrap: break-word; word-break: break-word; line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+}
+.vas_101-actWhen {
+    flex: none; margin-left: auto; max-width: 100%; text-align: right;
+    color: var(--ic-muted); font-size: 0.9231em; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---- Activity: e-mail rows ---- */
+/* The recipient line under an e-mail's subject. It WRAPS rather than clipping:
+   it lists the mail's addresses in full, and an address cut off mid-domain
+   identifies nobody. break-word, since a single long address has no space to
+   break at. */
+.vas_101-actSub {
+    display: block; font-size: 0.8462em; color: var(--ic-muted); margin-top: 0.125em;
+    white-space: normal; overflow-wrap: break-word; word-break: break-word; line-height: 1.45;
+}
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value. */
+.vas_101-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_101-cvOld {
+    color: var(--ic-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_101-cvArrow { flex: none; color: var(--ic-muted); }
+.vas_101-cvNew {
+    color: var(--ic-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_101-actRow.vas_101-is-openable { cursor: pointer; }
+.vas_101-actRow.vas_101-is-openable:hover { background: #F7FBFE; }
+.vas_101-actCaret {
+    display: inline-flex; align-items: center; flex: none;
+    color: var(--ic-muted); transition: transform .15s ease;
+}
+.vas_101-actRow.vas_101-is-open .vas_101-actCaret {
+    transform: rotate(90deg); color: var(--ic-action);
+}
+/* The message body, revealed under its row. */
+.vas_101-actBody {
+    background: #F7FAFD; border-bottom: 1px solid var(--ic-row-div);
+    padding: 0.625em 0.875em 0.75em 2.5em;
+    font-size: 0.8125em; color: var(--ic-text); line-height: 1.55;
+}
+.vas_101-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+/* From / To / Cc / Bcc heading the opened message — wraps on the address, for
+   the same reason the row's recipient line does. */
+.vas_101-actMeta {
+    font-size: 0.8462em; color: var(--ic-muted); margin-bottom: 0.3125em;
+    overflow-wrap: break-word; word-break: break-word;
+}
+
+/* Activity pager — a sibling of the list card, so the controls keep their place
+   while the card's rows are replaced underneath them. */
+.vas_101-pager {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    gap: 0.5em 0.875em; margin-top: 0.5625em; font-size: 0.75em; color: var(--ic-muted);
+}
+.vas_101-pgCtrls { display: inline-flex; align-items: center; gap: 0.5em; }
+.vas_101-pgPos { color: var(--ic-text); font-weight: 700; }
+.vas_101-pgBtn {
+    display: inline-flex; align-items: center; gap: 0.3125em;
+    border: 1px solid var(--ic-card-bd); border-radius: 999px;
+    padding: 0.25em 0.625em; background: #fff; color: var(--ic-text);
+    font-weight: 700; line-height: 1; cursor: pointer; user-select: none; white-space: nowrap;
+}
+.vas_101-pgBtn:hover { background: var(--ic-info-bg); border-color: var(--ic-action); }
+.vas_101-pgBtn.vas_101-is-disabled {
+    opacity: .45; cursor: default; pointer-events: none; color: var(--ic-muted);
+}
+
+/* Toast (record-open feedback) */
+.vas_101-toast {
+    position: absolute; left: 50%; bottom: 1em; transform: translate(-50%, 0.75em);
+    max-width: 90%; padding: 0.5em 0.875em; border-radius: 8px;
+    background: #102C3F; color: #fff; font-size: 0.8125em; line-height: 1.4;
+    box-shadow: 0 6px 18px rgba(16,44,63,0.25);
+    opacity: 0; z-index: 1000; pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+}
+.vas_101-toast.vas_101-show { opacity: 1; transform: translate(-50%, 0); }
+.vas_101-toast.vas_101-err  { background: #B23636; }
+.vas_101-toast.vas_101-ok   { background: #0C5D38; }
+
+/* ----------------------------------------------------------- */
+/*  Actions (visual buttons) — no longer rendered               */
+/* ----------------------------------------------------------- */
+/* The Complete / Post adjustments buttons are gone from the panel, so
+   .vas_101-actions and the .vas_101-btn family style nothing now. They are left
+   in place: .vas_101-is-disabled is shared with the pager above, and these are
+   the panel's only record of its own control styling should an action return. */
 .vas_101-actions {
     display: flex;
     align-items: center;

@@ -72,6 +72,34 @@ namespace VIS.Controllers
             return new { iso = iso, symbol = symbol };
         }
 // ===== NEW CODE END — currency format =====
+        /// <summary>
+        /// The product's CURRENT cost price, as a derived table (M_Product_ID, CurrentCostPrice).
+        /// Picks the M_Cost row whose cost element matches the accounting schema's own costing
+        /// method, so landed-cost and other cost COMPONENT rows are excluded. A plain
+        /// MAX(M_Cost.CurrentCostPrice) is NOT the product cost - on FSMTesting6 it reports
+        /// 'Air Filter (7 micron)' at 80,142.29 (a Landed Cost component) against a true standard
+        /// cost of 2,599.
+        /// </summary>
+        private const string ProductCurrentCostSql = @"
+                    SELECT c.M_Product_ID, MAX(c.CurrentCostPrice) AS CurrentCostPrice
+                    FROM M_Cost c
+                    INNER JOIN M_CostElement ce ON ce.M_CostElement_ID = c.M_CostElement_ID
+                    INNER JOIN C_AcctSchema acs ON acs.C_AcctSchema_ID = c.C_AcctSchema_ID
+                                               AND acs.M_CostType_ID   = c.M_CostType_ID
+                    WHERE c.IsActive = 'Y'
+                      AND ce.CostingMethod IS NOT NULL
+                      AND ce.CostingMethod = acs.CostingMethod
+                    GROUP BY c.M_Product_ID";
+
+        /// <summary>
+        /// Unit cost of an issue line: the line's own cost when it has one, otherwise the product's
+        /// current cost, otherwise 0. Expects the line aliased as "line" and the product-cost
+        /// derived table aliased as "pc".
+        /// The NULLIF guards are essential: M_InventoryLine.CurrentCostPrice is a literal 0 (not
+        /// NULL) on many issue lines, so a plain COALESCE returns 0 and never reaches the fallback.
+        /// </summary>
+        private const string LineUnitCostSql =
+            "COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pc.CurrentCostPrice, 0)";
 
         /// <summary>Returns paginated list of recent material issue transactions.</summary>
         [AjaxAuthorizeAttribute]
@@ -130,12 +158,18 @@ namespace VIS.Controllers
                         wh.Name AS WarehouseName,
                         COUNT(line.M_InventoryLine_ID) AS LineCount,
                         SUM(line.QtyInternalUse) AS TotalQty,
-                        SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)) AS TotalValue,
+                        SUM(line.QtyInternalUse * " + LineUnitCostSql + @") AS TotalValue,
                         ROW_NUMBER() OVER (ORDER BY ai.MovementDate DESC, ai.M_Inventory_ID DESC) AS RowSeq
                       FROM (" + invAccessSql + @") ai
                       INNER JOIN AD_Org org ON org.AD_Org_ID = ai.AD_Org_ID
                       LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = ai.M_Warehouse_ID
+                      -- IsActive belongs in the JOIN condition, not a WHERE clause: moving it to
+                      -- WHERE would turn this LEFT JOIN into an inner join and drop line-less
+                      -- documents, which this widget must still list (a Drafted issue with no
+                      -- lines yet is exactly the sort of row it exists to surface).
                       LEFT JOIN M_InventoryLine line ON line.M_Inventory_ID = ai.M_Inventory_ID
+                                                    AND line.IsActive = 'Y'
+                      LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = line.M_Product_ID
                       GROUP BY ai.M_Inventory_ID, ai.DocumentNo, ai.MovementDate, ai.DocStatus, org.Name, wh.Name
                     ) WHERE RowSeq > " + offset + " AND RowSeq <= " + (offset + pSize);
 

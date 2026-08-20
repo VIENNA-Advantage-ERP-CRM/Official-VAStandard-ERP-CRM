@@ -280,6 +280,29 @@ namespace VAS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// Returns the aggregated per-tax breakdown for the whole order from C_OrderTax.
+        /// C_OrderTax is maintained by the framework on every line save, so the result
+        /// covers all saved lines across all pages — not just the current page.
+        /// The panel JS calls this after save, delete, and initial load to show correct
+        /// individual tax rows in the totals footer.
+        /// </summary>
+        /// <param name="C_Order_ID">parent order</param>
+        /// <returns>serialized list of OrderTaxBreakdownItem</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetTaxBreakdown(int C_Order_ID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = (Ctx)Session["ctx"];
+                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                retJSON = JsonConvert.SerializeObject(model.LoadOrderTaxBreakdown(ctx, C_Order_ID));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
         /// <summary>Deletes the supplied saved order lines through MOrderLine.</summary>
         /// <param name="payload">serialized OrderDeleteLinesRequest</param>
         /// <returns>serialized save result (refreshed lines or error key)</returns>

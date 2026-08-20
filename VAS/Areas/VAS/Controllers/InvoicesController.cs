@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -791,22 +792,85 @@ namespace VIS.Controllers
         }
 
         /// <summary>
+        /// Parses an ISO (yyyy-MM-dd) date sent by the search widget's date-range inputs. Returns null
+        /// for an empty / malformed value, so a bad filter simply does not narrow the search rather
+        /// than failing it. Parsed with the invariant culture (the HTML date input always posts ISO),
+        /// never the server's locale.
+        /// </summary>
+        private static DateTime? ParseIsoDate(string value)
+        {
+            DateTime parsed;
+            if (!string.IsNullOrEmpty(value) &&
+                DateTime.TryParseExact(value.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+            {
+                return parsed.Date;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Parses an amount bound sent by the search widget's amount-range inputs. The client reads
+        /// those through the framework's VAmountTextBox, whose getValue() already resolves the user's
+        /// decimal separator and hands back a plain JS number — so the wire format is always invariant
+        /// ("1234.5"), never locale-formatted. Returns null for an empty / malformed value.
+        /// </summary>
+        private static decimal? ParseAmount(string value)
+        {
+            decimal parsed;
+            if (!string.IsNullOrEmpty(value) &&
+                decimal.TryParse(value.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out parsed))
+            {
+                return parsed;
+            }
+            return null;
+        }
+
+        /// <summary>
         /// Type-ahead search for the Sales Invoice search widget. Matches active sales invoices of the
-        /// session client by document number, customer name, document status (keyword → DocStatus code
-        /// or IsPaid flag), or grand-total amount (when the query is numeric). Completed ('CO') and
-        /// voided ('VO') invoices are excluded. Returns the top N matches
-        /// (newest first), each carrying its own currency symbol/ISO, so the widget can list them and
-        /// zoom the host window's invoice tab to the chosen record. The query is bound as a parameter
-        /// (no SQL injection); MRole is applied on the main physical table (C_Invoice). Oracle/PostgreSQL
+        /// session client by document number, customer name, target document type (C_DocTypeTarget_ID —
+        /// by C_DocType.Name or DocBaseType, e.g. "Credit Memo" / "ARC"), SALES ORDER document number
+        /// (typing an order's DocumentNo returns every invoice raised against it — matched on the
+        /// header link C_Invoice.C_Order_ID and on the line link C_InvoiceLine.C_OrderLine_ID →
+        /// C_OrderLine → C_Order, so a "create lines from" invoice with no header order is found too),
+        /// document status (keyword → DocStatus code or IsPaid flag), or grand-total amount (when the
+        /// query is numeric). Those are
+        /// OR'ed; the optional filters then NARROW (AND) the result:
+        ///   invFrom/invTo - Invoice Date  (C_Invoice.DateInvoiced)
+        ///   dueFrom/dueTo - Due Date      (C_InvoicePaySchedule.DueDate, matched via EXISTS so an
+        ///                                  invoice with several schedules is still one row)
+        ///   amtFrom/amtTo - grand-total range, compared on ABS(GrandTotal) exactly like the free-text
+        ///                   amount match, so a credit memo's negative total falls in the same band
+        ///   currencyId    - C_Invoice.C_Currency_ID (the widget picks it with the framework's
+        ///                   C_Currency_ID lookup control)
+        /// Either bound of a range may be omitted (open-ended). A filter alone is a valid search — the
+        /// free-text term may be empty when at least one filter is set. Date ranges are inclusive of
+        /// both days: the upper bound is bound as the exclusive start of the NEXT day, so a
+        /// DateInvoiced / DueDate carrying a time component still matches (no TRUNC — Oracle-only). The
+        /// Due Date range only decides WHICH invoices match; the schedule's own due date is not
+        /// returned. Returns the top N matches (newest first), each carrying its own currency
+        /// symbol/ISO and its target document type, so the widget can list them and zoom the host
+        /// window's invoice tab to the chosen record. Every user value is bound as a parameter (no SQL
+        /// injection); MRole is applied on the main physical table (C_Invoice). Oracle/PostgreSQL
         /// compatible.
         /// </summary>
-        /// <param name="q">Free-text search term.</param>
+        /// <param name="q">Free-text search term. May be empty when a filter is supplied.</param>
         /// <param name="max">Maximum rows to return (1..25, default 10).</param>
+        /// <param name="page">1-based page for the dropdown's scroll paging.</param>
+        /// <param name="invFrom">Invoice Date range start (yyyy-MM-dd), inclusive; optional.</param>
+        /// <param name="invTo">Invoice Date range end (yyyy-MM-dd), inclusive; optional.</param>
+        /// <param name="dueFrom">Due Date range start (yyyy-MM-dd), inclusive; optional.</param>
+        /// <param name="dueTo">Due Date range end (yyyy-MM-dd), inclusive; optional.</param>
+        /// <param name="amtFrom">Grand-total range start (invariant decimal), inclusive; optional.</param>
+        /// <param name="amtTo">Grand-total range end (invariant decimal), inclusive; optional.</param>
+        /// <param name="currencyId">C_Currency_ID to restrict to; 0 / absent = any currency.</param>
         /// <returns>JSON { rows[] } where each row has cInvoiceId, documentNo, customerName, grandTotal,
-        /// docStatus, isPaid, dateInvoiced, curSymbol, currencyIso.</returns>
+        /// docStatus, isPaid, dateInvoiced, docTypeName, docBaseType, orderDocumentNo, curSymbol,
+        /// currencyIso.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult SearchInvoices(string q, int max = 10, int page = 1)
+        public JsonResult SearchInvoices(string q, int max = 10, int page = 1,
+            string invFrom = null, string invTo = null, string dueFrom = null, string dueTo = null,
+            string amtFrom = null, string amtTo = null, int currencyId = 0)
         {
             if (Session["ctx"] == null)
             {
@@ -816,8 +880,33 @@ namespace VIS.Controllers
             Ctx ctx = Session["ctx"] as Ctx;
             int clientId = ctx.GetAD_Client_ID();
 
+            /* Date-range filters. The upper bounds become the exclusive start of the following day so
+               the range stays inclusive of that whole day even when the column carries a time. */
+            DateTime? invFromDate = ParseIsoDate(invFrom);
+            DateTime? invToDate = ParseIsoDate(invTo);
+            DateTime? dueFromDate = ParseIsoDate(dueFrom);
+            DateTime? dueToDate = ParseIsoDate(dueTo);
+            /* Amount range + currency restriction — same AND semantics as the date ranges. */
+            decimal? amtFromValue = ParseAmount(amtFrom);
+            decimal? amtToValue = ParseAmount(amtTo);
+            /* 0 in BOTH bounds means "no amount filter", not "invoices totalling exactly zero" —
+               otherwise a zeroed-out pair would silently return nothing. A single 0 bound is kept:
+               0 → 5000 is a real band. */
+            if (amtFromValue.HasValue && amtToValue.HasValue && amtFromValue.Value == 0m && amtToValue.Value == 0m)
+            {
+                amtFromValue = null;
+                amtToValue = null;
+            }
+            if (currencyId < 0)
+            {
+                currencyId = 0;
+            }
+            bool hasFilter = invFromDate.HasValue || invToDate.HasValue || dueFromDate.HasValue || dueToDate.HasValue
+                             || amtFromValue.HasValue || amtToValue.HasValue || currencyId > 0;
+
             q = (q ?? "").Trim();
-            if (q.Length == 0)
+            /* Nothing to search on: no term AND no filter. (A filter on its own IS a search.) */
+            if (q.Length == 0 && !hasFilter)
             {
                 return Json(JsonConvert.SerializeObject(new { rows = new List<object>() }), JsonRequestBehavior.AllowGet);
             }
@@ -842,10 +931,37 @@ namespace VIS.Controllers
             string likeVal = "%" + q.ToUpper() + "%";
 
             List<string> ors = new List<string>();
-            parameters.Add(new SqlParameter("@Like1", likeVal));
-            ors.Add("UPPER(i.DocumentNo) LIKE @Like1");
-            parameters.Add(new SqlParameter("@Like2", likeVal));
-            ors.Add("UPPER(bp.Name) LIKE @Like2");
+            if (q.Length > 0)
+            {
+                parameters.Add(new SqlParameter("@Like1", likeVal));
+                ors.Add("UPPER(i.DocumentNo) LIKE @Like1");
+                parameters.Add(new SqlParameter("@Like2", likeVal));
+                ors.Add("UPPER(bp.Name) LIKE @Like2");
+                /* Target document type (C_DocTypeTarget_ID): by its name ("Credit Memo", "AR
+                   Invoice") or by its DocBaseType code ("ARC", "ARI"). */
+                parameters.Add(new SqlParameter("@Like3", likeVal));
+                ors.Add("UPPER(dt.Name) LIKE @Like3");
+                parameters.Add(new SqlParameter("@Like4", likeVal));
+                ors.Add("UPPER(dt.DocBaseType) LIKE @Like4");
+                /* Sales order document number: typing an order's DocumentNo returns EVERY invoice
+                   raised against that order. Two ways an invoice hangs off an order, both counted:
+                     - header link, C_Invoice.C_Order_ID (the LEFT-joined so alias), and
+                     - line link, C_InvoiceLine.C_OrderLine_ID -> C_OrderLine -> C_Order, which is
+                       how a "create lines from" invoice references its order when the header
+                       C_Order_ID was never set.
+                   The line-level test is an EXISTS so an invoice with many matching lines is still
+                   ONE row. (This whole OR block is appended after AddAccessSQL - see below - so the
+                   access parser never sees these subqueries.) */
+                parameters.Add(new SqlParameter("@Like5", likeVal));
+                ors.Add("UPPER(so.DocumentNo) LIKE @Like5");
+                parameters.Add(new SqlParameter("@Like6", likeVal));
+                ors.Add(@"EXISTS (SELECT 1 FROM C_InvoiceLine ilo
+                                  INNER JOIN C_OrderLine olo ON (olo.C_OrderLine_ID=ilo.C_OrderLine_ID)
+                                  INNER JOIN C_Order oho ON (oho.C_Order_ID=olo.C_Order_ID)
+                                  WHERE ilo.C_Invoice_ID=i.C_Invoice_ID
+                                    AND ilo.IsActive='Y'
+                                    AND UPPER(oho.DocumentNo) LIKE @Like6)");
+            }
 
             /* Status keyword -> document-status code(s). Codes are constants, safe to inline. */
             string ql = q.ToLower();
@@ -882,6 +998,8 @@ namespace VIS.Controllers
                 ors.Add("ABS(i.GrandTotal) = @Amt");
             }
 
+            /* The sales order is LEFT joined: an invoice raised without an order (C_Order_ID unset)
+               must still be found by its number / customer / amount. */
             string selectSql = @"
                 SELECT i.C_Invoice_ID AS C_Invoice_ID,
                        i.DocumentNo AS Invoice_Document_No,
@@ -890,17 +1008,22 @@ namespace VIS.Controllers
                        i.DocStatus AS DocStatus,
                        i.IsPaid AS IsPaid,
                        i.DateInvoiced AS Invoice_Date,
+                       dt.Name AS Doc_Type_Name,
+                       dt.DocBaseType AS Doc_Base_Type,
+                       so.DocumentNo AS Order_Document_No,
                        cur.ISO_Code AS Currency_ISO,
                        CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
                 FROM C_Invoice i
                 INNER JOIN C_BPartner bp ON (i.C_BPartner_ID=bp.C_BPartner_ID)
                 INNER JOIN C_Currency cur ON (i.C_Currency_ID=cur.C_Currency_ID)
+                INNER JOIN C_DocType dt ON (dt.C_DocType_ID=i.C_DocTypeTarget_ID)
+                LEFT OUTER JOIN C_Order so ON (so.C_Order_ID=i.C_Order_ID)
                 WHERE i.IsSOTrx='Y'
                   AND i.IsActive='Y'
-                  AND i.AD_Client_ID=" + clientId + @"
-                  AND (" + string.Join(" OR ", ors) + @")";
+                  AND i.AD_Client_ID=" + clientId;
 
-            /* MRole only on the main physical table (C_Invoice / alias i). */
+            /* MRole only on the main physical table (C_Invoice / alias i). Applied while the WHERE
+               still carries nothing but plain predicates — everything with a subquery goes on after. */
             selectSql = MRole.GetDefault(ctx).AddAccessSQL(
                 selectSql,
                 "i",
@@ -908,6 +1031,80 @@ namespace VIS.Controllers
                 MRole.SQL_RO
             );
 
+            /* The free-text OR block is appended AFTER AddAccessSQL: the sales-order LINE match is an
+               EXISTS carrying its own FROM / WHERE, which would otherwise confuse the access-SQL
+               parser when it looks for the statement's real FROM clause. Appending keeps the role
+               predicate intact and the subquery out of its way. No term (a filter-only search) means
+               no block at all — an empty "AND ()" would not parse. */
+            if (ors.Count > 0)
+            {
+                selectSql += @"
+                  AND (" + string.Join(" OR ", ors) + ")";
+            }
+
+            /* The date ranges follow, for the same reason (the Due Date filter is an EXISTS too).
+               Both bounds are half-open
+               (>= from, < to+1day) so no TRUNC / date_trunc is needed on either dialect.
+               Parameters are added in the exact order their placeholders appear in the final SQL —
+               Oracle binds by POSITION, not by name. */
+            if (invFromDate.HasValue)
+            {
+                selectSql += @"
+                  AND i.DateInvoiced >= @InvFrom";
+                parameters.Add(new SqlParameter("@InvFrom", SqlDbType.DateTime) { Value = invFromDate.Value });
+            }
+            if (invToDate.HasValue)
+            {
+                selectSql += @"
+                  AND i.DateInvoiced < @InvToExcl";
+                parameters.Add(new SqlParameter("@InvToExcl", SqlDbType.DateTime) { Value = invToDate.Value.AddDays(1) });
+            }
+            if (dueFromDate.HasValue || dueToDate.HasValue)
+            {
+                /* EXISTS (not a join): an invoice with several pay schedules in the range stays a
+                   SINGLE row in the dropdown. */
+                selectSql += @"
+                  AND EXISTS (SELECT 1 FROM C_InvoicePaySchedule ips
+                              WHERE ips.C_Invoice_ID=i.C_Invoice_ID
+                                AND ips.IsActive='Y'";
+                if (dueFromDate.HasValue)
+                {
+                    selectSql += @"
+                                AND ips.DueDate >= @DueFrom";
+                    parameters.Add(new SqlParameter("@DueFrom", SqlDbType.DateTime) { Value = dueFromDate.Value });
+                }
+                if (dueToDate.HasValue)
+                {
+                    selectSql += @"
+                                AND ips.DueDate < @DueToExcl";
+                    parameters.Add(new SqlParameter("@DueToExcl", SqlDbType.DateTime) { Value = dueToDate.Value.AddDays(1) });
+                }
+                selectSql += ")";
+            }
+            /* Amount band on ABS(GrandTotal): the same comparison the free-text amount match uses, so
+               a credit memo (negative total) lands in the band its magnitude belongs to. */
+            if (amtFromValue.HasValue)
+            {
+                selectSql += @"
+                  AND (i.GrandTotal) >= @AmtFrom";
+                parameters.Add(new SqlParameter("@AmtFrom", Math.Abs(amtFromValue.Value)));
+            }
+            if (amtToValue.HasValue)
+            {
+                selectSql += @"
+                  AND (i.GrandTotal) <= @AmtTo";
+                parameters.Add(new SqlParameter("@AmtTo", Math.Abs(amtToValue.Value)));
+            }
+            if (currencyId > 0)
+            {
+                selectSql += @"
+                  AND i.C_Currency_ID=@CurrencyId";
+                parameters.Add(new SqlParameter("@CurrencyId", currencyId));
+            }
+
+            /* Ordering / paging is appended last, after both the access predicate and the filters -
+               the Due Date range only decides WHICH invoices match; the schedule's own due date is
+               not part of the result. */
             string sql = selectSql + @"
                 ORDER BY i.DateInvoiced DESC, i.C_Invoice_ID DESC
                 OFFSET @Offset ROWS FETCH NEXT @Max ROWS ONLY";
@@ -915,8 +1112,8 @@ namespace VIS.Controllers
             /* Scroll paging: skip the pages already loaded, then fetch ONE row more than the page
                size so we can tell the client whether another page exists (hasMore) without a
                separate COUNT query. @Offset then @Max appear last in the SQL — for Oracle's
-               positional binding they must be added last, in that order (after @Like1, @Like2 and
-               the optional @Amt). */
+               positional binding they must be added last, in that order (after the @Like*, the
+               optional @Amt, the optional date bounds and the optional amount / currency filters). */
             parameters.Add(new SqlParameter("@Offset", (page - 1) * max));
             parameters.Add(new SqlParameter("@Max", max + 1));
 
@@ -936,6 +1133,11 @@ namespace VIS.Controllers
                         docStatus = Util.GetValueOfString(dr["DocStatus"]),
                         isPaid = Util.GetValueOfString(dr["IsPaid"]),
                         dateInvoiced = dr["Invoice_Date"] != DBNull.Value ? Convert.ToDateTime(dr["Invoice_Date"]).ToString("MMM dd, yyyy") : "",
+                        docTypeName = Util.GetValueOfString(dr["Doc_Type_Name"]),
+                        docBaseType = Util.GetValueOfString(dr["Doc_Base_Type"]),
+                        /* Sales order the invoice hangs off (header link); empty when there is none
+                           or when the invoice only references the order line-by-line. */
+                        orderDocumentNo = Util.GetValueOfString(dr["Order_Document_No"]),
                         curSymbol = Util.GetValueOfString(dr["Cur_Symbol"]),
                         currencyIso = Util.GetValueOfString(dr["Currency_ISO"])
                     });

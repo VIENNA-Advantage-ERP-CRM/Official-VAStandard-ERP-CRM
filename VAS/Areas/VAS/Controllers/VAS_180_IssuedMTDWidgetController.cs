@@ -80,6 +80,11 @@ namespace VIS.Controllers
             DateTime monthStart = new DateTime(now.Year, now.Month, 1);
             DateTime nextMonthStart = monthStart.AddMonths(1);
 
+            // An "issue line" is a line on an INTERNAL USE document carrying an internal-use
+            // quantity. M_Inventory also backs Physical Inventory, and M_InventoryLine also
+            // carries count lines (QtyCount/QtyBook), so all three predicates below are needed
+            // to match the definition used by VAS_185_InventoryUseTrendWidget. Without the
+            // IsInternalUse filter this KPI counted 34 lines for the current month instead of 12.
             string sql = @"
                 SELECT COUNT(line.M_InventoryLine_ID)
                 FROM M_InventoryLine line
@@ -88,10 +93,11 @@ namespace VIS.Controllers
                   AND line.IsActive = 'Y'
                   AND inv.IsInternalUse = 'Y'
                   AND inv.DocStatus IN ('CO', 'CL')
-                  AND inv.MovementDate >= @MonthStart
-                  AND inv.MovementDate < @NextMonthStart
-                  AND line.M_Product_ID IS NOT NULL
-                  AND COALESCE(line.QtyInternalUse, 0) > 0";
+                  AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
+                  AND line.IsActive = 'Y'
+                  AND COALESCE(line.QtyInternalUse, 0) > 0
+                  AND inv.MovementDate >= " + msl + @"
+                  AND inv.MovementDate < " + nmsl;
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 

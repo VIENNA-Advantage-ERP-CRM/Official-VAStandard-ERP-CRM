@@ -168,7 +168,7 @@
         }
 
         function monthName(month) {
-            return new Date(2000, month - 1, 1).toLocaleDateString(window.navigator.language, { month: 'short' });
+            return new Date(2000, month - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long' });
         }
 
         function periodLabel() {

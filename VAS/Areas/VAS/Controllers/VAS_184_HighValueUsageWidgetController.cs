@@ -71,6 +71,29 @@ namespace VIS.Controllers
             return new { iso = iso, symbol = symbol, stdPrecision = stdPrecision };
         }
 // ===== NEW CODE END — currency format =====
+        /// <summary>
+        /// The product's CURRENT cost price, as a derived table (M_Product_ID, CurrentCostPrice).
+        /// Picks the M_Cost row whose cost element matches the accounting schema's own costing
+        /// method, so landed-cost and other cost COMPONENT rows are excluded. A plain
+        /// MAX(M_Cost.CurrentCostPrice) is NOT the product cost - on FSMTesting6 it reports
+        /// 'Air Filter (7 micron)' at 80,142.29 (a Landed Cost component) against a true standard
+        /// cost of 2,599.
+        /// </summary>
+        private const string ProductCurrentCostSql = @"
+                    SELECT c.M_Product_ID, MAX(c.CurrentCostPrice) AS CurrentCostPrice
+                    FROM M_Cost c
+                    INNER JOIN M_CostElement ce ON ce.M_CostElement_ID = c.M_CostElement_ID
+                    INNER JOIN C_AcctSchema acs ON acs.C_AcctSchema_ID = c.C_AcctSchema_ID
+                                               AND acs.M_CostType_ID   = c.M_CostType_ID
+                    WHERE c.IsActive = 'Y'
+                      AND ce.CostingMethod IS NOT NULL
+                      AND ce.CostingMethod = acs.CostingMethod
+                    GROUP BY c.M_Product_ID";
+
+
+        /// <summary>
+        /// The product's CURRENT cost price - the live valuation cost the spec ranks this widget by
+        /// </summary>
 
         /// <summary>Endpoint A: Top 10 high-value products consumed in selected month and year.</summary>
         [AjaxAuthorizeAttribute]
@@ -93,13 +116,16 @@ namespace VIS.Controllers
                 // aggregate would append the predicate outside the subquery (ORA-00907).
                 string invAccessSql = BuildAccessibleInventorySql(ctx, msl, nmsl);
 
-                // Cost is line.CurrentCostPrice ONLY. The previous
-                // COALESCE(CurrentCostPrice, PriceCost, VA024_CostPrice, 0) fallback chain silently
-                // substituted a different price whenever the line carried no current cost, and the
-                // final ", 0" turned a line with no price at all into a zero-value row that still
-                // occupied one of the ten slots. Lines with no CurrentCostPrice are now excluded
-                // outright, which is also what keeps zero-value products off the widget:
-                // CurrentCostPrice > 0 is false for NULL as well as for 0.
+                // Ranking measure is the PRODUCT's current cost price, per spec §3/§8 - explicitly
+                // "not the historical issue cost on the line". Ranking by the line cost put
+                // genuinely expensive products at the bottom of a high-value widget: on
+                // FSMTesting6 'Valves or nozzles', 'Air Filter (7 micron)', 'Spray balls' and
+                // 'Brake fluid tester' all carry NO cost on their issue lines, so they scored 0
+                // against real current costs of 2,699 / 2,599 / 2,499 / 2,399.
+                //
+                // Issued value still prefers the line's own cost (that is what the issue actually
+                // cost); the product cost is the fallback so a line with no recorded cost
+                // contributes its valuation rather than zero.
                 string sql = @"
                     SELECT * FROM (
                       SELECT
@@ -107,21 +133,21 @@ namespace VIS.Controllers
                         p.Name AS ProductName,
                         asi.Description AS Attribute,
                         uom.Name AS UomName,
-                        MAX(line.CurrentCostPrice) AS CostPrice,
+                        MAX(COALESCE(pc.CurrentCostPrice, NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), 0)) AS CostPrice,
                         SUM(line.QtyInternalUse) AS TotalIssuedQty,
-                        SUM(line.QtyInternalUse * line.CurrentCostPrice) AS TotalIssuedValue
+                        SUM(line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pc.CurrentCostPrice, 0)) AS TotalIssuedValue
                       FROM M_InventoryLine line
                       INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                       INNER JOIN M_Product p ON p.M_Product_ID = line.M_Product_ID
                       LEFT JOIN C_UOM uom ON uom.C_UOM_ID = line.C_UOM_ID
                       LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = line.M_AttributeSetInstance_ID
+                      LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = p.M_Product_ID
                       WHERE line.IsActive = 'Y'
                         AND COALESCE(line.QtyInternalUse, 0) > 0
                         AND line.CurrentCostPrice > 0
                       GROUP BY p.M_Product_ID, p.Name, asi.Description, uom.Name
-                      HAVING SUM(line.QtyInternalUse * line.CurrentCostPrice) > 0
-                      ORDER BY MAX(line.CurrentCostPrice) DESC,
-                               SUM(line.QtyInternalUse * line.CurrentCostPrice) DESC
+                      ORDER BY MAX(COALESCE(pc.CurrentCostPrice, NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), 0)) DESC,
+                               SUM(line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pc.CurrentCostPrice, 0)) DESC
                     ) WHERE ROWNUM <= 10";
 
                 using (IDataReader dr = DB.ExecuteReader(sql, null, null))
@@ -132,7 +158,7 @@ namespace VIS.Controllers
                         {
                             productId = Util.GetValueOfInt(dr["M_Product_ID"]),
                             productName = Util.GetValueOfString(dr["ProductName"]),
-                            attribute = Util.GetValueOfString(dr["Attribute"]),
+                            attribute = NormalizeAttributes(Util.GetValueOfString(dr["Attribute"])),
                             uomName = Util.GetValueOfString(dr["UomName"]),
                             costPrice = Util.GetValueOfDecimal(dr["CostPrice"]),
                             issuedQty = Util.GetValueOfDecimal(dr["TotalIssuedQty"]),
@@ -183,11 +209,12 @@ namespace VIS.Controllers
                       wh.Name AS WarehouseName,
                       loc.Value AS LocatorCode,
                       line.QtyInternalUse,
-                      (line.QtyInternalUse * line.CurrentCostPrice) AS LineValue
+                      (line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pc.CurrentCostPrice, 0)) AS LineValue
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
                     LEFT JOIN M_Locator loc ON loc.M_Locator_ID = line.M_Locator_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = loc.M_Warehouse_ID
+                    LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = line.M_Product_ID
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
                       AND line.CurrentCostPrice > 0
@@ -240,6 +267,27 @@ namespace VIS.Controllers
                       AND inv.MovementDate < " + periodEnd;
 
             return MRole.GetDefault(ctx).AddAccessSQL(sql, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+        }
+
+        /// <summary>
+        /// An attribute set instance with no attributes stores a dash placeholder in Description
+        /// (e.g. "---"). The widget renders the attribute into the row meta line whenever it is
+        /// truthy, so the placeholder would show as "--- - 34 Nos". Collapse dash-only values to
+        /// empty and let the widget's own fallback handle it.
+        /// </summary>
+        private static string NormalizeAttributes(string description)
+        {
+            if (string.IsNullOrWhiteSpace(description)) { return ""; }
+
+            string trimmed = description.Trim();
+            foreach (char c in trimmed)
+            {
+                if (c != '-' && c != '_' && c != '.' && !char.IsWhiteSpace(c))
+                {
+                    return trimmed;
+                }
+            }
+            return "";
         }
 
         private static string ToSqlDate(DateTime date)

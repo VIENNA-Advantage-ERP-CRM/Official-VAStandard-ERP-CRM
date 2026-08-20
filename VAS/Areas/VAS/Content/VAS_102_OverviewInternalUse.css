@@ -85,6 +85,18 @@
  *                          (it used to switch to scrolling only under 720px), so
  *                          a panel just wide of that threshold cannot clip the
  *                          Value / Status columns.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *                        - Added the Activity field-change delta
+ *                          (.vas_102-actDelta / -cvOld / -cvArrow / -cvNew):
+ *                          "was X → now Y" under the field's name, the old
+ *                          value struck through and the new one carrying the
+ *                          row's colour. Matches VAS_101 / VAS_104.
  ***********************************************************/
 
 .vas_102-root {
@@ -654,22 +666,22 @@
 /* ----------------------------------------------------------- */
 /*  Issue line table                                           */
 /* ----------------------------------------------------------- */
-/* The table scrolls horizontally at ANY width, not only under a breakpoint: the
-   rows carry a min-width, so when the panel is narrower than the eight columns
-   need (single view, or a zoomed-out browser handing the panel an in-between
-   width) the reader scrolls to Value / Status instead of losing them off the
-   edge — the panel root itself never scrolls sideways. */
+/* The table SHRINKS to the panel; it never scrolls sideways. It used to carry a
+   floor width and its own horizontal scrollbar, on the argument that the reader
+   could scroll to Value / Status rather than lose them — but a scrollbar inside
+   a card hides those columns just as effectively, since it has to be found and
+   dragged before it says anything is there. The eight tracks compress instead,
+   each keeping its ellipsis and the row's tooltip. */
 .vas_102-table {
     border: 1px solid var(--iu-card-bd);
     border-radius: var(--iu-card-radius);
     background: #fff;
-    overflow-x: auto;
-    overflow-y: hidden;
 }
 
 /* Every track is minmax(0, Nfr). A bare Nfr track cannot shrink below its
    content, so one long product name or amount pushed the row wider than the
-   table and the right-hand columns were clipped away entirely. */
+   table and the right-hand columns were clipped away entirely. It is also what
+   lets the row compress now that it has no floor width. */
 .vas_102-tRow {
     display: grid;
     align-items: center;
@@ -678,7 +690,6 @@
     grid-template-columns:
         minmax(0, 2.2fr) minmax(0, 1fr)   minmax(0, 0.7fr) minmax(0, 0.9fr)
         minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 0.9fr);
-    min-width: 720px;
 }
 
 .vas_102-tHead {
@@ -896,14 +907,33 @@
 .vas_102-actLead,
 .vas_102-actSub {
     display: block;
+}
+.vas_102-actLead {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* The recipient line WRAPS instead of clipping: it lists the mail's addresses
+   in full, and an address cut off mid-domain identifies nobody. break-word
+   rather than a plain wrap, since a single long address has no space in it to
+   break at. */
 .vas_102-actSub {
     font-size: 0.8462em; /* ~0.6875em against the body anchor */
     color: var(--iu-muted);
     margin-top: 0.125em;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
+}
+
+/* The base unit named after the on-hand figure. Muted and a size down, so the
+   quantity still reads first. */
+.vas_102-baseUom {
+    margin-left: 0.3125em;
+    color: var(--iu-muted);
+    font-size: 0.9231em;
+    font-weight: 400;
 }
 
 .vas_102-actWhen {
@@ -972,3 +1002,23 @@
 [dir="rtl"] .vas_102-actCaret svg { transform: scaleX(-1); }
 [dir="rtl"] .vas_102-actRow.vas_102-is-open .vas_102-actCaret { transform: rotate(-90deg); }
 [dir="rtl"] .vas_102-pgBtn .vas_102-ic svg { transform: scaleX(-1); }
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value.
+   Matches VAS_101 / VAS_104. */
+.vas_102-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_102-cvOld {
+    color: var(--iu-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_102-cvArrow { flex: none; color: var(--iu-muted); }
+.vas_102-cvNew {
+    color: var(--iu-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}

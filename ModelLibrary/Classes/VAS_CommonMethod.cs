@@ -1044,7 +1044,7 @@ namespace ModelLibrary.Classes
         /// <param name="document">Optional in-memory PO instance; when supplied, its pre-change (old) column
         /// values are resolved the same way as the current record and returned in OldJsonData</param>
         /// <returns>Reference-resolved column values (NewJsonData/OldJsonData) along with the raw record data</returns>
-        public static RefValuesResult GetRefValues(Ctx ctx, string window_name, string table_name, int record_id, PO document)
+        public static RefValuesResult GetRefValues(Ctx ctx, string window_name, string table_name, int record_id, PO document, Trx trx)
         {
             var result = new RefValuesResult();
             try
@@ -1052,7 +1052,7 @@ namespace ModelLibrary.Classes
                 GridWindow windowVO = GetWindowVO(ctx, window_name);
 
                 string query = $"SELECT * FROM {table_name} WHERE {table_name}_ID = {record_id.ToString(CultureInfo.InvariantCulture)}";
-                DataSet ds = DB.ExecuteDataset(query, null, document.Get_Trx());
+                DataSet ds = DB.ExecuteDataset(query, null, trx);
 
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                 {

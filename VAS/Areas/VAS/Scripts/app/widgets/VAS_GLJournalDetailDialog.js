@@ -18,10 +18,17 @@
  * The footer shows a Post button (for Approved/Completed/Closed, not-yet-posted
  * journals) and a Close button; Download PDF is opt-in via showDownload.
  *
+ * Download PDF needs BOTH gates: the host asks for it, AND the screen is
+ * configured to print - an AD_Process_ID linked on the VAS_GLJournal window's
+ * GL_Journal tab, which is the report the button runs. GetJournalPrintInfo
+ * resolves that once per page (the ids are per screen, not per journal) and the
+ * button stays hidden when nothing is linked.
+ *
  * Public API:
  *   VAS.GLJournalDetailDialog.open(journalId, {
  *       windowNo:     <number>,    // WindowNo passed to the PDF print process (default 0)
- *       showDownload: <boolean>,   // show the "Download PDF" button (default false)
+ *       showDownload: <boolean>,   // offer the "Download PDF" button (default false);
+ *                                  // still hidden unless a print process is configured
  *       onChanged:    function(){} // invoked after a successful post so the
  *                                  // host widget can refresh its own KPI / list
  *   });
@@ -65,6 +72,19 @@
 
     /* Download PDF is opt-in per host (only some widgets expose it). */
     var showDownload = false;
+
+    /* Print process availability. The button is shown only when an AD_Process_ID
+       is linked on the VAS_GLJournal window's GL_Journal tab - that process IS
+       the report, so without it the button has nothing to run. Both ids are
+       window-level (identical for every journal), so GetJournalPrintInfo is
+       probed once and the answer is reused for the rest of the page; a print
+       click then needs no round-trip. The probe still has to pass a real
+       journalId because the endpoint authorizes record access, so it runs on
+       the first open of a download-enabled host - and only for those hosts. */
+    var printProcessId = 0;
+    var printTableId = 0;
+    var printInfoResolved = false;
+    var printInfoRequest = null;
 
     var selectedJournalId = 0;
     var selectedJournalStatus = "";
@@ -301,11 +321,18 @@
         }
     }
 
+    /* Framework dialog rather than window.alert, so the message renders inside
+       the app shell like every other VIS notification (and does not block the
+       JS thread). VIS.ADialog.info(AD_Message, _, rawText, title): the text we
+       have here is already resolved/localized, so it goes in the raw-text
+       argument with an empty message key. Falls back to alert only when the
+       framework dialog is unavailable, so an error is never swallowed. */
     function showProcessError(message) {
-        window.alert(
-            message ||
-            lbl("VAS_041_JournalProcessFailed", "Journal process failed.")
-        );
+        var text = message || lbl("VAS_041_JournalProcessFailed", "Journal process failed.");
+
+        if (window.VIS && VIS.ADialog && typeof VIS.ADialog.info === "function") {
+            VIS.ADialog.info("", true, text);
+        }
     }
 
     /* Dimension cell: left-aligned with a value, centered "-" placeholder. */
@@ -560,6 +587,12 @@
         $dialog.find(".VAS-glje-dialog-sub").html("&mdash;");
 
         updateActionButtons();
+
+        /* Only hosts that want the button pay for the lookup, and only until it
+           is answered once (the process is per screen, not per journal). */
+        if (showDownload) {
+            resolvePrintInfo();
+        }
 
         lockBodyScroll(true);
 
@@ -904,8 +937,13 @@
         }
 
         if ($downloadButton) {
+            /* Two gates: the host has to ask for the button AND the screen has
+               to be configured with a print process. Until the probe answers,
+               isPrintConfigured() is false and the button stays hidden - it
+               appears rather than disappears, so it is never offered for a
+               screen that cannot print. */
             $downloadButton
-                .toggle(showDownload)
+                .toggle(showDownload && isPrintConfigured())
                 .prop(
                     "disabled",
                     actionInProgress || selectedJournalId <= 0 || !detailLoaded
@@ -1014,6 +1052,56 @@
 
     /* ---- print / PDF ---------------------------------------------------- */
 
+    function isPrintConfigured() {
+        return printProcessId > 0 && printTableId > 0;
+    }
+
+    /* Resolves the print process ONCE per page. GetJournalPrintInfo reads
+       AD_Tab for the VAS_GLJournal window / GL_Journal table and returns
+       AD_Process_ID 0 when nothing is linked there - which keeps the Download
+       PDF button hidden.
+
+       A response that is not a successful payload (session expired, no record
+       access on this particular journal) leaves printInfoResolved false, so the
+       next open probes again instead of caching "no print" from a per-record
+       failure. */
+    function resolvePrintInfo() {
+        if (printInfoResolved || printInfoRequest || selectedJournalId <= 0) {
+            return;
+        }
+
+        printInfoRequest = $.ajax({
+            url: VIS.Application.contextUrl + CTRL + "GetJournalPrintInfo",
+            type: "GET",
+            dataType: "json",
+            cache: false,
+            data: {
+                journalId: selectedJournalId
+            },
+            success: function (rawInfo) {
+                var info = normalizeResponse(rawInfo);
+
+                if (!info || info.success === false) {
+                    return;
+                }
+
+                printProcessId =
+                    Number(info.AD_Process_ID || info.ad_Process_ID || info.adProcessId) || 0;
+
+                printTableId =
+                    Number(info.AD_Table_ID || info.ad_Table_ID || info.adTableId) || 0;
+
+                printInfoResolved = true;
+            },
+            complete: function () {
+                printInfoRequest = null;
+
+                /* Reveal (or leave hidden) the button now the answer is in. */
+                updateActionButtons();
+            }
+        });
+    }
+
     function printCurrentPopup() {
         if (
             !$dialog ||
@@ -1028,52 +1116,23 @@
             return;
         }
 
+        /* The button is only rendered for a configured screen, so this guards
+           against a stale click rather than a normal path. */
+        if (!isPrintConfigured()) {
+            showProcessError(
+                lbl("VAS_041_PrintProcessNotFound", "Print process is not configured for GL Journal.")
+            );
+
+            return;
+        }
+
         actionInProgress = true;
 
         showBusy(true);
 
         updateActionButtons();
 
-        $.ajax({
-            url: VIS.Application.contextUrl + CTRL + "GetJournalPrintInfo",
-            type: "GET",
-            dataType: "json",
-            cache: false,
-            data: {
-                journalId: selectedJournalId
-            },
-            success: function (rawInfo) {
-                var info = normalizeResponse(rawInfo);
-
-                var processId =
-                    Number(info && (info.AD_Process_ID || info.ad_Process_ID || info.adProcessId)) || 0;
-
-                var tableId =
-                    Number(info && (info.AD_Table_ID || info.ad_Table_ID || info.adTableId)) || 0;
-
-                if (processId <= 0 || tableId <= 0) {
-                    finishPdfDownload();
-
-                    showProcessError(
-                        lbl("VAS_041_PrintProcessNotFound", "Print process is not configured for GL Journal.")
-                    );
-
-                    return;
-                }
-
-                generateJournalPDF(processId, tableId);
-            },
-            error: function (xhr) {
-                finishPdfDownload();
-
-                showProcessError(
-                    getAjaxErrorMessage(
-                        xhr,
-                        lbl("VAS_041_PrintProcessNotFound", "Print process is not configured for GL Journal.")
-                    )
-                );
-            }
-        });
+        generateJournalPDF(printProcessId, printTableId);
     }
 
     function generateJournalPDF(processId, tableId) {
@@ -1088,14 +1147,12 @@
                 WindowNo: (currentOpts && currentOpts.windowNo) || 0,
                 filetype: "P",
                 actionOrigin: "W",
-                originName: lbl("VAS_041_GLJournal", "GL Journal")
+                originName: "GL Journal"
             },
             success: function (raw) {
                 var res = normalizeResponse(raw);
 
-                var file =
-                    res &&
-                    (res.ReportFilePath || res.FilePath || res.FileName || res.fileName || res.path);
+                var file = res && (res.ReportFilePath || res.FilePath || res.FileName || res.fileName || res.path);
 
                 if (!file) {
                     showProcessError(
@@ -1104,18 +1161,13 @@
                         lbl("VAS_041_PrintFailed", "Could not generate the PDF.")
                     );
 
-                    return;
+                    return false;
                 }
 
                 window.open(VIS.Application.contextUrl + file, "_blank");
             },
             error: function (xhr) {
-                showProcessError(
-                    getAjaxErrorMessage(
-                        xhr,
-                        lbl("VAS_041_PrintFailed", "Could not generate the PDF.")
-                    )
-                );
+                showProcessError(getAjaxErrorMessage(xhr, lbl("VAS_041_PrintFailed", "Could not generate the PDF.")));
             },
             complete: finishPdfDownload
         });

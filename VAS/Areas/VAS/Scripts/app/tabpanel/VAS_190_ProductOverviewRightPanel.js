@@ -41,6 +41,16 @@
  *   VAI163   2026-08-10  Activity gained chat comments (CM_Chat / CM_ChatEntry)
  *                        as their own "chat" entry type. The comment itself is
  *                        the row's headline, with the whole text on the tooltip.
+ *   VAI163   2026-08-11  Stock details and Recent transactions name the unit
+ *                        beside the figure (qtyText, the helper the Stock
+ *                        summary already used) instead of printing a bare
+ *                        number. Both columns are the product's BASE uom —
+ *                        M_Storage.QtyOnHand and M_Transaction.MovementQty —
+ *                        and a quantity whose unit the reader has to infer from
+ *                        another section is a quantity they can misread.
+ *   VAI163   2026-08-11  Activity pages at 15 rows rather than 6, matching every
+ *                        other tab panel's feed; at 6 a product with any history
+ *                        was mostly pager clicks.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -109,7 +119,12 @@
         // touches another, and a product change resets every one of them.
         var pages = {};
         var ROWS_PER_PAGE = 10;
-        var ACTIVITY_PER_PAGE = 6;
+        // UOM conversions page at FIVE, not ten: they sit high in the panel and a
+        // product with many units pushed everything below them off the screen.
+        var UOM_ROWS_PER_PAGE = 5;
+        // 15 rows a page, the same as every other overview panel's activity feed.
+        // It was 6, which made a product with any history nothing but pager clicks.
+        var ACTIVITY_PER_PAGE = 15;
 
         // ----------------------------------------------------------------- //
         //  Messages                                                          //
@@ -163,6 +178,12 @@
             $busy[0].style.visibility = show ? "visible" : "hidden";
         }
 
+        // The candidate window names a row carries, if any.
+        function openWindowNames($el) {
+            var raw = $el.attr("data-open-windows");
+            return raw ? String(raw).split(",") : null;
+        }
+
         // Delegated once on the root so it survives every re-render: a document
         // row opens the record it points at, a mail card toggles its body.
         function bindEvents() {
@@ -170,7 +191,8 @@
                 e.preventDefault();
                 openRecord($(this).attr("data-open-table"),
                            $(this).attr("data-open-id"),
-                           $(this).attr("data-open-sotrx") === "Y");
+                           $(this).attr("data-open-sotrx") === "Y",
+                           openWindowNames($(this)));
             });
             // Those rows are buttons, so they have to answer the keyboard the
             // way a button does.
@@ -179,7 +201,8 @@
                 e.preventDefault();
                 openRecord($(this).attr("data-open-table"),
                            $(this).attr("data-open-id"),
-                           $(this).attr("data-open-sotrx") === "Y");
+                           $(this).attr("data-open-sotrx") === "Y",
+                           openWindowNames($(this)));
             });
 
             $root.on("click", ".vas_190-tlCard.vas_190-clickable", function () {
@@ -203,11 +226,66 @@
         // Opens a record's window filtered to that row through the platform's
         // zoom API. Never a full-page navigation — that crashes the host from
         // inside a panel. Degrades silently so a click can never throw.
-        function openRecord(tableName, recordId, isSOTrx) {
+        // Window name -> AD_Window_ID, resolved once per name and remembered for
+        // the life of the panel. A name the dictionary does not know is cached as
+        // -1 so a failed lookup is not repeated on every click.
+        var windowIdByName = {};
+
+        function resolveWindowIdByName(windowName) {
+            if (!windowName) return 0;
+            if (windowIdByName.hasOwnProperty(windowName)) {
+                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_190_ProductOverviewRightPanel/GetWindowId", windowName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) { windowIdByName[windowName] = -1; return 0; }
+                windowIdByName[windowName] = id;
+                return id;
+            } catch (e) {
+                windowIdByName[windowName] = -1;
+                return 0;
+            }
+        }
+
+        // Windows a row may ask for BY NAME, because its table's zoom target opens
+        // the wrong screen. C_BPartner is the case that matters here: its zoom
+        // target is the customer master, so a click on a SUPPLIER opened the
+        // customer window with a vendor's id in it.
+        //
+        // Several names are tried in order because the dictionary's own naming is
+        // the tenant's, not ours — the first that resolves wins, and when none
+        // does the click falls back to the zoom target exactly as before. Nothing
+        // is hard-failed on a name we cannot confirm.
+        var VENDOR_WINDOW_NAMES = ["VAS_Vendor", "VAS_VendorMaster", "VAS_BusinessPartnerVendor"];
+
+        function resolveFirstWindowId(names) {
+            if (!names) return 0;
+            for (var i = 0; i < names.length; i++) {
+                var id = resolveWindowIdByName(names[i]);
+                if (id > 0) return id;
+            }
+            return 0;
+        }
+
+        // Opens a record's window filtered to that row through the platform's
+        // zoom API. Never a full-page navigation — that crashes the host from
+        // inside a panel. Degrades silently so a click can never throw.
+        function openRecord(tableName, recordId, isSOTrx, windowNames) {
             if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
             try {
-                var windowId = 0;
-                if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
+                // A window named on the ROW wins: it is the only thing that can
+                // tell two records of the same table apart, which is exactly the
+                // customer-versus-vendor case.
+                var windowId = resolveFirstWindowId(windowNames);
+
+                if (windowId <= 0 &&
+                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
                     // The 4th argument picks the sales vs purchase window for a
                     // dual-purpose table like C_Order.
                     windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, !!isSOTrx) || 0;
@@ -470,6 +548,10 @@
                     .attr("data-open-table", opts.openTable)
                     .attr("data-open-id", opts.openId);
                 if (opts.openSOTrx) $row.attr("data-open-sotrx", "Y");
+                // Candidate window names, tried in order before the zoom target.
+                if (opts.openWindows) {
+                    $row.attr("data-open-windows", opts.openWindows.join(","));
+                }
             }
             return $row;
         }
@@ -634,12 +716,21 @@
                 // The date is only shown when the schema actually carries one;
                 // no discontinued-date field is invented to fill the sentence.
                 var when = formatDate(p.DiscontinuedFrom);
+                var line = when
+                    ? msg("VAS_190_DiscontinuedFrom", "Discontinued from") + " " + when
+                    : msg("VAS_190_Discontinued", "Discontinued");
+
+                // "existing stock can still be sold" is a statement about STOCK, so
+                // it is only true of a product that HAS any — an Item (ProductType
+                // 'I'). A service, an expense type or a resource holds no stock to
+                // sell down, and telling the reader otherwise describes inventory
+                // that cannot exist. Those types get the bare discontinued note.
+                if (p.ProductType === "I") {
+                    line += " — " + msg("VAS_190_StockSellable",
+                                        "existing stock can still be sold");
+                }
                 $hero.append($('<div class="vas_190-statusLine vas_190-lineWarn"></div>')
-                    .text(when
-                        ? msg("VAS_190_DiscontinuedFrom", "Discontinued from") + " " + when +
-                          " — " + msg("VAS_190_StockSellable", "existing stock can still be sold")
-                        : msg("VAS_190_DiscontinuedNote",
-                              "Discontinued — existing stock can still be sold")));
+                    .text(line));
             }
 
             // Metric grid: four cells for an Item, exactly three for every other
@@ -767,6 +858,10 @@
         function renderStockDetails() {
             var rows = data.StockDetails;
             var prec = +data.Product.UomPrecision || 0;
+            // M_Storage holds the on-hand in the product's BASE uom, so every
+            // figure in this grid is in that unit — it is named on each row
+            // rather than left to be inferred from the Stock summary above.
+            var uom = data.Product.BaseUomName || "";
             var $sec = section(msg("VAS_190_StockDetails", "Stock details"),
                                rows.length + " " + msg("VAS_190_Lines", "lines"));
 
@@ -795,7 +890,7 @@
                 $row.append(gridCell(r.WarehouseName || "—", null, true));
                 $row.append(gridCell(r.LocatorName || "—"));
                 $row.append(gridCell(r.Attributes || "—"));
-                $row.append(gridCell(formatNumber(+r.QtyOnHand || 0, prec), "r"));
+                $row.append(gridCell(qtyText(r.QtyOnHand, prec, uom), "r"));
                 return $row;
             });
 
@@ -815,22 +910,36 @@
             var $sec = section(msg("VAS_190_UomConversions", "UOM conversions"),
                                base ? msg("VAS_190_Base", "base") + ": " + base : "");
 
-            var $list = $('<div class="vas_190-clist"></div>');
-            $sec.append($list);
-
-            for (var i = 0; i < rows.length; i++) {
-                var c = rows[i];
+            // Paged at 5. A product with a dozen conversions pushed every section
+            // below it off the panel, and the rows past the first few are reference
+            // detail — reachable, not worth the height.
+            paginate($sec, "uomrows", rows, UOM_ROWS_PER_PAGE, function (c) {
                 // "= rate BaseUom" is assembled here, never in SQL.
                 var value = "= " + formatNumber(+c.RateToBase || 0, rateDigits(c.RateToBase)) +
                             (base ? " " + base : "");
-                $list.append(listRow({
+                return listRow({
                     primary: c.UomName || "—",
-                    meta: c.IsProductSpecific
-                        ? msg("VAS_190_ProductConversion", "Product-specific conversion")
-                        : msg("VAS_190_GenericConversion", "Generic UOM conversion"),
+                    meta: uomConversionMeta(c),
                     value: value
-                }));
-            }
+                });
+            });
+        }
+
+        // What a conversion row says about ITSELF, beneath the unit's name.
+        //
+        // It used to read "Product-specific conversion" / "Generic UOM conversion"
+        // and nothing else — so on a product whose purchase or sales unit differs
+        // from the base one, the row a reader was looking for was indistinguishable
+        // from every other row. The unit's ROLE on this product leads the line now,
+        // and how the conversion is defined follows it.
+        function uomConversionMeta(c) {
+            var bits = [];
+            if (c.IsPurchaseUom) bits.push(msg("VAS_190_PurchaseUom", "Purchase UOM"));
+            if (c.IsSalesUom)    bits.push(msg("VAS_190_SalesUom", "Sales UOM"));
+            bits.push(c.IsProductSpecific
+                ? msg("VAS_190_ProductConversion", "Product-specific conversion")
+                : msg("VAS_190_GenericConversion", "Generic UOM conversion"));
+            return bits.join(" · ");
         }
 
         // A conversion rate is meaningless rounded to the currency precision: 12
@@ -1022,7 +1131,11 @@
                     value: v.VendorProductNo || "",
                     valueSub: v.VendorProductNo ? msg("VAS_190_VendorProductNo", "vendor product no.") : "",
                     openTable: "C_BPartner",
-                    openId: v.C_BPartner_ID
+                    openId: v.C_BPartner_ID,
+                    // A supplier row opens the VENDOR master. C_BPartner's zoom
+                    // target is the customer master, so the click landed on the
+                    // customer window with a vendor's id in it.
+                    openWindows: VENDOR_WINDOW_NAMES
                 }));
             }
         }
@@ -1116,6 +1229,9 @@
         function renderTransactions() {
             var rows = data.Transactions;
             var prec = +data.Product.UomPrecision || 0;
+            // M_Transaction.MovementQty is in the product's BASE uom, as the
+            // stock figures above are, so the unit is named on the row.
+            var uom = data.Product.BaseUomName || "";
             var $sec = section(msg("VAS_190_RecentTransactions", "Recent transactions"),
                                msg("VAS_190_Showing", "showing") + " " + rows.length);
 
@@ -1168,7 +1284,7 @@
                 $row.append($doc);
 
                 $row.append(gridCell(formatDate(t.MovementDate) || "—"));
-                $row.append(gridCell(formatNumber(+t.MovementQty || 0, prec), "r"));
+                $row.append(gridCell(qtyText(t.MovementQty, prec, uom), "r"));
                 // A movement with no genuine price shows a dash. No cost is
                 // computed to fill the column.
                 $row.append(gridCell(

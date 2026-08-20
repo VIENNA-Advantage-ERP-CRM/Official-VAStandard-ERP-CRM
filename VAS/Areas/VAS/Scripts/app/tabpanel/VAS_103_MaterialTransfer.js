@@ -32,6 +32,92 @@
  *   VAI163   2026-08-07  Emits the vas_103-prefixed modifier classes the
  *                        stylesheet now uses, the runtime-built ones included
  *                        ("vas_103-tone-" + tone).
+ *   VAI163   2026-08-12  Header:
+ *                        - "Requested by" becomes "Created by", with the CREATED
+ *                          stamp beside it. The field was always
+ *                          M_Movement.CreatedBy, and calling it "Requested by"
+ *                          named a role the movement does not record.
+ *                        - The details card drops Transfer No (the title strip
+ *                          already carries it) and Reference (which was the
+ *                          document's Description, and now heads the Notes
+ *                          section) for the Incoterm, and absorbs the Route
+ *                          section — the From -> To pair is transfer IDENTITY, so
+ *                          it belongs in the identity card rather than in a
+ *                          standalone strip below it.
+ *                        - The Transfer Value KPI card is gone, as is the Total
+ *                          Value on the lines footer: a stock movement does not
+ *                          change what the stock is worth, so a value total on it
+ *                          invited a reading it cannot support.
+ *                        - The Confirmations card shows only when the document
+ *                          type actually raises confirmations
+ *                          (IsConfirmationDocType, model side). It read "0" on
+ *                          every ordinary transfer, which is not the same as
+ *                          "this document has none to raise".
+ *                        - A "Transfer Confirmed" pill once a confirmation has
+ *                          been completed.
+ *                        Generated from:
+ *                        - The Requisition and Production Order chips NAME their
+ *                          document and open it (openRecord), instead of reporting
+ *                          a bare Linked / Not linked. A transfer raised from
+ *                          neither still says so.
+ *                        Lines:
+ *                        - The product's code stands alone (the "SKU" prefix is
+ *                          gone) and the line's ATTRIBUTES travel with it.
+ *                        - The Source column is gone, and with it the "From
+ *                          Manual (n)" breakdown on the footer: per line it was a
+ *                          badge that read "Manual" on almost every row, and the
+ *                          Generated From strip above already names the origin.
+ *                        - A line with a confirmation opens a drawer of its
+ *                          confirmation figures — confirmed, difference and
+ *                          scrapped quantities, with the locator the scrap landed
+ *                          in shown only when something actually was scrapped.
+ *                        Lifecycle + bottom:
+ *                        - The stepper is built from the document type and real
+ *                          dates rather than five copies of MovementDate:
+ *                          Drafted (created), Initiated (in-progress, confirmation
+ *                          doc types only), Completed (non-confirmation types),
+ *                          Confirmed and Received (confirmation types, both dated
+ *                          by the confirmation's completion), Posted. Stages a
+ *                          document can never reach are not drawn.
+ *                        - Notes and Activity sections at the foot of the panel.
+ *                        - The Print / Receive Transfer buttons are gone; both
+ *                          were presentational and neither did anything.
+ *   VAI163   2026-08-13  Activity pages at 15 rows (ACTIVITY_PER_PAGE), matching
+ *                        the other overview panels. The pager is a sibling of
+ *                        the list card so the controls keep their place while
+ *                        the rows are replaced underneath them, and the
+ *                        section's count badge still counts the WHOLE feed.
+ *   VAI163   2026-08-14  Header:
+ *                        - The route moved from the card's LEFT column to the
+ *                          RIGHT, closing it under the document fields and
+ *                          spanning both of their tracks, and is drawn a size
+ *                          down (stylesheet). The warehouse pair is reference
+ *                          detail beside those fields, not a headline of its own.
+ *                        - The right column names the DOCUMENT TYPE (model side),
+ *                          which the header could not answer before.
+ *                        Lines:
+ *                        - The confirmation toggle's tick is sized up
+ *                          (stylesheet). It is the only mark distinguishing a
+ *                          confirmed line and the control that opens its figures,
+ *                          and at 0.85em it read as a speck beside the product
+ *                          name.
+ *                        Activity:
+ *                        - Reports edits FIELD BY FIELD: an "Updated" row per
+ *                          changed column (model side), headlined "Updated
+ *                          <field>" with the line it landed on beneath it and
+ *                          "when · by whom" where every other row carries it.
+ *                          The feed used to say only that the transfer had been
+ *                          created, completed or confirmed — and its "Completed"
+ *                          row is dated from M_Movement.Updated, so the nearest
+ *                          thing to an edit trail was one row carrying the LAST
+ *                          save's timestamp and nothing about what it touched.
+ *   VAI163   2026-08-17  Activity's field-level rows carry the MOVE: "was X →
+ *                        now Y" under the field's name (changeDelta), the old
+ *                        value struck through and a value the log recorded as
+ *                        empty shown as an em dash, so a cleared field is
+ *                        visibly cleared rather than looking like a rendering
+ *                        gap. A row said WHICH field moved but never what it
+ *                        moved from or to.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -125,6 +211,10 @@
         var $body;
         var $emptyState;
         var data = null;
+        // Which lines have their confirmation drawer open, keyed by
+        // M_MovementLine_ID. Kept outside render() so a repaint of the same record
+        // leaves the reader where they were; reset with the record.
+        var openConfirmLines = {};
 
         this.init = function () {
             $root = $('<div class="vas_103-root"></div>');
@@ -153,6 +243,11 @@
         }
 
         this.fetchData = function (recordID) {
+            // Open drawers belong to the record that was on screen; a different
+            // transfer's line ids mean nothing here.
+            openConfirmLines = {};
+            // A different record starts at the top of its own feed.
+            activityPage = 0;
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_103_MaterialTransfer/GetMaterialTransferOverview",
@@ -174,6 +269,7 @@
 
         this.clear = function () {
             data = null;
+            openConfirmLines = {};
             render();
         };
 
@@ -189,13 +285,17 @@
             $emptyState.hide();
             $body.show();
 
+            // The Route strip is gone as a section of its own — the From -> To
+            // pair is transfer identity and is drawn inside the header card.
             renderHeader();
-            renderRoute();
             renderGeneratedFrom();
             renderSnapshot();
             renderTimeline();
             renderLines();
-            renderActions();
+            // Notes and Activity close the panel: both are commentary on
+            // everything above them, so they read last.
+            renderNotes();
+            renderActivity();
         }
 
         // ----------------------------------------------------------------- //
@@ -220,6 +320,25 @@
             return (value === null || value === undefined || String(value).trim() === "")
                 ? VIS.Msg.getMsg("VAS_103_NA")
                 : value;
+        }
+
+        // The AD_Message keys this panel gained are not seeded on every
+        // deployment; without a fallback they would render as the raw key. The
+        // seeded ones keep going through VIS.Msg.getMsg directly.
+        function getMsg(key, fallback) {
+            try {
+                var m = VIS.Msg.getMsg(key);
+                if (m && m !== key) return m;
+            } catch (e) { }
+            return fallback != null ? fallback : key;
+        }
+
+        // True when this document type is the kind that raises a movement
+        // confirmation (C_DocType.IsInTransit). Everything confirmation-shaped on
+        // the panel — the Confirmations card, the Confirmed / Received lifecycle
+        // stages — exists only for these.
+        function isConfirmType() {
+            return !!(data && data.IsConfirmationDocType);
         }
 
         function currencyToken() {
@@ -254,15 +373,27 @@
                 : VIS.Msg.getMsg("VAS_103_InterWarehouse");
         }
 
-        // Movement-stage booleans derived from status / processing / confirms.
+        // Movement-stage booleans.
+        //
+        // "confirmed" is the CONFIRMATION document being completed, not the
+        // movement leaving Drafted — it used to be `code !== "DR"`, so a transfer
+        // that had merely been submitted reported itself confirmed, and "received"
+        // was the mere EXISTENCE of a confirmation record, which is raised the
+        // moment the transfer completes and says nothing about the goods arriving.
+        // Both now come from the confirmation's own completion (model side), and a
+        // document type that raises no confirmation reaches neither.
         function stageFlags() {
             var code = data.StatusCode;
             var completed = data.Processed || code === "CO" || code === "CL";
+            var confirmed = isConfirmType() && !!data.IsConfirmationCompleted;
             return {
                 drafted:   true,
-                confirmed: completed || code !== "DR",
+                initiated: completed || code === "IP" || code === "AP" || code === "WC",
                 completed: completed,
-                received:  (data.ConfirmationCount || 0) > 0,
+                confirmed: confirmed,
+                // The goods are received when the confirmation that records their
+                // arrival is completed — the same event, so the same date.
+                received:  confirmed,
                 posted:    !!data.Posted
             };
         }
@@ -278,12 +409,10 @@
             return VIS.Msg.getMsg("VAS_103_Drafted");
         }
 
-        // Per-line origin: Requisition / Production Order / Manual.
-        function lineOrigin(ln) {
-            if (ln.RequisitionLineID > 0) return "req";
-            if (ln.WorkOrderID > 0)       return "prod";
-            return "manual";
-        }
+        // lineOrigin() is gone with the Source column it fed. It classified each
+        // line as Requisition / Production Order / Manual, and on almost every
+        // transfer that was a column of identical "Manual" badges — while the
+        // Generated From strip above already names where the transfer came from.
 
         // ---------- Header (title strip + details card) ---------- //
 
@@ -300,7 +429,13 @@
             var subBits = [];
             var moved = formatDate(data.MovementDate);
             if (moved) subBits.push(VIS.Msg.getMsg("VAS_103_MovementDate") + " " + moved);
-            if (data.RequestedBy) subBits.push(VIS.Msg.getMsg("VAS_103_RequestedBy") + " " + data.RequestedBy);
+            // Who raised it and when — the field was always M_Movement.CreatedBy,
+            // so it is named for what it is.
+            if (data.CreatedByName) {
+                subBits.push(getMsg("VAS_103_CreatedBy", "Created by") + " " + data.CreatedByName);
+            }
+            var createdOn = formatDate(data.CreatedOn);
+            if (createdOn) subBits.push(getMsg("VAS_103_CreatedOn", "Created on") + " " + createdOn);
             if (subBits.length) {
                 $tl.append($('<div class="vas_103-hdrSub"></div>').text(subBits.join(" · ")));
             }
@@ -308,6 +443,12 @@
 
             var $pills = $('<div class="vas_103-hdrPills"></div>');
             $pills.append(headerPill(transferTypeLabel(), "info", "transfer", false));
+            // A completed confirmation is the milestone that says the goods
+            // actually arrived, so it earns a pill of its own.
+            if (data.IsConfirmationCompleted) {
+                $pills.append(headerPill(
+                    getMsg("VAS_103_TransferConfirmed", "Transfer Confirmed"), "success", "check", false));
+            }
             if (data.Posted) {
                 $pills.append(headerPill(VIS.Msg.getMsg("VAS_103_Posted"), "success", "check", false));
             }
@@ -325,17 +466,31 @@
             $left.append($('<div class="vas_103-vendName"></div>').text(transferTypeLabel()));
 
             var $contact = $('<div class="vas_103-vendContact"></div>');
-            appendContactBit($contact, "user", data.RequestedBy);
+            appendContactBit($contact, "user", data.CreatedByName);
             appendContactBit($contact, "calendar", formatDate(data.MovementDate));
             if ($contact.children().length) $left.append($contact);
+
             $card.append($left);
 
+            // Transfer No is gone (the title strip above already carries it) and so
+            // is Reference, which was the document's Description — that text is a
+            // note, and it heads the Notes section at the foot of the panel now.
             var $right = $('<div class="vas_103-hdrColR"></div>');
-            $right.append(headerField(VIS.Msg.getMsg("VAS_103_TransferNo"), na(data.DocumentNo), false));
-            $right.append(headerField(VIS.Msg.getMsg("VAS_103_Reference"), na(data.Description), false));
+            // The document type the transfer was raised on — which movement this
+            // is, and the one field the header could not answer.
+            $right.append(headerField(getMsg("VAS_103_DocumentType", "Document Type"),
+                na(data.DocTypeName), false));
+            $right.append(headerField(getMsg("VAS_103_Incoterm", "Incoterm"),
+                na(data.IncotermName), false));
             $right.append(headerField(VIS.Msg.getMsg("VAS_103_Posted"),
                 data.Posted ? VIS.Msg.getMsg("VAS_103_Posted")
                             : VIS.Msg.getMsg("VAS_103_NotPosted"), false));
+
+            // The route closes the right column, spanning both of its field tracks
+            // (stylesheet). It sat in the LEFT column beside the transfer type;
+            // moved here it reads under the document fields it belongs with, and
+            // the left column is left to identity alone.
+            $right.append(buildRoute());
             $card.append($right);
 
             $body.append($card);
@@ -367,11 +522,14 @@
             $container.append($bit);
         }
 
-        // ---------- Route strip (From -> To) ---------- //
+        // ---------- Route (From -> To), inside the header card ---------- //
 
-        function renderRoute() {
-            var $sec = section(VIS.Msg.getMsg("VAS_103_Route"), null);
-
+        // Was a section of its own beneath the card, then the card's LEFT column.
+        // It now closes the RIGHT column, spanning both field tracks, and is drawn
+        // a size down from the standalone strip it began as — the warehouse pair
+        // is reference detail beside the document fields, not a headline of its
+        // own, and at the old size it dominated a card it merely sits in.
+        function buildRoute() {
             var $route = $('<div class="vas_103-route"></div>');
             $route.append(routeNode(VIS.Msg.getMsg("VAS_103_From"), na(data.FromWarehouseName)));
 
@@ -381,7 +539,7 @@
             $route.append($arrow);
 
             $route.append(routeNode(VIS.Msg.getMsg("VAS_103_To"), na(data.ToWarehouseName)));
-            $sec.append($route);
+            return $route;
         }
 
         function routeNode(label, warehouse) {
@@ -396,19 +554,50 @@
         function renderGeneratedFrom() {
             var $sec = section(VIS.Msg.getMsg("VAS_103_GeneratedFrom"), null);
             var $row = $('<div class="vas_103-origins"></div>');
-            $row.append(originChip(VIS.Msg.getMsg("VAS_103_Requisition"), data.HasRequisition));
-            $row.append(originChip(VIS.Msg.getMsg("VAS_103_ProductionOrder"), data.HasWorkOrder));
+
+            // A chip is only drawn for an origin the transfer actually has, and it
+            // NAMES that document and opens it. Both used to be drawn always, one
+            // of them reading "Not linked" — the absence of a link is not news, and
+            // "Linked" without a document number could not be acted on.
+            var any = false;
+            if (data.HasRequisition && data.RequisitionNo) {
+                $row.append(originChip(VIS.Msg.getMsg("VAS_103_Requisition"), data.RequisitionNo,
+                    data.RequisitionCount, "M_Requisition", data.RequisitionId, "VAS_Requisition"));
+                any = true;
+            }
+            if (data.HasWorkOrder) {
+                // The document number needs the VAMFG module to be readable; the
+                // chip still opens the record without it.
+                $row.append(originChip(VIS.Msg.getMsg("VAS_103_ProductionOrder"),
+                    data.WorkOrderNo || ("#" + data.WorkOrderId), data.WorkOrderCount,
+                    "VAMFG_M_WorkOrder", data.WorkOrderId, null));
+                any = true;
+            }
+            if (!any) {
+                $row.append($('<span class="vas_103-originChip vas_103-is-muted"></span>')
+                    .append(svgIcon("link"))
+                    .append($('<span class="vas_103-originLbl"></span>')
+                        .text(getMsg("VAS_103_ManualTransfer", "Raised manually"))));
+            }
             $sec.append($row);
         }
 
-        function originChip(label, linked) {
-            var $c = $('<span class="vas_103-originChip"></span>')
-                .toggleClass("vas_103-is-linked", !!linked)
-                .toggleClass("vas_103-is-muted", !linked);
+        // label + the document's own number, opening that record on click. `count`
+        // above 1 says how many more of the same kind the lines carry.
+        function originChip(label, value, count, tableName, recordId, windowName) {
+            var $c = $('<span class="vas_103-originChip vas_103-is-linked"></span>');
             $c.append(svgIcon("link"));
             $c.append($('<span class="vas_103-originLbl"></span>').text(label));
-            $c.append($('<span class="vas_103-originState"></span>').text(
-                linked ? VIS.Msg.getMsg("VAS_103_Origin") : VIS.Msg.getMsg("VAS_103_NotLinked")));
+            $c.append($('<span class="vas_103-originState"></span>').text(value));
+            if (+count > 1) {
+                $c.append($('<span class="vas_103-originMore"></span>')
+                    .text("+" + (+count - 1)));
+            }
+            if (tableName && +recordId > 0) {
+                $c.addClass("vas_103-is-openable")
+                  .attr("title", getMsg("VAS_103_OpenRecord", "Open") + " " + value)
+                  .on("click", function () { openRecord(tableName, recordId, windowName); });
+            }
             return $c;
         }
 
@@ -416,7 +605,6 @@
 
         function renderSnapshot() {
             var $snap = $('<section class="vas_103-snap"></section>');
-            var cur = currencyToken();
 
             // Lines.
             $snap.append(metricCard("lines", "layers", VIS.Msg.getMsg("VAS_103_Lines"),
@@ -426,14 +614,21 @@
             $snap.append(metricCard("qty", "box", VIS.Msg.getMsg("VAS_103_TransferQty"),
                 formatNumber(+data.TransferQty || 0, 0), VIS.Msg.getMsg("VAS_103_UnitsMoved")));
 
-            // Transfer value.
-            $snap.append(metricCard("value", "coins", VIS.Msg.getMsg("VAS_103_TransferValue"),
-                formatAmount(+data.TransferValue || 0, cur, data.StdPrecision), ""));
+            // The Transfer Value card is gone. Moving stock between locators does
+            // not change what it is worth, so a money total on a transfer invited a
+            // reading the document cannot support — and the figure came from
+            // whichever optional cost column the schema happened to carry.
 
-            // Confirmations.
-            $snap.append(metricCard("confirm", "check", VIS.Msg.getMsg("VAS_103_Confirmations"),
-                (data.ConfirmationCount || 0) + "", VIS.Msg.getMsg("VAS_103_ReceiptRecords")));
+            // Confirmations, but only for a document type that actually raises
+            // them. It reported "0" on every ordinary transfer, which is not the
+            // same as "this document has none to raise".
+            if (isConfirmType()) {
+                $snap.append(metricCard("confirm", "check", VIS.Msg.getMsg("VAS_103_Confirmations"),
+                    (data.ConfirmationCount || 0) + "", VIS.Msg.getMsg("VAS_103_ReceiptRecords")));
+            }
 
+            // The grid tracks the cards actually drawn — two or three.
+            $snap.addClass(isConfirmType() ? "vas_103-cards-3" : "vas_103-cards-2");
             $body.append($snap);
         }
 
@@ -452,15 +647,53 @@
 
         // ---------- Lifecycle stepper (5 nodes) ---------- //
 
-        function renderTimeline() {
+        // The stages this document can actually reach, each with the date it
+        // actually happened on.
+        //
+        // Every stage used to be dated by MovementDate — one document field
+        // repeated five times, which said nothing about when anything occurred —
+        // and every document was given all five stages whether or not it could ever
+        // reach them. The shape follows the document type:
+        //
+        //   Drafted    always, dated by the record's creation
+        //   Initiated  confirmation types only, once the document is in progress
+        //   Completed  non-confirmation types only, dated by the workflow's
+        //              DocComplete stamp (the same rule the PO overview follows)
+        //   Confirmed  confirmation types only, dated by the CONFIRMATION's
+        //              completion
+        //   Received   confirmation types only — the confirmation is what records
+        //              the arrival, so it carries the same date
+        //   Posted     always, dated by when posting actually ran (Fact_Acct)
+        function lifecycleStages() {
             var f = stageFlags();
-            var stages = [
-                { key: "VAS_103_Drafted",   done: f.drafted,   date: data.MovementDate },
-                { key: "VAS_103_Confirmed", done: f.confirmed, date: data.MovementDate },
-                { key: "VAS_103_Completed", done: f.completed, date: data.MovementDate },
-                { key: "VAS_103_Received",  done: f.received,  date: data.MovementDate },
-                { key: "VAS_103_Posted",    done: f.posted,    date: data.MovementDate }
-            ];
+            var conf = isConfirmType();
+            var stages = [];
+
+            stages.push({ key: "VAS_103_Drafted", label: "Drafted",
+                          done: f.drafted, date: data.CreatedOn });
+
+            if (conf) {
+                stages.push({ key: "VAS_103_Initiated", label: "Initiated",
+                              done: f.initiated, date: data.CompletedDate });
+            } else {
+                stages.push({ key: "VAS_103_Completed", label: "Completed",
+                              done: f.completed, date: data.CompletedDate });
+            }
+
+            if (conf) {
+                stages.push({ key: "VAS_103_Confirmed", label: "Confirmed",
+                              done: f.confirmed, date: data.ConfirmedDate });
+                stages.push({ key: "VAS_103_Received", label: "Received",
+                              done: f.received, date: data.ConfirmedDate });
+            }
+
+            stages.push({ key: "VAS_103_Posted", label: "Posted",
+                          done: f.posted, date: data.PostedDate });
+            return stages;
+        }
+
+        function renderTimeline() {
+            var stages = lifecycleStages();
 
             var activeIdx = -1;
             for (var k = 0; k < stages.length; k++) { if (stages[k].done) activeIdx = k; }
@@ -473,9 +706,9 @@
                 var stateCls, metaText;
                 if (s.done) {
                     stateCls = "vas_103-is-done";
-                    metaText = (i === 4)
-                        ? VIS.Msg.getMsg("VAS_103_Posted")
-                        : (formatDate(s.date) || VIS.Msg.getMsg("VAS_103_Done"));
+                    // A stage that happened but whose date cannot be resolved says
+                    // "Done" rather than borrowing another stage's date.
+                    metaText = formatDate(s.date) || VIS.Msg.getMsg("VAS_103_Done");
                 } else if (i === activeIdx + 1) {
                     stateCls = "vas_103-is-active";
                     metaText = VIS.Msg.getMsg("VAS_103_Pending");
@@ -483,7 +716,7 @@
                     stateCls = "is-pending";
                     metaText = VIS.Msg.getMsg("VAS_103_Pending");
                 }
-                $tl.append(stepEntry(i + 1, VIS.Msg.getMsg(s.key), metaText, s.done, stateCls));
+                $tl.append(stepEntry(i + 1, getMsg(s.key, s.label), metaText, s.done, stateCls));
             }
             $sec.append($tl);
         }
@@ -526,6 +759,9 @@
 
             var $tbl = $('<div class="vas_103-table"></div>');
 
+            // No Source column: per line it was a badge reading "Manual" on almost
+            // every row, and the Generated From strip above already names where the
+            // transfer came from.
             var $head = $('<div class="vas_103-tRow vas_103-tHead"></div>');
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_103_Item")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_103_FromLocator")));
@@ -533,59 +769,58 @@
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_103_UOM")));
             $head.append($('<span class="vas_103-ta-r"></span>').text(VIS.Msg.getMsg("VAS_103_Quantity")));
             $head.append($('<span class="vas_103-ta-r"></span>').text(VIS.Msg.getMsg("VAS_103_Value")));
-            $head.append($('<span class="vas_103-ta-c"></span>').text(VIS.Msg.getMsg("VAS_103_Source")));
             $tbl.append($head);
 
-            var breakdown = { req: 0, prod: 0, manual: 0 };
-            var totQty = 0, totVal = 0;
+            var totQty = 0;
 
             for (var i = 0; i < lines.length; i++) {
                 var ln = lines[i];
-                var origin = lineOrigin(ln);
-                breakdown[origin]++;
                 totQty += (+ln.MovementQty || 0);
-                totVal += (+ln.LineValue || 0);
-                $tbl.append(buildLineRow(ln, origin, cur));
+                $tbl.append(buildLineRow(ln, cur));
+                // The line's confirmation figures, collapsed beneath it. Only a
+                // line that HAS a confirmation gets one.
+                var $drawer = buildConfirmDrawer(ln);
+                if ($drawer) $tbl.append($drawer);
             }
 
-            // Totals footer with source breakdown.
+            // Totals footer. The source breakdown is gone with the column it
+            // summarised — "From Manual (n)" was a count of lines with nothing
+            // linked to them, which is not an origin. So is Total Value: moving
+            // stock does not change what it is worth.
             var $foot = $('<div class="vas_103-tFoot"></div>');
-
-            var breakBits = [];
-            if (breakdown.req)    breakBits.push(VIS.Msg.getMsg("VAS_103_Requisition") + " (" + breakdown.req + ")");
-            if (breakdown.prod)   breakBits.push(VIS.Msg.getMsg("VAS_103_ProductionOrder") + " (" + breakdown.prod + ")");
-            if (breakdown.manual) breakBits.push(VIS.Msg.getMsg("VAS_103_Manual") + " (" + breakdown.manual + ")");
-            if (breakBits.length) {
-                $foot.append($('<span class="vas_103-tf"></span>').text(
-                    VIS.Msg.getMsg("VAS_103_From") + " " + breakBits.join(", ")));
-            }
-
-            var $qty = $('<span class="vas_103-tf"></span>');
+            var $qty = $('<span class="vas_103-tf vas_103-is-grand"></span>');
             $qty.append(document.createTextNode(VIS.Msg.getMsg("VAS_103_TotalQty")));
             $qty.append($('<b></b>').text(formatNumber(totQty, 0)));
             $foot.append($qty);
-
-            var $val = $('<span class="vas_103-tf vas_103-is-grand"></span>');
-            $val.append(document.createTextNode(VIS.Msg.getMsg("VAS_103_TotalValue")));
-            $val.append($('<b></b>').text(formatAmount(totVal, cur, data.StdPrecision)));
-            $foot.append($val);
-
             $tbl.append($foot);
 
             return $tbl;
         }
 
-        function buildLineRow(ln, origin, cur) {
+        function buildLineRow(ln, cur) {
             var $tr = $('<div class="vas_103-tRow vas_103-tBody"></div>');
 
-            // Item (name + SKU)
+            // Item: the product, its code and its attributes.
             var $item = $('<span class="vas_103-itItem"></span>');
-            $item.append($('<div class="vas_103-itName"></div>').text(na(ln.ProductName)));
-            if (ln.ProductCode) {
-                $item.append($('<div class="vas_103-itSku"></div>')
-                    .text(VIS.Msg.getMsg("VAS_103_SKU") + " " + ln.ProductCode));
-            } else if (ln.Description) {
-                $item.append($('<div class="vas_103-itSku"></div>').text(ln.Description));
+
+            var $nameRow = $('<div class="vas_103-itNameRow"></div>');
+            $nameRow.append($('<span class="vas_103-itName"></span>').text(na(ln.ProductName)));
+            // The toggle for the line's confirmation figures, on the name itself.
+            var $cBtn = buildConfirmToggle(ln);
+            if ($cBtn) $nameRow.append($cBtn);
+            $item.append($nameRow);
+
+            // The product's code, alone. It was prefixed with the word "SKU",
+            // which belongs to a column header, not to every row of the table.
+            var subBits = [];
+            if (ln.ProductCode) subBits.push(ln.ProductCode);
+            // Attributes travel with the product: a lot / serial / attribute set is
+            // what distinguishes two rows of the same item from each other.
+            if (ln.AttributeSetInstance) subBits.push(ln.AttributeSetInstance);
+            if (!subBits.length && ln.Description) subBits.push(ln.Description);
+            if (subBits.length) {
+                var sub = subBits.join(" · ");
+                $item.append($('<div class="vas_103-itSku"></div>').text(sub).attr("title", sub));
             }
             $tr.append($item);
 
@@ -607,37 +842,387 @@
             $tr.append($('<span class="vas_103-ta-r"></span>').text(
                 formatAmount(+ln.LineValue || 0, cur, data.StdPrecision)));
 
-            // Source badge
-            var srcKey = origin === "req" ? "VAS_103_Requisition"
-                       : (origin === "prod" ? "VAS_103_ProductionOrder" : "VAS_103_Manual");
-            var $q = $('<span class="vas_103-ta-c"></span>');
-            $q.append($('<span class="vas_103-tag"></span>').addClass("vas_103-s-" + origin)
-                .text(VIS.Msg.getMsg(srcKey)));
-            $tr.append($q);
-
             return $tr;
         }
 
-        // ---------- Actions (visual buttons) ---------- //
+        // ---------- Per-line confirmation figures ---------- //
 
-        // Presentational only. Receive Transfer is disabled once the movement is
-        // already posted / received.
-        function renderActions() {
-            var f = stageFlags();
-            var received = f.posted || f.received;
+        // The toggle that opens a line's confirmation figures, sitting on the
+        // product name. Returns null for a line with no confirmation, so an
+        // unconfirmed line carries no control at all.
+        function buildConfirmToggle(ln) {
+            if (!ln.HasConfirm) return null;
 
-            var $bar = $('<section class="vas_103-actions"></section>');
-            $bar.append(actionButton("print", VIS.Msg.getMsg("VAS_103_Print"), "sec", false));
-            $bar.append(actionButton("download", VIS.Msg.getMsg("VAS_103_ReceiveTransfer"), "pri", received));
-            $body.append($bar);
+            var id = ln.M_MovementLine_ID;
+            var open = !!openConfirmLines[id];
+            var $b = $('<span class="vas_103-cfBtn"></span>')
+                .toggleClass("vas_103-is-open", open)
+                .attr("title", getMsg("VAS_103_ConfirmationStatus", "Confirmation status"));
+            $b.append(svgIcon("check"));
+            $b.on("click", function (e) {
+                e.stopPropagation();
+                var nowOpen = !openConfirmLines[id];
+                if (nowOpen) openConfirmLines[id] = true; else delete openConfirmLines[id];
+                $b.toggleClass("vas_103-is-open", nowOpen);
+                $b.closest(".vas_103-tBody").next(".vas_103-cfDrawer").toggle(nowOpen);
+            });
+            return $b;
         }
 
-        function actionButton(icon, label, kind, disabled) {
-            var $b = $('<span class="vas_103-btn"></span>').addClass("vas_103-btn-" + (kind || "sec"));
-            if (disabled) $b.addClass("vas_103-is-disabled");
-            $b.append(svgIcon(icon));
-            $b.append($('<span></span>').text(label));
+        // The drawer: what the confirmation actually recorded against this line —
+        // confirmed, difference and scrapped quantities, with the locator the scrap
+        // landed in shown only when something was scrapped. A sibling of the line
+        // row rather than a child, so it can span the table's full width instead of
+        // living inside one grid cell.
+        function buildConfirmDrawer(ln) {
+            if (!ln.HasConfirm) return null;
+
+            var open = !!openConfirmLines[ln.M_MovementLine_ID];
+            var prec = +ln.UOMPrecision || 0;
+
+            var $d = $('<div class="vas_103-cfDrawer"></div>');
+            if (!open) $d.hide();
+
+            var $grid = $('<div class="vas_103-cfGrid"></div>');
+            $grid.append(confirmBit(getMsg("VAS_103_ConfirmTarget", "Target"),
+                formatNumber(+ln.ConfirmTargetQty || 0, prec), null));
+            $grid.append(confirmBit(getMsg("VAS_103_ConfirmedQty", "Confirmed Qty"),
+                formatNumber(+ln.ConfirmedQty || 0, prec), "vas_103-cf-ok"));
+
+            // A difference is only interesting when there IS one, but it is always
+            // shown: a zero difference is the reassurance the reader came for.
+            var diff = +ln.DifferenceQty || 0;
+            $grid.append(confirmBit(getMsg("VAS_103_DifferenceQty", "Difference"),
+                signedNumber(diff, prec), diff !== 0 ? "vas_103-cf-warn" : null));
+
+            var scrap = +ln.ScrappedQty || 0;
+            var $scrap = confirmBit(getMsg("VAS_103_ScrapQty", "Scrap Qty"),
+                formatNumber(scrap, prec), scrap > 0 ? "vas_103-cf-risk" : null);
+            // The scrap locator only means something where something was actually
+            // scrapped, so it sits under the figure and only then.
+            if (scrap > 0 && ln.ScrapLocatorName) {
+                $scrap.append($('<span class="vas_103-cfLoc"></span>')
+                    .text(ln.ScrapLocatorName)
+                    .attr("title", getMsg("VAS_103_ScrapLocator", "Scrap locator") + ": " + ln.ScrapLocatorName));
+            }
+            $grid.append($scrap);
+
+            $d.append($grid);
+            return $d;
+        }
+
+        function confirmBit(label, value, toneCls) {
+            var $b = $('<div class="vas_103-cfBit"></div>');
+            $b.append($('<span class="vas_103-cfLbl"></span>').text(label));
+            $b.append($('<span class="vas_103-cfVal"></span>')
+                .addClass(toneCls || "").text(value));
             return $b;
+        }
+
+        // Signed number: "+N" for positive, "−N" for negative, "0" for zero.
+        function signedNumber(value, precision) {
+            var v = +value || 0;
+            if (v === 0) return formatNumber(0, precision);
+            return (v > 0 ? "+" : "−") + formatNumber(Math.abs(v), precision);
+        }
+
+        // ---------- Actions ---------- //
+
+        // The Print and Receive Transfer buttons are gone, with actionButton().
+        // Both were presentational only: neither was wired to anything, so the
+        // panel offered two controls that did nothing on every record. Printing and
+        // receiving belong to the transfer window, where each runs behind the
+        // document's own validation.
+
+        // ---------- Notes ---------- //
+
+        function renderNotes() {
+            var rows = (data && data.Notes) || [];
+            if (!rows.length) return;
+
+            var $sec = section(getMsg("VAS_103_Notes", "Notes"), { summary: rows.length + "" });
+
+            var $card = $('<div class="vas_103-panelcard"></div>');
+            for (var i = 0; i < rows.length; i++) {
+                var n = rows[i];
+                var $n = $('<div class="vas_103-noteRow"></div>');
+                $n.append($('<span class="vas_103-noteTag"></span>')
+                    .addClass(n.NoteType === "header" ? "vas_103-n-header" : "vas_103-n-line")
+                    .text(n.NoteType === "header"
+                        ? getMsg("VAS_103_NoteHeader", "Document")
+                        : getMsg("VAS_103_NoteLine", "Line")));
+                $n.append($('<span class="vas_103-noteTxt"></span>').text(n.Text || ""));
+                $card.append($n);
+            }
+            $sec.append($card);
+        }
+
+        // ---------- Activity ---------- //
+
+        var ACT_TYPES = {
+            Note:         { tone: "info",    icon: "note",   label: "Note" },
+            Created:      { tone: "neutral", icon: "plus",   label: "Created" },
+            Completed:    { tone: "success", icon: "check",  label: "Completed" },
+            Confirmation: { tone: "warning", icon: "clock",  label: "Confirmation" },
+            Confirmed:    { tone: "success", icon: "check",  label: "Confirmed" },
+            // One row per FIELD that changed, not one per save (model side).
+            Updated:      { tone: "info",    icon: "pencil", label: "Updated" }
+        };
+
+        // Maximum activity rows shown per page; the feed paginates beyond this.
+        // A transfer accumulates every status change, confirmation and note, and
+        // an unpaged feed made the section scroll past everything below it. The
+        // section's own count badge still counts the WHOLE feed, not the page.
+        var ACTIVITY_PER_PAGE = 15;
+        var activityPage = 0;   // current Activity page (0-based)
+
+        function renderActivity() {
+            var rows = (data && data.Activity) || [];
+            if (!rows.length) return;
+
+            var $sec = section(getMsg("VAS_103_Activity", "Activity"), { summary: rows.length + "" });
+
+            var $card = $('<div class="vas_103-panelcard"></div>');
+            $sec.append($card);
+
+            // The pager is a sibling of the card, so it keeps its place while the
+            // card's rows are replaced underneath it.
+            var $pager = $('<div class="vas_103-pager"></div>');
+            if (rows.length > ACTIVITY_PER_PAGE) $sec.append($pager);
+
+            function paintPage() {
+                var pageCount = Math.max(1, Math.ceil(rows.length / ACTIVITY_PER_PAGE));
+                if (activityPage >= pageCount) activityPage = pageCount - 1;
+                if (activityPage < 0) activityPage = 0;
+
+                var start = activityPage * ACTIVITY_PER_PAGE;
+                var end = Math.min(rows.length, start + ACTIVITY_PER_PAGE);
+
+                $card.empty();
+                for (var i = start; i < end; i++) $card.append(activityRow(rows[i]));
+
+                buildPager($pager, activityPage, pageCount, rows.length, start, end,
+                    function (p) { activityPage = p; paintPage(); });
+            }
+
+            paintPage();
+        }
+
+        // Range caption on the left, Previous / page-of / Next on the right.
+        // Rebuilt on every page change so the disabled states stay accurate.
+        // `page` is 0-based and `onGo` is handed the page to move to, so the
+        // caller owns its own page state. Nothing is drawn for a single-page
+        // list, so a short feed shows no controls at all.
+        function buildPager($pager, page, pageCount, total, start, end, onGo) {
+            $pager.empty();
+            if (pageCount <= 1) return;
+
+            $pager.append($('<span class="vas_103-pgRange"></span>').text(
+                getMsg("VAS_103_Showing", "Showing") + " " + (start + 1) + "-" + end + " " +
+                getMsg("VAS_103_Of", "of") + " " + total));
+
+            var $ctrls = $('<span class="vas_103-pgCtrls"></span>');
+            $ctrls.append(pagerButton(getMsg("VAS_103_Previous", "Previous"), "chevLeft",
+                page <= 0, function () { onGo(page - 1); }));
+            $ctrls.append($('<span class="vas_103-pgPos"></span>').text(
+                getMsg("VAS_103_Page", "Page") + " " + (page + 1) + " " +
+                getMsg("VAS_103_Of", "of") + " " + pageCount));
+            $ctrls.append(pagerButton(getMsg("VAS_103_Next", "Next"), "chevRight",
+                page >= pageCount - 1, function () { onGo(page + 1); }));
+            $pager.append($ctrls);
+        }
+
+        function pagerButton(label, icon, disabled, handler) {
+            var $b = $('<span class="vas_103-pgBtn"></span>');
+            if (icon === "chevLeft") $b.append(svgIcon(icon));
+            $b.append($('<span></span>').text(label));
+            if (icon === "chevRight") $b.append(svgIcon(icon));
+            if (disabled) $b.addClass("vas_103-is-disabled");
+            else $b.on("click", handler);
+            return $b;
+        }
+
+        // "was X → now Y" under the field's name, for a field-level edit. A
+        // value the log recorded as empty reads as an em dash rather than as a
+        // blank, so a cleared field is visibly cleared instead of looking like a
+        // rendering gap. Follows VAS_101 / VAS_104.
+        function changeDelta(a) {
+            var $d = $('<small class="vas_103-actSub vas_103-actDelta"></small>');
+            var blank = "—";
+            $d.append($('<span class="vas_103-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_103-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_103-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
+        }
+
+        function activityRow(a) {
+            var meta = ACT_TYPES[a.EventType] || ACT_TYPES.Note;
+
+            var $row = $('<div class="vas_103-actRow"></div>');
+            var $badge = $('<span class="vas_103-actBadge"></span>')
+                .addClass("vas_103-tone-" + meta.tone);
+            $badge.append(svgIcon(meta.icon));
+            $badge.append($('<span></span>').text(getMsg("VAS_103_Act" + a.EventType, meta.label)));
+            $row.append($badge);
+
+            var $main = $('<div class="vas_103-actMain"></div>');
+            var title = activityTitle(a);
+            var $title = $('<span class="vas_103-actTitle"></span>').text(title).attr("title", title);
+            // A note's headline IS the comment, so it wraps rather than
+            // ellipsising after one line — that text is what the reader came for.
+            if (a.EventType === "Note") $title.addClass("vas_103-multiline");
+            $main.append($title);
+
+            var when = formatDateTime(a.EventTime);
+            if (a.ActorName) {
+                when = when ? when + " · " + getMsg("VAS_103_By", "by") + " " + a.ActorName
+                            : getMsg("VAS_103_By", "by") + " " + a.ActorName;
+            }
+            $main.append($('<span class="vas_103-actWhen"></span>').text(when).attr("title", when));
+
+            // A line edit names the line it landed on, BENEATH the headline and its
+            // stamp — appended last so it takes a row of its own (stylesheet) and
+            // the "when · by whom" stays on the headline's line where every other
+            // row carries it. Dropped entirely for a header edit, which has no line
+            // to name.
+            if (a.EventType === "Updated" && a.ChangeScope) {
+                $main.append($('<small class="vas_103-actSub"></small>')
+                    .text(a.ChangeScope).attr("title", a.ChangeScope));
+            }
+            // ...and the move itself: what the field held before the edit and
+            // what it holds after, on a sub-line of its own.
+            if (a.OldValue || a.NewValue) $main.append(changeDelta(a));
+            $row.append($main);
+            return $row;
+        }
+
+        function activityTitle(a) {
+            if (a.EventType === "Note") return a.Title || getMsg("VAS_103_ActNote", "Note");
+            if (a.EventType === "Created")
+                return getMsg("VAS_103_ActCreatedTxt", "Transfer created") + (a.Title ? " " + a.Title : "");
+            if (a.EventType === "Completed")
+                return getMsg("VAS_103_ActCompletedTxt", "Transfer completed") + (a.Title ? " " + a.Title : "");
+            if (a.EventType === "Confirmation")
+                return getMsg("VAS_103_ActConfirmationTxt", "Confirmation raised") + (a.Title ? " " + a.Title : "");
+            if (a.EventType === "Confirmed")
+                return getMsg("VAS_103_ActConfirmedTxt", "Confirmation completed") + (a.Title ? " " + a.Title : "");
+            // A field-level edit headlines with the FIELD that changed — the row's
+            // tag already says "Updated", and the field is what tells one edit
+            // apart from the next.
+            if (a.EventType === "Updated" && a.FieldName)
+                return getMsg("VAS_103_ActFieldUpdated", "Updated") + " " + a.FieldName;
+            return a.Title || "";
+        }
+
+        // ---------- Opening a linked record ---------- //
+
+        // Tables whose record does NOT open in the table's default zoom window,
+        // mapped to the name of the window it does. Ported from VAS_106.
+        var WINDOW_NAME_BY_TABLE = {
+            "M_Requisition": "VAS_Requisition"
+        };
+
+        // Window name -> AD_Window_ID, resolved once per name and remembered for
+        // the life of the panel. A name the dictionary does not know is cached as
+        // -1 so a failed lookup is not repeated on every click.
+        var windowIdByName = {};
+        var windowIdByTable = {};
+
+        function resolveWindowIdByName(windowName) {
+            if (!windowName) return 0;
+            if (windowIdByName.hasOwnProperty(windowName)) {
+                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_103_MaterialTransfer/GetWindow_ID", windowName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) {
+                    windowIdByName[windowName] = -1;
+                    console.log("resolveWindowIdByName: no window named " + windowName);
+                    return 0;
+                }
+                windowIdByName[windowName] = id;
+                return id;
+            } catch (e) {
+                windowIdByName[windowName] = -1;
+                console.log(e);
+                return 0;
+            }
+        }
+
+        // Last resort: ask the SERVER which window the table opens in. The
+        // Production Order chip needs it — VAMFG_M_WorkOrder is maintained by a
+        // module window whose name cannot be hard-coded here, and the browser-side
+        // zoom lookup only knows tables the client has cached.
+        function resolveWindowIdByTable(tableName) {
+            if (!tableName) return 0;
+            if (windowIdByTable.hasOwnProperty(tableName)) {
+                return windowIdByTable[tableName] > 0 ? windowIdByTable[tableName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_103_MaterialTransfer/GetWindowIdByTable", tableName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) {
+                    windowIdByTable[tableName] = -1;
+                    console.log("resolveWindowIdByTable: no window for table " + tableName);
+                    return 0;
+                }
+                windowIdByTable[tableName] = id;
+                return id;
+            } catch (e) {
+                windowIdByTable[tableName] = -1;
+                console.log(e);
+                return 0;
+            }
+        }
+
+        // Opens the record's window filtered to that row, in three steps: the window
+        // the CALLER names, else the table's own zoom target, else the window the
+        // DICTIONARY says the table opens in. Degrades to a toast so a click never
+        // throws.
+        function openRecord(tableName, recordId, windowName) {
+            if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
+            try {
+                var windowId = resolveWindowIdByName(windowName || WINDOW_NAME_BY_TABLE[tableName]);
+
+                if (windowId <= 0 &&
+                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
+                    // Neither table this panel opens serves both sides of the
+                    // trade, so no IsSOTrx is asked for.
+                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, false) || 0;
+                }
+                if (windowId <= 0) windowId = resolveWindowIdByTable(tableName);
+
+                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === "function") {
+                    var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
+                    VIS.viewManager.startWindow(windowId, zoomQuery);
+                    return;
+                }
+            } catch (e) { console.log(e); }
+            toast(getMsg("VAS_103_OpenRecord", "Open") + " " + tableName + " #" + recordId, true);
+        }
+
+        // Lightweight self-contained toast (no dependency on a host toast API).
+        function toast(message, isError) {
+            var $t = $('<div class="vas_103-toast"></div>')
+                .addClass(isError ? "vas_103-err" : "vas_103-ok").text(message);
+            $root.append($t);
+            setTimeout(function () { $t.addClass("vas_103-show"); }, 10);
+            setTimeout(function () {
+                $t.removeClass("vas_103-show");
+                setTimeout(function () { $t.remove(); }, 300);
+            }, 3200);
         }
 
         // ----------------------------------------------------------------- //
@@ -645,6 +1230,8 @@
         // ----------------------------------------------------------------- //
 
         var SVG_ICONS = {
+            chevLeft: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
+            chevRight: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
             user:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
             calendar: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>',
             box:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>',
@@ -654,8 +1241,13 @@
             arrow:    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>',
             link:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
             check:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
-            print:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>',
-            download: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>'
+            // The activity badges. 'print' and 'download' went with the Print and
+            // Receive Transfer buttons that were the only things using them.
+            note:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>',
+            plus:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
+            clock:    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>',
+            // The field-level "Updated" activity rows.
+            pencil:   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'
         };
 
         function svgIcon(name) {
@@ -697,6 +1289,35 @@
                 });
             } catch (e) {
                 return d.toDateString();
+            }
+        }
+
+        // Date AND time, for the activity feed's genuine timestamps.
+        //
+        // The database holds these in UTC and the server emits no timezone
+        // designator (e.g. "2026-08-12T10:00:00"), which the browser reads as
+        // LOCAL — so an untagged stamp prints the stored UTC clock and every
+        // activity time reads hours out. Tagging it "Z" makes toLocale* render it
+        // in the viewer's own zone. A string already carrying a "Z" or a ±hh:mm
+        // offset is left alone. Ported from VAS_106.
+        function formatDateTime(value) {
+            if (!value) return "";
+            var d;
+            if (value instanceof Date) {
+                d = value;
+            } else {
+                var s = String(value);
+                if (!/(Z|[+\-]\d{2}:?\d{2})$/.test(s) && /^\d{4}-\d{2}-\d{2}T/.test(s)) s += "Z";
+                d = new Date(s);
+            }
+            if (isNaN(d.getTime())) return "";
+            try {
+                return d.toLocaleString(window.navigator.language, {
+                    year: "numeric", month: "short", day: "2-digit",
+                    hour: "2-digit", minute: "2-digit"
+                });
+            } catch (e) {
+                return d.toString();
             }
         }
 

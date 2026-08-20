@@ -1011,6 +1011,20 @@ namespace VAdvantage.Model
             //	Importance / Priority
             SetPriority();
 
+            // check mail templates from request or request type.
+            if (GetR_MailText_ID() > 0)
+            {
+                mailText_ID = GetR_MailText_ID();
+            }
+            if (mailText_ID == 0)
+            {
+                if (_requestType != null && _requestType.GetR_MailText_ID() > 0)
+                {
+                    mailText_ID = _requestType.GetR_MailText_ID();
+                }
+            }
+
+
             //	New
             if (newRecord)
                 return true;
@@ -1154,21 +1168,7 @@ namespace VAdvantage.Model
                     update.Save();
             }
 
-
-            //
-            // check mail templates from request or request type.
-            if (GetR_MailText_ID() > 0)
-            {
-                mailText_ID = GetR_MailText_ID();
-            }
-            if (mailText_ID == 0)
-            {
-                if (_requestType != null && _requestType.GetR_MailText_ID() > 0)
-                {
-                    mailText_ID = _requestType.GetR_MailText_ID();
-                }
-            }
-
+            //            
             if (mailText_ID == 0)
             {
                 _emailTo = new StringBuilder();

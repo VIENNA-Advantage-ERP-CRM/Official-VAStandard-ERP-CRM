@@ -3114,9 +3114,9 @@
                 pendingXhr[action] = null;
             }
 
-            // Clear panel body
+            // Show "no data available" placeholder instead of a blank body
             var bodyEl = document.getElementById('vas_123_body_' + widgetID);
-            if (bodyEl) bodyEl.innerHTML = '';
+            if (bodyEl) bodyEl.innerHTML = '<div class="vas_123_qrp-norecord">' + esc(msg('VIS_NoData')) + '</div>';
         };
 
     }; // end VAS.VAS_123_QuotationRightPanel constructor

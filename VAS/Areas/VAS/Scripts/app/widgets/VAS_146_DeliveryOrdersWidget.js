@@ -133,7 +133,7 @@
         }
 
         function monthName(month) {
-            return new Date(2000, month - 1, 1).toLocaleDateString(window.navigator.language, { month: 'short' });
+            return new Date(2000, month - 1, 1).toLocaleDateString(window.navigator.language, { month: 'long' });
         }
 
         function statusLabel(code) {
@@ -161,7 +161,7 @@
             $nextButton.prop('disabled', true);
         }
 
-        /* ---- Filter options (Month / Year, latest first, no "All") ---- */
+        /* ---- Filter options (Month / Year, latest first, default to current month/year) ---- */
         function loadFilterOptions() {
             if (datesRequest && datesRequest.readyState !== 4) { datesRequest.abort(); }
 
@@ -179,29 +179,37 @@
                     }
 
                     var dates = result.rows || [];
-                    state.months = [];
+                    state.months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
                     state.years = [];
+
+                    var now = new Date();
+                    var currentMonth = now.getMonth() + 1;
+                    var currentYear = now.getFullYear();
+
                     for (var i = 0; i < dates.length; i++) {
                         var date = parseDate(dates[i]);
                         if (!date) { continue; }
-                        var m = date.getMonth() + 1;
                         var y = date.getFullYear();
-                        if (state.months.indexOf(m) < 0) { state.months.push(m); }
                         if (state.years.indexOf(y) < 0) { state.years.push(y); }
                     }
 
-                    state.hasAnyDates = state.months.length > 0 && state.years.length > 0;
-                    if (!state.hasAnyDates) {
+                    if (state.years.indexOf(currentYear) < 0) {
+                        state.years.push(currentYear);
+                    }
+
+                    state.years.sort(function (a, b) { return b - a; });
+
+                    state.hasAnyDates = dates.length > 0;
+                    if (!dates.length) {
                         setBusy(false);
                         renderFilters();
                         showEmptyOverall();
                         return;
                     }
 
-                    /* Default = month/year of the newest date (first row). */
-                    var newest = parseDate(dates[0]);
-                    state.month = newest.getMonth() + 1;
-                    state.year = newest.getFullYear();
+                    /* Default to current month and current year */
+                    state.month = currentMonth;
+                    state.year = currentYear;
                     renderFilters();
                     loadOrdersForSelectedMonthYear();
                 },

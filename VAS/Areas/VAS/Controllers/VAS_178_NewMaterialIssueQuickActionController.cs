@@ -20,7 +20,9 @@ namespace VIS.Controllers
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_178_NewMaterialIssueQuickActionController).FullName);
 
-        private const string MaterialIssueWindowExportId = "VAS_1000223";
+        // Export_ID is stable across databases (AD_Window_ID is not): VAS_1000221 resolves to
+        // VAS_InternalUseInventory on every VA instance. VAS_1000223 is the VAS_Production window.
+        private const string MaterialIssueWindowExportId = "VAS_1000221";
 
         /// <summary>Returns the active Material Issue / Internal Use window ID.</summary>
         [AjaxAuthorizeAttribute]
@@ -53,8 +55,13 @@ namespace VIS.Controllers
             string sql = $@"
                 SELECT ADWindow.AD_Window_ID
                 FROM AD_Window ADWindow
-                WHERE ADWindow.IsActive=N'Y'
-                  AND (ADWindow.Name = 'Material Issue' OR ADWindow.Name = 'Internal Use' OR ADWindow.Name = 'Inventory Use' OR ADWindow.Export_ID = @Export_ID)
+                WHERE ADWindow.IsActive='Y'
+                  AND (ADWindow.Export_ID = @Export_ID
+                       OR ADWindow.Name = 'VAS_InternalUseInventory'
+                       OR ADWindow.Name = 'Internal Use Inventory'
+                       OR ADWindow.Name = 'Material Issue'
+                       OR ADWindow.Name = 'Internal Use'
+                       OR ADWindow.Name = 'Inventory Use')
                 ORDER BY ADWindow.AD_Window_ID ASC";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -72,12 +79,15 @@ namespace VIS.Controllers
             int windowId = Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null));
             if (windowId <= 0)
             {
-                // Fallback to default physical inventory / material issue window ID if specific name not found
+                // Fallback for instances that renamed the window. Match on a space-insensitive
+                // "InternalUse" token so both 'VAS_InternalUseInventory' and 'Internal Use Inventory'
+                // resolve. A broad '%Issue%'/'%Inventory%' LIKE must NOT be used here - it matches
+                // 'Perpetual Inventory' (AD_Window_ID 175) first and opens the wrong window.
                 string fallbackSql = @"
                     SELECT ADWindow.AD_Window_ID
                     FROM AD_Window ADWindow
-                    WHERE ADWindow.IsActive=N'Y'
-                      AND (ADWindow.Name LIKE '%Issue%' OR ADWindow.Name LIKE '%Inventory%')
+                    WHERE ADWindow.IsActive='Y'
+                      AND REPLACE(UPPER(ADWindow.Name), ' ', '') LIKE '%INTERNALUSE%'
                     ORDER BY ADWindow.AD_Window_ID ASC";
 
                 fallbackSql = MRole.GetDefault(ctx).AddAccessSQL(

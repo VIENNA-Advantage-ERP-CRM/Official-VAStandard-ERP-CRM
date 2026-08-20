@@ -32,6 +32,69 @@
  *   VAI163   2026-08-07  Emits the vas_104-prefixed modifier classes the
  *                        stylesheet now uses, the runtime-built ones included
  *                        ("vas_104-tone-" + tone).
+ *   VAI163   2026-08-12  Header:
+ *                        - The eyebrow names the DOCUMENT THIS IS: "GRN
+ *                          Confirmation No." over a receipt and "Delivery Order
+ *                          Confirmation No." over a shipment. It read "Goods
+ *                          Receipt Note" / "Outbound Shipment", which named the
+ *                          SOURCE document over the confirmation's own number.
+ *                        - The "Quality Not Applicable" pill is gone: it announced
+ *                          the absence of something on every ordinary confirmation.
+ *                          Quality still hides its own columns when it does not
+ *                          apply, which is the same news told once.
+ *                        - A Disputed pill when the confirmation is in dispute
+ *                          (IsInDispute, model side).
+ *                        - The details card drops Confirmation No (the title strip
+ *                          already carries it) and Warehouse (the left column
+ *                          already does), leaving the source document — which is
+ *                          now a LINK that opens the GRN or the delivery order
+ *                          (openRecord / WINDOW_NAME_BY_TABLE, resolved through the
+ *                          new GetWindow_ID endpoint; M_InOut serves both sides so
+ *                          the window has to be named).
+ *                        - The confirmation type shows the DICTIONARY's own name
+ *                          for it (ConfirmTypeName, model side). The panel carried
+ *                          its own map of four codes, so a customer-added type
+ *                          showed a bare code.
+ *                        Lines:
+ *                        - The item cell carries the source document's LINE NUMBER
+ *                          and the line's ATTRIBUTES beside the product, and the
+ *                          product's Value stands alone — it was prefixed "SKU",
+ *                          a word for a column header, not for every row.
+ *                        - The Locator column is gone. A locator only means
+ *                          something where something was scrapped, so it sits under
+ *                          the Scrapped figure, and only when that figure is
+ *                          non-zero — as a column it was repeated down the table
+ *                          saying nothing.
+ *                        - Status is no longer derived from the quantities
+ *                          (Cleared / Partial / Hold / Pending, which every line
+ *                          had). It is the QUALITY verdict now, from the line's own
+ *                          parameters compared actual-against-acceptable, and only
+ *                          lines that HAVE quality parameters carry one.
+ *                        - Each such line opens a drawer of its quality parameters
+ *                          (VA010_ShipConfParameters, model side): QC date, test
+ *                          parameter, acceptable value, actual value and quantity.
+ *                        Bottom:
+ *                        - Notes and Activity sections, in that order, below the
+ *                          lines.
+ *                        - The Print / Confirm buttons are gone. Both were
+ *                          presentational only and neither did anything; the
+ *                          actions belong to the confirmation window.
+ *   VAI163   2026-08-13  Activity pages at 15 rows (ACTIVITY_PER_PAGE), matching
+ *                        the other overview panels. The pager is a sibling of
+ *                        the list card so the controls keep their place while
+ *                        the rows are replaced underneath them, and the
+ *                        section's count badge still counts the WHOLE feed.
+ *   VAI163   2026-08-13  - Confirmation Type moved from the identity column to
+ *                          the FIELD column on the right of the details card. It
+ *                          sat under the party name, which it has nothing to do
+ *                          with; it belongs beside the source document.
+ *                        - Activity reports edits FIELD BY FIELD ("Changed"
+ *                          rows): the field's name headlines the row — prefixed
+ *                          with the line it happened on when a line changed — and
+ *                          the value move (old struck through, new in weight)
+ *                          runs beneath it on its own line (changeDelta). The
+ *                          feed used to say only when the document was last
+ *                          saved, via the Completed row's Updated stamp.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -125,6 +188,10 @@
         var $body;
         var $emptyState;
         var data = null;
+        // Which lines have their quality-parameter drawer open, keyed by
+        // M_InOutLineConfirm_ID. Kept outside render() so a repaint of the same
+        // record leaves the reader where they were; reset with the record.
+        var openQcLines = {};
 
         this.init = function () {
             $root = $('<div class="vas_104-root"></div>');
@@ -153,6 +220,11 @@
         }
 
         this.fetchData = function (recordID) {
+            // Open drawers belong to the record that was on screen; a different
+            // confirmation's line ids mean nothing here.
+            openQcLines = {};
+            // A different record starts at the top of its own feed.
+            activityPage = 0;
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_104_OverviewShipGRNConfirmation/GetShipGRNConfirmationOverview",
@@ -174,6 +246,7 @@
 
         this.clear = function () {
             data = null;
+            openQcLines = {};
             render();
         };
 
@@ -198,7 +271,10 @@
             renderHeader();
             renderSnapshot();
             renderLines();
-            renderActions();
+            // Notes and Activity close the panel: both are commentary on
+            // everything above them, so they read last.
+            renderNotes();
+            renderActivity();
         }
 
         // ----------------------------------------------------------------- //
@@ -223,6 +299,17 @@
             return (value === null || value === undefined || String(value).trim() === "")
                 ? VIS.Msg.getMsg("VAS_104_NA")
                 : value;
+        }
+
+        // The AD_Message keys this panel gained are not seeded on every
+        // deployment; without a fallback they would render as the raw key. The
+        // seeded ones keep going through VIS.Msg.getMsg directly.
+        function getMsg(key, fallback) {
+            try {
+                var m = VIS.Msg.getMsg(key);
+                if (m && m !== key) return m;
+            } catch (e) { }
+            return fallback != null ? fallback : key;
         }
 
         // ---------- Status map (DocStatus code -> label + tone) ---------- //
@@ -256,7 +343,15 @@
             "D0": "VAS_104_DropShipConfirm"
         };
 
+        // The confirmation type's FULL name. The server sends the dictionary's own
+        // name for the value stored on the record (ConfirmTypeName, from the
+        // reference list behind M_InOutConfirm.ConfirmType), so the panel reads
+        // what the confirmation screen reads — translations and customer-added
+        // types included. The map below is only the fallback for a deployment
+        // whose reference list could not be read; it used to be the whole answer,
+        // so any type outside those four codes showed a bare code.
         function confirmTypeLabel() {
+            if (data.ConfirmTypeName) return data.ConfirmTypeName;
             var k = CONFIRMTYPE_MAP[data.ConfirmTypeCode];
             return k ? VIS.Msg.getMsg(k) : na(data.ConfirmTypeCode);
         }
@@ -265,6 +360,22 @@
             return (data.SourceTypeCode === "SHP")
                 ? VIS.Msg.getMsg("VAS_104_Shipment")
                 : VIS.Msg.getMsg("VAS_104_GoodsReceipt");
+        }
+
+        // What THIS document is, over its own number. It named the SOURCE document
+        // ("Goods Receipt Note" / "Outbound Shipment") above the confirmation's
+        // number, which read as though the number belonged to the source.
+        function confirmationEyebrow() {
+            return (data.SourceTypeCode === "SHP")
+                ? getMsg("VAS_104_DOConfirmationNo", "Delivery Order Confirmation No.")
+                : getMsg("VAS_104_GRNConfirmationNo", "GRN Confirmation No.");
+        }
+
+        // The window each side of M_InOut opens in — a receipt is a Material
+        // Receipt, a shipment a Delivery Order. One table, two screens, which the
+        // browser's zoom lookup cannot choose between.
+        function sourceWindowName() {
+            return (data.SourceTypeCode === "SHP") ? "VAS_DeliveryOrder" : "VAS_MaterialReceipt";
         }
 
         // Number of quality lines that did not pass QC (quality mode only).
@@ -277,21 +388,12 @@
             return n;
         }
 
-        // Per-line status per the documented rule:
-        //  Hold    when difference != 0 or scrapped > 0
-        //  Cleared when confirmed = target (and nothing held)
-        //  Partial when confirmed > 0
-        //  Pending otherwise (nothing confirmed yet)
-        function lineStatus(ln) {
-            var target = +ln.TargetQty || 0;
-            var confirmed = +ln.ConfirmedQty || 0;
-            var difference = +ln.DifferenceQty || 0;
-            var scrapped = +ln.ScrappedQty || 0;
-            if (difference !== 0 || scrapped > 0) return "hold";
-            if (confirmed === target) return "cleared";
-            if (confirmed > 0) return "partial";
-            return "pending";
-        }
+        // lineStatus() is gone with the column it fed. It derived a Cleared /
+        // Partial / Hold / Pending tag from the line's own quantities, so every
+        // line carried one — and it only ever restated what the Difference and
+        // Scrapped columns beside it already showed. The Status column now reports
+        // the QUALITY verdict (qcStatusMeta), which the quantities cannot answer,
+        // and only for a line that has quality parameters to derive one from.
 
         // ---------- Header (title strip + details card) ---------- //
 
@@ -303,10 +405,7 @@
             var $top = $('<div class="vas_104-hdrTop"></div>');
 
             var $tl = $('<div class="vas_104-hdrTitleWrap"></div>');
-            $tl.append($('<div class="vas_104-hdrEyebrow"></div>').text(
-                (data.SourceTypeCode === "SHP")
-                    ? VIS.Msg.getMsg("VAS_104_OutboundShipment")
-                    : VIS.Msg.getMsg("VAS_104_GoodsReceiptNote")));
+            $tl.append($('<div class="vas_104-hdrEyebrow"></div>').text(confirmationEyebrow()));
             $tl.append($('<div class="vas_104-hdrTitle"></div>').text(na(data.DocumentNo)));
 
             var subBits = [];
@@ -321,15 +420,23 @@
             var $pills = $('<div class="vas_104-hdrPills"></div>');
             $pills.append(headerPill(sourceTypeLabel(), "info", "box", false));
 
-            // QC hold warning (quality mode only) or no-quality marker.
+            // QC hold warning, quality mode only. There is deliberately no
+            // "Quality Not Applicable" counterpart: it announced the absence of
+            // something on every ordinary confirmation, and the panel already says
+            // it by hiding the quality columns.
             if (qm) {
                 var fails = qcFailCount();
                 if (fails > 0) {
                     $pills.append(headerPill(
                         fails + " " + VIS.Msg.getMsg("VAS_104_LinesFailedQC"), "risk", "alert", false));
                 }
-            } else {
-                $pills.append(headerPill(VIS.Msg.getMsg("VAS_104_QualityNotApplicable"), "neutral", null, false));
+            }
+
+            // A disputed confirmation says so: the quantities did not agree and
+            // the document is being contested, which outranks its status.
+            if (data.IsInDispute) {
+                $pills.append(headerPill(
+                    getMsg("VAS_104_InDispute", "Disputed"), "warning", "alert", false));
             }
 
             $pills.append(headerPill(st.label, st.tone, null, true));
@@ -344,7 +451,6 @@
             var $left = $('<div class="vas_104-hdrColL"></div>');
             $left.append($('<div class="vas_104-fLabel"></div>').text(VIS.Msg.getMsg("VAS_104_Party")));
             $left.append($('<div class="vas_104-vendName"></div>').text(na(data.PartyName)));
-            $left.append(headerField(VIS.Msg.getMsg("VAS_104_ConfirmationType"), confirmTypeLabel(), false));
 
             var $contact = $('<div class="vas_104-vendContact"></div>');
             appendContactBit($contact, "warehouse", data.WarehouseName);
@@ -352,13 +458,44 @@
             if ($contact.children().length) $left.append($contact);
             $card.append($left);
 
+            // Confirmation No and Warehouse are gone from this column: the title
+            // strip above already carries the confirmation number, and the left
+            // column already carries the warehouse. What is left is the document
+            // this confirmation was raised against (which OPENS it) and the
+            // confirmation's own type — the latter moved here off the identity
+            // column, where it sat under the party name it has nothing to do with.
             var $right = $('<div class="vas_104-hdrColR"></div>');
-            $right.append(headerField(VIS.Msg.getMsg("VAS_104_ConfirmationNo"), na(data.DocumentNo), false));
-            $right.append(headerField(VIS.Msg.getMsg("VAS_104_SourceDocument"), na(data.SourceDocumentNo), true));
-            $right.append(headerField(VIS.Msg.getMsg("VAS_104_Warehouse"), na(data.WarehouseName), false));            
+            var $srcLabel = (data.SourceTypeCode === "SHP")
+                ? getMsg("VAS_104_SourceDeliveryOrder", "Delivery Order")
+                : getMsg("VAS_104_SourceGRN", "Goods Receipt Note");
+            $right.append(sourceLinkField($srcLabel));
+            $right.append(headerField(VIS.Msg.getMsg("VAS_104_ConfirmationType"),
+                confirmTypeLabel(), false));
             $card.append($right);
 
             $body.append($card);
+        }
+
+        // The source document as a link. It carried the link STYLING already but
+        // nothing happened on click; it opens the record now — the Material
+        // Receipt window for a receipt, the Delivery Order window for a shipment.
+        // A confirmation with no readable source degrades to plain text.
+        function sourceLinkField(label) {
+            var $f = $('<div class="vas_104-hdrField"></div>');
+            $f.append($('<div class="vas_104-fLabel"></div>').text(label));
+
+            var docNo = data.SourceDocumentNo;
+            var $v = $('<div class="vas_104-fVal"></div>').text(na(docNo));
+            if (docNo && +data.SourceInOutID > 0) {
+                $v.addClass("vas_104-is-link")
+                  .attr("title", getMsg("VAS_104_OpenSource", "Open") + " " + docNo)
+                  .on("click", function () {
+                      openRecord("M_InOut", data.SourceInOutID, sourceWindowName(),
+                                 data.SourceTypeCode === "SHP");
+                  });
+            }
+            $f.append($v);
+            return $f;
         }
 
         function headerPill(label, tone, icon, withDot) {
@@ -459,9 +596,11 @@
 
             var $tbl = $('<div class="vas_104-table"></div>');
 
+            // No Locator column: a locator only means something where something
+            // was scrapped, so it moved under the Scrapped figure and shows only
+            // when that figure is non-zero.
             var $head = $('<div class="vas_104-tRow vas_104-tHead"></div>');
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_104_Item")));
-            $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_104_Locator")));
             $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_104_UOM")));
             $head.append($('<span class="vas_104-ta-r"></span>').text(VIS.Msg.getMsg("VAS_104_Target")));
             $head.append($('<span class="vas_104-ta-r"></span>').text(VIS.Msg.getMsg("VAS_104_Confirmed")));
@@ -480,6 +619,10 @@
                 totDiff      += (+ln.DifferenceQty || 0);
                 totScrap     += (+ln.ScrappedQty || 0);
                 $tbl.append(buildLineRow(ln));
+                // The line's quality parameters, collapsed beneath it. Only a line
+                // that HAS parameters gets one, and it stays shut until asked for.
+                var $drawer = buildQcDrawer(ln);
+                if ($drawer) $tbl.append($drawer);
             }
 
             // Totals footer
@@ -504,21 +647,39 @@
         function buildLineRow(ln) {
             var $tr = $('<div class="vas_104-tRow vas_104-tBody"></div>');
 
-            // Item (name + SKU)
+            // Item: the source document's line number, the product, its Value and
+            // its attributes.
             var $item = $('<span class="vas_104-itItem"></span>');
-            $item.append($('<div class="vas_104-itName"></div>').text(na(ln.ProductName)));
-            if (ln.ProductCode) {
-                $item.append($('<div class="vas_104-itSku"></div>')
-                    .text(VIS.Msg.getMsg("VAS_104_SKU") + " " + ln.ProductCode));
-            } else if (ln.Description) {
-                $item.append($('<div class="vas_104-itSku"></div>').text(ln.Description));
+
+            var $nameRow = $('<div class="vas_104-itNameRow"></div>');
+            // The line number the GRN / shipment knows this row by — the one thing
+            // that ties a confirmation row back to the document it confirms.
+            if (+ln.Line > 0) {
+                $nameRow.append($('<span class="vas_104-lineNo"></span>')
+                    .text("#" + ln.Line)
+                    .attr("title", getMsg("VAS_104_SourceLineNo", "Line no. on the source document")));
+            }
+            $nameRow.append($('<span class="vas_104-itName"></span>').text(na(ln.ProductName)));
+            // The toggle for the line's quality parameters, on the name itself.
+            var $qcBtn = buildQcToggle(ln);
+            if ($qcBtn) $nameRow.append($qcBtn);
+            $item.append($nameRow);
+
+            // The product's Value, alone. It was prefixed with the word "SKU",
+            // which belongs to a column header, not to every row of the table.
+            var subBits = [];
+            if (ln.ProductCode) subBits.push(ln.ProductCode);
+            // Attributes travel with the product: a lot / serial / attribute set is
+            // what distinguishes two rows of the same item from each other.
+            if (ln.AttributeSetInstance) subBits.push(ln.AttributeSetInstance);
+            if (!subBits.length && ln.Description) subBits.push(ln.Description);
+            if (subBits.length) {
+                var sub = subBits.join(" · ");
+                $item.append($('<div class="vas_104-itSku"></div>').text(sub).attr("title", sub));
             }
             $tr.append($item);
 
             var prec = +ln.UOMPrecision || 0;
-
-            // Locator
-            $tr.append($('<span></span>').text(na(ln.LocatorName)));
 
             // UOM
             $tr.append($('<span></span>').text(na(ln.UOMName)));
@@ -535,10 +696,21 @@
             $tr.append($('<span class="vas_104-ta-r vas_104-diff"></span>').addClass(diffTone)
                 .text(signedNumber(diff, prec)));
 
-            // Scrapped (red when > 0)
+            // Scrapped (red when > 0), with the LOCATOR beneath it. The locator
+            // only means something where something was actually scrapped — as its
+            // own column it repeated down the table saying nothing — so it appears
+            // here and only when the figure above it is non-zero.
             var scrap = +ln.ScrappedQty || 0;
-            $tr.append($('<span class="vas_104-ta-r vas_104-scrap"></span>').toggleClass("vas_104-has", scrap > 0)
+            var $scrapCell = $('<span class="vas_104-ta-r vas_104-scrapCell"></span>');
+            $scrapCell.append($('<span class="vas_104-scrap"></span>')
+                .toggleClass("vas_104-has", scrap > 0)
                 .text(formatNumber(scrap, prec)));
+            if (scrap > 0 && ln.LocatorName) {
+                $scrapCell.append($('<span class="vas_104-scrapLoc"></span>')
+                    .text(ln.LocatorName)
+                    .attr("title", getMsg("VAS_104_ScrapLocator", "Scrap locator") + ": " + ln.LocatorName));
+            }
+            $tr.append($scrapCell);
 
             // QC mark (qc-only) — Pass / Fail chip when quality applies to the line.
             var $qc = $('<span class="vas_104-ta-c vas_104-qc-only"></span>');
@@ -552,41 +724,372 @@
             }
             $tr.append($qc);
 
-            // Status tag
-            var st = lineStatus(ln);
-            var stKey = st === "cleared" ? "VAS_104_Cleared"
-                      : (st === "partial" ? "VAS_104_Partial"
-                      : (st === "hold" ? "VAS_104_Hold" : "VAS_104_Pending"));
+            // Status — the QUALITY verdict, and only for a line that has quality
+            // parameters to derive one from. It used to be computed from the
+            // quantities for EVERY line (Cleared / Partial / Hold / Pending),
+            // which said the same thing the Difference and Scrapped columns
+            // already say, one column to the left.
             var $q = $('<span class="vas_104-ta-c"></span>');
-            $q.append($('<span class="vas_104-tag"></span>').addClass("vas_104-s-" + st)
-                .text(VIS.Msg.getMsg(stKey)));
+            var qs = qcStatusMeta(ln.QcStatusCode);
+            if (qs) {
+                $q.append($('<span class="vas_104-tag"></span>')
+                    .addClass("vas_104-s-" + qs.cls).text(qs.label));
+            } else {
+                $q.append($('<span class="vas_104-dash"></span>').text("—"));
+            }
             $tr.append($q);
 
             return $tr;
         }
 
-        // ---------- Actions (visual buttons) ---------- //
-
-        // Presentational only. The confirm button relabels by mode and is
-        // disabled once the confirmation has been processed.
-        function renderActions() {
-            var processed = data.Processed;
-            var confirmLabel = qualityMode()
-                ? VIS.Msg.getMsg("VAS_104_ClearQualityConfirm")
-                : VIS.Msg.getMsg("VAS_104_Confirm");
-
-            var $bar = $('<section class="vas_104-actions"></section>');
-            $bar.append(actionButton("print", VIS.Msg.getMsg("VAS_104_Print"), "sec", false));
-            $bar.append(actionButton("check", confirmLabel, "pri", processed));
-            $body.append($bar);
+        // A line's quality verdict, derived server-side from its own parameters by
+        // comparing each actual value against the acceptable one. Returns null for
+        // a line with no parameters, which is what leaves its Status cell empty.
+        function qcStatusMeta(code) {
+            if (code === "P") return { cls: "pass",    label: getMsg("VAS_104_QcPassed",  "Passed") };
+            if (code === "F") return { cls: "fail",    label: getMsg("VAS_104_QcFailed",  "Failed") };
+            if (code === "N") return { cls: "pending", label: getMsg("VAS_104_QcPending", "Pending") };
+            return null;
         }
 
-        function actionButton(icon, label, kind, disabled) {
-            var $b = $('<span class="vas_104-btn"></span>').addClass("vas_104-btn-" + (kind || "sec"));
-            if (disabled) $b.addClass("vas_104-is-disabled");
-            $b.append(svgIcon(icon));
-            $b.append($('<span></span>').text(label));
+        // ---------- Per-line quality parameters (VA010_ShipConfParameters) ---------- //
+
+        // The toggle that opens a line's quality parameters, sitting on the product
+        // name. Returns null for a line with none, so an ordinary line carries no
+        // control at all.
+        function buildQcToggle(ln) {
+            var params = ln.QualityParams || [];
+            if (!params.length) return null;
+
+            var id = ln.M_InOutLineConfirm_ID;
+            var open = !!openQcLines[id];
+            var $b = $('<span class="vas_104-qcBtn"></span>')
+                .toggleClass("vas_104-is-open", open)
+                .attr("title", getMsg("VAS_104_QualityParams", "Quality parameters") + " (" + params.length + ")");
+            $b.append(svgIcon("flask"));
+            $b.append($('<span></span>').text(params.length + ""));
+            $b.on("click", function (e) {
+                e.stopPropagation();
+                var nowOpen = !openQcLines[id];
+                if (nowOpen) openQcLines[id] = true; else delete openQcLines[id];
+                $b.toggleClass("vas_104-is-open", nowOpen);
+                $b.closest(".vas_104-tBody").next(".vas_104-qcDrawer").toggle(nowOpen);
+            });
             return $b;
+        }
+
+        // The drawer itself: one row per parameter, carrying the QC date, the test
+        // parameter, the acceptable value, the actual value and the quantity to
+        // verify. A sibling of the line row rather than a child, so it can span the
+        // table's full width instead of living inside one grid cell.
+        function buildQcDrawer(ln) {
+            var params = ln.QualityParams || [];
+            if (!params.length) return null;
+
+            var open = !!openQcLines[ln.M_InOutLineConfirm_ID];
+            var $d = $('<div class="vas_104-qcDrawer"></div>');
+            if (!open) $d.hide();
+
+            var $tbl = $('<div class="vas_104-qcTable"></div>');
+
+            var $head = $('<div class="vas_104-qcRow vas_104-qcHead"></div>');
+            $head.append($('<span></span>').text(getMsg("VAS_104_QcDate", "QC Date")));
+            $head.append($('<span></span>').text(getMsg("VAS_104_TestParameter", "Test Parameter")));
+            $head.append($('<span></span>').text(getMsg("VAS_104_AcceptableValue", "Acceptable Value")));
+            $head.append($('<span></span>').text(getMsg("VAS_104_ActualValue", "Actual Value")));
+            $head.append($('<span class="vas_104-ta-r"></span>').text(getMsg("VAS_104_QcQty", "Qty")));
+            $head.append($('<span class="vas_104-ta-c"></span>').text(VIS.Msg.getMsg("VAS_104_Status")));
+            $tbl.append($head);
+
+            for (var i = 0; i < params.length; i++) {
+                $tbl.append(buildQcParamRow(params[i], +ln.UOMPrecision || 0));
+            }
+
+            $d.append($tbl);
+            return $d;
+        }
+
+        function buildQcParamRow(q, prec) {
+            var $r = $('<div class="vas_104-qcRow vas_104-qcBody"></div>');
+
+            $r.append($('<span></span>').text(formatDate(q.QAQCDate) || "—"));
+            $r.append($('<span></span>').text(na(q.ParameterName)).attr("title", q.ParameterName || ""));
+            $r.append($('<span></span>').text(na(q.AcceptableValue)));
+
+            // An actual value that has not been recorded yet is a dash, not a
+            // blank: the parameter exists and is waiting to be filled in.
+            var actual = q.ActualValue;
+            var $actual = $('<span></span>');
+            if (actual) {
+                $actual.addClass(q.StatusCode === "F" ? "vas_104-qcMiss" : "vas_104-qcHit").text(actual);
+            } else {
+                $actual.append($('<span class="vas_104-dash"></span>').text("—"));
+            }
+            $r.append($actual);
+
+            $r.append($('<span class="vas_104-ta-r"></span>')
+                .text(formatNumber(+q.QuantityToVerify || 0, prec)));
+
+            var qs = qcStatusMeta(q.StatusCode);
+            var $st = $('<span class="vas_104-ta-c"></span>');
+            if (qs) {
+                $st.append($('<span class="vas_104-tag"></span>')
+                    .addClass("vas_104-s-" + qs.cls).text(qs.label));
+            }
+            $r.append($st);
+
+            if (q.Remark) $r.attr("title", q.Remark);
+            return $r;
+        }
+
+        // ---------- Actions ---------- //
+
+        // The Print and Confirm buttons are gone, with actionButton(). Both were
+        // presentational only: neither was wired to anything, so the panel offered
+        // two controls that did nothing on every record. Printing and confirming
+        // belong to the confirmation window, where each runs behind the document's
+        // own validation.
+
+        // ---------- Notes ---------- //
+
+        function renderNotes() {
+            var rows = (data && data.Notes) || [];
+            if (!rows.length) return;
+
+            var $sec = section(getMsg("VAS_104_Notes", "Notes"), { summary: rows.length + "" });
+
+            var $card = $('<div class="vas_104-panelcard"></div>');
+            for (var i = 0; i < rows.length; i++) {
+                var n = rows[i];
+                var $n = $('<div class="vas_104-noteRow"></div>');
+                $n.append($('<span class="vas_104-noteTag"></span>')
+                    .addClass(n.NoteType === "header" ? "vas_104-n-header" : "vas_104-n-line")
+                    .text(n.NoteType === "header"
+                        ? getMsg("VAS_104_NoteHeader", "Document")
+                        : getMsg("VAS_104_NoteLine", "Line")));
+                $n.append($('<span class="vas_104-noteTxt"></span>').text(n.Text || ""));
+                $card.append($n);
+            }
+            $sec.append($card);
+        }
+
+        // ---------- Activity ---------- //
+
+        var ACT_TYPES = {
+            Note:      { tone: "info",    icon: "note",  label: "Note" },
+            Created:   { tone: "neutral", icon: "plus",  label: "Created" },
+            Completed: { tone: "success", icon: "check", label: "Completed" },
+            // One row per FIELD that changed, not one per save.
+            Changed:   { tone: "info",    icon: "note",  label: "Changed" }
+        };
+
+        // Maximum activity rows shown per page; the feed paginates beyond this.
+        // A confirmation accumulates every status change and note, and an unpaged
+        // feed made the section scroll past everything below it. The section's own
+        // count badge still counts the WHOLE feed, not the page.
+        var ACTIVITY_PER_PAGE = 15;
+        var activityPage = 0;   // current Activity page (0-based)
+
+        function renderActivity() {
+            var rows = (data && data.Activity) || [];
+            if (!rows.length) return;
+
+            var $sec = section(getMsg("VAS_104_Activity", "Activity"), { summary: rows.length + "" });
+
+            var $card = $('<div class="vas_104-panelcard"></div>');
+            $sec.append($card);
+
+            // The pager is a sibling of the card, so it keeps its place while the
+            // card's rows are replaced underneath it.
+            var $pager = $('<div class="vas_104-pager"></div>');
+            if (rows.length > ACTIVITY_PER_PAGE) $sec.append($pager);
+
+            function paintPage() {
+                var pageCount = Math.max(1, Math.ceil(rows.length / ACTIVITY_PER_PAGE));
+                if (activityPage >= pageCount) activityPage = pageCount - 1;
+                if (activityPage < 0) activityPage = 0;
+
+                var start = activityPage * ACTIVITY_PER_PAGE;
+                var end = Math.min(rows.length, start + ACTIVITY_PER_PAGE);
+
+                $card.empty();
+                for (var i = start; i < end; i++) $card.append(activityRow(rows[i]));
+
+                buildPager($pager, activityPage, pageCount, rows.length, start, end,
+                    function (p) { activityPage = p; paintPage(); });
+            }
+
+            paintPage();
+        }
+
+        // Range caption on the left, Previous / page-of / Next on the right.
+        // Rebuilt on every page change so the disabled states stay accurate.
+        // `page` is 0-based and `onGo` is handed the page to move to, so the
+        // caller owns its own page state. Nothing is drawn for a single-page
+        // list, so a short feed shows no controls at all.
+        function buildPager($pager, page, pageCount, total, start, end, onGo) {
+            $pager.empty();
+            if (pageCount <= 1) return;
+
+            $pager.append($('<span class="vas_104-pgRange"></span>').text(
+                getMsg("VAS_104_Showing", "Showing") + " " + (start + 1) + "-" + end + " " +
+                getMsg("VAS_104_Of", "of") + " " + total));
+
+            var $ctrls = $('<span class="vas_104-pgCtrls"></span>');
+            $ctrls.append(pagerButton(getMsg("VAS_104_Previous", "Previous"), "chevLeft",
+                page <= 0, function () { onGo(page - 1); }));
+            $ctrls.append($('<span class="vas_104-pgPos"></span>').text(
+                getMsg("VAS_104_Page", "Page") + " " + (page + 1) + " " +
+                getMsg("VAS_104_Of", "of") + " " + pageCount));
+            $ctrls.append(pagerButton(getMsg("VAS_104_Next", "Next"), "chevRight",
+                page >= pageCount - 1, function () { onGo(page + 1); }));
+            $pager.append($ctrls);
+        }
+
+        function pagerButton(label, icon, disabled, handler) {
+            var $b = $('<span class="vas_104-pgBtn"></span>');
+            if (icon === "chevLeft") $b.append(svgIcon(icon));
+            $b.append($('<span></span>').text(label));
+            if (icon === "chevRight") $b.append(svgIcon(icon));
+            if (disabled) $b.addClass("vas_104-is-disabled");
+            else $b.on("click", handler);
+            return $b;
+        }
+
+        function activityRow(a) {
+            var meta = ACT_TYPES[a.EventType] || ACT_TYPES.Note;
+
+            var $row = $('<div class="vas_104-actRow"></div>');
+            var $badge = $('<span class="vas_104-actBadge"></span>')
+                .addClass("vas_104-tone-" + meta.tone);
+            $badge.append(svgIcon(meta.icon));
+            $badge.append($('<span></span>').text(getMsg("VAS_104_Act" + a.EventType, meta.label)));
+            $row.append($badge);
+
+            var $main = $('<div class="vas_104-actMain"></div>');
+            var title = activityTitle(a);
+            var $title = $('<span class="vas_104-actTitle"></span>').text(title).attr("title", title);
+            // A note's headline IS the comment, so it wraps rather than
+            // ellipsising after one line — that text is what the reader came for.
+            if (a.EventType === "Note") $title.addClass("vas_104-multiline");
+            $main.append($title);
+
+            // A field change shows the move itself under the field's name: what
+            // the value was, and what it became. That is the whole point of a
+            // change row — a bare "updated" without it is what this replaced.
+            if (a.EventType === "Changed") $main.append(changeDelta(a));
+
+            // "when · by whom", the same two parts in the same place on every row.
+            var when = formatDateTime(a.EventTime);
+            if (a.ActorName) {
+                when = when ? when + " · " + getMsg("VAS_104_By", "by") + " " + a.ActorName
+                            : getMsg("VAS_104_By", "by") + " " + a.ActorName;
+            }
+            $main.append($('<span class="vas_104-actWhen"></span>').text(when).attr("title", when));
+            $row.append($main);
+            return $row;
+        }
+
+        // The old → new pair, on the sub-line beneath the field's name.
+        function changeDelta(a) {
+            var $d = $('<small class="vas_104-actDelta"></small>');
+            var blank = "—";
+            $d.append($('<span class="vas_104-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_104-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_104-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
+        }
+
+        function activityTitle(a) {
+            if (a.EventType === "Note") return a.Title || getMsg("VAS_104_ActNote", "Note");
+            // A field change is headlined by the FIELD, prefixed with the line it
+            // happened on when it was a line that changed. The values go on the
+            // sub-line beneath (changeDelta).
+            if (a.EventType === "Changed") {
+                var name = a.FieldName || getMsg("VAS_104_Field", "Field");
+                return a.ChangeScope ? a.ChangeScope + " · " + name : name;
+            }
+            if (a.EventType === "Created")
+                return getMsg("VAS_104_ActCreatedTxt", "Confirmation created") +
+                       (a.Title ? " " + a.Title : "");
+            if (a.EventType === "Completed")
+                return getMsg("VAS_104_ActCompletedTxt", "Confirmation completed") +
+                       (a.Title ? " " + a.Title : "");
+            return a.Title || "";
+        }
+
+        // ---------- Opening the source document ---------- //
+
+        // Window name -> AD_Window_ID, resolved once per name and remembered for
+        // the life of the panel. A name the dictionary does not know is cached as
+        // -1 so a failed lookup is not repeated on every click. Ported from
+        // VAS_106.
+        var windowIdByName = {};
+
+        function resolveWindowIdByName(windowName) {
+            if (!windowName) return 0;
+            if (windowIdByName.hasOwnProperty(windowName)) {
+                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_104_OverviewShipGRNConfirmation/GetWindow_ID", windowName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) {
+                    windowIdByName[windowName] = -1;
+                    console.log("resolveWindowIdByName: no window named " + windowName);
+                    return 0;
+                }
+                windowIdByName[windowName] = id;
+                return id;
+            } catch (e) {
+                windowIdByName[windowName] = -1;
+                console.log(e);
+                return 0;
+            }
+        }
+
+        // Opens the record's window filtered to that row: the window the caller
+        // NAMES, else the table's zoom target told which side of the trade to
+        // resolve. M_InOut is the case that needs naming — a goods receipt and a
+        // delivery order are two screens on one table. Degrades to a toast so a
+        // click never throws.
+        function openRecord(tableName, recordId, windowName, isSOTrx) {
+            if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
+            try {
+                var windowId = resolveWindowIdByName(windowName);
+
+                if (windowId <= 0 &&
+                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
+                    // 4th arg is IsSOTrx — which side of a dual-purpose table to
+                    // open. M_InOut is one, and the confirmation knows its side.
+                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, !!isSOTrx) || 0;
+                }
+
+                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === "function") {
+                    var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
+                    VIS.viewManager.startWindow(windowId, zoomQuery);
+                    return;
+                }
+            } catch (e) { console.log(e); }
+            toast(getMsg("VAS_104_OpenSource", "Open") + " " + tableName + " #" + recordId, true);
+        }
+
+        // Lightweight self-contained toast (no dependency on a host toast API).
+        function toast(message, isError) {
+            var $t = $('<div class="vas_104-toast"></div>')
+                .addClass(isError ? "vas_104-err" : "vas_104-ok").text(message);
+            $root.append($t);
+            setTimeout(function () { $t.addClass("vas_104-show"); }, 10);
+            setTimeout(function () {
+                $t.removeClass("vas_104-show");
+                setTimeout(function () { $t.remove(); }, 300);
+            }, 3200);
         }
 
         // ----------------------------------------------------------------- //
@@ -594,6 +1097,8 @@
         // ----------------------------------------------------------------- //
 
         var SVG_ICONS = {
+            chevLeft: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
+            chevRight: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
             warehouse: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8l9-5 9 5v13"/><path d="M7 21v-8h10v8"/></svg>',
             calendar:  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>',
             box:       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>',
@@ -603,7 +1108,11 @@
             shield:    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>',
             alert:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
             check:     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
-            print:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>'
+            // The quality-parameter toggle on a line, and the two activity badges.
+            // 'print' went with the Print button that was the only thing using it.
+            flask:     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6.5L3.8 18a2 2 0 0 0 1.7 3h13a2 2 0 0 0 1.7-3L15 8.5V2"/><path d="M8 2h8"/><path d="M6.5 15h11"/></svg>',
+            note:      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>',
+            plus:      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>'
         };
 
         function svgIcon(name) {
@@ -642,6 +1151,36 @@
                 });
             } catch (e) {
                 return d.toDateString();
+            }
+        }
+
+        // Date AND time, for the activity feed's genuine timestamps.
+        //
+        // The database holds these in UTC and the server emits no timezone
+        // designator (e.g. "2026-08-12T10:00:00"), which the browser reads as
+        // LOCAL — so an untagged stamp prints the stored UTC clock and every
+        // activity time reads hours out. Tagging it "Z" makes toLocale* render it
+        // in the viewer's own zone, which is what the feed should show. A string
+        // already carrying a "Z" or a ±hh:mm offset is left alone. Ported from
+        // VAS_106.
+        function formatDateTime(value) {
+            if (!value) return "";
+            var d;
+            if (value instanceof Date) {
+                d = value;
+            } else {
+                var s = String(value);
+                if (!/(Z|[+\-]\d{2}:?\d{2})$/.test(s) && /^\d{4}-\d{2}-\d{2}T/.test(s)) s += "Z";
+                d = new Date(s);
+            }
+            if (isNaN(d.getTime())) return "";
+            try {
+                return d.toLocaleString(window.navigator.language, {
+                    year: "numeric", month: "short", day: "2-digit",
+                    hour: "2-digit", minute: "2-digit"
+                });
+            } catch (e) {
+                return d.toString();
             }
         }
 

@@ -283,7 +283,7 @@ namespace VAdvantage.Alert
 
             //    }
             //}
-
+            Trx trx = null;
             int record_id = 0;
             if (eventType.Equals("DELETE"))
             {
@@ -292,9 +292,10 @@ namespace VAdvantage.Alert
             else
             {
                 record_id = document.Get_ID();
+                trx = document.Get_Trx();
             }
 
-            VAS_CommonMethod.RefValuesResult outp = VAS_CommonMethod.GetRefValues(document.GetCtx(), windowName, tableName, record_id, document);
+            VAS_CommonMethod.RefValuesResult outp = VAS_CommonMethod.GetRefValues(document.GetCtx(), windowName, tableName, record_id, document, trx);
             refValues = outp?.NewJsonData;
             Dictionary<string, object> oldRefValues = outp?.OldJsonData;
 

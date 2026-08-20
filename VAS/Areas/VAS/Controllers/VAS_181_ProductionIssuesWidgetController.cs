@@ -154,36 +154,31 @@ namespace VIS.Controllers
             string msl = ToSqlDate(monthStart);
             string nmsl = ToSqlDate(nextMonthStart);
 
-            string productionOrderColumn = ResolveProductionOrderColumn();
-            if (productionOrderColumn == null)
-            {
-                // Nothing on the issue line records a production order, so no line can honestly be
-                // classified as a production issue. Report 0 rather than inventing a proxy - the
-                // previous "C_Charge_ID IS NOT NULL OR M_RequisitionLine_ID IS NOT NULL" test was
-                // exactly such a proxy and had nothing to do with production.
-                Log.Log(Level.WARNING, "VAS_181_ProductionIssuesWidget: M_InventoryLine has no work-order column in this installation; production issues cannot be classified.");
-                return 0;
-            }
-
-            // Confirmed business rule from the spec, followed exactly:
-            //   "Use the production order on the line level only: VAMFG_M_WorkOrder_ID IS NOT NULL"
-            //   "Issued line value = COALESCE(QtyInternalUse,0) * COALESCE(CurrentCostPrice,0)"
-            //   "Lines with null CurrentCostPrice contribute zero value. Do not substitute another
-            //    cost field."  <- which is why there is no PriceCost / VA024_CostPrice fallback here.
-            string productionTest = "line." + productionOrderColumn + " IS NOT NULL";
-            const string lineValue = "(COALESCE(line.QtyInternalUse, 0) * COALESCE(line.CurrentCostPrice, 0))";
-
+            // Production share = value of issue lines raised against a WORK ORDER.
+            //
+            // The previous classification (C_Charge_ID IS NOT NULL OR M_RequisitionLine_ID IS NOT
+            // NULL) was always true: an internal-use line always carries a charge account, so on
+            // FSMTesting6 all 90 issue lines matched and this KPI returned a hard-coded-looking
+            // 100% (and its complement VAS_182 returned 0%). The work order link is the only
+            // field in the schema that actually distinguishes a production issue.
+            //
+            // Cost fallback must end in 0: NVL(CurrentCostPrice, PriceCost) yields NULL when both
+            // are null, and SUM() silently drops those lines from the total.
             string sql = @"
                 SELECT
-                  COALESCE(SUM(CASE WHEN " + productionTest + " THEN " + lineValue + @" ELSE 0 END), 0) AS ProductionValue,
-                  COALESCE(SUM(" + lineValue + @"), 0) AS TotalValue
+                  COALESCE(SUM(CASE WHEN COALESCE(line.VA075_WorkOrder_ID, 0) > 0
+                                      OR COALESCE(line.VAMFG_M_WorkOrder_ID, 0) > 0
+                                    THEN (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0))
+                                    ELSE 0 END), 0) AS ProductionValue,
+                  COALESCE(SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)), 0) AS TotalValue
                 FROM M_InventoryLine line
                 INNER JOIN M_Inventory inv ON inv.M_Inventory_ID = line.M_Inventory_ID
                 WHERE inv.IsActive = 'Y'
                   AND line.IsActive = 'Y'
                   AND inv.IsInternalUse = 'Y'
                   AND inv.DocStatus IN ('CO', 'CL')
-                  AND line.M_Product_ID IS NOT NULL
+                  AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
+                  AND line.IsActive = 'Y'
                   AND COALESCE(line.QtyInternalUse, 0) > 0
                   AND inv.MovementDate >= " + msl + @"
                   AND inv.MovementDate < " + nmsl;
