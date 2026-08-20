@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
@@ -23,8 +24,10 @@ namespace VASLogic.Models
     /// Module Name : VAS_196_PeriodControlMatrix
     /// Purpose     : Backs the VAS_196_PeriodControlMatrixWidget dashboard widget.
     ///               Serves the cascading Calendar -> Year -> Period -> PeriodControl
-    ///               hierarchy and performs the open/close status change for one
-    ///               C_PeriodControl row.
+    ///               hierarchy, performs the open/close status change for one
+    ///               C_PeriodControl row, and runs the period-level open/close
+    ///               process for the whole period (C_Period.Processing) with its
+    ///               Organization / DocBaseType / PeriodAction parameters.
     ///
     ///               Every list is a separate, narrow request so the browser never
     ///               receives the whole hierarchy at once (only the default path is
@@ -56,16 +59,30 @@ namespace VASLogic.Models
         /* C_Period.PeriodType stored code for a standard accounting period. */
         private const string PERIODTYPE_StandardPeriod = "S";
 
-        /* Dictionary coordinates of the standard open/close process. The numeric
+        /* Dictionary coordinates of the standard open/close processes. The numeric
            AD_Process_ID is resolved from these at runtime and cached per
            application domain - the ID itself differs per environment and must never
-           be hard-coded. */
+           be hard-coded.
+           Two different processes, deliberately:
+             C_PeriodControl.Processing -> acts on ONE control row (the row buttons),
+             C_Period.Processing        -> acts on the WHOLE period, taking
+                                           Organization / DocBaseType / PeriodAction
+                                           parameters (the header dialog). */
         private const string TABLENAME_PeriodControl = "C_PeriodControl";
+        private const string TABLENAME_Period = "C_Period";
         private const string COLUMNNAME_Processing = "Processing";
+
+        /* Parameter names of the period-level process. They must match
+           VAdvantage.Process.PeriodStatus.Prepare() exactly - the process engine
+           passes AD_PInstance_Para rows through by ParameterName. */
+        private const string PARAM_AD_Org_ID = "AD_Org_ID";
+        private const string PARAM_DocBaseType = "DocBaseType";
+        private const string PARAM_PeriodAction = "PeriodAction";
 
         /* Resolved once per app domain; 0 = not looked up yet, -1 = looked up and
            not found (so a broken dictionary is not re-queried on every click). */
         private static int _periodControlProcessId = 0;
+        private static int _periodProcessId = 0;
 
         // ─────────────────────────────────────────────────────────────────────
         // §1  Cascading lookups
@@ -478,8 +495,34 @@ namespace VASLogic.Models
         /// <returns>AD_Process_ID, or 0 when the column carries no process.</returns>
         public int GetPeriodControlProcessId(Ctx ctx)
         {
-            if (_periodControlProcessId > 0) { return _periodControlProcessId; }
-            if (_periodControlProcessId < 0) { return 0; }      // looked up, not configured
+            return GetProcessId(ctx, TABLENAME_PeriodControl, ref _periodControlProcessId);
+        }
+
+        /// <summary>
+        /// Resolves the AD_Process_ID attached to C_Period.Processing - the
+        /// period-level open / close process the header dialog runs. Same rules as
+        /// <see cref="GetPeriodControlProcessId"/>: looked up from the dictionary,
+        /// never hard-coded, cached per app domain.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <returns>AD_Process_ID, or 0 when the column carries no process.</returns>
+        public int GetPeriodProcessId(Ctx ctx)
+        {
+            return GetProcessId(ctx, TABLENAME_Period, ref _periodProcessId);
+        }
+
+        /// <summary>
+        /// Reads the AD_Process_ID off one table's Processing column and memoises it
+        /// in the supplied cache slot.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="tableName">AD_Table.TableName owning the column.</param>
+        /// <param name="cache">Cache slot: 0 = not looked up, -1 = not configured.</param>
+        /// <returns>AD_Process_ID, or 0 when the column carries no process.</returns>
+        private int GetProcessId(Ctx ctx, string tableName, ref int cache)
+        {
+            if (cache > 0) { return cache; }
+            if (cache < 0) { return 0; }                       // looked up, not configured
             if (ctx == null) { return 0; }
 
             string sql = @"
@@ -497,7 +540,7 @@ namespace VASLogic.Models
 
             SqlParameter[] parameters = new SqlParameter[]
             {
-                new SqlParameter("@TableName", TABLENAME_PeriodControl),
+                new SqlParameter("@TableName", tableName),
                 new SqlParameter("@ColumnName", COLUMNNAME_Processing)
             };
 
@@ -508,7 +551,7 @@ namespace VASLogic.Models
                 processId = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Process_ID"]);
             }
 
-            _periodControlProcessId = processId > 0 ? processId : -1;
+            cache = processId > 0 ? processId : -1;
             return processId;
         }
 
@@ -567,6 +610,331 @@ namespace VASLogic.Models
         }
 
         // ─────────────────────────────────────────────────────────────────────
+        // §2b  Period-level open / close (standard process, with parameters)
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Runs the standard process attached to C_Period.Processing
+        /// (VAdvantage.Process.PeriodStatus) against the WHOLE selected period, with
+        /// the same three parameters the framework's own process dialog offers:
+        /// Organization, Document BaseType and Period Action. The process updates
+        /// every matching C_PeriodControl row in one statement; nothing here writes
+        /// PeriodStatus itself.
+        ///
+        /// Both id lists arrive as the comma-separated strings a multi-select lookup
+        /// produces and are handed to the process the same way - so they are parsed
+        /// to integers and re-joined before use (the process concatenates them into
+        /// an IN clause), and every id is then checked against an active, accessible
+        /// row of its own table. Note that AD_Org_ID 0 is a REAL id here (the
+        /// tenant-wide '*' organization), not an "empty" marker.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="calendarId">C_Calendar_ID the client had selected.</param>
+        /// <param name="yearId">C_Year_ID the client had selected.</param>
+        /// <param name="periodId">C_Period_ID the process runs against.</param>
+        /// <param name="orgIds">Comma-separated AD_Org_ID list, or empty for all.</param>
+        /// <param name="docBaseTypeIds">Comma-separated C_DocBaseType_ID list, or empty for all.</param>
+        /// <param name="periodAction">C_PeriodControl.PeriodAction code: O, C or P.</param>
+        /// <returns>Populated <see cref="PeriodProcessResult"/> (never null).</returns>
+        public PeriodProcessResult RunPeriodProcess(Ctx ctx, int calendarId, int yearId, int periodId,
+            string orgIds, string docBaseTypeIds, string periodAction)
+        {
+            PeriodProcessResult result = new PeriodProcessResult();
+            result.Success = false;
+            result.C_Period_ID = periodId;
+
+            if (ctx == null || periodId <= 0)
+            {
+                result.ErrorCode = ERROR_INVALID_REQUEST;
+                return result;
+            }
+
+            /* 1 - only the three actions the process itself understands. Anything
+                   else would make it return "-" and change nothing. */
+            if (!MPeriodControl.PERIODACTION_OpenPeriod.Equals(periodAction)
+                && !MPeriodControl.PERIODACTION_ClosePeriod.Equals(periodAction)
+                && !MPeriodControl.PERIODACTION_PermanentlyClosePeriod.Equals(periodAction))
+            {
+                result.ErrorCode = ERROR_INVALID_ACTION;
+                return result;
+            }
+
+            /* 2 - the selection the browser sent must still describe a real, active,
+                   accessible period under the selected year and calendar. */
+            if (!IsPeriodValid(ctx, calendarId, yearId, periodId))
+            {
+                result.ErrorCode = ERROR_INVALID_REQUEST;
+                return result;
+            }
+
+            /* 3 - the id lists reach the process as text and end up inside an IN
+                   clause, so nothing but digits and separators may survive. */
+            bool listsValid;
+            string orgs = NormalizeIdList(orgIds, out listsValid);
+            if (!listsValid)
+            {
+                result.ErrorCode = ERROR_INVALID_REQUEST;
+                return result;
+            }
+
+            string docTypes = NormalizeIdList(docBaseTypeIds, out listsValid);
+            if (!listsValid)
+            {
+                result.ErrorCode = ERROR_INVALID_REQUEST;
+                return result;
+            }
+
+            /* 4 - and every id must resolve to a row this role may actually read. */
+            if (!AreIdsAccessible(ctx, "AD_Org", "AD_Org_ID", "o", orgs)
+                || !AreIdsAccessible(ctx, "C_DocBaseType", "C_DocBaseType_ID", "dbt", docTypes))
+            {
+                result.ErrorCode = ERROR_INVALID_REQUEST;
+                return result;
+            }
+
+            /* 5 - the process must exist before anything is written. */
+            int processId = GetPeriodProcessId(ctx);
+            if (processId <= 0)
+            {
+                result.ErrorCode = ERROR_NO_PROCESS;
+                Log.Log(Level.SEVERE, "VAS_196_PeriodControlMatrix: no AD_Process_ID on "
+                    + TABLENAME_Period + "." + COLUMNNAME_Processing
+                    + " - the period open/close process is not configured in this environment.");
+                return result;
+            }
+
+            /* 6 - run it through the normal process engine; the parameters travel as
+                   AD_PInstance_Para rows, exactly as the framework dialog sends them. */
+            string summary;
+            string processError = ExecutePeriodProcess(ctx, processId, periodId, orgs, docTypes,
+                periodAction, out summary);
+
+            result.Summary = summary;
+
+            if (!string.IsNullOrEmpty(processError))
+            {
+                result.ErrorCode = ERROR_PROCESS_FAILED;
+                result.ErrorMessage = processError;
+                return result;
+            }
+
+            result.Success = true;
+            return result;
+        }
+
+        /// <summary>
+        /// Validates that the selected period really hangs under the selected year
+        /// and calendar and that every level of that chain is active and accessible.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="calendarId">C_Calendar_ID the client had selected.</param>
+        /// <param name="yearId">C_Year_ID the client had selected.</param>
+        /// <param name="periodId">C_Period_ID the client had selected.</param>
+        /// <returns>True when the whole hierarchy resolves to exactly this period.</returns>
+        private bool IsPeriodValid(Ctx ctx, int calendarId, int yearId, int periodId)
+        {
+            if (calendarId <= 0 || yearId <= 0 || periodId <= 0) { return false; }
+
+            string sql = @"
+                SELECT p.C_Period_ID AS C_Period_ID
+                FROM C_Period p
+                INNER JOIN C_Year y ON (y.C_Year_ID=p.C_Year_ID)
+                INNER JOIN C_Calendar cal ON (cal.C_Calendar_ID=y.C_Calendar_ID)
+                WHERE p.C_Period_ID=@C_Period_ID
+                  AND p.C_Year_ID=@C_Year_ID
+                  AND y.C_Calendar_ID=@C_Calendar_ID
+                  AND p.IsActive='Y'
+                  AND y.IsActive='Y'
+                  AND cal.IsActive='Y'";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@C_Period_ID", periodId),
+                new SqlParameter("@C_Year_ID", yearId),
+                new SqlParameter("@C_Calendar_ID", calendarId)
+            };
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
+            return ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0;
+        }
+
+        /// <summary>
+        /// Parses a client-supplied comma-separated id list and rebuilds it from the
+        /// parsed integers, so only digits and separators can ever reach the SQL the
+        /// process assembles. Duplicates are dropped, order is preserved.
+        /// 0 is accepted: it is the tenant-wide '*' organization.
+        /// </summary>
+        /// <param name="raw">Raw list as the multi-select lookup produced it.</param>
+        /// <param name="valid">False when any token is not a non-negative integer.</param>
+        /// <returns>Rebuilt list, or an empty string when nothing was selected.</returns>
+        private string NormalizeIdList(string raw, out bool valid)
+        {
+            valid = true;
+            if (string.IsNullOrEmpty(raw)) { return ""; }
+
+            string[] tokens = raw.Split(',');
+            List<string> ids = new List<string>();
+
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                string token = tokens[i].Trim();
+                if (token.Length == 0) { continue; }
+
+                int id;
+                if (!int.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out id)
+                    || id < 0)
+                {
+                    valid = false;
+                    return "";
+                }
+
+                string text = id.ToString(CultureInfo.InvariantCulture);
+                if (!ids.Contains(text)) { ids.Add(text); }
+            }
+
+            return string.Join(",", ids.ToArray());
+        }
+
+        /// <summary>
+        /// True when every id of an already-normalized list resolves to an active row
+        /// of the given table that this role may read. An empty list passes: it means
+        /// "no restriction", which the process itself handles.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="tableName">Physical table holding the ids.</param>
+        /// <param name="keyColumn">Its primary key column.</param>
+        /// <param name="alias">Alias used for the access SQL.</param>
+        /// <param name="idList">Normalized comma-separated list (digits only).</param>
+        /// <returns>True when all ids were found.</returns>
+        private bool AreIdsAccessible(Ctx ctx, string tableName, string keyColumn, string alias, string idList)
+        {
+            if (string.IsNullOrEmpty(idList)) { return true; }
+
+            /* idList is rebuilt from parsed integers by NormalizeIdList, so inlining
+               it carries no injection risk - and an IN list cannot be bound as a
+               single parameter on either backend. */
+            string sql = "SELECT " + alias + "." + keyColumn + " AS Item_ID"
+                + " FROM " + tableName + " " + alias
+                + " WHERE " + alias + "." + keyColumn + " IN (" + idList + ")"
+                + " AND " + alias + ".IsActive='Y'";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, alias, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            int found = (ds != null && ds.Tables.Count > 0) ? ds.Tables[0].Rows.Count : 0;
+
+            return found == idList.Split(',').Length;
+        }
+
+        /// <summary>
+        /// Executes the period-level open/close process through the normal process
+        /// engine (AD_PInstance + AD_PInstance_Para + ProcessInfo + ProcessCtl). The
+        /// process class is never called directly.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="processId">AD_Process_ID resolved from column metadata.</param>
+        /// <param name="periodId">Record the process runs against.</param>
+        /// <param name="orgs">Normalized AD_Org_ID list, or empty.</param>
+        /// <param name="docTypes">Normalized C_DocBaseType_ID list, or empty.</param>
+        /// <param name="periodAction">Validated PeriodAction code.</param>
+        /// <param name="summary">Process summary, translated for display.</param>
+        /// <returns>Empty string on success, otherwise the process error summary.</returns>
+        private string ExecutePeriodProcess(Ctx ctx, int processId, int periodId, string orgs,
+            string docTypes, string periodAction, out string summary)
+        {
+            summary = "";
+
+            try
+            {
+                MPInstance instance = new MPInstance(ctx, processId, periodId);
+                if (!instance.Save())
+                {
+                    Log.Log(Level.SEVERE, "VAS_196_PeriodControlMatrix: could not create AD_PInstance for"
+                        + " AD_Process_ID=" + processId + ", C_Period_ID=" + periodId);
+                    return "process_instance_failed";
+                }
+
+                /* Only the parameters that carry a value are written - an empty
+                   Organization / DocBaseType means "every one of them" to the
+                   process, and it tests for null rather than for an empty string. */
+                if (!string.IsNullOrEmpty(orgs)
+                    && !SaveParameter(instance, 10, PARAM_AD_Org_ID, orgs))
+                {
+                    return "process_parameter_failed";
+                }
+
+                if (!string.IsNullOrEmpty(docTypes)
+                    && !SaveParameter(instance, 20, PARAM_DocBaseType, docTypes))
+                {
+                    return "process_parameter_failed";
+                }
+
+                if (!SaveParameter(instance, 30, PARAM_PeriodAction, periodAction))
+                {
+                    return "process_parameter_failed";
+                }
+
+                ProcessInfo pi = new ProcessInfo("", processId);
+                pi.SetAD_PInstance_ID(instance.GetAD_PInstance_ID());
+                pi.SetRecord_ID(periodId);
+                pi.SetTable_ID(MTable.Get_Table_ID(TABLENAME_Period));
+                pi.SetAD_Client_ID(ctx.GetAD_Client_ID());
+                pi.SetAD_Org_ID(ctx.GetAD_Org_ID());
+                pi.SetAD_User_ID(ctx.GetAD_User_ID());
+
+                ProcessCtl worker = new ProcessCtl(ctx, null, pi, null);
+                worker.Run();
+
+                /* The process answers with tagged text ("@Period Updated@ #12"), so
+                   it is resolved against AD_Message before it leaves the server. */
+                string raw = pi.GetSummary();
+                summary = string.IsNullOrEmpty(raw) ? "" : Msg.ParseTranslation(ctx, raw);
+
+                if (pi.IsError())
+                {
+                    Log.Log(Level.SEVERE, "VAS_196_PeriodControlMatrix: period open/close process failed for"
+                        + " C_Period_ID=" + periodId + " - " + raw);
+                    return string.IsNullOrEmpty(summary) ? "process_error" : summary;
+                }
+
+                if (!string.IsNullOrEmpty(summary))
+                {
+                    Log.Info("VAS_196_PeriodControlMatrix: period open/close process summary - " + summary);
+                }
+                return "";
+            }
+            catch (Exception ex)
+            {
+                /* The process engine touches the database and other modules, so it is
+                   one of the few places that genuinely needs a guard. */
+                Log.Log(Level.SEVERE, "VAS_196_PeriodControlMatrix.ExecutePeriodProcess", ex);
+                return ex.Message;
+            }
+        }
+
+        /// <summary>
+        /// Writes one AD_PInstance_Para row.
+        /// </summary>
+        /// <param name="instance">Saved process instance.</param>
+        /// <param name="seqNo">Parameter sequence.</param>
+        /// <param name="name">ParameterName the process reads.</param>
+        /// <param name="value">Parameter value.</param>
+        /// <returns>True when the row was saved.</returns>
+        private bool SaveParameter(MPInstance instance, int seqNo, string name, string value)
+        {
+            MPInstancePara para = new MPInstancePara(instance, seqNo);
+            para.setParameter(name, value);
+
+            if (para.Save()) { return true; }
+
+            Log.Log(Level.SEVERE, "VAS_196_PeriodControlMatrix: could not save process parameter "
+                + name + " on AD_PInstance_ID=" + instance.GetAD_PInstance_ID());
+            return false;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
         // §3  Helpers
         // ─────────────────────────────────────────────────────────────────────
 
@@ -622,6 +990,7 @@ namespace VASLogic.Models
         public const string ERROR_NO_PROCESS = "NOPROCESS";
         public const string ERROR_SAVE_FAILED = "SAVEFAILED";
         public const string ERROR_PROCESS_FAILED = "PROCESSFAILED";
+        public const string ERROR_INVALID_ACTION = "INVALIDACTION";
 
         /// <summary>Id / name pair for one selector option.</summary>
         public class LookupItem
@@ -688,6 +1057,23 @@ namespace VASLogic.Models
             public string ErrorCode { get; set; }
 
             /// <summary>Raw process/save message, shown as detail when present.</summary>
+            public string ErrorMessage { get; set; }
+        }
+
+        /// <summary>Outcome of one period-level process run.</summary>
+        public class PeriodProcessResult
+        {
+            public bool Success { get; set; }
+            public int C_Period_ID { get; set; }
+
+            /// <summary>Translated process summary ("Period Updated #12"), shown to
+            /// the user as-is when the run succeeded.</summary>
+            public string Summary { get; set; }
+
+            /// <summary>One of the ERROR_* tokens; the client resolves the label.</summary>
+            public string ErrorCode { get; set; }
+
+            /// <summary>Raw process message, shown as detail when present.</summary>
             public string ErrorMessage { get; set; }
         }
     }

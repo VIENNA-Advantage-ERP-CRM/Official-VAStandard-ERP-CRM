@@ -18,6 +18,16 @@
  * server RE-READ after the standard open/close process finished - a failed run
  * leaves the row exactly as it was.
  *
+ * The header link (top right) opens the period-level dialog: the same standard
+ * process the framework runs from C_Period.Processing, with its own three
+ * parameters - Organization and Document BaseType as multi-select lookups, and
+ * Period Action. It opens with its parameters cleared, OK runs the process and
+ * closes it, and the matrix is re-read afterwards. While it is open the card
+ * behind it takes no input, so the period cannot change under the run. Like the
+ * filter popover it has no outside-click dismisser and no modal overlay:
+ * clicking elsewhere on the dashboard leaves it where it is and blocks nothing
+ * outside this widget.
+ *
  * Sizing follows design.md: the card carries the widget root anchor clamp, the
  * header reads --dash-inline-size (populated by ensureDashInlineSizeVar), rows
  * sit one step below the title, and the list never scrolls - the visible row
@@ -49,6 +59,16 @@
  * 14d| Clear                                   | VIS_Clear                 (reuse)
  * 14e| Apply                                   | VIS_Apply                 (reuse)
  * 14f| Filter                                  | VAS_034_Filter            (reuse)
+ * 14g| Open / Close Period                     | VAS_196_OpenClosePeriod
+ * 14h| Period Action                           | VAS_196_PeriodAction
+ * 14i| Open Period                             | VAS_196_OpenPeriod
+ * 14j| Close Period                            | VAS_196_ClosePeriod
+ * 14k| Permanently Close Period                | VAS_196_PermanentlyClosePeriod
+ * 14l| Select at least one organization.       | VAS_196_SelectOrganization
+ * 14m| Select a period first.                  | VAS_196_SelectPeriod
+ * 14n| Could not run the period process.       | VAS_196_ProcessRunFailed
+ * 14o| OK                                      | OK                        (reuse)
+ * 14p| Cancel                                  | Cancel                    (reuse)
  * 15 | Could not change the period status.     | VAS_196_ChangeFailed
  * 16 | The open/close process is not configured. | VAS_196_NoProcess
  * 17 | The selected period is no longer available. | VAS_196_InvalidSelection
@@ -91,9 +111,19 @@
         'P': { key: 'VAS_192_PermanentlyClosed', text: 'Permanently Closed', tone: 'dark', actionKey: '', actionText: '', actionTone: '' }
     };
 
+    /* The three actions VAdvantage.Process.PeriodStatus understands, in the order
+       the standard process dialog offers them. Stored codes, kept in lock-step with
+       MPeriodControl.PERIODACTION_*. */
+    var PERIOD_ACTIONS = [
+        { code: 'O', key: 'VAS_196_OpenPeriod', text: 'Open Period' },
+        { code: 'C', key: 'VAS_196_ClosePeriod', text: 'Close Period' },
+        { code: 'P', key: 'VAS_196_PermanentlyClosePeriod', text: 'Permanently Close Period' }
+    ];
+
     /* Server error tokens -> message key + inline default. */
     var ERROR_MAP = {
         'INVALID': { key: 'VAS_196_InvalidSelection', text: 'The selected period is no longer available.' },
+        'INVALIDACTION': { key: 'VAS_196_InvalidSelection', text: 'The selected period is no longer available.' },
         'NOTFOUND': { key: 'VAS_196_InvalidSelection', text: 'The selected period is no longer available.' },
         'PERMCLOSED': { key: 'VAS_196_PermClosedHint', text: 'This period is permanently closed and cannot be reopened.' },
         'NOPROCESS': { key: 'VAS_196_NoProcess', text: 'The open/close process is not configured.' },
@@ -130,10 +160,28 @@
         var vDocTypeCtrl = null;
         var _popupOpen = false;
 
+        /* Period process popover - the header link's own panel. Same mechanics as the
+           filter popover (body-appended, non-modal, anchored to its own button, no
+           outside-click dismisser) and the same per-instance namespace, so it belongs
+           to this widget alone and leaves every other dashboard card alone. It runs
+           the standard process on C_Period.Processing and carries exactly the three
+           parameters that process declares. */
+        var $processPopup = null;
+        var $processBtn = null;
+        var vProcOrgCtrl = null;
+        var vProcDocCtrl = null;
+        var $procAction = null;
+        var _processPopupOpen = false;
+
         /* Per-instance event namespace - a dashboard can hold two of this widget, and
            each must unbind only its own document/window dismissers. */
         var _ns = '.vas196_' + (VAS.VAS_196_PeriodControlMatrixWidget._seq =
             (VAS.VAS_196_PeriodControlMatrixWidget._seq || 0) + 1);
+
+        /* One namespace per popover: closing one must never unbind the other's
+           dismissers, even though only one of them is ever open at a time. */
+        var _nsFilter = _ns + 'f';
+        var _nsProcess = _ns + 'p';
 
         /* Current selection (echoed back on every status change so the server can
            re-validate the whole hierarchy). */
@@ -206,6 +254,10 @@
             if (VIS && VIS.ADialog && VIS.ADialog.error) { VIS.ADialog.error("", "", text); }
         }
 
+        function showInfo(text) {
+            if (VIS && VIS.ADialog && VIS.ADialog.info) { VIS.ADialog.info("", "", text); }
+        }
+
         // ── Build ────────────────────────────────────────────────────────────
 
         this.Initalize = function () {
@@ -218,6 +270,7 @@
             var title = label('VAS_196_PeriodControlMatrix', 'Period Control Matrix');
             var subtitle = label('VAS_196_ByDocBaseType', 'By document base type');
             var filterLabel = label('VAS_034_Filter', 'Filter');
+            var processLabel = label('VAS_196_OpenClosePeriod', 'Open / Close Period');
 
             $card = $(
                 '<div class="vas-196-card vas-widget-bg" role="group" aria-label="' + escapeHtml(title) + '">' +
@@ -235,6 +288,11 @@
                             '<div class="vas-196-title" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</div>' +
                             '<div class="vas-196-subtitle" title="' + escapeHtml(subtitle) + '">' + escapeHtml(subtitle) + '</div>' +
                         '</div>' +
+                        /* Header link, top right: opens the period process dialog. A
+                           link and not a button - it is a route into the standard
+                           process, not one of the matrix's own row actions. */
+                        '<button type="button" class="vas-196-headlink" aria-haspopup="dialog"' +
+                            ' title="' + escapeHtml(processLabel) + '">' + escapeHtml(processLabel) + '</button>' +
                     '</div>' +
                     '<div class="vas-196-body">' +
                         '<div class="vas-196-filters">' +
@@ -270,6 +328,12 @@
             $filterBtn.on('click', function (e) {
                 e.stopPropagation();
                 toggleFilterPopup();
+            });
+
+            $processBtn = $card.find('.vas-196-headlink');
+            $processBtn.on('click', function (e) {
+                e.stopPropagation();
+                toggleProcessPopup();
             });
 
             /* Cascade: a calendar change clears year, period and the matrix; a year
@@ -514,15 +578,20 @@
             catch (e) { if (typeof ctrl.setValue === 'function') { ctrl.setValue(null); } }
         }
 
-        /* Builds one filter field: a bold caption on its own line above an underlined
-           control row that carries the lookup text box and its search button. The row
-           owns the underline so it runs unbroken beneath both (same treatment as the
+        /* Builds one lookup field: a bold caption on its own line above an underlined
+           control row that carries the lookup text box and its button(s). The row
+           owns the underline so it runs unbroken beneath them (same treatment as the
            VAS_063 / VAS_067 search filters). Returns null when the framework controls
            are unavailable or the lookup cannot be built, so a missing dictionary entry
-           drops one field instead of breaking the popover. */
-        function buildLookupField(columnName, validation, labelText) {
+           drops one field instead of breaking the popover.
+           displayType selects the flavour: DisplayType.Search for the single-value
+           filter fields, DisplayType.MultiKey for the process parameters - a MultiKey
+           control returns its selection as a comma-separated id list and carries a
+           second button, which is why both are appended when present. */
+        function buildLookupField(columnName, validation, labelText, displayType, mandatory) {
             if (!VIS.MLookupFactory || !VIS.Controls || !VIS.Controls.VTextBoxButton) { return null; }
 
+            var type = displayType || VIS.DisplayType.Search;
             var ctrl;
             try {
                 var ctx = VIS.Env.getCtx();
@@ -530,13 +599,16 @@
                 /* ctx, windowNo, column_ID, AD_Reference_ID, columnName,
                    AD_Reference_Value_ID, isParent, validationCode */
                 var lookup = VIS.MLookupFactory.get(ctx, ($self.windowNo > 0 ? $self.windowNo : 0), 0,
-                    VIS.DisplayType.Search, columnName, 0, false, validation);
+                    type, columnName, 0, false, validation);
+
+                /* No lookup, no field - the caller decides what to do instead. */
+                if (!lookup) { return null; }
 
                 /* columnName, mandatory, readOnly, updateable, displayType, lookup */
-                ctrl = new VIS.Controls.VTextBoxButton(columnName, false, false, true,
-                    VIS.DisplayType.Search, lookup);
+                ctrl = new VIS.Controls.VTextBoxButton(columnName, !!mandatory, false, true,
+                    type, lookup);
             } catch (e) {
-                if (window.console) { console.log(e); }
+                if (window.console) { console.log('VAS_196: lookup ' + columnName + ' failed', e); }
                 return null;
             }
 
@@ -549,6 +621,7 @@
 
             var $field = $('<div class="vas-196-frow">');
             var $caption = $('<div class="vas-196-flabel">').text(text);
+            if (mandatory) { $caption.append('<span class="vas-196-freq">*</span>'); }
             var $row = $('<div class="vas-196-fctrlrow">');
 
             $row.append(ctrl.getControl()
@@ -556,8 +629,60 @@
                 .attr('data-hasbtn', ' ')
                 .css('width', '100%'));
 
-            var btn = ctrl.getBtn ? ctrl.getBtn(0) : null;
-            if (btn) { $row.append($('<span class="vas-196-fbtnwrap">').append(btn)); }
+            /* Search offers one button (the lookup), MultiKey two (pick list and
+               clear) - only ask for as many as the flavour actually has, so the
+               filter fields keep the single trailing affordance they had. */
+            var btnCount = (type === VIS.DisplayType.MultiKey) ? 2 : 1;
+            for (var b = 0; b < btnCount; b++) {
+                var btn = null;
+                try { btn = ctrl.getBtn ? ctrl.getBtn(b) : null; } catch (e2) { btn = null; }
+                /* jQuery object or bare element, depending on the control version. */
+                if (btn && (typeof btn.length !== 'number' || btn.length > 0)) {
+                    $row.append($('<span class="vas-196-fbtnwrap">').append(btn));
+                }
+            }
+
+            $field.append($caption).append($row);
+
+            return { field: $field, ctrl: ctrl };
+        }
+
+        /* Same field, built as a dropdown off a TableDir lookup.
+           AD_Org_ID and C_DocBaseType_ID are TableDir columns in the dictionary, not
+           Search ones - asking MLookupFactory for a Search lookup on them returns
+           nothing to build a control from, which silently dropped both filter fields.
+           Every other org picker in this codebase (vtrxmaterial, vinvoicegen,
+           VAS_TimeSheetInvoice) uses TableDir + VComboBox for exactly this reason,
+           and a bounded list of organizations / base types reads better as a
+           dropdown than as a type-ahead anyway. */
+        function buildComboField(columnName, validation, labelText, mandatory) {
+            if (!VIS.MLookupFactory || !VIS.Controls || !VIS.Controls.VComboBox) { return null; }
+
+            var ctrl;
+            try {
+                var lookup = VIS.MLookupFactory.get(VIS.Env.getCtx(),
+                    ($self.windowNo > 0 ? $self.windowNo : 0), 0,
+                    VIS.DisplayType.TableDir, columnName, 0, false, validation);
+
+                if (!lookup) { return null; }
+
+                /* columnName, mandatory, readOnly, updateable, lookup, size */
+                ctrl = new VIS.Controls.VComboBox(columnName, !!mandatory, false, true, lookup, 50);
+            } catch (e) {
+                if (window.console) { console.log('VAS_196: combo ' + columnName + ' failed', e); }
+                return null;
+            }
+
+            var text = (VIS.translatedTexts && VIS.translatedTexts[columnName])
+                ? VIS.translatedTexts[columnName]
+                : labelText;
+
+            var $field = $('<div class="vas-196-frow">');
+            var $caption = $('<div class="vas-196-flabel">').text(text);
+            if (mandatory) { $caption.append('<span class="vas-196-freq">*</span>'); }
+
+            var $row = $('<div class="vas-196-fctrlrow">')
+                .append(ctrl.getControl().addClass('vas-196-fsel').css('width', '100%'));
 
             $field.append($caption).append($row);
 
@@ -579,7 +704,7 @@
                tenant-wide '*' org, AD_Org_ID 0, is deliberately kept because
                tenant-wide period controls belong to it) and no cost / profit centres,
                which are accounting dimensions rather than postable organizations. */
-            var org = buildLookupField('AD_Org_ID',
+            var org = buildComboField('AD_Org_ID',
                 "AD_Org.IsActive='Y' AND (AD_Org.IsSummary='N' OR AD_Org.AD_Org_ID=0)" +
                 " AND AD_Org.IsCostCenter='N' AND AD_Org.IsProfitCenter='N'",
                 label('VAS_196_Organization', 'Organization'));
@@ -588,7 +713,7 @@
 
             /* Document base type - the same table the matrix rows are resolved from,
                so the selected C_DocBaseType_ID matches a row id for id. */
-            var doc = buildLookupField('C_DocBaseType_ID', "C_DocBaseType.IsActive='Y'",
+            var doc = buildComboField('C_DocBaseType_ID', "C_DocBaseType.IsActive='Y'",
                 label('VAS_196_DocBaseType', 'Document Base Type'));
             vDocTypeCtrl = doc ? doc.ctrl : null;
 
@@ -627,14 +752,22 @@
             $('body').append($filterPopup);
         }
 
-        /* Anchors the popover under the funnel, right edges aligned, and flips it
-           above when the icon sits too low in the viewport. */
         function positionFilterPopup() {
-            if (!$filterPopup || !$filterBtn || !$filterBtn[0]) { return; }
+            positionPopup($filterPopup, $filterBtn);
+        }
 
-            var rect = $filterBtn[0].getBoundingClientRect();
-            var pw = $filterPopup.outerWidth();
-            var ph = $filterPopup.outerHeight();
+        function positionProcessPopup() {
+            positionPopup($processPopup, $processBtn);
+        }
+
+        /* Anchors a popover under its own button, right edges aligned, and flips it
+           above when the button sits too low in the viewport. */
+        function positionPopup($popup, $btn) {
+            if (!$popup || !$btn || !$btn[0]) { return; }
+
+            var rect = $btn[0].getBoundingClientRect();
+            var pw = $popup.outerWidth();
+            var ph = $popup.outerHeight();
             var gap = 8;
 
             var left = rect.right - pw;
@@ -649,17 +782,21 @@
                 else { top = Math.max(gap, window.innerHeight - ph - gap); }
             }
 
-            $filterPopup.css({ left: Math.round(left) + 'px', top: Math.round(top) + 'px' });
-            $filterPopup.toggleClass('vas-196-fpop-above', !below);
+            $popup.css({ left: Math.round(left) + 'px', top: Math.round(top) + 'px' });
+            $popup.toggleClass('vas-196-fpop-above', !below);
 
-            /* Point the arrow at the funnel's centre wherever the panel ended up. */
+            /* Point the arrow at the button's centre wherever the panel ended up. */
             var caret = rect.left + (rect.width / 2) - left;
             caret = Math.max(12, Math.min(pw - 12, caret));
-            $filterPopup.find('.vas-196-fpop-arrow').css('left', Math.round(caret) + 'px');
+            $popup.find('.vas-196-fpop-arrow').css('left', Math.round(caret) + 'px');
         }
 
         function openFilterPopup() {
             if (!$filterPopup) { buildFilterPopup(); }
+
+            /* One panel at a time: they anchor to neighbouring header controls and
+               would otherwise overlap. */
+            closeProcessPopup();
 
             /* Nothing to pick when every control of the period is tenant-wide. */
             $orgField.toggleClass('vas-196-hidden', !_showOrg);
@@ -669,16 +806,20 @@
             _popupOpen = true;
             if ($filterBtn) { $filterBtn.addClass('vas-196-filter-btn-open'); }
 
+            /* Same as the process panel: nothing behind the filter can be picked
+               while it is open - only the funnel it hangs from stays live. */
+            blockCard(true, $filterBtn);
+
             /* Bound only while the popover is open, under this widget's own namespace,
                so two instances never fight over them.
                Deliberately NO outside-click dismisser: the panel stays put while the
                user works anywhere else on the screen - it closes on the funnel, on
                Apply, or on Escape, and nothing else. */
-            $(document).on('keydown' + _ns, onDocumentKeyDown);
+            $(document).on('keydown' + _nsFilter, onFilterKeyDown);
             /* Follow the funnel instead of closing: a lookup's Info window can shift
                the page, and closing there would pull the control out from under an
                interaction the user is in the middle of. */
-            $(window).on('resize' + _ns + ' scroll' + _ns, positionFilterPopup);
+            $(window).on('resize' + _nsFilter + ' scroll' + _nsFilter, positionFilterPopup);
         }
 
         function closeFilterPopup() {
@@ -687,16 +828,259 @@
             if ($filterPopup) { $filterPopup.addClass('vas-196-hidden'); }
             if ($filterBtn) { $filterBtn.removeClass('vas-196-filter-btn-open'); }
 
-            $(document).off('keydown' + _ns);
-            $(window).off('resize' + _ns + ' scroll' + _ns);
+            blockCard(false);
+
+            $(document).off('keydown' + _nsFilter);
+            $(window).off('resize' + _nsFilter + ' scroll' + _nsFilter);
         }
 
         function toggleFilterPopup() {
             if (_popupOpen) { closeFilterPopup(); } else { openFilterPopup(); }
         }
 
-        function onDocumentKeyDown(e) {
+        function onFilterKeyDown(e) {
             if (e.key === 'Escape' || e.keyCode === 27) { closeFilterPopup(); }
+        }
+
+        // ── Period process dialog (C_Period.Processing) ──────────────────────
+
+        /* Builds the header link's panel: the three parameters the standard process
+           declares, then OK / Cancel. Built once and kept, but its parameters are
+           cleared on every opening, so a run is always deliberate - nothing is ever
+           carried over from the previous one. */
+        function buildProcessPopup() {
+            var procLabel = label('VAS_196_OpenClosePeriod', 'Open / Close Period');
+
+            $processPopup = $('<div class="vas-196-fpop vas-196-ppop vas-196-hidden" role="dialog"' +
+                ' aria-label="' + escapeHtml(procLabel) + '">');
+            $processPopup.append('<span class="vas-196-fpop-arrow"></span>');
+
+            /* Organization - mandatory, exactly as the process declares it. Same
+               restriction as the filter lookup: no summary orgs except the
+               tenant-wide '*' (AD_Org_ID 0), which owns the tenant-wide controls,
+               and no cost / profit centres. MultiKey: the process takes a list. */
+            var orgValidation = "AD_Org.IsActive='Y' AND (AD_Org.IsSummary='N' OR AD_Org.AD_Org_ID=0)" +
+                " AND AD_Org.IsCostCenter='N' AND AD_Org.IsProfitCenter='N'";
+            var orgLabel = label('VAS_196_Organization', 'Organization');
+
+            var org = buildLookupField('AD_Org_ID', orgValidation, orgLabel,
+                VIS.DisplayType.MultiKey, true)
+                /* Falls back to a single-select dropdown where the MultiKey lookup
+                   cannot be built - one organization per run instead of several,
+                   which the process handles just as well, rather than no field. */
+                || buildComboField('AD_Org_ID', orgValidation, orgLabel, true);
+            vProcOrgCtrl = org ? org.ctrl : null;
+
+            /* Document base type - optional; empty means every base type of the
+               period, which is how the process reads a missing parameter. */
+            var docValidation = "C_DocBaseType.IsActive='Y'";
+            var docLabel = label('VAS_196_DocBaseType', 'Document Base Type');
+
+            var doc = buildLookupField('C_DocBaseType_ID', docValidation, docLabel,
+                VIS.DisplayType.MultiKey, false)
+                || buildComboField('C_DocBaseType_ID', docValidation, docLabel, false);
+            vProcDocCtrl = doc ? doc.ctrl : null;
+
+            /* Period Action - the process's own list parameter. Plain select: the
+               three stored codes are fixed by MPeriodControl, so there is nothing to
+               look up. */
+            var $actionField = $('<div class="vas-196-frow">');
+            var $actionCaption = $('<div class="vas-196-flabel">')
+                .text(label('VAS_196_PeriodAction', 'Period Action'))
+                .append('<span class="vas-196-freq">*</span>');
+            $procAction = $('<select class="vas-196-fsel">');
+            for (var i = 0; i < PERIOD_ACTIONS.length; i++) {
+                $procAction.append($('<option>')
+                    .attr('value', PERIOD_ACTIONS[i].code)
+                    .text(label(PERIOD_ACTIONS[i].key, PERIOD_ACTIONS[i].text)));
+            }
+            $actionField.append($actionCaption)
+                .append($('<div class="vas-196-fctrlrow">').append($procAction));
+
+            var $foot = $('<div class="vas-196-fpop-foot">');
+            var $cancel = $('<button type="button" class="vas-196-linkbtn">')
+                .text(label('Cancel', 'Cancel'));
+            var $ok = $('<button type="button" class="vas-196-linkbtn vas-196-linkbtn-primary">')
+                .text(label('OK', 'OK'));
+
+            $ok.on('click', function () { runPeriodProcess(); });
+            $cancel.on('click', function () { closeProcessPopup(); });
+
+            $foot.append($cancel).append($ok);
+            if (org) { $processPopup.append(org.field); }
+            if (doc) { $processPopup.append(doc.field); }
+            $processPopup.append($actionField);
+            $processPopup.append($foot);
+
+            $processPopup.on('keydown', function (e) {
+                if (e.key === 'Escape' || e.keyCode === 27) {
+                    e.stopPropagation();
+                    closeProcessPopup();
+                    if ($processBtn) { $processBtn.focus(); }
+                }
+            });
+
+            $('body').append($processPopup);
+        }
+
+        function openProcessPopup() {
+            if (!$processPopup) { buildProcessPopup(); }
+
+            closeFilterPopup();
+
+            /* Always opens empty: a parameter left over from the previous run would
+               be applied without the user having picked it this time. */
+            ctrlClear(vProcOrgCtrl);
+            ctrlClear(vProcDocCtrl);
+
+            $processPopup.removeClass('vas-196-hidden');
+            positionProcessPopup();
+            _processPopupOpen = true;
+            if ($processBtn) { $processBtn.addClass('vas-196-headlink-open'); }
+
+            /* The panel owns the widget while it is open: the selectors, the funnel
+               and the row buttons behind it stop responding, so the period the
+               process is about to run against cannot change under it. Only this
+               card is covered - the rest of the dashboard stays live. */
+            blockCard(true, $processBtn);
+
+            /* Same contract as the filter popover: no outside-click dismisser, its
+               own namespace, and it follows its button rather than closing when the
+               page moves under a lookup's Info window. */
+            $(document).on('keydown' + _nsProcess, onProcessKeyDown);
+            $(window).on('resize' + _nsProcess + ' scroll' + _nsProcess, positionProcessPopup);
+        }
+
+        function closeProcessPopup() {
+            if (!_processPopupOpen) { return; }
+            _processPopupOpen = false;
+            if ($processPopup) { $processPopup.addClass('vas-196-hidden'); }
+            if ($processBtn) { $processBtn.removeClass('vas-196-headlink-open'); }
+
+            blockCard(false);
+
+            $(document).off('keydown' + _nsProcess);
+            $(window).off('resize' + _nsProcess + ' scroll' + _nsProcess);
+        }
+
+        /* Makes the card inert while one of the two popovers is open - the card only,
+           never the dashboard. Nothing behind the panel can be picked: not the
+           Calendar / Year / Period selectors, not the row Open / Close buttons, not
+           the other popover's button.
+           $live is the control the open panel hangs from (the funnel or the header
+           link); it is left alive so the panel can always be toggled shut from where
+           it was opened. */
+        function blockCard(block, $live) {
+            if (!$card) { return; }
+            $card.toggleClass('vas-196-card-blocked', !!block);
+
+            /* The cover stops the mouse and survives every repaint of the list, but
+               it does not stop the keyboard - so the three selectors and the funnel
+               are disabled as well. Their previous state is remembered: a selector
+               with no options is disabled on its own account and must stay that way
+               when the panel closes. */
+            if (!$selCal) { return; }
+            var $stable = $selCal.add($selYear).add($selPeriod).add($filterBtn);
+            if (block && $live && $live.length) { $stable = $stable.not($live); }
+
+            $stable.each(function () {
+                var $el = $(this);
+                if (block) {
+                    $el.attr('data-vas196-dis', $el.prop('disabled') ? '1' : '0');
+                    $el.prop('disabled', true);
+                } else if ($el.attr('data-vas196-dis') !== undefined) {
+                    $el.prop('disabled', $el.attr('data-vas196-dis') === '1');
+                    $el.removeAttr('data-vas196-dis');
+                }
+            });
+
+            $card.find('.vas-196-blocked-live').removeClass('vas-196-blocked-live');
+            if (block && $live) { $live.addClass('vas-196-blocked-live'); }
+        }
+
+        function toggleProcessPopup() {
+            if (_processPopupOpen) { closeProcessPopup(); } else { openProcessPopup(); }
+        }
+
+        function onProcessKeyDown(e) {
+            if (e.key === 'Escape' || e.keyCode === 27) { closeProcessPopup(); }
+        }
+
+        /* Reads a MultiKey control as the comma-separated id list the process expects.
+           Empty stays empty - the process reads a missing parameter as "all of them". */
+        function ctrlIdList(ctrl) {
+            if (!ctrl) { return ''; }
+            var raw = (typeof ctrl.getValue === 'function') ? ctrl.getValue() : ctrl.value;
+            if (raw === null || raw === undefined) { return ''; }
+            return String(raw).replace(/\s/g, '');
+        }
+
+        /* Hands the three parameters to the standard process on C_Period.Processing.
+           Nothing is computed here: the server re-validates the whole selection, runs
+           the process through the process engine and answers with its summary. */
+        function runPeriodProcess() {
+            if (_periodId <= 0) {
+                showError(label('VAS_196_SelectPeriod', 'Select a period first.'));
+                return;
+            }
+
+            var orgIds = ctrlIdList(vProcOrgCtrl);
+            if (!orgIds) {
+                showError(label('VAS_196_SelectOrganization', 'Select at least one organization.'));
+                return;
+            }
+
+            var docIds = ctrlIdList(vProcDocCtrl);
+            var action = $procAction ? $procAction.val() : '';
+            if (!action) { return; }
+
+            /* Everything needed is read, so the panel goes away now - the busy overlay
+               carries the run from here, and the matrix repaints under it. A rejected
+               parameter above keeps the panel open instead, so the user can fix it. */
+            closeProcessPopup();
+
+            showBusy(true);
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_196_PeriodControlMatrixWidget/RunPeriodProcess',
+                type: 'POST',
+                cache: false,
+                data: {
+                    calendarId: _calendarId,
+                    yearId: _yearId,
+                    periodId: _periodId,
+                    orgIds: orgIds,
+                    docBaseTypeIds: docIds,
+                    periodAction: action
+                },
+                success: function (res) {
+                    var data = null;
+                    try { data = parseResponse(res); } catch (e) { }
+
+                    if (!data || data.error) {
+                        showError(label('VAS_196_ProcessRunFailed', 'Could not run the period process.'));
+                        return;
+                    }
+
+                    if (!data.Success) {
+                        var err = ERROR_MAP[data.ErrorCode] ||
+                            { key: 'VAS_196_ProcessRunFailed', text: 'Could not run the period process.' };
+                        var text = label(err.key, err.text);
+                        if (data.ErrorMessage) { text += ' ' + data.ErrorMessage; }
+                        showError(text);
+                        return;
+                    }
+
+                    /* The process updated C_PeriodControl rows directly, so the matrix
+                       is re-read rather than patched from the request. */
+                    if (_periodId > 0) { loadControls(_periodId); }
+
+                    if (data.Summary) { showInfo(data.Summary); }
+                },
+                error: function () {
+                    showError(label('VAS_196_ProcessRunFailed', 'Could not run the period process.'));
+                },
+                complete: function () { showBusy(false); }
+            });
         }
 
         /* Commits what the two lookups hold. Both are plain id comparisons against the
@@ -975,8 +1359,11 @@
         // ── Framework contract ───────────────────────────────────────────────
 
         this.refreshWidget = function () {
-            /* Refresh means "start clean" - drop the filter with the data. */
+            /* Refresh means "start clean" - drop the filter with the data. The
+               process dialog's own parameters are left as they were; it is closed,
+               not reset, because it is not part of what the matrix displays. */
             closeFilterPopup();
+            closeProcessPopup();
             _filterOrgId = null;
             _filterDocTypeId = null;
             ctrlClear(vOrgCtrl);
@@ -1001,10 +1388,11 @@
             if ($selYear) { $selYear.off(); }
             if ($selPeriod) { $selPeriod.off(); }
             if ($filterBtn) { $filterBtn.off(); }
+            if ($processBtn) { $processBtn.off(); }
 
-            /* The popover was appended to <body>, so removing $root would leave it
-               behind - close it (which unbinds the document/window dismissers under
-               this instance's namespace) and tear it down explicitly. */
+            /* Both popovers were appended to <body>, so removing $root would leave
+               them behind - close each (which unbinds the document/window dismissers
+               under this instance's namespaces) and tear them down explicitly. */
             closeFilterPopup();
             if ($filterPopup) {
                 $filterPopup.off();
@@ -1013,6 +1401,16 @@
                 $orgField = null;
                 vOrgCtrl = null;
                 vDocTypeCtrl = null;
+            }
+
+            closeProcessPopup();
+            if ($processPopup) {
+                $processPopup.off();
+                $processPopup.remove();
+                $processPopup = null;
+                $procAction = null;
+                vProcOrgCtrl = null;
+                vProcDocCtrl = null;
             }
 
             $root.remove();

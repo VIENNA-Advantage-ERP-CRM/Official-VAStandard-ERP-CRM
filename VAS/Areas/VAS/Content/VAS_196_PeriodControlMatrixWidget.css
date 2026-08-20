@@ -93,6 +93,54 @@
     white-space: nowrap;
 }
 
+/* ---- Header link, top right: opens the period process dialog ----
+   A link, not a button: it leads into the standard C_Period process rather than
+   acting on the matrix, so it carries no surface of its own. It sits at the end of
+   the header row (the title block takes the remaining width) and never wraps. */
+.vas-196-headlink {
+    flex: 0 0 auto;
+    align-self: flex-start;
+    font-family: inherit;
+    font-size: .75em;
+    font-weight: 500;
+    line-height: 1.3;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #0083DA;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.vas-196-headlink:hover,
+.vas-196-headlink-open {
+    text-decoration: underline;
+}
+
+/* No focus ring: it is a text link in the header, and the browser's box around it
+   reads as a stray border on the card. The open state is already visible through
+   the underline. */
+.vas-196-headlink:focus,
+.vas-196-headlink:focus-visible,
+.vas-196-headlink:active {
+    outline: 0 none;
+    box-shadow: none;
+}
+
+/* While either popover is open the card takes no input at all: the Calendar /
+   Year / Period selectors, the funnel and the row Open / Close buttons all stop
+   responding. Only the control the open panel hangs from keeps its clicks, so the
+   panel can always be toggled shut from the same spot. Nothing outside this card
+   is covered - the rest of the dashboard stays live. */
+.vas-196-card-blocked .vas-196-header,
+.vas-196-card-blocked .vas-196-body {
+    pointer-events: none;
+}
+
+.vas-196-card-blocked .vas-196-blocked-live {
+    pointer-events: auto;
+}
+
 /* ---- Body: filters (fixed) + list (flexible) + pager (fixed) ---- */
 .vas-196-body {
     flex: 1 1 auto;
@@ -198,7 +246,7 @@
 /* ==========================================================
    Filter popover — anchored under the funnel, appended to <body>
    Not a dialog: no modal overlay, no backdrop, nothing outside this widget is
-   blocked while it is open. It carries the two VIS lookup controls (AD_Org_ID,
+   blocked while it is open. It carries the two VIS lookup dropdowns (AD_Org_ID,
    C_DocBaseType_ID). Borderless: depth comes from the shadow and the caret that
    ties it to the icon, not from an outline. It is a document-baseline surface,
    not part of the widget's em scale, so it declares its own anchor and the VIS
@@ -345,6 +393,46 @@
     outline: 2px solid #BFE4FF;
     outline-offset: 1px;
     border-radius: 4px;
+}
+
+/* ==========================================================
+   Period process popover — the header link's panel
+   Same surface as the filter popover (it reuses .vas-196-fpop and the field
+   treatment below it); only the extras live here: the mandatory marker the
+   standard process dialog shows, and the plain Period Action select. It carries no
+   title of its own - the link that opened it already names it.
+   ========================================================== */
+.vas-196-ppop {
+    width: 320px;
+}
+
+/* Mandatory marker, exactly as the framework's process dialog renders it. */
+.vas-196-freq {
+    color: #D93025;
+    margin-left: 2px;
+}
+
+/* Dropdown inside a field row - the filter's Organization / Document BaseType
+   combos and the process dialog's Period Action. It draws its own text but leaves
+   the underline to the row it sits in, like the lookup text boxes. */
+.vas-196-fsel,
+.vas-196-fsel:focus {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    height: 2.375em;
+    font-family: inherit;
+    font-size: 1.2em;
+    color: #102C3F;
+    /* !important for the same reason .vas-196-fctrl needs it: the framework control
+       arrives with its own chrome, and the row owns the only edge here. */
+    background: transparent !important;
+    border: 0 none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    margin: 0 !important;
+    padding: 0 0.25em !important;
+    cursor: pointer;
 }
 
 /* The list adapts its visible row count to this box's height and never scrolls;

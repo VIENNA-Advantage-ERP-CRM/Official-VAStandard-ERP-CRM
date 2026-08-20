@@ -27,7 +27,9 @@ namespace VAS.Controllers
     ///               and every selected id is re-validated server-side inside the
     ///               model before a status change is executed.
     ///               One action per cascade level so the browser never requests the
-    ///               whole Calendar/Year/Period/PeriodControl hierarchy at once.
+    ///               whole Calendar/Year/Period/PeriodControl hierarchy at once, plus
+    ///               the two write actions: one control row (ChangePeriodStatus) and
+    ///               the whole period (RunPeriodProcess).
     /// Chronological development:
     ///   VAI154      2026-08-19 Created
     /// </summary>
@@ -182,6 +184,49 @@ namespace VAS.Controllers
                 catch (Exception ex)
                 {
                     Log.Log(Level.SEVERE, "VAS_196_PeriodControlMatrixWidget.ChangePeriodStatus", ex);
+                    retJSON = JsonConvert.SerializeObject(new { error = true });
+                }
+            }
+
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// Runs the period-level open / close process (C_Period.Processing) for the
+        /// whole selected period, with the Organization / Document BaseType /
+        /// Period Action parameters the framework's own process dialog offers. Both
+        /// id lists arrive as the comma-separated text a multi-select lookup
+        /// produces; the model parses and re-validates them. POST only because it
+        /// changes data.
+        /// </summary>
+        /// <param name="calendarId">C_Calendar_ID the client had selected.</param>
+        /// <param name="yearId">C_Year_ID the client had selected.</param>
+        /// <param name="periodId">C_Period_ID the process runs against.</param>
+        /// <param name="orgIds">Comma-separated AD_Org_ID list, or empty for all.</param>
+        /// <param name="docBaseTypeIds">Comma-separated C_DocBaseType_ID list, or empty for all.</param>
+        /// <param name="periodAction">PeriodAction code: O, C or P.</param>
+        /// <returns>JSON-serialized PeriodProcessResult, or { error }.</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult RunPeriodProcess(int calendarId, int yearId, int periodId,
+            string orgIds, string docBaseTypeIds, string periodAction)
+        {
+            string retJSON = "";
+
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                try
+                {
+                    VAS_196_PeriodControlMatrixModel model = new VAS_196_PeriodControlMatrixModel();
+                    retJSON = JsonConvert.SerializeObject(
+                        model.RunPeriodProcess(ctx, calendarId, yearId, periodId,
+                            orgIds, docBaseTypeIds, periodAction));
+                }
+                catch (Exception ex)
+                {
+                    Log.Log(Level.SEVERE, "VAS_196_PeriodControlMatrixWidget.RunPeriodProcess", ex);
                     retJSON = JsonConvert.SerializeObject(new { error = true });
                 }
             }
