@@ -1,3 +1,4 @@
+using System;
 using System.Data;
 using System.Web.Mvc;
 using System.Data.SqlClient;
@@ -171,5 +172,16 @@ namespace VIS.Controllers
             return Convert.ToInt32(Math.Round(pct));
         }
 // ----- END OLD CODE -----
-    }
+    
+        /// <summary>Date literal for the target DB. Merged in from upstream/beta, which
+        /// introduced the msl/nmsl date-literal style this controller now uses.</summary>
+        private static string ToSqlDate(DateTime date)
+        {
+            if (DB.IsOracle())
+            {
+                return "TO_DATE('" + date.ToString("yyyy-MM-dd") + "', 'YYYY-MM-DD')";
+            }
+            return "CAST('" + date.ToString("yyyy-MM-dd") + "' AS DATE)";
+        }
+}
 }

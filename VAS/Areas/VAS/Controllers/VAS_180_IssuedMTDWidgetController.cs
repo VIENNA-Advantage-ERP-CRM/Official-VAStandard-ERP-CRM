@@ -91,13 +91,11 @@ namespace VIS.Controllers
                 INNER JOIN M_Inventory inv ON inv.M_Inventory_ID = line.M_Inventory_ID
                 WHERE inv.IsActive = 'Y'
                   AND line.IsActive = 'Y'
-                  AND inv.IsInternalUse = 'Y'
-                  AND inv.DocStatus IN ('CO', 'CL')
                   AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
-                  AND line.IsActive = 'Y'
+                  AND inv.DocStatus IN ('CO', 'CL')
                   AND COALESCE(line.QtyInternalUse, 0) > 0
-                  AND inv.MovementDate >= " + msl + @"
-                  AND inv.MovementDate < " + nmsl;
+                  AND inv.MovementDate >= @MonthStart
+                  AND inv.MovementDate < @NextMonthStart";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
