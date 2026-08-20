@@ -181,6 +181,37 @@
 ///                          carries the component, not the order. Its identifier
 ///                          column is probed rather than assumed, as the VA075
 ///                          ones are — VAMFG is not part of this solution either.
+///   VAI163   2026-08-14  - Activity reports edits FIELD BY FIELD
+///                          (LoadChangeActivity / AddChangeRow): one "updated" row
+///                          per AD_ChangeLog entry, naming the column that changed,
+///                          who changed it and when, for the requisition header AND
+///                          its lines — a requisition's substantive edits are its
+///                          requested quantities and products, and those live on the
+///                          lines. Until this the feed's only account of a change
+///                          was the single "status" milestone, derived from
+///                          M_Requisition.Updated, which is the LAST save and says
+///                          nothing about what it touched. Table names are matched
+///                          with UPPER, since an equality on the stored spelling
+///                          fails silently and reads exactly like the loader was
+///                          never written.
+///                        - A chat comment's author now resolves from
+///                          CM_ChatEntry.AD_User_ID falling back to CreatedBy. An
+///                          entry logged through the platform's own chat plumbing
+///                          leaves AD_User_ID null, so asking that column alone
+///                          printed the comment and its timestamp with NO NAME
+///                          against it — which is most of them. Its AD_Table lookup
+///                          became an IN + UPPER for the same reason as the mail
+///                          one: as a scalar sub-select a second row RAISES, and
+///                          the whole comment feed would vanish with it.
+///   VAI163   2026-08-17  Field-level activity carries the OLD and NEW values
+///                        (AD_ChangeLog.OldValue / NewValue). Both are normalised
+///                        through ChangeValue: the literal "null" the platform
+///                        writes for a cleared field reads as empty, not as the
+///                        word. A row whose two values are equal is dropped — a
+///                        save that rewrote a field with the value it already had
+///                        is not an edit, and the platform logs plenty of those.
+///                        The trail said WHICH field moved but never what it moved
+///                        from or to. Follows VAS_101 / VAS_104.
 /// </summary>
 
 using System;
@@ -1119,6 +1150,12 @@ namespace VASLogic.Models
             // Downstream documents — the rest of the requisition's lifecycle.
             LoadDocumentActivity(M_Requisition_ID, activity);
 
+            // What was actually edited, field by field. Until this the feed's only
+            // account of a change was the single "status" milestone above, derived
+            // from M_Requisition.Updated — which is the LAST save and says nothing
+            // about what it touched.
+            LoadChangeActivity(M_Requisition_ID, activity);
+
             // Chat comments.
             LoadCommentActivity(M_Requisition_ID, activity);
 
@@ -1310,6 +1347,56 @@ namespace VASLogic.Models
                 _log.Severe("LoadDocumentActivity/PO (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
             }
 
+            // ----- Every other document raised from the requisition -----
+            //
+            // The feed reported the purchase orders and their goods receipts and
+            // nothing else, so an RFQ, a material transfer or an inventory-use
+            // issue created from this requisition left no trace in the trail at all
+            // — even though the Documents section listed it. Each is created from
+            // the requisition by its own process, and each is worth a row saying
+            // WHAT was created, its document number, who created it and when.
+            //
+            // Every source is column-guarded and separately try/caught, so a schema
+            // without the module behind one simply contributes no rows.
+            AddCreationActivity(M_Requisition_ID, list, "rfqcreated", "C_RfQ", null,
+                @"SELECT q.DocumentNo, q.Created, u.Name AS UserName
+                    FROM C_RfQ q
+                    LEFT OUTER JOIN AD_User u ON (q.CreatedBy = u.AD_User_ID)
+                   WHERE q.M_Requisition_ID = @M_Requisition_ID
+                     AND q.IsActive = 'Y'",
+                "C_RfQ", "M_Requisition_ID");
+
+            AddCreationActivity(M_Requisition_ID, list, "movementcreated", "M_Movement", null,
+                @"SELECT m.DocumentNo, m.Created, u.Name AS UserName
+                    FROM M_Movement m
+                    LEFT OUTER JOIN AD_User u ON (m.CreatedBy = u.AD_User_ID)
+                   WHERE m.IsActive = 'Y'
+                     AND EXISTS (SELECT 1
+                                   FROM M_MovementLine ml
+                                  INNER JOIN M_RequisitionLine rl
+                                          ON (rl.M_RequisitionLine_ID = ml.M_RequisitionLine_ID)
+                                  WHERE ml.M_Movement_ID    = m.M_Movement_ID
+                                    AND rl.M_Requisition_ID = @M_Requisition_ID
+                                    AND ml.IsActive         = 'Y'
+                                    AND rl.IsActive         = 'Y')",
+                "M_MovementLine", "M_RequisitionLine_ID");
+
+            AddCreationActivity(M_Requisition_ID, list, "internalusecreated", "M_Inventory", null,
+                @"SELECT inv.DocumentNo, inv.Created, u.Name AS UserName
+                    FROM M_Inventory inv
+                    LEFT OUTER JOIN AD_User u ON (inv.CreatedBy = u.AD_User_ID)
+                   WHERE inv.IsActive = 'Y'
+                     AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
+                     AND EXISTS (SELECT 1
+                                   FROM M_InventoryLine il
+                                  INNER JOIN M_RequisitionLine rl
+                                          ON (rl.M_RequisitionLine_ID = il.M_RequisitionLine_ID)
+                                  WHERE il.M_Inventory_ID   = inv.M_Inventory_ID
+                                    AND rl.M_Requisition_ID = @M_Requisition_ID
+                                    AND il.IsActive         = 'Y'
+                                    AND rl.IsActive         = 'Y')",
+                "M_InventoryLine", "M_RequisitionLine_ID");
+
             // ----- Goods receipts booked against those orders -----
             try
             {
@@ -1367,19 +1454,242 @@ namespace VASLogic.Models
             }
         }
 
+        /// <summary>
+        /// One "updated" row per FIELD the user changed, read from the platform's
+        /// change log (AD_ChangeLog). Each row names the field (the dictionary's
+        /// display name for the column, falling back to the raw column name), who
+        /// changed it and when — so the trail says which field moved rather than
+        /// only that the record's status changed at some point.
+        ///
+        /// Both the header (M_Requisition) and its LINES (M_RequisitionLine) are
+        /// read. A requisition's substantive edits are its requested quantities and
+        /// products, and those live on the lines — a header-only trail would report
+        /// almost nothing. A line row is labelled with its line number and product
+        /// so the reader can tell which row moved.
+        ///
+        /// The table name is matched with UPPER so a dictionary holding it in
+        /// another case still resolves: an equality on the stored spelling fails
+        /// SILENTLY, which reads exactly like the loader was never written.
+        ///
+        /// Silently degrades when change logging is off for the ROLE that made the
+        /// edit (AD_Role.IsChangeLog) — the platform writes no AD_ChangeLog rows at
+        /// all in that case. That is a dictionary setting, not something this can
+        /// fix.
+        /// </summary>
+        /// <param name="M_Requisition_ID">Selected requisition id.</param>
+        /// <param name="list">Activity list being populated.</param>
+        private void LoadChangeActivity(int M_Requisition_ID, List<ActivityData> list)
+        {
+            // ----- Header edits (M_Requisition) -----
+            try
+            {
+                // AD_Column is LEFT joined so a log row whose column has since been
+                // removed from the dictionary still reports its change.
+                string sql = @"SELECT cl.Created      AS EventOn,
+                                      cl.OldValue     AS OldValue,
+                                      cl.NewValue     AS NewValue,
+                                      u.Name          AS UserName,
+                                      col.Name        AS FieldLabel,
+                                      col.ColumnName  AS FieldColumn
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_Column col
+                                        ON (col.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                        ON (u.AD_User_ID = cl.CreatedBy)
+                                WHERE cl.Record_ID = @M_Requisition_ID
+                                  AND UPPER(adt.TableName) = 'M_REQUISITION'
+                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                ORDER BY cl.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows) AddChangeRow(r, "", list);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadChangeActivity/header (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
+            }
+
+            // ----- Line edits (M_RequisitionLine) -----
+            //
+            // The line ids are reached through a join rather than a sub-select on
+            // the same parameter, so the statement carries its bind name exactly
+            // once: Oracle binds positionally, and a repeated name becomes a
+            // second, unfilled placeholder.
+            try
+            {
+                string sql = @"SELECT cl.Created      AS EventOn,
+                                      cl.OldValue     AS OldValue,
+                                      cl.NewValue     AS NewValue,
+                                      u.Name          AS UserName,
+                                      col.Name        AS FieldLabel,
+                                      col.ColumnName  AS FieldColumn,
+                                      l.Line          AS LineNo,
+                                      p.Name          AS ProductName
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                INNER JOIN M_RequisitionLine l
+                                        ON (l.M_RequisitionLine_ID = cl.Record_ID)
+                                 LEFT OUTER JOIN M_Product p
+                                        ON (p.M_Product_ID = l.M_Product_ID)
+                                 LEFT OUTER JOIN AD_Column col
+                                        ON (col.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                        ON (u.AD_User_ID = cl.CreatedBy)
+                                WHERE UPPER(adt.TableName) = 'M_REQUISITIONLINE'
+                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                  AND l.M_Requisition_ID = @M_Requisition_ID
+                                ORDER BY cl.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        // "#10 Steel Bolt M8" — the line number identifies the row,
+                        // the product says what it is without a second lookup.
+                        string scope = "#" + Util.GetValueOfInt(r["LineNo"]);
+                        string prod  = Util.GetValueOfString(r["ProductName"]);
+                        if (!string.IsNullOrEmpty(prod)) scope += " " + prod.Trim();
+                        AddChangeRow(r, scope, list);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadChangeActivity/lines (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Turns one AD_ChangeLog row into an "updated" activity entry. A change
+        /// whose column the dictionary cannot name is skipped: it would render as a
+        /// bare "Updated" identifying nothing, which is what naming the field
+        /// exists to stop.
+        /// </summary>
+        /// <param name="r">Change-log row.</param>
+        /// <param name="scope">Which record the edit landed on: "" for the
+        /// requisition header, else the line's number and product.</param>
+        /// <param name="list">Activity list being populated.</param>
+        private void AddChangeRow(DataRow r, string scope, List<ActivityData> list)
+        {
+            DateTime? at = Util.GetValueOfDateTime(r["EventOn"]);
+            if (!at.HasValue) return;
+
+            string field = Util.GetValueOfString(r["FieldLabel"]);
+            if (string.IsNullOrEmpty(field))
+                field = Util.GetValueOfString(r["FieldColumn"]);
+            if (string.IsNullOrEmpty(field)) return;
+
+            // The move itself. A save that rewrites a field with the value it
+            // already had is not an edit, and the platform logs plenty of those.
+            string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
+            string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
+            if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) return;
+
+            list.Add(new ActivityData
+            {
+                Type        = "updated",
+                FieldName   = field,
+                OldValue    = oldValue,
+                NewValue    = newValue,
+                ChangeScope = scope,
+                UserName    = Util.GetValueOfString(r["UserName"]),
+                Created     = at
+            });
+        }
+
+        /// <summary>
+        /// Normalises a logged value for display. The platform writes the literal
+        /// "null" into AD_ChangeLog for a cleared field, which would otherwise be
+        /// shown to the reader as though it were the text "null". Follows VAS_101.
+        /// </summary>
+        private static string ChangeValue(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            string v = value.Trim();
+            return string.Equals(v, "null", StringComparison.OrdinalIgnoreCase) ? "" : v;
+        }
+
+        /// <summary>
+        /// Runs one "document created from this requisition" query and adds a row
+        /// per document: the type the client labels it by, its document number, who
+        /// created it and when.
+        ///
+        /// Guarded on the link column that makes the query possible at all — the
+        /// requisition references on M_MovementLine and M_InventoryLine belong to a
+        /// module that is not part of this solution — and try/caught on top, so a
+        /// schema without it contributes no rows rather than costing the feed its
+        /// other sources.
+        /// </summary>
+        /// <param name="M_Requisition_ID">Selected requisition id.</param>
+        /// <param name="list">Activity list being populated.</param>
+        /// <param name="type">Activity type the client maps to a badge + sentence.</param>
+        /// <param name="what">Table being read, for the log line only.</param>
+        /// <param name="unused">Reserved; keeps the call sites aligned.</param>
+        /// <param name="sql">The query. Must select DocumentNo, Created, UserName
+        /// and bind @M_Requisition_ID exactly once.</param>
+        /// <param name="guardTable">Table carrying the link column, or "" to skip
+        /// the guard.</param>
+        /// <param name="guardColumn">The link column that must exist.</param>
+        private void AddCreationActivity(int M_Requisition_ID, List<ActivityData> list,
+                                         string type, string what, string unused,
+                                         string sql, string guardTable, string guardColumn)
+        {
+            if (!string.IsNullOrEmpty(guardTable) && !ColumnExists(guardTable, guardColumn))
+                return;
+
+            try
+            {
+                DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    list.Add(new ActivityData
+                    {
+                        Type       = type,
+                        DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
+                        UserName   = Util.GetValueOfString(r["UserName"]),
+                        Created    = Util.GetValueOfDateTime(r["Created"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("AddCreationActivity/" + what +
+                            " (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
+            }
+        }
+
         /// <summary>Loads CM_ChatEntry comments logged against the requisition.</summary>
         private void LoadCommentActivity(int M_Requisition_ID, List<ActivityData> list)
         {
             try
             {
+                // The author resolves from CM_ChatEntry.AD_User_ID falling back to
+                // CreatedBy. An entry logged through the platform's own chat
+                // plumbing often leaves AD_User_ID null, and asking that column
+                // alone printed the comment and its timestamp with NO NAME against
+                // it — which is most of them. CreatedBy is always stamped.
+                //
+                // The table id is matched with IN + UPPER so a dictionary holding
+                // the name in another case, or more than one row for it, resolves
+                // instead of failing the statement: as a scalar sub-select a second
+                // row RAISES, and the whole comment feed would vanish with it.
                 string sql = @"SELECT ce.CharacterData,
                                       ce.Created,
-                                      u.Name AS UserName
+                                      COALESCE(u.Name, cu.Name) AS UserName
                                  FROM CM_ChatEntry ce
-                                 INNER JOIN CM_Chat ch     ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
-                                 LEFT OUTER JOIN AD_User u ON (ce.AD_User_ID = u.AD_User_ID)
-                                WHERE ch.AD_Table_ID =
-                                      (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'M_Requisition')
+                                 INNER JOIN CM_Chat ch      ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
+                                 LEFT OUTER JOIN AD_User u  ON (ce.AD_User_ID = u.AD_User_ID)
+                                 LEFT OUTER JOIN AD_User cu ON (ce.CreatedBy  = cu.AD_User_ID)
+                                WHERE ch.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'M_REQUISITION')
                                   AND ch.Record_ID = @M_Requisition_ID
                                   AND ce.IsActive  = 'Y'";
                 DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
@@ -2025,6 +2335,7 @@ namespace VASLogic.Models
             LoadOrderDocuments(M_Requisition_ID, docs);
             LoadRfqDocuments(M_Requisition_ID, docs);
             LoadMovementDocuments(M_Requisition_ID, docs);
+            LoadInternalUseDocuments(M_Requisition_ID, docs);
             return docs;
         }
 
@@ -2038,11 +2349,22 @@ namespace VASLogic.Models
         {
             try
             {
+                // A BLANKET order raised from the requisition is reported as one,
+                // not as an ordinary purchase order: it commits a quantity over a
+                // period rather than ordering goods, and its own screen is a
+                // different window. C_Order.IsBlanketTrx is what the platform sets
+                // for it, guarded because it is not on every schema's C_Order —
+                // where it is absent every row simply reads as a purchase order,
+                // exactly as before.
+                bool hasBlanket = ColumnExists("C_Order", "IsBlanketTrx");
+                string blanketSel = hasBlanket ? "COALESCE(o.IsBlanketTrx, 'N')" : "'N'";
+
                 string sql = @"SELECT o.C_Order_ID,
                                       o.DocumentNo,
                                       o.DateOrdered,
                                       o.DocStatus,
                                       o.GrandTotal,
+                                      " + blanketSel + @" AS IsBlanket,
                                       COUNT(rl.M_RequisitionLine_ID) AS LineCount
                                  FROM M_RequisitionLine rl
                                 INNER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = rl.C_OrderLine_ID)
@@ -2050,16 +2372,19 @@ namespace VASLogic.Models
                                 WHERE rl.M_Requisition_ID = @M_Requisition_ID
                                   AND rl.IsActive = 'Y'
                                 GROUP BY o.C_Order_ID, o.DocumentNo, o.DateOrdered,
-                                         o.DocStatus, o.GrandTotal
+                                         o.DocStatus, o.GrandTotal, " + blanketSel + @"
                                 ORDER BY o.DateOrdered, o.DocumentNo";
                 DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
 
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
+                    bool isBlanket = Util.GetValueOfString(r["IsBlanket"]) == "Y";
                     docs.Add(new RequisitionDocumentData
                     {
-                        Type       = "order",
+                        // The type is what the panel labels the row by and what
+                        // names the window it opens, so a blanket carries its own.
+                        Type       = isBlanket ? "blanket" : "order",
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         DocDate    = Util.GetValueOfDateTime(r["DateOrdered"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
@@ -2078,12 +2403,19 @@ namespace VASLogic.Models
 
         /// <summary>
         /// The RFQs issued from this requisition (C_RfQ.M_Requisition_ID, written
-        /// by CreateRFQFromRequisition). An RFQ carries no value of its own, so the
-        /// row reports none rather than a zero the reader would read as an amount.
+        /// by CreateRFQFromRequisition), each carrying its own total (C_RfQ.TotalAmt).
+        ///
+        /// That column is dictionary-guarded: it is not on every C_RfQ revision, and
+        /// where it is absent the row reports NO amount rather than a zero — a
+        /// blank cell says "this schema does not record one", where "0.00" would be
+        /// read as an RFQ worth nothing.
         /// </summary>
         private void LoadRfqDocuments(int M_Requisition_ID, List<RequisitionDocumentData> docs)
         {
             if (!ColumnExists("C_RfQ", "M_Requisition_ID")) return;
+
+            bool hasTotal = ColumnExists("C_RfQ", "TotalAmt");
+            string totalSel = hasTotal ? "q.TotalAmt" : "CAST(NULL AS DECIMAL(20,4))";
 
             try
             {
@@ -2091,6 +2423,7 @@ namespace VASLogic.Models
                                       q.DocumentNo,
                                       q.DateResponse,
                                       q.DocStatus,
+                                      " + totalSel + @" AS TotalAmt,
                                       (SELECT COUNT(*)
                                          FROM C_RfQLine ql
                                         WHERE ql.C_RfQ_ID  = q.C_RfQ_ID
@@ -2110,7 +2443,7 @@ namespace VASLogic.Models
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         DocDate    = Util.GetValueOfDateTime(r["DateResponse"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
-                        Amount     = null,
+                        Amount     = hasTotal ? (decimal?)Util.GetValueOfDecimal(r["TotalAmt"]) : null,
                         LineCount  = Util.GetValueOfInt(r["LineCount"]),
                         TableName  = "C_RfQ",
                         RecordId   = Util.GetValueOfInt(r["C_RfQ_ID"])
@@ -2136,10 +2469,31 @@ namespace VASLogic.Models
 
             try
             {
+                // A movement has no stored total of its own, so its value is summed
+                // from the WHOLE transfer's lines — every line, not only the ones
+                // this requisition raised, because the figure names what that
+                // document is worth, which is what the transfer screen shows.
+                //
+                // The rate is the same one the Material Transfer overview values a
+                // line at: the line's own cost price, falling back to the VA024
+                // unit price. Both are optional module columns, so the expression
+                // is built from whichever the schema has and collapses to a
+                // constant 0 when it has neither — and a schema that can price
+                // nothing reports NO amount rather than a zero the reader would
+                // take for a free transfer.
+                string rateExpr = BuildMovementRateExpr();
+                string valueSel = (rateExpr == null)
+                    ? "CAST(NULL AS DECIMAL(20,4))"
+                    : @"(SELECT NVL(SUM(NVL(ml2.MovementQty, 0) * " + rateExpr + @"), 0)
+                          FROM M_MovementLine ml2
+                         WHERE ml2.M_Movement_ID = m.M_Movement_ID
+                           AND ml2.IsActive      = 'Y')";
+
                 string sql = @"SELECT m.M_Movement_ID,
                                       m.DocumentNo,
                                       m.MovementDate,
                                       m.DocStatus,
+                                      " + valueSel + @" AS MovementValue,
                                       COUNT(ml.M_MovementLine_ID) AS LineCount
                                  FROM M_MovementLine ml
                                 INNER JOIN M_Movement m
@@ -2149,7 +2503,8 @@ namespace VASLogic.Models
                                 WHERE rl.M_Requisition_ID = @M_Requisition_ID
                                   AND ml.IsActive = 'Y'
                                   AND rl.IsActive = 'Y'
-                                GROUP BY m.M_Movement_ID, m.DocumentNo, m.MovementDate, m.DocStatus
+                                GROUP BY m.M_Movement_ID, m.DocumentNo, m.MovementDate,
+                                         m.DocStatus, " + valueSel + @"
                                 ORDER BY m.MovementDate, m.DocumentNo";
                 DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
@@ -2162,7 +2517,8 @@ namespace VASLogic.Models
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         DocDate    = Util.GetValueOfDateTime(r["MovementDate"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
-                        Amount     = null,
+                        Amount     = (rateExpr == null)
+                            ? null : (decimal?)Util.GetValueOfDecimal(r["MovementValue"]),
                         LineCount  = Util.GetValueOfInt(r["LineCount"]),
                         TableName  = "M_Movement",
                         RecordId   = Util.GetValueOfInt(r["M_Movement_ID"])
@@ -2173,6 +2529,88 @@ namespace VASLogic.Models
             {
                 _log.Severe("LoadMovementDocuments (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// The Inventory Use issues raised against this requisition, through
+        /// M_InventoryLine.M_RequisitionLine_ID — the column the internal-use
+        /// screen writes when a line is picked from a requisition.
+        ///
+        /// Restricted to INTERNAL USE documents (M_Inventory.IsInternalUse = 'Y').
+        /// A physical inventory count shares the same tables and would otherwise be
+        /// listed here as though the requisition had produced one.
+        ///
+        /// The link column belongs to the distribution module, so it is
+        /// dictionary-guarded: without it the section simply lists no issues.
+        /// </summary>
+        private void LoadInternalUseDocuments(int M_Requisition_ID, List<RequisitionDocumentData> docs)
+        {
+            if (!ColumnExists("M_InventoryLine", "M_RequisitionLine_ID")) return;
+
+            try
+            {
+                string sql = @"SELECT inv.M_Inventory_ID,
+                                      inv.DocumentNo,
+                                      inv.MovementDate,
+                                      inv.DocStatus,
+                                      COUNT(il.M_InventoryLine_ID) AS LineCount
+                                 FROM M_InventoryLine il
+                                INNER JOIN M_Inventory inv
+                                        ON (inv.M_Inventory_ID = il.M_Inventory_ID)
+                                INNER JOIN M_RequisitionLine rl
+                                        ON (rl.M_RequisitionLine_ID = il.M_RequisitionLine_ID)
+                                WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                                  AND il.IsActive  = 'Y'
+                                  AND rl.IsActive  = 'Y'
+                                  AND inv.IsActive = 'Y'
+                                  AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
+                                GROUP BY inv.M_Inventory_ID, inv.DocumentNo,
+                                         inv.MovementDate, inv.DocStatus
+                                ORDER BY inv.MovementDate, inv.DocumentNo";
+                DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    docs.Add(new RequisitionDocumentData
+                    {
+                        Type       = "internaluse",
+                        DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
+                        DocDate    = Util.GetValueOfDateTime(r["MovementDate"]),
+                        DocStatus  = Util.GetValueOfString(r["DocStatus"]),
+                        // An issue's value is a costing question the document does
+                        // not answer on its own, so the row reports none.
+                        Amount     = null,
+                        LineCount  = Util.GetValueOfInt(r["LineCount"]),
+                        TableName  = "M_Inventory",
+                        RecordId   = Util.GetValueOfInt(r["M_Inventory_ID"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadInternalUseDocuments (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// The unit-rate expression a material-transfer line is valued at, over an
+        /// M_MovementLine aliased "ml2": the line's own cost price, else the VA024
+        /// unit price. Both are optional module columns.
+        ///
+        /// Returns NULL when the schema carries neither, which tells the caller to
+        /// report no amount at all rather than a zero — "0.00" against a real
+        /// transfer reads as a document worth nothing, where a blank cell says the
+        /// schema does not record a value. Mirrors how the Material Transfer
+        /// overview prices its own lines.
+        /// </summary>
+        private string BuildMovementRateExpr()
+        {
+            List<string> cols = new List<string>();
+            if (ColumnExists("M_MovementLine", "CurrentCostPrice")) cols.Add("ml2.CurrentCostPrice");
+            if (ColumnExists("M_MovementLine", "VA024_UnitPrice"))  cols.Add("ml2.VA024_UnitPrice");
+            if (cols.Count == 0) return null;
+            return "COALESCE(" + string.Join(", ", cols.ToArray()) + ", 0)";
         }
 
         /// <summary>
@@ -2256,14 +2694,29 @@ namespace VASLogic.Models
                     if (id > 0) return id;
                 }
 
-                // No zoom target on the table itself — take the window whose first
+                // No zoom target on the table itself — take the window whose FIRST
                 // tab sits on this table, which is the screen that maintains it.
+                //
+                // "First tab" has to be enforced, not just intended. Without the
+                // MIN(SeqNo) test below this returned ANY window carrying the table
+                // on ANY tab, ordered by SeqNo across every window at once — so a
+                // table that appears as a CHILD tab somewhere could win. The panel
+                // then started that window with an equal-query on the child's key
+                // column, which the window's own first tab does not have, and the
+                // framework raised on screen. That is what a click on the VA075
+                // field service request and the VAMFG production order chips
+                // reported: not "cannot open", but an error from a window opened
+                // with a query it could not run.
                 sql = @"SELECT tb.AD_Window_ID
                           FROM AD_Tab tb
                          INNER JOIN AD_Table t ON (t.AD_Table_ID = tb.AD_Table_ID)
                          WHERE UPPER(t.TableName) = UPPER(@TableName)
                            AND tb.IsActive        = 'Y'
                            AND t.IsActive         = 'Y'
+                           AND tb.SeqNo = (SELECT MIN(tb2.SeqNo)
+                                             FROM AD_Tab tb2
+                                            WHERE tb2.AD_Window_ID = tb.AD_Window_ID
+                                              AND tb2.IsActive     = 'Y')
                          ORDER BY tb.SeqNo, tb.AD_Tab_ID";
                 ds = DB.ExecuteDataset(
                     sql, new SqlParameter[] { new SqlParameter("@TableName", name) }, null);
@@ -2340,12 +2793,28 @@ namespace VASLogic.Models
 
         public class ActivityData
         {
-            // create | status | comment | po | grn | grncomplete | email
+            // create | status | updated | comment | po | grn | grncomplete | email
             public string    Type       { get; set; }
             public string    Text       { get; set; }   // comment body, mail subject, or actor
             public string    UserName   { get; set; }
             public string    DocumentNo { get; set; }   // related PO / GRN, when any
             public DateTime? Created    { get; set; }
+
+            // Field-level edit (AD_ChangeLog) — WHICH field changed and on which
+            // record.
+            /// <summary>The dictionary's label for the changed column.</summary>
+            public string    FieldName   { get; set; }
+            /// <summary>Which record the edit landed on: "" for the requisition
+            /// header, else the line's number and product ("#10 Steel Bolt M8").
+            /// A requisition's substantive edits are its requested quantities and
+            /// products, and those live on the lines.</summary>
+            public string    ChangeScope { get; set; }
+            // The move itself, for an "updated" row: what the field held
+            // before the edit and what it holds after. Either side is empty
+            // where the log recorded no value — a field cleared, or filled
+            // for the first time.
+            public string    OldValue    { get; set; }
+            public string    NewValue    { get; set; }
 
             // E-mail rows only (MailAttachment1). Body travels with the row so the
             // panel can reveal it on click without a second round trip.

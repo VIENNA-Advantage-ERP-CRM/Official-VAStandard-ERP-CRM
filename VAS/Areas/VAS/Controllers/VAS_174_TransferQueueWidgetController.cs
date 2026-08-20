@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -92,7 +93,13 @@ namespace VIS.Controllers
                     });
                 }
 
-                return Json(JsonConvert.SerializeObject(new { records = records }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE START — currency format (agent C08, 2026-08-19) =====
+                var currencyInfo = GetCurrencyInfo(ctx);
+                return Json(JsonConvert.SerializeObject(new { records = records, currency = currencyInfo }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                return Json(JsonConvert.SerializeObject(new { records = records }), JsonRequestBehavior.AllowGet);
+// ----- END OLD CODE -----
             }
             catch (Exception ex)
             {
@@ -215,5 +222,71 @@ namespace VIS.Controllers
             }
             return lines;
         }
+
+// ===== NEW CODE START — currency format (agent C08, 2026-08-19) =====
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetCurrencyInfo()
+        {
+            if (Session["ctx"] == null)
+                return Json(new { error = "Session Expired" }, JsonRequestBehavior.AllowGet);
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            return Json(GetCurrencyInfo(ctx), JsonRequestBehavior.AllowGet);
+        }
+
+        private static object GetCurrencyInfo(Ctx ctx)
+        {
+            int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
+            if (currencyId <= 0)
+            {
+                currencyId = ctx.GetContextAsInt("#C_Currency_ID");
+            }
+
+            string iso = "";
+            string symbol = "";
+
+            string sql = @"SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @p1";
+            SqlParameter[] param = null;
+
+            if (currencyId > 0)
+            {
+                param = new SqlParameter[] { new SqlParameter("@p1", currencyId) };
+            }
+            else
+            {
+                sql = @"SELECT c.ISO_Code, c.CurSymbol
+                        FROM AD_ClientInfo ci
+                        JOIN C_AcctSchema a ON a.C_AcctSchema_ID = ci.C_AcctSchema1_ID
+                        JOIN C_Currency c ON c.C_Currency_ID = a.C_Currency_ID
+                        WHERE ci.AD_Client_ID = @p1";
+                param = new SqlParameter[] { new SqlParameter("@p1", ctx.GetAD_Client_ID()) };
+            }
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, param);
+                if (dr != null && dr.Read())
+                {
+                    iso = Util.GetValueOfString(dr["ISO_Code"]);
+                    symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                VAdvantage.Logging.VLogger.Get().Severe("Error in GetCurrencyInfo (VAS_174): " + ex.Message);
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+
+            if (string.IsNullOrEmpty(iso)) { iso = "USD"; }
+            if (string.IsNullOrEmpty(symbol)) { symbol = iso; }
+
+            return new { iso = iso, symbol = symbol };
+        }
+// ===== NEW CODE END — currency format =====
     }
 }

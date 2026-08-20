@@ -1,4 +1,4 @@
-﻿/// <summary>
+/// <summary>
 /// Module Name : VASLogic
 /// Purpose     : Internal Use / Material Issue Overview tab panel data (read
 ///               side). Returns header identity, warehouse, KPI aggregates
@@ -130,6 +130,83 @@
 ///                          An exact match turned a differently-cased dictionary
 ///                          entry into a silent "no such window", which the panel
 ///                          can only report as a "Cannot open" toast.
+///   VAI163   2026-08-13  - The VA075 work-order lookup no longer hides behind
+///                          ColumnExists. VA075 is NOT part of this solution, so
+///                          its AD_Table / AD_Column rows are whatever the
+///                          module's own install left behind — and the guard
+///                          answers "absent" for a table it cannot find, or
+///                          raises (which the catch turns into "absent") when
+///                          AD_Table holds more than one row for the name. Either
+///                          way the panel reported no work order and the
+///                          Reference section read "Manual Issue" even though
+///                          M_InventoryLine.VA075_WorkOrder_ID held a good id.
+///                          The two lookups (direct, then the older
+///                          component-based one) are now ATTEMPTED, each with its
+///                          own once-per-process flag, so an install genuinely
+///                          without VA075 reports it once.
+///                        - On hand is reported in the PRODUCT'S BASE UOM — the
+///                          unit M_Storage.QtyOnHand is stored in — instead of
+///                          being restated into the line's entered uom, which
+///                          made the figure disagree with every other place the
+///                          product's stock is shown. The base unit's name and
+///                          precision travel with the line so the column can
+///                          name the scale it is on.
+///                        - Activity reports header edits FIELD BY FIELD
+///                          (LoadChangeActivity): one "updated" row per
+///                          AD_ChangeLog entry, naming the column that changed,
+///                          who changed it and when. The generic header-stamp
+///                          "updated" row survives only where change logging is
+///                          off for M_Inventory.
+///   VAI163   2026-08-14  Those field-by-field rows now cover the LINES as well as
+///                        the header (LoadChangeActivity reads AD_ChangeLog for
+///                        M_InventoryLine too, joined to this issue's lines). An
+///                        issue's substantive edits are its ISSUED QUANTITIES, and
+///                        those live on the lines — reading only M_Inventory
+///                        reported nothing at all for the change a reader most
+///                        wants to trace, so a corrected quantity left no record.
+///                        Each row carries the line it landed on (ChangeScope:
+///                        line number + product). Both passes share AddChangeRow,
+///                        which keeps the unnamed-column exclusion in one place.
+///                        Matches VAS_099 / VAS_101, which read the same pair.
+///   VAI163   2026-08-14  The VA075 work order's IDENTIFIER is probed rather than
+///                        assumed (RunWorkOrderLookup): DocumentNo was selected
+///                        outright, so on a revision naming it otherwise the whole
+///                        statement failed, the catch recorded the module as
+///                        unusable for the rest of the process, and the panel read
+///                        "Manual Issue" however good the id on the line was. The
+///                        REFERENCE column beside it was already probed for exactly
+///                        this reason; the identifier had been left assumed. The
+///                        lookup now also succeeds on the ID ALONE — a work order
+///                        that cannot be named is still a work order, and the panel
+///                        labels it "#<id>".
+///   VAI163   2026-08-17  - The Issue Timeline's Posted stage captions with a DATE
+///                          instead of the word "Posted", which only repeated the
+///                          stage's own title. GetPostedDate resolves the issue's
+///                          fact rows by AD_Table_ID IN + UPPER rather than joining
+///                          on TableName = 'M_Inventory': a dictionary that spells
+///                          the name in another case, or carries more than one row
+///                          for it, matched nothing — the same failure this panel's
+///                          e-mail lookup was already fixed for, and one that shows
+///                          up per DEPLOYMENT (it was reported on PostgreSQL, where
+///                          the stage showed the posting STATUS), not per statement.
+///                          It then falls back to the fact rows' accounting date
+///                          and, for a record the document itself reports as posted
+///                          but whose facts answer nothing, to the record's own last
+///                          change — the stamp posting leaves behind. Null only for
+///                          an issue that was never posted, which is the one case
+///                          the stage has no date to show.
+///                        - LoadPostingActivity resolves the table id the same way:
+///                          the trail lost its posting entry wherever the timeline
+///                          lost its posting date, and for the same reason.
+///   VAI163   2026-08-17  Field-level activity carries the OLD and NEW values
+///                        (AD_ChangeLog.OldValue / NewValue). Both are normalised
+///                        through ChangeValue: the literal "null" the platform
+///                        writes for a cleared field reads as empty, not as the
+///                        word. A row whose two values are equal is dropped — a
+///                        save that rewrote a field with the value it already had
+///                        is not an edit, and the platform logs plenty of those.
+///                        The trail said WHICH field moved but never what it moved
+///                        from or to. Follows VAS_101 / VAS_104.
 /// </summary>
 
 using System;
@@ -359,7 +436,10 @@ namespace VASLogic.Models
                 // closest stamp we have.
                 result.CompletedDate = result.UpdatedDate;
             }
-            result.PostedDate = GetPostedDate(M_Inventory_ID);
+            // The Posted flag licenses the last-change fallback inside, so the
+            // timeline's Posted stage always captions with a DATE on a posted issue
+            // instead of repeating the word "Posted".
+            result.PostedDate = GetPostedDate(M_Inventory_ID, result.Posted);
 
             // ----- Issue lines -----
             result.Lines = LoadLines(M_Inventory_ID, rateExpr, woExpr, hasAsi, M_Warehouse_ID);
@@ -572,6 +652,10 @@ namespace VASLogic.Models
                          WHERE UPPER(t.TableName) = UPPER(@TableName)
                            AND tb.IsActive        = 'Y'
                            AND t.IsActive         = 'Y'
+                           AND tb.SeqNo = (SELECT MIN(tb2.SeqNo)
+                                             FROM AD_Tab tb2
+                                            WHERE tb2.AD_Window_ID = tb.AD_Window_ID
+                                              AND tb2.IsActive     = 'Y')
                          ORDER BY tb.SeqNo, tb.AD_Tab_ID";
                 ds = DB.ExecuteDataset(
                     sql, new SqlParameter[] { new SqlParameter("@TableName", name) }, null);
@@ -651,6 +735,11 @@ namespace VASLogic.Models
                               COALESCE(loc.LocatorCombination, loc.Bin, loc.Value) AS LocatorName,
                               u.Name            AS UOMName,
                               NVL(u.StdPrecision, 0) AS UOMPrecision,
+                              -- The PRODUCT's own unit. On-hand is stored in it
+                              -- (M_Storage.QtyOnHand) and is reported in it, so
+                              -- the column has to be able to name it.
+                              bu.Name           AS BaseUOMName,
+                              NVL(bu.StdPrecision, 0) AS BaseUOMPrecision,
                               " + rateExpr + @"                        AS UnitRate,
                               NVL(l.QtyInternalUse, 0) * " + rateExpr + @" AS LineValue,
                               l.M_RequisitionLine_ID AS RequisitionLineID,
@@ -660,6 +749,7 @@ namespace VASLogic.Models
                            FROM M_InventoryLine l
                            LEFT OUTER JOIN M_Product p   ON (p.M_Product_ID   = l.M_Product_ID)
                            LEFT OUTER JOIN C_UOM     u   ON (u.C_UOM_ID        = l.C_UOM_ID)
+                           LEFT OUTER JOIN C_UOM     bu  ON (bu.C_UOM_ID       = p.C_UOM_ID)
                            LEFT OUTER JOIN M_Locator loc ON (loc.M_Locator_ID  = l.M_Locator_ID)
                            LEFT OUTER JOIN M_RequisitionLine rql ON (rql.M_RequisitionLine_ID = l.M_RequisitionLine_ID)
                            LEFT OUTER JOIN M_Requisition     rq  ON (rq.M_Requisition_ID      = rql.M_Requisition_ID)
@@ -722,7 +812,17 @@ namespace VASLogic.Models
                 decimal perBase    = (qtyBase != 0 && qtyEntered != 0) ? (qtyEntered / qtyBase) : 1;
 
                 ln.IssuedQty    = qtyEntered != 0 ? qtyEntered : qtyBase;
-                ln.AvailableQty = Util.GetValueOfDecimal(r["AvailableQtyBase"]) * perBase;
+
+                // On hand is reported in the PRODUCT'S BASE UOM, always — the unit
+                // M_Storage.QtyOnHand is actually stored in. It used to be restated
+                // into the line's entered UOM (* perBase), which made the figure
+                // disagree with every other place the product's stock is shown
+                // (the product screen, the storage tab, a stock report) for any
+                // line keyed in a non-base unit. The column names the base unit
+                // beside the figure so the different scale to Issued is explicit.
+                ln.AvailableQty       = Util.GetValueOfDecimal(r["AvailableQtyBase"]);
+                ln.BaseUOMName        = Util.GetValueOfString(r["BaseUOMName"]);
+                ln.BaseUOMPrecision   = Util.GetValueOfInt(r["BaseUOMPrecision"]);
 
                 // Requested, in order of authority:
                 //
@@ -898,72 +998,134 @@ namespace VASLogic.Models
         /// </summary>
         /// <param name="M_Inventory_ID">Selected internal-use issue id.</param>
         /// <param name="result">Overview payload being populated.</param>
+        /// <summary>
+        /// Remembers whether each VA075 lookup is usable against this schema, so a
+        /// database without the module reports it once per process rather than on
+        /// every issue the panel opens.
+        /// Null = not tried, false = the statement failed, true = it ran.
+        /// </summary>
+        private static bool? _va075DirectUsable;
+        private static bool? _va075ComponentUsable;
+
         private void LoadVA075WorkOrder(int M_Inventory_ID, InternalUseOverviewData result)
         {
-            bool hasWoCol   = ColumnExists("M_InventoryLine", "VA075_WorkOrder_ID");
-            bool hasCompCol = ColumnExists("M_InventoryLine", "VA075_WorkOrderComponent_ID");
-            // No VA075_WorkOrder table (module not installed) — nothing to read.
-            if (!ColumnExists("VA075_WorkOrder", "DocumentNo")) return;
-            if (!hasWoCol && !hasCompCol) return;
+            // "Work order reference" is named differently across VA075 revisions;
+            // take the first one this schema actually has. A dictionary that names
+            // none simply yields no reference pill — the chip itself does not
+            // depend on it.
+            string refCol = FirstExistingColumn("VA075_WorkOrder", new string[]
+            {
+                "VA075_ReferenceNo", "Reference", "POReference", "Description", "Name"
+            });
+            string refExpr = string.IsNullOrEmpty(refCol)
+                ? "CAST(NULL AS VARCHAR(255))" : "wo." + refCol;
 
+            // The work order stamped straight onto the issue line — the link the
+            // panel is really about.
+            if (_va075DirectUsable != false)
+            {
+                string inner = @"SELECT l.VA075_WorkOrder_ID AS WO_ID
+                                   FROM M_InventoryLine l
+                                  WHERE l.M_Inventory_ID = " + M_Inventory_ID + @"
+                                    AND l.IsActive       = 'Y'
+                                    AND COALESCE(l.VA075_WorkOrder_ID, 0) > 0";
+                if (RunWorkOrderLookup(inner, refExpr, result, ref _va075DirectUsable,
+                                       "direct", M_Inventory_ID))
+                {
+                    return;
+                }
+            }
+
+            // Older rows carry only the spare-part component; its own work order
+            // stands in. This is what keeps existing issues off "Manual Issue".
+            if (_va075ComponentUsable != false)
+            {
+                string inner = @"SELECT c.VA075_WorkOrder_ID AS WO_ID
+                                   FROM M_InventoryLine l
+                                  INNER JOIN VA075_WorkOrderComponent c
+                                          ON (c.VA075_WorkOrderComponent_ID = l.VA075_WorkOrderComponent_ID)
+                                  WHERE l.M_Inventory_ID = " + M_Inventory_ID + @"
+                                    AND l.IsActive       = 'Y'
+                                    AND COALESCE(l.VA075_WorkOrderComponent_ID, 0) > 0";
+                RunWorkOrderLookup(inner, refExpr, result, ref _va075ComponentUsable,
+                                   "component", M_Inventory_ID);
+            }
+        }
+
+        /// <summary>
+        /// Runs one VA075 work-order lookup and fills the payload from it.
+        ///
+        /// The statement is ATTEMPTED rather than gated on ColumnExists. That
+        /// dictionary guard was the single point at which the Work Order origin
+        /// failed: VA075 is NOT part of this solution, so its AD_Table / AD_Column
+        /// rows are whatever the module's own install left behind — and the guard
+        /// answers "absent" for a table it cannot find, or raises (which the catch
+        /// turns into "absent") when AD_Table holds more than one row for the name.
+        /// Either way the panel reported no work order and the Reference section
+        /// fell through to "Manual Issue" even though M_InventoryLine
+        /// .VA075_WorkOrder_ID held a perfectly good id. Running the query and
+        /// letting a genuinely absent module throw once is both more accurate and
+        /// cheaper than asking the dictionary to describe a schema it does not own.
+        ///
+        /// The issue id is inlined rather than bound: the caller's sub-select and
+        /// this statement would otherwise need the same bind name twice, which
+        /// Oracle's positional binding does not allow. It is an int, so nothing
+        /// can be injected.
+        /// </summary>
+        /// <returns>True when a work order was found and the payload filled.</returns>
+        private bool RunWorkOrderLookup(string innerSql, string refExpr,
+                                        InternalUseOverviewData result,
+                                        ref bool? usable, string which, int M_Inventory_ID)
+        {
             try
             {
-                // "Work order reference" is named differently across VA075
-                // revisions; take the first one this schema actually has.
-                string refCol = FirstExistingColumn("VA075_WorkOrder", new string[]
+                // The work order's IDENTIFIER is probed, not assumed. DocumentNo
+                // was selected outright — on a VA075 revision that names it
+                // otherwise the whole statement failed, the catch below recorded
+                // the module as unusable, and the panel fell through to "Manual
+                // Issue" however good the id on the line was. The reference column
+                // a few lines up was already probed for exactly this reason; the
+                // identifier had been left assumed.
+                //
+                // Selected as a stable alias so the reader below does not care
+                // which column answered.
+                string noCol = FirstExistingColumn("VA075_WorkOrder", new string[]
                 {
-                    "VA075_ReferenceNo", "Reference", "POReference", "Description", "Name"
+                    "DocumentNo", "Name", "Value", "VA075_SRNo"
                 });
-                string refExpr = string.IsNullOrEmpty(refCol)
-                    ? "CAST(NULL AS VARCHAR(255))" : "wo." + refCol;
-
-                // The ids reachable from the issue: stamped on the line, and (for
-                // older rows) through the spare-part component. The id is inlined
-                // rather than bound — the two UNION branches would otherwise need
-                // the same bind twice, which is not portable across the drivers
-                // this platform runs on. It is an int, so nothing can be injected.
-                List<string> sources = new List<string>();
-                if (hasWoCol)
-                {
-                    sources.Add(@"SELECT l.VA075_WorkOrder_ID AS WO_ID
-                                    FROM M_InventoryLine l
-                                   WHERE l.M_Inventory_ID = " + M_Inventory_ID + @"
-                                     AND l.IsActive       = 'Y'
-                                     AND NVL(l.VA075_WorkOrder_ID, 0) > 0");
-                }
-                if (hasCompCol && ColumnExists("VA075_WorkOrderComponent", "VA075_WorkOrder_ID"))
-                {
-                    sources.Add(@"SELECT c.VA075_WorkOrder_ID AS WO_ID
-                                    FROM M_InventoryLine l
-                                   INNER JOIN VA075_WorkOrderComponent c
-                                           ON (c.VA075_WorkOrderComponent_ID = l.VA075_WorkOrderComponent_ID)
-                                   WHERE l.M_Inventory_ID = " + M_Inventory_ID + @"
-                                     AND l.IsActive       = 'Y'
-                                     AND NVL(l.VA075_WorkOrderComponent_ID, 0) > 0");
-                }
-                if (sources.Count == 0) return;
+                string noExpr = string.IsNullOrEmpty(noCol)
+                    ? "CAST(NULL AS VARCHAR(255))" : "wo." + noCol;
+                string orderBy = string.IsNullOrEmpty(noCol)
+                    ? "wo.VA075_WorkOrder_ID" : "wo." + noCol;
 
                 string sql = @"SELECT wo.VA075_WorkOrder_ID,
-                                      wo.DocumentNo,
+                                      " + noExpr + @"  AS WorkOrderNo,
                                       " + refExpr + @" AS WorkOrderRef
                                  FROM VA075_WorkOrder wo
-                                WHERE wo.VA075_WorkOrder_ID IN ("
-                                 + string.Join(" UNION ", sources.ToArray()) + @")
-                                ORDER BY wo.DocumentNo";
-
+                                WHERE wo.VA075_WorkOrder_ID IN (" + innerSql + @")
+                                ORDER BY " + orderBy;
                 DataSet ds = DB.ExecuteDataset(sql, null, null);
-                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+                usable = true;
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return false;
 
                 DataRow r = ds.Tables[0].Rows[0];
                 result.VA075_WorkOrder_ID = Util.GetValueOfInt(r["VA075_WorkOrder_ID"]);
-                result.WorkOrderNo        = Util.GetValueOfString(r["DocumentNo"]);
+                result.WorkOrderNo        = Util.GetValueOfString(r["WorkOrderNo"]);
                 result.WorkOrderRef       = Util.GetValueOfString(r["WorkOrderRef"]);
                 result.WorkOrderCount     = ds.Tables[0].Rows.Count;
+                // The ID is what makes this an origin — a work order the panel can
+                // name is better, but one it cannot name is still a work order.
+                return result.VA075_WorkOrder_ID > 0;
             }
             catch (Exception ex)
             {
-                // Non-fatal: the origin simply falls back to requisition / manual.
-                _log.Severe("LoadVA075WorkOrder (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+                // Almost certainly "no such table / column" on an install without
+                // VA075. Recorded so the next issue skips the attempt.
+                usable = false;
+                _log.Severe("LoadVA075WorkOrder/" + which +
+                            " (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+                return false;
             }
         }
 
@@ -1206,29 +1368,83 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Returns the moment the issue was actually posted — the earliest Created
-        /// stamp across the Fact_Acct rows written for it — or null when it has
-        /// never been posted. Standalone query for the same MRole reason documented
-        /// on <see cref="GetCompletedDate"/>.
+        /// Returns the date the issue was posted, for the timeline's Posted stage:
+        /// the earliest Created stamp across the Fact_Acct rows written for it,
+        /// falling back to those rows' accounting date and finally — for a record
+        /// the document itself reports as posted but whose facts cannot be read —
+        /// to the record's own last change. Null only when the issue has never been
+        /// posted at all.
+        ///
+        /// The stage is meant to CAPTION WITH A DATE; with nothing to show it prints
+        /// the word "Posted", which only repeats the stage's own title. Hence the
+        /// chain: on a posted record, one of the three always answers.
+        ///
+        /// The table id is resolved with IN + UPPER over AD_Table rather than by
+        /// joining on TableName = 'M_Inventory'. A dictionary that spells the name
+        /// in another case, or carries more than one row for it, made the join
+        /// match nothing — and the panel then reported an obviously posted issue as
+        /// having no posting date. It is the same fix this panel's e-mail lookup
+        /// already carries, and the difference shows up per DEPLOYMENT (it was
+        /// reported on PostgreSQL), not per statement.
+        ///
+        /// Standalone queries for the same MRole reason documented on
+        /// <see cref="GetCompletedDate"/>. Every statement is portable: no NVL, no
+        /// TRUNC, one bind name per statement occurring exactly once.
         /// </summary>
         /// <param name="M_Inventory_ID">Selected internal-use issue id.</param>
-        private DateTime? GetPostedDate(int M_Inventory_ID)
+        /// <param name="posted">The record's own Posted flag — what licenses the
+        /// last-change fallback. Without it an unposted issue would be given a
+        /// posting date.</param>
+        private DateTime? GetPostedDate(int M_Inventory_ID, bool posted)
         {
             try
             {
-                string sql = @"SELECT MIN(fa.Created) AS PostedDate
+                // Both stamps in one read: Created is when posting RAN, DateAcct the
+                // date it was booked to. Created is the milestone the timeline wants;
+                // DateAcct answers for a deployment whose fact rows carry no usable
+                // create stamp.
+                string sql = @"SELECT MIN(fa.Created)  AS PostedOn,
+                                      MIN(fa.DateAcct) AS PostedAcct
                                  FROM Fact_Acct fa
-                                INNER JOIN AD_Table adt ON (adt.AD_Table_ID = fa.AD_Table_ID)
-                                WHERE fa.Record_ID  = @M_Inventory_ID
-                                  AND adt.TableName = 'M_Inventory'";
+                                WHERE fa.Record_ID = @M_Inventory_ID
+                                  AND fa.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'M_INVENTORY')";
                 DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
-                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
-                    return null;
-                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["PostedDate"]);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow r = ds.Tables[0].Rows[0];
+                    DateTime? postedOn = Util.GetValueOfDateTime(r["PostedOn"]);
+                    if (postedOn.HasValue) return postedOn;
+                    DateTime? postedAcct = Util.GetValueOfDateTime(r["PostedAcct"]);
+                    if (postedAcct.HasValue) return postedAcct;
+                }
             }
             catch (Exception ex)
             {
-                _log.Severe("GetPostedDate (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+                // Non-fatal: fall through to the record's own stamp below.
+                _log.Severe("GetPostedDate/facts (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+
+            // The document says it is posted, but its accounting facts answered
+            // nothing. Posting is what last wrote to the record — it stamps Posted
+            // and nothing else touches a posted issue — so its last change is the
+            // closest thing to the posting moment there is, and a date is what this
+            // stage exists to show. Never reached for an unposted issue.
+            if (!posted) return null;
+            try
+            {
+                string sql = @"SELECT i.Updated
+                                 FROM M_Inventory i
+                                WHERE i.M_Inventory_ID = @M_Inventory_ID";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return null;
+                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["Updated"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetPostedDate/record (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
                 return null;
             }
         }
@@ -1255,6 +1471,23 @@ namespace VASLogic.Models
 
             List<InternalUseActivityData> activity = new List<InternalUseActivityData>();
             LoadIssueMilestones(M_Inventory_ID, docStatus, activity);
+
+            // One row per FIELD the user changed.
+            int fieldChanges = LoadChangeActivity(M_Inventory_ID, activity);
+
+            // The milestone above adds a single generic "the issue was edited" row
+            // from the header's own stamp. That is a stand-in for exactly the
+            // detail this now carries, so it goes as soon as the change log has
+            // named the fields — otherwise the same edit is reported twice, once
+            // vaguely and once per field.
+            if (fieldChanges > 0)
+            {
+                activity.RemoveAll(delegate (InternalUseActivityData a)
+                {
+                    return a.Type == "updated" && string.IsNullOrEmpty(a.FieldName);
+                });
+            }
+
             LoadPostingActivity(M_Inventory_ID, activity);
             LoadNoteActivity(M_Inventory_ID, activity);
             LoadEmailActivity(M_Inventory_ID, activity);
@@ -1269,6 +1502,172 @@ namespace VASLogic.Models
             if (activity.Count > MAX_ENTRIES)
                 activity = activity.GetRange(0, MAX_ENTRIES);
             return activity;
+        }
+
+        /// <summary>
+        /// One "updated" row per FIELD the user changed, read from the platform's
+        /// change log (AD_ChangeLog). Each row names the field (the dictionary's
+        /// display name for the column, falling back to the raw column name), who
+        /// changed it and when — so the trail says which field moved rather than
+        /// only that something did.
+        ///
+        /// Both the header (M_Inventory) and its LINES (M_InventoryLine) are read.
+        /// An issue's substantive edits are its ISSUED QUANTITIES, and those live
+        /// on the lines — a header-only trail reported nothing at all for the
+        /// change a reader most wants to trace, so a corrected quantity left no
+        /// record. A line row is labelled with its line number and product so the
+        /// reader can tell which row moved.
+        ///
+        /// Silently degrades to no rows when change logging is off for the table,
+        /// in which case the caller keeps its single header-stamp "updated" row.
+        /// </summary>
+        /// <param name="M_Inventory_ID">Selected internal-use issue id.</param>
+        /// <param name="list">Feed being built; rows are appended.</param>
+        /// <returns>How many field-level rows were added.</returns>
+        private int LoadChangeActivity(int M_Inventory_ID, List<InternalUseActivityData> list)
+        {
+            int added = 0;
+
+            // ----- Header edits (M_Inventory) -----
+            try
+            {
+                // AD_Column is LEFT joined so a log row whose column has since been
+                // removed from the dictionary still reports its change.
+                string sql = @"SELECT cl.Created,
+                                      cl.OldValue,
+                                      cl.NewValue,
+                                      u.Name         AS UserName,
+                                      col.Name       AS FieldLabel,
+                                      col.ColumnName AS FieldColumn
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_Column col
+                                        ON (col.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                        ON (u.AD_User_ID = cl.CreatedBy)
+                                WHERE cl.Record_ID = @M_Inventory_ID
+                                  AND adt.TableName = 'M_Inventory'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
+                                ORDER BY cl.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                        if (AddChangeRow(r, "", list)) added++;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Change logging is optional; a schema without it just shows no
+                // per-field rows.
+                _log.Severe("LoadChangeActivity/header (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+
+            // ----- Line edits (M_InventoryLine) -----
+            //
+            // The line ids are reached through a join rather than a sub-select on
+            // the same parameter, so the statement carries its bind name exactly
+            // once: Oracle binds positionally, and a repeated name becomes a
+            // second, unfilled placeholder.
+            try
+            {
+                string sql = @"SELECT cl.Created,
+                                      cl.OldValue,
+                                      cl.NewValue,
+                                      u.Name         AS UserName,
+                                      col.Name       AS FieldLabel,
+                                      col.ColumnName AS FieldColumn,
+                                      l.Line  AS LineNo,
+                                      p.Name  AS ProductName
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                INNER JOIN M_InventoryLine l
+                                        ON (l.M_InventoryLine_ID = cl.Record_ID)
+                                 LEFT OUTER JOIN M_Product p
+                                        ON (p.M_Product_ID  = l.M_Product_ID)
+                                 LEFT OUTER JOIN AD_Column col
+                                        ON (col.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                        ON (u.AD_User_ID = cl.CreatedBy)
+                                WHERE adt.TableName = 'M_InventoryLine'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
+                                  AND l.M_Inventory_ID = @M_Inventory_ID
+                                ORDER BY cl.Created DESC";
+                DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        // "#10 Steel Bolt M8" — the line number identifies the row,
+                        // the product says what it is without a second lookup.
+                        string scope = "#" + Util.GetValueOfInt(r["LineNo"]);
+                        string prod  = Util.GetValueOfString(r["ProductName"]);
+                        if (!string.IsNullOrEmpty(prod)) scope += " " + prod.Trim();
+                        if (AddChangeRow(r, scope, list)) added++;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadChangeActivity/lines (M_Inventory_ID=" + M_Inventory_ID + "): " + ex.Message);
+            }
+
+            return added;
+        }
+
+        /// <summary>
+        /// Turns one AD_ChangeLog row into an "updated" activity entry. A change
+        /// whose column the dictionary cannot name is skipped: it would render as
+        /// a bare "Updated" identifying nothing, which is what naming the field
+        /// exists to stop.
+        /// </summary>
+        /// <param name="r">Change-log row (Created / UserName / FieldLabel /
+        /// FieldColumn).</param>
+        /// <param name="scope">Which record the edit landed on: "" for the issue
+        /// header, else the line's number and product.</param>
+        /// <param name="list">Feed being built; the row is appended.</param>
+        /// <returns>True when an entry was added.</returns>
+        private bool AddChangeRow(DataRow r, string scope, List<InternalUseActivityData> list)
+        {
+            DateTime? at = Util.GetValueOfDateTime(r["Created"]);
+            if (!at.HasValue) return false;
+
+            string field = Util.GetValueOfString(r["FieldLabel"]);
+            if (string.IsNullOrEmpty(field))
+                field = Util.GetValueOfString(r["FieldColumn"]);
+            if (string.IsNullOrEmpty(field)) return false;
+
+            // The move itself. A save that rewrites a field with the value it
+            // already had is not an edit, and the platform logs plenty of those.
+            string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
+            string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
+            if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) return false;
+
+            list.Add(new InternalUseActivityData
+            {
+                Type        = "updated",
+                FieldName   = field,
+                OldValue    = oldValue,
+                NewValue    = newValue,
+                ChangeScope = scope,
+                UserName    = Util.GetValueOfString(r["UserName"]),
+                Created     = at
+            });
+            return true;
+        }
+
+        /// <summary>
+        /// Normalises a logged value for display. The platform writes the literal
+        /// "null" into AD_ChangeLog for a cleared field, which would otherwise be
+        /// shown to the reader as though it were the text "null". Follows VAS_101.
+        /// </summary>
+        private static string ChangeValue(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            string v = value.Trim();
+            return string.Equals(v, "null", StringComparison.OrdinalIgnoreCase) ? "" : v;
         }
 
         /// <summary>
@@ -1339,6 +1738,12 @@ namespace VASLogic.Models
         /// <summary>
         /// Adds a "posted" entry from the earliest Fact_Acct row written for the
         /// issue, carrying the user who ran the posting.
+        ///
+        /// The table id is matched with IN + UPPER for the same reason as
+        /// <see cref="GetPostedDate"/>: joining on TableName = 'M_Inventory' finds
+        /// nothing on a dictionary that spells the name in another case or carries
+        /// more than one row for it, and the trail then lost its posting entry on
+        /// exactly the deployments where the timeline lost its posting date.
         /// </summary>
         private void LoadPostingActivity(int M_Inventory_ID, List<InternalUseActivityData> list)
         {
@@ -1346,10 +1751,11 @@ namespace VASLogic.Models
             {
                 string sql = @"SELECT fa.Created, u.Name AS UserName
                                  FROM Fact_Acct fa
-                                INNER JOIN AD_Table adt ON (adt.AD_Table_ID = fa.AD_Table_ID)
                                  LEFT OUTER JOIN AD_User u ON (fa.CreatedBy = u.AD_User_ID)
-                                WHERE fa.Record_ID  = @M_Inventory_ID
-                                  AND adt.TableName = 'M_Inventory'
+                                WHERE fa.Record_ID = @M_Inventory_ID
+                                  AND fa.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'M_INVENTORY')
                                 ORDER BY fa.Created";
                 DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
@@ -1618,7 +2024,10 @@ namespace VASLogic.Models
             public int      UOMPrecision       { get; set; }
             public decimal  RequestedQty       { get; set; }   // M_RequisitionLine.Qty, else QtyEntered
             public decimal  IssuedQty          { get; set; }   // QtyInternalUse
-            public decimal  AvailableQty       { get; set; }   // M_Storage on-hand
+            public decimal  AvailableQty       { get; set; }   // M_Storage on-hand, in BASE uom
+            /// <summary>The product's own unit, which on-hand is reported in.</summary>
+            public string   BaseUOMName        { get; set; }
+            public int      BaseUOMPrecision   { get; set; }
             public decimal  UnitRate           { get; set; }
             public decimal  LineValue          { get; set; }
             // Where UnitRate came from: LINE (this line's cost detail),
@@ -1640,6 +2049,21 @@ namespace VASLogic.Models
             public DateTime? Created    { get; set; }
             public string    DocumentNo { get; set; }
             public string    Text       { get; set; }   // note body / e-mail subject
+            /// <summary>For an "updated" row: the display name of the field that
+            /// changed. Empty on the generic header-stamp row that stands in when
+            /// change logging is off.</summary>
+            public string    FieldName  { get; set; }
+            /// <summary>For an "updated" row: which record the edit landed on —
+            /// "" for the issue header, else the line's number and product
+            /// ("#10 Steel Bolt M8"). An issue's substantive edits are its issued
+            /// quantities, and those live on the lines.</summary>
+            public string    ChangeScope { get; set; }
+            // The move itself, for an "updated" row: what the field held
+            // before the edit and what it holds after. Either side is empty
+            // where the log recorded no value — a field cleared, or filled
+            // for the first time.
+            public string    OldValue    { get; set; }
+            public string    NewValue    { get; set; }
 
             // E-mail (MailAttachment1) — the body is revealed on click.
             public string    Body       { get; set; }   // TextMsg (flattened to text)

@@ -49,6 +49,13 @@
  *                        back to (.vas_104-toast). The action bar
  *                        (.vas_104-actions / .vas_104-btn) is gone with the Print
  *                        and Confirm buttons it held.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
  ***********************************************************/
 
 .vas_104-root {
@@ -602,13 +609,12 @@
 .vas_104-tf.vas_104-is-grand { color: var(--gc-text); font-weight: 700; }
 .vas_104-tf.vas_104-is-grand b { color: var(--gc-risk-tx); margin-left: 0.375em; }
 
-@container (max-width: 700px) {
-    .vas_104-table { overflow-x: auto; }
-    .vas_104-tRow,
-    .vas_104-root.vas_104-no-quality .vas_104-tRow { min-width: 700px; }
-    /* The drawer travels with the rows it belongs to when the table scrolls. */
-    .vas_104-qcDrawer { min-width: 700px; }
-}
+/* A narrow panel SHRINKS the table; it never scrolls it sideways. Under 700px
+   the rows and the drawer under a line used to take a floor width and the card
+   its own horizontal scrollbar — which hides the right-hand columns behind a
+   control the reader has to find and drag. Every track is minmax(0, Nfr) and
+   every cell carries min-width: 0 with an ellipsis, so the columns compress
+   instead and a clipped value stays readable through the row's tooltip. */
 
 /* ----------------------------------------------------------- */
 /*  Notes + Activity                                            */
@@ -688,6 +694,39 @@
     align-items: baseline;
 }
 .vas_104-actTitle { min-width: 0; font-size: 0.8125em; color: var(--gc-text); }
+
+/* "was X → now Y" under the field's name, for a field-change row. The two
+   values are what the reader came for, so they carry the row's colour while the
+   arrow between them stays muted; both wrap rather than clip, since a truncated
+   value is no value.
+
+   order + full basis put it on its OWN line BELOW the first: .vas_104-actMain is
+   a space-between flex row, so without the ordering the delta would land between
+   the headline and the timestamp and push the timestamp onto a third line. */
+.vas_104-actDelta {
+    order: 3;
+    flex: 0 0 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25em 0.375em;
+    margin-top: 0.125em;
+    font-size: 0.8462em; /* ~0.6875em against the body anchor */
+}
+.vas_104-cvOld {
+    color: var(--gc-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+.vas_104-cvArrow { flex: none; color: var(--gc-muted); }
+.vas_104-cvNew {
+    color: var(--gc-text);
+    font-weight: 700;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
 /* A NOTE's headline is the comment itself: it wraps (to three lines) rather
    than running off the row, since that text is what the reader came for. */
 .vas_104-actTitle.vas_104-multiline {

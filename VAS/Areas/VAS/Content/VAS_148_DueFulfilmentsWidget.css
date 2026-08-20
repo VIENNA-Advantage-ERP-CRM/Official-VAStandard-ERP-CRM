@@ -100,9 +100,9 @@
 .vas-duf-val { font-size: .8em; font-weight: 700; color: #0083DA; white-space: nowrap; flex: 0 0 auto; }
 
 .vas-duf-r2 { display: flex; align-items: baseline; gap: .5em; line-height: 1.02; }
-.vas-duf-wh { font-size: .68em; color: #748494; white-space: nowrap; flex: 0 1 auto; max-width: 50%; overflow: hidden; text-overflow: ellipsis; }
-.vas-duf-addr { flex: 1; min-width: 0; font-size: .68em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vas-duf-lc { font-size: .68em; color: #748494; white-space: nowrap; flex: 0 0 auto; }
+.vas-duf-wh { font-size: .64em; color: #748494; white-space: nowrap; flex: 0 1 auto; max-width: 50%; overflow: hidden; text-overflow: ellipsis; }
+.vas-duf-addr { flex: 1; min-width: 0; font-size: .64em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas-duf-lc { font-size: .64em; color: #748494; white-space: nowrap; flex: 0 0 auto; }
 
 .vas-duf-foot {
     flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
@@ -129,7 +129,7 @@
 .vas-duf-body-lock { overflow: hidden; }
 
 .vas-duf-modal {
-    position: relative; width: min(55em, calc(100vw - 4em)); max-height: 90vh;
+    position: relative; width: min(72em, calc(100vw - 3em)); max-height: 94vh;
     display: flex; flex-direction: column;
     background: #fff; border-radius: 14px; overflow: hidden;
     box-shadow: 0 30px 70px rgba(2, 38, 64, .30);
@@ -147,14 +147,14 @@
 .vas-duf-mclose svg { width: 1.25em; height: 1.25em; }
 
 .vas-duf-mcontent { position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-.vas-duf-mbody { padding: 0.875em 1.25em; overflow: hidden; }
+.vas-duf-mbody { padding: 0.9em 1.35em; overflow: hidden; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 
 .vas-duf-mbusy { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, .6); z-index: 5; }
 .vas-duf-mbusy.vas-duf-hidden { display: none; }
 
 .vas-duf-optrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 1.25em; }
 .vas-duf-shiprow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0 1em; }
-.vas-duf-field { display: flex; flex-direction: column; padding: 0.5em 0.125em 0.375em; }
+.vas-duf-field { display: flex; flex-direction: column; padding: 0.45em 0.125em 0.35em; }
 .vas-duf-flabel { font-size: .75em; color: #5F7283; margin-bottom: 0.25em; }
 .vas-duf-f {
     font-family: inherit; font-size: .9em; color: #102C3F; border: none;
@@ -172,7 +172,7 @@ select.vas-duf-f {
 }
 .vas-duf-f:hover, .vas-duf-f:focus { border-bottom-color: #0083DA; }
 
-.vas-duf-note { display: flex; align-items: center; gap: 0.375em; font-size: .78em; color: #748494; margin: 0.625em 0; }
+.vas-duf-note { display: flex; align-items: center; gap: 0.375em; font-size: .76em; color: #748494; margin: 0.55em 0; }
 .vas-duf-note svg { width: 0.875em; height: 0.875em; color: #0083DA; flex: 0 0 auto; }
 
 .vas-duf-lines { display: flex; flex-direction: column; gap: 0.5em; min-height: 14.5em; }
@@ -251,3 +251,4 @@ select.vas-duf-f {
 .vas-duf-ctable td.s { font-weight: 700; color: #102C3F; }
 .vas-duf-ctable td.r, .vas-duf-ctable th.r { text-align: right; }
 .vas-duf-ctable tr:last-child td { border-bottom: none; }
+

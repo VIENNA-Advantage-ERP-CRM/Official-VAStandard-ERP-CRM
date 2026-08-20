@@ -298,6 +298,31 @@
  *                        field, per save. The single generic "Goods receipt
  *                        updated" row remains only where change logging is off
  *                        for M_InOut (model side).
+ *   VAI163   2026-08-14  Those "updated" rows now also cover edits to the LINES
+ *                        (model side). A line row names the line it landed on
+ *                        (a.ChangeScope — line number + product) on the same
+ *                        sub-line the e-mail recipients use, so the headline stays
+ *                        "Updated <field>": which field moved is the question, and
+ *                        the row it moved on qualifies it rather than competing
+ *                        for the one line that clips.
+ *   VAI163   2026-08-17  The Posted pill is drawn ONLY once the receipt is posted.
+ *                        It rendered on every record, reading "Not Posted" in grey
+ *                        on a receipt that is not yet completed and therefore
+ *                        cannot be posted at all — a standing notice about
+ *                        something that has not gone wrong, beside the status pill
+ *                        that already says where the document is. It is a
+ *                        milestone badge now: absent until the milestone is
+ *                        reached. The Order Progress timeline still carries the
+ *                        Posted stage, with the date posting ran, for a reader
+ *                        following the document through its states. Matches
+ *                        VAS_106.
+ *   VAI163   2026-08-17  Activity's field-level rows carry the MOVE: "was X →
+ *                        now Y" under the field's name (changeDelta), the old
+ *                        value struck through and a value the log recorded as
+ *                        empty shown as an em dash, so a cleared field is
+ *                        visibly cleared rather than looking like a rendering
+ *                        gap. A row said WHICH field moved but never what it
+ *                        moved from or to.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -850,11 +875,16 @@
             var $pills = $('<div class="vas_099-hdrPills"></div>');
             if (pm) $pills.append(headerPill(pm.label, pm.tone, "chevUp", false));
             $pills.append(headerPill(st.label, st.tone, null, true));
-            // Posted status shown as a pill on the right (moved out of the vendor
-            // details column): green when posted, neutral when not.
-            $pills.append(headerPill(
-                data.Posted ? VIS.Msg.getMsg("VAS_099_Posted") : msg("VAS_099_NotPosted", "Not Posted"),
-                data.Posted ? "success" : "neutral", null, false));
+            // Posted is a MILESTONE badge: it appears once the receipt has reached
+            // the ledger and not before. It used to render for every record,
+            // reading "Not Posted" in grey on a receipt that is not yet completed
+            // and therefore cannot be posted at all — a standing notice about
+            // something that has not gone wrong. The Order Progress timeline
+            // already carries the Posted stage for a reader following the
+            // document's state, with the date posting ran.
+            if (data.Posted) {
+                $pills.append(headerPill(VIS.Msg.getMsg("VAS_099_Posted"), "success", null, false));
+            }
             $top.append($pills);
 
             $strip.append($top);
@@ -1812,6 +1842,20 @@
             paintPage();
         }
 
+        // "was X → now Y" under the field's name, for a field-level edit. A
+        // value the log recorded as empty reads as an em dash rather than as a
+        // blank, so a cleared field is visibly cleared instead of looking like a
+        // rendering gap. Follows VAS_101 / VAS_104.
+        function changeDelta(a) {
+            var $d = $('<small class="vas_099-actSub vas_099-actDelta"></small>');
+            var blank = "—";
+            $d.append($('<span class="vas_099-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_099-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_099-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
+        }
+
         function activityRow(a) {
             var meta = ACT_TYPES[a.Type] || ACT_TYPES.note;
 
@@ -1840,6 +1884,18 @@
                     $title.append($('<small class="vas_099-actSub"></small>').text(to));
                 }
             }
+
+            // A line edit names the line it landed on, on the sub-line the e-mail
+            // recipients use. The headline stays "Updated <field>" — which field
+            // moved is the question, and the row it moved on qualifies it rather
+            // than competing with it for the one line that clips.
+            if (a.Type === "updated" && a.ChangeScope) {
+                $title.append($('<small class="vas_099-actSub"></small>')
+                    .text(a.ChangeScope).attr("title", a.ChangeScope));
+            }
+            // ...and the move itself: what the field held before the edit and
+            // what it holds after, on a sub-line of its own.
+            if (a.OldValue || a.NewValue) $title.append(changeDelta(a));
             $row.append($title);
 
             // "when · by whom" — the audit trail's whole point. For an e-mail that

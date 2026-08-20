@@ -133,6 +133,70 @@
 ///                          in TextMsg, and the feed shows a body as text — so the
 ///                          reader would otherwise get tags instead of a message.
 ///                          No markup is ever handed to the panel.
+///   VAI163   2026-08-17  - Order lines carry their LIST price
+///                          (C_OrderLine.PriceList) for the panel's unit-price
+///                          tooltip. Reported as stored, which is already the
+///                          line's SELECTED unit: the platform prices from
+///                          M_ProductPrice on the line's own C_UOM_ID and scales
+///                          price list with price entered on a UOM change, so the
+///                          pair sits on the scale the panel shows prices on.
+///                        - Delivery readiness gains the "partial" state: a line
+///                          part of which has already shipped reports that, ahead
+///                          of the stock states, which only answer whether the
+///                          REST could go out today. Its ordered / delivered pair
+///                          travels with the row so the panel can name the
+///                          quantities behind it.
+///                        - LoadNotes reaches C_OrderLine through a LEFT OUTER JOIN
+///                          (IsActive in the join, not the WHERE), so the header
+///                          note — C_Order.Description — is returned even for an
+///                          order with no active lines. The INNER JOIN dropped the
+///                          whole result there, so a description the user had just
+///                          typed and saved appeared nowhere and the Notes section
+///                          was not drawn at all. A line note is labelled with its
+///                          line NUMBER as well as the item, so two lines of the
+///                          same product no longer read as one note repeated. Both
+///                          follow VAS_092.
+///   VAI163   2026-08-17  - Shipments carry their CREATED stamp (M_InOut.Created)
+///                          as well as their movement date: the progress line's
+///                          Shipped / Delivered stages are dated by when the
+///                          delivery was RAISED, since MovementDate is a document
+///                          field a user can back-date or set forward. Follows
+///                          VAS_092's LastReceiptDate.
+///                        - A shipment reports what it DELIVERED in money
+///                          (DeliveredValue): each shipped line valued at its share
+///                          of the order line's net amount — a share of the line's
+///                          own money, so no view is needed on which unit either
+///                          side is held in. The Documents list showed a blank
+///                          amount against every shipment.
+///                        - Delivery readiness is reported entirely in the
+///                          PRODUCT's base unit, and labelled with it
+///                          (M_Product.C_UOM_ID). It converted onto the line's
+///                          selected unit, so a line sold by the box set a boxed
+///                          pending figure against warehouse stock counted in each.
+///                        - Order lines carry C_OrderLine.IsDropShip, for the
+///                          panel's per-line Drop Shipment: Yes / No.
+///                        - Activity reports edits FIELD BY FIELD
+///                          (LoadOrderChangeActivity, AD_ChangeLog): one "Updated"
+///                          row per changed column — the field's dictionary name,
+///                          who changed it and when — for the header AND its lines,
+///                          a line's row naming its line number. Ported from
+///                          VAS_092.
+///                        - The milestone row for a completed order is typed
+///                          "Completed" rather than "Updated" (which now means an
+///                          edit) and is dated by the workflow's DocComplete stamp,
+///                          falling back to the record's last change.
+///   VAI163   2026-08-17  Field-level activity carries the OLD and NEW values
+///                        (AD_ChangeLog.OldValue / NewValue). Both are normalised
+///                        through ChangeValue: the literal "null" the platform
+///                        writes for a cleared field reads as empty, not as the
+///                        word. A row whose two values are equal is dropped — a
+///                        save that rewrote a field with the value it already had
+///                        is not an edit, and the platform logs plenty of those.
+///                        The trail said WHICH field moved but never what it moved
+///                        from or to. Follows VAS_101 / VAS_104.
+///                        The line number and item move out of the field's NAME
+///                        into ChangeScope, where the panel draws them on their
+///                        own sub-line rather than inside the headline.
 /// </summary>
 
 using System;
@@ -383,6 +447,10 @@ namespace VASLogic.Models
                          WHERE UPPER(t.TableName) = UPPER(@TableName)
                            AND tb.IsActive        = 'Y'
                            AND t.IsActive         = 'Y'
+                           AND tb.SeqNo = (SELECT MIN(tb2.SeqNo)
+                                             FROM AD_Tab tb2
+                                            WHERE tb2.AD_Window_ID = tb.AD_Window_ID
+                                              AND tb2.IsActive     = 'Y')
                          ORDER BY tb.SeqNo, tb.AD_Tab_ID";
                 ds = DB.ExecuteDataset(
                     sql, new SqlParameter[] { new SqlParameter("@TableName", name) }, null);
@@ -877,12 +945,14 @@ namespace VASLogic.Models
                                   COALESCE(ol.QtyInvoiced, 0)  AS QtyInvoiced,
                                   COALESCE(ol.PriceActual, 0)  AS PriceActual,
                                   COALESCE(ol.PriceEntered, 0) AS PriceEntered,
+                                  COALESCE(ol.PriceList, 0)    AS PriceList,
                                   COALESCE(ol.Discount, 0)     AS Discount,
                                   COALESCE(ol.LineNetAmt, 0)   AS LineNetAmt,
                                   ol.Description               AS LineDescription,
                                   ol.M_Product_ID,
                                   ol.C_Charge_ID,
                                   ol.IsContract,
+                                  ol.IsDropShip,
                                   ol.C_Contract_ID,
                                   p.Value        AS ProductValue,
                                   p.Name         AS ProductName,
@@ -948,12 +1018,30 @@ namespace VASLogic.Models
                     ln.PriceActual    = Util.GetValueOfDecimal(r["PriceEntered"]);
                     if (ln.PriceActual == 0)
                         ln.PriceActual = Util.GetValueOfDecimal(r["PriceActual"]) * ln.UomRatio;
+                    // The list price the line was priced off (C_OrderLine.PriceList),
+                    // which the panel reveals on the unit price's hover tooltip.
+                    //
+                    // Taken as it stands, NOT scaled by the ratio above: PriceList
+                    // travels with PriceEntered, on the line's SELECTED unit. The
+                    // platform reads it out of M_ProductPrice for the line's own
+                    // C_UOM_ID, and its UOM callout multiplies price entered and
+                    // price list by the same conversion rate (MOrderLineModel
+                    // .GetPricesOnUomChange), so the pair is always on one scale —
+                    // which is the scale the price beside it is shown on. 0 when the
+                    // line carries no list price at all.
+                    ln.PriceList      = Util.GetValueOfDecimal(r["PriceList"]);
                     ln.Discount       = Util.GetValueOfDecimal(r["Discount"]);
                     ln.LineNetAmt     = Util.GetValueOfDecimal(r["LineNetAmt"]);
                     ln.Description    = Util.GetValueOfString(r["LineDescription"]);
                     ln.M_Product_ID   = Util.GetValueOfInt(r["M_Product_ID"]);
                     ln.C_Charge_ID    = Util.GetValueOfInt(r["C_Charge_ID"]);
                     ln.IsContractFlag = Util.GetValueOfString(r["IsContract"]) == "Y";
+                    // Whether this line ships straight to the customer rather than
+                    // out of our own warehouse (C_OrderLine.IsDropShip). The panel
+                    // states it on every line, Yes or No: which lines are drop
+                    // shipped changes who is expected to move the goods, and it was
+                    // nowhere on the row.
+                    ln.IsDropShip     = Util.GetValueOfString(r["IsDropShip"]) == "Y";
                     ln.C_Contract_ID  = Util.GetValueOfInt(r["C_Contract_ID"]);
                     ln.ContractNo     = Util.GetValueOfString(r["ContractNo"]);
                     ln.ProductValue   = Util.GetValueOfString(r["ProductValue"]);
@@ -1002,6 +1090,14 @@ namespace VASLogic.Models
         /// against on-hand stock (SUM M_Storage.QtyOnHand) in the fulfilment
         /// warehouse (line warehouse, else order warehouse). Service / charge
         /// lines are excluded. On Hand only — no available-to-promise.
+        ///
+        /// Every quantity here is the product's BASE unit — the unit stock is held
+        /// and counted in — and the row is labelled with that unit (M_Product
+        /// .C_UOM_ID), not the line's selected one. This is a stock question, and
+        /// M_Storage answers it in base units: converting the pending quantity onto
+        /// a line's selected unit meant a line sold by the box reported a boxed
+        /// figure against warehouse stock counted in each, and the two columns the
+        /// reader compares were no longer on one scale.
         /// </summary>
         private List<DeliveryReadinessData> LoadDeliveryReadiness(int C_Order_ID)
         {
@@ -1017,14 +1113,15 @@ namespace VASLogic.Models
                                   asi.Description AS AttributeSetInstance,
                                   wh.Name AS WarehouseName,
                                   COALESCE(ol.QtyOrdered, 0)   AS QtyOrdered,
-                                  COALESCE(ol.QtyEntered, 0)   AS QtyEntered,
                                   COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                                   COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS PendingQty,
                                   COALESCE(SUM(COALESCE(s.QtyOnHand, 0)), 0) AS QtyOnHand
                                 FROM C_Order o
                                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID)
                                 INNER JOIN M_Product p     ON (p.M_Product_ID = ol.M_Product_ID)
-                                LEFT OUTER JOIN C_UOM uom  ON (uom.C_UOM_ID = ol.C_UOM_ID)
+                                -- The PRODUCT's own unit, not the line's: every
+                                -- quantity on this row is a base-unit figure.
+                                LEFT OUTER JOIN C_UOM uom  ON (uom.C_UOM_ID = p.C_UOM_ID)
                                 -- A real instance only; see LoadLines.
                                 LEFT OUTER JOIN M_AttributeSetInstance asi
                                        ON (asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
@@ -1044,7 +1141,7 @@ namespace VASLogic.Models
                                   AND p.ProductType = 'I'
                                 GROUP BY ol.C_OrderLine_ID, p.M_Product_ID, p.Value, p.Name,
                                          uom.Name, asi.Description, wh.Name,
-                                         COALESCE(ol.QtyOrdered, 0), COALESCE(ol.QtyEntered, 0),
+                                         COALESCE(ol.QtyOrdered, 0),
                                          COALESCE(ol.QtyDelivered, 0)
                                 ORDER BY ol.C_OrderLine_ID";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
@@ -1060,27 +1157,32 @@ namespace VASLogic.Models
                     rd.AttributeSetInstance = Util.GetValueOfString(r["AttributeSetInstance"]);
                     rd.WarehouseName  = Util.GetValueOfString(r["WarehouseName"]);
 
-                    // Both quantities are converted onto the line's SELECTED unit —
-                    // the unit the row is now labelled with — so pending and on-hand
-                    // read against each other and against the order line above.
-                    // M_Storage holds the product's base unit, and so do
-                    // QtyOrdered / QtyDelivered.
-                    decimal baseQty = Util.GetValueOfDecimal(r["QtyOrdered"]);
-                    decimal entered = Util.GetValueOfDecimal(r["QtyEntered"]);
-                    if (entered == 0) entered = baseQty;
-                    decimal ratio = (entered != 0 && baseQty != 0) ? baseQty / entered : 1;
-
+                    // Every quantity is reported exactly as the database holds it —
+                    // the product's BASE unit, which is the unit the row is labelled
+                    // with (M_Product.C_UOM_ID, joined above) and the unit M_Storage
+                    // counts stock in. Nothing is converted onto the line's selected
+                    // unit any more: this table sets pending against on-hand, and
+                    // that comparison only means anything with both on one scale.
                     rd.PendingQty     = Util.GetValueOfDecimal(r["PendingQty"]);
                     rd.QtyOnHand      = Util.GetValueOfDecimal(r["QtyOnHand"]);
-                    if (ratio != 0)
-                    {
-                        rd.PendingQty = rd.PendingQty / ratio;
-                        rd.QtyOnHand  = rd.QtyOnHand  / ratio;
-                    }
+                    // The ordered / delivered pair travels with the row as well, on
+                    // the same scale: the partial state below is a statement about
+                    // how much of the line has gone out, and the panel names the
+                    // quantities behind it.
+                    rd.QtyOrdered     = Util.GetValueOfDecimal(r["QtyOrdered"]);
+                    rd.QtyDelivered   = Util.GetValueOfDecimal(r["QtyDelivered"]);
 
-                    // Ready or short — the panel has no "awaited" state any more, so
-                    // nothing on hand is simply the shortest of the short.
+                    // Delivered in full, delivered in PART, or not delivered at all —
+                    // and only that last case is a question about stock.
+                    //
+                    // A line the warehouse has already shipped something against is
+                    // reported as partially delivered whatever it still holds: the
+                    // row's news is that the delivery has begun and is not finished,
+                    // which "Ready to ship" and "Short by n" both hide. The stock
+                    // states stay exactly as they were for a line nothing has gone
+                    // out against.
                     if (rd.PendingQty <= 0)                 rd.Readiness = "ready";     // fully delivered
+                    else if (rd.QtyDelivered > 0)           rd.Readiness = "partial";   // some of it has shipped
                     else if (rd.QtyOnHand >= rd.PendingQty) rd.Readiness = "instock";   // can ship now
                     else                                    rd.Readiness = "short";     // not enough on hand
                     rows.Add(rd);
@@ -1109,19 +1211,34 @@ namespace VASLogic.Models
                                   io.DocStatus,
                                   io.MovementDate,
                                   io.TrackingNo,
+                                  io.Created,
                                   wh.Name AS WarehouseName,
                                   COALESCE(SUM(COALESCE(iol.MovementQty, 0)), 0) AS DeliveredQty,
-                                  COUNT(iol.M_InOutLine_ID) AS LineCount
+                                  COUNT(iol.M_InOutLine_ID) AS LineCount,
+                                  -- What the shipment was WORTH: each shipped line
+                                  -- valued at the share of its order line's net
+                                  -- amount that went out with it. Taken as a share
+                                  -- of the line's own money rather than quantity x
+                                  -- price, so the figure needs no view on which unit
+                                  -- either side is held in — both quantities are the
+                                  -- product's base unit, so the ratio cancels.
+                                  COALESCE(SUM(CASE WHEN COALESCE(ol.QtyOrdered, 0) <> 0
+                                                    THEN COALESCE(iol.MovementQty, 0)
+                                                         / ol.QtyOrdered
+                                                         * COALESCE(ol.LineNetAmt, 0)
+                                                    ELSE 0 END), 0) AS DeliveredValue
                                 FROM M_InOut io
                                 LEFT OUTER JOIN M_InOutLine iol
                                        ON (iol.M_InOut_ID = io.M_InOut_ID AND iol.IsActive = 'Y')
+                                LEFT OUTER JOIN C_OrderLine ol
+                                       ON (ol.C_OrderLine_ID = iol.C_OrderLine_ID)
                                 LEFT OUTER JOIN M_Warehouse wh ON (wh.M_Warehouse_ID = io.M_Warehouse_ID)
                                 WHERE io.C_Order_ID = @C_Order_ID
                                   AND io.IsActive   = 'Y'
                                   AND io.IsSOTrx    = 'Y'
                                   AND io.DocStatus NOT IN ('RE', 'VO')
                                 GROUP BY io.M_InOut_ID, io.DocumentNo, io.DocStatus, io.MovementDate,
-                                         io.TrackingNo, wh.Name
+                                         io.TrackingNo, io.Created, wh.Name
                                 ORDER BY io.MovementDate DESC, io.DocumentNo DESC";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return rows;
@@ -1137,6 +1254,12 @@ namespace VASLogic.Models
                     dv.WarehouseName = Util.GetValueOfString(r["WarehouseName"]);
                     dv.DeliveredQty  = Util.GetValueOfDecimal(r["DeliveredQty"]);
                     dv.LineCount     = Util.GetValueOfInt(r["LineCount"]);
+                    // When the shipment was RAISED, for the progress line's Shipped
+                    // and Delivered stages. MovementDate is a document field a user
+                    // can back-date or set forward, so the stage could report a day
+                    // on which nothing had yet been entered. Follows VAS_092.
+                    dv.Created       = Util.GetValueOfDateTime(r["Created"]);
+                    dv.DeliveredValue = Util.GetValueOfDecimal(r["DeliveredValue"]);
                     rows.Add(dv);
                 }
             }
@@ -1229,9 +1352,17 @@ namespace VASLogic.Models
                         DocumentNo = dv.DocumentNo,
                         DocStatus  = dv.DocStatus,
                         DocDate    = dv.MovementDate,
-                        // A shipment has no monetary total of its own; null, not a
-                        // zero the reader would take for an amount.
-                        Amount     = null,
+                        // A shipment carries no total of its own, so the row reports
+                        // what it DELIVERED: each shipped line valued at its share of
+                        // the order line's net amount, in the order's currency like
+                        // every other amount in this list. The column was blank for
+                        // every shipment, which said nothing about a document whose
+                        // whole point is the value that left the warehouse.
+                        //
+                        // Still null — not zero — when the shipment values to
+                        // nothing at all: no line of it reaches an order line, so
+                        // there is no figure to report rather than a figure of zero.
+                        Amount     = dv.DeliveredValue != 0 ? (decimal?)dv.DeliveredValue : null,
                         LineCount  = dv.LineCount,
                         Extra      = dv.TrackingNo
                     });
@@ -1336,6 +1467,7 @@ namespace VASLogic.Models
             LoadDeliveryActivity(C_Order_ID, activity);
             LoadInvoiceActivity(C_Order_ID, activity);
             LoadOrderMilestoneActivity(C_Order_ID, activity);
+            LoadOrderChangeActivity(C_Order_ID, activity);
 
             activity.Sort((a, b) =>
                 b.EventTime.GetValueOrDefault(DateTime.MinValue)
@@ -1609,12 +1741,18 @@ namespace VASLogic.Models
                 string docStatus = Util.GetValueOfString(r["DocStatus"]);
                 if (docStatus == "CO" || docStatus == "CL")
                 {
+                    // "Completed", not "Updated": the row is the document reaching
+                    // that state, and "Updated" now belongs to the field-by-field
+                    // edits below, which are actual updates. Dated by the workflow's
+                    // own DocComplete stamp where there is one, since o.Updated is
+                    // merely the last time anything on the record changed.
                     list.Add(new ActivityData
                     {
-                        EventType = "Updated",
+                        EventType = "Completed",
                         Title     = Util.GetValueOfString(r["DocumentNo"]),
                         ActorName = Util.GetValueOfString(r["UpdatedByName"]),
-                        EventTime = Util.GetValueOfDateTime(r["Updated"])
+                        EventTime = GetOrderCompletedDate(C_Order_ID)
+                                    ?? Util.GetValueOfDateTime(r["Updated"])
                     });
                 }
             }
@@ -1625,15 +1763,151 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// Field-level edits to the order, read from the platform's change log
+        /// (AD_ChangeLog) as ONE ROW PER FIELD: each names the field that changed —
+        /// the dictionary's display name for the column, falling back to the raw
+        /// column name — who changed it and when, so a reader can follow a single
+        /// field through the order's life.
+        ///
+        /// Both the header and its LINES are read, because "the record was modified"
+        /// means either to the person who changed it: a price edited on line 2 is a
+        /// change to the order. A line's row is labelled with its line number so the
+        /// two are told apart.
+        ///
+        /// Silently degrades when change logging is off for the table (no rows) or
+        /// the schema has no AD_ChangeLog at all. Ported from VAS_092, with COALESCE
+        /// for NVL so the statement runs on both databases.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected sales order id.</param>
+        /// <param name="list">Activity list being populated.</param>
+        private void LoadOrderChangeActivity(int C_Order_ID, List<ActivityData> list)
+        {
+            try
+            {
+                // AD_Column is LEFT joined so a log row whose column has since been
+                // removed from the dictionary still reports its change.
+                //
+                // The line-side rows are reached by Record_ID IN (the order's line
+                // ids) under the C_OrderLine table, and carry that line's number.
+                string sql = @"SELECT cl.Created     AS EventOn,
+                                      cl.OldValue    AS OldValue,
+                                      cl.NewValue    AS NewValue,
+                                      u.Name         AS UserName,
+                                      col.Name       AS FieldLabel,
+                                      col.ColumnName AS FieldColumn,
+                                      adt.TableName  AS ChangedTable,
+                                      ol.Line        AS LineNo,
+                                      p.Name         AS ProductName,
+                                      ch.Name        AS ChargeName
+                                 FROM AD_ChangeLog cl
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = cl.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_Column col
+                                        ON (col.AD_Column_ID = cl.AD_Column_ID)
+                                 LEFT OUTER JOIN AD_User u
+                                        ON (u.AD_User_ID = cl.CreatedBy)
+                                 LEFT OUTER JOIN C_OrderLine ol
+                                        ON (adt.TableName = 'C_OrderLine'
+                                            AND ol.C_OrderLine_ID = cl.Record_ID)
+                                 LEFT OUTER JOIN M_Product p  ON (p.M_Product_ID = ol.M_Product_ID)
+                                 LEFT OUTER JOIN C_Charge  ch ON (ch.C_Charge_ID  = ol.C_Charge_ID)
+                                WHERE COALESCE(cl.IsActive, 'Y') = 'Y'
+                                  AND ((adt.TableName = 'C_Order'
+                                        AND cl.Record_ID = @C_Order_ID)
+                                    OR (adt.TableName = 'C_OrderLine'
+                                        AND ol.C_Order_ID = @C_Order_ID2))
+                                ORDER BY cl.Created DESC";
+                DataSet ds = DB.ExecuteDataset(
+                    sql,
+                    new SqlParameter[]
+                    {
+                        // Positional binding: one placeholder per occurrence, in the
+                        // order the statement reads them.
+                        new SqlParameter("@C_Order_ID", C_Order_ID),
+                        new SqlParameter("@C_Order_ID2", C_Order_ID)
+                    },
+                    null);
+                if (ds == null || ds.Tables.Count == 0) return;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    string field = Util.GetValueOfString(r["FieldLabel"]);
+                    if (string.IsNullOrEmpty(field))
+                        field = Util.GetValueOfString(r["FieldColumn"]);
+                    // A row that can name no field renders as a bare "Updated" with
+                    // nothing to identify it — worse than not showing it at all.
+                    if (string.IsNullOrEmpty(field)) continue;
+
+                    // A change made on a LINE names the line it was made on, so an
+                    // edit to line 20's price is not read as an edit to the order.
+                    // The line number and its item travel in ChangeScope, beside the
+                    // field rather than inside its name.
+                    string scope = "";
+                    int lineNo = Util.GetValueOfInt(r["LineNo"]);
+                    if (Util.GetValueOfString(r["ChangedTable"]) == "C_OrderLine" && lineNo > 0)
+                    {
+                        scope = "#" + lineNo;
+                        string item = Util.GetValueOfString(r["ProductName"]);
+                        if (string.IsNullOrEmpty(item)) item = Util.GetValueOfString(r["ChargeName"]);
+                        if (!string.IsNullOrEmpty(item)) scope += " " + item.Trim();
+                    }
+
+                    // The move itself. A save that rewrites a field with the value it
+                    // already had is not an edit, and the platform logs plenty of those.
+                    string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
+                    string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
+                    if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) continue;
+
+                    list.Add(new ActivityData
+                    {
+                        EventType   = "Updated",
+                        FieldName   = field,
+                        OldValue    = oldValue,
+                        NewValue    = newValue,
+                        ChangeScope = scope,
+                        ActorName   = Util.GetValueOfString(r["UserName"]),
+                        EventTime   = Util.GetValueOfDateTime(r["EventOn"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Change logging is optional; a schema without it simply shows no
+                // update rows and the rest of the feed is unaffected.
+                _log.Severe("LoadOrderChangeActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Normalises a logged value for display. The platform writes the literal
+        /// "null" into AD_ChangeLog for a cleared field, which would otherwise be
+        /// shown to the reader as though it were the text "null". Follows VAS_101.
+        /// </summary>
+        private static string ChangeValue(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            string v = value.Trim();
+            return string.Equals(v, "null", StringComparison.OrdinalIgnoreCase) ? "" : v;
+        }
+
+        /// <summary>
         /// Loads notes: the order header note (C_Order.Description) plus each
-        /// line's own note (product / charge name + line description). Composed
-        /// in C# so the SQL stays portable (no DB-specific string functions).
+        /// line's own note (line number + product / charge name + line
+        /// description). Composed in C# so the SQL stays portable (no DB-specific
+        /// string functions).
         /// </summary>
         private List<NoteData> LoadNotes(int C_Order_ID)
         {
             List<NoteData> notes = new List<NoteData>();
             try
             {
+                // LEFT OUTER JOIN to C_OrderLine, with IsActive in the JOIN rather
+                // than the WHERE, so the C_Order row — and with it the header note
+                // (C_Order.Description) — comes back even when the order has no
+                // active lines. An INNER JOIN dropped the whole result for a
+                // line-less order, so a description the user had just typed and
+                // saved showed nowhere and the Notes section was not drawn at all.
+                // The same fix VAS_092 carries.
                 string sql = @"SELECT
                                   o.Description AS OrderNote,
                                   ol.Line       AS LineNo,
@@ -1641,12 +1915,12 @@ namespace VASLogic.Models
                                   p.Name        AS ProductName,
                                   ch.Name       AS ChargeName
                                 FROM C_Order o
-                                INNER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID)
+                                LEFT OUTER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID
+                                                                   AND ol.IsActive = 'Y')
                                 LEFT OUTER JOIN M_Product p  ON (p.M_Product_ID = ol.M_Product_ID)
                                 LEFT OUTER JOIN C_Charge  ch ON (ch.C_Charge_ID  = ol.C_Charge_ID)
                                 WHERE o.C_Order_ID = @C_Order_ID
                                   AND o.IsActive   = 'Y'
-                                  AND ol.IsActive  = 'Y'
                                 ORDER BY ol.Line";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return notes;
@@ -1670,9 +1944,17 @@ namespace VASLogic.Models
                     string prod = Util.GetValueOfString(r["ProductName"]);
                     if (string.IsNullOrEmpty(prod)) prod = Util.GetValueOfString(r["ChargeName"]);
 
-                    string text = string.IsNullOrEmpty(prod)
+                    // Labelled with the line NUMBER as well as the item, so a note
+                    // is attributable to the row it was written on — two lines of
+                    // the same product otherwise read as one note repeated.
+                    int lineNo = Util.GetValueOfInt(r["LineNo"]);
+                    string label = lineNo > 0 ? "#" + lineNo : "";
+                    if (!string.IsNullOrEmpty(prod))
+                        label = string.IsNullOrEmpty(label) ? prod.Trim() : label + " " + prod.Trim();
+
+                    string text = string.IsNullOrEmpty(label)
                         ? lineDesc.Trim()
-                        : prod.Trim() + " — " + lineDesc.Trim();
+                        : label + " — " + lineDesc.Trim();
                     notes.Add(new NoteData { NoteType = "line", Text = text });
                 }
             }
@@ -2047,12 +2329,18 @@ namespace VASLogic.Models
             public decimal QtyInvoiced    { get; set; }
             public decimal UomRatio       { get; set; }   // base units per selected unit
             public decimal PriceActual    { get; set; }
+            // C_OrderLine.PriceList as stored, which is the line's SELECTED unit —
+            // what it would have cost at list, shown on the unit price's tooltip.
+            // 0 when the line carries none.
+            public decimal PriceList      { get; set; }
             public decimal Discount       { get; set; }
             public decimal LineNetAmt     { get; set; }
             public string  Description    { get; set; }
             public int     M_Product_ID   { get; set; }
             public int     C_Charge_ID    { get; set; }
             public bool    IsContractFlag { get; set; }   // C_OrderLine.IsContract
+            // C_OrderLine.IsDropShip — the line ships direct to the customer.
+            public bool    IsDropShip     { get; set; }
             public int     C_Contract_ID  { get; set; }
             public string  ContractNo     { get; set; }
             public string  ProductValue   { get; set; }   // SKU
@@ -2095,12 +2383,19 @@ namespace VASLogic.Models
             public int     C_OrderLine_ID { get; set; }
             public string  ProductValue   { get; set; }
             public string  ProductName    { get; set; }
-            public string  UOMName        { get; set; }   // the unit the quantities are counted in
+            // The PRODUCT's base unit (M_Product.C_UOM_ID) — the unit every quantity
+            // on this row is counted in, stock included.
+            public string  UOMName        { get; set; }
             public string  AttributeSetInstance { get; set; }
             public string  WarehouseName  { get; set; }
             public decimal PendingQty     { get; set; }
             public decimal QtyOnHand      { get; set; }
-            public string  Readiness      { get; set; }   // ready | instock | short | awaited
+            // What was ordered and what has gone out, on the same (selected) unit —
+            // the pair the partial state is worked out from, and the pair the panel
+            // names beside it.
+            public decimal QtyOrdered     { get; set; }   // base unit, like every figure here
+            public decimal QtyDelivered   { get; set; }
+            public string  Readiness      { get; set; }   // ready | partial | instock | short
         }
 
         /// <summary>
@@ -2131,9 +2426,16 @@ namespace VASLogic.Models
             public string   DocumentNo    { get; set; }
             public string   DocStatus     { get; set; }
             public DateTime? MovementDate { get; set; }
+            // When the shipment RECORD was raised (M_InOut.Created) — what the
+            // progress line's Shipped / Delivered stages are dated by, since
+            // MovementDate can be back-dated.
+            public DateTime? Created      { get; set; }
             public string   TrackingNo    { get; set; }
             public string   WarehouseName { get; set; }
             public decimal  DeliveredQty  { get; set; }
+            // What went out, in money: each shipped line valued at its share of the
+            // order line's net amount.
+            public decimal  DeliveredValue { get; set; }
             public int      LineCount     { get; set; }
         }
 
@@ -2149,8 +2451,20 @@ namespace VASLogic.Models
 
         public class ActivityData
         {
-            public string   EventType { get; set; }   // Note | Email | Delivery | Invoice | Created | Updated
+            // Note | Email | Delivery | Invoice | Created | Completed | Updated
+            public string   EventType { get; set; }
             public string   Title     { get; set; }   // the row's headline; an e-mail's subject
+            // The field an "Updated" row is about — the dictionary's display name
+            // for the changed column. Empty on every other event type.
+            public string   FieldName { get; set; }
+            // The move itself: what the field held before the edit and what it holds
+            // after. Either side is empty where the log recorded no value — a field
+            // cleared, or filled for the first time.
+            public string   OldValue  { get; set; }
+            public string   NewValue  { get; set; }
+            // Which record the edit landed on: "" for the order header, else the
+            // line's number and item ("#20 Bolt M8").
+            public string   ChangeScope { get; set; }
             public string   ActorName { get; set; }
             public decimal  Amount    { get; set; }
             public DateTime? EventTime { get; set; }

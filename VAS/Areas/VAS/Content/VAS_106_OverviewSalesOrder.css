@@ -95,6 +95,58 @@
  *                        it (.vas_106-actBody / -actMeta). The row divider is
  *                        drawn between ADJACENT rows, so a row following an opened
  *                        message is given the border that rule cannot reach.
+ *   VAI163   2026-08-17  - Added .vas_106-linesTable.vas_106-no-discount (and its
+ *                          pairing with -no-contract): the lines table drops the
+ *                          Disc column on an order where nothing was discounted,
+ *                          so the row runs one track — or two — narrower. The
+ *                          history drawer follows both, min-widths included, since
+ *                          it sits on the same tracks.
+ *                        - The Delivered cell STACKS: the status line on top, the
+ *                          delivered / ordered ratio (.vas_106-progQty) beneath it.
+ *                          Side by side, the bar took the width the figures needed
+ *                          and the ratio was the first thing a narrow column
+ *                          squeezed out. The bar now takes the cell's width up to
+ *                          64px, and the RTL mirror flips the CROSS axis, which is
+ *                          the one that carries the alignment in a stacked cell.
+ *                        - Added .vas_106-rdTag.vas_106-partial: the Delivery
+ *                          Readiness state for a line part of which has shipped.
+ *                          Blue, not the amber SHORT wears — the delivery is under
+ *                          way, it is simply not finished.
+ *                        - Added .vas_106-hasTip (help cursor), for the unit price
+ *                          cell, which carries the line's list price on its hover.
+ *   VAI163   2026-08-17  - The lines table gains a fixed 2em ACTION track after
+ *                          Delivered (.vas_106-itAct) for the per-line history
+ *                          toggle, on all four column variants. .vas_106-histBtn
+ *                          loses the inline margin it needed inside the product
+ *                          name and becomes a round icon button, as in VAS_092.
+ *                        - Both drawer grids are now qualified by
+ *                          .vas_106-linesTable so they outrank the table's own
+ *                          variant grids: the drawer sits INSIDE that table, and a
+ *                          two-class rule lost to the three-class -no-contract /
+ *                          -no-discount selectors, which put the drawer's figures
+ *                          on the line row's tracks.
+ *                        - Delivery Readiness runs six columns: the unit has one of
+ *                          its own (.vas_106-rdUom) after the product name.
+ *                          .vas_106-uomTag / -nameTxt and the flex .vas_106-itName
+ *                          they needed are gone with the one-line layout.
+ *   VAI163   2026-08-17  - Section headings are the title alone: .vas_106-tIc (the
+ *                          leading icon) and .vas_106-badge (the trailing count)
+ *                          are no longer rendered and their rules are gone.
+ *                        - Added the order line's third detail line,
+ *                          .vas_106-itDrop (Drop Shipment: Yes / No), coloured by
+ *                          .vas_106-is-drop when the line ships direct.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *                        - Added the Activity field-change delta
+ *                          (.vas_106-actDelta / -cvOld / -cvArrow / -cvNew):
+ *                          "was X → now Y" under the field's name, the old
+ *                          value struck through and the new one carrying the
+ *                          row's colour. Matches VAS_101 / VAS_104.
  ***********************************************************/
 
 .vas_106-root {
@@ -433,28 +485,26 @@
     padding: 0.625em 0.125em; background: none; border: none;
     border-bottom: 1px solid var(--vaso-card-bd); font-family: inherit; text-align: left;
 }
-.vas_106-tIc { display: flex; color: var(--vaso-primary); }
 .vas_106-dsecTitle { font-size: 0.9375em; font-weight: 700; color: #141414; letter-spacing: .15px; }
-.vas_106-badge {
-    height: 1.25em; min-width: 1.75em; padding: 0 0.5em; border-radius: 999px;
-    background: var(--vaso-primary); color: #fff; font-size: 0.75em; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-}
-/* The chevron and the collapsed state are gone: .vas_106-dsecChev is no longer
-   rendered and .vas_106-collapsed is never set, so a section is simply open. */
+/* The heading is the title alone. .vas_106-tIc (the leading icon) and
+   .vas_106-badge (the trailing count) are no longer rendered, so their rules are
+   gone with them — as are the chevron and collapsed state before them
+   (.vas_106-dsecChev / .vas_106-collapsed). A section is simply open, and named. */
 .vas_106-dsecBody { padding-top: 0.75em; }
 
 /* ----------------------------------------------------------- */
 /*  Data tables                                                 */
 /* ----------------------------------------------------------- */
-/* The table scrolls horizontally at ANY width rather than clipping (overflow was
-   `hidden`): the rows carry a min-width, so when the panel is narrower than the
-   columns need — which is exactly what a zoomed-out browser produces, handing the
-   panel an in-between width — the reader scrolls to the last columns instead of
-   losing them off the edge. Matches VAS_099 / VAS_098. */
+/* The table SHRINKS to the panel; it never scrolls sideways. It used to carry a
+   floor width per column set and its own horizontal scrollbar, on the argument
+   that the reader could scroll to the last columns rather than lose them — but a
+   scrollbar inside a card hides those columns just as effectively, since it has
+   to be found and dragged before it says anything is there. The tracks compress
+   instead, each cell keeping its ellipsis and the row's tooltip.
+   Matches VAS_099 / VAS_098. */
 .vas_106-table {
     border: 1px solid var(--vaso-card-bd); border-radius: var(--vaso-card-radius);
-    background: #fff; overflow-x: auto; overflow-y: hidden;
+    background: #fff;
 }
 .vas_106-tRow { display: grid; align-items: center; gap: 0.625em; padding: 0.625em 0.875em; }
 /* Grid items default to min-width:auto, which blocks the ellipsis on the cells
@@ -465,32 +515,46 @@
    content, so one long product name or amount pushed the row wider than the
    table and the right-hand columns were clipped away entirely — the layout fault
    that showed up at 80% browser zoom, where the panel measures ~1.25x more CSS
-   pixels for the same physical width and the content no longer fits the tracks. */
+   pixels for the same physical width and the content no longer fits the tracks.
+
+   The 2em track after Delivered is the ACTION column: the per-line history
+   toggle, at a fixed width so it takes nothing from the columns carrying data
+   and stays in the same place down the table. */
 .vas_106-linesTable .vas_106-tRow {
     grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
-                           minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.4fr);
-    min-width: 620px;
+                           minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr) 2em
+                           minmax(0, 1.4fr);
 }
-/* No service line on the order, so no Contract column — six tracks, and the row
-   needs proportionally less room before it has to scroll. */
+/* No service line on the order, so no Contract column — the row needs
+   proportionally less room before it has to scroll. */
 .vas_106-linesTable.vas_106-no-contract .vas_106-tRow {
     grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
-                           minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr);
-    min-width: 520px;
+                           minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr) 2em;
 }
+/* Nothing on the order was discounted, so no Disc column — the 0.5fr track it
+   held comes out and every other column keeps its proportion. Both columns can
+   be absent at once, which is the last row below. */
+.vas_106-linesTable.vas_106-no-discount .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
+                           minmax(0, 0.9fr) minmax(0, 1fr) 2em minmax(0, 1.4fr);
+}
+.vas_106-linesTable.vas_106-no-contract.vas_106-no-discount .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
+                           minmax(0, 0.9fr) minmax(0, 1fr) 2em;
+}
+/* Delivery Readiness: Item | UOM | Warehouse | Pending | On Hand | Readiness.
+   The unit has a column of its own — it used to lead the product name, where it
+   read as part of it. */
 .vas_106-rdTable .vas_106-tRow {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 1.1fr)
-                           minmax(0, 0.9fr) minmax(0, 1.6fr);
-    min-width: 480px;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 0.7fr) minmax(0, 1.3fr)
+                           minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 1.6fr);
 }
 .vas_106-dvTable .vas_106-tRow {
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.4fr)
                            minmax(0, 0.7fr) minmax(0, 1fr);
-    min-width: 460px;
 }
 .vas_106-invTable .vas_106-tRow {
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1fr);
-    min-width: 400px;
 }
 /* Line change history, in a drawer under the line it belongs to.
 
@@ -499,12 +563,25 @@
    under the column it belongs to on the line above. It carries the lines table's
    min-width too, so when that table is scrolled sideways the drawer travels with
    it rather than stopping at the edge of the visible box. */
-.vas_106-lineHist { padding: 0 0 0.625em 1.25em; background: var(--vaso-faint-blue); min-width: 620px; }
-.vas_106-linesTable.vas_106-no-contract .vas_106-lineHist { min-width: 520px; }
+.vas_106-lineHist { padding: 0 0 0.625em 1.25em; background: var(--vaso-faint-blue); }
+/* The drawer no longer carries a floor width per column set: it shares the
+   lines table's tracks, and those now compress with the panel instead of
+   scrolling, so there is no scrolled width for its tint to run out to. */
 .vas_106-lhTable { margin-top: 0.5em; }
-.vas_106-lhTable .vas_106-tRow {
+/* Both drawer rules are qualified by .vas_106-linesTable so they outrank the
+   table's own variant grids above — the drawer is INSIDE that table, and a
+   two-class rule here would lose to the three-class .no-contract / .no-discount
+   selectors and put the drawer's six figures on the line row's tracks. */
+.vas_106-linesTable .vas_106-lhTable .vas_106-tRow {
     grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
                            minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr);
+    min-width: 0;
+}
+/* The drawer drops its Disc column with the table above it, so its figures stay
+   under the same headings. */
+.vas_106-linesTable.vas_106-no-discount .vas_106-lhTable .vas_106-tRow {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
+                           minmax(0, 0.9fr) minmax(0, 1fr);
     min-width: 0;
 }
 /* When the change was made, with that version's own note under it. */
@@ -515,12 +592,16 @@
 }
 .vas_106-lhBy { color: var(--vaso-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* The per-line history toggle, at the end of the product name. Icon-only: the
-   tooltip carries the meaning and the change count. */
+/* The action column after Delivered, holding the per-line history toggle. Empty
+   on a line that was never edited, so every row keeps the same grid. */
+.vas_106-itAct { display: flex; align-items: center; justify-content: center; min-width: 0; }
+
+/* The per-line history toggle. Icon-only: the tooltip carries the meaning and
+   the change count. */
 .vas_106-histBtn {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 1.5em; height: 1.5em; margin-left: 0.375em; vertical-align: -0.25em;
-    padding: 0; border: none; border-radius: 5px;
+    width: 1.75em; height: 1.75em;
+    padding: 0; border: none; border-radius: 50%;
     background: none; color: var(--vaso-muted); cursor: pointer; font-family: inherit;
     transition: transform .12s ease, color .12s ease;
 }
@@ -531,7 +612,6 @@
    four columns, one table for shipments, invoices and receipts alike. */
 .vas_106-docTable .vas_106-tRow {
     grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-    min-width: 440px;
 }
 /* Document identity cell: kind icon + doc no / caption + open affordance. */
 .vas_106-docItem { display: flex; align-items: center; gap: 0.5em; min-width: 0; }
@@ -558,24 +638,40 @@
    name — the attribute qualifies WHICH stock was sold. Darker than the unit
    line below it: it identifies the goods, where that only labels the count. */
 .vas_106-itAttr { font-size: 0.9231em; color: var(--vaso-sub); margin-top: 0.125em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Drop Shipment: Yes / No — the line's third detail, under the unit. Muted like
+   the sub-line above it when the answer is No, and coloured when it is Yes: a
+   line that ships direct is the one worth spotting down the column. */
+.vas_106-itDrop { font-size: 0.9231em; color: var(--vaso-muted); margin-top: 0.125em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas_106-itDrop.vas_106-is-drop { color: var(--vaso-info-tx); font-weight: 600; }
 
-/* Delivery Readiness: the unit LEADS the product name on one line. The tag holds
-   its width and the name gives way, so the ellipsis moves off .vas_106-itName —
-   which is a flex row here — and onto the name text inside it. Scoped to this
-   table; the Order Lines rows keep the unit on their sub-line. */
-.vas_106-rdTable .vas_106-itName { display: flex; align-items: baseline; gap: 0.4375em; }
-.vas_106-rdTable .vas_106-nameTxt {
-    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.vas_106-uomTag {
-    flex: none; font-size: 0.8em; font-weight: 700; letter-spacing: .3px;
-    text-transform: uppercase; color: var(--vaso-muted);
+/* Delivery Readiness: the unit has a COLUMN of its own after the product name.
+   It used to lead the name on the same line (.vas_106-uomTag / -nameTxt, with
+   .vas_106-itName turned into a flex row), where it read as part of the name and
+   left no column to scan down when the rows are counted in different units. */
+.vas_106-rdUom {
+    font-size: 0.9231em; font-weight: 700; letter-spacing: .3px;
+    text-transform: uppercase; color: var(--vaso-sub);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .vas_106-naDash { color: var(--vaso-muted); }
 
-/* Delivered progress cell */
-.vas_106-prog { display: inline-flex; align-items: center; gap: 0.4375em; justify-content: flex-end; font-size: 0.9231em; }
-.vas_106-progBar { width: 40px; height: 5px; border-radius: 999px; background: #E7EEF4; overflow: hidden; flex: none; }
+/* A cell whose hover carries more than it prints — the unit price, which holds
+   the line's list price on its tooltip. The help cursor is the only hint: a
+   figure that changes appearance to advertise a tooltip stops reading as a
+   figure. */
+.vas_106-hasTip { cursor: help; }
+
+/* Delivered progress cell.
+   The status line sits ON TOP of the delivered / ordered ratio rather than
+   beside it: side by side, the bar took the width the figures needed and the
+   ratio was squeezed out of a narrow column first. Stacked, each has the whole
+   cell, and the bar reads as the heading for the figure under it. */
+.vas_106-prog {
+    display: inline-flex; flex-direction: column; align-items: flex-end;
+    justify-content: center; gap: 0.25em; font-size: 0.9231em; line-height: 1.2;
+}
+.vas_106-progQty { white-space: nowrap; }
+.vas_106-progBar { width: 100%; max-width: 64px; height: 5px; border-radius: 999px; background: #E7EEF4; overflow: hidden; flex: none; }
 .vas_106-progBar i { display: block; height: 100%; border-radius: 999px; }
 .vas_106-prog.vas_106-full i { background: var(--vaso-success-tx); }
 .vas_106-prog.vas_106-part i { background: var(--vaso-warning-tx); }
@@ -663,6 +759,10 @@ select.vas_106-ffInput { appearance: none; -webkit-appearance: none; cursor: poi
 .vas_106-rdTag.vas_106-ready .vas_106-rdDot { background: var(--vaso-success-tx); }
 .vas_106-rdTag.vas_106-short   { background: var(--vaso-warning-bg); color: var(--vaso-warning-tx); }
 .vas_106-rdTag.vas_106-short .vas_106-rdDot { background: var(--vaso-warning-tx); }
+/* Part of the line has shipped. Blue, not the amber SHORT wears: the delivery is
+   under way and nothing is wrong with it — it simply is not finished. */
+.vas_106-rdTag.vas_106-partial { background: var(--vaso-info-bg); color: var(--vaso-info-tx); }
+.vas_106-rdTag.vas_106-partial .vas_106-rdDot { background: var(--vaso-info-tx); }
 .vas_106-rdTag.vas_106-awaited { background: var(--vaso-risk-bg); color: var(--vaso-risk-tx); }
 .vas_106-rdTag.vas_106-awaited .vas_106-rdDot { background: var(--vaso-risk-tx); }
 
@@ -808,6 +908,27 @@ select.vas_106-ffInput { appearance: none; -webkit-appearance: none; cursor: poi
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
 [dir="rtl"] .vas_106-table .vas_106-ta-r { text-align: left; justify-content: flex-start; }
-[dir="rtl"] .vas_106-prog { justify-content: flex-start; }
+/* The cell stacks, so it is the CROSS axis that has to flip. */
+[dir="rtl"] .vas_106-prog { align-items: flex-start; }
 [dir="rtl"] .vas_106-tFoot { justify-content: flex-start; }
 [dir="rtl"] .vas_106-hdrColL { border-right: none; border-left: 1px solid var(--vaso-row-div); padding-right: 0; padding-left: 1.25em; }
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value.
+   Matches VAS_101 / VAS_104. */
+.vas_106-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_106-cvOld {
+    color: var(--vaso-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_106-cvArrow { flex: none; color: var(--vaso-muted); }
+.vas_106-cvNew {
+    color: var(--vaso-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}

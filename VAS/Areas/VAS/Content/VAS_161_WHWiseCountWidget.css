@@ -328,7 +328,13 @@
 
 .vas-whwisecount-modal-dialog {
     width: clamp(340px, 85vw, 1400px);
-    height: clamp(420px, 85vh, 900px);
+    /* Height follows the CONTENT: header + a full page of rows + footer. It was a fixed
+       clamp(420px, 85vh, 900px), which made the popup ~900px tall on a normal screen while the
+       table only ever held a handful of rows - that is the large empty band under the lines.
+       Short pages are padded with filler rows in JS, so the height is still identical on every
+       page and does not jump while paging. max-height keeps it inside small viewports. */
+    height: auto;
+    max-height: clamp(420px, 85vh, 900px);
     font-size: clamp(14px, 1.2vw, 22px);
     background-color: #FFFFFF;
     border-radius: 16px;
@@ -514,4 +520,92 @@
     font-weight: 400;
     font-size: 0.75em;
     color: #5F7283;
+}
+
+/* ============================================================================
+   Modal row area (2026-08-18).
+   The dialog is a FIXED clamp(420px, 85vh, 900px) tall per the global design
+   standard, so the rows container must absorb that height rather than let the
+   table sit small at the top of a large empty popup. Row count is measured in
+   JS; these rules make the space available to measure.
+   ============================================================================ */
+.vas-whwisecount-rows-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+    /* Rows keep their NATURAL height (padding + font from the modal's clamp anchor).
+       They must not stretch: measureModalPageSize() measures a rendered row, so a
+       stretching row would make row height depend on row count and the calculation
+       would feed back on itself. The leftover space is taken up by filler rows
+       instead, which is what keeps the table a constant height on every page. */
+    .vas-whwisecount-rows-container > .vas-whwisecount-row-btn {
+        flex: 0 0 auto;
+    }
+
+/* Spacer rows: hold the height, show nothing, take no interaction. */
+.vas-whwisecount-filler {
+    pointer-events: none;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    cursor: default;
+}
+
+    .vas-whwisecount-filler:hover {
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+/* Detail popup rows: keep their natural height and never stretch, so a page of 3 real rows
+   plus 4 fillers is exactly as tall as a page of 7 real rows. */
+.vas-whwisecount-modal-rows-container > .vas-whwisecount-modal-data-row {
+    flex: 0 0 auto;
+}
+
+/* ============================================================================
+   DETAIL POPUP — DETERMINISTIC HEIGHT (redesign 2026-08-18)
+
+   Requirement: the popup is always the size needed for MODAL_PAGE_ROWS lines and
+   does NOT resize with how many lines a page happens to hold. A page with 3
+   records must be exactly as tall as a page with 7.
+
+   Previous attempts relied on filler rows to pad the height. That is fragile:
+   the rows were content-sized, so a filler was only ever *approximately* the
+   height of a real row, and the container height still followed its children.
+
+   This version fixes the geometry instead of approximating it:
+     --vas-row-h    one row's height, in em -> scales with the modal clamp() anchor
+     --vas-rows     how many lines the popup shows before paging
+   The rows container is set to exactly rows x row-height, so its height is
+   identical whether it contains 0, 3 or 7 children. Fillers now only preserve
+   the divider rhythm; the height no longer depends on them.
+   Everything stays relative (em) - no hardcoded px, per the global standard.
+   ============================================================================ */
+.vas-whwisecount-modal-dialog {
+    --vas-rows: 7;
+    --vas-row-h: 3.1em;
+}
+
+.vas-whwisecount-modal-rows-container {
+    /* Exactly N rows tall, always. Not flex:1, not auto. */
+    flex: 0 0 auto;
+    height: calc(var(--vas-rows) * var(--vas-row-h));
+    display: block;
+    overflow: hidden;
+}
+
+/* Every row - real or filler - occupies exactly one row height. */
+.vas-whwisecount-modal-rows-container > .vas-whwisecount-modal-data-row {
+    height: var(--vas-row-h);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* The body no longer stretches; it wraps header + fixed rows + footer. */
+.vas-whwisecount-modal-body {
+    flex: 0 0 auto;
 }

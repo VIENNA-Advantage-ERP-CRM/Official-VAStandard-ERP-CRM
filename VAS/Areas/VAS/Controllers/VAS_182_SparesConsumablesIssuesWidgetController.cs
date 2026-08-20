@@ -1,6 +1,8 @@
-using Newtonsoft.Json;
 using System;
+using System.Data;
 using System.Web.Mvc;
+using System.Data.SqlClient;
+using Newtonsoft.Json;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
@@ -14,10 +16,79 @@ namespace VIS.Controllers
     /// Purpose     : Supplies the KPI metric percentage share of material issue value classified for Spares / Consumables Month-to-Date (MTD).
     /// Chronological development:
     ///   AI-Dev      2026-08-02 Created
+    ///   Agent A04   2026-08-19 Added GetCurrencyInfo endpoint & currency formatting support
     /// </summary>
     public class VAS_182_SparesConsumablesIssuesWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_182_SparesConsumablesIssuesWidgetController).FullName);
+
+// ===== NEW CODE START — currency format (agent A04, 2026-08-19) =====
+        /// <summary>Returns currency info (iso code and currency symbol) for the current context.</summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetCurrencyInfo()
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null) { return Json("", JsonRequestBehavior.AllowGet); }
+
+            try
+            {
+                var currencyInfo = GetCurrencyInfoData(ctx);
+                string json = JsonConvert.SerializeObject(currencyInfo);
+                return Json(json, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_182_SparesConsumablesIssuesWidget.GetCurrencyInfo", ex);
+                string json = JsonConvert.SerializeObject(new { iso = "", symbol = "" });
+                return Json(json, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        private dynamic GetCurrencyInfoData(Ctx ctx)
+        {
+            int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
+            if (currencyId <= 0)
+            {
+                currencyId = ctx.GetContextAsInt("#C_Currency_ID");
+            }
+
+            string iso = "";
+            string symbol = "";
+
+            if (currencyId > 0)
+            {
+                string sql = "SELECT ISO_Code, COALESCE(CurSymbol, ISO_Code) AS CurSymbol FROM C_Currency WHERE C_Currency_ID = @p1 AND IsActive = 'Y'";
+                SqlParameter[] param = new SqlParameter[] { new SqlParameter("@p1", currencyId) };
+                using (IDataReader dr = DB.ExecuteReader(sql, param, null))
+                {
+                    if (dr != null && dr.Read())
+                    {
+                        iso = Util.GetValueOfString(dr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(iso))
+            {
+                string sql = @"SELECT c.ISO_Code, COALESCE(c.CurSymbol, c.ISO_Code) AS CurSymbol 
+                               FROM C_AcctSchema a 
+                               INNER JOIN C_Currency c ON (c.C_Currency_ID = a.C_Currency_ID) 
+                               WHERE a.AD_Client_ID = @p1 AND a.IsActive = 'Y'";
+                SqlParameter[] param = new SqlParameter[] { new SqlParameter("@p1", ctx.GetAD_Client_ID()) };
+                using (IDataReader dr = DB.ExecuteReader(sql, param, null))
+                {
+                    if (dr != null && dr.Read())
+                    {
+                        iso = Util.GetValueOfString(dr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                    }
+                }
+            }
+
+            return new { iso = iso, symbol = symbol };
+        }
 
         /// <summary>Returns the percentage share of MTD issued value for spares/consumables purpose.</summary>
         [AjaxAuthorizeAttribute]
@@ -100,7 +171,10 @@ namespace VIS.Controllers
             decimal pct = (sparesVal / totalVal) * 100m;
             return Convert.ToInt32(Math.Round(pct));
         }
-
+// ----- END OLD CODE -----
+    
+        /// <summary>Date literal for the target DB. Merged in from upstream/beta, which
+        /// introduced the msl/nmsl date-literal style this controller now uses.</summary>
         private static string ToSqlDate(DateTime date)
         {
             if (DB.IsOracle())
@@ -109,5 +183,5 @@ namespace VIS.Controllers
             }
             return "CAST('" + date.ToString("yyyy-MM-dd") + "' AS DATE)";
         }
-    }
+}
 }

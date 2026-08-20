@@ -110,6 +110,18 @@
  *                        .vas_098-ok is shared with the toast, and the button
  *                        rules are the panel's only record of its own control
  *                        styling should an action return.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *                        - Added the Activity field-change delta
+ *                          (.vas_098-actDelta / -cvOld / -cvArrow / -cvNew):
+ *                          "was X → now Y" under the field's name, the old
+ *                          value struck through and the new one carrying the
+ *                          row's colour. Matches VAS_101 / VAS_104.
  ***********************************************************/
 
 .vas_098-root {
@@ -329,16 +341,18 @@
 @keyframes vas_098-fade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
 
 /* ---------- Items ---------- */
-/* The table scrolls horizontally at ANY width, not only under a breakpoint: the
-   rows carry a min-width, so when the panel is narrower than the columns need
-   (a zoomed-out browser hands the panel an in-between width) the reader scrolls
-   to the last columns instead of losing them off the edge — the panel root
-   itself never scrolls sideways. */
-.vas_098-items { background:#fff; border:1px solid var(--rq-border); border-radius:13px; overflow-x:auto; overflow-y:hidden; box-shadow:var(--rq-widget-shadow) }
+/* The table SHRINKS to the panel; it never scrolls sideways. It used to carry a
+   floor width and its own horizontal scrollbar, on the argument that the reader
+   could scroll to the last columns rather than lose them — but a scrollbar
+   inside a card hides those columns just as effectively, since it has to be
+   found and dragged before it says anything is there. A compressed column is at
+   least visibly present, and every cell keeps its ellipsis and tooltip. */
+.vas_098-items { background:#fff; border:1px solid var(--rq-border); border-radius:13px; box-shadow:var(--rq-widget-shadow) }
 /* Every track is minmax(0, Nfr); a bare Nfr cannot shrink below its content, so
    one long product name pushed the row wider than the table and clipped the
-   right-hand columns away entirely. */
-.vas_098-itrow { display:grid; grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,0.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr); align-items:center; padding:9px 14px; gap:10px; min-width:520px }
+   right-hand columns away entirely. It is also what lets the row compress now
+   that it has no floor width. */
+.vas_098-itrow { display:grid; grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,0.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr); align-items:center; padding:9px 14px; gap:10px }
 /* Grid items default to min-width:auto, which blocks the ellipsis on the cells
    below from ever kicking in. */
 .vas_098-itrow > * { min-width:0 }
@@ -375,7 +389,7 @@
    rather than .vas_098-itrow — the two share the box but not its column
    meanings, so neither table's grid can reach the other's. */
 .vas_098-docRow { display:grid; grid-template-columns:minmax(0,2.4fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);
-    align-items:center; padding:9px 14px; gap:10px; min-width:420px }
+    align-items:center; padding:9px 14px; gap:10px }
 .vas_098-docRow > * { min-width:0 }
 .vas_098-docItem { display:flex; align-items:center; gap:8px; min-width:0 }
 .vas_098-docTxt { min-width:0; flex:1 }
@@ -498,9 +512,16 @@
    into a crammed 4-up one. Matches VAS_099_OverviewGRN and VAS_102. */
 @container (max-width: 700px) {
     .vas_098-stats { grid-template-columns:repeat(2, minmax(0, 1fr)) }
-    /* Four columns need proportionally less room before they have to scroll. */
-    .vas_098-itrow { grid-template-columns:minmax(0,1.8fr) minmax(0,1fr) minmax(0,0.6fr) minmax(0,1.1fr); min-width:360px }
-    .vas_098-itrow > :nth-child(5), .vas_098-itrow > :nth-child(6) { display:none }
+    /* The last two columns are NO LONGER DROPPED here. They used to be
+       display:none under 700px, which is every single-record view — so the panel
+       silently lost two of its six item columns exactly where a reader has the
+       record open to study it, with nothing on screen to say they existed.
+
+       Nothing replaces them: all six tracks stay and simply compress. The row
+       used to take a raised floor width here and scroll inside the card instead,
+       which put the same two columns out of sight behind a scrollbar the reader
+       had to find. A narrow column is readable at a glance and carries its full
+       value on the row's tooltip; a hidden one carries nothing. */
 }
 @container (max-width: 460px) {
     .vas_098-hdrCard { grid-template-columns:1fr }
@@ -528,3 +549,23 @@
    overrides yet. */
 [dir="rtl"] .vas_098-hdrColL { border-right:none; border-left:1px solid var(--rq-divider); padding-right:0; padding-left:20px }
 [dir="rtl"] .vas_098-pgBtn .vas_098-ic svg { transform:scaleX(-1) }
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value.
+   Matches VAS_101 / VAS_104. */
+.vas_098-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_098-cvOld {
+    color: var(--rq-text-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_098-cvArrow { flex: none; color: var(--rq-text-muted); }
+.vas_098-cvNew {
+    color: var(--rq-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}

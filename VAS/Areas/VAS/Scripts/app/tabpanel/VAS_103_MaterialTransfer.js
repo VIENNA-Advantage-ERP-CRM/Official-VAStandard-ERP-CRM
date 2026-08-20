@@ -87,6 +87,37 @@
  *                        the list card so the controls keep their place while
  *                        the rows are replaced underneath them, and the
  *                        section's count badge still counts the WHOLE feed.
+ *   VAI163   2026-08-14  Header:
+ *                        - The route moved from the card's LEFT column to the
+ *                          RIGHT, closing it under the document fields and
+ *                          spanning both of their tracks, and is drawn a size
+ *                          down (stylesheet). The warehouse pair is reference
+ *                          detail beside those fields, not a headline of its own.
+ *                        - The right column names the DOCUMENT TYPE (model side),
+ *                          which the header could not answer before.
+ *                        Lines:
+ *                        - The confirmation toggle's tick is sized up
+ *                          (stylesheet). It is the only mark distinguishing a
+ *                          confirmed line and the control that opens its figures,
+ *                          and at 0.85em it read as a speck beside the product
+ *                          name.
+ *                        Activity:
+ *                        - Reports edits FIELD BY FIELD: an "Updated" row per
+ *                          changed column (model side), headlined "Updated
+ *                          <field>" with the line it landed on beneath it and
+ *                          "when · by whom" where every other row carries it.
+ *                          The feed used to say only that the transfer had been
+ *                          created, completed or confirmed — and its "Completed"
+ *                          row is dated from M_Movement.Updated, so the nearest
+ *                          thing to an edit trail was one row carrying the LAST
+ *                          save's timestamp and nothing about what it touched.
+ *   VAI163   2026-08-17  Activity's field-level rows carry the MOVE: "was X →
+ *                        now Y" under the field's name (changeDelta), the old
+ *                        value struck through and a value the log recorded as
+ *                        empty shown as an em dash, so a cleared field is
+ *                        visibly cleared rather than looking like a rendering
+ *                        gap. A row said WHICH field moved but never what it
+ *                        moved from or to.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -439,21 +470,27 @@
             appendContactBit($contact, "calendar", formatDate(data.MovementDate));
             if ($contact.children().length) $left.append($contact);
 
-            // The route lives here now. Where the stock comes FROM and goes TO is
-            // transfer identity — it belongs beside the type, not in a strip of its
-            // own below the card.
-            $left.append(buildRoute());
             $card.append($left);
 
             // Transfer No is gone (the title strip above already carries it) and so
             // is Reference, which was the document's Description — that text is a
             // note, and it heads the Notes section at the foot of the panel now.
             var $right = $('<div class="vas_103-hdrColR"></div>');
+            // The document type the transfer was raised on — which movement this
+            // is, and the one field the header could not answer.
+            $right.append(headerField(getMsg("VAS_103_DocumentType", "Document Type"),
+                na(data.DocTypeName), false));
             $right.append(headerField(getMsg("VAS_103_Incoterm", "Incoterm"),
                 na(data.IncotermName), false));
             $right.append(headerField(VIS.Msg.getMsg("VAS_103_Posted"),
                 data.Posted ? VIS.Msg.getMsg("VAS_103_Posted")
                             : VIS.Msg.getMsg("VAS_103_NotPosted"), false));
+
+            // The route closes the right column, spanning both of its field tracks
+            // (stylesheet). It sat in the LEFT column beside the transfer type;
+            // moved here it reads under the document fields it belongs with, and
+            // the left column is left to identity alone.
+            $right.append(buildRoute());
             $card.append($right);
 
             $body.append($card);
@@ -487,10 +524,11 @@
 
         // ---------- Route (From -> To), inside the header card ---------- //
 
-        // Was a section of its own beneath the card. The From -> To pair is
-        // transfer IDENTITY — the one thing a material transfer is about — so it
-        // reads beside the transfer type rather than as a separate strip that
-        // repeated the card's frame around two warehouse names.
+        // Was a section of its own beneath the card, then the card's LEFT column.
+        // It now closes the RIGHT column, spanning both field tracks, and is drawn
+        // a size down from the standalone strip it began as — the warehouse pair
+        // is reference detail beside the document fields, not a headline of its
+        // own, and at the old size it dominated a card it merely sits in.
         function buildRoute() {
             var $route = $('<div class="vas_103-route"></div>');
             $route.append(routeNode(VIS.Msg.getMsg("VAS_103_From"), na(data.FromWarehouseName)));
@@ -922,11 +960,13 @@
         // ---------- Activity ---------- //
 
         var ACT_TYPES = {
-            Note:         { tone: "info",    icon: "note",  label: "Note" },
-            Created:      { tone: "neutral", icon: "plus",  label: "Created" },
-            Completed:    { tone: "success", icon: "check", label: "Completed" },
-            Confirmation: { tone: "warning", icon: "clock", label: "Confirmation" },
-            Confirmed:    { tone: "success", icon: "check", label: "Confirmed" }
+            Note:         { tone: "info",    icon: "note",   label: "Note" },
+            Created:      { tone: "neutral", icon: "plus",   label: "Created" },
+            Completed:    { tone: "success", icon: "check",  label: "Completed" },
+            Confirmation: { tone: "warning", icon: "clock",  label: "Confirmation" },
+            Confirmed:    { tone: "success", icon: "check",  label: "Confirmed" },
+            // One row per FIELD that changed, not one per save (model side).
+            Updated:      { tone: "info",    icon: "pencil", label: "Updated" }
         };
 
         // Maximum activity rows shown per page; the feed paginates beyond this.
@@ -1002,6 +1042,20 @@
             return $b;
         }
 
+        // "was X → now Y" under the field's name, for a field-level edit. A
+        // value the log recorded as empty reads as an em dash rather than as a
+        // blank, so a cleared field is visibly cleared instead of looking like a
+        // rendering gap. Follows VAS_101 / VAS_104.
+        function changeDelta(a) {
+            var $d = $('<small class="vas_103-actSub vas_103-actDelta"></small>');
+            var blank = "—";
+            $d.append($('<span class="vas_103-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_103-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_103-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
+        }
+
         function activityRow(a) {
             var meta = ACT_TYPES[a.EventType] || ACT_TYPES.Note;
 
@@ -1026,6 +1080,19 @@
                             : getMsg("VAS_103_By", "by") + " " + a.ActorName;
             }
             $main.append($('<span class="vas_103-actWhen"></span>').text(when).attr("title", when));
+
+            // A line edit names the line it landed on, BENEATH the headline and its
+            // stamp — appended last so it takes a row of its own (stylesheet) and
+            // the "when · by whom" stays on the headline's line where every other
+            // row carries it. Dropped entirely for a header edit, which has no line
+            // to name.
+            if (a.EventType === "Updated" && a.ChangeScope) {
+                $main.append($('<small class="vas_103-actSub"></small>')
+                    .text(a.ChangeScope).attr("title", a.ChangeScope));
+            }
+            // ...and the move itself: what the field held before the edit and
+            // what it holds after, on a sub-line of its own.
+            if (a.OldValue || a.NewValue) $main.append(changeDelta(a));
             $row.append($main);
             return $row;
         }
@@ -1040,6 +1107,11 @@
                 return getMsg("VAS_103_ActConfirmationTxt", "Confirmation raised") + (a.Title ? " " + a.Title : "");
             if (a.EventType === "Confirmed")
                 return getMsg("VAS_103_ActConfirmedTxt", "Confirmation completed") + (a.Title ? " " + a.Title : "");
+            // A field-level edit headlines with the FIELD that changed — the row's
+            // tag already says "Updated", and the field is what tells one edit
+            // apart from the next.
+            if (a.EventType === "Updated" && a.FieldName)
+                return getMsg("VAS_103_ActFieldUpdated", "Updated") + " " + a.FieldName;
             return a.Title || "";
         }
 
@@ -1173,7 +1245,9 @@
             // Receive Transfer buttons that were the only things using them.
             note:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>',
             plus:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
-            clock:    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>'
+            clock:    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>',
+            // The field-level "Updated" activity rows.
+            pencil:   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'
         };
 
         function svgIcon(name) {

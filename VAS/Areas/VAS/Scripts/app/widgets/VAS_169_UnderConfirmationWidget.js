@@ -15,6 +15,22 @@
 
 ; (function (VAS, $) {
 
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_169_UnderConfirmationWidget = function () {
 
         this.frame;
@@ -105,12 +121,69 @@
             });
         }
 
+// ===== NEW CODE START — currency format (agent C03, 2026-08-19) =====
+        var currencyInfo = { iso: '', symbol: '' };
+
+        function formatCurrency(amount, currInfo) {
+            var val = Number(amount || 0);
+            var info = currInfo || currencyInfo || {};
+            var iso = (info.iso || '').toUpperCase();
+            var symbol = info.symbol || '';
+
+            var indianISOs = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+            var isIndian = indianISOs.indexOf(iso) !== -1;
+
+            var formatted = '';
+            var absVal = Math.abs(val);
+
+            if (isIndian) {
+                if (absVal >= 10000000) {
+                    formatted = (val / 10000000).toFixed(2).replace(/\.00$/, '') + ' Cr';
+                } else if (absVal >= 100000) {
+                    formatted = (val / 100000).toFixed(2).replace(/\.00$/, '') + ' Lk';
+                } else {
+                    var parts = val.toFixed(2).replace(/\.00$/, '').split('.');
+                    var integerPart = parts[0];
+                    var decimalPart = parts.length > 1 ? '.' + parts[1] : '';
+                    var isNeg = integerPart.charAt(0) === '-';
+                    if (isNeg) integerPart = integerPart.substring(1);
+
+                    if (integerPart.length > 3) {
+                        var lastThree = integerPart.substring(integerPart.length - 3);
+                        var otherNumbers = integerPart.substring(0, integerPart.length - 3);
+                        otherNumbers = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",");
+                        integerPart = otherNumbers + "," + lastThree;
+                    }
+                    formatted = (isNeg ? '-' : '') + integerPart + decimalPart;
+                }
+            } else {
+                if (absVal >= 1000000000) {
+                    formatted = (val / 1000000000).toFixed(2).replace(/\.00$/, '') + 'B';
+                } else if (absVal >= 1000000) {
+                    formatted = (val / 1000000).toFixed(2).replace(/\.00$/, '') + 'M';
+                } else {
+                    var parts = val.toFixed(2).replace(/\.00$/, '').split('.');
+                    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                    formatted = parts.join('.');
+                }
+            }
+
+            if (symbol) {
+                return symbol + ' ' + formatted;
+            }
+            return formatted;
+        }
+
         function renderMetric(data) {
             var count = Number(data.count || 0);
+            if (data.currency) {
+                currencyInfo = data.currency;
+            }
 
             if ($valueEl) {
-                $valueEl.text(formatCount(count));
-                $valueEl.attr('title', formatCount(count));
+                var formattedCount = formatCount(count);
+                $valueEl.text(formattedCount);
+                $valueEl.attr('title', String(count));
                 $valueEl.attr('aria-live', 'polite');
 
                 // Warning tone (#D78B10) when count >= 1, neutral (#102C3F) when 0
@@ -127,6 +200,31 @@
                 $metaEl.attr('title', metaMsg);
             }
         }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//        function renderMetric_OLD(data) {
+//            var count = Number(data.count || 0);
+//
+//            if ($valueEl) {
+//                $valueEl.text(formatCount(count));
+//                $valueEl.attr('title', formatCount(count));
+//                $valueEl.attr('aria-live', 'polite');
+//
+//                // Warning tone (#D78B10) when count >= 1, neutral (#102C3F) when 0
+//                if (count >= 1) {
+//                    $valueEl.addClass('vas-under-confirmation-warning');
+//                } else {
+//                    $valueEl.removeClass('vas-under-confirmation-warning');
+//                }
+//            }
+//
+//            if ($metaEl) {
+//                var metaMsg = lbl("VAS_169_AwaitingConfirmation", "Awaiting confirmation");
+//                $metaEl.text(metaMsg);
+//                $metaEl.attr('title', metaMsg);
+//            }
+//        }
+// ----- END OLD CODE -----
 
         function setError() {
             if ($valueEl) {

@@ -505,3 +505,79 @@
     color: #102C3F;
     padding: 0 0.25em;
 }
+
+/* ============================================================================
+   Modal tabs + Inventory Counts pane (added 2026-08-16 at user request).
+   The modal previously had a single "Locators" section head; it now carries two
+   tabs, so the section head is replaced by a tab strip.
+   ============================================================================ */
+.vas-stocksearch-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+    padding: 0 1em;
+    border-bottom: 1px solid #D9E2EB;
+    flex: 0 0 auto;
+}
+
+.vas-stocksearch-tab {
+    font-family: inherit;
+    font-size: 0.72em;
+    font-weight: 500;
+    color: #5F7283;
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    padding: 0.65em 0.9em;
+    cursor: pointer;
+    white-space: nowrap;
+    outline: none;
+}
+
+    .vas-stocksearch-tab:hover {
+        color: #0083DA;
+    }
+
+    .vas-stocksearch-tab.vas-stocksearch-tab-active {
+        color: #0083DA;
+        font-weight: 700;
+        border-bottom-color: #1F83FF;
+    }
+
+.vas-stocksearch-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.vas-stocksearch-pane-hidden {
+    display: none !important;
+}
+
+/* Count history rows are navigable - make that visible. */
+.vas-stocksearch-count-row {
+    cursor: pointer;
+}
+
+    .vas-stocksearch-count-row:hover td {
+        background: #F5FBFF;
+    }
+
+.vas-stocksearch-table .attr-val {
+    color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-stocksearch-var-pos {
+    color: #0B6B45;
+    font-weight: 700;
+}
+
+.vas-stocksearch-var-neg {
+    color: #A33F3F;
+    font-weight: 700;
+}
+

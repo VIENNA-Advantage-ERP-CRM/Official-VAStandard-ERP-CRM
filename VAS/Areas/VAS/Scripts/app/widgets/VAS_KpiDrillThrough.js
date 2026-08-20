@@ -15,9 +15,22 @@
  *               pageSize: 7,                     // default 7
  *               mapData: function (data) { return { items, total, currency }; },
  *               mapRow: function (item, cur, h) { return { bpId, title, meta, valueText, valueTone }; },
- *               navigate: function (bpId) { ... }
+ *               navigate: function (recordId, kind) { ... }
  *           });
  *           drill.open(); drill.close(); drill.dispose();
+ *
+ * 2026-08-17 - a row used to be clickable whenever mapRow ran, even when it resolved to
+ *           no record: VAS_125's pipeline list includes lead-backed accounts, which carry
+ *           bpId 0 because there is no C_BPartner to open, so the row rendered as a
+ *           <button data-bp="0"> and the click guard below silently dropped it. The row
+ *           looked clickable and then did nothing - reported as "drill-through not showing
+ *           the record". Two changes:
+ *             - mapRow may return navId / navKind when the row opens something OTHER than
+ *               a business partner (a lead, say). navId defaults to bpId, and navKind is
+ *               handed to navigate() as its second argument, so a caller that only deals
+ *               in customers keeps its one-argument navigate untouched.
+ *             - a row with no positive navId is rendered as inert markup rather than a
+ *               button, so the affordance always matches what the row can do.
  */
 ; VAS = window.VAS || {};
 
@@ -110,8 +123,10 @@
             $count = $modal.find('.MPC-kpidrill-count');
             $modal.on('click', '[data-drill-close]', close);
             $modal.on('click', '.MPC-kpidrill-row', function () {
-                var bp = Number($(this).attr('data-bp'));
-                if (bp && typeof opts.navigate === 'function') { opts.navigate(bp); }
+                var id = Number($(this).attr('data-bp'));
+                if (id > 0 && typeof opts.navigate === 'function') {
+                    opts.navigate(id, $(this).attr('data-kind') || '');
+                }
             });
             $modal.on('click', '.MPC-kpidrill-pgbtn', function () { turnPage($(this).attr('data-dir')); });
         }
@@ -154,14 +169,25 @@
                 var r = opts.mapRow(item, currency, HELPERS) || {};
                 var name = r.title || '';
                 var toneCls = r.valueTone === 'danger' ? ' MPC-kpidrill-val-danger' : '';
-                return '<button type="button" class="MPC-kpidrill-row" data-bp="' + Number(r.bpId) + '">' +
+
+                /* Only a row that resolves to a record gets the clickable treatment - see
+                   the note in the file header. navId lets a row open something other than
+                   a business partner; it falls back to bpId for the customer-only callers.
+                   Everything with nothing to open is an inert <div>. */
+                var navId = Number(r.navId != null ? r.navId : r.bpId) || 0;
+                var canOpen = navId > 0 && typeof opts.navigate === 'function';
+                var tag = canOpen ? 'button' : 'div';
+
+                return '<' + tag +
+                    (canOpen ? ' type="button" data-bp="' + navId + '" data-kind="' + escapeHtml(r.navKind || '') + '"' : '') +
+                    ' class="MPC-kpidrill-row' + (canOpen ? '' : ' MPC-kpidrill-row-static') + '">' +
                     '<span class="MPC-kpidrill-avatar" style="background:' + avatarColor(name) + '">' + escapeHtml(initials(name)) + '</span>' +
                     '<span class="MPC-kpidrill-main">' +
                         '<span class="MPC-kpidrill-rtitle" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>' +
                         (r.meta ? '<span class="MPC-kpidrill-rmeta" title="' + escapeHtml(r.meta) + '">' + escapeHtml(r.meta) + '</span>' : '') +
                     '</span>' +
                     (r.valueText ? '<span class="MPC-kpidrill-rval' + toneCls + '">' + escapeHtml(r.valueText) + '</span>' : '') +
-                '</button>';
+                '</' + tag + '>';
             }).join('');
             $body.html('<div class="MPC-kpidrill-list">' + rows + '</div>');
 

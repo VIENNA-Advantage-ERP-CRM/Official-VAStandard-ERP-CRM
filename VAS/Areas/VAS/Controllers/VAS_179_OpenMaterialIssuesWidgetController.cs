@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.SqlClient;
 using Newtonsoft.Json;
 using System;
@@ -20,7 +21,8 @@ namespace VIS.Controllers
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_179_OpenMaterialIssuesWidgetController).FullName);
 
-        /// <summary>Returns the aggregate count of open material issue documents.</summary>
+// ===== NEW CODE START — currency format (agent A01, 2026-08-19) =====
+        /// <summary>Returns the aggregate count of open material issue documents along with system currency info.</summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetOpenMaterialIssuesCount()
@@ -34,6 +36,7 @@ namespace VIS.Controllers
                 string json = JsonConvert.SerializeObject(new
                 {
                     count = count,
+                    currency = GetCurrencyInfo(ctx),
                     success = true
                 });
                 return Json(json, JsonRequestBehavior.AllowGet);
@@ -45,6 +48,66 @@ namespace VIS.Controllers
                 return Json(json, JsonRequestBehavior.AllowGet);
             }
         }
+
+        private object GetCurrencyInfo(Ctx ctx)
+        {
+            string iso = "";
+            string symbol = "";
+            int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
+            if (currencyId <= 0)
+            {
+                int client = ctx.GetAD_Client_ID();
+                object val = DB.ExecuteScalar(
+                    "SELECT C_Currency_ID FROM C_AcctSchema WHERE AD_Client_ID = @Client AND IsActive = 'Y' ORDER BY C_AcctSchema_ID ASC",
+                    new SqlParameter[] { new SqlParameter("@Client", client) }, null);
+                currencyId = Util.GetValueOfInt(val);
+            }
+            if (currencyId > 0)
+            {
+                IDataReader cdr = null;
+                try
+                {
+                    cdr = DB.ExecuteReader(
+                        "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @Cur",
+                        new SqlParameter[] { new SqlParameter("@Cur", currencyId) });
+                    if (cdr != null && cdr.Read())
+                    {
+                        iso = Util.GetValueOfString(cdr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                    }
+                }
+                finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
+            }
+            return new { iso = iso, symbol = symbol };
+        }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//        /// <summary>Returns the aggregate count of open material issue documents.</summary>
+//        [AjaxAuthorizeAttribute]
+//        [AjaxSessionFilterAttribute]
+//        public JsonResult GetOpenMaterialIssuesCount()
+//        {
+//            Ctx ctx = Session["ctx"] as Ctx;
+//            if (ctx == null) { return Json("", JsonRequestBehavior.AllowGet); }
+//
+//            try
+//            {
+//                int count = GetOpenMaterialIssuesCountData(ctx);
+//                string json = JsonConvert.SerializeObject(new
+//                {
+//                    count = count,
+//                    success = true
+//                });
+//                return Json(json, JsonRequestBehavior.AllowGet);
+//            }
+//            catch (Exception ex)
+//            {
+//                Log.Log(Level.SEVERE, "VAS_179_OpenMaterialIssuesWidget.GetOpenMaterialIssuesCount", ex);
+//                string json = JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" });
+//                return Json(json, JsonRequestBehavior.AllowGet);
+//            }
+//        }
+// ----- END OLD CODE -----
 
         private int GetOpenMaterialIssuesCountData(Ctx ctx)
         {

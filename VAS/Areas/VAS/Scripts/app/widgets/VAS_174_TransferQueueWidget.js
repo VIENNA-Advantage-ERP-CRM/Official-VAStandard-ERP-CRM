@@ -79,6 +79,64 @@
         return '<span class="vas-174-pill vas-174-pill--pending">Pending</span>';
     }
 
+// ===== NEW CODE START — currency format (agent C08, 2026-08-19) =====
+    var INDIAN_ISOS = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+    function formatCurrency(val, currencyObj) {
+        var c = currencyObj || (window.VAS_CurrencyInfo || { iso: 'USD', symbol: '$' });
+        var symbol = c.symbol || '$';
+        var iso = (c.iso || '').toUpperCase();
+        var num = parseFloat(val);
+
+        if (val === null || val === undefined || isNaN(num)) {
+            num = 0;
+        }
+
+        var absVal = Math.abs(num);
+        var isIndian = INDIAN_ISOS.indexOf(iso) !== -1;
+        var compactStr = '';
+        var exactStr = '';
+
+        if (isIndian) {
+            exactStr = num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (absVal >= 10000000) {
+                compactStr = (num / 10000000).toFixed(2) + ' Cr';
+            } else if (absVal >= 100000) {
+                compactStr = (num / 100000).toFixed(2) + ' L';
+            } else if (absVal >= 1000) {
+                compactStr = (num / 1000).toFixed(2) + ' K';
+            } else {
+                compactStr = exactStr;
+            }
+        } else {
+            exactStr = num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (absVal >= 1000000000) {
+                compactStr = (num / 1000000000).toFixed(2) + ' B';
+            } else if (absVal >= 1000000) {
+                compactStr = (num / 1000000).toFixed(2) + ' M';
+            } else if (absVal >= 1000) {
+                compactStr = (num / 1000).toFixed(2) + ' K';
+            } else {
+                compactStr = exactStr;
+            }
+        }
+
+        return {
+            formatted: symbol + ' ' + compactStr,
+            exact: symbol + ' ' + exactStr
+        };
+    }
+
+    function formatCount(val) {
+        var num = parseInt(val, 10);
+        if (isNaN(num)) { num = 0; }
+        return {
+            formatted: num.toLocaleString(),
+            exact: num.toString()
+        };
+    }
+// ===== NEW CODE END — currency format =====
+
     VAS.VAS_174_TransferQueueWidget = function () {
 
         this.frame;
@@ -87,6 +145,7 @@
         var $self = this;
         var $wrapper = $('<div class="vas-174-container">');
         var $root = $('<div class="vas-174-root">');
+        var widgetObserver = null;
 
         var now = new Date();
         var selMonth = now.getMonth() + 1;
@@ -165,6 +224,22 @@
             });
 
             $wrapper.append($root);
+
+            // Self-Sizing Observer — feeds --widget-inline-size, which the root
+            // font-size clamp reads. Without it the CSS falls back to 380px and
+            // the whole widget renders smaller than VAS_165 / VAS_161.
+            if (window.ResizeObserver && $wrapper[0]) {
+                widgetObserver = new ResizeObserver(function (entries) {
+                    for (var i = 0; i < entries.length; i++) {
+                        var width = entries[i].contentRect.width;
+                        if (width > 0 && $root[0]) {
+                            $root[0].style.setProperty('--widget-inline-size', width + 'px');
+                        }
+                    }
+                });
+                widgetObserver.observe($wrapper[0]);
+            }
+
         }
 
         function toggleMonthDropdown() {
@@ -315,10 +390,21 @@
                 type: 'GET',
                 cache: false,
                 success: function (res) {
+// ===== NEW CODE START — currency format (agent C08, 2026-08-19) =====
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
                     if (data && typeof data === 'string') { data = JSON.parse(data); }
+                    if (data && data.currency) {
+                        window.VAS_CurrencyInfo = data.currency;
+                    }
                     allRecords = (data && !data.error && Array.isArray(data.records)) ? data.records : [];
                     applyFilters();
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                    var data = typeof res === 'string' ? JSON.parse(res) : res;
+//                    if (data && typeof data === 'string') { data = JSON.parse(data); }
+//                    allRecords = (data && !data.error && Array.isArray(data.records)) ? data.records : [];
+//                    applyFilters();
+// ----- END OLD CODE -----
                 },
                 error: function () {
                     allRecords = [];
@@ -465,6 +551,10 @@
         this.getRoot = function () { return $wrapper; };
 
         this.disposeComponent = function () {
+            if (widgetObserver) {
+                widgetObserver.disconnect();
+                widgetObserver = null;
+            }
             closeModal();
             closeDropdowns();
             $(document).off('click.vas174');

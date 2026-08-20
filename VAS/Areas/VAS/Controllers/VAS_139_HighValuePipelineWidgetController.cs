@@ -45,6 +45,23 @@ namespace VAS.Controllers
     ///   VAI052      2026-08-10 Source switched from C_Project (VAS_ProjectStatus
     ///                          'DR'/'IP') to VAS_Opportunity, per the open-stage rule
     ///                          in VA061_056_OpenOpportunitiesModel
+    ///   VAI052      2026-08-17 ORA-01008 on Oracle: BOTH endpoints failed before a row
+    ///                          was read, so this widget - and the VAS_125 Open Pipeline
+    ///                          drill-through, which reuses GetRows - could only ever
+    ///                          report "unable to load". Each statement embeds the
+    ///                          currency CTE plus the main projection, so @Client_ID
+    ///                          occurred 2x in GetRows and 3x in GetOpportunities (and
+    ///                          @Account_ID 1x more than its parameter) against ONE
+    ///                          parameter each. The app's Oracle layer never sets
+    ///                          BindByName, so ODP.NET binds BY POSITION and a name
+    ///                          occurring more often than the parameter list raises
+    ///                          ORA-01008 ("not all variables bound") - the same defect
+    ///                          already fixed in VAS_140 / VAS_128 / VAS_099. Both
+    ///                          statements are now assembled with NO placeholders: the
+    ///                          tenant id and default conversion type are server-derived,
+    ///                          and the account id is an int the action signature already
+    ///                          model-bound and validated as > 0, so none of them can
+    ///                          carry SQL text.
     /// </summary>
     public class VAS_139_HighValuePipelineWidgetController : Controller
     {
@@ -53,8 +70,14 @@ namespace VAS.Controllers
         private const int WidgetPageSize = 7;
         private const int MaxListPageSize = 25;
 
-        /// <summary>Single-row tenant accounting (reporting) currency.</summary>
-        private const string SchemaCurrencySql = @"
+        /// <summary>
+        /// Single-row tenant accounting (reporting) currency. The tenant id arrives as an
+        /// SQL expression because it is inlined, not bound - see the ORA-01008 note in the
+        /// class summary.
+        /// </summary>
+        private static string SchemaCurrencySql(string clientIdSql)
+        {
+            return @"
             SELECT ci.AD_Client_ID AS AD_Client_ID,
                    cs.C_Currency_ID AS Acct_Currency_ID,
                    cur.StdPrecision AS Std_Precision,
@@ -64,7 +87,18 @@ namespace VAS.Controllers
             INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID=ci.C_AcctSchema1_ID AND cs.IsActive = 'Y')
             INNER JOIN C_Currency cur ON (cur.C_Currency_ID=cs.C_Currency_ID AND cur.IsActive = 'Y')
             WHERE ci.IsActive = 'Y'
-              AND ci.AD_Client_ID = @Client_ID";
+              AND ci.AD_Client_ID = " + clientIdSql;
+        }
+
+        /// <summary>
+        /// An int as an SQL literal. Every value inlined by this controller is either
+        /// server-derived (tenant id, default conversion type) or an int the action
+        /// signature already model-bound and validated, so none can carry SQL text.
+        /// </summary>
+        private static string IntSql(int value)
+        {
+            return value.ToString(CultureInfo.InvariantCulture);
+        }
 
         /// <summary>
         /// Non-terminal opportunity stages, plus a NULL stage (Open / Unassigned).
@@ -90,12 +124,12 @@ namespace VAS.Controllers
         /// conversion type (VAS_Opportunity carries no conversion type). Mirrors the
         /// VAS_125 KPI so totals reconcile.
         /// </summary>
-        private string ConvertedAmtExpr()
+        private string ConvertedAmtExpr(string conversionTypeSql)
         {
             string conversionDate = DB.IsPostgreSQL() ? "CURRENT_DATE" : "TRUNC(SYSDATE)";
             return @"CASE WHEN o.C_Currency_ID IS NULL OR o.C_Currency_ID = sc.Acct_Currency_ID THEN COALESCE(o.PlannedAmt, 0)
                          ELSE CurrencyConvert(COALESCE(o.PlannedAmt, 0), o.C_Currency_ID, sc.Acct_Currency_ID, "
-                         + conversionDate + @", @ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID) END";
+                         + conversionDate + @", " + conversionTypeSql + @", o.AD_Client_ID, o.AD_Org_ID) END";
         }
 
         /// <summary>
@@ -122,7 +156,9 @@ namespace VAS.Controllers
 
             try
             {
-                int conversionTypeId = MConversionType.GetDefault(ctx.GetAD_Client_ID());
+                // Inlined, never bound: repeated placeholders break Oracle (ORA-01008).
+                string clientIdSql = IntSql(ctx.GetAD_Client_ID());
+                string conversionTypeSql = IntSql(MConversionType.GetDefault(ctx.GetAD_Client_ID()));
 
                 // Open opportunities with converted amount, resolved to an account.
                 // An opportunity may hang off a business partner OR, before the lead is
@@ -141,13 +177,13 @@ namespace VAS.Controllers
                            -- grouping on it would split one customer into several rows.
                            CASE WHEN bp.C_BPartner_ID IS NOT NULL THEN 0 ELSE COALESCE(ld.C_Lead_ID, 0) END AS Lead_Id,
                            COALESCE(bp.Name, ld.Name) AS Account_Name,
-                           " + ConvertedAmtExpr() + @" AS Converted_Amt
+                           " + ConvertedAmtExpr(conversionTypeSql) + @" AS Converted_Amt
                     FROM VAS_Opportunity o
                     INNER JOIN schema_currency sc ON (sc.AD_Client_ID=o.AD_Client_ID)
                     LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=" + CustomerIdExpr + @" AND bp.AD_Client_ID=o.AD_Client_ID AND bp.IsActive = 'Y')
                     LEFT OUTER JOIN C_Lead ld ON (ld.C_Lead_ID=o.C_Lead_ID AND ld.AD_Client_ID=o.AD_Client_ID AND ld.IsActive = 'Y')
                     WHERE o.IsActive = 'Y'
-                      AND o.AD_Client_ID = @Client_ID
+                      AND o.AD_Client_ID = " + clientIdSql + @"
                       AND " + OpenStagePredicate + @"
                       AND o.Ref_Order_ID IS NULL
                       AND o.C_Order_ID IS NULL
@@ -156,7 +192,7 @@ namespace VAS.Controllers
 
                 string sql = @"
                     WITH schema_currency AS (
-                        " + SchemaCurrencySql + @"
+                        " + SchemaCurrencySql(clientIdSql) + @"
                     ),
                     OpenOpportunity AS (
                         " + openOppSql + @"
@@ -214,11 +250,8 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, new SqlParameter[]
-                    {
-                        new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                        new SqlParameter("@ConversionType_ID", conversionTypeId)
-                    });
+                    // No parameters: every value in this statement is inlined (ORA-01008).
+                    dr = DB.ExecuteReader(sql);
                     while (dr != null && dr.Read())
                     {
                         total = Util.GetValueOfInt(dr["Total_Customers"]);
@@ -299,7 +332,9 @@ namespace VAS.Controllers
 
             try
             {
-                int conversionTypeId = MConversionType.GetDefault(ctx.GetAD_Client_ID());
+                // Inlined, never bound: repeated placeholders break Oracle (ORA-01008).
+                string clientIdSql = IntSql(ctx.GetAD_Client_ID());
+                string conversionTypeSql = IntSql(MConversionType.GetDefault(ctx.GetAD_Client_ID()));
 
                 // Match the account the row was grouped under. A business partner takes
                 // precedence, exactly as in GetRows, so an opportunity that carries both
@@ -308,9 +343,10 @@ namespace VAS.Controllers
                 // opportunity) or dangling, and NOT IN yields UNKNOWN on a NULL left
                 // side, which would silently drop the row.
                 bool byPartner = C_BPartner_ID > 0;
+                string accountIdSql = IntSql(byPartner ? C_BPartner_ID : C_Lead_ID);
                 string accountFilter = byPartner
-                    ? CustomerIdExpr + " = @Account_ID"
-                    : @"(o.C_Lead_ID = @Account_ID
+                    ? CustomerIdExpr + " = " + accountIdSql
+                    : @"(o.C_Lead_ID = " + accountIdSql + @"
                          AND NOT EXISTS (SELECT 1 FROM C_BPartner bp2
                                          WHERE bp2.C_BPartner_ID=" + CustomerIdExpr + @"
                                            AND bp2.AD_Client_ID=o.AD_Client_ID
@@ -324,16 +360,16 @@ namespace VAS.Controllers
                            o.Name AS Opp_Name,
                            COALESCE(owner.Name, '') AS Owner_Name,
                            o.VAS_OppStage AS Status_Code,
-                           ROUND(" + ConvertedAmtExpr() + @", sc.Std_Precision) AS Value_Conv,
+                           ROUND(" + ConvertedAmtExpr(conversionTypeSql) + @", sc.Std_Precision) AS Value_Conv,
                            o.VAS_DecisionDate AS Close_Date,
                            sc.Cur_Symbol AS Cur_Symbol,
                            sc.ISO_Code AS ISO_Code,
                            sc.Std_Precision AS Std_Precision
                     FROM VAS_Opportunity o
                     INNER JOIN schema_currency sc ON (sc.AD_Client_ID=o.AD_Client_ID)
-                    LEFT OUTER JOIN AD_User owner ON (owner.AD_User_ID=o.SalesRep_ID AND owner.AD_Client_ID = @Client_ID AND owner.IsActive = 'Y')
+                    LEFT OUTER JOIN AD_User owner ON (owner.AD_User_ID=o.SalesRep_ID AND owner.AD_Client_ID = " + clientIdSql + @" AND owner.IsActive = 'Y')
                     WHERE o.IsActive = 'Y'
-                      AND o.AD_Client_ID = @Client_ID
+                      AND o.AD_Client_ID = " + clientIdSql + @"
                       AND " + accountFilter + @"
                       AND " + OpenStagePredicate + @"
                       AND o.Ref_Order_ID IS NULL
@@ -342,7 +378,7 @@ namespace VAS.Controllers
 
                 string sql = @"
                     WITH schema_currency AS (
-                        " + SchemaCurrencySql + @"
+                        " + SchemaCurrencySql(clientIdSql) + @"
                     ),
                     opp_rows AS (
                         " + oppRowsSql + @"
@@ -369,12 +405,8 @@ namespace VAS.Controllers
                 IDataReader dr = null;
                 try
                 {
-                    dr = DB.ExecuteReader(sql, new SqlParameter[]
-                    {
-                        new SqlParameter("@Client_ID", ctx.GetAD_Client_ID()),
-                        new SqlParameter("@Account_ID", byPartner ? C_BPartner_ID : C_Lead_ID),
-                        new SqlParameter("@ConversionType_ID", conversionTypeId)
-                    });
+                    // No parameters: every value in this statement is inlined (ORA-01008).
+                    dr = DB.ExecuteReader(sql);
                     while (dr != null && dr.Read())
                     {
                         currencySymbol = Util.GetValueOfString(dr["Cur_Symbol"]);

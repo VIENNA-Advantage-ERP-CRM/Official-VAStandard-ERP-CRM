@@ -130,6 +130,34 @@
  *                        vas_092- prefix too. Sharing a name with a base-theme
  *                        rule meant the base design won and repainted the
  *                        panel; scoping them to the panel ends that.
+ *   VAI163   2026-08-14  - A vendor contact bit (.vas_092-contactBit) can now
+ *                          SHRINK and break inside itself. A flex item's default
+ *                          min-width is the widest its content can be, so a long
+ *                          e-mail address refused to narrow, overflowed the 40%
+ *                          vendor column and printed over the terms column beside
+ *                          it — visible in the single-record view, where the
+ *                          panel is narrow enough for the address to exceed its
+ *                          column. The icon now holds to the first line rather
+ *                          than centring against a wrapped address.
+ *                        - Added .vas_092-flagMark / -flag-on / -flag-off: the
+ *                          tick / cross a yes-no header field (Drop Shipment) is
+ *                          drawn as.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *                        - Added the Activity field-change delta
+ *                          (.vas_092-actDelta / -cvOld / -cvArrow / -cvNew):
+ *                          "was X → now Y" under the field's name, the old
+ *                          value struck through and the new one carrying the
+ *                          row's colour. Matches VAS_101 / VAS_104.
+ *   VAI163   2026-08-18  Dropped .vas_092-flagMark / -flag-on / -flag-off:
+ *                        Drop Shipment prints the word "Yes" / "No" as an
+ *                        ordinary header field again, so there is no tick or
+ *                        cross left to paint.
  ***********************************************************/
 
 .vas_092-root {
@@ -419,10 +447,34 @@
     font-size: 0.75em;
     color: var(--vaspo-text);
     margin-top: 0.375em;
+    min-width: 0;
 }
 
-.vas_092-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
-.vas_092-contactBit .vas_092-ic { color: var(--vaspo-action); }
+/* A contact bit must be allowed to SHRINK. A flex item defaults to
+   min-width:auto, which is the widest its content can be — so a long e-mail
+   address (akshay.kumar+12@viennasolutions.com) refused to narrow, pushed past
+   the 40% vendor column and printed straight over the terms column beside it.
+   The single-record view is where it shows, because that is where the panel is
+   narrow enough for the address to exceed its column.
+
+   min-width:0 lets the bit shrink, max-width caps it at the column, and the
+   address breaks inside itself — it has no space to wrap at, so a plain wrap
+   would not help. The icon holds to the first line (align-items:flex-start)
+   rather than centring itself against a two-line address. */
+.vas_092-contactBit {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 0.4375em;
+    min-width: 0;
+    max-width: 100%;
+}
+.vas_092-contactBit .vas_092-ic { color: var(--vaspo-action); margin-top: 0.15em; }
+.vas_092-contactBit > span {
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
+}
 
 .vas_092-ic { display: inline-flex; align-items: center; flex: none; }
 .vas_092-ic svg { display: block; }
@@ -763,19 +815,30 @@
     line-height: 1.35;
 }
 
-/* The headline (note text / e-mail subject) and, for an e-mail, the recipient
-   beneath it. Each line clips on its own so the row height stays predictable. */
+/* The headline (note text / e-mail subject) and, for an e-mail, the recipients
+   beneath it. The headline clips to one line so the row height stays predictable
+   — it has a tooltip carrying the whole of it. */
 .vas_092-actLead,
 .vas_092-actSub {
     display: block;
+}
+.vas_092-actLead {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* The recipient line WRAPS instead of clipping: it lists the mail's addresses
+   in full, and an address cut off mid-domain identifies nobody. break-word
+   rather than a plain wrap, since a single long address has no space in it to
+   break at. */
 .vas_092-actSub {
     font-size: 0.8462em; /* ~0.6875em against the body anchor */
     color: var(--vaspo-muted);
     margin-top: 0.125em;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.45;
 }
 
 /* An activity carrying a body (e-mail) opens on click. */
@@ -804,10 +867,14 @@
     line-height: 1.55;
 }
 .vas_092-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+/* The opened message's From / To / Cc / Bcc lines break on the address too, so
+   a long recipient list stays inside the panel. */
 .vas_092-actMeta {
     font-size: 0.8462em;
     color: var(--vaspo-muted);
     margin-bottom: 0.3125em;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 [dir="rtl"] .vas_092-actBody { padding-left: 0.875em; padding-right: 2.5em; }
@@ -912,26 +979,16 @@
     vertical-align: middle;
 }
 
-/* Last resort for a genuinely narrow panel: the seven-column line table (and the
-   history drawer sharing its grid) gets a floor width and scrolls inside its own
-   card, rather than crushing its columns or widening the panel. Everything else
-   on the page keeps its full width. */
-@container (max-width: 380px) {
-    .vas_092-itTable,
-    .vas_092-histTable,
-    .vas_092-docTable,
-    .vas_092-ldTable {
-        overflow-x: auto;
-        overflow-y: hidden;
-    }
-    .vas_092-itTable   .vas_092-tRow,
-    .vas_092-histTable .vas_092-tRow,
-    .vas_092-docTable  .vas_092-tRow,
-    .vas_092-ldTable   .vas_092-tRow { min-width: 360px; }
-    /* The drawer must scroll with its parent table, not on its own, or a past
-       version stops lining up with the line above it. */
-    .vas_092-lhTable { overflow: visible; }
-}
+/* A narrow panel SHRINKS its tables; it never scrolls them sideways.
+   Every track is minmax(0, Nfr) and every cell carries min-width: 0 with an
+   ellipsis, so the columns compress to whatever width the panel has and the text
+   that no longer fits is clipped with its full value on the row's tooltip.
+
+   The floor width + inner scrollbar this used to apply under 380px is gone: a
+   horizontal scrollbar inside a card hides the columns it pushes out — the
+   reader has to find it and drag it to learn there is anything there — where a
+   compressed column is at least visibly present. Nothing else on the page has
+   ever scrolled sideways, and the tables now behave the same way. */
 
 /* ----------------------------------------------------------- */
 /*  Per-line history (drawer under the line it belongs to)      */
@@ -1350,3 +1407,23 @@
 [dir="rtl"] .vas_092-tf b { margin-left: 0; margin-right: 0.375em; }
 [dir="rtl"] .vas_092-tf.vas_092-is-grand b { margin-left: 0; margin-right: 0.5em; }
 [dir="rtl"] .vas_092-ldFoot .vas_092-lf.vas_092-is-grand { margin-left: 0; margin-right: auto; }
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value.
+   Matches VAS_101 / VAS_104. */
+.vas_092-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_092-cvOld {
+    color: var(--vaspo-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_092-cvArrow { flex: none; color: var(--vaspo-muted); }
+.vas_092-cvNew {
+    color: var(--vaspo-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}

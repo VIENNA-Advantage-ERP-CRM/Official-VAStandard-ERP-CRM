@@ -57,6 +57,23 @@
  *                        the field's name (.vas_101-actDelta / -cvOld / -cvArrow /
  *                        -cvNew), with the old value struck through and the new
  *                        one carrying the weight.
+ *   VAI163   2026-08-14  - Added .vas_101-baseUom: the product's base unit named
+ *                          after the On Hand figure, muted and a size down so the
+ *                          quantity still reads first.
+ *                        - The count table's tracks are minmax(0, Nfr) and its
+ *                          cells clip inside their own track
+ *                          (.vas_101-tRow > span), so a long value can no longer
+ *                          widen a column and push the right-hand ones out of the
+ *                          frame — On Hand now carries a unit name as well as a
+ *                          number, and it is a notch wider (0.9fr -> 1.15fr) for
+ *                          it. Follows VAS_099, which took the same treatment.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
  ***********************************************************/
 
 .vas_101-root {
@@ -520,8 +537,23 @@
     align-items: center;
     gap: 0.625em;
     padding: 0.625em 0.875em;
-    grid-template-columns: 2.4fr 0.7fr 0.9fr 0.9fr 0.9fr 1.1fr 0.9fr;
+    /* On Hand (3rd) is a notch wider than the quantity columns beside it: it
+       carries the base unit's name after the figure, where they carry a figure
+       alone. Every track is minmax(0, Nfr) so a long value clips inside its own
+       column instead of widening the track and pushing the right-hand columns
+       out of the frame. */
+    grid-template-columns:
+        minmax(0, 2.4fr) minmax(0, 0.7fr) minmax(0, 1.15fr) minmax(0, 0.9fr)
+        minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 0.9fr);
 }
+
+/* Cells clip inside their own track rather than widening it — the counterpart to
+   the minmax(0, Nfr) tracks above. The item cell's children carry their own
+   ellipsis, so it is unharmed by the clip. */
+.vas_101-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vas_101-tHead > span,
+.vas_101-tRow > span.vas_101-ta-r,
+.vas_101-tRow > span.vas_101-ta-c { white-space: nowrap; }
 
 .vas_101-tHead {
     background: #F5F8FB;
@@ -540,6 +572,15 @@
 }
 .vas_101-tBody:last-of-type { border-bottom: none; }
 .vas_101-tBody:hover { background: #FAFCFE; }
+
+/* The base unit named after the On Hand figure. Muted and a size down, so the
+   quantity still reads first and the unit qualifies it. */
+.vas_101-baseUom {
+    margin-left: 0.3125em;
+    color: var(--ic-muted);
+    font-size: 0.9231em;
+    font-weight: 400;
+}
 
 .vas_101-table .vas_101-ta-r { text-align: right; justify-content: flex-end; }
 .vas_101-table .vas_101-ta-c { text-align: center; justify-content: center; }
@@ -621,10 +662,12 @@
 .vas_101-tf.vas_101-is-grand { color: var(--ic-text); font-weight: 700; }
 .vas_101-tf.vas_101-is-grand b { color: var(--ic-action); margin-left: 0.5em; font-size: 1.15em; }
 
-@container (max-width: 620px) {
-    .vas_101-table { overflow-x: auto; }
-    .vas_101-tRow { min-width: 620px; }
-}
+/* A narrow panel SHRINKS the table; it never scrolls it sideways. Under 620px
+   the rows used to take a floor width and the card its own horizontal
+   scrollbar, which hides the right-hand columns behind a control the reader has
+   to find and drag. Every track is minmax(0, Nfr) and every cell carries
+   min-width: 0 with an ellipsis, so the columns compress instead and a clipped
+   value stays readable through the row's tooltip. */
 
 /* ----------------------------------------------------------- */
 /*  Related Documents                                           */
