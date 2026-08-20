@@ -263,7 +263,7 @@ namespace VIS.Controllers
                         {
                             try
                             {
-                                decimal conv = MCurrency.CurrencyConvert(
+                                decimal conv = MConversionRate.Convert(ctx,
                                     balanceDue,
                                     orderCurId,
                                     schemaCurrencyId,

@@ -168,7 +168,7 @@ namespace VIS.Controllers
                         decimal enteredAmt = Util.GetValueOfDecimal(row["entered_amount"]);
                         int enteredCurId = Util.GetValueOfInt(row["entered_currency_id"]);
                         int convTypeId = Util.GetValueOfInt(row["conversion_type_id"]);
-                        DateTime orderDate = Util.GetValueOfDateTime(row["order_date"]);
+                        DateTime orderDate = Util.GetValueOfDateTime(row["order_date"]).Value;
                         int orgId = Util.GetValueOfInt(row["org_id"]);
 
                         decimal convertedAmt = enteredAmt;
