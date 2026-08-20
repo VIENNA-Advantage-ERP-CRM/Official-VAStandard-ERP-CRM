@@ -159,6 +159,11 @@
     <Compile Include="Models\VAS_190_ProductOverviewRightPanelModel.cs" />
     <Compile Include="Models\VAS_191_APPaymentDetailPanelModel.cs" />
     <Compile Include="Models\VAS_191_APPaymentDetailPanelModel.Actions.cs" />
+    <Compile Include="Models\VAS_192_CurrentPeriodModel.cs" />
+    <Compile Include="Models\VAS_193_PreviousPeriodModel.cs" />
+    <Compile Include="Models\VAS_196_PeriodControlMatrixModel.cs" />
+    <Compile Include="Models\VAS_199_PaymentAllocationStatusModel.cs" />
+    <Compile Include="Models\VAS_200_BankReconcilationModel.cs" />
     <Compile Include="Models\VAS_100_OverviewDOModel.cs" />
     <Compile Include="Models\VAS_101_OverviewInventoryCountModel.cs" />
     <Compile Include="Models\VAS_102_OverviewInternalUseModel.cs" />
