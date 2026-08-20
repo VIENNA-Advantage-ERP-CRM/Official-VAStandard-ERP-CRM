@@ -1,0 +1,757 @@
+/* ============================================================
+   VAS_209_Top10VendorsWidget Stylesheet
+   Purchase Order Dashboard - Widget 07: Top 10 Vendors (3x2)
+   100% Dynamic Fluid Responsive System Standard
+   ============================================================ */
+
+.vas-t10v-container {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.vas-t10v-container *,
+.vas-t10v-container *::before,
+.vas-t10v-container *::after {
+    box-sizing: border-box;
+}
+
+/* Glass Widget Surface */
+.vas-t10v-root {
+    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: clamp(16px, 1.2cqi, 20px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    padding: .85em;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    color: #102C3F;
+    text-align: left;
+    position: relative;
+}
+
+/* Header */
+.vas-t10v-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    flex: none;
+    margin-bottom: .65em;
+}
+
+.vas-t10v-head-txt {
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-t10v-title {
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+    margin: 0;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Month / Year Select Filter (Arrow-less Internal Use Standard - Rule 13) */
+.vas-t10v-mfilter {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+}
+
+.vas-t10v-sel {
+    font-family: inherit;
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    background-color: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    padding: 0.35em 0.75em;
+    line-height: 1.1;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(16, 47, 74, .04);
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+    text-align: center;
+    text-align-last: center;
+    outline: none;
+    transition: background-color .15s, border-color .15s;
+}
+
+.vas-t10v-sel option {
+    text-align: center;
+}
+
+.vas-t10v-sel:hover,
+.vas-t10v-sel:focus {
+    background-color: #EEF8FF;
+    border-color: #0083DA;
+}
+
+.vas-t10v-sel-month {
+    min-width: 7.5em;
+}
+
+.vas-t10v-sel-year {
+    min-width: 5.2em;
+}
+
+/* Ranked Horizontal Bar List Body */
+.vas-t10v-hlist {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    gap: .15em;
+}
+
+.vas-t10v-hrow {
+    padding: .28em .35em;
+    border-radius: 8px;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: background .15s, box-shadow .15s;
+    outline: none;
+    min-height: 0;
+}
+
+.vas-t10v-hrow:hover {
+    background: #F4FAFF;
+    box-shadow: inset 0 0 0 1px #0083DA;
+    border-radius: 8px;
+    outline: none;
+}
+
+.vas-t10v-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .5em;
+    width: 100%;
+}
+
+.vas-t10v-nm {
+    display: block;
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-t10v-vl {
+    font-size: .75em;
+    font-weight: 700;
+    color: #0083DA;
+    flex: none;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-t10v-track {
+    height: 7px;
+    border-radius: 999px;
+    background: #EEF3F8;
+    margin-top: .3em;
+    overflow: hidden;
+    display: flex;
+    width: 100%;
+}
+
+.vas-t10v-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width .35s ease;
+}
+
+/* Footer Pager */
+.vas-t10v-wfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding-top: .45em;
+    margin-top: .35em;
+}
+
+.vas-t10v-helper {
+    font-size: .75em;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-t10v-pager {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+}
+
+.vas-t10v-pbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #FFFFFF;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    outline: none;
+    transition: background .15s, border-color .15s;
+}
+
+.vas-t10v-pbtn:hover:not(:disabled) {
+    background: #EEF8FF;
+    border-color: #0083DA;
+}
+
+.vas-t10v-pbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+    background: #FFFFFF;
+    border-color: #D9E2EB;
+}
+
+.vas-t10v-pbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-t10v-ptxt {
+    font-size: .8125em;
+    font-weight: 500;
+    color: #102C3F;
+    min-width: 3.4em;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Busy Indicator */
+.vas-t10v-busy {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.65);
+    border-radius: 14px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-t10v-hidden {
+    display: none !important;
+}
+
+/* Skeleton Loading & Empty / Error States */
+.vas-t10v-skeleton {
+    cursor: default;
+    pointer-events: none;
+}
+
+.vas-t10v-skeleton .vas-t10v-fill {
+    background: #EAF1F7;
+}
+
+.vas-t10v-empty-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5em .5em;
+    text-align: center;
+    color: #5F7283;
+    width: 100%;
+    height: 100%;
+}
+
+.vas-t10v-empty-msg {
+    font-size: .75em;
+    margin: 0 0 .5em 0;
+}
+
+.vas-t10v-retry-btn {
+    border-radius: 999px;
+    padding: .35em .85em;
+    font-size: .75em;
+    font-family: inherit;
+    border: 1px solid #0083DA;
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+.vas-t10v-retry-btn:hover {
+    background: #EEF8FF;
+}
+
+/* ============================================================
+   DRILL-DOWN MODAL STYLES (Canonical Modal Anchor Architecture)
+   ============================================================ */
+
+.vas-t10v-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 38, 64, .34);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: min(4vh, 28px) min(3vw, 28px);
+    backdrop-filter: blur(2px);
+}
+
+.vas-t10v-mask.vas-t10v-open {
+    display: flex;
+}
+
+.vas-t10v-modal {
+    width: min(1240px, 94vw);
+    max-height: min(880px, 90dvh);
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 16px;
+    box-shadow: 0 28px 64px rgba(15, 61, 97, .26);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #102C3F;
+}
+
+.vas-t10v-modal.vas-t10v-modal-sm {
+    width: min(760px, 94vw);
+}
+
+.vas-t10v-modal.vas-t10v-modal-md {
+    width: min(1000px, 94vw);
+}
+
+/* Modal Header */
+.vas-t10v-modal-header {
+    height: 56px;
+    flex: none;
+    padding: 0 16px;
+    border-bottom: 1px solid #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vas-t10v-mhead-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.vas-t10v-htxt {
+    min-width: 0;
+}
+
+.vas-t10v-modal-header h2 {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 400;
+    color: #141414;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-t10v-modal-header .vas-t10v-msub {
+    font-size: .8125em;
+    color: #717182;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-t10v-hact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+}
+
+.vas-t10v-xbtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    color: #141414;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    outline: none;
+    transition: background .15s;
+}
+
+.vas-t10v-xbtn:hover {
+    background: #F1F4F8;
+}
+
+/* Modal Body */
+.vas-t10v-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 1.125em .875em;
+    display: flex;
+    flex-direction: column;
+    gap: .75em;
+    container-type: inline-size;
+    --panel-anchor: clamp(18px, 1vw, 20px);
+    font-size: var(--panel-anchor);
+}
+
+.vas-t10v-modal-body button,
+.vas-t10v-modal-body input,
+.vas-t10v-modal-body select,
+.vas-t10v-modal-body textarea,
+.vas-t10v-modal-body optgroup {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+/* Modal Footer */
+.vas-t10v-modal-foot {
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #FBFDFF;
+}
+
+.vas-t10v-foot-note {
+    font-size: .8125em;
+    color: #5F7283;
+}
+
+.vas-t10v-btn {
+    border-radius: 999px;
+    padding: .5em .875em;
+    font-size: .8125em;
+    font-family: inherit;
+    border: 1px solid #0083DA;
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+    outline: none;
+    transition: background .15s;
+}
+
+.vas-t10v-btn:hover {
+    background: #EEF8FF;
+}
+
+/* Stat Cards Strip */
+.vas-t10v-mstats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .5em;
+    flex: none;
+}
+
+.vas-t10v-mstat {
+    border: 1px solid #D9E2EB;
+    border-radius: 10px;
+    padding: .4em .6em;
+    background: #FBFDFF;
+    min-width: 0;
+}
+
+.vas-t10v-mstat .l {
+    font-size: .6875em;
+    color: #5F7283;
+    line-height: 1.3;
+}
+
+.vas-t10v-mstat .v {
+    font-size: .875em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+    margin-top: .1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-t10v-msec {
+    font-size: .9375em;
+    font-weight: 500;
+    color: #102C3F;
+    margin: .25em 0 .25em;
+    padding-bottom: .3em;
+    border-bottom: 1px solid #E2EAF1;
+    flex: none;
+}
+
+.vas-t10v-polink {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    font-size: .75em;
+    color: #5F7283;
+    flex: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Modal Paginated Tables */
+.vas-t10v-mtbl-wrap {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-t10v-paged-table-wrap {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-t10v-mrow {
+    display: grid;
+    gap: .75em;
+    padding: 0 .5em;
+    align-items: center;
+}
+
+.vas-t10v-mhead {
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    padding: .5em .5em;
+    border-bottom: 1px solid #C5D2DD;
+    position: sticky;
+    top: 0;
+    background: #FFFFFF;
+    z-index: 2;
+    flex: none;
+}
+
+.vas-t10v-mbody {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-t10v-mbody .vas-t10v-mrow {
+    font-size: .75em;
+    padding: .55em .5em;
+    border-bottom: 1px solid #E2EAF1;
+    transition: background .12s;
+}
+
+.vas-t10v-mbody .vas-t10v-mrow:last-child {
+    border-bottom: 0;
+}
+
+.vas-t10v-mbody .vas-t10v-mrow:hover {
+    background: #F4FAFF;
+    box-shadow: inset 0 0 0 1px #0083DA;
+    border-radius: 6px;
+}
+
+.vas-t10v-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas-t10v-cell.vas-t10v-right {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-t10v-cell.vas-t10v-center {
+    display: flex;
+    justify-content: center;
+}
+
+.vas-t10v-c-prim {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-t10v-c-std {
+    color: #5F7283;
+}
+
+.vas-t10v-c-emph {
+    font-weight: 700;
+    color: #0083DA;
+}
+
+.vas-t10v-lnk {
+    border: 0;
+    background: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    color: #0083DA;
+    text-decoration: none;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    text-align: left;
+}
+
+.vas-t10v-lnk:hover {
+    color: #0069AE;
+}
+
+.vas-t10v-iconbtn {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #FFFFFF;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    flex: none;
+    outline: none;
+    transition: background .15s, border-color .15s;
+}
+
+.vas-t10v-iconbtn:hover {
+    background: #EEF8FF;
+    border-color: #0083DA;
+}
+
+.vas-t10v-iconbtn svg {
+    width: .85em;
+    height: .85em;
+}
+
+/* Modal Table Footer */
+.vas-t10v-mtfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    border-top: 1px solid #D9E2EB;
+    padding-top: .5em;
+    margin-top: .5em;
+    flex: none;
+}
+
+.vas-t10v-loading-row {
+    padding: 2em;
+    text-align: center;
+    font-size: .75em;
+    color: #5F7283;
+}
+
+/* ============================================================
+   CHIPS & GLANCE LABELS
+   ============================================================ */
+
+.vas-t10v-chip {
+    display: inline-block;
+    border-radius: 999px;
+    padding: .3125em .625em;
+    font-size: .6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.vas-t10v-chip.chip-info {
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+.vas-t10v-chip.chip-ok {
+    background: #E7F7EF;
+    color: #0B6B45;
+}
+
+.vas-t10v-chip.chip-warn {
+    background: #FFF6E2;
+    color: #9A6500;
+}
+
+.vas-t10v-chip.chip-risk {
+    background: #FCEFEF;
+    color: #A33F3F;
+}
+
+.vas-t10v-chip.chip-neutral {
+    background: #F1F4F8;
+    color: #41576A;
+    font-weight: 500;
+}
+
+.vas-t10v-chip.chip-prop {
+    background: #EFEEFF;
+    color: #5F4AA6;
+}

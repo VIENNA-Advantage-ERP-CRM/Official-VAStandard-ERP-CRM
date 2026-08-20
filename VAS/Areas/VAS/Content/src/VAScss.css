@@ -233,4 +233,18 @@
 @import "../VAS_173_TransfersByWarehouseWidget.css";
 @import "../VAS_174_TransferQueueWidget.css";
 
-
+@import "../VAS_203_POGlobalSearchWidget.css";
+@import "../VAS_204_NewPurchaseOrderWidget.css";
+@import "../VAS_205_POCompletedMTDWidget.css";
+@import "../VAS_206_POsPendingDeliveryWidget.css";
+@import "../VAS_207_DraftedInProcessPOsWidget.css";
+@import "../VAS_208_MonthlyPOTrendWidget.css";
+@import "../VAS_209_Top10VendorsWidget.css";
+@import "../VAS_210_CategoryWisePOWidget.css";
+@import "../VAS_211_WarehouseDocumentStatusWidget.css";
+@import "../VAS_212_ExpectedLandedCostWidget.css";
+@import "../VAS_213_POsExpectedThisMonthWidget.css";
+@import "../VAS_214_POPendingForPaymentWidget.css";
+@import "../VAS_215_RepresentativeWisePOWidget.css";
+@import "../VAS_216_POQueueWidget.css";
+@import "../VAS_217_OpenRequisitionsWidget.css";
