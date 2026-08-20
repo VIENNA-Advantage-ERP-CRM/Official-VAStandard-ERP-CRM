@@ -71,7 +71,7 @@ namespace VAS.Areas.VAS.Controllers
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet ds = DB.ExecuteDataset(sql, dataParams, null);
+            DataSet ds = CoreLibrary.DataBase.DB.ExecuteDataset(sql, dataParams, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 DataRow dr = ds.Tables[0].Rows[0];
@@ -182,7 +182,7 @@ namespace VAS.Areas.VAS.Controllers
                         base_o.AD_Org_ID
                     ORDER BY base_o.DateOrdered, base_o.C_Order_ID";
 
-                using (IDataReader dr = DB.ExecuteReader(sql, null, null))
+                using (IDataReader dr = CoreLibrary.DataBase.DB.ExecuteReader(sql, null, null))
                 {
                     while (dr != null && dr.Read())
                     {
@@ -378,7 +378,7 @@ namespace VAS.Areas.VAS.Controllers
                 decimal monthValue = 0;
                 var vendorSet = new HashSet<string>();
 
-                using (IDataReader dr = DB.ExecuteReader(sql, null, null))
+                using (IDataReader dr = CoreLibrary.DataBase.DB.ExecuteReader(sql, null, null))
                 {
                     while (dr != null && dr.Read())
                     {
@@ -559,7 +559,7 @@ namespace VAS.Areas.VAS.Controllers
 
                 var lines = new List<object>();
 
-                using (IDataReader dr = DB.ExecuteReader(sql, null, null))
+                using (IDataReader dr = CoreLibrary.DataBase.DB.ExecuteReader(sql, null, null))
                 {
                     int lineIdx = 1;
                     while (dr != null && dr.Read())
@@ -634,7 +634,7 @@ namespace VAS.Areas.VAS.Controllers
 
         private static string ToSqlDate(DateTime date)
         {
-            if (DB.IsOracle())
+            if (CoreLibrary.DataBase.DB.IsOracle())
             {
                 return "TO_DATE('" + date.ToString("yyyy-MM-dd") + "', 'YYYY-MM-DD')";
             }
