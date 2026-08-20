@@ -1,4 +1,4 @@
-﻿import "../app/forms/createforecast.js";
+import "../app/forms/createforecast.js";
 import "../app/forms/glDimensionValue.js";
 import "../app/forms/vallocation.js";
 import "../app/forms/vcreatefrom.js";
