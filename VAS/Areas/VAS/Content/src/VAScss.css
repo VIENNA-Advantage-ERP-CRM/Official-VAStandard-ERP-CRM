@@ -228,8 +228,8 @@
 @import "../VAS_172_PendingTransferConfirmationWidget.css";
 @import "../VAS_173_TransfersByWarehouseWidget.css";
 @import "../VAS_174_TransferQueueWidget.css";
-@import "../VAS_199_WarehouseDocumentStatusWidget.css";
-@import "../VAS_192_NewPurchaseOrderWidget.css";
-@import "../VAS_202_POPendingForPaymentWidget.css";
-@import "../VAS_204_POQueueWidget.css";
-@import "../VAS_205_OpenRequisitionsWidget.css";
+@import "../VAS_211_WarehouseDocumentStatusWidget.css";
+@import "../VAS_204_NewPurchaseOrderWidget.css";
+@import "../VAS_214_POPendingForPaymentWidget.css";
+@import "../VAS_216_POQueueWidget.css";
+@import "../VAS_217_OpenRequisitionsWidget.css";
