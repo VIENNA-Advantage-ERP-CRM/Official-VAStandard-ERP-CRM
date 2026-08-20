@@ -44,6 +44,10 @@
  *  4 | Advances / prepayments                   | VAS_199_AdvancesPrepayments
  *  5 | Allocated (CO / CL)                      | VAS_199_AllocatedCoCl
  *  6 | require allocation or reclassification   | VAS_199_NeedsAttention
+ *  6a| Open Payment Allocation                  | VAS_199_OpenPaymentAllocation
+ *  6b| Oldest unallocated                       | VAS_199_OldestUnallocated
+ *  6c| days                                     | VAS_199_Days
+ *  6d| Unallocated value                        | VAS_199_UnallocatedValue
  *  7 | No open accounting period                | VAS_199_NoOpenPeriod
  *  8 | Dashboard period                         | VAS_199_DashboardPeriod
  *  9 | No payments in this category             | VAS_199_NoPayments
@@ -125,6 +129,7 @@
         var $root = $('<div class="vas-199-root">');
         var $card;
         var $list;
+        var $action;
         var $foot;
         var $periodBtn;
         var $busy;
@@ -229,6 +234,25 @@
             return sign + (symbol ? symbol : '') + text;
         }
 
+        /* Headline money: the shared compact formatter, so a seven-figure total does
+           not overrun the strip and the numbering system follows the base currency
+           (lakh / crore vs K / M). The ISO code rides alongside as the unit, so no
+           symbol is hard-coded. */
+        function formatCompactAmount(value, iso, precision) {
+            var n = Number(value || 0);
+            if (!isFinite(n)) { n = 0; }
+            var p = Number(precision);
+            if (!isFinite(p) || p < 0) { p = 2; }
+
+            var sign = n < 0 ? '-' : '';
+            if (VIS.Util && VIS.Util.formatCompactAmount) {
+                return sign + VIS.Util.formatCompactAmount(n, iso, p);
+            }
+            return sign + Math.abs(n).toLocaleString(window.navigator.language, {
+                minimumFractionDigits: p, maximumFractionDigits: p
+            });
+        }
+
         /* Server dates arrive as ISO strings without a zone marker, so they parse
            as local time and no day can shift. */
         function formatDate(value) {
@@ -244,6 +268,9 @@
             if (name === 'chevNext') { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'; }
             if (name === 'chevDown') { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'; }
             if (name === 'calendar') { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>'; }
+            if (name === 'arrowR') { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="18" y2="12"/><polyline points="13 7 18 12 13 17"/></svg>'; }
+            if (name === 'pending') { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4"/><line x1="7.5" y1="7.5" x2="13" y2="7.5"/><line x1="7.5" y1="11" x2="11" y2="11"/><circle cx="16.5" cy="16.5" r="4.5" fill="#FFFFFF"/><polyline points="16.5 14.4 16.5 16.7 18.2 17.6"/></svg>'; }
+            if (name === 'money') { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.6 3h6.8l-1.2 3.1a1 1 0 0 1-.93.64h-2.54a1 1 0 0 1-.93-.64L8.6 3z"/><path d="M9.7 6.9C7 8.3 5.2 10.9 5.2 14a6.8 6.8 0 0 0 13.6 0c0-3.1-1.8-5.7-4.5-7.1"/><path d="M12 10.2v7.2"/><path d="M13.9 11.7h-2.5a1.35 1.35 0 0 0 0 2.7h1.2a1.35 1.35 0 0 1 0 2.7h-2.5"/></svg>'; }
             if (name === 'close') { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>'; }
             if (name === 'tick') { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'; }
             if (name === 'zoom') { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M8 21H3v-5"/><path d="M3 21l7-7"/></svg>'; }
@@ -280,14 +307,19 @@
                     '</div>' +
                     '<div class="vas-199-body">' +
                         '<div class="vas-199-list"></div>' +
+                        '<div class="vas-199-action"></div>' +
                         '<div class="vas-199-foot"></div>' +
                     '</div>' +
                 '</div>'
             );
 
             $list = $card.find('.vas-199-list');
+            $action = $card.find('.vas-199-action');
             $foot = $card.find('.vas-199-foot');
             $periodBtn = $card.find('.vas-199-periodchip');
+
+            /* Delegated: the strip is repainted on every period change. */
+            $action.on('click', '.vas-199-openform', function () { openAllocationForm(); });
 
             $periodBtn.on('click', function (e) {
                 e.stopPropagation();
@@ -401,10 +433,13 @@
             $periodBtn.toggleClass('vas-199-hidden', _periods.length === 0);
         }
 
+        /* State takeover: with no period there is nothing to act on and nothing to
+           total, so both strips go with the list. */
         function renderState(text, isError) {
             if (!$list) { return; }
             $list.html('<div class="vas-199-state' + (isError ? ' vas-199-state-error' : '') + '">' +
                 escapeHtml(text) + '</div>');
+            $action.empty();
             $foot.empty();
         }
 
@@ -429,19 +464,102 @@
             }
 
             $list.html(html);
+            paintAction();
             paintFoot();
         }
 
-        /* Footer helper: how many payments still need somebody to act - the two
-           unallocated buckets together. Zero is stated, not hidden. */
-        function paintFoot() {
+        /* Action strip: how many payments still need somebody to act - the two
+           unallocated buckets together - and the way to go and do it. The button is
+           only offered when the server could resolve the standard Allocation form;
+           a dead button would be worse than none. */
+        function paintAction() {
+            if (!$action) { return; }
+
             var counts = _counts || {};
             var open = Number(counts.SettlementCount || 0) + Number(counts.AdvanceCount || 0);
-            var text = formatCount(open) + ' ' +
-                label('VAS_199_NeedsAttention', 'require allocation or reclassification');
+            var text = label('VAS_199_NeedsAttention', 'require allocation or reclassification');
+            var formId = Number(counts.AllocationFormId || 0);
+            var openLabel = label('VAS_199_OpenPaymentAllocation', 'Open Payment Allocation');
 
-            $foot.html('<span class="vas-199-foot-info" title="' + escapeHtml(text) + '">' +
-                escapeHtml(text) + '</span>');
+            var html = '<div class="vas-199-action-info">' +
+                    '<span class="vas-199-action-ico">' + icon('pending') + '</span>' +
+                    '<span class="vas-199-action-text" title="' +
+                        escapeHtml(formatCount(open) + ' ' + text) + '">' +
+                        '<b class="vas-199-action-count">' + escapeHtml(formatCount(open)) + '</b>' +
+                        escapeHtml(text) +
+                    '</span>' +
+                '</div>';
+
+            if (formId > 0) {
+                html += '<span class="vas-199-stat-sep"></span>' +
+                    '<button type="button" class="vas-199-openform" data-form-id="' + formId +
+                        '" title="' + escapeHtml(openLabel) + '">' +
+                        escapeHtml(openLabel) + icon('arrowR') +
+                    '</button>';
+            }
+
+            $action.html(html);
+        }
+
+        /* Opens the standard Allocation form. The AD_Form_ID was resolved server-side
+           from AD_Form.ClassName, never hard-coded, and startForm keeps the user
+           inside the shell - no full-page navigation. */
+        function openAllocationForm() {
+            var formId = Number((_counts || {}).AllocationFormId || 0);
+            if (formId <= 0) { return; }
+            if (!VIS.viewManager || typeof VIS.viewManager.startForm !== 'function') { return; }
+
+            closeModal();
+            closePicker();
+
+            try {
+                VIS.viewManager.startForm(formId);
+            } catch (e) {
+                if (window.console) { console.log(e); }
+            }
+        }
+
+        /* Footer strip: the two headline figures of what is still unallocated - how
+           long the oldest one has been waiting, and what the whole of it is worth in
+           the tenant's base currency. Both are stated as zero / a dash rather than
+           hidden when there is nothing outstanding. */
+        function paintFoot() {
+            var counts = _counts || {};
+
+            var days = Number(counts.OldestUnallocatedDays);
+            var hasDays = isFinite(days) && days >= 0;
+            var daysText = hasDays ? formatCount(days) : '—';
+            var daysTip = hasDays && counts.OldestUnallocatedDate
+                ? formatDate(counts.OldestUnallocatedDate)
+                : daysText;
+
+            var amountText = formatCompactAmount(counts.UnallocatedAmount,
+                counts.BaseCurrencyIso, counts.BaseCurrencyPrecision);
+            var iso = counts.BaseCurrencyIso || '';
+
+            $foot.html(
+                statHtml(icon('calendar'),
+                    label('VAS_199_OldestUnallocated', 'Oldest unallocated'),
+                    daysText, label('VAS_199_Days', 'days'), daysTip) +
+                '<span class="vas-199-stat-sep"></span>' +
+                statHtml(icon('money'),
+                    label('VAS_199_UnallocatedValue', 'Unallocated value'),
+                    amountText, iso, amountText + (iso ? ' ' + iso : ''))
+            );
+        }
+
+        function statHtml(iconSvg, labelText, value, unit, tip) {
+            return '<div class="vas-199-stat">' +
+                '<span class="vas-199-stat-ico">' + iconSvg + '</span>' +
+                '<span class="vas-199-stat-text">' +
+                    '<span class="vas-199-stat-label" title="' + escapeHtml(labelText) + '">' +
+                        escapeHtml(labelText) + '</span>' +
+                    '<span class="vas-199-stat-value" title="' + escapeHtml(tip) + '">' +
+                        escapeHtml(value) +
+                        (unit ? '<span class="vas-199-stat-unit">' + escapeHtml(unit) + '</span>' : '') +
+                    '</span>' +
+                '</span>' +
+            '</div>';
         }
 
         // ── Period picker ────────────────────────────────────────────────────
@@ -898,6 +1016,7 @@
 
         this.disposeComponent = function () {
             if ($list) { $list.off(); }
+            if ($action) { $action.off(); }
             if ($periodBtn) { $periodBtn.off(); }
 
             /* Both overlays were appended to <body>, so removing $root would leave

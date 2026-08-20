@@ -73,6 +73,13 @@ namespace VASLogic.Models
         /* C_PeriodControl.PeriodStatus stored code for an open control row. */
         private const string PERIODSTATUS_Open = "O";
 
+        /* The standard Allocation form the card's action button opens. Resolved from
+           AD_Form.ClassName at runtime - the numeric AD_Form_ID differs per
+           environment - and memoised per app domain. 0 = not looked up yet,
+           -1 = looked up and not present, so a missing form is not re-queried. */
+        private const string ALLOCATION_FORM_CLASSNAME = "VAdvantage.Apps.AForms.VAllocation";
+        private static int _allocationFormId = 0;
+
         /* Detail paging guard rails. The client asks for a page size; anything
            outside this band is clamped so a crafted request cannot pull the whole
            payment table into one response. */
@@ -250,8 +257,10 @@ namespace VASLogic.Models
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// The three category counts of one period, from a single aggregated pass
-        /// over C_Payment - one query, not one per row and not one per category.
+        /// The three category counts of one period plus the two headline figures of
+        /// what is still unallocated - the age of the oldest one and their total
+        /// value in the tenant's base currency - from a single aggregated pass over
+        /// C_Payment. One query, not one per row and not one per figure.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="periodId">C_Period_ID selected by the user.</param>
@@ -261,6 +270,7 @@ namespace VASLogic.Models
         {
             CategoryCounts result = new CategoryCounts();
             result.C_Period_ID = periodId;
+            result.OldestUnallocatedDays = -1;      // -1 = nothing unallocated
 
             if (ctx == null) { return result; }
 
@@ -272,15 +282,34 @@ namespace VASLogic.Models
             }
 
             result.PeriodName = period.Name;
+            result.AllocationFormId = GetAllocationFormId();
 
-            /* Flat SUM(CASE ...) aggregation rather than three nested counting
-               subqueries: nested selects can exhaust the AddAccessSQL parser, and
-               one pass is cheaper than three. */
+            /* The unallocated total is reported in ONE currency, so payments in
+               foreign currencies are converted through the standard DB function to
+               the tenant's primary accounting-schema currency - never summed raw
+               and never against a hard-coded currency. */
+            BaseCurrency baseCurrency = GetBaseCurrency(ctx);
+            result.BaseCurrencyIso = baseCurrency.Iso;
+            result.BaseCurrencySymbol = baseCurrency.Symbol;
+            result.BaseCurrencyPrecision = baseCurrency.Precision;
+
+            string amountExpr = baseCurrency.C_Currency_ID > 0
+                ? @"SUM(CASE WHEN COALESCE(p.IsAllocated,'N')<>'Y' THEN COALESCE(currencyConvert(p.PayAmt,p.C_Currency_ID,@AcctCurrencyId,p.DateAcct,p.C_ConversionType_ID,p.AD_Client_ID,p.AD_Org_ID),0) ELSE 0 END)"
+                : "0";      // no accounting schema resolved - report nothing rather than a raw mixed-currency sum
+
+            /* Flat SUM(CASE ...) aggregation rather than nested counting subqueries:
+               nested selects can exhaust the AddAccessSQL parser, and one pass is
+               cheaper than several. The oldest date is returned as a DATE and the
+               day count is worked out in C# - date arithmetic differs between the
+               two backends and there is no reason to make the query carry it. */
             StringBuilder sql = new StringBuilder();
             sql.Append(@"
                 SELECT SUM(CASE WHEN COALESCE(p.IsAllocated,'N')<>'Y' AND COALESCE(p.IsPrepayment,'N')<>'Y' AND COALESCE(ch.IsAdvanceCharge,'N')<>'Y' THEN 1 ELSE 0 END) AS Settlement_Count,
                        SUM(CASE WHEN COALESCE(p.IsAllocated,'N')<>'Y' AND (p.IsPrepayment='Y' OR COALESCE(ch.IsAdvanceCharge,'N')='Y') THEN 1 ELSE 0 END) AS Advance_Count,
-                       SUM(CASE WHEN p.IsAllocated='Y' THEN 1 ELSE 0 END) AS Allocated_Count
+                       SUM(CASE WHEN p.IsAllocated='Y' THEN 1 ELSE 0 END) AS Allocated_Count,
+                       MIN(CASE WHEN COALESCE(p.IsAllocated,'N')<>'Y' THEN p.DateAcct ELSE NULL END) AS Oldest_Unallocated_Date,
+                       ");
+            sql.Append(amountExpr).Append(@" AS Unallocated_Amount
                 FROM C_Payment p
                 LEFT OUTER JOIN C_Charge ch ON (ch.C_Charge_ID=p.C_Charge_ID)
                 WHERE ");
@@ -289,13 +318,104 @@ namespace VASLogic.Models
             string accessSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "p",
                 MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet ds = DB.ExecuteDataset(accessSql, PeriodBoundParameters(period), null);
+            /* Bind values in the order they APPEAR: the conversion sits in the SELECT
+               list, ahead of the period bounds in the WHERE. */
+            List<SqlParameter> parameters = new List<SqlParameter>();
+            if (baseCurrency.C_Currency_ID > 0)
+            {
+                parameters.Add(new SqlParameter("@AcctCurrencyId", baseCurrency.C_Currency_ID));
+            }
+            parameters.AddRange(PeriodBoundParameters(period));
+
+            DataSet ds = DB.ExecuteDataset(accessSql, parameters.ToArray(), null);
             if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { return result; }
 
             DataRow row = ds.Tables[0].Rows[0];
             result.SettlementCount = Util.GetValueOfInt(row["Settlement_Count"]);
             result.AdvanceCount = Util.GetValueOfInt(row["Advance_Count"]);
             result.AllocatedCount = Util.GetValueOfInt(row["Allocated_Count"]);
+            result.UnallocatedAmount = Util.GetValueOfDecimal(row["Unallocated_Amount"]);
+
+            /* Age of the oldest unallocated payment, in whole days from its
+               accounting date to today. A payment accounted in the future counts as
+               0 days rather than a negative age. */
+            DateTime? oldest = Util.GetValueOfDateTime(row["Oldest_Unallocated_Date"]);
+            if (oldest.HasValue)
+            {
+                double days = (DateTime.Now.Date - oldest.Value.Date).TotalDays;
+                result.OldestUnallocatedDays = days > 0 ? (int)Math.Floor(days) : 0;
+                result.OldestUnallocatedDate = oldest;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// AD_Form_ID of the standard Allocation form, resolved from its ClassName so
+        /// no numeric id is ever hard-coded. Dictionary metadata does not change at
+        /// runtime, so the answer is memoised per app domain.
+        /// </summary>
+        /// <returns>AD_Form_ID, or 0 when the form is not present in this environment
+        /// (the client then hides the action button rather than offering a dead one).</returns>
+        private int GetAllocationFormId()
+        {
+            if (_allocationFormId > 0) { return _allocationFormId; }
+            if (_allocationFormId < 0) { return 0; }        // looked up, not present
+
+            string sql = @"
+                SELECT Form.AD_Form_ID AS Form_ID
+                FROM AD_Form Form
+                WHERE Form.ClassName=@ClassName
+                  AND Form.IsActive='Y'";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@ClassName", ALLOCATION_FORM_CLASSNAME)
+            };
+
+            int formId = Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null));
+            _allocationFormId = formId > 0 ? formId : -1;
+
+            return formId;
+        }
+
+        /// <summary>
+        /// The tenant's base currency: the currency of the primary accounting schema
+        /// (AD_ClientInfo.C_AcctSchema1_ID). Reads only system / reference tables
+        /// scoped to the session client, so no MRole predicate is applied - the same
+        /// treatment the sibling KPI widgets give this lookup.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <returns>Populated <see cref="BaseCurrency"/>; C_Currency_ID is 0 when the
+        /// tenant has no primary accounting schema.</returns>
+        private BaseCurrency GetBaseCurrency(Ctx ctx)
+        {
+            BaseCurrency result = new BaseCurrency();
+            result.Precision = 2;
+
+            string sql = @"
+                SELECT AcctSchema.C_Currency_ID AS Acct_Currency_ID,
+                       Currency.StdPrecision AS Std_Precision,
+                       CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Currency_Symbol,
+                       Currency.ISO_Code AS Currency_Iso
+                FROM AD_ClientInfo ClientInfo
+                INNER JOIN C_AcctSchema AcctSchema ON (AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID)
+                INNER JOIN C_Currency Currency ON (Currency.C_Currency_ID=AcctSchema.C_Currency_ID)
+                WHERE ClientInfo.AD_Client_ID=@AD_Client_ID";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { return result; }
+
+            DataRow row = ds.Tables[0].Rows[0];
+            result.C_Currency_ID = Util.GetValueOfInt(row["Acct_Currency_ID"]);
+            result.Precision = Util.GetValueOfInt(row["Std_Precision"]);
+            result.Symbol = Util.GetValueOfString(row["Currency_Symbol"]);
+            result.Iso = Util.GetValueOfString(row["Currency_Iso"]);
 
             return result;
         }
@@ -583,7 +703,8 @@ namespace VASLogic.Models
             public string CalendarName { get; set; }
         }
 
-        /// <summary>The three category counts of one period.</summary>
+        /// <summary>The three category counts of one period, plus the unallocated
+        /// headline figures shown under them.</summary>
         public class CategoryCounts
         {
             public int C_Period_ID { get; set; }
@@ -593,8 +714,36 @@ namespace VASLogic.Models
             public int AdvanceCount { get; set; }
             public int AllocatedCount { get; set; }
 
+            /// <summary>Whole days from the oldest unallocated payment's accounting
+            /// date to today; -1 when nothing is unallocated in this period.</summary>
+            public int OldestUnallocatedDays { get; set; }
+
+            /// <summary>Accounting date behind OldestUnallocatedDays, for the tooltip.</summary>
+            public DateTime? OldestUnallocatedDate { get; set; }
+
+            /// <summary>Total of every unallocated payment, converted to the base
+            /// currency below.</summary>
+            public decimal UnallocatedAmount { get; set; }
+
+            public string BaseCurrencyIso { get; set; }
+            public string BaseCurrencySymbol { get; set; }
+            public int BaseCurrencyPrecision { get; set; }
+
+            /// <summary>AD_Form_ID of the standard Allocation form; 0 hides the
+            /// action button rather than offering a dead one.</summary>
+            public int AllocationFormId { get; set; }
+
             /// <summary>One of the ERROR_* tokens; the client resolves the label.</summary>
             public string ErrorCode { get; set; }
+        }
+
+        /// <summary>The tenant's primary accounting-schema currency.</summary>
+        private class BaseCurrency
+        {
+            public int C_Currency_ID { get; set; }
+            public string Iso { get; set; }
+            public string Symbol { get; set; }
+            public int Precision { get; set; }
         }
 
         /// <summary>Period list, default selection and its counts, in one payload.</summary>
