@@ -326,3 +326,8 @@ import "../app/widgets/VAS_171_InitiatedMTDWidget.js";
 import "../app/widgets/VAS_172_PendingTransferConfirmationWidget.js";
 import "../app/widgets/VAS_173_TransfersByWarehouseWidget.js";
 import "../app/widgets/VAS_174_TransferQueueWidget.js";
+import "../app/widgets/PeriodControl/VAS_192_CurrentPeriodWidget.js";
+import "../app/widgets/PeriodControl/VAS_193_PreviousPeriodWidget.js";
+import "../app/widgets/PeriodControl/VAS_196_PeriodControlMatrixWidget.js";
+import "../app/widgets/PeriodControl/VAS_199_PaymentAllocationStatusWidget.js";
+import "../app/widgets/PeriodControl/VAS_200_BankReconcilationWidget.js";

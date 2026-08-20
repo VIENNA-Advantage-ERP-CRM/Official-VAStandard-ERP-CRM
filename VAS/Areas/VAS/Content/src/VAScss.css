@@ -229,3 +229,8 @@
 @import "../VAS_172_PendingTransferConfirmationWidget.css";
 @import "../VAS_173_TransfersByWarehouseWidget.css";
 @import "../VAS_174_TransferQueueWidget.css";
+@import "../VAS_192_CurrentPeriodWidget.css";
+@import "../VAS_193_PreviousPeriodWidget.css";
+@import "../VAS_196_PeriodControlMatrixWidget.css";
+@import "../VAS_199_PaymentAllocationStatusWidget.css";
+@import "../VAS_200_BankReconcilationWidget.css";
