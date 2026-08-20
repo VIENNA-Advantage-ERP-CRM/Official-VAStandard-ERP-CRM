@@ -240,6 +240,7 @@ namespace VASLogic.Models
                        pc.AD_Org_ID AS AD_Org_ID,
                        COALESCE(org.Name,N'') AS Org_Name,
                        pc.DocBaseType AS Doc_Base_Type,
+                       dbt.C_DocBaseType_ID AS C_DocBaseType_ID,
                        COALESCE(dbt.Name,pc.DocBaseType) AS Doc_Base_Type_Name,
                        pc.PeriodStatus AS Period_Status,
                        pc.PeriodAction AS Period_Action
@@ -275,6 +276,7 @@ namespace VASLogic.Models
                 row.AD_Org_ID = Util.GetValueOfInt(dt.Rows[i]["AD_Org_ID"]);
                 row.OrgName = Util.GetValueOfString(dt.Rows[i]["Org_Name"]);
                 row.DocBaseType = Util.GetValueOfString(dt.Rows[i]["Doc_Base_Type"]);
+                row.C_DocBaseType_ID = Util.GetValueOfInt(dt.Rows[i]["C_DocBaseType_ID"]);
                 row.DocBaseTypeName = Util.GetValueOfString(dt.Rows[i]["Doc_Base_Type_Name"]);
                 row.PeriodStatus = Util.GetValueOfString(dt.Rows[i]["Period_Status"]);
                 row.PeriodAction = Util.GetValueOfString(dt.Rows[i]["Period_Action"]);
@@ -655,6 +657,10 @@ namespace VASLogic.Models
 
             /// <summary>Stored code; the client keys its status/tone map off it.</summary>
             public string DocBaseType { get; set; }
+
+            /// <summary>C_DocBaseType key, so the filter dialog's lookup value can be
+            /// matched against a row without comparing display names.</summary>
+            public int C_DocBaseType_ID { get; set; }
 
             /// <summary>C_DocBaseType name, falling back to the stored code.</summary>
             public string DocBaseTypeName { get; set; }

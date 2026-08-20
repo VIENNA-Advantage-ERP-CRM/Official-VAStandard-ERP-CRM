@@ -43,6 +43,12 @@
  * 12 | Confirm                                 | VAS_062_Confirm           (reuse)
  * 13 | This period is permanently closed and cannot be reopened. | VAS_196_PermClosedHint
  * 14 | No period controls configured for this period.            | VAS_196_NoControls
+ * 14a| Organization                            | VAS_196_Organization
+ * 14b| Document Base Type                      | VAS_196_DocBaseType
+ * 14c| No period controls match the filter.    | VAS_196_NoMatches
+ * 14d| Clear                                   | VIS_Clear                 (reuse)
+ * 14e| Apply                                   | VIS_Apply                 (reuse)
+ * 14f| Filter                                  | VAS_034_Filter            (reuse)
  * 15 | Could not change the period status.     | VAS_196_ChangeFailed
  * 16 | The open/close process is not configured. | VAS_196_NoProcess
  * 17 | The selected period is no longer available. | VAS_196_InvalidSelection
@@ -103,6 +109,7 @@
         this.frame;
         this.windowNo;
 
+        var $self = this;
         var $root = $('<div class="vas-196-root">');
         var $card;
         var $list;
@@ -110,7 +117,23 @@
         var $selCal;
         var $selYear;
         var $selPeriod;
+        var $filterBtn;
         var $busy;
+
+        /* Filter popover (lives on <body>, so it is NOT inside $root - always address
+           it through these references, never through $root.find). Built once on first
+           open and kept, so the two VIS lookup controls hold their selection between
+           openings. Non-modal: it never blocks the rest of the dashboard. */
+        var $filterPopup = null;
+        var $orgField = null;
+        var vOrgCtrl = null;
+        var vDocTypeCtrl = null;
+        var _popupOpen = false;
+
+        /* Per-instance event namespace - a dashboard can hold two of this widget, and
+           each must unbind only its own document/window dismissers. */
+        var _ns = '.vas196_' + (VAS.VAS_196_PeriodControlMatrixWidget._seq =
+            (VAS.VAS_196_PeriodControlMatrixWidget._seq || 0) + 1);
 
         /* Current selection (echoed back on every status change so the server can
            re-validate the whole hierarchy). */
@@ -129,6 +152,21 @@
            period is tenant-wide (AD_Org_ID = 0) the column would repeat "*" on every
            row, so it is dropped entirely. */
         var _showOrg = false;
+
+        /* Committed filter terms (lower-cased). They are applied by Apply / Enter /
+           Clear only - typing alone does not repaint, so the buttons stay meaningful.
+           _view is the filtered projection of _rows that the pager and the list work
+           against; _rows always stays the full set the server returned. */
+        var _view = [];
+
+        /* Committed filter selection, as the ids the lookups return. null = the field
+           was left empty, so that dimension is not filtered at all. 0 is a REAL id
+           here - the tenant-wide '*' organization - so it must never be treated as
+           "nothing picked": picking '*' filters the matrix down to the tenant-wide
+           controls. */
+        var _filterOrgId = null;
+        var _filterDocTypeId = null;
+
         var _page = 1;
         var _pageSize = 5;
         var _rowH = 0;
@@ -179,6 +217,7 @@
         function createWidget() {
             var title = label('VAS_196_PeriodControlMatrix', 'Period Control Matrix');
             var subtitle = label('VAS_196_ByDocBaseType', 'By document base type');
+            var filterLabel = label('VAS_034_Filter', 'Filter');
 
             $card = $(
                 '<div class="vas-196-card vas-widget-bg" role="group" aria-label="' + escapeHtml(title) + '">' +
@@ -205,6 +244,16 @@
                                 escapeHtml(label('VAS_196_Year', 'Year')) + '"></select>' +
                             '<select class="vas-196-sel vas-196-sel-period" aria-label="' +
                                 escapeHtml(label('VAS_192_Period', 'Period')) + '"></select>' +
+                            /* Funnel: opens the filter dialog. Keeping the lookups in a
+                               dialog leaves the whole card height to the matrix. */
+                            '<button type="button" class="vas-196-filter-btn" aria-haspopup="dialog"' +
+                                ' aria-label="' + escapeHtml(filterLabel) + '"' +
+                                ' title="' + escapeHtml(filterLabel) + '">' +
+                                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"' +
+                                    ' stroke-linecap="round" stroke-linejoin="round">' +
+                                    '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>' +
+                                '</svg>' +
+                            '</button>' +
                         '</div>' +
                         '<div class="vas-196-list"></div>' +
                         '<div class="vas-196-pager"></div>' +
@@ -217,6 +266,11 @@
             $selCal = $card.find('.vas-196-sel-cal');
             $selYear = $card.find('.vas-196-sel-year');
             $selPeriod = $card.find('.vas-196-sel-period');
+            $filterBtn = $card.find('.vas-196-filter-btn');
+            $filterBtn.on('click', function (e) {
+                e.stopPropagation();
+                toggleFilterPopup();
+            });
 
             /* Cascade: a calendar change clears year, period and the matrix; a year
                change clears period and the matrix. Nothing is kept from the previous
@@ -407,6 +461,259 @@
                One template still applies to every row in the list. */
             if ($list) { $list.toggleClass('vas-196-list-org', _showOrg); }
 
+            /* No organizations in this period means nothing to pick - drop whatever
+               the org lookup was still holding (the field itself is hidden when the
+               dialog next opens). */
+            if (!_showOrg && _filterOrgId !== null) {
+                _filterOrgId = null;
+                ctrlClear(vOrgCtrl);
+                if ($filterBtn) {
+                    $filterBtn.toggleClass('vas-196-filter-btn-active', _filterDocTypeId !== null);
+                }
+            }
+
+            buildView();
+            paintList();
+        }
+
+        /* Projects _rows through the committed filter selection. Each term is applied
+           whenever it HAS a value - including id 0 for the tenant-wide organization -
+           and skipped only when the lookup was left empty (null). */
+        function buildView() {
+            if (_filterOrgId === null && _filterDocTypeId === null) { _view = _rows; return; }
+
+            _view = [];
+            for (var i = 0; i < _rows.length; i++) {
+                var row = _rows[i];
+                if (_filterOrgId !== null && row.AD_Org_ID !== _filterOrgId) { continue; }
+                if (_filterDocTypeId !== null && row.C_DocBaseType_ID !== _filterDocTypeId) { continue; }
+                _view.push(row);
+            }
+        }
+
+        // ── Filter dialog (VIS lookup controls) ──────────────────────────────
+
+        /* Reads a VIS control's current value as an id. VTextBoxButton exposes both
+           getValue() and .value depending on version - take whichever answers.
+           Returns null for an empty control, NOT 0: AD_Org_ID 0 is the tenant-wide
+           '*' organization and a legitimate selection, so "no value" and "0" have to
+           stay distinguishable all the way through to buildView(). */
+        function ctrlId(ctrl) {
+            if (!ctrl) { return null; }
+            var raw = (typeof ctrl.getValue === 'function') ? ctrl.getValue() : ctrl.value;
+            if (raw === null || raw === undefined || raw === '') { return null; }
+            var id = parseInt(raw, 10);
+            return isNaN(id) ? null : id;
+        }
+
+        /* setValue(value, forceSet, fireEvent) - all three are needed for the control
+           to repaint its display text without firing the change event back at us. */
+        function ctrlClear(ctrl) {
+            if (!ctrl) { return; }
+            try { ctrl.setValue(null, true, false); }
+            catch (e) { if (typeof ctrl.setValue === 'function') { ctrl.setValue(null); } }
+        }
+
+        /* Builds one filter field: a bold caption on its own line above an underlined
+           control row that carries the lookup text box and its search button. The row
+           owns the underline so it runs unbroken beneath both (same treatment as the
+           VAS_063 / VAS_067 search filters). Returns null when the framework controls
+           are unavailable or the lookup cannot be built, so a missing dictionary entry
+           drops one field instead of breaking the popover. */
+        function buildLookupField(columnName, validation, labelText) {
+            if (!VIS.MLookupFactory || !VIS.Controls || !VIS.Controls.VTextBoxButton) { return null; }
+
+            var ctrl;
+            try {
+                var ctx = VIS.Env.getCtx();
+
+                /* ctx, windowNo, column_ID, AD_Reference_ID, columnName,
+                   AD_Reference_Value_ID, isParent, validationCode */
+                var lookup = VIS.MLookupFactory.get(ctx, ($self.windowNo > 0 ? $self.windowNo : 0), 0,
+                    VIS.DisplayType.Search, columnName, 0, false, validation);
+
+                /* columnName, mandatory, readOnly, updateable, displayType, lookup */
+                ctrl = new VIS.Controls.VTextBoxButton(columnName, false, false, true,
+                    VIS.DisplayType.Search, lookup);
+            } catch (e) {
+                if (window.console) { console.log(e); }
+                return null;
+            }
+
+            /* Prefer the framework's own translated element name for the column, so the
+               field is captioned exactly as it is everywhere else; the AD_Message
+               fallback only kicks in where there is no such text. */
+            var text = (VIS.translatedTexts && VIS.translatedTexts[columnName])
+                ? VIS.translatedTexts[columnName]
+                : labelText;
+
+            var $field = $('<div class="vas-196-frow">');
+            var $caption = $('<div class="vas-196-flabel">').text(text);
+            var $row = $('<div class="vas-196-fctrlrow">');
+
+            $row.append(ctrl.getControl()
+                .addClass('vas-196-fctrl')
+                .attr('data-hasbtn', ' ')
+                .css('width', '100%'));
+
+            var btn = ctrl.getBtn ? ctrl.getBtn(0) : null;
+            if (btn) { $row.append($('<span class="vas-196-fbtnwrap">').append(btn)); }
+
+            $field.append($caption).append($row);
+
+            return { field: $field, ctrl: ctrl };
+        }
+
+        /* The popover is NOT modal and carries no overlay: every other widget on the
+           dashboard stays clickable while it is open, and it belongs visually to this
+           widget alone. It is appended to <body> (the card clips its own overflow, so
+           an in-card popover would be cut off) and positioned against the funnel on
+           every open, which is what makes it read as attached to the icon. */
+        function buildFilterPopup() {
+            $filterPopup = $('<div class="vas-196-fpop vas-196-hidden" role="dialog" aria-label="' +
+                escapeHtml(label('VAS_034_Filter', 'Filter')) + '">');
+            $filterPopup.append('<span class="vas-196-fpop-arrow"></span>');
+
+            /* Organization - only offered when the period is controlled per org.
+               Same restriction the standard org lookups use: no summary orgs (the
+               tenant-wide '*' org, AD_Org_ID 0, is deliberately kept because
+               tenant-wide period controls belong to it) and no cost / profit centres,
+               which are accounting dimensions rather than postable organizations. */
+            var org = buildLookupField('AD_Org_ID',
+                "AD_Org.IsActive='Y' AND (AD_Org.IsSummary='N' OR AD_Org.AD_Org_ID=0)" +
+                " AND AD_Org.IsCostCenter='N' AND AD_Org.IsProfitCenter='N'",
+                label('VAS_196_Organization', 'Organization'));
+            $orgField = org ? org.field : $();
+            vOrgCtrl = org ? org.ctrl : null;
+
+            /* Document base type - the same table the matrix rows are resolved from,
+               so the selected C_DocBaseType_ID matches a row id for id. */
+            var doc = buildLookupField('C_DocBaseType_ID', "C_DocBaseType.IsActive='Y'",
+                label('VAS_196_DocBaseType', 'Document Base Type'));
+            vDocTypeCtrl = doc ? doc.ctrl : null;
+
+            /* Borderless action column - text buttons, no surface of their own. */
+            var $foot = $('<div class="vas-196-fpop-foot">');
+            var $clear = $('<button type="button" class="vas-196-linkbtn">')
+                .text(label('VIS_Clear', 'Clear'));
+            var $apply = $('<button type="button" class="vas-196-linkbtn vas-196-linkbtn-primary">')
+                .text(label('VIS_Apply', 'Apply'));
+
+            /* Clear resets the fields only - it neither applies nor closes, so the
+               user can pick a different combination straight away. */
+            $clear.on('click', function () {
+                ctrlClear(vOrgCtrl);
+                ctrlClear(vDocTypeCtrl);
+            });
+
+            $apply.on('click', function () {
+                applyFilters();
+                closeFilterPopup();
+            });
+
+            $foot.append($clear).append($apply);
+            if (org) { $filterPopup.append($orgField); }
+            if (doc) { $filterPopup.append(doc.field); }
+            $filterPopup.append($foot);
+
+            $filterPopup.on('keydown', function (e) {
+                if (e.key === 'Escape' || e.keyCode === 27) {
+                    e.stopPropagation();
+                    closeFilterPopup();
+                    if ($filterBtn) { $filterBtn.focus(); }
+                }
+            });
+
+            $('body').append($filterPopup);
+        }
+
+        /* Anchors the popover under the funnel, right edges aligned, and flips it
+           above when the icon sits too low in the viewport. */
+        function positionFilterPopup() {
+            if (!$filterPopup || !$filterBtn || !$filterBtn[0]) { return; }
+
+            var rect = $filterBtn[0].getBoundingClientRect();
+            var pw = $filterPopup.outerWidth();
+            var ph = $filterPopup.outerHeight();
+            var gap = 8;
+
+            var left = rect.right - pw;
+            left = Math.min(left, window.innerWidth - pw - gap);
+            left = Math.max(gap, left);
+
+            var top = rect.bottom + gap;
+            var below = true;
+            if (top + ph > window.innerHeight - gap) {
+                var above = rect.top - ph - gap;
+                if (above >= gap) { top = above; below = false; }
+                else { top = Math.max(gap, window.innerHeight - ph - gap); }
+            }
+
+            $filterPopup.css({ left: Math.round(left) + 'px', top: Math.round(top) + 'px' });
+            $filterPopup.toggleClass('vas-196-fpop-above', !below);
+
+            /* Point the arrow at the funnel's centre wherever the panel ended up. */
+            var caret = rect.left + (rect.width / 2) - left;
+            caret = Math.max(12, Math.min(pw - 12, caret));
+            $filterPopup.find('.vas-196-fpop-arrow').css('left', Math.round(caret) + 'px');
+        }
+
+        function openFilterPopup() {
+            if (!$filterPopup) { buildFilterPopup(); }
+
+            /* Nothing to pick when every control of the period is tenant-wide. */
+            $orgField.toggleClass('vas-196-hidden', !_showOrg);
+
+            $filterPopup.removeClass('vas-196-hidden');
+            positionFilterPopup();
+            _popupOpen = true;
+            if ($filterBtn) { $filterBtn.addClass('vas-196-filter-btn-open'); }
+
+            /* Bound only while the popover is open, under this widget's own namespace,
+               so two instances never fight over them.
+               Deliberately NO outside-click dismisser: the panel stays put while the
+               user works anywhere else on the screen - it closes on the funnel, on
+               Apply, or on Escape, and nothing else. */
+            $(document).on('keydown' + _ns, onDocumentKeyDown);
+            /* Follow the funnel instead of closing: a lookup's Info window can shift
+               the page, and closing there would pull the control out from under an
+               interaction the user is in the middle of. */
+            $(window).on('resize' + _ns + ' scroll' + _ns, positionFilterPopup);
+        }
+
+        function closeFilterPopup() {
+            if (!_popupOpen) { return; }
+            _popupOpen = false;
+            if ($filterPopup) { $filterPopup.addClass('vas-196-hidden'); }
+            if ($filterBtn) { $filterBtn.removeClass('vas-196-filter-btn-open'); }
+
+            $(document).off('keydown' + _ns);
+            $(window).off('resize' + _ns + ' scroll' + _ns);
+        }
+
+        function toggleFilterPopup() {
+            if (_popupOpen) { closeFilterPopup(); } else { openFilterPopup(); }
+        }
+
+        function onDocumentKeyDown(e) {
+            if (e.key === 'Escape' || e.keyCode === 27) { closeFilterPopup(); }
+        }
+
+        /* Commits what the two lookups hold. Both are plain id comparisons against the
+           loaded rows - no display-name matching, so a renamed or translated
+           organization / base type can never break the filter. */
+        function applyFilters() {
+            _filterOrgId = _showOrg ? ctrlId(vOrgCtrl) : null;
+            _filterDocTypeId = ctrlId(vDocTypeCtrl);
+
+            if ($filterBtn) {
+                $filterBtn.toggleClass('vas-196-filter-btn-active',
+                    _filterOrgId !== null || _filterDocTypeId !== null);
+            }
+
+            _page = 1;
+            _needsSync = true;
+            buildView();
             paintList();
         }
 
@@ -425,20 +732,27 @@
                 return;
             }
 
-            var totalPages = _pageSize > 0 ? Math.ceil(_rows.length / _pageSize) : 1;
+            /* Distinct from the state above: the period does have controls, the
+               filter just excluded them all - say which of the two it is. */
+            if (!_view || _view.length === 0) {
+                renderState(label('VAS_196_NoMatches', 'No period controls match the filter.'), false);
+                return;
+            }
+
+            var totalPages = _pageSize > 0 ? Math.ceil(_view.length / _pageSize) : 1;
             if (_page > totalPages) { _page = totalPages; }
             if (_page < 1) { _page = 1; }
 
             var from = (_page - 1) * _pageSize;
-            var to = Math.min(from + _pageSize, _rows.length);
+            var to = Math.min(from + _pageSize, _view.length);
 
             var html = '';
             for (var i = from; i < to; i++) {
-                html += buildRow(_rows[i]);
+                html += buildRow(_view[i]);
             }
             $list.html(html);
 
-            $pager.html(pagerHtml(_page, totalPages, from + 1, to, _rows.length));
+            $pager.html(pagerHtml(_page, totalPages, from + 1, to, _view.length));
             $pager.find('.vas-196-pg-prev').on('click', function () {
                 if (_page > 1) { _page--; paintList(); }
             });
@@ -532,7 +846,7 @@
 
         function syncCapacity() {
             if (!$list || !$list[0]) { return; }
-            if (!_rows || _rows.length === 0) { return; }
+            if (!_view || _view.length === 0) { return; }
 
             var avail = $list[0].clientHeight;
             if (avail <= 0) {
@@ -661,7 +975,16 @@
         // ── Framework contract ───────────────────────────────────────────────
 
         this.refreshWidget = function () {
+            /* Refresh means "start clean" - drop the filter with the data. */
+            closeFilterPopup();
+            _filterOrgId = null;
+            _filterDocTypeId = null;
+            ctrlClear(vOrgCtrl);
+            ctrlClear(vDocTypeCtrl);
+            if ($filterBtn) { $filterBtn.removeClass('vas-196-filter-btn-active'); }
+
             _rows = [];
+            _view = [];
             _page = 1;
             _needsSync = true;
             loadBootstrap();
@@ -677,6 +1000,21 @@
             if ($selCal) { $selCal.off(); }
             if ($selYear) { $selYear.off(); }
             if ($selPeriod) { $selPeriod.off(); }
+            if ($filterBtn) { $filterBtn.off(); }
+
+            /* The popover was appended to <body>, so removing $root would leave it
+               behind - close it (which unbinds the document/window dismissers under
+               this instance's namespace) and tear it down explicitly. */
+            closeFilterPopup();
+            if ($filterPopup) {
+                $filterPopup.off();
+                $filterPopup.remove();
+                $filterPopup = null;
+                $orgField = null;
+                vOrgCtrl = null;
+                vDocTypeCtrl = null;
+            }
+
             $root.remove();
         };
     };
