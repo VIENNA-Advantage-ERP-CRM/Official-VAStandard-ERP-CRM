@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VAS_186_ProductCategoryUsageWidget
  * 4x2 Horizontal Bar Chart Widget for Inventory Use dashboard.
  * Displays internal-use consumption grouped by product category for selected period,
@@ -32,52 +32,6 @@
  * 22 | All                                    | VAS_All
  */
 ; VAS = window.VAS || {};
-
-/* ==========================================================================================
-   🛑 🚨 🚨 🛑  DEMO DATA - UI PREVIEW ONLY - DELETE THIS BLOCK BEFORE COMMIT  🛑 🚨 🚨 🛑
-   Set VAS_186_DEMO to false (or delete this block and the two `if (VAS_186_DEMO)` guards in
-   loadCategoryUsage() and the drill-down loader) to restore live controller data.
-   ========================================================================================== */
-var VAS_186_DEMO = true;
-
-function VAS_186_demoCategories() {
-    var names = ["Standard", "Accessories", "Spare Parts", "Lubricants", "Electrical", "Hydraulics",
-        "Fasteners", "Bearings", "Safety Gear", "Tooling", "Consumables", "Filters",
-        "Seals & Gaskets", "Pneumatics", "Instrumentation", "Packaging", "Cleaning Supplies",
-        "Welding", "Cutting Tools", "Adhesives", "Pipes & Fittings", "Cables"];
-    var out = [];
-    for (var i = 0; i < names.length; i++) {
-        var val = 34900 - (i * 1420) - ((i % 5) * 260);
-        out.push({
-            categoryId: 800001 + i, categoryName: names[i],
-            totalQty: 12 + ((i * 11) % 190), totalValue: val > 0 ? val : 180
-        });
-    }
-    return out;
-}
-
-function VAS_186_demoIssueLines() {
-    var products = ["Hydraulic Pump HP-450", "Bearing Assembly SKF-6204", "Control Valve CV-12",
-        "Drive Belt DB-880", "Servo Motor SM-3000", "Gear Box GB-75", "Seal Kit SK-220",
-        "Filter Cartridge FC-90"];
-    var attrs = ["Grade A", "", "Batch B-2291", "", "", "Grade C", "", "Batch B-1140"];
-    var uoms = ["Each", "Set", "Kg", "Ltr"];
-    var whs = ["Central WH / A-01-02", "North WH / C-02-07", "Plant WH / E-03-09", "Central WH / B-04-11"];
-    var out = [];
-    for (var i = 0; i < 22; i++) {
-        out.push({
-            documentNo: "IU-" + (104820 + i * 3),
-            productName: products[i % products.length],
-            attribute: attrs[i % attrs.length],
-            uomName: uoms[i % uoms.length],
-            whLoc: whs[i % whs.length],
-            qty: 2 + ((i * 5) % 27),
-            movementDate: String(1 + (i % 28)).padStart(2, '0') + " Aug 2026"
-        });
-    }
-    return out;
-}
-/* ===================== 🛑 END DEMO DATA BLOCK 🛑 ===================== */
 
 ; (function (VAS, $) {
 
@@ -151,20 +105,88 @@ function VAS_186_demoIssueLines() {
             return data || {};
         }
 
+// ===== NEW CODE START — currency format (agent A08, 2026-08-19) =====
+        var currencyIso = "";
+        var currencySymbol = "";
+        var indianIsos = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function isIndianIso(iso) {
+            if (!iso) { return false; }
+            return indianIsos.indexOf(String(iso).toUpperCase()) !== -1;
+        }
+
         function formatQty(value) {
             var n = Number(value || 0);
             return n.toLocaleString(window.navigator.language);
         }
 
-        function formatINR(value) {
+        function formatCurrency(value) {
             var val = Number(value || 0);
-            if (val >= 100000) {
-                return '₹' + (val / 100000).toFixed(1) + 'L';
-            } else if (val >= 1000) {
-                return '₹' + (val / 1000).toFixed(1) + 'k';
+            if (isNaN(val)) { val = 0; }
+            var sym = currencySymbol || currencyIso || "";
+            var iso = (currencyIso || "").toUpperCase();
+            var isIndian = isIndianIso(iso);
+
+            var formatted = "";
+            var absVal = Math.abs(val);
+
+            if (isIndian) {
+                if (absVal >= 10000000) {
+                    formatted = (val / 10000000).toFixed(1) + 'Cr';
+                } else if (absVal >= 100000) {
+                    formatted = (val / 100000).toFixed(1) + 'L';
+                } else if (absVal >= 1000) {
+                    formatted = (val / 1000).toFixed(1) + 'k';
+                } else {
+                    formatted = val.toLocaleString('en-IN');
+                }
+            } else {
+                if (absVal >= 1000000000) {
+                    formatted = (val / 1000000000).toFixed(1) + 'B';
+                } else if (absVal >= 1000000) {
+                    formatted = (val / 1000000).toFixed(1) + 'M';
+                } else if (absVal >= 1000) {
+                    formatted = (val / 1000).toFixed(1) + 'k';
+                } else {
+                    formatted = val.toLocaleString(window.navigator.language);
+                }
             }
-            return '₹' + val.toLocaleString(window.navigator.language);
+
+            if (sym) {
+                return sym + (sym.length > 1 && !sym.match(/^[₹$€£¥]$/) ? " " : "") + formatted;
+            }
+            return formatted;
         }
+
+        function formatCurrencyExact(value) {
+            var val = Number(value || 0);
+            if (isNaN(val)) { val = 0; }
+            var sym = currencySymbol || currencyIso || "";
+            var iso = (currencyIso || "").toUpperCase();
+            var isIndian = isIndianIso(iso);
+            var formatted = isIndian ? val.toLocaleString('en-IN') : val.toLocaleString(window.navigator.language);
+            if (sym) {
+                return sym + (sym.length > 1 && !sym.match(/^[₹$€£¥]$/) ? " " : "") + formatted;
+            }
+            return formatted;
+        }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//        function formatQty(value) {
+//            var n = Number(value || 0);
+//            return n.toLocaleString(window.navigator.language);
+//        }
+//
+//        function formatINR(value) {
+//            var val = Number(value || 0);
+//            if (val >= 100000) {
+//                return '₹' + (val / 100000).toFixed(1) + 'L';
+//            } else if (val >= 1000) {
+//                return '₹' + (val / 1000).toFixed(1) + 'k';
+//            }
+//            return '₹' + val.toLocaleString(window.navigator.language);
+//        }
+// ----- END OLD CODE -----
 
         function formatMonthName(m) {
             var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -205,17 +227,9 @@ function VAS_186_demoIssueLines() {
             } catch (e) { }
         }
 
+// ===== NEW CODE START — currency format (agent A08, 2026-08-19) =====
         function loadCategoryUsage() {
             showBusy(true);
-
-            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
-            if (VAS_186_DEMO) {
-                categoriesData = VAS_186_demoCategories();
-                pageNo = 1;
-                renderCategories();
-                showBusy(false);
-                return;
-            }
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_186_ProductCategoryUsageWidget/GetCategoryUsage',
@@ -225,6 +239,10 @@ function VAS_186_demoIssueLines() {
                 success: function (res) {
                     var data = parseResponse(res);
                     categoriesData = data.categories || [];
+                    if (data.currency) {
+                        currencyIso = data.currency.iso || "";
+                        currencySymbol = data.currency.symbol || "";
+                    }
                     pageNo = 1;
                     renderCategories();
                 },
@@ -236,6 +254,31 @@ function VAS_186_demoIssueLines() {
                 complete: function () { showBusy(false); }
             });
         }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//        function loadCategoryUsage() {
+//            showBusy(true);
+//
+//            $.ajax({
+//                url: VIS.Application.contextUrl + 'VAS_186_ProductCategoryUsageWidget/GetCategoryUsage',
+//                type: 'GET',
+//                data: { month: selectedMonth, year: selectedYear },
+//                cache: false,
+//                success: function (res) {
+//                    var data = parseResponse(res);
+//                    categoriesData = data.categories || [];
+//                    pageNo = 1;
+//                    renderCategories();
+//                },
+//                error: function () {
+//                    categoriesData = [];
+//                    pageNo = 1;
+//                    renderCategories();
+//                },
+//                complete: function () { showBusy(false); }
+//            });
+//        }
+// ----- END OLD CODE -----
 
         function renderCategories() {
             if (!$body) { return; }
@@ -286,13 +329,15 @@ function VAS_186_demoIssueLines() {
 
                 var barPct = Math.max(3, Math.round((catMeasure / topCategoryMeasure) * 100));
                 var sharePct = activePeriodTotal > 0 ? Math.round((catMeasure / activePeriodTotal) * 100) : 0;
-                var measureStr = activeMeasure === "val" ? formatINR(cat.totalValue) : formatQty(cat.totalQty);
+// ===== NEW CODE START — currency format (agent A08, 2026-08-19) =====
+                var measureStr = activeMeasure === "val" ? formatCurrency(cat.totalValue) : formatQty(cat.totalQty);
+                var exactMeasureStr = activeMeasure === "val" ? formatCurrencyExact(cat.totalValue) : formatQty(cat.totalQty);
 
                 rowsHtml +=
                     '<button type="button" class="vas-pcu-row" data-catid="' + cat.categoryId + '" data-catname="' + escapeHtml(cat.categoryName) + '">' +
                     '<div class="vas-pcu-cat-name" title="' + escapeHtml(cat.categoryName) + '">' + escapeHtml(cat.categoryName) + '</div>' +
                     '<div class="vas-pcu-bar-track"><div class="vas-pcu-bar-fill" style="width:' + barPct + '%;"></div></div>' +
-                    '<div class="vas-pcu-measure-num" title="' + escapeHtml(measureStr) + '">' + escapeHtml(measureStr) + '</div>' +
+                    '<div class="vas-pcu-measure-num" title="' + escapeHtml(exactMeasureStr) + '">' + escapeHtml(measureStr) + '</div>' +
                     '<div class="vas-pcu-share-pct">' + sharePct + '%</div>' +
                     '</button>';
             }
@@ -304,7 +349,7 @@ function VAS_186_demoIssueLines() {
             if (categoriesData.length > shownCount) {
                 var restMeasure = activePeriodTotal - shownTotalMeasure;
                 var restPct = activePeriodTotal > 0 ? Math.round((restMeasure / activePeriodTotal) * 100) : 0;
-                var restStr = activeMeasure === "val" ? formatINR(restMeasure) : (formatQty(restMeasure) + ' units');
+                var restStr = activeMeasure === "val" ? formatCurrency(restMeasure) : (formatQty(restMeasure) + ' units');
                 $footnote.text(shownCount + ' ' + label("VAS_Of", "of") + ' ' + categoriesData.length +
                     ' ' + label("VAS_Categories", "categories") + ' · ' +
                     label("VAS_Others", "Others") + ': ' + restStr + ' (' + restPct + '%)');
@@ -312,6 +357,35 @@ function VAS_186_demoIssueLines() {
                 $footnote.text(label("VAS_All", "All") + ' ' + categoriesData.length + ' ' +
                     label("VAS_CategoriesShown", "categories shown"));
             }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                var measureStr = activeMeasure === "val" ? formatINR(cat.totalValue) : formatQty(cat.totalQty);
+//
+//                rowsHtml +=
+//                    '<button type="button" class="vas-pcu-row" data-catid="' + cat.categoryId + '" data-catname="' + escapeHtml(cat.categoryName) + '">' +
+//                    '<div class="vas-pcu-cat-name" title="' + escapeHtml(cat.categoryName) + '">' + escapeHtml(cat.categoryName) + '</div>' +
+//                    '<div class="vas-pcu-bar-track"><div class="vas-pcu-bar-fill" style="width:' + barPct + '%;"></div></div>' +
+//                    '<div class="vas-pcu-measure-num" title="' + escapeHtml(measureStr) + '">' + escapeHtml(measureStr) + '</div>' +
+//                    '<div class="vas-pcu-share-pct">' + sharePct + '%</div>' +
+//                    '</button>';
+//            }
+//
+//            $body.html(rowsHtml);
+//
+//            // Footnote counts the bars actually on screen, so it can no longer overstate the page.
+//            var shownCount = endIndex - startIndex;
+//            if (categoriesData.length > shownCount) {
+//                var restMeasure = activePeriodTotal - shownTotalMeasure;
+//                var restPct = activePeriodTotal > 0 ? Math.round((restMeasure / activePeriodTotal) * 100) : 0;
+//                var restStr = activeMeasure === "val" ? formatINR(restMeasure) : (formatQty(restMeasure) + ' units');
+//                $footnote.text(shownCount + ' ' + label("VAS_Of", "of") + ' ' + categoriesData.length +
+//                    ' ' + label("VAS_Categories", "categories") + ' · ' +
+//                    label("VAS_Others", "Others") + ': ' + restStr + ' (' + restPct + '%)');
+//            } else {
+//                $footnote.text(label("VAS_All", "All") + ' ' + categoriesData.length + ' ' +
+//                    label("VAS_CategoriesShown", "categories shown"));
+//            }
+// ----- END OLD CODE -----
 
             if ($pagerText) {
                 $pagerText.text(label("VAS_Page", "Page") + ' ' + pageNo + ' ' + label("VAS_Of", "of") + ' ' + totalPages);
@@ -501,14 +575,6 @@ function VAS_186_demoIssueLines() {
 
             $('body').append($modal);
 
-            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
-            if (VAS_186_DEMO) {
-                issueLines = VAS_186_demoIssueLines();
-                mPageNo = 1;
-                renderLinesTable();
-                return;
-            }
-
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_186_ProductCategoryUsageWidget/GetCategoryIssueLines',
                 type: 'GET',
@@ -674,3 +740,4 @@ function VAS_186_demoIssueLines() {
     };
 
 })(VAS, jQuery);
+

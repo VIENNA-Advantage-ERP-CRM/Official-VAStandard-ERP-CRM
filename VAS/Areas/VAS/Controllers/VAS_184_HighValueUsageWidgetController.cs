@@ -1,4 +1,4 @@
-﻿using System.Data.SqlClient;
+using System.Data.SqlClient;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -21,6 +21,56 @@ namespace VIS.Controllers
     public class VAS_184_HighValueUsageWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_184_HighValueUsageWidgetController).FullName);
+
+// ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
+        private object GetCurrencyInfo(Ctx ctx)
+        {
+            string iso = "";
+            string symbol = "";
+            int stdPrecision = 2;
+
+            if (ctx != null)
+            {
+                int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
+                if (currencyId > 0)
+                {
+                    string sql = "SELECT ISO_Code, CurSymbol, StdPrecision FROM C_Currency WHERE C_Currency_ID = @Cur";
+                    SqlParameter[] param = new SqlParameter[] { new SqlParameter("@Cur", currencyId) };
+                    using (IDataReader dr = DB.ExecuteReader(sql, param, null))
+                    {
+                        if (dr != null && dr.Read())
+                        {
+                            iso = Util.GetValueOfString(dr["ISO_Code"]);
+                            symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                            stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
+                        }
+                    }
+                }
+                if (string.IsNullOrEmpty(iso))
+                {
+                    string sql = @"SELECT c.ISO_Code, c.CurSymbol, c.StdPrecision 
+                                   FROM C_AcctSchema acs 
+                                   JOIN C_Currency c ON c.C_Currency_ID = acs.C_Currency_ID 
+                                   WHERE acs.AD_Client_ID = @Client AND acs.IsActive='Y'";
+                    SqlParameter[] param = new SqlParameter[] { new SqlParameter("@Client", ctx.GetAD_Client_ID()) };
+                    using (IDataReader dr = DB.ExecuteReader(sql, param, null))
+                    {
+                        if (dr != null && dr.Read())
+                        {
+                            iso = Util.GetValueOfString(dr["ISO_Code"]);
+                            symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                            stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
+                        }
+                    }
+                }
+            }
+            if (string.IsNullOrEmpty(symbol))
+            {
+                symbol = iso;
+            }
+            return new { iso = iso, symbol = symbol, stdPrecision = stdPrecision };
+        }
+// ===== NEW CODE END — currency format =====
 
         /// <summary>Endpoint A: Top 10 high-value products consumed in selected month and year.</summary>
         [AjaxAuthorizeAttribute]
@@ -97,7 +147,12 @@ namespace VIS.Controllers
                 Log.Log(Level.SEVERE, "VAS_184_HighValueUsageWidget.GetHighValueProducts", ex);
                 return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" }), JsonRequestBehavior.AllowGet);
             }
-            return Json(JsonConvert.SerializeObject(new { products = rows, success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
+            return Json(JsonConvert.SerializeObject(new { products = rows, currency = GetCurrencyInfo(ctx), success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//          return Json(JsonConvert.SerializeObject(new { products = rows, success = true }), JsonRequestBehavior.AllowGet);
+// ----- END OLD CODE -----
         }
 
         /// <summary>Endpoint B: Individual issue entries for a specific product in selected period.</summary>
@@ -160,7 +215,12 @@ namespace VIS.Controllers
                 Log.Log(Level.SEVERE, "VAS_184_HighValueUsageWidget.GetProductIssueHistory", ex);
                 return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" }), JsonRequestBehavior.AllowGet);
             }
-            return Json(JsonConvert.SerializeObject(new { issues = issues, success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
+            return Json(JsonConvert.SerializeObject(new { issues = issues, currency = GetCurrencyInfo(ctx), success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//          return Json(JsonConvert.SerializeObject(new { issues = issues, success = true }), JsonRequestBehavior.AllowGet);
+// ----- END OLD CODE -----
         }
 
         /// <summary>
@@ -192,3 +252,4 @@ namespace VIS.Controllers
         }
     }
 }
+

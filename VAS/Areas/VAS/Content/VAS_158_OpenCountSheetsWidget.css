@@ -86,7 +86,10 @@
 
 .vas-opencountsheets-modal-dialog {
     width: clamp(340px, 85vw, 1400px);
-    height: clamp(420px, 85vh, 900px);
+    /* Content-sized: header + exactly --vas-rows lines + footer. The fixed clamp height forced a
+       ~900px popup regardless of how few rows existed, leaving a large empty band under the lines. */
+    height: auto;
+    max-height: clamp(420px, 85vh, 900px);
     font-size: clamp(14px, 1.2vw, 22px);
     background-color: #FFFFFF;
     border-radius: 16px;
@@ -337,3 +340,36 @@
     font-size: 0.8125em;
     color: #5F7283;
 }
+
+
+
+/* ============================================================================
+   POPUP — DETERMINISTIC HEIGHT (2026-08-18) — see VAS_156 for the rationale.
+   ============================================================================ */
+.vas-opencountsheets-modal-dialog {
+    --vas-rows: 7;
+    --vas-row-h: 2.6em;
+}
+
+.vas-opencountsheets-rows-container {
+    flex: 0 0 auto;
+    height: calc(var(--vas-rows) * var(--vas-row-h));
+    display: block;
+    overflow: hidden;
+}
+
+    .vas-opencountsheets-rows-container > .vas-opencountsheets-data-row {
+        height: var(--vas-row-h);
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+.vas-opencountsheets-filler {
+    pointer-events: none;
+    background: transparent !important;
+    cursor: default;
+}
+
+    .vas-opencountsheets-filler:hover {
+        background: transparent !important;
+    }

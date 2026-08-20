@@ -199,7 +199,12 @@
 
 .vas-adjwisecount-modal-dialog {
     width: clamp(340px, 85vw, 1400px);
-    height: clamp(420px, 85vh, 900px);
+    /* Height follows the CONTENT - header + exactly --vas-rows lines + footer - not the viewport.
+       A fixed clamp(420px, 85vh, 900px) made the popup ~900px tall on a normal screen while the
+       table held a handful of rows, leaving a large empty band under the lines. Short pages are
+       padded with filler rows, so the height is still identical on every page. */
+    height: auto;
+    max-height: clamp(420px, 85vh, 900px);
     font-size: clamp(14px, 1.2vw, 22px);
     background-color: #FFFFFF;
     border-radius: 14px;
@@ -447,3 +452,45 @@
     font-size: 0.75em;
     color: #5F7283;
 }
+
+
+
+/* ============================================================================
+   POPUP — DETERMINISTIC HEIGHT (2026-08-18)
+   Same rule as VAS_161 / VAS_165: the popup is always the size needed for
+   --vas-rows lines and does NOT resize with how many lines a page holds.
+   The rows container is set to exactly rows x row-height, so its height is
+   identical whether it contains 0, 3 or 7 children - the fillers only preserve
+   the divider rhythm, they are not load-bearing.
+   Both values are em, so the popup scales with the modal's clamp() anchor
+   across 1080p / 2K / 4K.
+   ============================================================================ */
+.vas-adjwisecount-modal-dialog {
+    --vas-rows: 7;
+    --vas-row-h: 2.6em;
+}
+
+.vas-adjwisecount-rows {
+    flex: 0 0 auto;
+    height: calc(var(--vas-rows) * var(--vas-row-h));
+    display: block;
+    overflow: hidden;
+}
+
+    /* Every row - real or filler - occupies exactly one row height. */
+    .vas-adjwisecount-rows > .vas-adjwisecount-data-row {
+        height: var(--vas-row-h);
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+/* Spacer rows: hold the height, show nothing, take no interaction. */
+.vas-adjwisecount-filler {
+    pointer-events: none;
+    background: transparent !important;
+    cursor: default;
+}
+
+    .vas-adjwisecount-filler:hover {
+        background: transparent !important;
+    }

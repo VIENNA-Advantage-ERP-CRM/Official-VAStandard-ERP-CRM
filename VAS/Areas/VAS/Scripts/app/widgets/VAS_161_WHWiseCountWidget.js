@@ -7,7 +7,7 @@
  * Labels / Message Keys Table:
  *  #  | Fallback Text                                    | Message Key
  * ----+--------------------------------------------------+-----------------------------------
- *  1  | Warehouse wise count                             | VAS_161_WHWiseCount
+ *  1  | Warehouse wise count                             | VAS_161_WarehouseWiseCount
  *  2  | Warehouse                                        | VAS_161_Warehouse
  *  3  | Locators                                         | VAS_161_Locators
  *  4  | Count Sessions                                   | VAS_161_CountSessions
@@ -71,7 +71,14 @@
         var selectedYear = now.getFullYear();
         var summaryData = [];
         var currentPage = 1;
-        var pageSize = 4;
+        /* The popup ALWAYS holds exactly MODAL_PAGE_ROWS lines. Its size is fixed by that count and
+           does NOT change with how much data there is: a page with 4 real rows renders 4 rows plus 3
+           invisible filler rows, so the dialog is the same height as a page with 7. Anything past
+           MODAL_PAGE_ROWS goes to the next page via the pager.
+           A fixed count (not a measured one) is required because the dialog is content-sized -
+           measuring the container would be circular, since its height comes from the rows. */
+        var MODAL_PAGE_ROWS = 7;
+        var pageSize = MODAL_PAGE_ROWS;
         var widgetObserver = null;
         var $modalOverlay = null;
 
@@ -89,7 +96,7 @@
             var $titleBlock = $('<div class="vas-whwisecount-title-block">');
             // Renamed "WH wise Count" -> "Warehouse wise count" (2026-08-16, user request).
             // Routed through the message key instead of a hardcoded literal (Rule 8).
-            var $title = $('<h3 class="vas-whwisecount-title"></h3>').text(lbl("VAS_161_WHWiseCount", "Warehouse wise count"));
+            var $title = $('<h3 class="vas-whwisecount-title"></h3>').text(lbl("VAS_161_WarehouseWiseCount", "Warehouse wise count"));
             $subtitle = $('<span class="vas-whwisecount-subtitle">Warehouses with active count locators</span>');
             $titleBlock.append($title).append($subtitle);
             $leftCluster.append($iconWell).append($titleBlock);
@@ -221,11 +228,32 @@
             });
         }
 
+        /* The popup is a fixed MODAL_PAGE_ROWS lines tall. Short pages and the empty state are
+           padded with the spacers below so the height never changes while paging. */
+
+        /* Invisible spacers that hold the table at a constant height. */
+        function appendFillerRows($rowsContainer, count) {
+            for (var f = 0; f < count; f++) {
+                $rowsContainer.append(
+                    '<div class="vas-whwisecount-row-btn vas-whwisecount-grid-template vas-whwisecount-filler" aria-hidden="true">' +
+                    '<div class="vas-whwisecount-cell">&nbsp;</div>' +
+                    '<div class="vas-whwisecount-cell">&nbsp;</div>' +
+                    '<div class="vas-whwisecount-cell">&nbsp;</div>' +
+                    '<div class="vas-whwisecount-cell">&nbsp;</div>' +
+                    '</div>'
+                );
+            }
+        }
+
         function renderSummaryPage() {
             $rowsContainer.empty();
 
+            pageSize = MODAL_PAGE_ROWS;
+
             if (!summaryData || summaryData.length === 0) {
                 $rowsContainer.html('<div class="vas-whwisecount-message">No inventory counts recorded for this period. Pick another month to review earlier counts.</div>');
+                // Hold the dialog's full height even with nothing to show (global standard).
+                appendFillerRows($rowsContainer, Math.max(0, pageSize - 1));
                 $footer.find('.vas-whwisecount-footer-text').text('Showing 0 of 0');
                 $footer.find('.vas-whwisecount-pager').hide();
                 return;
@@ -265,6 +293,9 @@
 
                 $rowsContainer.append($row);
             }
+
+            // Pad the last (or only) page so the table height is identical on every page.
+            appendFillerRows($rowsContainer, Math.max(0, pageSize - pageItems.length));
 
             var $footerText = $footer.find('.vas-whwisecount-footer-text');
             var $pagerInfo = $footer.find('.vas-whwisecount-pager-info');
@@ -381,7 +412,10 @@
             var totalQty = resData.totalQty || 0;
 
             var modalPage = 1;
-            var modalPageSize = 6;
+            /* The detail popup ALWAYS holds exactly this many lines. Short pages are padded with
+               invisible filler rows below, so the popup is the SAME height whether a page carries
+               7 records or 3 - it no longer shrinks to fit the last page. */
+            var modalPageSize = MODAL_PAGE_ROWS;
 
             var $headerGrid = $(
                 '<div class="vas-whwisecount-modal-grid-template vas-whwisecount-header-row">' +
@@ -393,7 +427,7 @@
             );
             $body.append($headerGrid);
 
-            var $modalRowsContainer = $('<div class="vas-whwisecount-modal-rows-container" style="flex: 1; display: flex; flex-direction: column;"></div>');
+            var $modalRowsContainer = $('<div class="vas-whwisecount-modal-rows-container"></div>');
             $body.append($modalRowsContainer);
 
             var $footer = $(
@@ -410,6 +444,20 @@
                 '</div>'
             );
             $body.append($footer);
+
+            function appendModalFillerRows($container, count) {
+                for (var f = 0; f < count; f++) {
+                    $container.append(
+                        '<div class="vas-whwisecount-modal-grid-template vas-whwisecount-modal-data-row vas-whwisecount-filler" aria-hidden="true">' +
+                        '<div class="vas-whwisecount-cell"><div class="vas-whwisecount-prod-title">&nbsp;</div>' +
+                        '<div class="vas-whwisecount-prod-attr">&nbsp;</div></div>' +
+                        '<div class="vas-whwisecount-cell">&nbsp;</div>' +
+                        '<div class="vas-whwisecount-cell">&nbsp;</div>' +
+                        '<div class="vas-whwisecount-cell">&nbsp;</div>' +
+                        '</div>'
+                    );
+                }
+            }
 
             function updateModalPage() {
                 $modalRowsContainer.empty();
@@ -441,6 +489,9 @@
                     );
                     $modalRowsContainer.append($mRow);
                 }
+
+                // Hold the popup at MODAL_PAGE_ROWS lines regardless of how many this page has.
+                appendModalFillerRows($modalRowsContainer, Math.max(0, modalPageSize - paged.length));
 
                 $footer.find('.vas-modal-helper').text('Showing ' + (start + 1) + '–' + end + ' of ' + totalLines + ' · ' + sessionCount + ' count sessions');
                 $footer.find('.vas-m-info').text(modalPage + ' of ' + totalPages);
@@ -518,3 +569,4 @@
     };
 
 })(VAS, jQuery);
+

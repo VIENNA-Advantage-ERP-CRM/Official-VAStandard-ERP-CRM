@@ -43,6 +43,36 @@
         return d.getDate() + ' ' + monthNames()[d.getMonth()] + ' ' + d.getFullYear();
     }
 
+    // ===== NEW CODE START — currency format (agent C06, 2026-08-19) =====
+    // Organization-aware currency formatter (Note: VAS_172 carries no monetary values per Material Transfer spec; provided for standard helper completeness)
+    function formatCurrency(val, iso, symbol) {
+        if (val === null || val === undefined || isNaN(val)) return '—';
+        var num = Number(val);
+        var isIndian = (iso === 'INR');
+        var formatted = '';
+        if (isIndian) {
+            if (Math.abs(num) >= 10000000) {
+                formatted = (num / 10000000).toFixed(2) + ' Cr';
+            } else if (Math.abs(num) >= 100000) {
+                formatted = (num / 100000).toFixed(2) + ' Lakh';
+            } else {
+                formatted = num.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+            }
+        } else {
+            if (Math.abs(num) >= 1000000000) {
+                formatted = (num / 1000000000).toFixed(2) + 'B';
+            } else if (Math.abs(num) >= 1000000) {
+                formatted = (num / 1000000).toFixed(2) + 'M';
+            } else {
+                formatted = num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+            }
+        }
+        return (symbol ? symbol + ' ' : '') + formatted;
+    }
+    // ===== NEW CODE END — currency format =====
+    // ----- OLD CODE (kept for rollback, do not delete) -----
+    // ----- END OLD CODE -----
+
     function deriveLineStatus(confirmed, target) {
         if (confirmed === null || confirmed === undefined) {
             return { status: 'Pending', cls: 'vas-172-pill--amber', text: 'Pending' };

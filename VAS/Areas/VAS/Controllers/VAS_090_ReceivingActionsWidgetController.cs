@@ -244,6 +244,19 @@ namespace VIS.Controllers
                        OrderLine.Line AS Line_No,
                        COALESCE(Product.Name, " + NLiteral("-") + @") AS Item_Name,
                        AttributeInstance.Description AS Attribute_Name,
+                       /* Everything VIS.PAttributesForm needs to open on this line, plus whether
+                          the product's attribute set actually demands an instance. Without these
+                          the modal could only DISPLAY the PO line's inherited attribute - there was
+                          no way to pick one, so a product with a mandatory attribute set could not
+                          be received. */
+                       OrderLine.M_Product_ID AS Product_ID,
+                       COALESCE(OrderLine.M_AttributeSetInstance_ID, 0) AS Attribute_Set_Instance_ID,
+                       COALESCE(Product.M_AttributeSet_ID, 0) AS Attribute_Set_ID,
+                       COALESCE(AttributeSet.IsInstanceAttribute, 'N') AS Is_Instance_Attribute,
+                       COALESCE(AttributeSet.MandatoryType, 'N') AS Attribute_Mandatory_Type,
+                       COALESCE(AttributeSet.IsLotMandatory, 'N') AS Is_Lot_Mandatory,
+                       COALESCE(AttributeSet.IsSerNoMandatory, 'N') AS Is_SerNo_Mandatory,
+                       COALESCE(AttributeSet.IsGuaranteeDateMandatory, 'N') AS Is_Guarantee_Mandatory,
                        COALESCE(OrderLine.QtyOrdered, 0) AS PO_Qty,
                        COALESCE(OrderLine.QtyDelivered, 0) AS Already_Received_Qty,
                        COALESCE(OrderLine.QtyOrdered, 0) - COALESCE(OrderLine.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__ AS Open_Qty,
@@ -254,6 +267,7 @@ namespace VIS.Controllers
                    are listed for receiving - charge / service lines are out. */
                 INNER JOIN M_Product Product ON (Product.M_Product_ID=OrderLine.M_Product_ID AND Product.IsActive='Y' AND Product.ProductType='I')
                 LEFT OUTER JOIN M_AttributeSetInstance AttributeInstance ON (AttributeInstance.M_AttributeSetInstance_ID=OrderLine.M_AttributeSetInstance_ID)
+                LEFT OUTER JOIN M_AttributeSet AttributeSet ON (AttributeSet.M_AttributeSet_ID=Product.M_AttributeSet_ID AND AttributeSet.IsActive='Y')
                 LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=OrderLine.C_UOM_ID AND UOM.IsActive='Y')
                 WHERE PurchaseOrder.IsActive='Y'
                   AND PurchaseOrder.IsSOTrx='N'
@@ -308,6 +322,20 @@ namespace VIS.Controllers
                         lineNo = Util.GetValueOfInt(dr["Line_No"]),
                         itemName = Util.GetValueOfString(dr["Item_Name"]),
                         attributeName = Util.GetValueOfString(dr["Attribute_Name"]),
+                        productId = Util.GetValueOfInt(dr["Product_ID"]),
+                        attributeSetInstanceId = Util.GetValueOfInt(dr["Attribute_Set_Instance_ID"]),
+                        attributeSetId = Util.GetValueOfInt(dr["Attribute_Set_ID"]),
+                        // A set only yields a per-receipt instance when IsInstanceAttribute = 'Y'.
+                        hasAttributeSet = Util.GetValueOfInt(dr["Attribute_Set_ID"]) > 0
+                                          && Util.GetValueOfString(dr["Is_Instance_Attribute"]) == "Y",
+                        // 'Y' = always mandatory, 'S' = mandatory when shipping/receiving.
+                        attributeMandatory = Util.GetValueOfInt(dr["Attribute_Set_ID"]) > 0
+                                          && Util.GetValueOfString(dr["Is_Instance_Attribute"]) == "Y"
+                                          && (Util.GetValueOfString(dr["Attribute_Mandatory_Type"]) == "Y"
+                                              || Util.GetValueOfString(dr["Attribute_Mandatory_Type"]) == "S"
+                                              || Util.GetValueOfString(dr["Is_Lot_Mandatory"]) == "Y"
+                                              || Util.GetValueOfString(dr["Is_SerNo_Mandatory"]) == "Y"
+                                              || Util.GetValueOfString(dr["Is_Guarantee_Mandatory"]) == "Y"),
                         poQty = Util.GetValueOfDecimal(dr["PO_Qty"]),
                         alreadyReceivedQty = Util.GetValueOfDecimal(dr["Already_Received_Qty"]),
                         openQty = openQty,
@@ -558,12 +586,19 @@ namespace VIS.Controllers
             // Aggregate typed quantities per PO line and remember the chosen locator.
             Dictionary<int, decimal> qtyByLine = new Dictionary<int, decimal>();
             Dictionary<int, int> locatorByLine = new Dictionary<int, int>();
+            // Attribute set instance picked per line in the modal (VIS.PAttributesForm).
+            Dictionary<int, int> attributeByLine = new Dictionary<int, int>();
 
             foreach (ReceiveLineInput input in inputs)
             {
                 if (input == null || input.PoLineId <= 0) { continue; }
                 if (input.ReceivedQty < 0) { return Fail("Received quantity cannot be negative."); }
                 if (input.ReceivedQty == 0) { continue; }
+
+                if (input.AttributeSetInstanceId > 0)
+                {
+                    attributeByLine[input.PoLineId] = input.AttributeSetInstanceId;
+                }
 
                 if (qtyByLine.ContainsKey(input.PoLineId))
                 {
@@ -673,6 +708,15 @@ namespace VIS.Controllers
                     MInOutLine receiptLine = new MInOutLine(receipt);
                     receiptLine.SetOrderLine(orderLine, lineLocatorId, receivedQty);
                     receiptLine.SetQty(receivedQty);
+
+                    /* Apply the attribute set instance chosen in the modal. This must come AFTER
+                       SetOrderLine, which copies the ORDER line's instance onto the receipt line -
+                       assigning before it would be overwritten. When nothing was picked the line
+                       keeps whatever the PO line carried, which is the previous behaviour. */
+                    if (attributeByLine.ContainsKey(selectedLine.Key) && attributeByLine[selectedLine.Key] > 0)
+                    {
+                        receiptLine.SetM_AttributeSetInstance_ID(attributeByLine[selectedLine.Key]);
+                    }
 
                     if (orderLine.GetQtyOrdered() != 0 && orderLine.GetQtyEntered() != orderLine.GetQtyOrdered())
                     {
@@ -941,6 +985,8 @@ namespace VIS.Controllers
             public int PoLineId { get; set; }
             public decimal ReceivedQty { get; set; }
             public int LocatorId { get; set; }
+            /// <summary>Attribute set instance chosen in the modal (0 = none / inherit the PO line's).</summary>
+            public int AttributeSetInstanceId { get; set; }
         }
 
         /// <summary>Live open-quantity snapshot for one PO line.</summary>

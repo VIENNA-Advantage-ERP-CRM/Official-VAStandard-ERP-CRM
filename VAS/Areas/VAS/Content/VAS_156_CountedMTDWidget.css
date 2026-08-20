@@ -124,6 +124,10 @@
 
 .vas-counted-mtd-modal-dialog {
     width: min(720px, 100%);
+    /* Height follows the CONTENT: header + exactly --vas-rows lines + footer. Short pages are
+       padded with fillers in JS, so the popup is the same height on every page and never shrinks
+       to fit the last page. max-height only guards small viewports. */
+    height: auto;
     max-height: calc(100dvh - 48px);
     background: #FFFFFF;
     border-radius: 16px;
@@ -312,3 +316,41 @@
     min-width: 3.5em;
     text-align: center;
 }
+
+
+
+/* ============================================================================
+   POPUP — DETERMINISTIC HEIGHT (2026-08-18)
+   Same rule as VAS_161 / VAS_162 / VAS_165: the popup is always the size needed
+   for --vas-rows lines and does not resize with how many lines a page holds.
+   The rows container is exactly rows x row-height, so its height is identical
+   whether it holds 0, 3 or 7 children. Values stay in em so the popup scales
+   with the modal clamp() anchor across resolutions.
+   ============================================================================ */
+.vas-counted-mtd-modal-dialog {
+    --vas-rows: 7;
+    --vas-row-h: 2.6em;
+}
+
+.vas-counted-mtd-rows {
+    flex: 0 0 auto;
+    height: calc(var(--vas-rows) * var(--vas-row-h));
+    display: block;
+    overflow: hidden;
+}
+
+    .vas-counted-mtd-rows > .vas-counted-mtd-data-row {
+        height: var(--vas-row-h);
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+.vas-counted-mtd-filler {
+    pointer-events: none;
+    background: transparent !important;
+    cursor: default;
+}
+
+    .vas-counted-mtd-filler:hover {
+        background: transparent !important;
+    }

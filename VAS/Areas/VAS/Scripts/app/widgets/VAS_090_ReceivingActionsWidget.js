@@ -427,6 +427,9 @@
                 if (!lineEntry[id]) { lineEntry[id] = {}; }
                 lineEntry[id].locatorId = Number($(this).val() || 0);
             });
+            $dialog.on('click', '[data-attr-polineid]', function () {
+                openAttributeDialog(Number($(this).data('attr-polineid')));
+            });
             $dialog.on('click', '.vas-ra-rcv-prev', function () { if (rcvPageNo > 1) { rcvPageNo--; renderReceiveLines(); } });
             $dialog.on('click', '.vas-ra-rcv-next', function () { rcvPageNo++; renderReceiveLines(); });
             $dialog.on('click', '.vas-ra-make-grn', makeGRN);
@@ -710,6 +713,40 @@
                 '<div class="vas-ra-receive-table">' +
                 '<div class="vas-ra-receive-row head"><span>' + escapeHtml(lbl("VAS_090_Item", "Item")) + '</span><span>' + escapeHtml(lbl("VAS_090_Attribute", "Attribute")) + '</span><span>' + escapeHtml(lbl("VAS_090_POQty", "PO Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_OpenQty", "Open Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_Locator", "Locator")) + '</span><span>' + escapeHtml(lbl("VAS_090_Received", "Received")) + '</span></div>';
 
+            /* ---- Product attribute (lot / serial / guarantee date) -----------------------------
+               A product whose attribute set has IsInstanceAttribute='Y' needs an attribute set
+               instance on the receipt line. The modal previously only DISPLAYED whatever the PO
+               line had inherited, so a product with a mandatory set could not be received at all.
+
+               The picker is the framework's own dialog, VIS.PAttributesForm - the same popup the
+               standard window opens from an order line's attribute button. It can both CREATE a new
+               instance (lot no, serial no, guarantee date) and select an existing one, which matters
+               for purchasing because the lot being bought usually does not exist yet.
+
+               Constructor (Areas/VIS/Scripts/app/Framework/pattributesform.js):
+                   new VIS.PAttributesForm(M_AttributeSetInstance_ID, M_Product_ID, M_Locator_ID,
+                                           C_BPartner_ID, productWindow, AD_Column_ID, pwindowNo)
+               AD_Column_ID is M_InOutLine.M_AttributeSetInstance_ID (8772) - the receipt line's
+               column, NOT the order line's 8767, because the instance is being set on the GRN.
+               pwindowNo -1 skips the parent window/tab lookup: this widget is not an AD_Window.
+               Pattern taken from ASI18 PurchaseOrderPrint's AttributeSetInstanceField.jsx. */
+            function attributeCellHtml(line, text, chosenId, missing) {
+                if (!line.hasAttributeSet) {
+                    return '<span class="vas-ra-attr-plain" title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</span>';
+                }
+                var label = text || (chosenId > 0
+                    ? lbl("VAS_090_AttributeSet", "Attribute set")
+                    : lbl("VAS_090_SelectAttribute", "Select attribute"));
+                var cls = "vas-ra-attr-btn" + (missing ? " vas-ra-attr-missing" : "") + (chosenId > 0 ? " vas-ra-attr-set" : "");
+                var title = missing
+                    ? lbl("VAS_090_AttributeRequired", "This product requires an attribute before it can be received.")
+                    : label;
+                return '<button type="button" class="' + cls + '" data-attr-polineid="' + escapeHtml(line.poLineId) + '"' +
+                    ' title="' + escapeHtml(title) + '">' +
+                    (missing ? '<span class="vas-ra-attr-flag" aria-hidden="true">!</span>' : '') +
+                    '<span class="vas-ra-attr-text">' + escapeHtml(label) + '</span></button>';
+            }
+
             var rcvTotalPages = Math.max(1, Math.ceil((currentLines || []).length / RCV_PAGE_SIZE));
             if (rcvPageNo > rcvTotalPages) { rcvPageNo = rcvTotalPages; }
             if (rcvPageNo < 1) { rcvPageNo = 1; }
@@ -727,11 +764,18 @@
                        ("-", "---"): show nothing for those. */
                     var attributeText = (line.attributeName && !/^-+$/.test(String(line.attributeName).trim())) ? line.attributeName : "";
                     var entry = lineEntry[line.poLineId] || {};
+                    /* A picked attribute overrides whatever the PO line inherited. */
+                    if (entry.attributeName != null) { attributeText = entry.attributeName; }
+                    var attrRequired = !!line.attributeMandatory;
+                    var attrChosenId = entry.attributeSetInstanceId != null
+                        ? Number(entry.attributeSetInstanceId)
+                        : Number(line.attributeSetInstanceId || 0);
+                    var attrMissing = attrRequired && attrChosenId <= 0;
                     var qtyValue = entry.qty != null ? entry.qty : toInputValue(line.defaultReceivedQty);
                     html +=
                         '<div class="vas-ra-receive-row">' +
                         '<span class="vas-ra-line-name" title="' + escapeHtml(line.itemName || "-") + '">' + escapeHtml(line.itemName || "-") + '</span>' +
-                        '<span class="vas-ra-line-attr" title="' + escapeHtml(attributeText) + '">' + escapeHtml(attributeText) + '</span>' +
+                        '<span class="vas-ra-line-attr">' + attributeCellHtml(line, attributeText, attrChosenId, attrMissing) + '</span>' +
                         '<span class="num">' + escapeHtml(formatQtyWithUom(line.poQty, line.uom)) + '</span>' +
                         '<span class="num">' + escapeHtml(formatQtyWithUom(line.openQty, line.uom)) + '</span>' +
                         '<span>' + locatorSelectHtml(line.poLineId) + '</span>' +
@@ -793,6 +837,93 @@
             });
         }
 
+        /* M_InOutLine.M_AttributeSetInstance_ID - the receipt line's attribute column. NOT
+           C_OrderLine's 8767: the instance is being set on the GRN being created, not on the PO. */
+        var INOUTLINE_ASI_COLUMN_ID = 8772;
+
+        function openAttributeDialog(poLineId) {
+            var line = null;
+            for (var i = 0; i < (currentLines || []).length; i++) {
+                if (Number(currentLines[i].poLineId) === Number(poLineId)) { line = currentLines[i]; break; }
+            }
+            if (!line || !line.hasAttributeSet) { return; }
+
+            var VISns = window.VIS;
+            if (!VISns || typeof VISns.PAttributesForm !== 'function') {
+                notify(lbl("VAS_090_AttributeDialogUnavailable", "Attribute dialog is not available."));
+                return;
+            }
+
+            var productId = Number(line.productId || 0);
+            if (productId <= 0) { return; }
+
+            var entry = lineEntry[poLineId] || {};
+            var currentAsi = entry.attributeSetInstanceId != null
+                ? Number(entry.attributeSetInstanceId)
+                : Number(line.attributeSetInstanceId || 0);
+
+            var dialog = null;
+            try {
+                dialog = new VISns.PAttributesForm(
+                    currentAsi,                          // 0 starts a new instance
+                    productId,
+                    Number(entry.locatorId || 0),
+                    Number(currentPO && currentPO.bpartnerId ? currentPO.bpartnerId : 0),
+                    false,                               // transaction-line mode
+                    INOUTLINE_ASI_COLUMN_ID,
+                    -1                                   // no parent window/tab context
+                );
+            } catch (e) {
+                console.error("VAS_090: failed to open attribute dialog", e);
+                return;
+            }
+
+            // hasAttribute is false when the product has no attribute set, or when the dialog's own
+            // load failed - it shows its own message in that case.
+            if (!dialog || !dialog.hasAttribute) { return; }
+
+            dialog.onClose = function (nextAsiId, nextName) {
+                var resolved = Number(nextAsiId || 0);
+                if (!lineEntry[poLineId]) { lineEntry[poLineId] = {}; }
+                lineEntry[poLineId].attributeSetInstanceId = resolved;
+                lineEntry[poLineId].attributeName = nextName ? String(nextName) : "";
+                renderReceiveLines();
+            };
+
+            dialog.showDialog();
+
+            /* Stacking fix: PAttributesForm renders through jQuery UI .dialog(), which stacks its
+               widget around z-index 100 (jQuery UI's own .ui-front level). This widget's modal
+               (.vas-ra-dialog) sits at z-index 10000, so the attribute popup opened BEHIND the
+               "Make GRN" modal and was unreachable.
+               The dialog element is created by the framework and never handed back, so it is
+               raised here: the attribute dialog is the most recently added .ui-dialog, and its
+               modal overlay the most recent .ui-widget-overlay. Both are lifted just above this
+               widget's modal, and only for this dialog - no global .ui-dialog override, which
+               would affect every other screen in the application. */
+            raiseAttributeDialogAboveModal();
+        }
+
+        /* Kept next to the opener so the two are read together. */
+        function raiseAttributeDialogAboveModal() {
+            var MODAL_Z = 10000;          // .vas-ra-dialog
+
+            var raise = function () {
+                var $uiDialog = $('.ui-dialog').last();
+                if ($uiDialog.length) { $uiDialog.css('z-index', MODAL_Z + 20); }
+
+                var $overlay = $('.ui-widget-overlay').last();
+                if ($overlay.length) { $overlay.css('z-index', MODAL_Z + 10); }
+            };
+
+            // Immediately, for the normal synchronous case...
+            raise();
+            // ...and once more after the current tick, in case the framework builds the dialog
+            // asynchronously (PAttributes/Load fetches before it renders). Raising twice is
+            // harmless; missing it leaves the popup stuck behind the modal.
+            setTimeout(raise, 0);
+        }
+
         function makeGRN() {
             if (!currentPO) { return; }
 
@@ -820,7 +951,25 @@
                 }
 
                 if (qty > 0) {
-                    lines.push({ poLineId: Number(line.poLineId), receivedQty: qty, locatorId: Number(entry.locatorId || 0) });
+                    /* A product whose attribute set is mandatory cannot be received without an
+                       attribute set instance - the document save would be rejected server-side, so
+                       stop here with a message naming the item instead. */
+                    var asiId = entry.attributeSetInstanceId != null
+                        ? Number(entry.attributeSetInstanceId)
+                        : Number(line.attributeSetInstanceId || 0);
+
+                    if (line.attributeMandatory && asiId <= 0) {
+                        invalidMessage = lbl("VAS_090_AttributeRequiredFor", "Select an attribute for") +
+                            ' "' + (line.itemName || "") + '".';
+                        break;
+                    }
+
+                    lines.push({
+                        poLineId: Number(line.poLineId),
+                        receivedQty: qty,
+                        locatorId: Number(entry.locatorId || 0),
+                        attributeSetInstanceId: asiId
+                    });
                 }
             }
 

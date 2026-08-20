@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VAS_183_MaterialConsumptionWidget
  * 3x2 Summary & Breakdown Widget for Inventory Use dashboard.
  * Displays warehouse/locator-wise consumption with progress bars, compact INR values,
@@ -28,71 +28,6 @@
  * 19 | lines                                  | VAS_Lines
  */
 ; VAS = window.VAS || {};
-
-/* ==========================================================================================
-   🛑 🚨 🚨 🛑  DEMO DATA - UI PREVIEW ONLY - DELETE THIS BLOCK BEFORE COMMIT  🛑 🚨 🚨 🛑
-   Set VAS_183_DEMO to false (or delete this block and the three `if (VAS_183_DEMO)` guards in
-   loadWarehouses(), loadLocatorSummary() and the locator-detail loader) to restore live data.
-   Numbers are seeded from warehouse + month + year so changing any filter visibly changes the
-   list - that is what makes the filter fix checkable without a database.
-   ========================================================================================== */
-var VAS_183_DEMO = true;
-
-function VAS_183_demoWarehouses() {
-    return [
-        { warehouseId: 5001, shortName: "Central WH", name: "Central Warehouse" },
-        { warehouseId: 5002, shortName: "North WH", name: "North Warehouse" },
-        { warehouseId: 5003, shortName: "Plant WH", name: "Plant Warehouse" },
-        { warehouseId: 5004, shortName: "Spares WH", name: "Spares Warehouse" }
-    ];
-}
-
-function VAS_183_demoSeed(whId, month, year) {
-    return ((Number(whId) || 0) % 97) + (Number(month) || 1) * 13 + ((Number(year) || 2026) % 100);
-}
-
-function VAS_183_demoLocators(whId, month, year) {
-    var seed = VAS_183_demoSeed(whId, month, year);
-    var aisles = ["A", "B", "C", "D", "E", "F"];
-    var zones = ["Bulk Store", "Pick Face", "Quarantine", "Staging", "Returns", "Bonded"];
-    var out = [];
-    for (var i = 0; i < 21; i++) {
-        var qty = 40 + ((seed + i * 17) % 380);
-        out.push({
-            locatorId: 700001 + i,
-            locatorCode: aisles[i % aisles.length] + "-" + String(1 + (i % 9)).padStart(2, '0') + "-" + String(1 + ((i * 3) % 12)).padStart(2, '0'),
-            locatorName: zones[i % zones.length],
-            totalQty: qty,
-            totalValue: qty * (85 + ((seed + i * 29) % 640))
-        });
-    }
-    out.sort(function (a, b) { return b.totalQty - a.totalQty; });
-    return out;
-}
-
-function VAS_183_demoLocatorDetail(whId, locatorId, month, year) {
-    var seed = VAS_183_demoSeed(whId, month, year) + (Number(locatorId) || 0) % 23;
-    var products = ["Descaling Chemicals", "4 mm Screws", "Hydraulic Oil ISO 46", "Bearing SKF-6204",
-        "Drive Belt DB-880", "Gasket Sheet GS-3", "Welding Rod 3.2mm", "Cotton Waste",
-        "Grease Cartridge", "Air Filter AF-12", "Cable Tie 200mm", "Emery Paper 120"];
-    var uoms = ["Each", "Kg", "Ltr", "Set", "Box"];
-    var attrs = ["Grade A", "", "Batch B-2291", "", "Lot 77-C", ""];
-    var items = [];
-    var totalQty = 0, totalValue = 0;
-    for (var i = 0; i < 20; i++) {
-        var qty = 3 + ((seed + i * 11) % 64);
-        totalQty += qty;
-        totalValue += qty * (95 + ((seed + i * 37) % 520));
-        items.push({
-            productName: products[i % products.length],
-            consumedQty: qty,
-            uomName: uoms[i % uoms.length],
-            attributes: attrs[i % attrs.length]
-        });
-    }
-    return { items: items, totalQty: totalQty, totalValue: totalValue, distinctItemCount: items.length };
-}
-/* ===================== 🛑 END DEMO DATA BLOCK 🛑 ===================== */
 
 ; (function (VAS, $) {
 
@@ -174,6 +109,58 @@ function VAS_183_demoLocatorDetail(whId, locatorId, month, year) {
             return n.toLocaleString(window.navigator.language);
         }
 
+// ===== NEW CODE START — currency format (agent A05, 2026-08-19) =====
+        var currencyInfo = { iso: "INR", symbol: "₹" };
+
+        function formatCurrency(value) {
+            var val = Number(value || 0);
+            var absVal = Math.abs(val);
+            var sign = val < 0 ? "-" : "";
+            var symbol = currencyInfo.symbol || currencyInfo.iso || "₹";
+            var iso = (currencyInfo.iso || "INR").toUpperCase();
+            var indianIsos = ["INR", "PKR", "BDT", "NPR", "BTN", "LKR"];
+
+            function trimFixed(num, decimals) {
+                var str = num.toFixed(decimals);
+                return str.replace(/\.?0+$/, "");
+            }
+
+            var compact = "";
+            var exact = "";
+
+            if (indianIsos.indexOf(iso) !== -1) {
+                exact = sign + symbol + val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                if (absVal >= 10000000) {
+                    compact = sign + symbol + trimFixed(absVal / 10000000, 2) + 'Cr';
+                } else if (absVal >= 100000) {
+                    compact = sign + symbol + trimFixed(absVal / 100000, 2) + 'L';
+                } else if (absVal >= 1000) {
+                    compact = sign + symbol + trimFixed(absVal / 1000, 1) + 'K';
+                } else {
+                    compact = sign + symbol + absVal.toLocaleString('en-IN');
+                }
+            } else {
+                exact = sign + symbol + val.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                if (absVal >= 1000000000) {
+                    compact = sign + symbol + trimFixed(absVal / 1000000000, 2) + 'B';
+                } else if (absVal >= 1000000) {
+                    compact = sign + symbol + trimFixed(absVal / 1000000, 2) + 'M';
+                } else if (absVal >= 1000) {
+                    compact = sign + symbol + trimFixed(absVal / 1000, 1) + 'K';
+                } else {
+                    compact = sign + symbol + absVal.toLocaleString(window.navigator.language);
+                }
+            }
+
+            return { compact: compact, exact: exact };
+        }
+
+        function formatINR(value) {
+            return formatCurrency(value).compact;
+        }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+/*
         function formatINR(value) {
             var val = Number(value || 0);
             if (val >= 100000) {
@@ -183,6 +170,8 @@ function VAS_183_demoLocatorDetail(whId, locatorId, month, year) {
             }
             return '₹' + val.toLocaleString(window.navigator.language);
         }
+*/
+// ----- END OLD CODE -----
 
         function formatMonthLabel(m, y) {
             var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -218,14 +207,6 @@ function VAS_183_demoLocatorDetail(whId, locatorId, month, year) {
 
         function loadWarehouses() {
             showBusy(true);
-
-            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
-            if (VAS_183_DEMO) {
-                warehouses = VAS_183_demoWarehouses();
-                populateWarehouseOptions();
-                loadLocatorSummary();
-                return;
-            }
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_183_MaterialConsumptionWidget/GetWarehouses',
@@ -388,26 +369,31 @@ function VAS_183_demoLocatorDetail(whId, locatorId, month, year) {
             showBusy(true);
             var whId = selectedWarehouse ? selectedWarehouse.warehouseId : 0;
 
-            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
-            if (VAS_183_DEMO) {
-                locatorsData = VAS_183_demoLocators(whId, selectedMonth, selectedYear);
-                pageNo = 1;
-                renderLocatorList();
-                showBusy(false);
-                return;
-            }
-
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_183_MaterialConsumptionWidget/GetLocatorSummary',
                 type: 'GET',
                 data: { warehouseId: whId, month: selectedMonth, year: selectedYear },
                 cache: false,
+                // ===== NEW CODE START — currency format (agent A05, 2026-08-19) =====
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data.currency) { currencyInfo = data.currency; }
+                    locatorsData = data.locators || [];
+                    pageNo = 1;
+                    renderLocatorList();
+                },
+                // ===== NEW CODE END — currency format =====
+                // ----- OLD CODE (kept for rollback, do not delete) -----
+                /*
                 success: function (res) {
                     var data = parseResponse(res);
                     locatorsData = data.locators || [];
                     pageNo = 1;
                     renderLocatorList();
                 },
+                */
+                // ----- END OLD CODE -----
+
                 error: function () {
                     locatorsData = [];
                     renderLocatorList();
@@ -444,6 +430,22 @@ function VAS_183_demoLocatorDetail(whId, locatorId, month, year) {
                 var loc = locatorsData[j];
                 var pct = Math.max(6, Math.round((loc.totalQty / maxQty) * 100));
 
+                // ===== NEW CODE START — currency format (agent A05, 2026-08-19) =====
+                var formattedVal = formatCurrency(loc.totalValue);
+                rowsHtml +=
+                    '<button type="button" class="vas-mcw-row" data-locid="' + loc.locatorId + '" data-code="' + escapeHtml(loc.locatorCode) + '" data-name="' + escapeHtml(loc.locatorName) + '">' +
+                    '<div class="vas-mcw-row-left">' +
+                    '<div class="vas-mcw-row-label" title="' + escapeHtml(loc.locatorCode + ' - ' + loc.locatorName) + '">' + escapeHtml(loc.locatorCode + ' - ' + loc.locatorName) + '</div>' +
+                    '<div class="vas-mcw-bar-track"><div class="vas-mcw-bar-fill" style="width:' + pct + '%;"></div></div>' +
+                    '</div>' +
+                    '<div class="vas-mcw-row-right">' +
+                    '<div class="vas-mcw-row-qty">' + escapeHtml(formatQty(loc.totalQty)) + '</div>' +
+                    '<div class="vas-mcw-row-val" title="' + escapeHtml(formattedVal.exact) + '">' + escapeHtml(formattedVal.compact) + '</div>' +
+                    '</div>' +
+                    '</button>';
+                // ===== NEW CODE END — currency format =====
+                // ----- OLD CODE (kept for rollback, do not delete) -----
+                /*
                 rowsHtml +=
                     '<button type="button" class="vas-mcw-row" data-locid="' + loc.locatorId + '" data-code="' + escapeHtml(loc.locatorCode) + '" data-name="' + escapeHtml(loc.locatorName) + '">' +
                     '<div class="vas-mcw-row-left">' +
@@ -455,6 +457,8 @@ function VAS_183_demoLocatorDetail(whId, locatorId, month, year) {
                     '<div class="vas-mcw-row-val">' + escapeHtml(formatINR(loc.totalValue)) + '</div>' +
                     '</div>' +
                     '</button>';
+                */
+                // ----- END OLD CODE -----
             }
 
             $body.html(rowsHtml);
@@ -616,23 +620,27 @@ function VAS_183_demoLocatorDetail(whId, locatorId, month, year) {
 
             $('body').append($modal);
 
-            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
-            if (VAS_183_DEMO) {
-                var demo = VAS_183_demoLocatorDetail(whId, locatorId, selectedMonth, selectedYear);
-                $modal.find('.vas-mcw-m-qty').text(formatQty(demo.totalQty));
-                $modal.find('.vas-mcw-m-val').text(formatINR(demo.totalValue));
-                $modal.find('.vas-mcw-m-items').text(demo.distinctItemCount);
-                modalItemData = demo.items;
-                modalPageNo = 1;
-                renderModalTable();
-                return;
-            }
-
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_183_MaterialConsumptionWidget/GetLocatorDetails',
                 type: 'GET',
                 data: { warehouseId: whId, locatorId: locatorId, month: selectedMonth, year: selectedYear },
                 cache: false,
+                // ===== NEW CODE START — currency format (agent A05, 2026-08-19) =====
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data.currency) { currencyInfo = data.currency; }
+                    var formattedModalVal = formatCurrency(data.totalValue);
+                    $modal.find('.vas-mcw-m-qty').text(formatQty(data.totalQty));
+                    $modal.find('.vas-mcw-m-val').text(formattedModalVal.compact).attr('title', formattedModalVal.exact);
+                    $modal.find('.vas-mcw-m-items').text(data.distinctItemCount || 0);
+
+                    modalItemData = data.items || [];
+                    modalPageNo = 1;
+                    renderModalTable();
+                }
+                // ===== NEW CODE END — currency format =====
+                // ----- OLD CODE (kept for rollback, do not delete) -----
+                /*
                 success: function (res) {
                     var data = parseResponse(res);
                     $modal.find('.vas-mcw-m-qty').text(formatQty(data.totalQty));
@@ -643,6 +651,8 @@ function VAS_183_demoLocatorDetail(whId, locatorId, month, year) {
                     modalPageNo = 1;
                     renderModalTable();
                 }
+                */
+                // ----- END OLD CODE -----
             });
         }
 
@@ -779,3 +789,4 @@ function VAS_183_demoLocatorDetail(whId, locatorId, month, year) {
     };
 
 })(VAS, jQuery);
+

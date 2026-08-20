@@ -57,6 +57,11 @@
         var totalPages = 1;
         var recordsData = [];
 
+// ===== NEW CODE START — currency format (agent A09, 2026-08-19) =====
+        var currencyIso = '';
+        var currencySymbol = '';
+// ===== NEW CODE END — currency format =====
+
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
             return (translated && translated.charAt(0) !== '[') ? translated : fallback;
@@ -83,15 +88,92 @@
             return n.toLocaleString(window.navigator.language);
         }
 
-        function formatINR(value) {
-            var val = Number(value || 0);
-            if (val >= 100000) {
-                return '₹' + (val / 100000).toFixed(1) + 'L';
-            } else if (val >= 1000) {
-                return '₹' + (val / 1000).toFixed(1) + 'k';
+// ===== NEW CODE START — currency format (agent A09, 2026-08-19) =====
+        /**
+         * Formats currency values according to organization locale/currency settings.
+         * Indian ISOs: Lakh/Crore notation.
+         * Other ISOs: Standard thousand separators, compact M/B notation.
+         */
+        function formatCurrencyAmount(val, iso, symbol) {
+            var num = parseFloat(val);
+            if (isNaN(num)) { num = 0; }
+            symbol = symbol || '';
+            iso = (iso || '').toUpperCase();
+
+            var indianIsos = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+            var isIndian = indianIsos.indexOf(iso) !== -1;
+            var formattedVal = '';
+
+            if (isIndian) {
+                var absVal = Math.abs(num);
+                if (absVal >= 10000000) {
+                    formattedVal = (num / 10000000).toFixed(2).replace(/\.00$/, '') + ' Cr';
+                } else if (absVal >= 100000) {
+                    formattedVal = (num / 100000).toFixed(2).replace(/\.00$/, '') + ' L';
+                } else if (absVal >= 1000) {
+                    formattedVal = (num / 1000).toFixed(1).replace(/\.0$/, '') + ' k';
+                } else {
+                    formattedVal = formatIndianGrouping(num);
+                }
+            } else {
+                var absVal = Math.abs(num);
+                if (absVal >= 1000000000) {
+                    formattedVal = (num / 1000000000).toFixed(2).replace(/\.00$/, '') + ' B';
+                } else if (absVal >= 1000000) {
+                    formattedVal = (num / 1000000).toFixed(2).replace(/\.00$/, '') + ' M';
+                } else if (absVal >= 1000) {
+                    formattedVal = (num / 1000).toFixed(1).replace(/\.0$/, '') + ' K';
+                } else {
+                    formattedVal = num.toLocaleString();
+                }
             }
-            return '₹' + val.toLocaleString(window.navigator.language);
+
+            return symbol ? (symbol + ' ' + formattedVal) : formattedVal;
         }
+
+        function formatFullCurrency(val, iso, symbol) {
+            var num = parseFloat(val);
+            if (isNaN(num)) { num = 0; }
+            symbol = symbol || '';
+            iso = (iso || '').toUpperCase();
+
+            var indianIsos = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+            var isIndian = indianIsos.indexOf(iso) !== -1;
+            var fullStr = isIndian ? formatIndianGrouping(num) : num.toLocaleString();
+            return symbol ? (symbol + ' ' + fullStr) : fullStr;
+        }
+
+        function formatIndianGrouping(num) {
+            var parts = num.toString().split('.');
+            var integerPart = parts[0];
+            var decimalPart = parts.length > 1 ? '.' + parts[1] : '';
+            var isNegative = false;
+
+            if (integerPart.indexOf('-') === 0) {
+                isNegative = true;
+                integerPart = integerPart.substring(1);
+            }
+
+            var lastThree = integerPart.substring(integerPart.length - 3);
+            var otherNumbers = integerPart.substring(0, integerPart.length - 3);
+            if (otherNumbers !== '') {
+                lastThree = ',' + lastThree;
+            }
+            var formatted = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree + decimalPart;
+            return isNegative ? '-' + formatted : formatted;
+        }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//        function formatINR(value) {
+//            var val = Number(value || 0);
+//            if (val >= 100000) {
+//                return '₹' + (val / 100000).toFixed(1) + 'L';
+//            } else if (val >= 1000) {
+//                return '₹' + (val / 1000).toFixed(1) + 'k';
+//            }
+//            return '₹' + val.toLocaleString(window.navigator.language);
+//        }
+// ----- END OLD CODE -----
 
         function getStatusBadge(status) {
             if (status === 'CO' || status === 'CL') {
@@ -128,6 +210,7 @@
             } catch (e) { }
         }
 
+// ===== NEW CODE START — currency format (agent A09, 2026-08-19) =====
         function loadRecentIssues() {
             showBusy(true);
 
@@ -140,6 +223,10 @@
                     var data = parseResponse(res);
                     recordsData = data.records || [];
                     totalRecords = data.totalRecords || 0;
+                    if (data.currency) {
+                        currencyIso = data.currency.iso || '';
+                        currencySymbol = data.currency.symbol || '';
+                    }
                     renderRecords();
                 },
                 error: function () {
@@ -150,6 +237,31 @@
                 complete: function () { showBusy(false); }
             });
         }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//        function loadRecentIssues() {
+//            showBusy(true);
+//
+//            $.ajax({
+//                url: VIS.Application.contextUrl + 'VAS_187_RecentInventoryUseWidget/GetRecentIssues',
+//                type: 'GET',
+//                data: { status: selectedStatus, pageNo: pageNo, pageSize: pageSize },
+//                cache: false,
+//                success: function (res) {
+//                    var data = parseResponse(res);
+//                    recordsData = data.records || [];
+//                    totalRecords = data.totalRecords || 0;
+//                    renderRecords();
+//                },
+//                error: function () {
+//                    recordsData = [];
+//                    totalRecords = 0;
+//                    renderRecords();
+//                },
+//                complete: function () { showBusy(false); }
+//            });
+//        }
+// ----- END OLD CODE -----
 
         function renderRecords() {
             if (!$body) { return; }
@@ -170,9 +282,12 @@
             var endIndex = Math.min(totalRecords, startIndex + recordsData.length);
             var rowsHtml = '';
 
+// ===== NEW CODE START — currency format (agent A09, 2026-08-19) =====
             for (var i = 0; i < recordsData.length; i++) {
                 var item = recordsData[i];
                 var metaStr = item.orgName + ' · ' + (item.warehouseName || 'Warehouse') + ' · ' + item.movementDate;
+                var formattedCompactVal = formatCurrencyAmount(item.totalValue, currencyIso, currencySymbol);
+                var formattedFullVal = formatFullCurrency(item.totalValue, currencyIso, currencySymbol);
 
                 rowsHtml +=
                     '<button type="button" class="vas-riu-row" data-invid="' + item.inventoryId + '">' +
@@ -185,10 +300,32 @@
                     '</div>' +
                     '<div class="vas-riu-row-right">' +
                     '<div class="vas-riu-lines-qty">' + item.lineCount + ' lines · ' + formatQty(item.totalQty) + '</div>' +
-                    '<div class="vas-riu-val">' + formatINR(item.totalValue) + '</div>' +
+                    '<div class="vas-riu-val" title="' + escapeHtml(formattedFullVal) + '">' + escapeHtml(formattedCompactVal) + '</div>' +
                     '</div>' +
                     '</button>';
             }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//            for (var i = 0; i < recordsData.length; i++) {
+//                var item = recordsData[i];
+//                var metaStr = item.orgName + ' · ' + (item.warehouseName || 'Warehouse') + ' · ' + item.movementDate;
+//
+//                rowsHtml +=
+//                    '<button type="button" class="vas-riu-row" data-invid="' + item.inventoryId + '">' +
+//                    '<div class="vas-riu-row-left">' +
+//                    '<div class="vas-riu-doc-head">' +
+//                    '<span class="vas-riu-doc-no">' + escapeHtml(item.documentNo) + '</span>' +
+//                    getStatusBadge(item.docStatus) +
+//                    '</div>' +
+//                    '<div class="vas-riu-doc-meta" title="' + escapeHtml(metaStr) + '">' + escapeHtml(metaStr) + '</div>' +
+//                    '</div>' +
+//                    '<div class="vas-riu-row-right">' +
+//                    '<div class="vas-riu-lines-qty">' + item.lineCount + ' lines · ' + formatQty(item.totalQty) + '</div>' +
+//                    '<div class="vas-riu-val">' + formatINR(item.totalValue) + '</div>' +
+//                    '</div>' +
+//                    '</button>';
+//            }
+// ----- END OLD CODE -----
 
             $body.html(rowsHtml);
 

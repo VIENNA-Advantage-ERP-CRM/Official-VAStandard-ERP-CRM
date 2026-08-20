@@ -12,10 +12,6 @@
  */
 ; VAS = window.VAS || {};
 
-/* 🛑 🚨 🚨 🛑  DEMO DATA - UI PREVIEW ONLY - DELETE BEFORE COMMIT  🛑 🚨 🚨 🛑
-   Set to false (or delete this line and the `if (VAS_182_DEMO)` guard in loadKpi). */
-var VAS_182_DEMO = true;
-
 ; (function (VAS, $) {
 
     function ensureDashInlineSizeVar($el) {
@@ -34,6 +30,70 @@ var VAS_182_DEMO = true;
         write();
     }
 
+// ===== NEW CODE START — currency format (agent A04, 2026-08-19) =====
+    /**
+     * Formats currency values according to organization locale/currency settings (Section 1).
+     * @param {number|string} val Numeric value to format
+     * @param {string} iso Currency ISO code (e.g. 'USD', 'INR')
+     * @param {string} symbol Currency symbol (e.g. '$', '₹')
+     * @returns {string} Formatted currency string
+     */
+    function formatCurrencyAmount(val, iso, symbol) {
+        var num = parseFloat(val);
+        if (isNaN(num)) { num = 0; }
+        symbol = symbol || '';
+        iso = (iso || '').toUpperCase();
+
+        var indianIsos = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+        var isIndian = indianIsos.indexOf(iso) !== -1;
+        var formattedVal = '';
+
+        if (isIndian) {
+            var absVal = Math.abs(num);
+            if (absVal >= 10000000) { // 1 Crore = 10,000,000
+                formattedVal = (num / 10000000).toFixed(2).replace(/\.00$/, '') + ' Cr';
+            } else if (absVal >= 100000) { // 1 Lakh = 100,000
+                formattedVal = (num / 100000).toFixed(2).replace(/\.00$/, '') + ' L';
+            } else {
+                formattedVal = formatIndianGrouping(num);
+            }
+        } else {
+            var absVal = Math.abs(num);
+            if (absVal >= 1000000000) {
+                formattedVal = (num / 1000000000).toFixed(2).replace(/\.00$/, '') + ' B';
+            } else if (absVal >= 1000000) {
+                formattedVal = (num / 1000000).toFixed(2).replace(/\.00$/, '') + ' M';
+            } else if (absVal >= 1000) {
+                formattedVal = num.toLocaleString();
+            } else {
+                formattedVal = num.toLocaleString();
+            }
+        }
+
+        return symbol ? (symbol + ' ' + formattedVal) : formattedVal;
+    }
+
+    function formatIndianGrouping(num) {
+        var parts = num.toString().split('.');
+        var integerPart = parts[0];
+        var decimalPart = parts.length > 1 ? '.' + parts[1] : '';
+        var isNegative = false;
+
+        if (integerPart.indexOf('-') === 0) {
+            isNegative = true;
+            integerPart = integerPart.substring(1);
+        }
+
+        var lastThree = integerPart.substring(integerPart.length - 3);
+        var otherNumbers = integerPart.substring(0, integerPart.length - 3);
+        if (otherNumbers !== '') {
+            lastThree = ',' + lastThree;
+        }
+        var formatted = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree + decimalPart;
+        return isNegative ? '-' + formatted : formatted;
+    }
+// ===== NEW CODE END — currency format =====
+
     VAS.VAS_182_SparesConsumablesIssuesWidget = function () {
 
         this.frame;
@@ -45,6 +105,11 @@ var VAS_182_DEMO = true;
         var $valueEl;
         var $metaEl;
         var $busy;
+
+// ===== NEW CODE START — currency format (agent A04, 2026-08-19) =====
+        var currencyIso = '';
+        var currencySymbol = '';
+// ===== NEW CODE END — currency format =====
 
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
@@ -93,17 +158,25 @@ var VAS_182_DEMO = true;
             } catch (e) { }
         }
 
+// ===== NEW CODE START — currency format (agent A04, 2026-08-19) =====
+        function loadCurrencyInfo() {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_182_SparesConsumablesIssuesWidget/GetCurrencyInfo',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data) {
+                        currencyIso = data.iso || '';
+                        currencySymbol = data.symbol || '';
+                    }
+                }
+            });
+        }
+
         function loadKpi() {
             showBusy(true);
-
-            /* 🛑 🚨 DEMO DATA - UI PREVIEW ONLY - DELETE BEFORE COMMIT 🚨 🛑
-               This tile renders a single percentage, so there are no rows to fake; the value below
-               just replaces the live 0% while the classification question is open. */
-            if (VAS_182_DEMO) {
-                renderMetric({ percentage: 39 });
-                showBusy(false);
-                return;
-            }
+            loadCurrencyInfo();
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_182_SparesConsumablesIssuesWidget/GetSparesConsumablesPercentage',
@@ -131,6 +204,39 @@ var VAS_182_DEMO = true;
             }
             if ($card) { $card.prop('disabled', false); }
         }
+// ===== NEW CODE END — currency format =====
+
+// ----- OLD CODE (kept for rollback, do not delete) -----
+        function loadKpi_Old() {
+            showBusy(true);
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_182_SparesConsumablesIssuesWidget/GetSparesConsumablesPercentage',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data.error) { setError(); return; }
+                    renderMetric(data);
+                },
+                error: function () { setError(); },
+                complete: function () { showBusy(false); }
+            });
+        }
+
+        function renderMetric_Old(data) {
+            var pct = Number(data.percentage || 0);
+
+            if ($valueEl) {
+                $valueEl.text(pct + '%');
+                $valueEl.attr('title', pct + '%');
+            }
+            if ($metaEl) {
+                $metaEl.text(label("VAS_OfIssuedValueMTD", "Of issued value MTD"));
+            }
+            if ($card) { $card.prop('disabled', false); }
+        }
+// ----- END OLD CODE -----
 
         function setError() {
             if ($valueEl) {

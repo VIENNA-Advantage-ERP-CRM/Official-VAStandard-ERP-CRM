@@ -12,10 +12,6 @@
  */
 ; VAS = window.VAS || {};
 
-/* 🛑 🚨 🚨 🛑  DEMO DATA - UI PREVIEW ONLY - DELETE BEFORE COMMIT  🛑 🚨 🚨 🛑
-   Set to false (or delete this line and the `if (VAS_181_DEMO)` guard in the KPI loader). */
-var VAS_181_DEMO = true;
-
 ; (function (VAS, $) {
 
     function ensureDashInlineSizeVar($el) {
@@ -72,11 +68,89 @@ var VAS_181_DEMO = true;
             $busy.toggleClass('vas-piw-hidden', !show);
         }
 
+// ===== NEW CODE START — currency format (agent A03, 2026-08-19) =====
+        var currencyInfo = { iso: '', symbol: '' };
+
+        function loadCurrencyInfo() {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_181_ProductionIssuesWidget/GetCurrencyInfo',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data && data.iso) {
+                        currencyInfo.iso = data.iso;
+                        currencyInfo.symbol = data.symbol || '';
+                    }
+                }
+            });
+        }
+
+        /**
+         * Organization-aware currency formatter
+         * @param {number|string} val - Amount to format
+         * @param {boolean} compact - Whether to format with Lakh/Crore or M/B
+         * @returns {string} Formatted currency string with org currency symbol
+         */
+        function formatCurrency(val, compact) {
+            var num = Number(val);
+            if (isNaN(num) || val === null || val === undefined || val === '') {
+                num = 0;
+            }
+            var sym = currencyInfo.symbol || '';
+            var iso = (currencyInfo.iso || '').toUpperCase();
+            var isIndian = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'].indexOf(iso) !== -1;
+
+            if (compact) {
+                var absNum = Math.abs(num);
+                var sign = num < 0 ? '-' : '';
+                if (isIndian) {
+                    if (absNum >= 10000000) {
+                        return sym + sign + (absNum / 10000000).toFixed(2) + ' Cr';
+                    } else if (absNum >= 100000) {
+                        return sym + sign + (absNum / 100000).toFixed(2) + ' L';
+                    }
+                } else {
+                    if (absNum >= 1000000000) {
+                        return sym + sign + (absNum / 1000000000).toFixed(2) + ' B';
+                    } else if (absNum >= 1000000) {
+                        return sym + sign + (absNum / 1000000).toFixed(2) + ' M';
+                    }
+                }
+            }
+
+            var parts = num.toFixed(2).split('.');
+            var intPart = parts[0];
+            var decPart = parts[1];
+
+            if (isIndian) {
+                var lastThree = intPart.substring(intPart.length - 3);
+                var otherNumbers = intPart.substring(0, intPart.length - 3);
+                if (otherNumbers !== '') {
+                    lastThree = ',' + lastThree;
+                }
+                intPart = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree;
+            } else {
+                intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            }
+
+            return sym + intPart + '.' + decPart;
+        }
+
+        this.Initalize = function () {
+            createWidget();
+            setupResizeObserver();
+            loadCurrencyInfo();
+            loadKpi();
+        };
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
         this.Initalize = function () {
             createWidget();
             setupResizeObserver();
             loadKpi();
         };
+// ----- END OLD CODE -----
 
         function setupResizeObserver() {
             if (typeof ResizeObserver === 'undefined') { return; }
@@ -96,16 +170,6 @@ var VAS_181_DEMO = true;
         function loadKpi() {
             showBusy(true);
 
-            /* 🛑 🚨 DEMO DATA - UI PREVIEW ONLY - DELETE BEFORE COMMIT 🚨 🛑
-               A single-percentage KPI tile, so there are no rows to fake. 61% is the value the
-               source mock shows; it is the complement of VAS_182's 39%, which is what the design
-               intends the pair to add up to. */
-            if (VAS_181_DEMO) {
-                renderMetric({ percentage: 61 });
-                showBusy(false);
-                return;
-            }
-
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_181_ProductionIssuesWidget/GetProductionIssuesPercentage',
                 type: 'GET',
@@ -120,6 +184,7 @@ var VAS_181_DEMO = true;
             });
         }
 
+// ===== NEW CODE START — currency format (agent A03, 2026-08-19) =====
         function renderMetric(data) {
             var pct = Number(data.percentage || 0);
 
@@ -132,6 +197,21 @@ var VAS_181_DEMO = true;
             }
             if ($card) { $card.prop('disabled', false); }
         }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+        function renderMetric(data) {
+            var pct = Number(data.percentage || 0);
+
+            if ($valueEl) {
+                $valueEl.text(pct + '%');
+                $valueEl.attr('title', pct + '%');
+            }
+            if ($metaEl) {
+                $metaEl.text(label("VAS_OfIssuedValueMTD", "Of issued value MTD"));
+            }
+            if ($card) { $card.prop('disabled', false); }
+        }
+// ----- END OLD CODE -----
 
         function setError() {
             if ($valueEl) {

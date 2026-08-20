@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VAS_184_HighValueUsageWidget
  * 2x2 List Widget for Inventory Use dashboard.
  * Displays top 10 products consumed ranked by current cost price descending.
@@ -27,51 +27,6 @@
  * 18 | lines                                  | VAS_Lines
  */
 ; VAS = window.VAS || {};
-
-/* ==========================================================================================
-   🛑 🚨 🚨 🛑  DEMO DATA - UI PREVIEW ONLY - DELETE THIS BLOCK BEFORE COMMIT  🛑 🚨 🚨 🛑
-   Set VAS_184_DEMO to false (or delete this block and the two `if (VAS_184_DEMO)` guards in
-   loadProducts() and loadIssueHistory()) to restore live controller data.
-   ========================================================================================== */
-var VAS_184_DEMO = true;
-
-function VAS_184_demoProducts() {
-    var names = ["Hydraulic Pump HP-450", "Bearing Assembly SKF-6204", "Control Valve CV-12", "Drive Belt DB-880",
-        "Servo Motor SM-3000", "Gear Box GB-75", "Coupling Flex CF-40", "Seal Kit SK-220",
-        "Pressure Sensor PS-16", "Filter Cartridge FC-90", "Chain Sprocket CS-32", "Bushing BR-18",
-        "Solenoid Coil SC-24", "Impeller IM-140", "Shaft Alloy SA-600", "O-Ring Set OR-55",
-        "Contactor CT-63", "Limit Switch LS-11", "Grease Nipple GN-08", "V-Belt Pulley VP-210",
-        "Thermostat TH-95", "Lubricant Drum LD-200"];
-    var attrs = ["Grade A", "", "Batch B-2291", "", "Grade A", "", "Batch B-1140", "", "", "Grade C"];
-    var uoms = ["Each", "Each", "Set", "Each", "Each", "Kg", "Each", "Set", "Each", "Ltr"];
-    var out = [];
-    for (var i = 0; i < names.length; i++) {
-        var cost = 48200 - (i * 1970) - ((i % 4) * 310);
-        var qty = 3 + ((i * 7) % 46);
-        out.push({
-            productId: 900001 + i, productName: names[i], attribute: attrs[i % attrs.length],
-            uomName: uoms[i % uoms.length], costPrice: cost, issuedQty: qty, issuedValue: cost * qty
-        });
-    }
-    return out;
-}
-
-function VAS_184_demoIssueHistory() {
-    var whs = ["Central WH / A-01-02", "Central WH / B-04-11", "North WH / C-02-07", "North WH / D-01-03",
-        "Plant WH / E-03-09", "Plant WH / F-05-01"];
-    var out = [];
-    for (var i = 0; i < 24; i++) {
-        var qty = 2 + ((i * 3) % 19);
-        var unit = 1450 + ((i % 6) * 275);
-        out.push({
-            documentNo: "IU-" + (104820 + i * 3),
-            movementDate: String(1 + (i % 28)).padStart(2, '0') + " Aug 2026",
-            warehouseLoc: whs[i % whs.length], qty: qty, value: qty * unit
-        });
-    }
-    return out;
-}
-/* ===================== 🛑 END DEMO DATA BLOCK 🛑 ===================== */
 
 ; (function (VAS, $) {
 
@@ -117,45 +72,60 @@ function VAS_184_demoIssueHistory() {
         var pageSize = 3;
         var totalPages = 1;
         var isRefitting = false;
+        var currencyInfo = { iso: "INR", symbol: "₹", stdPrecision: 2 };
 
-        function DateTimeNowMonth() { return new Date().getMonth() + 1; }
-        function DateTimeNowYear() { return new Date().getFullYear(); }
+// ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
+        function formatMoney(value, isCompact) {
+            var val = Number(value);
+            if (isNaN(val) || value === null || value === undefined || value === '') { val = 0; }
 
-        function label(key, fallback) {
-            var translated = VIS.Msg.getMsg(key);
-            return (translated && translated.charAt(0) !== '[') ? translated : fallback;
-        }
+            var iso = (currencyInfo && currencyInfo.iso ? currencyInfo.iso : "INR").toUpperCase();
+            var sym = (currencyInfo && currencyInfo.symbol) ? currencyInfo.symbol : (iso || "₹");
+            var prec = (currencyInfo && typeof currencyInfo.stdPrecision === 'number') ? currencyInfo.stdPrecision : 2;
+            var space = sym.length > 1 ? ' ' : '';
+            var isIndian = ["INR", "PKR", "BDT", "NPR", "BTN", "LKR"].indexOf(iso) !== -1;
+            var absVal = Math.abs(val);
 
-        function escapeHtml(value) {
-            return String(value == null ? "" : value)
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
-
-        function parseResponse(res) {
-            var data = res;
-            if (typeof data === 'string') { data = JSON.parse(data); }
-            if (typeof data === 'string') { data = JSON.parse(data); }
-            return data || {};
-        }
-
-        function formatQty(value) {
-            var n = Number(value || 0);
-            return n.toLocaleString(window.navigator.language);
-        }
-
-        function formatINR(value) {
-            var val = Number(value || 0);
-            if (val >= 100000) {
-                return '₹' + (val / 100000).toFixed(1) + 'L';
-            } else if (val >= 1000) {
-                return '₹' + (val / 1000).toFixed(1) + 'k';
+            if (isCompact && absVal > 0) {
+                if (isIndian) {
+                    if (absVal >= 10000000) {
+                        return sym + space + (val / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr';
+                    }
+                    if (absVal >= 100000) {
+                        return sym + space + (val / 100000).toFixed(2).replace(/\.?0+$/, '') + ' Lakh';
+                    }
+                    if (absVal >= 1000) {
+                        return sym + space + (val / 1000).toFixed(2).replace(/\.?0+$/, '') + 'k';
+                    }
+                } else {
+                    if (absVal >= 1000000000) {
+                        return sym + space + (val / 1000000000).toFixed(2).replace(/\.?0+$/, '') + 'B';
+                    }
+                    if (absVal >= 1000000) {
+                        return sym + space + (val / 1000000).toFixed(2).replace(/\.?0+$/, '') + 'M';
+                    }
+                    if (absVal >= 1000) {
+                        return sym + space + (val / 1000).toFixed(2).replace(/\.?0+$/, '') + 'k';
+                    }
+                }
             }
-            return '₹' + val.toLocaleString(window.navigator.language);
+
+            var locale = isIndian ? 'en-IN' : 'en-US';
+            var numStr = val.toLocaleString(locale, { minimumFractionDigits: 0, maximumFractionDigits: prec });
+            return sym + space + numStr;
         }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//        function formatINR(value) {
+//            var val = Number(value || 0);
+//            if (val >= 100000) {
+//                return '₹' + (val / 100000).toFixed(1) + 'L';
+//            } else if (val >= 1000) {
+//                return '₹' + (val / 1000).toFixed(1) + 'k';
+//            }
+//            return '₹' + val.toLocaleString(window.navigator.language);
+//        }
+// ----- END OLD CODE -----
 
         function formatMonthName(m) {
             var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -199,25 +169,25 @@ function VAS_184_demoIssueHistory() {
         function loadProducts() {
             showBusy(true);
 
-            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
-            if (VAS_184_DEMO) {
-                productsData = VAS_184_demoProducts();
-                pageNo = 1;
-                renderProducts();
-                showBusy(false);
-                return;
-            }
-
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_184_HighValueUsageWidget/GetHighValueProducts',
                 type: 'GET',
                 data: { month: selectedMonth, year: selectedYear },
                 cache: false,
                 success: function (res) {
+// ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
                     var data = parseResponse(res);
+                    if (data.currency) { currencyInfo = data.currency; }
                     productsData = data.products || [];
                     pageNo = 1;
                     renderProducts();
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                  var data = parseResponse(res);
+//                  productsData = data.products || [];
+//                  pageNo = 1;
+//                  renderProducts();
+// ----- END OLD CODE -----
                 },
                 error: function () {
                     productsData = [];
@@ -275,14 +245,29 @@ function VAS_184_demoIssueHistory() {
                 var attrMeta = item.attribute ? (item.attribute + ' · ') : '';
                 attrMeta += formatQty(item.issuedQty) + ' ' + (item.uomName || 'Nos');
 
+// ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
+                var compactCost = formatMoney(item.costPrice, true);
+                var fullCost = formatMoney(item.costPrice, false);
+
                 rowsHtml +=
                     '<button type="button" class="vas-hvu-row" data-pid="' + item.productId + '" data-pname="' + escapeHtml(item.productName) + '" data-cost="' + item.costPrice + '" data-attr="' + escapeHtml(item.attribute || "-") + '" data-uom="' + escapeHtml(item.uomName || "Nos") + '" data-qty="' + item.issuedQty + '" data-val="' + item.issuedValue + '">' +
                     '<div class="vas-hvu-row-left">' +
                     '<div class="vas-hvu-p-name" title="' + escapeHtml(item.productName) + '">' + escapeHtml(item.productName) + '</div>' +
                     '<div class="vas-hvu-p-meta" title="' + escapeHtml(attrMeta) + '">' + escapeHtml(attrMeta) + '</div>' +
                     '</div>' +
-                    '<div class="vas-hvu-p-cost" title="Cost price ' + escapeHtml(formatINR(item.costPrice)) + '">' + escapeHtml(formatINR(item.costPrice)) + '</div>' +
+                    '<div class="vas-hvu-p-cost" title="Cost price ' + escapeHtml(fullCost) + '">' + escapeHtml(compactCost) + '</div>' +
                     '</button>';
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//              rowsHtml +=
+//                  '<button type="button" class="vas-hvu-row" data-pid="' + item.productId + '" data-pname="' + escapeHtml(item.productName) + '" data-cost="' + item.costPrice + '" data-attr="' + escapeHtml(item.attribute || "-") + '" data-uom="' + escapeHtml(item.uomName || "Nos") + '" data-qty="' + item.issuedQty + '" data-val="' + item.issuedValue + '">' +
+//                  '<div class="vas-hvu-row-left">' +
+//                  '<div class="vas-hvu-p-name" title="' + escapeHtml(item.productName) + '">' + escapeHtml(item.productName) + '</div>' +
+//                  '<div class="vas-hvu-p-meta" title="' + escapeHtml(attrMeta) + '">' + escapeHtml(attrMeta) + '</div>' +
+//                  '</div>' +
+//                  '<div class="vas-hvu-p-cost" title="Cost price ' + escapeHtml(formatINR(item.costPrice)) + '">' + escapeHtml(formatINR(item.costPrice)) + '</div>' +
+//                  '</button>';
+// ----- END OLD CODE -----
             }
 
             $body.html(rowsHtml);
@@ -311,13 +296,18 @@ function VAS_184_demoIssueHistory() {
 
             var monthFull = formatMonthName(selectedMonth) + ' ' + selectedYear;
 
+// ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
+            var mCompactCost = formatMoney(cost, true);
+            var mFullCost = formatMoney(cost, false);
+            var mFullIssuedValue = formatMoney(issuedValue, false);
+
             $modal = $(
                 '<div class="vas-hvu-modal-overlay" role="dialog" aria-modal="true">' +
                 '<div class="vas-hvu-modal-card">' +
                 '<div class="vas-hvu-modal-head">' +
                 '<div class="vas-hvu-modal-title-wrap">' +
                 '<h3 class="vas-hvu-modal-title" title="' + escapeHtml(pname) + '">' + escapeHtml(pname) + '</h3>' +
-                '<span class="vas-hvu-cost-chip">' + escapeHtml(formatINR(cost)) + '</span>' +
+                '<span class="vas-hvu-cost-chip" title="Cost price ' + escapeHtml(mFullCost) + '">' + escapeHtml(mCompactCost) + '</span>' +
                 '</div>' +
                 '<button type="button" class="vas-hvu-modal-close" aria-label="' + escapeHtml(label("VAS_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
@@ -327,9 +317,31 @@ function VAS_184_demoIssueHistory() {
                 '<div class="vas-hvu-modal-grid">' +
                 '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_Attribute", "Attribute")) + '</div><div class="vas-hvu-m-val" title="' + escapeHtml(attr) + '">' + escapeHtml(attr) + '</div></div>' +
                 '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_UoM", "UoM")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(uom) + '</div></div>' +
-                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_CurrentCostPrice", "Current Cost Price")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatINR(cost)) + '</div></div>' +
-                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_TotalIssued", "Total Issued")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatQty(issuedQty) + ' ' + uom + ' · ' + formatINR(issuedValue)) + '</div></div>' +
+                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_CurrentCostPrice", "Current Cost Price")) + '</div><div class="vas-hvu-m-val" title="' + escapeHtml(mFullCost) + '">' + escapeHtml(mFullCost) + '</div></div>' +
+                '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_TotalIssued", "Total Issued")) + '</div><div class="vas-hvu-m-val" title="' + escapeHtml(formatQty(issuedQty) + ' ' + uom + ' · ' + mFullIssuedValue) + '">' + escapeHtml(formatQty(issuedQty) + ' ' + uom + ' · ' + mFullIssuedValue) + '</div></div>' +
                 '</div>' +
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//          $modal = $(
+//              '<div class="vas-hvu-modal-overlay" role="dialog" aria-modal="true">' +
+//              '<div class="vas-hvu-modal-card">' +
+//              '<div class="vas-hvu-modal-head">' +
+//              '<div class="vas-hvu-modal-title-wrap">' +
+//              '<h3 class="vas-hvu-modal-title" title="' + escapeHtml(pname) + '">' + escapeHtml(pname) + '</h3>' +
+//              '<span class="vas-hvu-cost-chip">' + escapeHtml(formatINR(cost)) + '</span>' +
+//              '</div>' +
+//              '<button type="button" class="vas-hvu-modal-close" aria-label="' + escapeHtml(label("VAS_Close", "Close")) + '">' +
+//              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+//              '</button>' +
+//              '</div>' +
+//              '<div class="vas-hvu-modal-body">' +
+//              '<div class="vas-hvu-modal-grid">' +
+//              '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_Attribute", "Attribute")) + '</div><div class="vas-hvu-m-val" title="' + escapeHtml(attr) + '">' + escapeHtml(attr) + '</div></div>' +
+//              '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_UoM", "UoM")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(uom) + '</div></div>' +
+//              '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_CurrentCostPrice", "Current Cost Price")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatINR(cost)) + '</div></div>' +
+//              '<div class="vas-hvu-modal-field"><div class="vas-hvu-m-lbl">' + escapeHtml(label("VAS_TotalIssued", "Total Issued")) + '</div><div class="vas-hvu-m-val">' + escapeHtml(formatQty(issuedQty) + ' ' + uom + ' · ' + formatINR(issuedValue)) + '</div></div>' +
+//              '</div>' +
+// ----- END OLD CODE -----
                 '<table class="vas-hvu-issues-table">' +
                 '<thead><tr>' +
                 '<th>' + escapeHtml(label("VAS_DocNo", "Doc No.")) + '</th>' +
@@ -399,17 +411,33 @@ function VAS_184_demoIssueHistory() {
                 var mEnd = Math.min(issueHistory.length, mStart + mPageSize);
                 var tbodyHtml = '';
 
+// ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
                 for (var j = mStart; j < mEnd; j++) {
                     var rec = issueHistory[j];
+                    var recValFormatted = formatMoney(rec.value, false);
                     tbodyHtml +=
                         '<tr>' +
                         '<td title="' + escapeHtml(rec.documentNo) + '">' + escapeHtml(rec.documentNo) + '</td>' +
                         '<td>' + escapeHtml(rec.movementDate) + '</td>' +
                         '<td title="' + escapeHtml(rec.warehouseLoc) + '">' + escapeHtml(rec.warehouseLoc) + '</td>' +
                         '<td>' + escapeHtml(formatQty(rec.qty)) + '</td>' +
-                        '<td>' + escapeHtml(formatINR(rec.value)) + '</td>' +
+                        '<td title="' + escapeHtml(recValFormatted) + '">' + escapeHtml(recValFormatted) + '</td>' +
                         '</tr>';
                 }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//              for (var j = mStart; j < mEnd; j++) {
+//                  var rec = issueHistory[j];
+//                  tbodyHtml +=
+//                      '<tr>' +
+//                      '<td title="' + escapeHtml(rec.documentNo) + '">' + escapeHtml(rec.documentNo) + '</td>' +
+//                      '<td>' + escapeHtml(rec.movementDate) + '</td>' +
+//                      '<td title="' + escapeHtml(rec.warehouseLoc) + '">' + escapeHtml(rec.warehouseLoc) + '</td>' +
+//                      '<td>' + escapeHtml(formatQty(rec.qty)) + '</td>' +
+//                      '<td>' + escapeHtml(formatINR(rec.value)) + '</td>' +
+//                      '</tr>';
+//              }
+// ----- END OLD CODE -----
 
                 $tbody.html(tbodyHtml + fillerRows(mPageSize - (mEnd - mStart)));
                 $mHelper.text((mEnd - mStart) + ' ' + ofTxt + ' ' + issueHistory.length + ' ' + linesTxt);
@@ -452,24 +480,25 @@ function VAS_184_demoIssueHistory() {
 
             $('body').append($modal);
 
-            // 🛑 DEMO DATA guard - delete with the block at the top of this file.
-            if (VAS_184_DEMO) {
-                issueHistory = VAS_184_demoIssueHistory();
-                mPageNo = 1;
-                renderIssueTable();
-                return;
-            }
-
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_184_HighValueUsageWidget/GetProductIssueHistory',
                 type: 'GET',
                 data: { productId: pid, month: selectedMonth, year: selectedYear },
                 cache: false,
                 success: function (res) {
+// ===== NEW CODE START — currency format (agent A06, 2026-08-19) =====
                     var data = parseResponse(res);
+                    if (data.currency) { currencyInfo = data.currency; }
                     issueHistory = data.issues || [];
                     mPageNo = 1;
                     renderIssueTable();
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                  var data = parseResponse(res);
+//                  issueHistory = data.issues || [];
+//                  mPageNo = 1;
+//                  renderIssueTable();
+// ----- END OLD CODE -----
                 }
             });
         }
@@ -596,3 +625,4 @@ function VAS_184_demoIssueHistory() {
     };
 
 })(VAS, jQuery);
+

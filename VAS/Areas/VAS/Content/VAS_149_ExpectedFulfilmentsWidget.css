@@ -139,7 +139,7 @@
 .vas-exf-dialog {
     /* Viewport-anchored (the dialog lives on <body>, outside the widget), same
        basis as the widget card so it scales at any resolution; internals are em. */
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0092), 17px);
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0115), 21px);
     position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 2em; font-family: Roboto, Arial, sans-serif;
 }
 .vas-exf-dialog.vas-exf-hidden { display: none; }
@@ -147,7 +147,7 @@
 .vas-exf-body-lock { overflow: hidden; }
 
 .vas-exf-modal {
-    position: relative; width: min(55em, calc(100vw - 4em)); max-height: 90vh;
+    position: relative; width: min(72em, calc(100vw - 3em)); max-height: 94vh;
     display: flex; flex-direction: column;
     background: #fff; border-radius: 14px; overflow: hidden;
     box-shadow: 0 30px 70px rgba(2, 38, 64, .30);
@@ -165,14 +165,14 @@
 .vas-exf-mclose svg { width: 1.25em; height: 1.25em; }
 
 .vas-exf-mcontent { position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-.vas-exf-mbody { padding: 0.5em 1em; overflow: hidden; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.vas-exf-mbody { padding: 0.9em 1.35em; overflow: hidden; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 
 .vas-exf-mbusy { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, .6); z-index: 5; }
 .vas-exf-mbusy.vas-exf-hidden { display: none; }
 
 .vas-exf-optrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 1.25em; }
 .vas-exf-shiprow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0 1em; }
-.vas-exf-field { display: flex; flex-direction: column; padding: 0.25em 0.125em 0.2em; }
+.vas-exf-field { display: flex; flex-direction: column; padding: 0.45em 0.125em 0.35em; }
 .vas-exf-flabel { font-size: .75em; color: #5F7283; margin-bottom: 0.25em; }
 .vas-exf-f {
     font-family: inherit; font-size: .9em; color: #102C3F; border: none;
@@ -184,7 +184,7 @@ select.vas-exf-f {
 }
 .vas-exf-f:hover, .vas-exf-f:focus { border-bottom-color: #0083DA; }
 
-.vas-exf-note { display: flex; align-items: center; gap: 0.375em; font-size: .7em; color: #748494; margin: 0.35em 0; }
+.vas-exf-note { display: flex; align-items: center; gap: 0.375em; font-size: .76em; color: #748494; margin: 0.55em 0; }
 .vas-exf-note svg { width: 0.875em; height: 0.875em; color: #0083DA; flex: 0 0 auto; }
 
 /* Sized for a full page of 5 lines so the modal keeps a stable height and does
@@ -265,3 +265,4 @@ select.vas-exf-f {
 .vas-exf-ctable td.s { font-weight: 700; color: #102C3F; }
 .vas-exf-ctable td.r, .vas-exf-ctable th.r { text-align: right; }
 .vas-exf-ctable tr:last-child td { border-bottom: none; }
+

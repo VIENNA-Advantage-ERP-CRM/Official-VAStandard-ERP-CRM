@@ -61,7 +61,9 @@
         var draftCount = 0;
         var draftList = [];
         var currentPage = 1;
-        var pageSize = 8;
+        /* Lines the popup holds before paging. MUST stay in step with --vas-rows in
+       VAS_158_OpenCountSheetsWidget.css, which sizes the dialog to exactly this many rows. */
+        var pageSize = 7;
         var $modalOverlay = null;
         var widgetObserver = null;
 
@@ -211,7 +213,7 @@
             );
             $body.append($headerRow);
 
-            var $rowsContainer = $('<div class="vas-opencountsheets-rows-container" style="flex: 1; display: flex; flex-direction: column;"></div>');
+            var $rowsContainer = $('<div class="vas-opencountsheets-rows-container"></div>');
             $body.append($rowsContainer);
 
             var $footer = $(
@@ -231,6 +233,22 @@
 
         function updatePageRender($rowsContainer, $footer) {
             $rowsContainer.empty();
+
+            /* Invisible spacers so a short page occupies the same height as a full one. */
+            var appendFillerRows = function (count) {
+                for (var f = 0; f < count; f++) {
+                    $rowsContainer.append(
+                        '<div class="vas-opencountsheets-grid-row vas-opencountsheets-data-row vas-opencountsheets-filler" aria-hidden="true">' +
+                        '<div class="vas-opencountsheets-cell">&nbsp;</div>' +
+                        '<div class="vas-opencountsheets-cell">&nbsp;</div>' +
+                        '<div class="vas-opencountsheets-cell">&nbsp;</div>' +
+                        '<div class="vas-opencountsheets-cell">&nbsp;</div>' +
+                        '<div class="vas-opencountsheets-cell">&nbsp;</div>' +
+                        '<div class="vas-opencountsheets-cell">&nbsp;</div>' +
+                        '</div>'
+                    );
+                }
+            };
 
             var totalItems = draftList.length;
             var totalPages = Math.ceil(totalItems / pageSize) || 1;
@@ -267,6 +285,9 @@
 
                 $rowsContainer.append($row);
             }
+
+            // Hold the popup at pageSize lines regardless of what this page holds.
+            appendFillerRows(Math.max(0, pageSize - pageItems.length));
 
             var $footerText = $footer.find('.vas-opencountsheets-footer-text');
             var $pagerInfo = $footer.find('.vas-opencountsheets-pager-info');
@@ -399,3 +420,4 @@
     };
 
 })(VAS, jQuery);
+

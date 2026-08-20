@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using System;
 using System.Web.Mvc;
+using System.Data.SqlClient;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
@@ -18,6 +19,71 @@ namespace VIS.Controllers
     public class VAS_181_ProductionIssuesWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_181_ProductionIssuesWidgetController).FullName);
+
+// ===== NEW CODE START — currency format (agent A03, 2026-08-19) =====
+        /// <summary>Returns the organization currency info (ISO code and symbol).</summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetCurrencyInfo()
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null) { return Json("", JsonRequestBehavior.AllowGet); }
+
+            try
+            {
+                var currencyInfo = GetCurrencyInfoData(ctx);
+                string json = JsonConvert.SerializeObject(currencyInfo);
+                return Json(json, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_181_ProductionIssuesWidget.GetCurrencyInfo", ex);
+                string json = JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" });
+                return Json(json, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        private object GetCurrencyInfoData(Ctx ctx)
+        {
+            int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
+            string iso = "";
+            string symbol = "";
+
+            if (currencyId > 0)
+            {
+                string sql = "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @param1 AND IsActive = 'Y'";
+                SqlParameter[] param = new SqlParameter[] { new SqlParameter("@param1", currencyId) };
+                using (System.Data.IDataReader dr = DB.ExecuteReader(sql, param, null))
+                {
+                    if (dr != null && dr.Read())
+                    {
+                        iso = Util.GetValueOfString(dr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(iso))
+            {
+                string sql = @"SELECT c.ISO_Code, c.CurSymbol 
+                               FROM AD_ClientInfo ci
+                               INNER JOIN C_AcctSchema a ON (ci.C_AcctSchema1_ID = a.C_AcctSchema_ID)
+                               INNER JOIN C_Currency c ON (a.C_Currency_ID = c.C_Currency_ID)
+                               WHERE ci.AD_Client_ID = @param1";
+                SqlParameter[] param = new SqlParameter[] { new SqlParameter("@param1", ctx.GetAD_Client_ID()) };
+                using (System.Data.IDataReader dr = DB.ExecuteReader(sql, param, null))
+                {
+                    if (dr != null && dr.Read())
+                    {
+                        iso = Util.GetValueOfString(dr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                    }
+                }
+            }
+
+            return new { iso = iso, symbol = symbol };
+        }
+// ===== NEW CODE END — currency format =====
 
         /// <summary>Returns the percentage share of MTD issued value for production purpose.</summary>
         [AjaxAuthorizeAttribute]
@@ -151,3 +217,4 @@ namespace VIS.Controllers
         }
     }
 }
+

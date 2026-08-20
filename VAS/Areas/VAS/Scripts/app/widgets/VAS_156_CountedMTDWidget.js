@@ -19,7 +19,9 @@
 
     // Window name/search key for the Inventory Count screen, same target VAS_158 navigates to.
     var COUNT_WINDOW_NAME = "VAS_PhysicalInventory";
-    var MODAL_PAGE_SIZE = 8;
+    /* Lines the popup holds before paging. MUST stay in step with --vas-rows in
+       VAS_156_CountedMTDWidget.css, which sizes the dialog to exactly this many rows. */
+    var MODAL_PAGE_SIZE = 7;
 
     VAS.VAS_156_CountedMTDWidget = function () {
 
@@ -174,6 +176,22 @@
             return code || '';
         }
 
+        /* Invisible spacers so a short page occupies the same height as a full one. */
+        function fillerRowsHtml(count) {
+            var html = '';
+            for (var f = 0; f < count; f++) {
+                html += '<div class="vas-counted-mtd-grid-row vas-counted-mtd-data-row vas-counted-mtd-filler" aria-hidden="true">' +
+                    '<div class="vas-counted-mtd-cell">&nbsp;</div>' +
+                    '<div class="vas-counted-mtd-cell">&nbsp;</div>' +
+                    '<div class="vas-counted-mtd-cell">&nbsp;</div>' +
+                    '<div class="vas-counted-mtd-cell">&nbsp;</div>' +
+                    '<div class="vas-counted-mtd-cell">&nbsp;</div>' +
+                    '<div class="vas-counted-mtd-cell">&nbsp;</div>' +
+                    '</div>';
+            }
+            return html;
+        }
+
         function renderModalPage() {
             if (!$modal) { return; }
 
@@ -184,7 +202,8 @@
             if (modalPageNo < 1) { modalPageNo = 1; }
 
             if (total === 0) {
-                $tbody.html('<div class="vas-counted-mtd-empty">' +
+                $tbody.html(fillerRowsHtml(Math.max(0, MODAL_PAGE_SIZE - 1)) +
+                    '<div class="vas-counted-mtd-empty">' +
                     escapeHtml(lbl("VAS_156_NoProductsCounted", "No products counted yet this month")) + '</div>');
                 $modal.find('.vas-counted-mtd-footer-text').text('');
                 $modal.find('.vas-counted-mtd-pager').hide();
@@ -208,7 +227,7 @@
                     '</div>';
             }
 
-            $tbody.html(html);
+            $tbody.html(html + fillerRowsHtml(Math.max(0, MODAL_PAGE_SIZE - (end - start))));
             $modal.find('.vas-counted-mtd-footer-text').text(
                 (start + 1) + '–' + end + ' ' + lbl("VAS_Of", "of") + ' ' + total);
             $modal.find('.vas-counted-mtd-pager-info').text(modalPageNo + ' / ' + modalTotalPages);
@@ -380,4 +399,5 @@
     };
 
 })(VAS, jQuery);
+
 

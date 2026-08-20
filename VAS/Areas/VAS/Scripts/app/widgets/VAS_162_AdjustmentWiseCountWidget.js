@@ -24,7 +24,9 @@
 
 ; (function (VAS, $) {
 
-    var MODAL_PAGE_SIZE = 8;
+    /* Lines the popup holds before paging. MUST stay in step with --vas-rows in
+       VAS_162_AdjustmentWiseCountWidget.css, which sizes the dialog to exactly this many rows. */
+    var MODAL_PAGE_SIZE = 7;
 
     /* Product and attribute text comes from the database and was previously concatenated straight
        into innerHTML. The source prompt requires the opposite: "Render database text through
@@ -315,7 +317,9 @@
                         $subtitle.text(monthName + ' ' + selectedYear + ' · ' + res.details.length + ' records');
                         renderDetailGrid($body, res.details);
                     } else {
-                        $body.html('<div class="vas-adjwisecount-message">No adjustments for the selected period.</div>');
+                        // Render the grid with no rows rather than replacing the body: the popup
+                        // keeps its fixed height instead of collapsing to a single message line.
+                        renderDetailGrid($body, []);
                     }
                 },
                 error: function (err) {
@@ -368,8 +372,36 @@
             );
             $body.append($footer);
 
+            /* Invisible spacers so a short page occupies the same height as a full one. The
+               dialog height is fixed by the CSS row arithmetic, so these only keep the divider
+               rhythm - but without them the last page shows a bare gap under the final row. */
+            function appendFillerRows($container, count) {
+                for (var f = 0; f < count; f++) {
+                    $container.append(
+                        '<div class="vas-adjwisecount-grid-row vas-adjwisecount-data-row vas-adjwisecount-filler" aria-hidden="true">' +
+                        '<div class="vas-adjwisecount-cell">&nbsp;</div>' +
+                        '<div class="vas-adjwisecount-cell">&nbsp;</div>' +
+                        '<div class="vas-adjwisecount-cell">&nbsp;</div>' +
+                        '<div class="vas-adjwisecount-cell">&nbsp;</div>' +
+                        '<div class="vas-adjwisecount-cell">&nbsp;</div>' +
+                        '<div class="vas-adjwisecount-cell">&nbsp;</div>' +
+                        '</div>'
+                    );
+                }
+            }
+
             function paint() {
                 $rows.empty();
+
+                if (total === 0) {
+                    $rows.append('<div class="vas-adjwisecount-message">' +
+                        esc(lbl("VAS_162_NoAdjustments", "No adjustments for the selected period.")) +
+                        '</div>');
+                    appendFillerRows($rows, Math.max(0, pageSize - 1));
+                    $footer.find('.vas-adjwisecount-footer-text').text('');
+                    $footer.find('.vas-adjwisecount-pager').hide();
+                    return;
+                }
 
                 var start = (pageNo - 1) * pageSize;
                 var end = Math.min(total, start + pageSize);
@@ -401,6 +433,9 @@
                         '</div>'
                     ));
                 }
+
+                // Hold the popup at MODAL_PAGE_SIZE lines regardless of what this page holds.
+                appendFillerRows($rows, Math.max(0, pageSize - (end - start)));
 
                 $footer.find('.vas-adjwisecount-footer-text').text(
                     total === 0 ? '' : (start + 1) + '–' + end + ' ' + lbl("VAS_Of", "of") + ' ' + total);
@@ -463,3 +498,4 @@
     };
 
 })(VAS, jQuery);
+

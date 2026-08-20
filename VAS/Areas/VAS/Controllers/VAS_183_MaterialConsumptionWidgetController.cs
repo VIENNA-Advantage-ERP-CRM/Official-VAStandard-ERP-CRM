@@ -1,4 +1,4 @@
-﻿using System.Data.SqlClient;
+using System.Data.SqlClient;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -131,7 +131,12 @@ namespace VIS.Controllers
                 Log.Log(Level.SEVERE, "VAS_183_MaterialConsumptionWidget.GetLocatorSummary", ex);
                 return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" }), JsonRequestBehavior.AllowGet);
             }
-            return Json(JsonConvert.SerializeObject(new { locators = rows, success = true }), JsonRequestBehavior.AllowGet);
+            // ===== NEW CODE START — currency format (agent A05, 2026-08-19) =====
+            return Json(JsonConvert.SerializeObject(new { locators = rows, currency = GetCurrencyInfo(ctx), success = true }), JsonRequestBehavior.AllowGet);
+            // ===== NEW CODE END — currency format =====
+            // ----- OLD CODE (kept for rollback, do not delete) -----
+            // return Json(JsonConvert.SerializeObject(new { locators = rows, success = true }), JsonRequestBehavior.AllowGet);
+            // ----- END OLD CODE -----
         }
 
         /// <summary>Endpoint B: Item-level consumption details for a locator modal.</summary>
@@ -207,6 +212,19 @@ namespace VIS.Controllers
                 return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" }), JsonRequestBehavior.AllowGet);
             }
 
+            // ===== NEW CODE START — currency format (agent A05, 2026-08-19) =====
+            return Json(JsonConvert.SerializeObject(new
+            {
+                totalQty = totalQty,
+                totalValue = totalValue,
+                distinctItemCount = distinctItems.Count,
+                items = items,
+                currency = GetCurrencyInfo(ctx),
+                success = true
+            }), JsonRequestBehavior.AllowGet);
+            // ===== NEW CODE END — currency format =====
+            // ----- OLD CODE (kept for rollback, do not delete) -----
+            /*
             return Json(JsonConvert.SerializeObject(new
             {
                 totalQty = totalQty,
@@ -215,7 +233,88 @@ namespace VIS.Controllers
                 items = items,
                 success = true
             }), JsonRequestBehavior.AllowGet);
+            */
+            // ----- END OLD CODE -----
         }
+
+        // ===== NEW CODE START — currency format (agent A05, 2026-08-19) =====
+        /// <summary>Returns currency ISO code and symbol for context org/client.</summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetCurrencyInfo()
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null) { return Json("", JsonRequestBehavior.AllowGet); }
+            object curr = GetCurrencyInfo(ctx);
+            return Json(JsonConvert.SerializeObject(curr), JsonRequestBehavior.AllowGet);
+        }
+
+        private static object GetCurrencyInfo(Ctx ctx)
+        {
+            string iso = "INR";
+            string symbol = "₹";
+
+            if (ctx == null)
+            {
+                return new { iso = iso, symbol = symbol };
+            }
+
+            int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
+            if (currencyId <= 0)
+            {
+                currencyId = ctx.GetContextAsInt("#C_Currency_ID");
+            }
+
+            IDataReader dr = null;
+            try
+            {
+                if (currencyId > 0)
+                {
+                    string sql = "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = " + currencyId + " AND IsActive = 'Y'";
+                    dr = DB.ExecuteReader(sql, null, null);
+                    if (dr != null && dr.Read())
+                    {
+                        iso = Util.GetValueOfString(dr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                    }
+                }
+                else
+                {
+                    string sql = @"
+                        SELECT c.ISO_Code, c.CurSymbol
+                        FROM AD_ClientInfo ci
+                        INNER JOIN C_AcctSchema a ON (a.C_AcctSchema_ID = ci.C_AcctSchema1_ID AND a.IsActive = 'Y')
+                        INNER JOIN C_Currency c ON (c.C_Currency_ID = a.C_Currency_ID AND c.IsActive = 'Y')
+                        WHERE ci.AD_Client_ID = " + ctx.GetAD_Client_ID() + " AND ci.IsActive = 'Y'";
+                    dr = DB.ExecuteReader(sql, null, null);
+                    if (dr != null && dr.Read())
+                    {
+                        iso = Util.GetValueOfString(dr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_183_MaterialConsumptionWidget.GetCurrencyInfo", ex);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+
+            if (string.IsNullOrEmpty(symbol))
+            {
+                symbol = iso;
+            }
+
+            return new { iso = iso, symbol = symbol };
+        }
+        // ===== NEW CODE END — currency format =====
 
         /// <summary>
         /// Role-filtered consumption transactions for the period. Kept as a plain SELECT with no
