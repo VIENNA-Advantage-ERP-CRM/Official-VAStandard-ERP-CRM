@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Web.Mvc;
+using System.Data.SqlClient;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
@@ -21,11 +22,50 @@ namespace VIS.Controllers
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_185_InventoryUseTrendWidgetController).FullName);
 
+        /// <summary>
+        /// The product's CURRENT cost price, as a derived table (M_Product_ID, CurrentCostPrice).
+        /// Picks the M_Cost row whose cost element matches the accounting schema's own costing
+        /// method, so landed-cost and other cost COMPONENT rows are excluded. A plain
+        /// MAX(M_Cost.CurrentCostPrice) is NOT the product cost - on FSMTesting6 it reports
+        /// 'Air Filter (7 micron)' at 80,142.29 (a Landed Cost component) against a true standard
+        /// cost of 2,599.
+        /// </summary>
+        private const string ProductCurrentCostSql = @"
+                    SELECT c.M_Product_ID, MAX(c.CurrentCostPrice) AS CurrentCostPrice
+                    FROM M_Cost c
+                    INNER JOIN M_CostElement ce ON ce.M_CostElement_ID = c.M_CostElement_ID
+                    INNER JOIN C_AcctSchema acs ON acs.C_AcctSchema_ID = c.C_AcctSchema_ID
+                                               AND acs.M_CostType_ID   = c.M_CostType_ID
+                    WHERE c.IsActive = 'Y'
+                      AND ce.CostingMethod IS NOT NULL
+                      AND ce.CostingMethod = acs.CostingMethod
+                    GROUP BY c.M_Product_ID";
+
+
         private class MonthBucket
         {
             public decimal qty;
             public decimal val;
             public int docs;
+        }
+
+
+        /// <summary>
+        /// Three-letter month names for the chart axis.
+        /// Deliberately NOT message keys: no VAS widget translates month names through AD_Message.
+        /// Nine sibling widgets (VAS_161, VAS_165, VAS_183, VAS_184, VAS_186, VAS_188 among them)
+        /// carry the same hardcoded array in JS, and AD_Message holds no month-name keys for VAS at
+        /// all - only phrases like "This Month". Keeping the array matches that.
+        /// </summary>
+        private static readonly string[] MonthShortNames = new string[]
+        {
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        };
+
+        private static string GetMonthShortName(int month)
+        {
+            if (month < 1 || month > 12) { return ""; }
+            return MonthShortNames[month - 1];
         }
 
         /// <summary>Returns monthly trend series for the specified rolling window (3, 6, or 12 months).</summary>
@@ -60,14 +100,20 @@ namespace VIS.Controllers
 
                 invAccessSql = MRole.GetDefault(ctx).AddAccessSQL(invAccessSql, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
+                // NULLIF guards are required, not cosmetic: line.CurrentCostPrice is a literal 0
+                // (not NULL) on many issue lines, so a plain COALESCE returns 0 and never reaches
+                // a fallback - those lines contributed nothing to the value series. Falling back to
+                // the product's current cost recovered 27% of August's value on FSMTesting6
+                // (25,032 -> 31,830) and 5% of July's (3,821,261 -> 4,016,382).
                 string sql = @"
                     SELECT
                       TO_CHAR(ai.MovementDate, 'YYYY-MM') AS MonthBucket,
                       SUM(line.QtyInternalUse) AS TotalQty,
-                      SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)) AS TotalValue,
+                      SUM(line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pc.CurrentCostPrice, 0)) AS TotalValue,
                       COUNT(DISTINCT ai.M_Inventory_ID) AS DocCount
                     FROM M_InventoryLine line
                     INNER JOIN (" + invAccessSql + @") ai ON ai.M_Inventory_ID = line.M_Inventory_ID
+                    LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = line.M_Product_ID
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
                     GROUP BY TO_CHAR(ai.MovementDate, 'YYYY-MM')
@@ -96,13 +142,12 @@ namespace VIS.Controllers
 
             {
                 var series = new List<object>();
-                string[] monthNames = new string[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
                 for (int i = 0; i < windowMonths; i++)
                 {
                     DateTime dt = startMonthStart.AddMonths(i);
                     string key = dt.ToString("yyyy-MM");
-                    string labelName = monthNames[dt.Month - 1] + (windowMonths == 12 ? (" '" + dt.ToString("yy")) : "");
+                    string labelName = GetMonthShortName(dt.Month) + (windowMonths == 12 ? (" '" + dt.ToString("yy")) : "");
 
                     decimal qty = 0;
                     decimal val = 0;
@@ -119,16 +164,73 @@ namespace VIS.Controllers
                     {
                         key = key,
                         label = labelName,
-                        fullMonth = monthNames[dt.Month - 1] + " " + dt.Year,
+                        fullMonth = GetMonthShortName(dt.Month) + " " + dt.Year,
                         qty = qty,
                         val = val,
                         docs = docs
                     });
                 }
 
-                return Json(JsonConvert.SerializeObject(new { series = series, success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
+                return Json(JsonConvert.SerializeObject(new { series = series, currency = GetCurrencyInfo(ctx), success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//              return Json(JsonConvert.SerializeObject(new { series = series, success = true }), JsonRequestBehavior.AllowGet);
+// ----- END OLD CODE -----
             }
         }
+
+// ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
+        /// <summary>
+        /// Retrieves currency ISO code and symbol based on session $C_Currency_ID or C_AcctSchema fallback.
+        /// </summary>
+        private object GetCurrencyInfo(Ctx ctx)
+        {
+            string iso = "";
+            string symbol = "";
+            int currencyId = ctx != null ? ctx.GetContextAsInt("$C_Currency_ID") : 0;
+            if (currencyId > 0)
+            {
+                IDataReader cdr = null;
+                try
+                {
+                    cdr = DB.ExecuteReader(
+                        "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @Cur",
+                        new SqlParameter[] { new SqlParameter("@Cur", currencyId) });
+                    if (cdr != null && cdr.Read())
+                    {
+                        iso = Util.GetValueOfString(cdr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                    }
+                }
+                finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
+            }
+
+            if (string.IsNullOrEmpty(iso) && ctx != null)
+            {
+                int clientId = ctx.GetAD_Client_ID();
+                IDataReader cdr = null;
+                try
+                {
+                    cdr = DB.ExecuteReader(
+                        @"SELECT c.ISO_Code, c.CurSymbol 
+                          FROM AD_ClientInfo ci 
+                          INNER JOIN C_AcctSchema ac ON (ac.C_AcctSchema_ID = ci.C_AcctSchema1_ID) 
+                          INNER JOIN C_Currency c ON (c.C_Currency_ID = ac.C_Currency_ID) 
+                          WHERE ci.AD_Client_ID = @Client",
+                        new SqlParameter[] { new SqlParameter("@Client", clientId) });
+                    if (cdr != null && cdr.Read())
+                    {
+                        iso = Util.GetValueOfString(cdr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                    }
+                }
+                finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
+            }
+
+            return new { iso = iso, symbol = symbol };
+        }
+// ===== NEW CODE END — currency format =====
 
         private static string ToSqlDate(DateTime date)
         {

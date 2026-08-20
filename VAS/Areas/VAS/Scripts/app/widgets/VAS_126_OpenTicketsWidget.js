@@ -17,6 +17,12 @@
  * Backend - VAS_126_OpenTicketsWidget/GetOpenTickets       (KPI aggregate)
  *           VAS_126_OpenTicketsWidget/GetAffectedCustomers (paged triage list)
  *
+ * Routing - 2026-08-17: hosted on a window, a triage row (and "open in browser")
+ *           navigates the host grid in place (widgetFirevalueChanged). On the Home /
+ *           landing dashboard (windowNo < 0) there is no host grid, so the standard
+ *           Customer window is opened via VAS.ZoomUtil - on the picked record, or
+ *           unpositioned for "open in browser" (record id 0).
+ *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  #  | Current Text                   | Message Key
  * ----+--------------------------------+--------------------------------
@@ -41,6 +47,13 @@
     // Host window to zoom when the widget is not hosted on the Customers window
     // itself (documented for admin confirmation; the resolved host name wins).
     var CUSTOMER_WINDOW_NAME = "Business Partner";
+
+    /* 2026-08-17: zoom target when the widget is NOT hosted inside a window
+       (windowNo < 0 - the Home / landing dashboard). There is no host grid to navigate
+       there, so the Customer window is opened directly; VAS.ZoomUtil resolves the
+       AD_Window_ID from the new name, then the old name, then VAS_ZoomScreenConfig. */
+    var ZOOM_WINDOW_NAME_NEW = "VAS_CustomerMaster";
+    var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
 
     function ensureDashInlineSizeVar($el) {
         if (window.__vasDashInlineSizeObserver) { return; }
@@ -77,6 +90,10 @@
         var $detailSummary;
         var currentDetailId = 0;
         var currentDetailName = '';
+
+        /* AD_Window_ID of the Customer window, resolved once on the first Home-page
+           zoom and reused afterwards (0 = not resolved yet). */
+        var zoomWindowId = 0;
 
         var lastCount = 0;
         var pageSize = 7;
@@ -401,15 +418,25 @@
 
         // "Open in browser": open the host Customers window so the user can work the
         // full list in the app (best-effort; documented for admin confirmation).
+        // From the Home / landing page (windowNo < 0) the Customer window is opened
+        // unpositioned instead - record id 0 means "no record to land on".
         function openInBrowser() {
             closeTriage();
             try {
-                $self.widgetFirevalueChanged({
-                    "TabLayout": "N",
-                    "TabIndex": "0",
-                    "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
-                    "ActionType": "W"
-                });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabLayout": "N",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
+                        "ActionType": "W"
+                    });
+                }
+                else {
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", 0, zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* best-effort */ }
         }
 
@@ -435,13 +462,22 @@
             if (!bpId) { return; }
             closeTriage();
             try {
-                $self.widgetFirevalueChanged({
-                    "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId),
-                    "TabLayout": "Y",
-                    "TabIndex": "0",
-                    "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
-                    "ActionType": "W"
-                });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId),
+                        "TabLayout": "Y",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME,
+                        "ActionType": "W"
+                    });
+                }
+                else {
+                    /* Home / landing page: no host grid, so open the standard Customer window. */
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", Number(bpId), zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* zoom is best-effort */ }
         }
 

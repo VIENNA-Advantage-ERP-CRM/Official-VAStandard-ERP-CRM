@@ -6,9 +6,9 @@
  * Summary Message Table
  *  # | Current Text                    | Message Key
  * ---+---------------------------------+-----------------------------------
- *  1 | Production Issues               | VAS_ProductionIssues
- *  2 | Of issued value MTD             | VAS_OfIssuedValueMTD
- *  3 | Couldn't load                   | VAS_CouldntLoad
+ *  1 | Production Issues               | VAS_181_ProductionIssues
+ *  2 | Of issued value MTD             | VAS_181_OfIssuedValueMTD
+ *  3 | Couldn't load                   | VAS_181_CouldntLoad
  */
 ; VAS = window.VAS || {};
 
@@ -68,11 +68,89 @@
             $busy.toggleClass('vas-piw-hidden', !show);
         }
 
+// ===== NEW CODE START — currency format (agent A03, 2026-08-19) =====
+        var currencyInfo = { iso: '', symbol: '' };
+
+        function loadCurrencyInfo() {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_181_ProductionIssuesWidget/GetCurrencyInfo',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data && data.iso) {
+                        currencyInfo.iso = data.iso;
+                        currencyInfo.symbol = data.symbol || '';
+                    }
+                }
+            });
+        }
+
+        /**
+         * Organization-aware currency formatter
+         * @param {number|string} val - Amount to format
+         * @param {boolean} compact - Whether to format with Lakh/Crore or M/B
+         * @returns {string} Formatted currency string with org currency symbol
+         */
+        function formatCurrency(val, compact) {
+            var num = Number(val);
+            if (isNaN(num) || val === null || val === undefined || val === '') {
+                num = 0;
+            }
+            var sym = currencyInfo.symbol || '';
+            var iso = (currencyInfo.iso || '').toUpperCase();
+            var isIndian = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'].indexOf(iso) !== -1;
+
+            if (compact) {
+                var absNum = Math.abs(num);
+                var sign = num < 0 ? '-' : '';
+                if (isIndian) {
+                    if (absNum >= 10000000) {
+                        return sym + sign + (absNum / 10000000).toFixed(2) + ' Cr';
+                    } else if (absNum >= 100000) {
+                        return sym + sign + (absNum / 100000).toFixed(2) + ' L';
+                    }
+                } else {
+                    if (absNum >= 1000000000) {
+                        return sym + sign + (absNum / 1000000000).toFixed(2) + ' B';
+                    } else if (absNum >= 1000000) {
+                        return sym + sign + (absNum / 1000000).toFixed(2) + ' M';
+                    }
+                }
+            }
+
+            var parts = num.toFixed(2).split('.');
+            var intPart = parts[0];
+            var decPart = parts[1];
+
+            if (isIndian) {
+                var lastThree = intPart.substring(intPart.length - 3);
+                var otherNumbers = intPart.substring(0, intPart.length - 3);
+                if (otherNumbers !== '') {
+                    lastThree = ',' + lastThree;
+                }
+                intPart = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree;
+            } else {
+                intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            }
+
+            return sym + intPart + '.' + decPart;
+        }
+
+        this.Initalize = function () {
+            createWidget();
+            setupResizeObserver();
+            loadCurrencyInfo();
+            loadKpi();
+        };
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
         this.Initalize = function () {
             createWidget();
             setupResizeObserver();
             loadKpi();
         };
+// ----- END OLD CODE -----
 
         function setupResizeObserver() {
             if (typeof ResizeObserver === 'undefined') { return; }
@@ -106,6 +184,21 @@
             });
         }
 
+// ===== NEW CODE START — currency format (agent A03, 2026-08-19) =====
+        function renderMetric(data) {
+            var pct = Number(data.percentage || 0);
+
+            if ($valueEl) {
+                $valueEl.text(pct + '%');
+                $valueEl.attr('title', pct + '%');
+            }
+            if ($metaEl) {
+                $metaEl.text(label("VAS_181_OfIssuedValueMTD", "Of issued value MTD"));
+            }
+            if ($card) { $card.prop('disabled', false); }
+        }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
         function renderMetric(data) {
             var pct = Number(data.percentage || 0);
 
@@ -118,18 +211,27 @@
             }
             if ($card) { $card.prop('disabled', false); }
         }
+// ----- END OLD CODE -----
 
         function setError() {
             if ($valueEl) {
                 $valueEl.text('—');
                 $valueEl.removeAttr('title');
             }
-            if ($metaEl) { $metaEl.text(label("VAS_CouldntLoad", "Couldn't load")); }
+            if ($metaEl) { $metaEl.text(label("VAS_181_CouldntLoad", "Couldn't load")); }
             if ($card) { $card.prop('disabled', true); }
         }
 
         function openProductionIssuesList() {
-            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL') AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
+            // Keep in lock-step with GetProductionIssuesPercentageData in the controller. The
+            // drill-through is DOCUMENT level, so the work-order classification (a line-level
+            // column) is expressed as an EXISTS over the production issue lines.
+            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL')"
+                + " AND COALESCE(M_Inventory.IsInternalUse, 'N') = 'Y'"
+                + " AND EXISTS (SELECT 1 FROM M_InventoryLine il WHERE il.M_Inventory_ID = M_Inventory.M_Inventory_ID"
+                + " AND il.IsActive = 'Y' AND COALESCE(il.QtyInternalUse, 0) > 0"
+                + " AND (COALESCE(il.VA075_WorkOrder_ID, 0) > 0 OR COALESCE(il.VAMFG_M_WorkOrder_ID, 0) > 0))"
+                + " AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
             var windowParam = {
                 "TabWhereClause": where,
                 "TabLayout": "N",
@@ -139,7 +241,7 @@
         }
 
         function createWidget() {
-            var title = label("VAS_ProductionIssues", "Production Issues");
+            var title = label("VAS_181_ProductionIssues", "Production Issues");
             $card = $(
                 '<button type="button" class="vas-piw-card vas-widget-bg" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-piw-label">' + escapeHtml(title) + '</div>' +

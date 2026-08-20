@@ -8,6 +8,10 @@
  *           classes), never a hand-built insert form (Prompt_Instructions:
  *           "No Direct INSERT Queries"). No backend/controller: this tile only
  *           fires the open action.
+ *           2026-08-17 - the value-changed channel only reaches a host window when the
+ *           widget sits ON one. From the Home / landing dashboard (windowNo < 0) the
+ *           Customer window is resolved by name through VAS.ZoomUtil and started on a
+ *           blank record instead, so the tile works on both hosts.
  * Design  - new-customer.html (attached) + Design Specs/dashboard-widgets.md
  *           "Quick Action Widget": pale-blue glass, 2px dashed #9ED1FF border,
  *           centred blue "+" well above a bold title and muted subtitle. Internal
@@ -24,6 +28,14 @@
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /* 2026-08-17: target window for the Home / landing page (windowNo < 0), where the
+       framework's value-changed channel has no host window to open in new mode. The
+       AD_Window_ID is resolved from these names by VAS.ZoomUtil (new name, then old
+       name, then VAS_ZoomScreenConfig). */
+    var ZOOM_TABLE = 'C_BPartner';
+    var ZOOM_WINDOW_NAME_NEW = 'VAS_CustomerMaster';
+    var ZOOM_WINDOW_NAME_OLD = 'Business Partner';
 
     /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
        :root equal to the dashboard container's current pixel width so the widget
@@ -67,16 +79,53 @@
                 .replace(/'/g, '&#039;');
         }
 
+        /* Core-native "open on new record": a query flagged as a new-record query loads
+           no rows ("2=3") and the core then auto-starts a blank record as soon as the
+           tab finishes loading (same approach as VAS_150 / VAS_082). */
+        function buildNewRecordQuery() {
+            try {
+                var query = new VIS.Query(ZOOM_TABLE);
+                query.addRestriction(VIS.Query.prototype.NEWRECORD);   // "2=3" -> loads no rows
+                query.newRecord = true;
+                if (query.setRecordCount) { query.setRecordCount(0); }
+                return query;
+            } catch (e) { return null; }
+        }
+
+        /* Home / landing page (windowNo < 0): there is no host window for the
+           value-changed channel to put in new mode, so the Customer window is resolved
+           by name and started on a blank record. Best-effort - an unresolved window or
+           an unavailable framework simply does not navigate. */
+        function openNewCustomerFromHome() {
+            if (!window.VAS || !VAS.ZoomUtil) { return; }
+            VAS.ZoomUtil.getWindowId(ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                .done(function (id) {
+                    id = Number(id) || 0;
+                    if (id <= 0) { return; }
+                    if (!window.VIS || !VIS.viewManager || typeof VIS.viewManager.startWindow !== 'function') { return; }
+                    try { VIS.viewManager.startWindow(id, buildNewRecordQuery()); } catch (e) { /* best-effort */ }
+                });
+        }
+
         // Open the widget's configured window (the Customer / Business Partner
         // window) directly on a NEW record through the widget framework's
         // value-changed channel. The host reuses the same window and starts a
         // blank record (IsTabInNewMode) - no duplicate window is opened.
+        // 2026-08-17: that channel only reaches a host window when the widget sits ON
+        // one; from the Home page the window is opened directly instead.
         function openNewCustomer() {
-            var windowParam = {
-                "IsTabInNewMode": "true",
-                "TabIndex": "0"
-            };
-            $self.widgetFirevalueChanged(windowParam);
+            try {
+                if ($self.windowNo >= 0) {
+                    var windowParam = {
+                        "IsTabInNewMode": "true",
+                        "TabIndex": "0"
+                    };
+                    $self.widgetFirevalueChanged(windowParam);
+                }
+                else {
+                    openNewCustomerFromHome();
+                }
+            } catch (e) { /* best-effort */ }
         }
 
         function createWidget() {

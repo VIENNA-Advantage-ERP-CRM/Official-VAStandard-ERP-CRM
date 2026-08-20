@@ -64,7 +64,14 @@
         var selectedYear = now.getFullYear();
         var summaryData = [];
         var currentPage = 1;
-        var pageSize = 4;
+        /* The popup ALWAYS holds exactly MODAL_PAGE_ROWS lines. Its size is fixed by that count and
+           does NOT change with how much data there is: a page with 4 real rows renders 4 rows plus 3
+           invisible filler rows, so the dialog is the same height as a page with 7. Anything past
+           MODAL_PAGE_ROWS goes to the next page via the pager.
+           A fixed count (not a measured one) is required because the dialog is content-sized -
+           measuring the container would be circular, since its height comes from the rows. */
+        var MODAL_PAGE_ROWS = 7;
+        var pageSize = MODAL_PAGE_ROWS;
         var widgetObserver = null;
         var $modalOverlay = null;
 
@@ -212,11 +219,27 @@
             });
         }
 
+        function appendFillerRows($rowsContainer, count) {
+            for (var f = 0; f < count; f++) {
+                $rowsContainer.append(
+                    '<div class="vas-locwisecount-row-btn vas-locwisecount-grid-template vas-locwisecount-filler" aria-hidden="true">' +
+                    '<div class="vas-locwisecount-cell">&nbsp;</div>' +
+                    '<div class="vas-locwisecount-cell">&nbsp;</div>' +
+                    '<div class="vas-locwisecount-cell">&nbsp;</div>' +
+                    '<div class="vas-locwisecount-cell">&nbsp;</div>' +
+                    '</div>'
+                );
+            }
+        }
+
         function renderSummaryPage() {
             $rowsContainer.empty();
 
+            pageSize = MODAL_PAGE_ROWS;
+
             if (!summaryData || summaryData.length === 0) {
                 $rowsContainer.html('<div class="vas-locwisecount-message">No location counts recorded for this period. Pick another month to review earlier counts.</div>');
+                appendFillerRows($rowsContainer, Math.max(0, pageSize - 1));
                 $footer.find('.vas-locwisecount-footer-text').text('Showing 0 of 0');
                 $footer.find('.vas-locwisecount-pager').hide();
                 return;
@@ -253,6 +276,8 @@
 
                 $rowsContainer.append($row);
             }
+
+            appendFillerRows($rowsContainer, Math.max(0, pageSize - pageItems.length));
 
             var $footerText = $footer.find('.vas-locwisecount-footer-text');
             var $pagerInfo = $footer.find('.vas-locwisecount-pager-info');
@@ -369,7 +394,10 @@
             var totalQty = resData.totalQty || 0;
 
             var modalPage = 1;
-            var modalPageSize = 6;
+            /* The detail popup ALWAYS holds exactly this many lines. Short pages are padded with
+               invisible filler rows below, so the popup is the SAME height whether a page carries
+               7 records or 3 - it no longer shrinks to fit the last page. */
+            var modalPageSize = MODAL_PAGE_ROWS;
 
             var $headerGrid = $(
                 '<div class="vas-locwisecount-modal-grid-template vas-locwisecount-header-row">' +
@@ -381,7 +409,7 @@
             );
             $body.append($headerGrid);
 
-            var $modalRowsContainer = $('<div class="vas-locwisecount-modal-rows-container" style="flex: 1; display: flex; flex-direction: column;"></div>');
+            var $modalRowsContainer = $('<div class="vas-locwisecount-modal-rows-container"></div>');
             $body.append($modalRowsContainer);
 
             var $footer = $(
@@ -398,6 +426,20 @@
                 '</div>'
             );
             $body.append($footer);
+
+            function appendModalFillerRows($container, count) {
+                for (var f = 0; f < count; f++) {
+                    $container.append(
+                        '<div class="vas-locwisecount-modal-grid-template vas-locwisecount-modal-data-row vas-locwisecount-filler" aria-hidden="true">' +
+                        '<div class="vas-locwisecount-cell"><div class="vas-locwisecount-prod-title">&nbsp;</div>' +
+                        '<div class="vas-locwisecount-prod-attr">&nbsp;</div></div>' +
+                        '<div class="vas-locwisecount-cell">&nbsp;</div>' +
+                        '<div class="vas-locwisecount-cell">&nbsp;</div>' +
+                        '<div class="vas-locwisecount-cell">&nbsp;</div>' +
+                        '</div>'
+                    );
+                }
+            }
 
             function updateModalPage() {
                 $modalRowsContainer.empty();
@@ -429,6 +471,9 @@
                     );
                     $modalRowsContainer.append($mRow);
                 }
+
+                // Hold the popup at MODAL_PAGE_ROWS lines regardless of how many this page has.
+                appendModalFillerRows($modalRowsContainer, Math.max(0, modalPageSize - paged.length));
 
                 $footer.find('.vas-modal-helper').text('Showing ' + (start + 1) + '–' + end + ' of ' + totalLines + ' · ' + sessionCount + ' count sessions');
                 $footer.find('.vas-m-info').text(modalPage + ' of ' + totalPages);

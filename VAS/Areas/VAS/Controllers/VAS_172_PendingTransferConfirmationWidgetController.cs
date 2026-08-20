@@ -285,5 +285,58 @@ namespace VIS.Controllers
                 return Json(new { error = ex.Message }, JsonRequestBehavior.AllowGet);
             }
         }
+
+        // ===== NEW CODE START — currency format (agent C06, 2026-08-19) =====
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetCurrencyInfo()
+        {
+            if (Session["ctx"] == null)
+                return Json(new { iso = "", symbol = "" }, JsonRequestBehavior.AllowGet);
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            var info = GetCurrencyInfo(ctx);
+            return Json(new { iso = info.iso, symbol = info.symbol }, JsonRequestBehavior.AllowGet);
+        }
+
+        public class CurrencyInfoResult
+        {
+            public string iso { get; set; }
+            public string symbol { get; set; }
+        }
+
+        public static CurrencyInfoResult GetCurrencyInfo(Ctx ctx)
+        {
+            var res = new CurrencyInfoResult { iso = "", symbol = "" };
+            if (ctx == null) return res;
+            string sql = @"
+                SELECT
+                    c.ISO_Code,
+                    COALESCE(c.CurSymbol, c.ISO_Code) AS CurSymbol
+                FROM AD_ClientInfo ci
+                INNER JOIN C_AcctSchema a ON (a.C_AcctSchema_ID = ci.C_AcctSchema1_ID)
+                INNER JOIN C_Currency c ON (c.C_Currency_ID = a.C_Currency_ID)
+                WHERE ci.AD_Client_ID = " + ctx.GetAD_Client_ID();
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql);
+                if (dr != null && dr.Read())
+                {
+                    res.iso = Util.GetValueOfString(dr["ISO_Code"]);
+                    res.symbol = Util.GetValueOfString(dr["CurSymbol"]);
+                }
+            }
+            catch { }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+            return res;
+        }
+        // ===== NEW CODE END — currency format =====
+        // ----- OLD CODE (kept for rollback, do not delete) -----
+        // ----- END OLD CODE -----
     }
 }

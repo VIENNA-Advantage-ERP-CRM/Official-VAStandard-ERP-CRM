@@ -455,6 +455,76 @@
     color: #0B6B45;
 }
 
+/* Open-record action tile.
+   Shares the stat tile's footprint, radius and label so it sits in the row as a peer, but is tinted
+   with the action blue and carries a chevron so it reads as a control rather than a fifth metric.
+   Position in the row is decided by emission order in the JS (immediately before the Status tile),
+   NOT by a margin here - an auto margin would push it away from Status and defeat the pairing. */
+.MPC-product-search-open-record {
+    display: block;
+    /* Match the stat tiles' width exactly instead of sizing to the "Open" text + chevron, which
+       made the button noticeably narrower than the Status tile beside it. flex: 0 0 auto stops it
+       shrinking when the row wraps, so the pair keeps a consistent footprint. */
+    flex: 0 0 auto;
+    width: 5.75em;
+    min-width: 5.75em;
+    font-family: inherit;
+    font-size: inherit;
+    text-align: left;
+    cursor: pointer;
+    background: #F4FAFF;
+    border: 1px solid #BFE4FF;
+    transition: background 150ms ease, border-color 150ms ease;
+}
+
+    .MPC-product-search-open-record:hover {
+        background: #EEF6FF;
+        border-color: #0083DA;
+    }
+
+    .MPC-product-search-open-record:focus-visible {
+        outline: none;
+        border-color: #0083DA;
+        box-shadow: inset 0 0 0 1px #0083DA;
+    }
+
+.MPC-product-search-open-record-value {
+    margin-block-start: 0.125em;
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    color: #0083DA;
+    font-size: 1em;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.MPC-product-search-open-record-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-product-search-open-record-arrow {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+    .MPC-product-search-open-record-arrow svg {
+        width: 0.875em;
+        height: 0.875em;
+    }
+
+    /* Nudge, not a slide: the tile is a fixed-width peer of the stat tiles, so a large travel
+       would push the chevron out of the box. */
+    .MPC-product-search-open-record:hover .MPC-product-search-open-record-arrow {
+        transform: translateX(0.125em);
+    }
+
+.MPC-product-search-open-record-arrow {
+    transition: transform 150ms ease;
+}
+
 .MPC-product-search-tabs {
     flex: 0 0 auto;
     display: inline-flex;

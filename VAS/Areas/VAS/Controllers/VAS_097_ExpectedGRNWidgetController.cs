@@ -405,7 +405,7 @@ namespace VIS.Controllers
                 ExpectedGRNLineInfo lineInfo = openLines[selectedLine.Key];
                 if (selectedLine.Value > lineInfo.OpenQty)
                 {
-                    return Fail("Received quantity cannot be greater than open quantity.");
+                    return Fail("Received quantity cannot be greater than ordered quantity.");
                 }
             }
 

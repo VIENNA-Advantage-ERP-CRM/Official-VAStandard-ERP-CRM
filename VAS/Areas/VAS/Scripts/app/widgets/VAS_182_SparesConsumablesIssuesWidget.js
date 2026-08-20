@@ -6,9 +6,9 @@
  * Summary Message Table
  *  # | Current Text                    | Message Key
  * ---+---------------------------------+-----------------------------------
- *  1 | Spares / Consumables            | VAS_SparesConsumables
- *  2 | Of issued value MTD             | VAS_OfIssuedValueMTD
- *  3 | Couldn't load                   | VAS_CouldntLoad
+ *  1 | Spares / Consumables            | VAS_182_SparesConsumables
+ *  2 | Of issued value MTD             | VAS_182_OfIssuedValueMTD
+ *  3 | Couldn't load                   | VAS_182_CouldntLoad
  */
 ; VAS = window.VAS || {};
 
@@ -30,6 +30,70 @@
         write();
     }
 
+// ===== NEW CODE START — currency format (agent A04, 2026-08-19) =====
+    /**
+     * Formats currency values according to organization locale/currency settings (Section 1).
+     * @param {number|string} val Numeric value to format
+     * @param {string} iso Currency ISO code (e.g. 'USD', 'INR')
+     * @param {string} symbol Currency symbol (e.g. '$', '₹')
+     * @returns {string} Formatted currency string
+     */
+    function formatCurrencyAmount(val, iso, symbol) {
+        var num = parseFloat(val);
+        if (isNaN(num)) { num = 0; }
+        symbol = symbol || '';
+        iso = (iso || '').toUpperCase();
+
+        var indianIsos = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+        var isIndian = indianIsos.indexOf(iso) !== -1;
+        var formattedVal = '';
+
+        if (isIndian) {
+            var absVal = Math.abs(num);
+            if (absVal >= 10000000) { // 1 Crore = 10,000,000
+                formattedVal = (num / 10000000).toFixed(2).replace(/\.00$/, '') + ' Cr';
+            } else if (absVal >= 100000) { // 1 Lakh = 100,000
+                formattedVal = (num / 100000).toFixed(2).replace(/\.00$/, '') + ' L';
+            } else {
+                formattedVal = formatIndianGrouping(num);
+            }
+        } else {
+            var absVal = Math.abs(num);
+            if (absVal >= 1000000000) {
+                formattedVal = (num / 1000000000).toFixed(2).replace(/\.00$/, '') + ' B';
+            } else if (absVal >= 1000000) {
+                formattedVal = (num / 1000000).toFixed(2).replace(/\.00$/, '') + ' M';
+            } else if (absVal >= 1000) {
+                formattedVal = num.toLocaleString();
+            } else {
+                formattedVal = num.toLocaleString();
+            }
+        }
+
+        return symbol ? (symbol + ' ' + formattedVal) : formattedVal;
+    }
+
+    function formatIndianGrouping(num) {
+        var parts = num.toString().split('.');
+        var integerPart = parts[0];
+        var decimalPart = parts.length > 1 ? '.' + parts[1] : '';
+        var isNegative = false;
+
+        if (integerPart.indexOf('-') === 0) {
+            isNegative = true;
+            integerPart = integerPart.substring(1);
+        }
+
+        var lastThree = integerPart.substring(integerPart.length - 3);
+        var otherNumbers = integerPart.substring(0, integerPart.length - 3);
+        if (otherNumbers !== '') {
+            lastThree = ',' + lastThree;
+        }
+        var formatted = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree + decimalPart;
+        return isNegative ? '-' + formatted : formatted;
+    }
+// ===== NEW CODE END — currency format =====
+
     VAS.VAS_182_SparesConsumablesIssuesWidget = function () {
 
         this.frame;
@@ -41,6 +105,11 @@
         var $valueEl;
         var $metaEl;
         var $busy;
+
+// ===== NEW CODE START — currency format (agent A04, 2026-08-19) =====
+        var currencyIso = '';
+        var currencySymbol = '';
+// ===== NEW CODE END — currency format =====
 
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
@@ -89,8 +158,25 @@
             } catch (e) { }
         }
 
+// ===== NEW CODE START — currency format (agent A04, 2026-08-19) =====
+        function loadCurrencyInfo() {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_182_SparesConsumablesIssuesWidget/GetCurrencyInfo',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data) {
+                        currencyIso = data.iso || '';
+                        currencySymbol = data.symbol || '';
+                    }
+                }
+            });
+        }
+
         function loadKpi() {
             showBusy(true);
+            loadCurrencyInfo();
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_182_SparesConsumablesIssuesWidget/GetSparesConsumablesPercentage',
@@ -114,32 +200,103 @@
                 $valueEl.attr('title', pct + '%');
             }
             if ($metaEl) {
+                $metaEl.text(label("VAS_182_OfIssuedValueMTD", "Of issued value MTD"));
+            }
+            if ($card) { $card.prop('disabled', false); }
+        }
+// ===== NEW CODE END — currency format =====
+
+// ----- OLD CODE (kept for rollback, do not delete) -----
+        function loadKpi_Old() {
+            showBusy(true);
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_182_SparesConsumablesIssuesWidget/GetSparesConsumablesPercentage',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data.error) { setError(); return; }
+                    renderMetric(data);
+                },
+                error: function () { setError(); },
+                complete: function () { showBusy(false); }
+            });
+        }
+
+        function renderMetric_Old(data) {
+            var pct = Number(data.percentage || 0);
+
+            if ($valueEl) {
+                $valueEl.text(pct + '%');
+                $valueEl.attr('title', pct + '%');
+            }
+            if ($metaEl) {
                 $metaEl.text(label("VAS_OfIssuedValueMTD", "Of issued value MTD"));
             }
             if ($card) { $card.prop('disabled', false); }
         }
+// ----- END OLD CODE -----
 
         function setError() {
             if ($valueEl) {
                 $valueEl.text('—');
                 $valueEl.removeAttr('title');
             }
-            if ($metaEl) { $metaEl.text(label("VAS_CouldntLoad", "Couldn't load")); }
+            if ($metaEl) { $metaEl.text(label("VAS_182_CouldntLoad", "Couldn't load")); }
             if ($card) { $card.prop('disabled', true); }
         }
 
+        // The framework navigates IN-PLACE (no new window, no half-drawn screen) only when the
+        // payload's ActionName equals the name of the window currently HOSTING this widget;
+        // otherwise VIS.dynamicWidget resolves ActionName through UserPreference/GetWindowID and
+        // opens a second window. Resolve the host window name from the listener chain.
+        // Established pattern - see VAS_091_MaterialReceiptSearchWidget.js zoomTo() (also 067/069/070/128).
+        function hostWindowName() {
+            try {
+                var l = $self.listener;
+                for (var i = 0; i < 6 && l; i++) {
+                    if (l.apanel && l.apanel.gridWindow && l.apanel.gridWindow.getName) {
+                        return l.apanel.gridWindow.getName();
+                    }
+                    if (l.gridWindow && l.gridWindow.getName) {
+                        return l.gridWindow.getName();
+                    }
+                    l = l.listener;
+                }
+            } catch (e) { }
+            return '';
+        }
+
+        // Drill to the EXACT documents behind the KPI: completed internal-use documents for the
+        // current month that carry at least one spares / consumables line. The EXISTS predicate
+        // mirrors the line-level classification in GetSparesConsumablesPercentageData() one-for-one,
+        // so the list can never drift from the percentage on the tile.
+        // Portability: only columns present on every target DB are used here - the work-order
+        // columns (VA075_WorkOrder_ID / VAMFG_M_WorkOrder_ID) are module-specific and absent on
+        // DB 1, and an unresolved column makes the grid query throw instead of opening.
         function openSparesConsumablesList() {
-            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL') AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
-            var windowParam = {
+            // Keep in lock-step with GetSparesConsumablesPercentageData in the controller, and the
+            // exact complement of the VAS_181 drill-through. The classification is line-level but
+            // this drills through at DOCUMENT level, so it is expressed as an EXISTS over the
+            // non-work-order issue lines.
+            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL')"
+                + " AND COALESCE(M_Inventory.IsInternalUse, 'N') = 'Y'"
+                + " AND EXISTS (SELECT 1 FROM M_InventoryLine il WHERE il.M_Inventory_ID = M_Inventory.M_Inventory_ID"
+                + " AND il.IsActive = 'Y' AND COALESCE(il.QtyInternalUse, 0) > 0"
+                + " AND COALESCE(il.VA075_WorkOrder_ID, 0) = 0 AND COALESCE(il.VAMFG_M_WorkOrder_ID, 0) = 0)"
+                + " AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
+            $self.widgetFirevalueChanged({
                 "TabWhereClause": where,
-                "TabLayout": "N",
-                "TabIndex": "0"
-            };
-            $self.widgetFirevalueChanged(windowParam);
+                "TabLayout": "Y",
+                "TabIndex": "0",
+                "ActionName": hostWindowName() || "VAS_InternalUseInventory",
+                "ActionType": "W"
+            });
         }
 
         function createWidget() {
-            var title = label("VAS_SparesConsumables", "Spares / Consumables");
+            var title = label("VAS_182_SparesConsumables", "Spares / Consumables");
             $card = $(
                 '<button type="button" class="vas-sci-card vas-widget-bg" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-sci-label">' + escapeHtml(title) + '</div>' +

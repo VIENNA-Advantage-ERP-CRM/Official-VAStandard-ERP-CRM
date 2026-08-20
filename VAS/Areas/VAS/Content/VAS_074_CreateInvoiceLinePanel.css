@@ -388,6 +388,21 @@
     line-height: 1.3;
 }
 
+/* View-only notice in the "..." (Additional Info) modal: the hosting tab has an unsaved edit,
+   so every field is built read-only and this says why. Same slot and shape as the blocking
+   validation message above, in the warning tone rather than danger. */
+.vas-cil-more-note {
+    margin: 0 1.25em;
+    padding: 0.5em 0.75em;
+    border-radius: var(--cil-r-sm);
+    background: #fdf3e2;
+    box-shadow: inset 0.1875em 0 0 var(--cil-warning);
+    color: #8a5a09;
+    font-size: 0.75em;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
 /* Mandatory curated ("...") modal field: colour its label with the framework mandatory
    colour (dictionary-mandatory fields AND conditional Capital/Expense-on-Asset-Related). */
 .vas-cil-dyn-mandatory label {

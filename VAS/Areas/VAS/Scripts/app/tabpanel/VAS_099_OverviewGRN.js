@@ -246,6 +246,83 @@
  *                        - To Verify is right-aligned: it is a quantity, and it
  *                          reads against the line's own Received / Ordered
  *                          figures directly above it.
+ *   VAI163   2026-08-11  Removed the Complete GRN and Generate Invoice buttons,
+ *                        and with them the whole Actions section: renderActions,
+ *                        actionButton, disableBtn, blockBtn, runAction,
+ *                        successText and the Generate Invoice dialog
+ *                        (openInvoiceDialog / showError). Nothing else reached
+ *                        any of them. Both actions live on the receipt's own
+ *                        screen, which carries the document's full validation.
+ *                        The controller's CompleteGRN / GenerateInvoice /
+ *                        GetInvoiceDocTypes endpoints went with them, as did the
+ *                        model's GetLatestInvoiceDocNoForOrder — nothing outside
+ *                        this panel called any of it.
+ *   VAI163   2026-08-12  - A receipt confirmation in Documents opens its record
+ *                          again. M_InOutConfirm's zoom target does not resolve
+ *                          to a screen the role can open, so the click answered
+ *                          with the platform's "with your current roles"
+ *                          refusal. openRecord now asks WINDOW_NAME_BY_TABLE
+ *                          first, which names the Ship/Receipt Confirmation
+ *                          window (VAS_ShipReceiptConfirm), and resolves it to
+ *                          an id through the panel's own GetWindow_ID endpoint;
+ *                          the zoom target stays as the fallback for every other
+ *                          table. Ported from VAS_092.
+ *                        - An e-mail's recipient line lists every address on the
+ *                          mail (To, Cc and Bcc, each labelled) in full instead
+ *                          of naming the To list and counting the rest as
+ *                          "+n more". The count could only be resolved by
+ *                          opening the message, which a mail stored without a
+ *                          body cannot do. allRecipients / countAddresses went
+ *                          with it, as did the sub-line's tooltip.
+ *                        - A value that has not been entered reads as a dash,
+ *                          not "N/A" (na / BLANK) — the placeholder the panel
+ *                          already used for a missing document no, date or
+ *                          amount.
+ *                        - To Verify is right-aligned by the quality drawer's
+ *                          own rule rather than by the material table's
+ *                          (stylesheet).
+ *   VAI163   2026-08-13  Repaired 104 double-encoded characters. The file had at
+ *                        some point been read as Windows-1252 and re-saved as
+ *                        UTF-8, so every em dash, middle dot, rupee sign, arrow
+ *                        and plus-minus in it had been rewritten as its own
+ *                        mojibake ("—" as "a-hat euro right-quote"). The header
+ *                        title and the Material Lines / Activity separators
+ *                        printed that mojibake on screen, because the corruption
+ *                        was in the SOURCE, not in how the bundle is served.
+ *                        Keep this file UTF-8: an editor that saves it as ANSI
+ *                        reintroduces the whole class of defect at once.
+ *   VAI163   2026-08-13  Activity now reports edits FIELD BY FIELD: an "updated"
+ *                        row carries the name of the column that changed
+ *                        (a.FieldName) and headlines with it, so the trail reads
+ *                        "Updated <field> · <when> · by <who>" — one row per
+ *                        field, per save. The single generic "Goods receipt
+ *                        updated" row remains only where change logging is off
+ *                        for M_InOut (model side).
+ *   VAI163   2026-08-14  Those "updated" rows now also cover edits to the LINES
+ *                        (model side). A line row names the line it landed on
+ *                        (a.ChangeScope — line number + product) on the same
+ *                        sub-line the e-mail recipients use, so the headline stays
+ *                        "Updated <field>": which field moved is the question, and
+ *                        the row it moved on qualifies it rather than competing
+ *                        for the one line that clips.
+ *   VAI163   2026-08-17  The Posted pill is drawn ONLY once the receipt is posted.
+ *                        It rendered on every record, reading "Not Posted" in grey
+ *                        on a receipt that is not yet completed and therefore
+ *                        cannot be posted at all — a standing notice about
+ *                        something that has not gone wrong, beside the status pill
+ *                        that already says where the document is. It is a
+ *                        milestone badge now: absent until the milestone is
+ *                        reached. The Order Progress timeline still carries the
+ *                        Posted stage, with the date posting ran, for a reader
+ *                        following the document through its states. Matches
+ *                        VAS_106.
+ *   VAI163   2026-08-17  Activity's field-level rows carry the MOVE: "was X →
+ *                        now Y" under the field's name (changeDelta), the old
+ *                        value struck through and a value the log recorded as
+ *                        empty shown as an em dash, so a cleared field is
+ *                        visibly cleared rather than looking like a rendering
+ *                        gap. A row said WHICH field moved but never what it
+ *                        moved from or to.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -402,15 +479,70 @@
             });
         }
 
+        // Tables whose record does NOT open in the table's default zoom window,
+        // mapped to the name of the window it does open. The VAS_092 Purchase
+        // Order overview carries the same map for the same reason.
+        //
+        // A receipt confirmation is the case that needed it: M_InOutConfirm's
+        // zoom target does not resolve to a screen this role can open, so
+        // clicking a confirmation in Documents answered with the platform's
+        // "with your current roles" refusal instead of the record. Naming the
+        // window it actually lives on — Ship/Receipt Confirmation — resolves the
+        // id from the dictionary instead of guessing at it.
+        //
+        // Any further screen that needs naming belongs here; nothing else has to
+        // change.
+        var WINDOW_NAME_BY_TABLE = {
+            "M_InOutConfirm": "VAS_ShipReceiptConfirm"
+        };
+
+        // Window name -> AD_Window_ID, resolved once per name and remembered for
+        // the life of the panel. A name the dictionary does not know is cached as
+        // -1 so a failed lookup is not repeated on every click.
+        var windowIdByName = {};
+
+        // Resolves a window id from its name through the panel's own endpoint.
+        // Returns 0 when it cannot be resolved, which leaves openRecord() to fall
+        // back to the table's zoom target.
+        function resolveWindowIdByName(windowName) {
+            if (!windowName) return 0;
+            if (windowIdByName.hasOwnProperty(windowName)) {
+                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
+            }
+            try {
+                if (!(window.VIS && VIS.dataContext &&
+                      typeof VIS.dataContext.getJSONRecord === "function")) {
+                    return 0;
+                }
+                var id = VIS.dataContext.getJSONRecord(
+                    "VAS_099_OverviewGRN/GetWindow_ID", windowName);
+                id = parseInt(id, 10);
+                if (isNaN(id) || id <= 0) {
+                    windowIdByName[windowName] = -1;
+                    console.log("resolveWindowIdByName: no window named " + windowName);
+                    return 0;
+                }
+                windowIdByName[windowName] = id;
+                return id;
+            } catch (e) {
+                windowIdByName[windowName] = -1;
+                console.log(e);
+                return 0;
+            }
+        }
+
         // Opens the record's window filtered to that row, using the platform's
-        // zoom API (the same pattern as VAS_092_OverviewPurchaseOrder): resolve the
-        // table's default zoom window, then start it with an equal-query on the
-        // table's key column. Degrades to a toast so a click never throws.
+        // zoom API (the same pattern as VAS_092_OverviewPurchaseOrder): the window
+        // named for this table when it has one, else the table's default zoom
+        // target, then start it with an equal-query on the table's key column.
+        // Degrades to a toast so a click never throws.
         function openRecord(tableName, recordId, isSOTrx) {
             if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
             try {
-                var windowId = 0;
-                if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
+                var windowId = resolveWindowIdByName(WINDOW_NAME_BY_TABLE[tableName]);
+
+                if (windowId <= 0 &&
+                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
                     // The 4th arg (IsSOTrx) picks the sales vs purchase window for
                     // dual-purpose tables like C_Order.
                     windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, !!isSOTrx) || 0;
@@ -573,7 +705,10 @@
             drawSection("documents", renderDocuments);
             drawSection("notes",    renderNotes);
             drawSection("activity", renderActivity);
-            drawSection("actions",  renderActions);
+            // The action bar (Complete GRN / Generate Invoice) is gone — both
+            // actions belong to the receipt's own screen, which is where they
+            // carry the document's full validation and where a reader expects to
+            // find them. The panel reports the receipt; it no longer drives it.
         }
 
         // Runs one section's renderer, containing any failure to that section.
@@ -631,10 +766,17 @@
             return $sec;
         }
 
-        // Returns "N/A" for blank values so the layout never shows an empty cell.
+        // Placeholder for a value that has not been entered yet. An em dash, not
+        // "N/A": the panel already writes one for a missing document no, date or
+        // amount (buildDocumentRow), so every blank now reads the same way, and a
+        // dash says "nothing here" without the abbreviation's tone of a rule
+        // having been broken.
+        var BLANK = "—";
+
+        // Returns the dash for blank values so the layout never shows an empty cell.
         function na(value) {
             return (value === null || value === undefined || String(value).trim() === "")
-                ? VIS.Msg.getMsg("VAS_099_NA")
+                ? BLANK
                 : value;
         }
 
@@ -733,11 +875,16 @@
             var $pills = $('<div class="vas_099-hdrPills"></div>');
             if (pm) $pills.append(headerPill(pm.label, pm.tone, "chevUp", false));
             $pills.append(headerPill(st.label, st.tone, null, true));
-            // Posted status shown as a pill on the right (moved out of the vendor
-            // details column): green when posted, neutral when not.
-            $pills.append(headerPill(
-                data.Posted ? VIS.Msg.getMsg("VAS_099_Posted") : msg("VAS_099_NotPosted", "Not Posted"),
-                data.Posted ? "success" : "neutral", null, false));
+            // Posted is a MILESTONE badge: it appears once the receipt has reached
+            // the ledger and not before. It used to render for every record,
+            // reading "Not Posted" in grey on a receipt that is not yet completed
+            // and therefore cannot be posted at all — a standing notice about
+            // something that has not gone wrong. The Order Progress timeline
+            // already carries the Posted stage for a reader following the
+            // document's state, with the date posting ran.
+            if (data.Posted) {
+                $pills.append(headerPill(VIS.Msg.getMsg("VAS_099_Posted"), "success", null, false));
+            }
             $top.append($pills);
 
             $strip.append($top);
@@ -1695,6 +1842,20 @@
             paintPage();
         }
 
+        // "was X → now Y" under the field's name, for a field-level edit. A
+        // value the log recorded as empty reads as an em dash rather than as a
+        // blank, so a cleared field is visibly cleared instead of looking like a
+        // rendering gap. Follows VAS_101 / VAS_104.
+        function changeDelta(a) {
+            var $d = $('<small class="vas_099-actSub vas_099-actDelta"></small>');
+            var blank = "—";
+            $d.append($('<span class="vas_099-cvOld"></span>').text(a.OldValue || blank));
+            $d.append($('<span class="vas_099-cvArrow"></span>').text("→"));
+            $d.append($('<span class="vas_099-cvNew"></span>').text(a.NewValue || blank));
+            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            return $d;
+        }
+
         function activityRow(a) {
             var meta = ACT_TYPES[a.Type] || ACT_TYPES.note;
 
@@ -1714,16 +1875,27 @@
             $title.append($('<span class="vas_099-actLead"></span>')
                 .text(title).attr("title", title));
 
-            // An e-mail names its recipients under the subject: the To list, plus
-            // a count of the Cc / Bcc addresses so a reader can see at a glance
-            // that others were copied. Every address itself is listed in the body.
+            // An e-mail names its recipients under the subject — every address on
+            // the To, Cc and Bcc lists, in full. No tooltip: the line is no
+            // longer an abridgement of something the reader has to hover to see.
             if (a.Type === "email") {
                 var to = recipientSummary(a);
                 if (to) {
-                    $title.append($('<small class="vas_099-actSub"></small>')
-                        .text(to).attr("title", allRecipients(a) || to));
+                    $title.append($('<small class="vas_099-actSub"></small>').text(to));
                 }
             }
+
+            // A line edit names the line it landed on, on the sub-line the e-mail
+            // recipients use. The headline stays "Updated <field>" — which field
+            // moved is the question, and the row it moved on qualifies it rather
+            // than competing with it for the one line that clips.
+            if (a.Type === "updated" && a.ChangeScope) {
+                $title.append($('<small class="vas_099-actSub"></small>')
+                    .text(a.ChangeScope).attr("title", a.ChangeScope));
+            }
+            // ...and the move itself: what the field held before the edit and
+            // what it holds after, on a sub-line of its own.
+            if (a.OldValue || a.NewValue) $title.append(changeDelta(a));
             $row.append($title);
 
             // "when · by whom" — the audit trail's whole point. For an e-mail that
@@ -1760,6 +1932,13 @@
             if (a.Type === "email") {
                 return (a.Text || "").trim() || msg("VAS_099_NoSubject", "(no subject)");
             }
+            // A field-level edit headlines with the FIELD that changed — the row's
+            // tag already says "Updated", and the field is what tells one edit
+            // apart from the next. Rows with no field (change logging off) keep
+            // the generic wording.
+            if (a.Type === "updated" && a.FieldName) {
+                return msg("VAS_099_ActFieldUpdated", "Updated") + " " + a.FieldName;
+            }
             var title = meta.titleKey ? msg(meta.titleKey, meta.titleText) : (meta.titleText || "");
             if (a.DocumentNo) title += " — " + a.DocumentNo;
             return title;
@@ -1792,341 +1971,43 @@
                 .text(msg(key, fallback) + " " + String(value).trim()));
         }
 
-        // Row sub-line: the To list, plus "+n more" covering the Cc / Bcc
-        // addresses. Counting by comma / semicolon is enough for a summary — the
-        // body lists the addresses verbatim.
-        function recipientSummary(a) {
-            var to = (a.MailTo || "").trim();
-            var extra = countAddresses(a.MailCc) + countAddresses(a.MailBcc);
-            if (!to && !extra) return "";
-            var s = msg("VAS_099_MailTo", "To:") + " " + (to || VIS.Msg.getMsg("VAS_099_NA"));
-            if (extra > 0) s += " +" + extra + " " + msg("VAS_099_MoreRecipients", "more");
-            return s;
-        }
-
-        // Every address on the mail, for the row's hover tooltip.
-        function allRecipients(a) {
-            var bits = [];
-            if (a.MailTo)  bits.push(msg("VAS_099_MailTo",  "To:")  + " " + a.MailTo);
-            if (a.MailCc)  bits.push(msg("VAS_099_MailCc",  "Cc:")  + " " + a.MailCc);
-            if (a.MailBcc) bits.push(msg("VAS_099_MailBcc", "Bcc:") + " " + a.MailBcc);
-            return bits.join("\n");
-        }
-
-        function countAddresses(value) {
-            if (!value || !String(value).trim()) return 0;
-            var parts = String(value).split(/[;,]/);
-            var n = 0;
-            for (var i = 0; i < parts.length; i++) {
-                if (parts[i].trim()) n++;
-            }
-            return n;
-        }
-
-        // ---------- Actions (visual buttons) ---------- //
-
-        // Document actions. Complete GRN runs the receipt's Complete (DocAction
-        // "CO"); Generate Invoice creates the AP invoice for the receipt's linked
-        // purchase order. Both confirm first, POST to the controller, then refresh
-        // the panel. Buttons disable themselves when the action does not apply.
-        function renderActions() {
-            var $bar = $('<section class="vas_099-actions"></section>');
-
-            var isCompleted = (data.StatusCode === "CO" || data.StatusCode === "CL");
-            var isClosedOff = (data.StatusCode === "VO" || data.StatusCode === "RE");
-            var hasPO = +data.C_Order_ID > 0;
-
-            // Complete GRN — only when the receipt is still open (not completed /
-            // voided / reversed).
-            var $complete = actionButton("check", VIS.Msg.getMsg("VAS_099_CompleteGRN"), "pri");
-            if (isCompleted || isClosedOff) {
-                disableBtn($complete);
-            } else {
-                $complete.on("click", function () {
-                    if (!confirm(msg("VAS_099_ConfirmComplete",
-                        "Complete this goods receipt? This will process the receipt."))) return;
-                    runAction($complete, "CompleteGRN",
-                        msg("VAS_099_CompleteFailed", "Could not complete the goods receipt."));
-                });
-            }
-            $bar.append($complete);
-
-            // Generate Invoice — any completed receipt can be invoiced. With a
-            // purchase order the invoice covers the order's uninvoiced received
-            // quantity; a manually created receipt (no order) is invoiced from the
-            // receipt's own lines, so the button no longer depends on a PO.
-            var $invoice = actionButton("doc", msg("VAS_099_GenerateInvoice", "Generate Invoice"), "sec");
-            if (!isCompleted) {
-                // A disabled button used to be silent: clicking it did nothing at
-                // all, so the reason it cannot run was never stated. It now says
-                // which of the two reasons applies — the receipt is not completed
-                // yet, or it is voided / reversed and never will be.
-                blockBtn($invoice, isClosedOff
-                    ? msg("VAS_099_InvoiceNotOnVoided",
-                          "This goods receipt is voided or reversed — no invoice can be generated from it.")
-                    : msg("VAS_099_InvoiceNeedsComplete",
-                          "Complete the goods receipt before generating an invoice."));
-            } else {
-                // Same as the main screen: the document type and the vendor's
-                // invoice reference are asked for before anything is generated.
-                $invoice.on("click", function () { openInvoiceDialog($invoice); });
-            }
-            $bar.append($invoice);
-
-            $body.append($bar);
-        }
-
-        function actionButton(icon, label, kind) {
-            var $b = $('<span class="vas_099-btn"></span>').addClass("vas_099-btn-" + (kind || "sec"));
-            $b.append(svgIcon(icon));
-            $b.append($('<span></span>').text(label));
-            return $b;
-        }
-
-        function disableBtn($b) { $b.addClass("vas_099-is-disabled"); }
-
-        // A button that cannot run, but says so. `is-disabled` sets
-        // pointer-events:none, which also swallows the tooltip and the click — so a
-        // greyed button was completely mute about why it was greyed. `is-blocked`
-        // looks the same and still receives the pointer, so the reason reaches the
-        // reader both on hover and on click. It carries no action handler, so it
-        // stays as unable to run as `is-disabled` is.
-        function blockBtn($b, why) {
-            $b.addClass("vas_099-is-blocked").attr("title", why);
-            $b.on("click", function () { toast(why, true); });
-        }
-
-        // POSTs a document action to the controller, then refreshes the panel on
-        // success. Guards against double-clicks while the action is in flight.
-        // `extra` carries an action's own parameters (the invoice dialog's document
-        // type / reference); the record id is always sent.
-        function runAction($btn, endpoint, failMsg, extra, onDone) {
-            if ($btn.hasClass("vas_099-is-disabled") || $btn.hasClass("vas_099-is-busy")) return;
-            $btn.addClass("vas_099-is-busy");
-            showBusy(true);
-
-            var payload = { M_InOut_ID: $self.record_ID };
-            if (extra) {
-                for (var k in extra) {
-                    if (extra.hasOwnProperty(k)) payload[k] = extra[k];
-                }
-            }
-
-            $.ajax({
-                url: VIS.Application.contextUrl + "VAS_099_OverviewGRN/" + endpoint,
-                type: "POST",
-                dataType: "json",
-                data: payload,
-                success: function (raw) {
-                    var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    $btn.removeClass("vas_099-is-busy");
-                    // A caller that returns true from onDone has shown the refusal
-                    // itself (the invoice dialog puts it in the form), so it is not
-                    // repeated as a toast behind the dialog.
-                    var handled = onDone ? (onDone(res) === true) : false;
-                    if (res && res.success) {
-                        toast(successText(res), false);
-                        // Re-fetch so the status pill, timeline and buttons reflect
-                        // the new document state.
-                        $self.fetchData($self.record_ID);
-                    } else {
-                        // The action was refused (a closed period, a validation the
-                        // document raised). Show its reason and re-read the record:
-                        // a refused completion can still have moved the document
-                        // (to Invalid), and the panel must not keep showing the
-                        // state it had before.
-                        if (!handled) toast((res && (res.error || res.message)) || failMsg, true);
-                        $self.fetchData($self.record_ID);
-                    }
-                },
-                error: function () {
-                    $btn.removeClass("vas_099-is-busy");
-                    showBusy(false);
-                    if (onDone) onDone(null);
-                    toast(failMsg, true);
-                }
-            });
-        }
-
-        // The text a successful action leaves on screen.
+        // Row sub-line: every address the mail went to, written out in full —
+        // To, then Cc, then Bcc, each behind its own label.
         //
-        // A generated invoice is named here rather than taken from the server's
-        // sentence, so the number is guaranteed to reach the reader (it is the one
-        // thing they need in order to go and find the document) and the wording is
-        // translatable through AD_Message like the rest of the panel. The server's
-        // own message is the fallback, and a plain "Done." the last resort.
-        function successText(res) {
-            if (res && res.invoiceNo) {
-                return msg("VAS_099_InvoiceCreated", "Invoice") + " " + res.invoiceNo + " " +
-                       msg("VAS_099_Generated", "generated.");
-            }
-            return (res && res.message) || msg("VAS_099_Done", "Done.");
+        // It used to name the To list alone and count the rest as "+n more",
+        // which asked the reader to open the message (or hover it) to learn who
+        // was actually copied — and a mail stored without a body cannot be
+        // opened at all, so on those rows the addresses were unreachable. The
+        // sub-line wraps rather than ellipsising now (stylesheet), so a long
+        // list is read on the row itself.
+        //
+        // A label with nothing behind it is left out entirely rather than
+        // printed against a dash: this line lists recipients, and "Cc: —" is not
+        // one.
+        function recipientSummary(a) {
+            var bits = [];
+            appendAddressBit(bits, "VAS_099_MailTo",  "To:",  a.MailTo);
+            appendAddressBit(bits, "VAS_099_MailCc",  "Cc:",  a.MailCc);
+            appendAddressBit(bits, "VAS_099_MailBcc", "Bcc:", a.MailBcc);
+            return bits.join(" · ");
         }
 
-        // ---------- Generate Invoice dialog ---------- //
-
-        // The panel asks for the same two things the main screen's Generate
-        // Invoice dialog asks for — the target document type and the vendor's own
-        // invoice reference — plus the generate-charges flag, and generates
-        // nothing until both mandatory fields are answered. The document types
-        // offered are the ones the receipt qualifies for (fetched with the
-        // receipt's own default already selected).
-        function openInvoiceDialog($btn) {
-            if ($btn.hasClass("vas_099-is-disabled") || $btn.hasClass("vas_099-is-busy")) return;
-
-            showBusy(true);
-            $.ajax({
-                url: VIS.Application.contextUrl + "VAS_099_OverviewGRN/GetInvoiceDocTypes",
-                type: "GET",
-                dataType: "json",
-                data: { M_InOut_ID: $self.record_ID },
-                // Nothing has been generated at this point — this call only reads
-                // the document types the dialog offers. Reporting a failure here as
-                // "Could not generate the invoice" told the reader an invoice had
-                // been attempted and had failed, which is not what happened; the
-                // message now names what actually went wrong.
-                success: function (raw) {
-                    showBusy(false);
-                    var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (!res || !res.success) {
-                        toast((res && (res.error || res.message)) ||
-                            msg("VAS_099_DocTypesFailed",
-                                "Could not load the invoice document types."), true);
-                        return;
-                    }
-                    if (!(res.docTypes || []).length) {
-                        toast(msg("VAS_099_NoInvoiceDocTypes",
-                            "No invoice document type is available for this goods receipt."), true);
-                        return;
-                    }
-                    buildInvoiceDialog($btn, res);
-                },
-                error: function () {
-                    showBusy(false);
-                    toast(msg("VAS_099_DocTypesFailed",
-                        "Could not load the invoice document types."), true);
-                }
-            });
+        function appendAddressBit(bits, key, fallback, value) {
+            var text = (value === null || value === undefined) ? "" : String(value).trim();
+            if (!text) return;
+            bits.push(msg(key, fallback) + " " + text);
         }
 
-        function buildInvoiceDialog($btn, res) {
-            var docTypes = res.docTypes || [];
+        // allRecipients (the row's hover tooltip) and countAddresses (the "+n
+        // more" tally) are gone with the abridged sub-line they served: the row
+        // now writes every address out, so there is nothing left to count or to
+        // recover on hover.
 
-            var $overlay = $('<div class="vas_099-modal"></div>');
-            var $card = $('<div class="vas_099-modalCard"></div>');
-
-            var $head = $('<div class="vas_099-modalHead"></div>');
-            $head.append($('<h3></h3>').text(msg("VAS_099_CreateInvoice", "Create Invoice")));
-            if (res.documentNo) {
-                $head.append($('<span class="vas_099-modalSub"></span>')
-                    .text(VIS.Msg.getMsg("VAS_099_GoodsReceiptNote") + " " + res.documentNo));
-            }
-            $card.append($head);
-
-            var $body = $('<div class="vas_099-modalBody"></div>');
-
-            // Document type — mandatory, as on the main screen.
-            var $docField = $('<label class="vas_099-fld"></label>');
-            $docField.append($('<span class="vas_099-fldLbl"></span>')
-                .text(msg("VAS_099_DocumentType", "Document Type") + " *"));
-            var $docSel = $('<select class="vas_099-input"></select>');
-            $docSel.append($('<option></option>').attr("value", "")
-                .text(msg("VAS_099_SelectDocType", "Select a document type")));
-            for (var i = 0; i < docTypes.length; i++) {
-                var $opt = $('<option></option>')
-                    .attr("value", docTypes[i].C_DocType_ID).text(docTypes[i].Name);
-                if (+docTypes[i].C_DocType_ID === +res.defaultDocTypeId) $opt.prop("selected", true);
-                $docSel.append($opt);
-            }
-            $docField.append($docSel);
-            $body.append($docField);
-
-            // Invoice reference — mandatory on the purchase side, as on the main
-            // screen: it is the vendor's own invoice number against this receipt.
-            var $refField = $('<label class="vas_099-fld"></label>');
-            $refField.append($('<span class="vas_099-fldLbl"></span>')
-                .text(msg("VAS_099_InvoiceReference", "Invoice Reference") + " *"));
-            var $ref = $('<input type="text" class="vas_099-input" maxlength="60">');
-            $refField.append($ref);
-            $body.append($refField);
-
-            // Generate charges — spreads the receipt's charges over the lines.
-            var $chargeField = $('<label class="vas_099-fldChk"></label>');
-            var $charges = $('<input type="checkbox">');
-            $chargeField.append($charges);
-            $chargeField.append($('<span></span>')
-                .text(msg("VAS_099_GenerateCharges", "Generate Charges")));
-            $body.append($chargeField);
-
-            var $error = $('<div class="vas_099-modalErr" style="display:none;"></div>');
-            $body.append($error);
-            $card.append($body);
-
-            var $foot = $('<div class="vas_099-modalFoot"></div>');
-            var $cancel = $('<span class="vas_099-btn vas_099-btn-sec"></span>')
-                .append($('<span></span>').text(msg("VAS_099_Cancel", "Cancel")));
-            var $create = $('<span class="vas_099-btn vas_099-btn-pri"></span>')
-                .append($('<span></span>').text(msg("VAS_099_CreateInvoice", "Create Invoice")));
-            $foot.append($cancel).append($create);
-            $card.append($foot);
-
-            $overlay.append($card);
-            $root.append($overlay);
-            $ref.trigger("focus");
-
-            function close() { $overlay.remove(); }
-
-            // Clicking the backdrop (never the card) closes without generating.
-            $overlay.on("click", function (e) { if (e.target === $overlay[0]) close(); });
-            $cancel.on("click", close);
-
-            $create.on("click", function () {
-                var docId = +$docSel.val() || 0;
-                var ref = ($ref.val() || "").trim();
-
-                if (!docId && !ref) {
-                    return showError($error, msg("VAS_099_DocTypeAndRefMandatory",
-                        "Select a document type and enter the invoice reference."));
-                }
-                if (!docId) {
-                    return showError($error, msg("VAS_099_DocTypeMandatory",
-                        "Select a document type."));
-                }
-                if (!ref) {
-                    return showError($error, msg("VAS_099_InvoiceRefMandatory",
-                        "Enter the invoice reference."));
-                }
-                $error.hide();
-
-                // The dialog stays up until the server answers, then closes only
-                // when an invoice was actually created — a refusal is shown in
-                // place, with the values still filled in.
-                $create.addClass("vas_099-is-busy");
-                runAction($btn, "GenerateInvoice",
-                    msg("VAS_099_InvoiceFailed", "Could not generate the invoice."),
-                    {
-                        C_DocType_ID: docId,
-                        InvoiceReference: ref,
-                        GenerateCharges: $charges.is(":checked")
-                    },
-                    function (res) {
-                        $create.removeClass("vas_099-is-busy");
-                        if (res && res.success) {
-                            // Closed here so the success toast — which names the
-                            // generated invoice — is the thing left on screen.
-                            close();
-                            return false;
-                        }
-                        showError($error, (res && (res.error || res.message)) ||
-                            msg("VAS_099_InvoiceFailed", "Could not generate the invoice."));
-                        return true;      // shown in the form; no toast behind it
-                    });
-            });
-        }
-
-        function showError($error, text) {
-            $error.text(text).show();
-        }
+        // The Actions section is gone with the buttons it drew. renderActions,
+        // actionButton, disableBtn, blockBtn, runAction, successText, the
+        // Generate Invoice dialog (openInvoiceDialog / showError) and the
+        // CompleteGRN / GenerateInvoice calls went with it — nothing else
+        // reached any of them. The controller's matching endpoints are gone too.
 
         // Lightweight self-contained toast.
         function toast(message, isError) {

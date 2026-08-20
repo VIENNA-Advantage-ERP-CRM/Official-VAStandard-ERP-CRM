@@ -170,8 +170,10 @@
             titles.appendChild(el('div', 'MPC-wc-subtitle', lbl('VAS_155_WC_Subtitle', 'Drafted and in-progress delivery confirmations')));
             head.appendChild(icon);
             head.appendChild(titles);
+
             var gridHead = el('div', 'MPC-wc-row MPC-wc-ghead');
             gridHead.appendChild(el('span', null, lbl('VAS_155_WC_ColConfirmation', 'Confirmation')));
+            gridHead.appendChild(el('span', null, lbl('VAS_155_WC_ColCustomer', 'Customer')));
             gridHead.appendChild(el('span', null, lbl('VAS_155_WC_ColLines', 'Lines')));
             gridHead.appendChild(el('span', 'MPC-wc-col-status', lbl('VAS_155_WC_ColStatus', 'Status')));
 
@@ -239,6 +241,25 @@
 
         /* ---- Widget list ---- */
         function loadWidgetList() {
+            /* ============================================================================
+               TEMPORARY FAKE DATA FOR TESTING (M_InOutConfirm is empty in this DB).
+               DELETE THIS WHOLE BLOCK (down to "END TEMPORARY FAKE DATA") to restore the
+               real GetWaitingConfirmations fetch. status is one of: drafted / inProgress
+               / dispute. 5 rows + ROWS_PER_PAGE 3 = 2 pages, so paging is testable too.
+               ============================================================================ */
+            state.items = [
+                { confirmId: -101, confirmNo: 'SC-DEMO-0001', doNo: 'DO-2026-0148', customer: 'Apex Med Systems', lineCount: 3, status: 'drafted' },
+                { confirmId: -102, confirmNo: 'SC-DEMO-0002', doNo: 'DO-2026-0147', customer: 'Northwind Energy', lineCount: 5, status: 'inProgress' },
+                { confirmId: -103, confirmNo: 'SC-DEMO-0003', doNo: 'DO-2026-0146', customer: 'UrbanAxis Retail', lineCount: 2, status: 'dispute' },
+                { confirmId: -104, confirmNo: 'SC-DEMO-0004', doNo: 'DO-2026-0145', customer: 'صيدلية الأرجوان', lineCount: 4, status: 'inProgress' },
+                { confirmId: -105, confirmNo: 'SC-DEMO-0005', doNo: 'DO-2026-0144', customer: 'Stelvio Foods', lineCount: 1, status: 'drafted' }
+            ];
+            state.page = 0;
+            state.loaded = true;
+            renderRows();
+            return;
+            /* ===== END TEMPORARY FAKE DATA ===== */
+
             if (listRequest && typeof listRequest.abort === 'function') {
                 try { listRequest.abort(); } catch (ignored) { }
             }
@@ -297,13 +318,8 @@
             row.type = 'button';
             row.setAttribute('data-id', item.confirmId);
 
-            var confirmCol = el('div', 'MPC-wc-c-primary');
-            confirmCol.appendChild(el('div', 'MPC-wc-c-title', item.confirmNo || ''));
-            if (item.customer) {
-                confirmCol.appendChild(el('div', 'MPC-wc-c-customer-sub', item.customer));
-            }
-            row.appendChild(confirmCol);
-
+            row.appendChild(el('span', 'MPC-wc-c-primary', item.confirmNo || ''));
+            row.appendChild(el('span', 'MPC-wc-c-body', item.customer || ''));
             row.appendChild(el('span', 'MPC-wc-c-body', String(item.lineCount || 0)));
             var statusCell = el('span', 'MPC-wc-col-status');
             statusCell.appendChild(statusPill(item.status));
@@ -371,6 +387,41 @@
 
         /* ---- Detail view ---- */
         function loadConfirmationDetail() {
+            /* ============================================================================
+               TEMPORARY FAKE DATA FOR TESTING - DELETE THIS BLOCK (down to "END TEMPORARY
+               FAKE DATA") to restore the real GetConfirmationDetail fetch. 12 lines +
+               LINES_PER_PAGE 5 = 3 pages; mix of Matched / Pending / zero-confirmed.
+               ============================================================================ */
+            (function () {
+                var src = null;
+                for (var s = 0; s < state.items.length; s++) {
+                    if (state.items[s].confirmId === modalState.confirmId) { src = state.items[s]; break; }
+                }
+                var products = ['Facility Sensor Kit', 'Mounting Brackets', 'Calibration Tools', 'Boiler Valves', 'Pressure Gauges', 'Shelving Units', 'Label Printers', 'Barcode Scanners', 'Cold Chain Tags', 'Lab Centrifuge', 'Sample Trays', 'Reagent Boxes'];
+                var fakeLines = [];
+                for (var i = 0; i < 12; i++) {
+                    var target = 5 + i * 3;
+                    var confirmed = (i % 3 === 0) ? target : (i % 3 === 1 ? Math.floor(target / 2) : 0);
+                    fakeLines.push({ lineNo: i + 1, productName: products[i], confirmedQty: confirmed, targetQty: target, matched: confirmed === target });
+                }
+                modalState.header = {
+                    confirmId: modalState.confirmId,
+                    confirmNo: src ? src.confirmNo : 'SC-DEMO',
+                    doNo: src ? src.doNo : 'DO-DEMO',
+                    customer: src ? src.customer : 'Demo Customer',
+                    status: src ? src.status : 'inProgress',
+                    warehouseName: 'Central Warehouse - Baghdad',
+                    warehouseId: 0,
+                    confirmDate: '2026-07-20'
+                };
+                modalState.lines = fakeLines;
+                modalState.view = 'detail';
+                modalState.linePage = 0;
+                renderModal();
+            })();
+            return;
+            /* ===== END TEMPORARY FAKE DATA ===== */
+
             if (detailRequest && typeof detailRequest.abort === 'function') {
                 try { detailRequest.abort(); } catch (ignored) { }
             }

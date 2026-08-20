@@ -14,7 +14,10 @@
 
 .vas-mcw-card {
     font-family: Roboto, Arial, sans-serif;
-    font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
+    /* Container-query scaling first (cqi resolves against the root, which sets
+       container-type: inline-size), with the JS-driven --widget-inline-size as the
+       fallback for engines without container queries. Same scale in both: 4cqi == 0.04. */
+    font-size: clamp(15px, 4cqi, 24px);
     font-size: clamp(15px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.04), 24px);
     width: 100%;
     height: 100%;
@@ -45,7 +48,15 @@
     display: flex;
     align-items: center;
     gap: .625em;
+    flex: 1 1 auto;
     min-width: 0;
+}
+
+/* Title/subtitle stack. min-width:0 is what lets .vas-mcw-title's ellipsis engage instead of the
+   block holding the header open and pushing the filters over the title. */
+.vas-mcw-head-text {
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 .vas-mcw-ico {
@@ -89,6 +100,13 @@
     flex: 0 0 auto;
 }
 
+/* Filter pill button - unchanged from the source design (translucent white, #E4EDF4 border,
+   8px radius, .6875em Roboto Medium, #5F7283) with the chevron / calendar glyphs sized to 1em. */
+.vas-mcw-dd {
+    position: relative;
+    display: inline-flex;
+}
+
 .vas-mcw-pill-btn {
     font-family: inherit;
     font-size: .6875em;
@@ -97,11 +115,12 @@
     background: rgba(255, 255, 255, 0.85);
     border: 1px solid #E4EDF4;
     border-radius: 8px;
-    padding: .375em .625em;
+    padding: .32em .55em;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: .35em;
+    gap: .3em;
+    white-space: nowrap;
     outline: none;
 }
 
@@ -109,6 +128,61 @@
         border-color: #0083DA;
         color: #0083DA;
     }
+
+    .vas-mcw-pill-btn svg {
+        width: 1em;
+        height: 1em;
+        flex: 0 0 auto;
+    }
+
+/* Dropdown menu. Appended to <body> and positioned with position:fixed from JS, because
+   .vas-mcw-card is overflow:hidden and would clip a menu rendered inside the card. Menus are the
+   one surface the design allows to scroll internally. */
+.vas-mcw-menu {
+    position: fixed;
+    z-index: 10001;
+    display: none;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(15, 61, 97, .16);
+    min-width: 10em;
+    max-height: 15.7em;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-family: Roboto, Arial, sans-serif;
+    padding: .25em 0;
+}
+
+    .vas-mcw-menu.vas-mcw-menu-open {
+        display: block;
+    }
+
+    .vas-mcw-menu button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        font-family: inherit;
+        font-size: .72em;
+        font-weight: 500;
+        color: #5F7283;
+        background: transparent;
+        border: 0;
+        padding: .5em .75em;
+        cursor: pointer;
+        white-space: nowrap;
+        outline: none;
+    }
+
+        .vas-mcw-menu button:hover {
+            background: #EEF6FF;
+        }
+
+        .vas-mcw-menu button.vas-mcw-menu-on {
+            color: #0083DA;
+            font-weight: 600;
+            background: #EEF6FF;
+        }
 
 /* Body Section */
 .vas-mcw-body {
@@ -125,6 +199,15 @@
     align-items: center;
     justify-content: space-between;
     gap: .75em;
+    /* Rows share the body height evenly and are allowed to shrink (flex: 1 1 0 + min-height: 0).
+       Previously they had NO flex property, so they defaulted to flex: 0 1 auto and kept their
+       natural height while the page size is hard-coded to 4: when 4 natural rows were taller than
+       the body, the surplus rows were pushed past the bottom edge and silently clipped by
+       overflow:hidden on .vas-mcw-body - the widget claimed 4 rows but only showed 3.
+       min-height: 0 is the part that actually permits shrinking; without it a flex item will not
+       shrink below its content size and the overflow comes straight back. */
+    flex: 1 1 0;
+    min-height: 0;
     padding: .45em .625em;
     border-radius: 8px;
     border: 0;
@@ -521,104 +604,7 @@
     white-space: normal;
 }
 
-
-/* Standard Modal / Popup Rules */
-.vas-modal-overlay {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    background: rgba(0, 0, 0, 0.45) !important;
-    backdrop-filter: blur(4px) !important;
-    z-index: 10000 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 16px !important;
-}
-
-.vas-modal-card {
-    background: #ffffff !important;
-    border-radius: 12px !important;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2) !important;
-    width: 90% !important;
-    max-width: 680px !important;
-    max-height: 85vh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-    font-family: Roboto, Arial, sans-serif !important;
-    font-size: 13px !important;
-    color: #102C3F !important;
-}
-
-.vas-modal-head {
-    padding: 14px 18px !important;
-    border-bottom: 1px solid #E2EAF1 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    background: #F8FAFC !important;
-}
-
-.vas-modal-title {
-    font-size: 15px !important;
-    font-weight: 600 !important;
-    color: #102C3F !important;
-    margin: 0 !important;
-}
-
-.vas-modal-close {
-    background: none !important;
-    border: none !important;
-    font-size: 22px !important;
-    line-height: 1 !important;
-    color: #5F7283 !important;
-    cursor: pointer !important;
-}
-
-.vas-modal-close:hover {
-    color: #102C3F !important;
-}
-
-.vas-modal-body {
-    padding: 16px 18px !important;
-    overflow-y: auto !important;
-    flex: 1 1 auto !important;
-}
-
-.vas-modal-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    margin: 0 !important;
-}
-
-.vas-modal-table th {
-    padding: 10px 12px !important;
-    font-size: 11px !important;
-    font-weight: 500 !important;
-    color: #41576A !important;
-    text-transform: uppercase !important;
-    border-bottom: 1px solid #C5D2DD !important;
-    background: #FFFFFF !important;
-    text-align: left !important;
-}
-
-.vas-modal-table td {
-    padding: 10px 12px !important;
-    font-size: 12px !important;
-    color: #102C3F !important;
-    border-bottom: 1px solid #E2EAF1 !important;
-}
-
-.vas-modal-foot {
-    padding: 12px 18px !important;
-    border-top: 1px solid #D9E2EB !important;
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    background: #F8FAFC !important;
-    font-size: 12px !important;
-    color: #5F7283 !important;
-}
+/* NOTE: a duplicated, unscoped ".vas-modal-*" block used to live here (and in five sibling
+   widget stylesheets). It was dead code - no JavaScript referenced those class names, this
+   widget uses its own scoped modal classes - and it carried hardcoded px font sizes with
+   !important, which breaks the Universal Dynamic Responsive System rule. Removed 2026-08-12. */

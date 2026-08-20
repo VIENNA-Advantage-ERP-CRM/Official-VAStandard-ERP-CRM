@@ -6,9 +6,9 @@
  * Summary Message Table
  *  # | Current Text                           | Message Key
  * ---+----------------------------------------+-----------------------------------
- *  1 | New Material Issue                     | VAS_NewMaterialIssue
- *  2 | Issue stock for production / spares    | VAS_IssueStockForProductionSpares
- *  3 | Unable to open the window              | VAS_CouldntOpenWindow
+ *  1 | New Material Issue                     | VAS_178_NewMaterialIssue
+ *  2 | Issue stock for production / spares    | VAS_178_IssueStockForProductionSpares
+ *  3 | Unable to open the window              | VAS_178_CouldntOpenWindow
  */
 ; VAS = window.VAS || {};
 
@@ -99,8 +99,106 @@
             });
         }
 
-        // Open the Material Issue window on a NEW record via the widget framework's
-        // value-changed channel (IsTabInNewMode), reusing the window instead of duplicate opening.
+        /* The Internal Use window must open on a NEW record and must never be duplicated.
+           viewManager.startWindow only reuses windows in its closed-window cache;
+           an already-OPEN window gets a second instance on every click. So:
+           - if the Internal Use window this widget opened is still open, bring that SAME
+             window to the front and start another new record in it (cmd_new);
+           - otherwise open it once with a "new record" query so the CORE itself
+             auto-starts the blank record when the tab loads (buildNewRecordQuery).
+           The opened-window reference is kept on a WINDOW-GLOBAL (keyed by window
+           id), not on widget-instance state, so it survives the dashboard
+           re-creating the widget - otherwise the reference resets and a new window
+           opens every time. */
+        var MI_VIEW_STORE = '__vasMaterialIssueViews';
+
+        function rememberMiView(windowId, view) {
+            if (!window[MI_VIEW_STORE]) { window[MI_VIEW_STORE] = {}; }
+            window[MI_VIEW_STORE][windowId] = view || null;
+        }
+
+        function recallMiView(windowId) {
+            return window[MI_VIEW_STORE] ? window[MI_VIEW_STORE][windowId] : null;
+        }
+
+        function startNewRecordIn(view) {
+            try {
+                if (view && view.cPanel && view.cPanel.cmd_new) {
+                    view.cPanel.cmd_new(false);
+                    return true;
+                }
+            } catch (e) { /* window still open; user can press New */ }
+            return false;
+        }
+
+        // The taskbar LI carries the view id and is removed on close, so its
+        // presence in the DOM means that window is still open.
+        function isViewStillOpen(view) {
+            if (!view || !view.getId) { return false; }
+            var li = document.getElementById(String(view.getId()));
+            return !!(li && li.tagName === 'LI');
+        }
+
+        function focusView(view) {
+            var viewId = view.getId();
+            var li = document.getElementById(String(viewId));
+            if (li && $(li).hasClass('vis-app-f-selected')) { return; }
+            if (VIS.desktopMgr && VIS.desktopMgr.toggleContainer) {
+                VIS.desktopMgr.toggleContainer(viewId);
+            }
+            if (VIS.desktopMgr && VIS.desktopMgr.activateTaskBarItemUsingID) {
+                VIS.desktopMgr.activateTaskBarItemUsingID({ data: function () { return viewId; } });
+            }
+        }
+
+        /* Core-native "open on new record": a query flagged as a new-record query
+           loads no rows ("2=3"), and GridController.queryCompleted ->
+           checkInsertNewRow() then auto-starts a blank record (dataNew) as soon
+           as the tab finishes loading. No onLoad/cmd_new timing needed - this is
+           the same path the core itself uses for zoom-to-new-record. */
+        function buildNewRecordQuery() {
+            var query = null;
+            try {
+                query = new VIS.Query("M_Inventory");
+                query.addRestriction(VIS.Query.prototype.NEWRECORD); // "2=3" -> loads no rows
+                // addRestriction only auto-flags against the static VIS.Query.NEWRECORD,
+                // which this core never assigns (only the prototype constant exists),
+                // so set the flag checkInsertNewRow() reads directly.
+                query.newRecord = true;
+                if (query.setRecordCount) { query.setRecordCount(0); }
+            } catch (e) { query = null; }
+            return query;
+        }
+
+        function startWindowById(windowId) {
+            // Reuse the window we already opened, if it is still open: focus it
+            // and start a new record in it - no second window.
+            var existing = recallMiView(windowId);
+            if (existing && isViewStillOpen(existing)) {
+                try {
+                    focusView(existing);
+                    startNewRecordIn(existing);
+                    return;
+                } catch (e) { /* fall through and open it again */ }
+            }
+
+            var newRecordQuery = buildNewRecordQuery();
+
+            var view = null;
+            if (VIS.viewManager && VIS.viewManager.startWindow) {
+                view = VIS.viewManager.startWindow(windowId, newRecordQuery);
+            }
+            else if (VIS.AEnv && VIS.AEnv.startWindow) {
+                view = VIS.AEnv.startWindow(windowId, newRecordQuery);
+            }
+
+            rememberMiView(windowId, view);
+        }
+
+        // Open the widget's configured window (the Internal Use / Material Issue window)
+        // directly on a NEW record through the widget framework's value-changed
+        // channel. The host reuses the same window and starts a blank record
+        // (IsTabInNewMode) - no duplicate window is opened.
         function openMaterialIssueNewRecord() {
             if (isOpening) { return; }
             isOpening = true;
@@ -112,10 +210,12 @@
                     "IsTabInNewMode": "true",
                     "TabIndex": "0"
                 };
-                $self.widgetFirevalueChanged(windowParam);
-            } catch (e) {
-                // Direct fallback via window start
-                openMaterialIssueWindowDirect();
+                // widgetFirevalueChanged returns false when no host listener is attached
+                // (it never throws), so the return flag - not an exception - is what tells
+                // us whether the framework channel handled the click.
+                if (!$self.widgetFirevalueChanged(windowParam)) {
+                    openMaterialIssueWindow();
+                }
             } finally {
                 window.setTimeout(function () {
                     isOpening = false;
@@ -124,49 +224,29 @@
             }
         }
 
-        function openMaterialIssueWindowDirect() {
+        function openMaterialIssueWindow() {
             if (materialIssueWindowId > 0) {
                 startWindowById(materialIssueWindowId);
                 return;
             }
-
             loadMaterialIssueWindowId(function (windowId) {
                 if (windowId > 0) {
                     startWindowById(windowId);
-                } else {
+                }
+                else {
                     VIS.ADialog.error(
-                        'VAS_CouldntOpenWindow',
+                        'VAS_178_CouldntOpenWindow',
                         true,
                         '',
-                        label('VAS_CouldntOpenWindow', 'Unable to open the window.')
+                        label('VAS_178_CouldntOpenWindow', 'Unable to open the window.')
                     );
                 }
             });
         }
 
-        function buildNewRecordQuery() {
-            var query = null;
-            try {
-                query = new VIS.Query("M_Inventory");
-                query.addRestriction(VIS.Query.prototype.NEWRECORD);
-                query.newRecord = true;
-                if (query.setRecordCount) { query.setRecordCount(0); }
-            } catch (e) { query = null; }
-            return query;
-        }
-
-        function startWindowById(windowId) {
-            var newRecordQuery = buildNewRecordQuery();
-            if (VIS.viewManager && VIS.viewManager.startWindow) {
-                VIS.viewManager.startWindow(windowId, newRecordQuery);
-            } else if (VIS.AEnv && VIS.AEnv.startWindow) {
-                VIS.AEnv.startWindow(windowId, newRecordQuery);
-            }
-        }
-
         function createWidget() {
-            var title = label('VAS_NewMaterialIssue', 'New Material Issue');
-            var subtitle = label('VAS_IssueStockForProductionSpares', 'Issue stock for production / spares');
+            var title = label('VAS_178_NewMaterialIssue', 'New Material Issue');
+            var subtitle = label('VAS_178_IssueStockForProductionSpares', 'Issue stock for production / spares');
 
             $card = $(
                 '<button type="button" class="vas-178-nmi-card vas-widget-bg" aria-label="' + escapeHtml(title + '. ' + subtitle) + '">' +
@@ -186,10 +266,6 @@
             $root.append($card);
         }
 
-        this.Initalize = function () {
-            createWidget();
-        };
-
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
@@ -198,8 +274,14 @@
         };
     };
 
+    // Returns true only when a host listener consumed the value, so the caller can
+    // fall back to opening the window directly instead of failing silently.
     VAS.VAS_178_NewMaterialIssueQuickAction.prototype.widgetFirevalueChanged = function (value) {
-        if (this.listener) { this.listener.widgetFirevalueChanged(value); }
+        if (this.listener && this.listener.widgetFirevalueChanged) {
+            this.listener.widgetFirevalueChanged(value);
+            return true;
+        }
+        return false;
     };
 
     VAS.VAS_178_NewMaterialIssueQuickAction.prototype.addChangeListener = function (listener) {

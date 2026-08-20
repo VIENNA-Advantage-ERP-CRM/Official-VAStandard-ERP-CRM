@@ -29,6 +29,11 @@
            page). renderTotals adds the live current-page sum so the totals row reflects the
            WHOLE order, not just the loaded page, while still updating during edits. */
         var otherSub = 0, otherTax = 0, otherTcs = 0;
+        /* Cached server tax breakdown for the current order (from GetTaxBreakdown /
+           C_OrderTax). Non-null only when at least one line is saved. Falls back to the
+           otherSub/otherTax live-sum path while lines are unsaved or the load is pending.
+           Refreshed on panel load, save and delete (refreshSummary). */
+        var taxSummary = null;
         /* dropdown catalogs */
         var uomList = [], taxList = [], taxRateById = {};
         /* AD_Column metadata cache (callout code + validation), keyed by column */
@@ -287,6 +292,7 @@
                     otherSub = (parent && +parent.OtherPagesSubtotal) || 0;
                     otherTax = (parent && +parent.OtherPagesTax) || 0;
                     otherTcs = (parent && +parent.OtherPagesTcs) || 0;
+                    taxSummary = null;   // drop prior order's breakdown; refreshSummary below reloads it
                     uomList = (parent && parent.UomList) || [];
                     taxList = (parent && parent.TaxList) || [];
                     taxRateById = {};
@@ -318,6 +324,7 @@
                     editing = null; morePopoverFor = null;
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
+                    refreshSummary();
                 },
                 error: function (err) {
                     console.log(err);
@@ -490,11 +497,27 @@
             $row.append('<div class="vas-obl-cell" role="columnheader">' + esc(lbl("VAS_107_ProductCharge", "Product / Charge")) + "</div>");
             $row.append('<div class="vas-obl-cell" role="columnheader">' + esc(lbl("Description", "Description")) + "</div>");
             $row.append('<div class="vas-obl-cell vas-obl-cell--right" role="columnheader">' + esc(lbl("VAS_107_QtyUom", "Quantity / UOM")) + "</div>");
-            $row.append('<div class="vas-obl-cell vas-obl-cell--right" role="columnheader">' + esc(lbl("Price", "Price")) + "</div>");
+            $row.append('<div class="vas-obl-cell vas-obl-cell--right vas-obl-hdr-price" role="columnheader">' + priceHeaderHtml() + "</div>");
             $row.append('<div class="vas-obl-cell" role="columnheader">' + esc(lbl("Tax", "Tax")) + "</div>");
             $row.append('<div class="vas-obl-cell vas-obl-cell--right" role="columnheader">' + esc(lbl("VAS_107_TaxableAmt", "Taxable Amount")) + "</div>");
             $row.append('<div class="vas-obl-cell vas-obl-cell--more" role="columnheader" aria-label="' + esc(lbl("VAS_107_More", "More")) + '"></div>');
             return $row;
+        }
+
+        /* Price header markup: "Price" with a smaller "(Incl. Tax)" second line when the
+           price list is tax-inclusive. Returns already-escaped (safe) HTML. */
+        function priceHeaderHtml() {
+            var main = esc(lbl("Price", "Price"));
+            if (parent && parent.IsTaxIncluded)
+                main += '<span class="vas-obl-hdr-price-sub">' + esc(lbl("VAS_107_InclTax", "(Incl. Tax)")) + "</span>";
+            return main;
+        }
+
+        /* Re-render the (once-built) Price header cell for the current parent tax mode.
+           Called from render() so the header tracks the order/price-list data that loads
+           AFTER buildHeadRow ran. */
+        function updatePriceHeader() {
+            if ($body) $body.find(".vas-obl-hdr-price").html(priceHeaderHtml());
         }
 
         /* ---------- render ---------- */
@@ -505,10 +528,13 @@
             // show a not-allowed cursor via their (enabled) parent cell - a disabled
             // control ignores its own `cursor` in Chromium, so the cell shows it instead.
             $body.toggleClass("vas-obl-locked", !panelEditable());
+            // The head row was built before the order data arrived, so refresh the Price
+            // header now that parent.IsTaxIncluded (price-list tax mode) is known.
+            updatePriceHeader();
 
             $linesBody.empty();
             if (!lines.length) {
-                $linesBody.append('<div class="vas-obl-emptyrow">' + esc(lbl("VAS_107_NoLines", "No lines yet - use Add line or Scan")) + "</div>");
+                $linesBody.append('<div class="vas-obl-emptyrow">' + esc(lbl("VAS_107_NoLines", "No lines yet - use Add line")) + "</div>");
             } else {
                 for (var i = 0; i < lines.length; i++) $linesBody.append(renderRow(lines[i]));
             }
@@ -563,28 +589,46 @@
         }
 
         function renderTotals() {
-            // Base = saved totals of every OTHER page (server), plus the live sum of the
-            // current page below, so the row shows the WHOLE order's grand total.
+            $totalsRow.empty();
+            // Primary path: server-computed breakdown from C_OrderTax covers ALL saved lines
+            // across all pages. refreshSummary() populates taxSummary after each load/save/delete.
+            if (taxSummary && taxSummary.length) {
+                var h = taxSummary[0];
+                var sym = h.CurSymbol ? h.CurSymbol + " " : "";
+                var prec = (h.StdPrecision != null && h.StdPrecision >= 0) ? h.StdPrecision : precision();
+                function fmtP(n) { return sym + (+n || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec }); }
+                $totalsRow.append(totalsRow(lbl("VAS_107_Subtotal", "Sub Total") + ":", fmtP(h.TotalLines), false));
+                for (var i = 0; i < taxSummary.length; i++) {
+                    if (!taxSummary[i].TaxName) continue;
+                    // TaxAmt from C_OrderTax is the base tax only (surcharge is separate).
+                    $totalsRow.append(totalsRow(esc(taxSummary[i].TaxName) + ":", fmtP(taxSummary[i].TaxAmt), false));
+                }
+                // Surcharge stored on index-0 (total across all lines; separate from base tax).
+                if (+h.TotalSurcharge) $totalsRow.append(totalsRow(lbl("VAS_107_Surcharge", "Surcharge") + ":", fmtP(h.TotalSurcharge), false));
+                if (+h.TCSAmount) $totalsRow.append(totalsRow(lbl("VA106_TaxCollectedAtSource", "TCS") + ":", fmtP(h.TCSAmount), false));
+                $totalsRow.append(totalsRow(lbl("VAS_107_Total", "Grand Total") + ":", fmtP(h.GrandTotal), true));
+                return;
+            }
+            // Fallback: C_OrderTax server breakdown not yet available (new/unsaved order, or
+            // the async refreshSummary call is still in-flight). Use otherSub/otherTax (other
+            // pages from the server) + live current-page sum so the totals row is always
+            // populated during editing — matching the VAS_074 pattern.
+            //
+            // Per-name tax breakdown is intentionally NOT shown here: taxByName would only
+            // cover the current page's lines, so CGST/SGST amounts would change as the user
+            // navigates pages even though the order total is fixed. Instead, show a single
+            // combined "Tax" row (correct cross-page total) and wait for the primary path
+            // (taxSummary from C_OrderTax) which gives the correct per-name breakdown.
             var sub = otherSub, tax = otherTax, tcs = otherTcs;
-            // Per-tax breakdown keyed by tax name (current page lines only).
-            var taxByName = {}, taxNameOrder = [];
             for (var i = 0; i < lines.length; i++) {
                 sub += lineTaxBaseSaved(lines[i]);
-                var lt = lineTaxTotalSaved(lines[i]);
-                tax += lt;
+                tax += lineTaxSaved(lines[i]) + lineSurcharge(lines[i]);
                 tcs += lineTcs(lines[i]);
-                var tn = lines[i].display.taxName || lbl("Tax", "Tax");
-                if (!taxByName.hasOwnProperty(tn)) { taxByName[tn] = 0; taxNameOrder.push(tn); }
-                taxByName[tn] += lt;
             }
             var sym = (parent && parent.CurSymbol) ? parent.CurSymbol + " " : "";
             function fmt(n) { return sym + fmtMoney(n); }
-            $totalsRow.empty();
             $totalsRow.append(totalsRow(lbl("VAS_107_Subtotal", "Sub Total") + ":", fmt(sub), false));
-            for (var t = 0; t < taxNameOrder.length; t++) {
-                $totalsRow.append(totalsRow(esc(taxNameOrder[t]) + ":", fmt(taxByName[taxNameOrder[t]]), false));
-            }
-            // TCS (Tax Collected at Source, VA106) - shown only when the module is in use.
+            if (tax) $totalsRow.append(totalsRow(lbl("Tax", "Tax") + ":", fmt(tax), false));
             if (tcs) $totalsRow.append(totalsRow(lbl("VA106_TaxCollectedAtSource", "TCS") + ":", fmt(tcs), false));
             $totalsRow.append(totalsRow(lbl("VAS_107_Total", "Grand Total") + ":", fmt(sub + tax + tcs), true));
         }
@@ -596,11 +640,61 @@
                 '<span class="vas-obl-totals-row__label">' + label + '</span>' +
                 '<span class="vas-obl-totals-row__value">' + esc(value) + '</span></div>';
         }
+        /* Fetches the per-tax breakdown for the whole order from C_OrderTax (all pages,
+           all saved lines). Stores the result in taxSummary and re-renders the totals row.
+           Called on panel load, after save, and after delete — mirroring VAS_074's pattern. */
+        function refreshSummary() {
+            var id = parent && parent.C_Order_ID;
+            if (!(id > 0)) { taxSummary = null; renderTotals(); return; }
+            try {
+                // Use $.ajax (not getJSONData) to match VAS_107's established double-JSON
+                // parse pattern: the controller returns Json(JsonConvert.SerializeObject(list)),
+                // so jQuery parses the outer wrapper to a string, then JSON.parse gives the array.
+                $.ajax({
+                    url: VIS.Application.contextUrl + "VAS_107_CreateOrderBottomPanel/GetTaxBreakdown",
+                    type: "GET", dataType: "json",
+                    data: { C_Order_ID: id },
+                    success: function (raw) {
+                        var parsed = (typeof raw === "string") ? JSON.parse(raw) : raw;
+                        taxSummary = (parsed && parsed.length) ? parsed : null;
+                        renderTotals();
+                    },
+                    error: function () { taxSummary = null; renderTotals(); }
+                });
+            } catch (e) { if (window.console) console.log(e); taxSummary = null; renderTotals(); }
+        }
+
+        /* Re-reads the C_Order header record from the DB so the VIS framework status bar
+           (TotalLines / GrandTotal) reflects the amounts MOrderLine.Save() just wrote.
+           curTab.dataRefresh() is the mTab-level wrapper: it resolves currentRow, calls
+           gridTable.dataRefresh(rowIndex) to fetch the fresh row, then calls
+           setCurrentRow(n, true) which fires fireDataStatusChanged and updates the status
+           bar. Calling gridTable.dataRefresh() directly (without a row index) skips the
+           status event entirely and leaves the bar stale. */
+        function refreshHeaderRecord() {
+            if ($self.curTab && typeof $self.curTab.dataRefresh === "function") {
+                $self.curTab.dataRefresh();
+            }
+        }
 
         /* The panel is editable only while the order can still take line changes -
            server-computed IsEditable = !Processed && DocStatus NOT IN (CO, CL, VO, RE).
            When false the whole panel is read-only: no Add / Save / Delete and no cell edit. */
         function panelEditable() { return !!(parent && parent.IsEditable); }
+
+        /* Returns true when the parent header tab has unsaved changes — i.e. the user has
+           edited a header field (pricelist, BPartner, etc.) without saving yet, or the header
+           record itself is brand-new and has never been saved.
+           gridTable.rowChanged holds the ROW INDEX of the dirty row (>= 0) when a header
+           field has been modified, or -1 when there are no unsaved changes. Using >= 0 (not
+           !! or truthy) is critical: -1 is truthy in JavaScript, so the naïve !!rowChanged
+           would fire false positives on every operation even with a clean header.
+           getIsInserting() covers the new-record case where no row index is assigned yet. */
+        function isHeaderDirty() {
+            var gt = $self.curTab && $self.curTab.gridTable;
+            if (!gt) return false;
+            return (gt.rowChanged >= 0) || (typeof gt.getIsInserting === "function" && !!gt.getIsInserting());
+        }
 
         function renderHeaderButtons() {
             var n = unsavedLines().length;
@@ -910,9 +1004,17 @@
                 $undo.on("click", function (e) { if (e.detail === 0) { e.stopPropagation(); undoAct(line); } });
                 cell.append($undo);
             }
-            var $btn = $('<button type="button" class="vas-obl-more-btn" title="' + esc(lbl("VAS_107_More", "More")) + '">' + icon("more-horizontal", "⋯") + "</button>");
+            var _addlCols = additionalInfoColumns(line);
+            var _hasVisible = hasVisibleAdditionalFields(line, _addlCols);
+            var _btnTitle = _hasVisible
+                ? esc(lbl("VAS_107_More", "More"))
+                : esc(lbl("VAS_107_NoAdditionalInfo", "No additional info for this line"));
+            var $btn = $('<button type="button" class="vas-obl-more-btn" title="' + _btnTitle + '">' + icon("more-horizontal", "⋯") + "</button>");
             if (morePopoverFor === line.rowId) $btn.addClass("is-open");
-            $btn.prop("disabled", !editable);
+            if (hasAdditionalValues(line, _addlCols)) $btn.addClass("has-values");
+            // Disable when read-only OR when no additional-info field is visible for this line
+            // (same DisplayLogic check the modal runs — would show "No additional info").
+            $btn.prop("disabled", !editable || !_hasVisible);
             // Open the additional-fields MODAL.
             $btn.on("click", function (e) { e.stopPropagation(); openMoreDialog(line); });
             // Keyboard: Tab continues the row's tab chain (forward -> save,
@@ -932,39 +1034,93 @@
         function openMoreDialog(line) {
             closeDialogs();
             morePopoverFor = line.rowId;
+            // Snapshot the line's editable state BEFORE any field is touched. Dynamic
+            // fields commit live to line.values/display on change, so closing via the
+            // cross (Cancel) must restore this snapshot to leave the record unchanged.
+            // Done keeps the edits. Deep-copy so in-dialog edits can't mutate the snapshot.
+            var moreSnapshot = {
+                values:        $.extend(true, {}, line.values),
+                display:       $.extend(true, {}, line.display),
+                dirty:         line.dirty,
+                _priceOverride: line._priceOverride,
+                _error:        line._error
+            };
             var primaryName = line.display.productName || line.display.chargeName ||
                 (lbl("VAS_107_Line", "Line") + " " + line.values.Line);
 
-            VAS.PanelUtil.openModal({
-                id:        "vasOblMore",
-                cssPrefix: "vas-obl",
-                title:     esc(primaryName) + " - " + esc(lbl("VAS_107_AdditionalInfo", "Additional Info")),
-                doneLabel: lbl("VAS_107_Done", "Done"),
-                buildBody: function ($body) {
-                    // Delegate field-group Show More/Less toggle to the grid body element.
-                    // Attached before the .empty() + field-build cycle so it persists across
-                    // the body reset (jQuery .empty() removes child handlers, not this one).
-                    $body.on("click.fldgrp", "[data-act=fldgrp-toggle]", function (e) {
-                        e.preventDefault();
-                        toggleFieldGroup($(this).closest(".vas-obl-fldgrp"));
-                    });
-                    $body.removeClass("vas-obl-more-grid").addClass("vas-obl-dialog__body--loading")
-                        .html('<div class="vas-obl-dialog-loading"><span class="vas-obl-dialog-spin" aria-label="' +
-                              esc(lbl("VAS_107_Loading", "Loading…")) + '"></span></div>');
-                    setTimeout(function () {
-                        if (morePopoverFor !== line.rowId || !$body.parent().length) return;
-                        $body.removeClass("vas-obl-dialog__body--loading").addClass("vas-obl-more-grid").empty();
-                        primeLineContext(line);
-                        appendDynFields(line, $body);
-                        if (!$body.children("[data-col]:not(.vas-obl-dyn-hidden)").length)
-                            $body.append('<p class="vas-obl-empty-message">' +
-                                         esc(lbl("VAS_107_NoAdditionalInfo", "No additional info for this line")) + "</p>");
-                        $body.find("[data-col]:not(.vas-obl-dyn-hidden)").find("input,select,textarea").first().focus();
-                    }, 0);
-                },
-                onDone: function () { commitMorePopover(); },
-                onClose: function () { morePopoverFor = null; render(); focusMoreBtn(line); }
+            var $backdrop = $('<div class="vas-obl-dialog-backdrop" id="vasOblMore"></div>');
+            var $dialog   = $('<div class="vas-obl-dialog"></div>');
+            $dialog.html(
+                '<header class="vas-obl-dialog__header"><div class="vas-obl-dialog__header-row">' +
+                '<h3 class="vas-obl-dialog__title">' + esc(primaryName) + " - " + esc(lbl("VAS_107_AdditionalInfo", "Additional Info")) + "</h3>" +
+                '<button type="button" class="vas-obl-dialog__close" data-act="cancel-more" aria-label="' + esc(lbl("VAS_107_Close", "Close")) + '" title="' + esc(lbl("VAS_107_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
+                "</div></header>" +
+                '<div class="vas-obl-dialog__body vas-obl-more-body vas-obl-more-grid" id="vasOblMoreBody"></div>' +
+                '<footer class="vas-obl-dialog__footer vas-obl-dialog__footer--end">' +
+                '<button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="close-more">' + esc(lbl("VAS_107_Done", "Done")) + "</button></footer>"
+            );
+            $backdrop.append($dialog);
+            $("body").append($backdrop);
+
+            var $body = $dialog.find("#vasOblMoreBody");
+
+            // Close only via Done (commit) or the X cross (cancel/discard).
+            // Never dismiss on backdrop click — an outside click (e.g. on a framework
+            // lookup popup) must not close the modal and lose in-flight edits.
+            // Both paths return focus to the row's "..." button so Tab continues.
+            function done() {
+                commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line);
+            }
+            // X = Cancel: discard everything changed in the modal and restore the line
+            // to its pre-open snapshot. No mandatory validation — edits are thrown away.
+            function cancel() {
+                var l = lineById(line.rowId);
+                if (l) {
+                    l.values        = moreSnapshot.values;
+                    l.display       = moreSnapshot.display;
+                    l.dirty         = moreSnapshot.dirty;
+                    l._priceOverride = moreSnapshot._priceOverride;
+                    l._error        = moreSnapshot._error;
+                }
+                closeDialogs(); render(); focusMoreBtn(line);
+            }
+            $dialog.on("click", "[data-act=close-more]",  done);
+            $dialog.on("click", "[data-act=cancel-more]", cancel);
+            // Enter / Space on Done must close even though the framework shell swallows
+            // the native Enter event — wire it explicitly (mirrors VAS_074).
+            $dialog.on("keydown", "[data-act=close-more]", function (e) {
+                if (e.key === "Enter" || e.key === " " || e.key === "Spacebar" || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault(); e.stopPropagation(); done();
+                }
             });
+            $dialog.on("keydown", "[data-act=cancel-more]", function (e) {
+                if (e.key === "Enter" || e.key === " " || e.key === "Spacebar" || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault(); e.stopPropagation(); cancel();
+                }
+            });
+            // Field-group Show More/Less toggle (delegated so it survives body rebuild).
+            $dialog.on("click", "[data-act=fldgrp-toggle]", function (e) {
+                e.preventDefault(); e.stopPropagation();
+                toggleFieldGroup($(this).closest(".vas-obl-fldgrp"));
+            });
+
+            // Building the curated fields is heavy (each FK builds a native VIS control
+            // + lookup synchronously). Paint a spinner first, then build on the next
+            // tick so the user sees a busy indicator rather than a frozen panel.
+            $body.removeClass("vas-obl-more-grid").addClass("vas-obl-dialog__body--loading")
+                .html('<div class="vas-obl-dialog-loading"><span class="vas-obl-dialog-spin" aria-label="' +
+                      esc(lbl("VAS_107_Loading", "Loading…")) + '"></span></div>');
+            setTimeout(function () {
+                if (morePopoverFor !== line.rowId || !$body.parent().length) return;
+                $body.removeClass("vas-obl-dialog__body--loading").addClass("vas-obl-more-grid").empty();
+                primeLineContext(line);
+                appendDynFields(line, $body);
+                applyFieldGroups($body);
+                if (!$body.children("[data-col]:not(.vas-obl-dyn-hidden)").length)
+                    $body.append('<p class="vas-obl-empty-message">' +
+                                 esc(lbl("VAS_107_NoAdditionalInfo", "No additional info for this line")) + "</p>");
+                $body.find("[data-col]:not(.vas-obl-dyn-hidden)").find("input,select,textarea").first().focus();
+            }, 0);
         }
 
         /* ---------- edit / commit ---------- */
@@ -1165,6 +1321,7 @@
         /* ---------- line operations ---------- */
         function addLine() {
             if (!parent || !parent.IsEditable) { showToast(lbl("VAS_107_OrderNotEditable", "This order cannot take new lines")); return; }
+            if (isHeaderDirty()) { showToast(lbl("VAS_107_SaveHeaderFirst", "Please save the header record before adding lines.")); return; }
             var maxLine = 0;
             for (var i = 0; i < lines.length; i++) maxLine = Math.max(maxLine, lines[i].values.Line || 0);
             var line = {
@@ -1212,12 +1369,9 @@
             catalog.$pop.on("mouseenter", ".vas-obl-catalog-popover__item", function () { setHighlight(+$(this).attr("data-idx")); });
             inner.append(catalog.$pop);
             positionCatalog();
-            // Do not fire the server search for an empty term — show a prompt instead.
-            // The field click sets an empty value; only type-ahead input should trigger the AJAX call.
-            if (!catalog.term) {
-                catalog.$pop.html('<div class="vas-obl-catalog__hint">' + esc(lbl("VAS_107_TypeToSearch", "Type to search…")) + "</div>");
-                return;
-            }
+            // Fire the server search immediately, even for an empty term: the server uses
+            // LIKE '%' which returns all products and charges so the user sees the full list
+            // on first click without having to type anything.
             catalog.$pop.html('<div class="vas-obl-catalog__hint">' + esc(lbl("VAS_107_Loading", "Loading…")) + "</div>");
             loadCatalogPage(inner, line, $inp, true);
         }
@@ -1709,10 +1863,12 @@
          * (op = =, !, ^, <, >) joined by & (AND) / | (OR); @tokens@ resolve from the
          * line values first, then the order header / document context. */
         function isColumnReadOnly(line, col) {
-            // C_UOM_ID is locked once the line is saved (C_OrderLine_ID > 0): the unit of
-            // measure must not change on an existing order line. Checked before the meta
-            // lookup so it holds even when column meta is absent.
-            if (col === "C_UOM_ID" && line && line.values && (line.values.C_OrderLine_ID || 0) > 0) return true;
+            // C_UOM_ID: always read-only for charge lines (default UOM is auto-assigned).
+            // For product lines: editable until saved, then locked.
+            if (col === "C_UOM_ID" && line && line.values) {
+                if ((line.values.C_Charge_ID || 0) > 0) return true;
+                return (line.values.C_OrderLine_ID || 0) > 0;
+            }
             // QtyOrdered must remain editable whenever the panel is editable; the
             // DB ReadOnlyLogic (e.g. @Processed@=Y) is guarded at the header level
             // by panelEditable() in startEdit, so we skip column-level locking here.
@@ -1941,6 +2097,35 @@
            decided AFTER buildDynField by applyDynDisplay (per the design - build the control
            first, then apply display logic), so a control keeps its state and just toggles
            visibility instead of being dropped/rebuilt. */
+        /* Returns true when at least one additional-info column would be VISIBLE in the
+           modal for this line after DisplayLogic is applied. Mirrors the exact check the
+           modal does after building its fields. Used to decide whether the "..." button
+           should be enabled — if no column is visible the modal would show "No additional
+           info for this line", so the button is disabled.
+           Pass a pre-computed cols array to avoid calling additionalInfoColumns twice. */
+        function hasVisibleAdditionalFields(line, cols) {
+            if (!cols) cols = additionalInfoColumns(line);
+            for (var i = 0; i < cols.length; i++) {
+                if (dynFieldVisible(line, cols[i])) return true;
+            }
+            return false;
+        }
+
+        /* Returns true when the line has at least one non-zero / non-empty value in any
+           column that appears in the Additional Info modal (module-guarded + applicable).
+           Used to visually highlight the "..." button so the user can see at a glance
+           that the modal contains data without opening it.
+           Pass a pre-computed cols array to avoid calling additionalInfoColumns twice. */
+        function hasAdditionalValues(line, cols) {
+            if (!cols) cols = additionalInfoColumns(line);
+            for (var i = 0; i < cols.length; i++) {
+                var val = line.values[cols[i].ColumnName];
+                // FK IDs are 0 when unset; amounts are 0 when unset; treat null/""/"0"/0 as empty.
+                if (val !== null && val !== undefined && val !== "" && +val !== 0) return true;
+            }
+            return false;
+        }
+
         function additionalInfoColumns(line) {
             var out = [];
             for (var i = 0; i < ADDITIONAL_INFO_FIELDS.length; i++) {
@@ -2665,8 +2850,8 @@
                 // attribute form directly (the instance is usually being created).
                 IsSOTrx: !!(parent && parent.IsSOTrx),
                 newAttribute: !(parent && parent.IsSOTrx),
-                // Show all instances regardless of on-hand qty (same as VAS_074).
-                showAll: true,
+                // Default to hiding zero / negative qty instances; user can toggle via checkbox.
+                showAll: false,
                 lbl: lbl, esc: esc, icon: icon,
                 showBusy: showBusy, showToast: showToast,
                 dateStr: dateStr, fmtMoney: fmtMoney, parseNum: parseNum,
@@ -3311,6 +3496,7 @@
         function saveRows(done, restrictIds) {
             commitMorePopover();
             if (!panelEditable()) { if (done) done(false); return; }   // read-only when doc completed/void/reversed/closed
+            if (isHeaderDirty()) { showToast(lbl("VAS_107_SaveHeaderFirst", "Please save the header record before adding lines.")); if (done) done(false); return; }
             var batch = unsavedLines();
             if (restrictIds) batch = batch.filter(function (l) { return restrictIds[l.rowId]; });
             if (!batch.length || !parent) { if (done) done(false); return; }
@@ -3334,7 +3520,7 @@
                     batch.forEach(function (l) { l._saving = false; });
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     saveInFlight = false;
-                    if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_107_LinesSaved", "Lines saved")); if (done) done(true); }
+                    if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_107_LinesSaved", "Lines saved")); refreshSummary(); refreshHeaderRecord(); if (done) done(true); }
                     else { batch.forEach(function (l) { setRowBusy(l, false); }); showServerSaveErrors(batch, res); if (done) done(false); }
                     flushPendingSave();
                 },
@@ -3450,7 +3636,7 @@
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { applyLinePaging(res); reloadLinesKeepingUnsaved(res.Lines); showToast(lbl("VAS_107_LinesDeleted", "Lines deleted")); }
+                    if (res && res.Success) { applyLinePaging(res); reloadLinesKeepingUnsaved(res.Lines); showToast(lbl("VAS_107_LinesDeleted", "Lines deleted")); refreshSummary(); refreshHeaderRecord(); }
                     else showToast(lbl((res && res.ErrorKey) || "VAS_107_DeleteFailed", "Delete failed"));
                 },
                 error: function (err) { console.log(err); showBusy(false); showToast(lbl("VAS_107_DeleteFailed", "Delete failed")); }
@@ -3477,6 +3663,64 @@
             // The Additional-Info modal closes ONLY via its Done button (Escape ignored).
         });
 
+        // Alt+Ctrl+N/S/D/Z/Q keyboard shortcuts via the shared utility (VAI154 12-Aug-2026).
+        $self._shortcuts = VAS.PanelShortcuts.register({
+            /**
+             * Panel is active when it is visible in the DOM and an order is loaded.
+             * Both conditions must hold; the shortcut is silently ignored otherwise.
+             */
+            isActive: function () {
+                return !!(parent && $root && $root.is(":visible"));
+            },
+            /**
+             * Suppress shortcuts while any attribute/scan dialog or the more-popover
+             * is open — the user must finish or dismiss it before acting via keyboard.
+             */
+            hasBlockingDialog: function () {
+                return !!(attrState || scanState || morePopoverFor ||
+                          document.getElementById("vasOblAttr") ||
+                          document.getElementById("vasOblScan"));
+            },
+            /** Alt+Ctrl+N — add a new line, same as the Add button. */
+            onNew: function () { addLine(); },
+            /** Alt+Ctrl+S — save all unsaved lines, same as the Save button. */
+            onSave: function () { saveRows(); },
+            /**
+             * Alt+Ctrl+D — delete the selected line(s).
+             * Shows a toast when nothing is selected; read-only guard is
+             * handled inside deleteSelected (panelEditable check).
+             */
+            onDelete: function () {
+                if (!selectedCount()) {
+                    showToast(lbl("VAS_107_SelectRowToDelete", "Select a row to delete"));
+                    return;
+                }
+                deleteSelected();
+            },
+            /**
+             * Alt+Ctrl+Z — undo changes on the first selected dirty/new line.
+             * A saved+dirty line reverts to its pristine snapshot (undoLine).
+             * A never-saved line is discarded entirely (discardNewLine), matching
+             * the behaviour of the per-row Undo (↺) button.
+             */
+            onUndo: function () {
+                var sel = lines.filter(function (l) {
+                    return l._sel && !l._saving && (l.dirty || l.status === "new");
+                });
+                if (!sel.length) return;
+                var target = sel[0];
+                if (target.status === "new") { discardNewLine(target); } else { undoLine(target); }
+            },
+            /**
+             * Alt+Ctrl+Q — refresh the current page for the loaded order, same
+             * as the Refresh button (re-fetches from the server, discards any
+             * unsaved client-side edits on this page).
+             */
+            onRefresh: function () {
+                if (parent && parent.C_Order_ID) $self.fetchData(parent.C_Order_ID, linePage);
+            }
+        });
+
         this.getRoot = function () { return $root; };
     };
 
@@ -3498,6 +3742,8 @@
     VAS.VAS_107_CreateOrderBottomPanel.prototype.sizeChanged = function (width) { this.panelWidth = width; };
 
     VAS.VAS_107_CreateOrderBottomPanel.prototype.dispose = function () {
+        // Remove the capture-phase shortcut listener registered during init (VAI154 12-Aug-2026).
+        if (this._shortcuts) { this._shortcuts.dispose(); this._shortcuts = null; }
         $(document).off("mousedown.vascil").off("keydown.vascil");
         $("#vasOblAttr, #vasOblScan, .vas-obl-toast").remove();
         this.record_ID = 0; this.table_ID = 0; this.windowNo = 0;

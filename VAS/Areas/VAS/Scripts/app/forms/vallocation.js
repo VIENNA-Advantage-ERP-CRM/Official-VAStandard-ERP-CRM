@@ -362,6 +362,101 @@
 
             $root.find(".vis-allocation-resultdiv").css({ "width": "100%", "margin": "0", "bottom": "0", "position": "inherit" });
             $bsyDiv[0].style.visibility = "hidden";
+
+            /* Last, once every control exists AND eventHandling() has wired the
+               change handlers - the preselection is applied THROUGH those
+               handlers, so it must not run before they are in place. */
+            applyFormInfo($self.FormInfo);
+        };
+
+        /* ---------------------------------------------------------------- */
+        /*  Caller-supplied preselection                                    */
+        /* ---------------------------------------------------------------- */
+
+        /* VIS.viewManager.startForm(AD_Form_ID, params) hands `params` to
+           init(windowNo, frame, additionalInfo), which parks it on FormInfo (see
+           the prototype at the bottom of this file). A caller that already knows
+           what is being allocated - the payment overview panel's "Apply advance",
+           for instance - can therefore give the form its starting filters instead
+           of making the user pick them again.
+
+           Recognised keys, all optional:
+             C_BPartner_ID   the partner to allocate for
+             AllocationFrom  "P" payment | "C" cash | "I" invoice | "G" GL journal
+             AllocationTo    same codes as AllocationFrom
+
+           Only keys the caller actually supplied are applied: started from the
+           menu with no parameters, the form opens exactly as it always did.
+
+           Guarded as a whole. Initialize() returns before init() appends the
+           form's root, so anything thrown in here would leave the user staring at
+           an empty frame - a bad parameter object must never cost more than its
+           own preselection. */
+        function applyFormInfo(formInfo) {
+            if (formInfo === null || formInfo === undefined) return;
+
+            try {
+                if (selectFormValue($OrgFilter, formInfo.AD_Org_ID)) {
+                    $OrgFilter.trigger("change");
+                }
+                /* Business partner. setValue's own signature carries the whole
+                   job: (value, forceSet, fireEvent). forceSet makes it set even
+                   when oldValue already equals the id, and fireEvent is what
+                   raises fireValueChanged - which this form maps to
+                   bpValueChanged, the handler that stores _C_BPartner_ID and
+                   clears the mandatory highlight. Without that third argument
+                   the control would LOOK filled while every grid still believed
+                   no partner had been chosen. The display text needs no help:
+                   setValue resolves it through the control's own lookup. */
+                if (hasFormValue(formInfo, "C_BPartner_ID")) {
+                    var bpID = VIS.Utility.Util.getValueOfInt(formInfo.C_BPartner_ID);
+                    if (bpID > 0) {
+                        $vSearchBPartner.setValue(bpID, true, true);
+                    }
+                }
+
+                /* Allocation From, then Allocation To - in that order, never the
+                   reverse: the From change handler resets To to the blank option,
+                   so a To applied first would be silently thrown away. Each one
+                   fires "change" so the form's own handler decides which grids
+                   show, which options stay reachable and what gets loaded. */
+                if (selectFormValue($allocationFrom, formInfo.AllocationFrom)) {
+                    $allocationFrom.trigger("change");
+                }
+                if (selectFormValue($allocationTo, formInfo.AllocationTo)) {
+                    $allocationTo.trigger("change");
+                }
+                if (selectFormValue($cmbCurrency, formInfo.C_Currency_ID)) {
+                    $cmbCurrency.trigger("change");
+                }
+            } catch (e) {
+                if (window.console) console.log("VAllocation: preselection ignored", e);
+            }
+        };
+
+        /* "The caller supplied this key at all". A key carrying null or an empty
+           string counts as NOT supplied, so a half-filled parameter object can
+           never blank a control the form defaulted for itself. */
+        function hasFormValue(formInfo, key) {
+            return formInfo[key] !== null && formInfo[key] !== undefined
+                && String(formInfo[key]).length > 0;
+        };
+
+        /* Selects the option carrying `value` on one of the allocation combos,
+           but ONLY when that option really exists - forcing an unknown value onto
+           a select leaves it blank while the change handler goes looking for a
+           grid that was never built. "0" is the combo's own blank option, so it
+           counts as "nothing preselected" rather than as a value.
+
+           Returns whether anything was applied, which is what tells the caller
+           there is a change event worth raising. */
+        function selectFormValue($sel, value) {
+            if (value === null || value === undefined) return false;
+            var v = String(value);
+            if (v.length === 0 || v === "0") return false;
+            if ($sel.find('option[value="' + v + '"]').length === 0) return false;
+            $sel.val(v);
+            return true;
         };
 
 
@@ -2734,7 +2829,13 @@
                     else {
                         $OrgFilter.append("<option value=0></option>");
                     }
-                    if (VIS.context.getContextAsInt("#AD_Org_ID") > 0) {
+
+                    if ($self.FormInfo && $self.FormInfo.AD_Org_ID > 0) {
+                        $OrgFilter.val($self.FormInfo.AD_Org_ID);
+                        ctx.setContext($self.windowNo, "OrgID", $self.FormInfo.AD_Org_ID);
+                        $OrgFilter.removeClass('vis-ev-col-mandatory');
+                    }
+                    else if (VIS.context.getContextAsInt("#AD_Org_ID") > 0) {
                         $OrgFilter.val(VIS.context.getContextAsInt("#AD_Org_ID"));
                         //Task_1455
                         //VIS_317 Set the value of Organization in Context.
@@ -7675,9 +7776,10 @@
         }
     };
 
-    VAllocation.prototype.init = function (windowNo, frame) {
+    VAllocation.prototype.init = function (windowNo, frame, additionalInfo) {
         this.frame = frame;
         this.windowNo = windowNo;
+        this.FormInfo = additionalInfo;
         this.Initialize();
         this.frame.getContentGrid().append(this.getRoot());
     };

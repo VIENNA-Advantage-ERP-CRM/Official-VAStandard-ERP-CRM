@@ -6,10 +6,10 @@
  * Summary Message Table
  *  # | Current Text                    | Message Key
  * ---+---------------------------------+-----------------------------------
- *  1 | Open Issues                     | VAS_OpenMaterialIssues
- *  2 | Awaiting fulfillment            | VAS_AwaitingFulfillment
- *  3 | No open issues                  | VAS_NoOpenMaterialIssues
- *  4 | Couldn't load                   | VAS_CouldntLoad
+ *  1 | Open Issues                     | VAS_179_OpenMaterialIssues
+ *  2 | Awaiting fulfillment            | VAS_179_AwaitingFulfillment
+ *  3 | No open issues                  | VAS_179_NoOpenMaterialIssues
+ *  4 | Couldn't load                   | VAS_179_CouldntLoad
  */
 ; VAS = window.VAS || {};
 
@@ -113,20 +113,101 @@
             });
         }
 
+        // ===== NEW CODE START — currency format (agent A01, 2026-08-19) =====
+        var currencyInfo = { iso: "", symbol: "" };
+
+        function formatCurrency(val, currencyObj) {
+            var amount = Number(val || 0);
+            if (isNaN(amount)) { amount = 0; }
+            var cur = currencyObj || currencyInfo || {};
+            var symbol = cur.symbol || "";
+            var iso = (cur.iso || "").toUpperCase();
+
+            var indianISOs = ["INR", "PKR", "BDT", "NPR", "BTN", "LKR"];
+            var formattedNum = "";
+
+            if (indianISOs.indexOf(iso) !== -1) {
+                var absAmt = Math.abs(amount);
+                var sign = amount < 0 ? "-" : "";
+                if (absAmt >= 10000000) {
+                    formattedNum = sign + (absAmt / 10000000).toFixed(2).replace(/\.00$/, '') + ' Cr';
+                } else if (absAmt >= 100000) {
+                    formattedNum = sign + (absAmt / 100000).toFixed(2).replace(/\.00$/, '') + ' L';
+                } else {
+                    var parts = absAmt.toFixed(2).split('.');
+                    var numStr = parts[0];
+                    var decStr = parts[1];
+                    if (numStr.length > 3) {
+                        var last3 = numStr.substring(numStr.length - 3);
+                        var otherDigits = numStr.substring(0, numStr.length - 3);
+                        formattedNum = otherDigits.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + last3;
+                    } else {
+                        formattedNum = numStr;
+                    }
+                    if (decStr && decStr !== "00") {
+                        formattedNum += "." + decStr;
+                    }
+                    formattedNum = sign + formattedNum;
+                }
+            } else {
+                var absAmt = Math.abs(amount);
+                var sign = amount < 0 ? "-" : "";
+                if (absAmt >= 1000000000) {
+                    formattedNum = sign + (absAmt / 1000000000).toFixed(2).replace(/\.00$/, '') + 'B';
+                } else if (absAmt >= 1000000) {
+                    formattedNum = sign + (absAmt / 1000000).toFixed(2).replace(/\.00$/, '') + 'M';
+                } else {
+                    formattedNum = amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                }
+            }
+
+            return symbol ? (symbol + " " + formattedNum).trim() : formattedNum;
+        }
+
+        function formatCount(value) {
+            var n = Number(value || 0);
+            return n.toLocaleString(window.navigator.language);
+        }
+
         function renderMetric(data) {
             lastCount = Number(data.count || 0);
+            if (data.currency) {
+                currencyInfo = data.currency;
+            }
 
             if ($valueEl) {
                 $valueEl.text(formatCount(lastCount));
-                $valueEl.attr('title', formatCount(lastCount));
+                $valueEl.attr('title', lastCount.toLocaleString(window.navigator.language));
             }
             if ($metaEl) {
                 $metaEl.text(lastCount === 0
-                    ? label("VAS_NoOpenMaterialIssues", "No open issues")
-                    : label("VAS_AwaitingFulfillment", "Awaiting fulfillment"));
+                    ? label("VAS_179_NoOpenMaterialIssues", "No open issues")
+                    : label("VAS_179_AwaitingFulfillment", "Awaiting fulfillment"));
             }
             if ($card) { $card.prop('disabled', false); }
         }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//        function formatCount(value) {
+//            var n = Number(value || 0);
+//            return n.toLocaleString(window.navigator.language);
+//        }
+//
+//        function renderMetric(data) {
+//            lastCount = Number(data.count || 0);
+//
+//            if ($valueEl) {
+//                $valueEl.text(formatCount(lastCount));
+//                $valueEl.attr('title', formatCount(lastCount));
+//            }
+//            if ($metaEl) {
+//                $metaEl.text(lastCount === 0
+//                    ? label("VAS_NoOpenMaterialIssues", "No open issues")
+//                    : label("VAS_AwaitingFulfillment", "Awaiting fulfillment"));
+//            }
+//            if ($card) { $card.prop('disabled', false); }
+//        }
+// ----- END OLD CODE -----
 
         function setError() {
             lastCount = 0;
@@ -134,12 +215,15 @@
                 $valueEl.text('—');
                 $valueEl.removeAttr('title');
             }
-            if ($metaEl) { $metaEl.text(label("VAS_CouldntLoad", "Couldn't load")); }
+            if ($metaEl) { $metaEl.text(label("VAS_179_CouldntLoad", "Couldn't load")); }
             if ($card) { $card.prop('disabled', true); }
         }
 
         function openMaterialIssuesList() {
-            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('DR', 'IP', 'WC', 'IN')";
+            // Must stay in lock-step with GetOpenMaterialIssuesCountData in the controller -
+            // including IsInternalUse, or the drilled-through list shows physical inventory
+            // documents the KPI never counted.
+            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.IsInternalUse = 'Y' AND M_Inventory.DocStatus IN ('DR', 'IP', 'WC', 'IN')";
             var windowParam = {
                 "TabWhereClause": where,
                 "TabLayout": "N",
@@ -149,7 +233,7 @@
         }
 
         function createWidget() {
-            var title = label("VAS_OpenMaterialIssues", "Open Issues");
+            var title = label("VAS_179_OpenMaterialIssues", "Open Issues");
             $card = $(
                 '<button type="button" class="vas-omi-card vas-widget-bg" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-omi-label">' + escapeHtml(title) + '</div>' +

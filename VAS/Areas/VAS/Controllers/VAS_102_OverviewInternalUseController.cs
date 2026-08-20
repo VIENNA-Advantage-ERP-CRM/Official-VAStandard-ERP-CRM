@@ -60,5 +60,26 @@ namespace VAS.Controllers
             }
             return Json(JsonConvert.SerializeObject(windowId), JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// Resolves the window a table's records open in, for chips whose screen
+        /// cannot be named in the panel's map — a module outside this solution
+        /// (VA075) ships its own window, and the browser-side zoom lookup only
+        /// knows tables the client has cached.
+        /// </summary>
+        /// <param name="fields">Physical table name, as sent by
+        /// VIS.dataContext.getJSONRecord.</param>
+        /// <returns>The window id, or 0 when the table has no window.</returns>
+        public JsonResult GetWindowIdByTable(string fields)
+        {
+            int windowId = 0;
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_102_OverviewInternalUseModel model = new VAS_102_OverviewInternalUseModel();
+                windowId = model.GetWindowIdByTable(ctx, fields);
+            }
+            return Json(JsonConvert.SerializeObject(windowId), JsonRequestBehavior.AllowGet);
+        }
     }
 }

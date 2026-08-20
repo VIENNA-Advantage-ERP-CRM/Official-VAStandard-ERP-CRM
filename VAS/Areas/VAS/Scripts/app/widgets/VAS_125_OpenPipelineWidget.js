@@ -13,6 +13,17 @@
  *
  * Backend - VAS_125_OpenPipelineWidget/GetOpenPipeline
  *
+ * Routing - 2026-08-17: a drill-through row opens the customer. Hosted on a window the
+ *           host grid is navigated in place (widgetFirevalueChanged); on the Home /
+ *           landing dashboard (windowNo < 0) there is no host grid, so the record is
+ *           opened in the standard Customer window via VAS.ZoomUtil.
+ *           2026-08-17 - the drill-through did not open anything: its endpoint
+ *           (VAS_139/GetRows) raised ORA-01008 on Oracle, so no rows loaded at all, and
+ *           the lead-backed rows it returns carry customerId 0, which the shared drill
+ *           swallowed silently. The endpoint is fixed in
+ *           VAS_139_HighValuePipelineWidgetController; a lead row is now tagged and opens
+ *           its Lead record instead of doing nothing (see mapRow / zoomToLead below).
+ *
  * ── Labels / Message Keys ─────────────────────────────────────────────────
  *  # | Current Text                | Message Key
  * ---+-----------------------------+--------------------------------
@@ -22,6 +33,10 @@
  *  4 | No open opportunities       | VAS_125_NoOpenOpportunities
  *  5 | Pipeline unavailable        | VAS_125_PipelineUnavailable
  *  6 | Currency rate unavailable   | VAS_125_RateUnavailable
+ *  7 | Open pipeline (drill title) | VAS_125_DrillTitle
+ *  8 | opp                         | VAS_125_Opp
+ *  9 | opps                        | VAS_125_Opps
+ * 10 | Lead                        | VAS_125_Lead
  * ──────────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -48,6 +63,22 @@
 
     var CUSTOMER_WINDOW_NAME = 'Business Partner';
 
+    /* 2026-08-17: zoom target when the widget is NOT hosted inside a window
+       (windowNo < 0 - the Home / landing dashboard). There is no host grid to navigate
+       there, so the record is opened in the standard Customer window; VAS.ZoomUtil
+       resolves the AD_Window_ID from the new name, then the old name, then
+       VAS_ZoomScreenConfig. */
+    var ZOOM_WINDOW_NAME_NEW = 'VAS_CustomerMaster';
+    var ZOOM_WINDOW_NAME_OLD = CUSTOMER_WINDOW_NAME;
+
+    /* 2026-08-17: a pipeline row may be backed by a C_Lead instead of a C_BPartner (see
+       mapRow). A lead lives in its own window and on a different table, so it can never be
+       reached by navigating the host Customer grid in place - it is always opened through
+       VAS.ZoomUtil, which resolves the id from the new name, then the old name, then
+       VAS_ZoomScreenConfig, and simply does not navigate when neither resolves. */
+    var LEAD_WINDOW_NAME_NEW = 'VAS_Lead';
+    var LEAD_WINDOW_NAME_OLD = 'Lead';
+
     VAS.VAS_125_OpenPipelineWidget = function () {
 
         this.frame;
@@ -59,6 +90,11 @@
         var $value;
         var $meta;
         var drill;
+        /* AD_Window_ID of the Customer window, resolved once on the first Home-page
+           zoom and reused afterwards (0 = not resolved yet). */
+        var zoomWindowId = 0;
+        /* Same, for the Lead window a lead-backed pipeline row opens. */
+        var leadWindowId = 0;
 
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
@@ -210,8 +246,37 @@
             if (!bpId) { return; }
             if (drill) { drill.close(); }
             try {
-                $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+                }
+                else {
+                    /* Home / landing page: no host grid, so open the standard Customer window. */
+                    VAS.ZoomUtil.zoomToRecord("C_BPartner_ID", Number(bpId), zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (id) {
+                            if (id > 0) { zoomWindowId = id; }
+                        });
+                }
             } catch (e) { /* best-effort */ }
+        }
+
+        /* A lead-backed row opens the Lead record. There is no in-place option here: the
+           host Customer grid is a C_BPartner tab, so a C_Lead can only be shown by opening
+           its own window - the same on a window host and on the Home page. */
+        function zoomToLead(leadId) {
+            if (!leadId) { return; }
+            if (drill) { drill.close(); }
+            try {
+                VAS.ZoomUtil.zoomToRecord("C_Lead_ID", Number(leadId), leadWindowId, LEAD_WINDOW_NAME_NEW, LEAD_WINDOW_NAME_OLD)
+                    .done(function (id) {
+                        if (id > 0) { leadWindowId = id; }
+                    });
+            } catch (e) { /* best-effort */ }
+        }
+
+        /* The drill hands back the id it rendered plus the kind of record it belongs to. */
+        function openDrillRow(recordId, kind) {
+            if (kind === 'LEAD') { zoomToLead(recordId); }
+            else { zoomToCustomer(recordId); }
         }
 
         function createDrill() {
@@ -226,12 +291,31 @@
                         currency: { symbol: data.currency_symbol || '', iso: data.currency_iso || '', precision: data.std_precision }
                     };
                 },
+                /* The endpoint ranks ACCOUNTS, and an account is either a business partner
+                   or - while the opportunity still hangs off an unconverted lead - a
+                   C_Lead, which arrives with customerId 0 and a leadId instead (VAS_139
+                   documents the same rule). Both belong in this list because the KPI counts
+                   both. A lead row used to carry bpId 0 and was silently unclickable; it now
+                   opens the Lead record through navId/navKind, and is tagged so the row says
+                   which kind of record it leads to. */
                 mapRow: function (item, cur, h) {
                     var opps = Number(item.openOpps || 0);
                     var oppWord = opps === 1 ? label('VAS_125_Opp', 'opp') : label('VAS_125_Opps', 'opps');
-                    return { bpId: item.customerId, title: item.customerName, meta: h.formatCount(opps) + ' ' + oppWord, valueText: h.formatMoney(item.pipeline, cur) };
+                    var bpId = Number(item.customerId || 0);
+                    var leadId = Number(item.leadId || 0);
+                    var isLead = bpId <= 0;
+                    var meta = h.formatCount(opps) + ' ' + oppWord;
+                    if (isLead) { meta += ' · ' + label('VAS_125_Lead', 'Lead'); }
+                    return {
+                        bpId: bpId,
+                        navId: isLead ? leadId : bpId,
+                        navKind: isLead ? 'LEAD' : 'BP',
+                        title: item.customerName,
+                        meta: meta,
+                        valueText: h.formatMoney(item.pipeline, cur)
+                    };
                 },
-                navigate: zoomToCustomer
+                navigate: openDrillRow
             });
         }
 

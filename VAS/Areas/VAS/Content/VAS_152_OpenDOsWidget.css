@@ -34,14 +34,14 @@
     /* Fully dynamic root anchor: font-size scales with the dashboard width with
        NO px ceiling, so the value/meta/title (all em) keep growing with the card
        at any screen resolution instead of freezing at a fixed px cap. */
-    font-size: calc(var(--dash-inline-size, 100vw) * .014);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.014), 32px);
 }
 
 .MPC-odo-title {
     font-weight: 500;
     color: #102C3F;
     line-height: 1.3;
-    font-size: calc(var(--dash-inline-size, 100vw) * .011375);
+    font-size: 0.8125em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

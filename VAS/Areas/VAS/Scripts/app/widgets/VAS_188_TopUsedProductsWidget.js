@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VAS_188_TopUsedProductsWidget
  * 4x2 Ranked List Widget for Inventory Use dashboard.
  * Displays top 10 products consumed ranked by quantity or value for selected period,
@@ -8,24 +8,24 @@
  * Summary Message Table
  *  # | Current Text                           | Message Key
  * ---+----------------------------------------+-----------------------------------
- *  1 | Top Used Products                      | VAS_TopUsedProducts
- *  2 | Most consumed items by volume         | VAS_MostConsumedItemsByVolume
- *  3 | Qty                                    | VAS_Qty
- *  4 | Value                                  | VAS_Value
- *  5 | Couldn't load                           | VAS_CouldntLoad
- *  6 | Close                                  | VAS_Close
- *  7 | Month                                  | VAS_Month
- *  8 | Consumed Qty                           | VAS_ConsumedQty
- *  9 | Consumed Value                         | VAS_ConsumedValue
- * 10 | Issue Lines                            | VAS_IssueLines
- * 11 | Doc No.                                | VAS_DocNo
- * 12 | Date                                   | VAS_Date
- * 13 | WH + Loc                               | VAS_WarehouseLocator
- * 14 | Loading...                             | VAS_Loading
- * 15 | No usage lines found.                  | VAS_NoUsageLinesFound
- * 16 | of                                     | VAS_Of
- * 17 | Page                                   | VAS_Page
- * 18 | lines                                  | VAS_Lines
+ *  1 | Top Used Products                      | VAS_188_TopUsedProducts
+ *  2 | Most consumed items by volume         | VAS_188_MostConsumedItemsByVolume
+ *  3 | Qty                                    | VAS_188_Qty
+ *  4 | Value                                  | VAS_188_Value
+ *  5 | Couldn't load                           | VAS_188_CouldntLoad
+ *  6 | Close                                  | VAS_188_Close
+ *  7 | Month                                  | VAS_188_Month
+ *  8 | Consumed Qty                           | VAS_188_ConsumedQty
+ *  9 | Consumed Value                         | VAS_188_ConsumedValue
+ * 10 | Issue Lines                            | VAS_188_IssueLines
+ * 11 | Doc No.                                | VAS_188_DocNo
+ * 12 | Date                                   | VAS_188_Date
+ * 13 | WH + Loc                               | VAS_188_WarehouseLocator
+ * 14 | Loading...                             | VAS_188_Loading
+ * 15 | No usage lines found.                  | VAS_188_NoUsageLinesFound
+ * 16 | of                                     | VAS_188_Of
+ * 17 | Page                                   | VAS_188_Page
+ * 18 | lines                                  | VAS_188_Lines
  */
 ; VAS = window.VAS || {};
 
@@ -104,15 +104,75 @@
             return n.toLocaleString(window.navigator.language);
         }
 
-        function formatINR(value) {
-            var val = Number(value || 0);
-            if (val >= 100000) {
-                return '₹' + (val / 100000).toFixed(1) + 'L';
-            } else if (val >= 1000) {
-                return '₹' + (val / 1000).toFixed(1) + 'k';
-            }
-            return '₹' + val.toLocaleString(window.navigator.language);
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
+        var currencyIso = '';
+        var currencySymbol = '';
+
+        function isIndianISO(iso) {
+            if (!iso) { return false; }
+            var indianIsos = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+            return indianIsos.indexOf(String(iso).toUpperCase()) !== -1;
         }
+
+        function getDisplaySymbol() {
+            return currencySymbol || currencyIso || '';
+        }
+
+        function formatCurrencyCompact(value) {
+            var val = Number(value || 0);
+            if (isNaN(val)) { val = 0; }
+            var sym = getDisplaySymbol();
+            var prefix = sym ? (sym + (sym.length > 2 ? ' ' : '')) : '';
+            var sign = val < 0 ? '-' : '';
+            var absVal = Math.abs(val);
+
+            if (isIndianISO(currencyIso)) {
+                if (absVal >= 10000000) {
+                    return sign + prefix + (absVal / 10000000).toFixed(1) + 'Cr';
+                } else if (absVal >= 100000) {
+                    return sign + prefix + (absVal / 100000).toFixed(1) + 'L';
+                } else if (absVal >= 1000) {
+                    return sign + prefix + (absVal / 1000).toFixed(1) + 'k';
+                }
+                return sign + prefix + absVal.toLocaleString('en-IN');
+            } else {
+                if (absVal >= 1000000000) {
+                    return sign + prefix + (absVal / 1000000000).toFixed(1) + 'B';
+                } else if (absVal >= 1000000) {
+                    return sign + prefix + (absVal / 1000000).toFixed(1) + 'M';
+                } else if (absVal >= 1000) {
+                    return sign + prefix + (absVal / 1000).toFixed(1) + 'k';
+                }
+                return sign + prefix + absVal.toLocaleString(window.navigator.language || 'en-US');
+            }
+        }
+
+        function formatCurrencyFull(value) {
+            var val = Number(value || 0);
+            if (isNaN(val)) { val = 0; }
+            var sym = getDisplaySymbol();
+            var prefix = sym ? (sym + (sym.length > 2 ? ' ' : '')) : '';
+            var sign = val < 0 ? '-' : '';
+            var absVal = Math.abs(val);
+
+            if (isIndianISO(currencyIso)) {
+                return sign + prefix + absVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } else {
+                return sign + prefix + absVal.toLocaleString(window.navigator.language || 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+        }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//      function formatINR(value) {
+//          var val = Number(value || 0);
+//          if (val >= 100000) {
+//              return '₹' + (val / 100000).toFixed(1) + 'L';
+//          } else if (val >= 1000) {
+//              return '₹' + (val / 1000).toFixed(1) + 'k';
+//          }
+//          return '₹' + val.toLocaleString(window.navigator.language);
+//      }
+// ----- END OLD CODE -----
 
         function formatMonthName(m) {
             var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -165,10 +225,22 @@
                 data: { month: selectedMonth, year: selectedYear, measure: activeMeasure },
                 cache: false,
                 success: function (res) {
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
                     var data = parseResponse(res);
+                    if (data.currency) {
+                        currencyIso = data.currency.iso || currencyIso;
+                        currencySymbol = data.currency.symbol || currencySymbol;
+                    }
                     productsData = data.products || [];
                     pageNo = 1;
                     renderProducts();
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                  var data = parseResponse(res);
+//                  productsData = data.products || [];
+//                  pageNo = 1;
+//                  renderProducts();
+// ----- END OLD CODE -----
                 },
                 error: function () {
                     productsData = [];
@@ -211,7 +283,12 @@
                     '</div>' +
                     '<div class="vas-tup-row-right">' +
                     '<div class="vas-tup-qty-uom">' + formatQty(item.totalQty) + ' ' + escapeHtml(item.uomName || "Nos") + '</div>' +
-                    '<div class="vas-tup-val">' + formatINR(item.totalValue) + '</div>' +
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
+                    '<div class="vas-tup-val" title="' + escapeHtml(formatCurrencyFull(item.totalValue)) + '">' + escapeHtml(formatCurrencyCompact(item.totalValue)) + '</div>' +
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                  '<div class="vas-tup-val">' + formatINR(item.totalValue) + '</div>' +
+// ----- END OLD CODE -----
                     '</div>' +
                     '</button>';
             }
@@ -241,32 +318,32 @@
                 '<h3 class="vas-tup-modal-title" title="' + escapeHtml(pname) + '">' + escapeHtml(pname) + '</h3>' +
                 '<span class="vas-tup-cat-badge">' + escapeHtml(categoryName) + '</span>' +
                 '</div>' +
-                '<button type="button" class="vas-tup-modal-close" aria-label="' + escapeHtml(label("VAS_Close", "Close")) + '">' +
+                '<button type="button" class="vas-tup-modal-close" aria-label="' + escapeHtml(label("VAS_188_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
                 '</button>' +
                 '</div>' +
                 '<div class="vas-tup-modal-body">' +
                 '<div class="vas-tup-summary-grid">' +
-                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_Month", "Month")) + '</div><div class="vas-tup-field-val">' + escapeHtml(monthFull) + '</div></div>' +
-                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_ConsumedQty", "Consumed Qty")) + '</div><div class="vas-tup-field-val">' + escapeHtml(formatQty(totalQty) + ' ' + uomName) + '</div></div>' +
-                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_ConsumedValue", "Consumed Value")) + '</div><div class="vas-tup-field-val">' + escapeHtml(formatINR(totalValue)) + '</div></div>' +
-                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_IssueLines", "Issue Lines")) + '</div><div class="vas-tup-field-val vas-tup-m-lines-cnt">—</div></div>' +
+                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_Month", "Month")) + '</div><div class="vas-tup-field-val">' + escapeHtml(monthFull) + '</div></div>' +
+                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedQty", "Consumed Qty")) + '</div><div class="vas-tup-field-val">' + escapeHtml(formatQty(totalQty) + ' ' + uomName) + '</div></div>' +
+                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedValue", "Consumed Value")) + '</div><div class="vas-tup-field-val" title="' + escapeHtml(formatCurrencyFull(totalValue)) + '">' + escapeHtml(formatCurrencyCompact(totalValue)) + '</div></div>' +
+                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_IssueLines", "Issue Lines")) + '</div><div class="vas-tup-field-val vas-tup-m-lines-cnt">—</div></div>' +
                 '</div>' +
                 '<table class="vas-tup-lines-table">' +
                 '<thead><tr>' +
-                '<th>' + escapeHtml(label("VAS_DocNo", "Doc No.")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Date", "Date")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_WarehouseLocator", "WH + Loc")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Qty", "Qty")) + '</th>' +
-                '<th>' + escapeHtml(label("VAS_Value", "Value")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_188_DocNo", "Doc No.")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_188_Date", "Date")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_188_WarehouseLocator", "WH + Loc")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_188_Qty", "Qty")) + '</th>' +
+                '<th>' + escapeHtml(label("VAS_188_Value", "Value")) + '</th>' +
                 '</tr></thead>' +
-                '<tbody class="vas-tup-m-tbody"><tr><td colspan="5" class="vas-tup-m-msgcell">' + escapeHtml(label("VAS_Loading", "Loading...")) + '</td></tr></tbody>' +
+                '<tbody class="vas-tup-m-tbody"><tr><td colspan="5" class="vas-tup-m-msgcell">' + escapeHtml(label("VAS_188_Loading", "Loading...")) + '</td></tr></tbody>' +
                 '</table>' +
                 '<div class="vas-tup-modal-foot">' +
-                '<div class="vas-tup-m-helper">' + escapeHtml('0 ' + label("VAS_Of", "of") + ' 0 ' + label("VAS_Lines", "lines")) + '</div>' +
+                '<div class="vas-tup-m-helper">' + escapeHtml('0 ' + label("VAS_188_Of", "of") + ' 0 ' + label("VAS_188_Lines", "lines")) + '</div>' +
                 '<div class="vas-tup-modal-pager">' +
                 '<button type="button" class="vas-tup-modal-pager-btn vas-tup-m-prev" disabled>&lsaquo;</button>' +
-                '<span class="vas-tup-m-pager-txt">' + escapeHtml(label("VAS_Page", "Page") + ' 1 ' + label("VAS_Of", "of") + ' 1') + '</span>' +
+                '<span class="vas-tup-m-pager-txt">' + escapeHtml(label("VAS_188_Page", "Page") + ' 1 ' + label("VAS_188_Of", "of") + ' 1') + '</span>' +
                 '<button type="button" class="vas-tup-modal-pager-btn vas-tup-m-next" disabled>&rsaquo;</button>' +
                 '</div>' +
                 '</div>' +
@@ -289,9 +366,9 @@
                 var $mPrev = $modal.find('.vas-tup-m-prev');
                 var $mNext = $modal.find('.vas-tup-m-next');
 
-                var ofTxt = label("VAS_Of", "of");
-                var linesTxt = label("VAS_Lines", "lines");
-                var pageTxt = label("VAS_Page", "Page");
+                var ofTxt = label("VAS_188_Of", "of");
+                var linesTxt = label("VAS_188_Lines", "lines");
+                var pageTxt = label("VAS_188_Page", "Page");
 
                 /* The popup is exactly one page tall, so every page must render mPageSize rows.
                    Pages holding fewer records are padded with spacer rows to stop the modal from
@@ -308,7 +385,7 @@
 
                 if (usageLines.length === 0) {
                     $tbody.html('<tr><td colspan="5" class="vas-tup-m-msgcell">' +
-                        escapeHtml(label("VAS_NoUsageLinesFound", "No usage lines found.")) + '</td></tr>' +
+                        escapeHtml(label("VAS_188_NoUsageLinesFound", "No usage lines found.")) + '</td></tr>' +
                         fillerRows(mPageSize - 1));
                     $mHelper.text('0 ' + ofTxt + ' 0 ' + linesTxt);
                     $mPagerTxt.text(pageTxt + ' 1 ' + ofTxt + ' 1');
@@ -329,7 +406,12 @@
                         '<td>' + escapeHtml(rec.movementDate) + '</td>' +
                         '<td title="' + escapeHtml(rec.whLoc) + '">' + escapeHtml(rec.whLoc) + '</td>' +
                         '<td>' + escapeHtml(formatQty(rec.qty)) + '</td>' +
-                        '<td>' + escapeHtml(formatINR(rec.value)) + '</td>' +
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
+                        '<td title="' + escapeHtml(formatCurrencyFull(rec.value)) + '">' + escapeHtml(formatCurrencyCompact(rec.value)) + '</td>' +
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                      '<td>' + escapeHtml(formatINR(rec.value)) + '</td>' +
+// ----- END OLD CODE -----
                         '</tr>';
                 }
 
@@ -378,20 +460,34 @@
                 url: VIS.Application.contextUrl + 'VAS_188_TopUsedProductsWidget/GetProductUsageDetails',
                 type: 'GET',
                 data: { productId: pid, month: selectedMonth, year: selectedYear },
-                cache: false,
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
                 success: function (res) {
                     var data = parseResponse(res);
+                    if (data.currency) {
+                        currencyIso = data.currency.iso || currencyIso;
+                        currencySymbol = data.currency.symbol || currencySymbol;
+                    }
                     usageLines = data.lines || [];
                     $modal.find('.vas-tup-m-lines-cnt').text(usageLines.length);
                     mPageNo = 1;
                     renderLinesTable();
                 }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//              success: function (res) {
+//                  var data = parseResponse(res);
+//                  usageLines = data.lines || [];
+//                  $modal.find('.vas-tup-m-lines-cnt').text(usageLines.length);
+//                  mPageNo = 1;
+//                  renderLinesTable();
+//              }
+// ----- END OLD CODE -----
             });
         }
 
         function createWidget() {
-            var title = label("VAS_TopUsedProducts", "Top Used Products");
-            var sub = label("VAS_MostConsumedItemsByVolume", "Most consumed items by volume");
+            var title = label("VAS_188_TopUsedProducts", "Top Used Products");
+            var sub = label("VAS_188_MostConsumedItemsByVolume", "Most consumed items by volume");
 
             $card = $(
                 '<div class="vas-tup-card vas-widget-bg">' +
@@ -539,3 +635,4 @@
     };
 
 })(VAS, jQuery);
+

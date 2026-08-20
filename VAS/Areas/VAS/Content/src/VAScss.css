@@ -198,6 +198,7 @@
 
 @import "../VAS_106_OverviewSalesOrder.css";
 @import "../VAS_189_ARInvoiceDetailPanel.css";
+@import "../VAS_191_APPaymentDetailPanel.css";
 @import "../VAS_156_CountedMTDWidget.css";
 @import "../VAS_157_VarianceLinesWidget.css";
 @import "../VAS_158_OpenCountSheetsWidget.css";
@@ -228,6 +229,7 @@
 @import "../VAS_172_PendingTransferConfirmationWidget.css";
 @import "../VAS_173_TransfersByWarehouseWidget.css";
 @import "../VAS_174_TransferQueueWidget.css";
+
 @import "../VAS_203_POGlobalSearchWidget.css";
 @import "../VAS_204_NewPurchaseOrderWidget.css";
 @import "../VAS_205_POCompletedMTDWidget.css";

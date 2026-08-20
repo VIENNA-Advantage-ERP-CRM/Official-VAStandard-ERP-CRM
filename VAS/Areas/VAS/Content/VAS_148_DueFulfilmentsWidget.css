@@ -18,12 +18,7 @@
 
 .vas-duf-card {
     font-family: Roboto, Arial, sans-serif;
-    /* Single dynamic font anchor, viewport-based (vw) so it tracks the SCREEN,
-       not a JS-measured container width - the old clamp's fixed 24px ceiling and
-       its dependency on --dash-inline-size froze all text from growing past a
-       point. max()+rem floor guards very narrow windows; no ceiling above it, so
-       text keeps scaling at any resolution. Everything below is em off this. */
-    font-size: max(0.9rem, 1.3vw);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.014), 24px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -70,18 +65,10 @@
     white-space: nowrap;
 }
 
-/* The body is a grid of equal dynamic tracks: one page of rows splits the body
-   evenly, so every row is the same height (body / page-size) whether the page
-   is full or has a single row - no row ever balloons to fill the whole body. */
 .vas-duf-body { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(5, minmax(0, 1fr)); overflow: hidden; }
 .vas-duf-empty { grid-row: 1 / -1; display: flex; align-items: center; justify-content: center; color: #748494; font-size: .8125em; }
 
-/* Compact 2-line row so all pageSize rows fit the 3x2 body without overflow.
-   Line 1: number . customer (ellipsis) . value    Line 2: warehouse . address
-   (ellipsis) . line count. Rows sit at natural height and pack from the top. */
 .vas-duf-row {
-    /* Fills its own grid track (equal body/page-size height); content is
-       vertically centred. A single row is one track tall, never the whole body. */
     display: flex;
     align-items: center;
     gap: .6em;
@@ -113,9 +100,9 @@
 .vas-duf-val { font-size: .8em; font-weight: 700; color: #0083DA; white-space: nowrap; flex: 0 0 auto; }
 
 .vas-duf-r2 { display: flex; align-items: baseline; gap: .5em; line-height: 1.02; }
-.vas-duf-wh { font-size: .68em; color: #748494; white-space: nowrap; flex: 0 1 auto; max-width: 50%; overflow: hidden; text-overflow: ellipsis; }
-.vas-duf-addr { flex: 1; min-width: 0; font-size: .68em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vas-duf-lc { font-size: .68em; color: #748494; white-space: nowrap; flex: 0 0 auto; }
+.vas-duf-wh { font-size: .64em; color: #748494; white-space: nowrap; flex: 0 1 auto; max-width: 50%; overflow: hidden; text-overflow: ellipsis; }
+.vas-duf-addr { flex: 1; min-width: 0; font-size: .64em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas-duf-lc { font-size: .64em; color: #748494; white-space: nowrap; flex: 0 0 auto; }
 
 .vas-duf-foot {
     flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
@@ -125,7 +112,7 @@
 .vas-duf-pager { display: flex; align-items: center; gap: 8px; }
 .vas-duf-pgbtn {
     width: 24px; height: 24px; border-radius: 6px; border: 1px solid #E4EDF4;
-    background: rgba(255, 255, 255, .9); display: flex; align-items: center; justify-content: center; color: #0083DA; cursor: pointer; padding: 0;
+    background: rgba(255, 255, 255, .9); display: inline-flex; align-items: center; justify-content: center; color: #0083DA; cursor: pointer; padding: 0;
 }
 .vas-duf-pgbtn:hover:not(:disabled) { background: #EAF4FD; }
 .vas-duf-pgbtn:disabled { background: rgba(255, 255, 255, .6); color: #B8C6D2; cursor: default; }
@@ -134,9 +121,7 @@
 
 /* ===================== MODAL ===================== */
 .vas-duf-dialog {
-    /* Viewport-anchored (the dialog lives on <body>, outside the widget), same
-       basis as the widget card so it scales at any resolution; internals are em. */
-    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0117), 24px);
+    font-size: clamp(16px, 1.17vw, 24px);
     position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 2em; font-family: Roboto, Arial, sans-serif;
 }
 .vas-duf-dialog.vas-duf-hidden { display: none; }
@@ -144,7 +129,7 @@
 .vas-duf-body-lock { overflow: hidden; }
 
 .vas-duf-modal {
-    position: relative; width: min(55em, calc(100vw - 4em)); max-height: 90vh;
+    position: relative; width: min(72em, calc(100vw - 3em)); max-height: 94vh;
     display: flex; flex-direction: column;
     background: #fff; border-radius: 14px; overflow: hidden;
     box-shadow: 0 30px 70px rgba(2, 38, 64, .30);
@@ -162,30 +147,34 @@
 .vas-duf-mclose svg { width: 1.25em; height: 1.25em; }
 
 .vas-duf-mcontent { position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-.vas-duf-mbody { padding: 0.875em 1.25em; overflow: hidden; }
+.vas-duf-mbody { padding: 0.9em 1.35em; overflow: hidden; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 
 .vas-duf-mbusy { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, .6); z-index: 5; }
 .vas-duf-mbusy.vas-duf-hidden { display: none; }
 
 .vas-duf-optrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 1.25em; }
 .vas-duf-shiprow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0 1em; }
-.vas-duf-field { display: flex; flex-direction: column; padding: 0.5em 0.125em 0.375em; }
+.vas-duf-field { display: flex; flex-direction: column; padding: 0.45em 0.125em 0.35em; }
 .vas-duf-flabel { font-size: .75em; color: #5F7283; margin-bottom: 0.25em; }
 .vas-duf-f {
     font-family: inherit; font-size: .9em; color: #102C3F; border: none;
     border-bottom: 1px solid #D7D7D7; background: transparent; padding: 0.3em 0.125em; outline: none;
 }
 select.vas-duf-f {
-    appearance: none; -webkit-appearance: none; cursor: pointer;
-    padding-right: 0.3em;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+    cursor: pointer;
+    padding-right: 0.5em;
+    text-align: center;
+    text-align-last: center;
 }
 .vas-duf-f:hover, .vas-duf-f:focus { border-bottom-color: #0083DA; }
 
-.vas-duf-note { display: flex; align-items: center; gap: 0.375em; font-size: .78em; color: #748494; margin: 0.625em 0; }
+.vas-duf-note { display: flex; align-items: center; gap: 0.375em; font-size: .76em; color: #748494; margin: 0.55em 0; }
 .vas-duf-note svg { width: 0.875em; height: 0.875em; color: #0083DA; flex: 0 0 auto; }
 
-/* Sized for a full page of 5 lines so the modal keeps a stable height and does
-   not shrink when a page has fewer (lines page 5 at a time). */
 .vas-duf-lines { display: flex; flex-direction: column; gap: 0.5em; min-height: 14.5em; }
 .vas-duf-line {
     display: flex; align-items: center; gap: 0.625em;
@@ -212,7 +201,8 @@ select.vas-duf-f {
 .vas-duf-loc {
     font-family: inherit; font-size: .78em; color: #102C3F; border: 1px solid #E4EDF4; border-radius: 0.5em;
     background: #fff; padding: 0.3em 0.5em; outline: none; max-width: 11em; cursor: pointer;
-    appearance: none; -webkit-appearance: none;
+    appearance: none !important; -webkit-appearance: none !important; -moz-appearance: none !important; background-image: none !important;
+    text-align: center; text-align-last: center;
 }
 .vas-duf-loc:hover, .vas-duf-loc:focus { border-color: #0083DA; }
 .vas-duf-loc:disabled { opacity: .5; cursor: default; }
@@ -224,11 +214,10 @@ select.vas-duf-f {
 .vas-duf-uom { font-size: .72em; color: #748494; }
 
 .vas-duf-linepager { display: flex; align-items: center; justify-content: space-between; gap: .5em; margin: 0.625em 0 0.375em; min-height: 1.5em; }
-/* The line pager reuses the card's .vas-duf-pgbtn; scale it in em inside the modal. */
-.vas-duf-linepager .vas-duf-pager { gap: 0.4em; }
-.vas-duf-linepager .vas-duf-pgbtn { width: 1.1em; height: 1.1em; border-radius: 0.4em; }
-.vas-duf-linepager .vas-duf-pgbtn svg { width: 0.65em; height: 0.65em; }
-.vas-duf-linepager .vas-duf-pgtext { font-size: 0.75em; }
+.vas-duf-linepager .vas-duf-pager { gap: 0.5em; }
+.vas-duf-linepager .vas-duf-pgbtn { width: 24px; height: 24px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; }
+.vas-duf-linepager .vas-duf-pgbtn svg { width: 14px; height: 14px; }
+.vas-duf-linepager .vas-duf-pgtext { font-size: 0.875em; }
 .vas-duf-linepager:empty { display: none; }
 
 .vas-duf-shhead { font-size: .95em; font-weight: 700; color: #000; padding: 0.75em 0 0.25em; }
@@ -262,3 +251,4 @@ select.vas-duf-f {
 .vas-duf-ctable td.s { font-weight: 700; color: #102C3F; }
 .vas-duf-ctable td.r, .vas-duf-ctable th.r { text-align: right; }
 .vas-duf-ctable tr:last-child td { border-bottom: none; }
+

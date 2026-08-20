@@ -50,6 +50,78 @@
  *                        prefix too. Sharing a name with a base-theme rule
  *                        meant the base design won and repainted the panel;
  *                        scoping them to the panel ends that.
+ *   VAI163   2026-08-11  - The layout holds at 80% browser zoom, which reports
+ *                          ~1.25x more CSS pixels for the same physical width and
+ *                          so kept the panel just above its old thresholds. The
+ *                          stat strip goes two-up from 700px rather than 620px,
+ *                          and every flexible track is minmax(0, Nfr) instead of
+ *                          a bare Nfr, which cannot shrink below its content —
+ *                          one long amount used to widen its own card / cell and
+ *                          push the row past the panel (-stats, -hdrCard,
+ *                          -itrow). Matches VAS_099 and VAS_102.
+ *                        - The item table scrolls horizontally at ANY width (it
+ *                          used to switch to scrolling only under 400px), so a
+ *                          panel just wide of that cannot clip its last columns.
+ *                          The row min-width follows the column count: 520px at
+ *                          six columns, 360px at the four shown below 700px.
+ *                        - Activity e-mail rows: a purple Email badge, a
+ *                          recipient sub-line (.vas_098-actsub) and a message
+ *                          body that opens on click (.vas_098-actrow.-openable /
+ *                          -actbody / -actmeta). A long subject ellipsises
+ *                          instead of pushing the timestamp out of the row.
+ *   VAI163   2026-08-11  Minor priority (.vas_098-prio.vas_098-minor) is green,
+ *                        the tone Low already carried. Grey read as "no priority
+ *                        set" rather than as the lowest priority there is.
+ *   VAI163   2026-08-12  - Added the Reference strip (.vas_098-genfrom /
+ *                          -gfLabel / -gfChips / -chip / -chipLabel / -chipVal,
+ *                          with .vas_098-is-link for a chip that opens its source
+ *                          record and .vas_098-ic-* tinting the leading icon
+ *                          only) — a port of the VAS_092 Generated From strip.
+ *                        - Added the Documents table (.vas_098-docRow / -docItem
+ *                          / -docTxt, rows clickable via
+ *                          .vas_098-docRow.vas_098-is-link). It reuses the items
+ *                          box (.vas_098-items) for its frame and scroll but
+ *                          carries its OWN four-track grid: the two tables share
+ *                          the box, not their column meanings.
+ *                        - Added the line-note caption in Notes
+ *                          (.vas_098-notelbl), which names the line a note was
+ *                          written against.
+ *   VAI163   2026-08-12  - The stat strip goes single-column at 340px, not 400px,
+ *                          matching VAS_099's snapshot. Between those two widths
+ *                          the four cards stacked one per line here while the GRN
+ *                          panel's stayed 2-up — which is what a record opened in
+ *                          SINGLE VIEW hits, the form taking the width and the
+ *                          tab panel left under 400px.
+ *                        - Section heads wrap (.vas_098-sechead): the summary
+ *                          drops under the title instead of being crushed against
+ *                          it in a narrow panel.
+ *                        - Activity rows wrap between the headline and the
+ *                          "when · by whom" stamp (.vas_098-atwrap), which now
+ *                          carries the actor's name on EVERY row and so is long
+ *                          enough to have squeezed the headline to an ellipsis.
+ *                          The stamp keeps its right alignment when it wraps
+ *                          (margin-left:auto). A comment's headline wraps to
+ *                          three lines (.vas_098-at.vas_098-multiline) instead of
+ *                          ellipsising after one.
+ *   VAI163   2026-08-12  The convert strip is gone from the panel, so
+ *                        .vas_098-convert / -cvnote / -cvactions / -btn (and its
+ *                        -primary / -secondary / :disabled states) style nothing
+ *                        any more. They are left in place rather than deleted:
+ *                        .vas_098-ok is shared with the toast, and the button
+ *                        rules are the panel's only record of its own control
+ *                        styling should an action return.
+ *   VAI163   2026-08-17  - The data tables SHRINK to the panel instead of taking
+ *                          their own horizontal scrollbar: the rows' floor
+ *                          widths and the card's overflow-x are gone. A
+ *                          scrollbar inside a card hides the columns it pushes
+ *                          out — it has to be found and dragged before it says
+ *                          anything is there — where a compressed column is
+ *                          visibly present and keeps its ellipsis and tooltip.
+ *                        - Added the Activity field-change delta
+ *                          (.vas_098-actDelta / -cvOld / -cvArrow / -cvNew):
+ *                          "was X → now Y" under the field's name, the old
+ *                          value struck through and the new one carrying the
+ *                          row's colour. Matches VAS_101 / VAS_104.
  ***********************************************************/
 
 .vas_098-root {
@@ -111,7 +183,9 @@
 .vas_098-prio.vas_098-high{background:#FCE3D2;color:#A8430F}
 .vas_098-prio.vas_098-med{background:#E4F0FF;color:#0E5DA8}
 .vas_098-prio.vas_098-low{background:#CCEFDD;color:#0C5D38}
-.vas_098-prio.vas_098-minor{background:#E9EDF1;color:#5A6B79}
+/* Minor is green, like Low. Both say "this can wait", and the grey it used to
+   carry read as "no priority set" rather than as the lowest one. */
+.vas_098-prio.vas_098-minor{background:#CCEFDD;color:#0C5D38}
 
 /* ---------- Header — title strip ---------- */
 /* Untinted strip carrying the title + subtitle and the priority / type /
@@ -130,7 +204,9 @@
    so short fields sit in rows instead of stacking into a tall column that
    leaves the identity half empty. Flat card — no shadow — on the standard
    12px radius, matching every other overview panel. */
-.vas_098-hdrCard { display:grid; grid-template-columns:40% 1fr; gap:14px 28px;
+/* minmax(0, 1fr) so a long field value wraps inside the field column instead of
+   widening it and pushing the card past the panel. */
+.vas_098-hdrCard { display:grid; grid-template-columns:40% minmax(0, 1fr); gap:14px 28px;
     border:1px solid var(--rq-border); border-radius:12px; background:#fff;
     padding:14px 16px; margin:10px 0 12px }
 .vas_098-hdrColL { min-width:0; border-right:1px solid var(--rq-divider); padding-right:20px }
@@ -150,6 +226,37 @@
     letter-spacing:.3px; text-transform:uppercase; white-space:nowrap; flex:none }
 .vas_098-personName { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .vas_098-hdrField { min-width:0 }
+
+/* ---------- Reference strip (Generated From) ---------- */
+/* Directly under the details card, in the VAS_092 Purchase Order shape: a label
+   followed by one chip per source document. The strip wraps, so a requisition
+   carrying several origins never pushes past the panel. */
+.vas_098-genfrom { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px;
+    padding:10px 14px; margin-bottom:13px;
+    background:var(--rq-glass-grad); border:1px solid var(--rq-border); border-radius:12px }
+.vas_098-gfLabel { flex:none; font-size:10.5px; font-weight:700; letter-spacing:.4px;
+    text-transform:uppercase; color:var(--rq-text-muted) }
+.vas_098-gfChips { display:flex; align-items:center; flex-wrap:wrap; gap:8px; min-width:0 }
+
+/* A chip caps at the strip's width and truncates its VALUE inside it, so one
+   long document number cannot run off the panel; the whole of it stays on the
+   chip's tooltip. */
+.vas_098-chip { display:inline-flex; align-items:center; gap:6px; max-width:100%; min-width:0;
+    background:#fff; border:1px solid var(--rq-border); border-radius:999px;
+    padding:5px 11px; font-size:12px; line-height:1.2 }
+.vas_098-chipLabel { color:var(--rq-text-muted); font-weight:700; white-space:nowrap; flex:none }
+.vas_098-chipVal { color:var(--rq-text); font-weight:600; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.vas_098-chip.vas_098-is-link { cursor:pointer }
+.vas_098-chip.vas_098-is-link:hover { border-color:var(--rq-action); background:var(--rq-faint-blue) }
+.vas_098-chip.vas_098-is-link:hover .vas_098-chipVal { color:var(--rq-link) }
+/* The leading icon carries the chip's tone; the rest of the chip stays neutral
+   so a strip of several origins reads as one row rather than a colour chart. */
+.vas_098-chip.vas_098-ic-info    > .vas_098-ic:first-child { color:var(--rq-sent-tx) }
+.vas_098-chip.vas_098-ic-success > .vas_098-ic:first-child { color:var(--rq-success-tx) }
+.vas_098-chip.vas_098-ic-warning > .vas_098-ic:first-child { color:var(--rq-warn-tx) }
+.vas_098-chip.vas_098-ic-muted   > .vas_098-ic:first-child { color:var(--rq-text-muted) }
+.vas_098-chip > .vas_098-ic:last-child { color:var(--rq-text-muted) }
 
 /* ---------- Convert strip ---------- */
 /* The strip must wrap inside the panel. It used to be a single non-wrapping flex
@@ -172,7 +279,10 @@
 .vas_098-btn:disabled { opacity:.45; cursor:not-allowed }
 
 /* ---------- Stat strip ---------- */
-.vas_098-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px }
+/* minmax(0, 1fr), not a bare 1fr: a bare fr track cannot shrink below its
+   content, so a long amount widened its own card and pushed the strip past the
+   panel instead of ellipsising inside it. */
+.vas_098-stats { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; margin-bottom:14px }
 .vas_098-stat { position:relative; background:rgba(255,255,255,0.85); border:1px solid var(--rq-border);
     border-radius:11px; padding:10px 13px 10px 15px; overflow:hidden; min-width:0 }
 .vas_098-stat::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px }
@@ -190,9 +300,15 @@
 .vas_098-breachic { color:var(--rq-danger); display:flex }
 
 /* ---------- Section head ---------- */
-.vas_098-sechead { display:flex; align-items:center; justify-content:space-between; margin:4px 0 8px }
-.vas_098-sechead h2 { font-size:15px; font-weight:700; color:var(--rq-text); margin:0 }
-.vas_098-secright { font-size:12.5px; color:var(--rq-text-2) }
+/* Title left, summary right — but the two WRAP rather than compete for one line.
+   In a narrow panel (a record opened in single view leaves the tab panel much
+   less room than the grid does) the summary was crushed against the title;
+   allowing the wrap drops it onto its own line, aligned left under the heading,
+   and the row grows instead of squeezing. */
+.vas_098-sechead { display:flex; align-items:baseline; justify-content:space-between;
+    flex-wrap:wrap; gap:2px 12px; margin:4px 0 8px }
+.vas_098-sechead h2 { font-size:15px; font-weight:700; color:var(--rq-text); margin:0; min-width:0 }
+.vas_098-secright { font-size:12.5px; color:var(--rq-text-2); min-width:0 }
 
 /* ---------- Stepper ---------- */
 .vas_098-stepper { display:flex; background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px;
@@ -225,8 +341,18 @@
 @keyframes vas_098-fade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
 
 /* ---------- Items ---------- */
-.vas_098-items { background:#fff; border:1px solid var(--rq-border); border-radius:13px; overflow:hidden; box-shadow:var(--rq-widget-shadow) }
-.vas_098-itrow { display:grid; grid-template-columns:2.2fr 1fr 0.6fr 1.2fr 1fr 1fr; align-items:center; padding:9px 14px; gap:10px }
+/* The table SHRINKS to the panel; it never scrolls sideways. It used to carry a
+   floor width and its own horizontal scrollbar, on the argument that the reader
+   could scroll to the last columns rather than lose them — but a scrollbar
+   inside a card hides those columns just as effectively, since it has to be
+   found and dragged before it says anything is there. A compressed column is at
+   least visibly present, and every cell keeps its ellipsis and tooltip. */
+.vas_098-items { background:#fff; border:1px solid var(--rq-border); border-radius:13px; box-shadow:var(--rq-widget-shadow) }
+/* Every track is minmax(0, Nfr); a bare Nfr cannot shrink below its content, so
+   one long product name pushed the row wider than the table and clipped the
+   right-hand columns away entirely. It is also what lets the row compress now
+   that it has no floor width. */
+.vas_098-itrow { display:grid; grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,0.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr); align-items:center; padding:9px 14px; gap:10px }
 /* Grid items default to min-width:auto, which blocks the ellipsis on the cells
    below from ever kicking in. */
 .vas_098-itrow > * { min-width:0 }
@@ -257,6 +383,24 @@
 .vas_098-grand b { color:var(--rq-primary); margin-left:8px; font-size:16px }
 .vas_098-itempty { padding:20px 16px; text-align:center; color:var(--rq-text-muted); font-size:13px }
 
+/* ---------- Documents (raised from the requisition) ---------- */
+/* Reuses the items box (border, radius, own horizontal scroll) with four tracks
+   of its own: Document | Date | Status | Amount. Its rows are .vas_098-docRow
+   rather than .vas_098-itrow — the two share the box but not its column
+   meanings, so neither table's grid can reach the other's. */
+.vas_098-docRow { display:grid; grid-template-columns:minmax(0,2.4fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);
+    align-items:center; padding:9px 14px; gap:10px }
+.vas_098-docRow > * { min-width:0 }
+.vas_098-docItem { display:flex; align-items:center; gap:8px; min-width:0 }
+.vas_098-docTxt { min-width:0; flex:1 }
+/* A whole document row is clickable — the open arrow and the doc no tint on
+   hover, the way the chips do. */
+.vas_098-docRow.vas_098-is-link { cursor:pointer }
+.vas_098-docRow.vas_098-is-link:hover { background:#F2F8FD }
+.vas_098-docRow.vas_098-is-link .vas_098-docItem > .vas_098-ic:last-child { color:var(--rq-text-muted); flex:none }
+.vas_098-docRow.vas_098-is-link:hover .vas_098-docItem > .vas_098-ic:last-child,
+.vas_098-docRow.vas_098-is-link:hover .vas_098-itname { color:var(--rq-link) }
+
 /* ---------- Pager (line items) ---------- */
 /* Sibling of the items box, not a child: that box takes its own horizontal
    scroll on narrow panels and the controls must stay put. */
@@ -283,15 +427,56 @@
 /* Downstream lifecycle documents. */
 .vas_098-actbadge.vas_098-po  { background:#E4F0FF; color:#0E5DA8 }
 .vas_098-actbadge.vas_098-grn { background:#CCEFDD; color:#0C5D38 }
+.vas_098-actbadge.vas_098-email { background:#EFEAFF; color:#5F4AA6 }
 .vas_098-actmain { flex:1; min-width:0 }
-.vas_098-atwrap { display:flex; justify-content:space-between; gap:12px; align-items:baseline }
-.vas_098-at { font-size:13.5px; color:var(--rq-text) }
-.vas_098-attime { font-size:11.5px; color:var(--rq-text-muted); white-space:nowrap }
+/* Headline left, "when · by whom" right — wrapping when the two cannot share a
+   line. The stamp now carries the actor's name on every row, not just an
+   e-mail's, so it is long enough to have squeezed the headline down to an
+   ellipsis on a narrow panel; it drops to its own line instead. */
+.vas_098-atwrap { display:flex; justify-content:space-between; flex-wrap:wrap;
+    gap:2px 12px; align-items:baseline }
+/* min-width:0 so a long subject ellipsises instead of pushing the timestamp
+   out of the row. */
+.vas_098-at { font-size:13.5px; color:var(--rq-text); min-width:0; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap }
+/* A COMMENT's headline is the comment itself, not a label — it wraps (to three
+   lines) rather than ellipsising, since a chat entry cut off after one line is
+   the part of the row the reader actually came for. */
+.vas_098-at.vas_098-multiline { white-space:normal; overflow-wrap:break-word; word-break:break-word;
+    line-height:1.45; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical }
+/* margin-left:auto keeps it right-aligned when it wraps onto a line of its own. */
+.vas_098-attime { font-size:11.5px; color:var(--rq-text-muted); white-space:nowrap;
+    flex:none; margin-left:auto; max-width:100%; overflow:hidden; text-overflow:ellipsis }
+
+/* ---------- Activity: e-mail rows ---------- */
+/* Recipient sub-line under an e-mail's subject. */
+.vas_098-actsub { margin-top:2px; font-size:11.5px; color:var(--rq-text-muted);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+/* A row carrying a message body opens it on click. */
+.vas_098-actrow.vas_098-openable { cursor:pointer }
+.vas_098-actrow.vas_098-openable:hover { background:var(--rq-faint-blue) }
+/* The body panel, revealed under its row. It is a sibling of the row, so it
+   carries the same left inset as the row's text column. */
+.vas_098-actbody { padding:10px 12px 12px; margin:0 0 8px; border-radius:9px;
+    background:var(--rq-faint-blue); border:1px solid var(--rq-border) }
+.vas_098-actmeta { font-size:11.5px; color:var(--rq-text-muted); word-break:break-word }
+.vas_098-actmeta + .vas_098-actmeta { margin-top:2px }
+/* The message itself keeps the sender's own line breaks. */
+.vas_098-actbody p { margin:8px 0 0; font-size:13px; color:var(--rq-text);
+    line-height:1.55; white-space:pre-wrap; word-break:break-word }
 
 /* ---------- Notes ---------- */
 .vas_098-notescard { padding:16px 18px }
 .vas_098-notesbody { font-size:13.5px; color:var(--rq-text); line-height:1.55 }
 .vas_098-notesbody p { margin:0 } .vas_098-notesbody p + p { margin-top:9px }
+/* Caption above a LINE's own note ("Line 10 — Steel Bolt M8"), so a reader knows
+   which row it annotates. The first one still needs its top gap: it follows the
+   header's note, not another caption. */
+.vas_098-notelbl { margin-top:12px; font-size:10.5px; font-weight:700; letter-spacing:.4px;
+    text-transform:uppercase; color:var(--rq-text-muted); line-height:1.3;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.vas_098-notelbl + p { margin-top:2px }
+.vas_098-notesbody > .vas_098-notelbl:first-child { margin-top:0 }
 
 /* ---------- Toast (convert-action feedback) ---------- */
 .vas_098-toast {
@@ -319,10 +504,24 @@
    on a desktop screen they never matched, so the six-column item row and the
    four-up stat strip stayed crammed at every zoom level. Breakpoints are aligned
    with VAS_099_OverviewGRN so the two panels collapse at the same widths. */
-@container (max-width: 620px) {
-    .vas_098-stats { grid-template-columns:repeat(2,1fr) }
-    .vas_098-itrow { grid-template-columns:1.8fr 1fr 0.6fr 1.1fr; }
-    .vas_098-itrow > :nth-child(5), .vas_098-itrow > :nth-child(6) { display:none }
+/* Two-up from 700px, not 620px. Four stat cards each carry an uppercase label,
+   a large figure and a caption, all clipped to one line, so they need ~700px
+   before they stop crushing — and browser zoom is what exposed it: at 80% the
+   panel measures ~1.25x more CSS pixels for the same physical width, which used
+   to carry it over the old 620px threshold and turn a comfortable 2-up strip
+   into a crammed 4-up one. Matches VAS_099_OverviewGRN and VAS_102. */
+@container (max-width: 700px) {
+    .vas_098-stats { grid-template-columns:repeat(2, minmax(0, 1fr)) }
+    /* The last two columns are NO LONGER DROPPED here. They used to be
+       display:none under 700px, which is every single-record view — so the panel
+       silently lost two of its six item columns exactly where a reader has the
+       record open to study it, with nothing on screen to say they existed.
+
+       Nothing replaces them: all six tracks stay and simply compress. The row
+       used to take a raised floor width here and scroll inside the card instead,
+       which put the same two columns out of sight behind a scrollbar the reader
+       had to find. A narrow column is readable at a glance and carries its full
+       value on the row's tooltip; a hidden one carries nothing. */
 }
 @container (max-width: 460px) {
     .vas_098-hdrCard { grid-template-columns:1fr }
@@ -333,11 +532,16 @@
     .vas_098-hdrPills { justify-content:flex-start }
 }
 @container (max-width: 400px) {
-    .vas_098-stats { grid-template-columns:1fr }
     .vas_098-convert { flex-direction:column; align-items:stretch }
-    /* Last resort: let the four remaining item columns scroll rather than crush. */
-    .vas_098-items { overflow-x:auto; overflow-y:hidden }
-    .vas_098-itrow { min-width:360px }
+}
+/* The stat strip goes single-column at 340px, not 400px — the width VAS_099's
+   snapshot uses. Between those two the requisition's four cards were stacking
+   one per line while the GRN panel's stayed 2-up, so the same record read as
+   four rows of summary here and two there. A record opened in SINGLE VIEW is
+   exactly where that showed: the form takes the width, the tab panel is left
+   under 400px, and the summary took four lines of it. */
+@container (max-width: 340px) {
+    .vas_098-stats { grid-template-columns:minmax(0, 1fr) }
 }
 
 /* ---------- RTL ---------- */
@@ -345,3 +549,23 @@
    overrides yet. */
 [dir="rtl"] .vas_098-hdrColL { border-right:none; border-left:1px solid var(--rq-divider); padding-right:0; padding-left:20px }
 [dir="rtl"] .vas_098-pgBtn .vas_098-ic svg { transform:scaleX(-1) }
+
+/* ---- Activity: field-change rows ---- */
+/* "was X → now Y" under the field's name. The two values are what the reader
+   came for, so they carry the row's colour while the arrow between them stays
+   muted; both wrap rather than clip, since a truncated value is no value.
+   Matches VAS_101 / VAS_104. */
+.vas_098-actDelta {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25em 0.375em;
+}
+.vas_098-cvOld {
+    color: var(--rq-text-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.vas_098-cvArrow { flex: none; color: var(--rq-text-muted); }
+.vas_098-cvNew {
+    color: var(--rq-text); font-weight: 700;
+    overflow-wrap: break-word; word-break: break-word;
+}
