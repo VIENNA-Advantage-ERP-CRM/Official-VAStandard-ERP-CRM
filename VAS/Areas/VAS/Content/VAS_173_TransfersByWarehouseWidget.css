@@ -15,7 +15,10 @@
     height: 100%;
     box-sizing: border-box;
     font-family: 'Roboto', sans-serif;
-    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.045), 24px);
+    /* Same scale as VAS_165 Location Wise Count so the Month/Year selects and the
+       rest of the chrome render at identical sizes. */
+    font-size: clamp(16px, 1.2cqi, 20px);
+    font-size: clamp(16px, calc(var(--widget-inline-size, 380px) * 0.045), 20px);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
     border: 2px solid #FFFFFF;
     border-radius: 14px;
@@ -98,7 +101,14 @@
     text-overflow: ellipsis;
 }
 
-.vas-173-period-btn {
+.vas-173-filter-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+/* Arrow-less select, copied verbatim from VAS_165 Location Wise Count. */
+.vas-173-select {
     appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
@@ -113,19 +123,19 @@
     padding: 0.35em 0.75em;
     min-width: 4.5em;
     text-align: center;
+    text-align-last: center;
     outline: none;
     cursor: pointer;
     box-sizing: border-box;
-    white-space: nowrap;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
     transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.vas-173-period-btn:hover {
+.vas-173-select:hover {
     background-color: #EEF8FF;
+    border-color: #0083DA;
+}
+
+.vas-173-select:focus {
     border-color: #0083DA;
 }
 
@@ -302,124 +312,6 @@
     color: #102C3F !important;
     font-weight: 500 !important;
     margin: 0 0.25em !important;
-}
-
-/* ── Period Picker Popover ───────────────────────────────────────────── */
-.vas-173-popover {
-    position: absolute;
-    top: 3.2em;
-    right: 0.5em;
-    z-index: 300;
-    background: #FFFFFF;
-    border: 1px solid #E4EDF4;
-    border-radius: 12px;
-    box-shadow: 0 8px 28px rgba(8, 30, 48, 0.18);
-    padding: 0.75rem;
-    width: 216px;
-    font-family: 'Roboto', sans-serif;
-}
-
-.vas-173-popover-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
-    border-bottom: 1px solid #EDF2F6;
-    padding-bottom: 0.35rem;
-}
-
-.vas-173-year-btn {
-    background: none;
-    border: 1px solid #E4EDF4;
-    border-radius: 7px;
-    width: 24px;
-    height: 24px;
-    cursor: pointer;
-    font-size: 0.875rem;
-    color: #0083DA;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-}
-
-.vas-173-year-btn:disabled {
-    color: #B8C6D2;
-    cursor: not-allowed;
-}
-
-.vas-173-year-label {
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: #102C3F;
-}
-
-.vas-173-month-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-}
-
-.vas-173-month-btn {
-    font-size: 0.6875rem;
-    padding: 0.35rem 0.1rem;
-    border: 1px solid transparent;
-    border-radius: 7px;
-    background: none;
-    cursor: pointer;
-    color: #102C3F;
-    text-align: center;
-    transition: background-color 100ms ease;
-}
-
-.vas-173-month-btn:hover:not(:disabled) {
-    background-color: #EEF6FF;
-    color: #0083DA;
-}
-
-.vas-173-month-btn--selected {
-    background-color: #0083DA !important;
-    color: #FFFFFF !important;
-    font-weight: 600;
-}
-
-.vas-173-month-btn--current {
-    border-color: #BFE4FF;
-    color: #0083DA;
-    font-weight: 700;
-}
-
-.vas-173-month-btn--disabled {
-    color: #C4CFD8;
-    cursor: not-allowed;
-}
-
-.vas-173-popover-foot {
-    margin-top: 0.5rem;
-    border-top: 1px solid #EDF2F6;
-    padding-top: 0.35rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.vas-173-cur-month-btn {
-    font-size: 0.75rem;
-    color: #0083DA;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-weight: 600;
-    padding: 0;
-}
-
-.vas-173-cur-month-btn:hover {
-    text-decoration: underline;
-}
-
-.vas-173-popover-hint {
-    font-size: 0.6875rem;
-    color: #748494;
 }
 
 /* ── SCREEN-SIZE DYNAMIC RESPONSIVE MODAL (LOCKED STABLE HEIGHT) ────── */

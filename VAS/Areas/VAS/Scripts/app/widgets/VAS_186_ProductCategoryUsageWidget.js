@@ -111,20 +111,88 @@
             return data || {};
         }
 
+// ===== NEW CODE START — currency format (agent A08, 2026-08-19) =====
+        var currencyIso = "";
+        var currencySymbol = "";
+        var indianIsos = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function isIndianIso(iso) {
+            if (!iso) { return false; }
+            return indianIsos.indexOf(String(iso).toUpperCase()) !== -1;
+        }
+
         function formatQty(value) {
             var n = Number(value || 0);
             return n.toLocaleString(window.navigator.language);
         }
 
-        function formatINR(value) {
+        function formatCurrency(value) {
             var val = Number(value || 0);
-            if (val >= 100000) {
-                return '₹' + (val / 100000).toFixed(1) + 'L';
-            } else if (val >= 1000) {
-                return '₹' + (val / 1000).toFixed(1) + 'k';
+            if (isNaN(val)) { val = 0; }
+            var sym = currencySymbol || currencyIso || "";
+            var iso = (currencyIso || "").toUpperCase();
+            var isIndian = isIndianIso(iso);
+
+            var formatted = "";
+            var absVal = Math.abs(val);
+
+            if (isIndian) {
+                if (absVal >= 10000000) {
+                    formatted = (val / 10000000).toFixed(1) + 'Cr';
+                } else if (absVal >= 100000) {
+                    formatted = (val / 100000).toFixed(1) + 'L';
+                } else if (absVal >= 1000) {
+                    formatted = (val / 1000).toFixed(1) + 'k';
+                } else {
+                    formatted = val.toLocaleString('en-IN');
+                }
+            } else {
+                if (absVal >= 1000000000) {
+                    formatted = (val / 1000000000).toFixed(1) + 'B';
+                } else if (absVal >= 1000000) {
+                    formatted = (val / 1000000).toFixed(1) + 'M';
+                } else if (absVal >= 1000) {
+                    formatted = (val / 1000).toFixed(1) + 'k';
+                } else {
+                    formatted = val.toLocaleString(window.navigator.language);
+                }
             }
-            return '₹' + val.toLocaleString(window.navigator.language);
+
+            if (sym) {
+                return sym + (sym.length > 1 && !sym.match(/^[₹$€£¥]$/) ? " " : "") + formatted;
+            }
+            return formatted;
         }
+
+        function formatCurrencyExact(value) {
+            var val = Number(value || 0);
+            if (isNaN(val)) { val = 0; }
+            var sym = currencySymbol || currencyIso || "";
+            var iso = (currencyIso || "").toUpperCase();
+            var isIndian = isIndianIso(iso);
+            var formatted = isIndian ? val.toLocaleString('en-IN') : val.toLocaleString(window.navigator.language);
+            if (sym) {
+                return sym + (sym.length > 1 && !sym.match(/^[₹$€£¥]$/) ? " " : "") + formatted;
+            }
+            return formatted;
+        }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//        function formatQty(value) {
+//            var n = Number(value || 0);
+//            return n.toLocaleString(window.navigator.language);
+//        }
+//
+//        function formatINR(value) {
+//            var val = Number(value || 0);
+//            if (val >= 100000) {
+//                return '₹' + (val / 100000).toFixed(1) + 'L';
+//            } else if (val >= 1000) {
+//                return '₹' + (val / 1000).toFixed(1) + 'k';
+//            }
+//            return '₹' + val.toLocaleString(window.navigator.language);
+//        }
+// ----- END OLD CODE -----
 
         function formatMonthName(m) {
             var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -165,6 +233,7 @@
             } catch (e) { }
         }
 
+// ===== NEW CODE START — currency format (agent A08, 2026-08-19) =====
         function loadCategoryUsage() {
             showBusy(true);
 
@@ -176,6 +245,10 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     categoriesData = data.categories || [];
+                    if (data.currency) {
+                        currencyIso = data.currency.iso || "";
+                        currencySymbol = data.currency.symbol || "";
+                    }
                     pageNo = 1;
                     renderCategories();
                 },
@@ -187,6 +260,31 @@
                 complete: function () { showBusy(false); }
             });
         }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//        function loadCategoryUsage() {
+//            showBusy(true);
+//
+//            $.ajax({
+//                url: VIS.Application.contextUrl + 'VAS_186_ProductCategoryUsageWidget/GetCategoryUsage',
+//                type: 'GET',
+//                data: { month: selectedMonth, year: selectedYear },
+//                cache: false,
+//                success: function (res) {
+//                    var data = parseResponse(res);
+//                    categoriesData = data.categories || [];
+//                    pageNo = 1;
+//                    renderCategories();
+//                },
+//                error: function () {
+//                    categoriesData = [];
+//                    pageNo = 1;
+//                    renderCategories();
+//                },
+//                complete: function () { showBusy(false); }
+//            });
+//        }
+// ----- END OLD CODE -----
 
         function renderCategories() {
             if (!$body) { return; }
@@ -237,13 +335,15 @@
 
                 var barPct = Math.max(3, Math.round((catMeasure / topCategoryMeasure) * 100));
                 var sharePct = activePeriodTotal > 0 ? Math.round((catMeasure / activePeriodTotal) * 100) : 0;
-                var measureStr = activeMeasure === "val" ? formatINR(cat.totalValue) : formatQty(cat.totalQty);
+// ===== NEW CODE START — currency format (agent A08, 2026-08-19) =====
+                var measureStr = activeMeasure === "val" ? formatCurrency(cat.totalValue) : formatQty(cat.totalQty);
+                var exactMeasureStr = activeMeasure === "val" ? formatCurrencyExact(cat.totalValue) : formatQty(cat.totalQty);
 
                 rowsHtml +=
                     '<button type="button" class="vas-pcu-row" data-catid="' + cat.categoryId + '" data-catname="' + escapeHtml(cat.categoryName) + '">' +
                     '<div class="vas-pcu-cat-name" title="' + escapeHtml(cat.categoryName) + '">' + escapeHtml(cat.categoryName) + '</div>' +
                     '<div class="vas-pcu-bar-track"><div class="vas-pcu-bar-fill" style="width:' + barPct + '%;"></div></div>' +
-                    '<div class="vas-pcu-measure-num" title="' + escapeHtml(measureStr) + '">' + escapeHtml(measureStr) + '</div>' +
+                    '<div class="vas-pcu-measure-num" title="' + escapeHtml(exactMeasureStr) + '">' + escapeHtml(measureStr) + '</div>' +
                     '<div class="vas-pcu-share-pct">' + sharePct + '%</div>' +
                     '</button>';
             }
@@ -255,7 +355,7 @@
             if (categoriesData.length > shownCount) {
                 var restMeasure = activePeriodTotal - shownTotalMeasure;
                 var restPct = activePeriodTotal > 0 ? Math.round((restMeasure / activePeriodTotal) * 100) : 0;
-                var restStr = activeMeasure === "val" ? formatINR(restMeasure) : (formatQty(restMeasure) + ' units');
+                var restStr = activeMeasure === "val" ? formatCurrency(restMeasure) : (formatQty(restMeasure) + ' units');
                 $footnote.text(shownCount + ' ' + label("VAS_186_Of", "of") + ' ' + categoriesData.length +
                     ' ' + label("VAS_186_Categories", "categories") + ' · ' +
                     label("VAS_186_Others", "Others") + ': ' + restStr + ' (' + restPct + '%)');
@@ -263,6 +363,35 @@
                 $footnote.text(label("VAS_186_All", "All") + ' ' + categoriesData.length + ' ' +
                     label("VAS_186_CategoriesShown", "categories shown"));
             }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                var measureStr = activeMeasure === "val" ? formatINR(cat.totalValue) : formatQty(cat.totalQty);
+//
+//                rowsHtml +=
+//                    '<button type="button" class="vas-pcu-row" data-catid="' + cat.categoryId + '" data-catname="' + escapeHtml(cat.categoryName) + '">' +
+//                    '<div class="vas-pcu-cat-name" title="' + escapeHtml(cat.categoryName) + '">' + escapeHtml(cat.categoryName) + '</div>' +
+//                    '<div class="vas-pcu-bar-track"><div class="vas-pcu-bar-fill" style="width:' + barPct + '%;"></div></div>' +
+//                    '<div class="vas-pcu-measure-num" title="' + escapeHtml(measureStr) + '">' + escapeHtml(measureStr) + '</div>' +
+//                    '<div class="vas-pcu-share-pct">' + sharePct + '%</div>' +
+//                    '</button>';
+//            }
+//
+//            $body.html(rowsHtml);
+//
+//            // Footnote counts the bars actually on screen, so it can no longer overstate the page.
+//            var shownCount = endIndex - startIndex;
+//            if (categoriesData.length > shownCount) {
+//                var restMeasure = activePeriodTotal - shownTotalMeasure;
+//                var restPct = activePeriodTotal > 0 ? Math.round((restMeasure / activePeriodTotal) * 100) : 0;
+//                var restStr = activeMeasure === "val" ? formatINR(restMeasure) : (formatQty(restMeasure) + ' units');
+//                $footnote.text(shownCount + ' ' + label("VAS_Of", "of") + ' ' + categoriesData.length +
+//                    ' ' + label("VAS_Categories", "categories") + ' · ' +
+//                    label("VAS_Others", "Others") + ': ' + restStr + ' (' + restPct + '%)');
+//            } else {
+//                $footnote.text(label("VAS_All", "All") + ' ' + categoriesData.length + ' ' +
+//                    label("VAS_CategoriesShown", "categories shown"));
+//            }
+// ----- END OLD CODE -----
 
             if ($pagerText) {
                 $pagerText.text(label("VAS_186_Page", "Page") + ' ' + pageNo + ' ' + label("VAS_186_Of", "of") + ' ' + totalPages);
@@ -480,7 +609,11 @@
                 '<span class="vas-pcu-ico" aria-hidden="true">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>' +
                 '</span>' +
-                '<div>' +
+                // Needs its own class: as an unstyled flex child this wrapper defaulted to
+                // min-width:auto, so it refused to shrink below the title's nowrap width and
+                // pushed the filter controls out over the header instead of letting the
+                // title's own ellipsis do the work.
+                '<div class="vas-pcu-head-text">' +
                 '<div class="vas-pcu-title">' + escapeHtml(title) + '</div>' +
                 '<div class="vas-pcu-sub">' + escapeHtml(sub) + '</div>' +
                 '</div>' +
@@ -616,3 +749,4 @@
     };
 
 })(VAS, jQuery);
+

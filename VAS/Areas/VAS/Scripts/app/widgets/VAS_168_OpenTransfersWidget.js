@@ -37,9 +37,56 @@
             $busy.toggleClass('vas-open-transfers-hidden', !show);
         }
 
+// ===== NEW CODE START — currency format (agent C02, 2026-08-19) =====
+        /**
+         * Organization-aware currency formatter.
+         * Formats monetary values based on C_Currency ISO code and symbol.
+         * @param {number|string} value Raw money amount
+         * @param {Object} currencyObj { iso: 'INR'|'USD'|..., symbol: '₹'|'$'|... }
+         * @returns {string} Formatted compact money string
+         */
+        function formatCurrency(value, currencyObj) {
+            var val = Number(value || 0);
+            if (isNaN(val)) { val = 0; }
+            var symbol = (currencyObj && currencyObj.symbol) ? currencyObj.symbol : '';
+            var iso = (currencyObj && currencyObj.iso) ? String(currencyObj.iso).toUpperCase() : '';
+
+            var isIndian = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'].indexOf(iso) !== -1;
+            var formattedNum = '';
+
+            if (isIndian) {
+                var absVal = Math.abs(val);
+                if (absVal >= 10000000) {
+                    formattedNum = (val / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2 }) + ' Cr';
+                } else if (absVal >= 100000) {
+                    formattedNum = (val / 100000).toLocaleString('en-IN', { maximumFractionDigits: 2 }) + ' Lakh';
+                } else {
+                    formattedNum = val.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+                }
+            } else {
+                var absValNonInd = Math.abs(val);
+                if (absValNonInd >= 1000000000) {
+                    formattedNum = (val / 1000000000).toLocaleString('en-US', { maximumFractionDigits: 2 }) + 'B';
+                } else if (absValNonInd >= 1000000) {
+                    formattedNum = (val / 1000000).toLocaleString('en-US', { maximumFractionDigits: 2 }) + 'M';
+                } else {
+                    formattedNum = val.toLocaleString('en-US', { maximumFractionDigits: 2 });
+                }
+            }
+
+            return symbol ? (symbol + ' ' + formattedNum).trim() : formattedNum;
+        }
+
         function formatCount(value) {
             return Number(value || 0).toLocaleString(window.navigator.language);
         }
+// ===== NEW CODE END — currency format =====
+
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//        function formatCount(value) {
+//            return Number(value || 0).toLocaleString(window.navigator.language);
+//        }
+// ----- END OLD CODE -----
 
         function escapeHtml(value) {
             return String(value == null ? "" : value)

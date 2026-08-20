@@ -116,6 +116,90 @@
             });
         }
 
+// ===== NEW CODE START — currency format (agent C04, 2026-08-19) =====
+        var currencyInfo = { iso: "", symbol: "" };
+
+        function formatCurrency(val, currencyObj) {
+            var amount = Number(val || 0);
+            if (isNaN(amount)) { amount = 0; }
+            var cur = currencyObj || currencyInfo || {};
+            var symbol = cur.symbol || "";
+            var iso = (cur.iso || "").toUpperCase();
+
+            var indianISOs = ["INR", "PKR", "BDT", "NPR", "BTN", "LKR"];
+            var formattedNum = "";
+
+            if (indianISOs.indexOf(iso) !== -1) {
+                var absAmt = Math.abs(amount);
+                var sign = amount < 0 ? "-" : "";
+                if (absAmt >= 10000000) {
+                    formattedNum = sign + (absAmt / 10000000).toFixed(2).replace(/\.00$/, '') + ' Cr';
+                } else if (absAmt >= 100000) {
+                    formattedNum = sign + (absAmt / 100000).toFixed(2).replace(/\.00$/, '') + ' L';
+                } else {
+                    var parts = absAmt.toFixed(2).split('.');
+                    var numStr = parts[0];
+                    var decStr = parts[1];
+                    if (numStr.length > 3) {
+                        var last3 = numStr.substring(numStr.length - 3);
+                        var otherDigits = numStr.substring(0, numStr.length - 3);
+                        formattedNum = otherDigits.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + last3;
+                    } else {
+                        formattedNum = numStr;
+                    }
+                    if (decStr && decStr !== "00") {
+                        formattedNum += "." + decStr;
+                    }
+                    formattedNum = sign + formattedNum;
+                }
+            } else {
+                var absAmt = Math.abs(amount);
+                var sign = amount < 0 ? "-" : "";
+                if (absAmt >= 1000000000) {
+                    formattedNum = sign + (absAmt / 1000000000).toFixed(2).replace(/\.00$/, '') + 'B';
+                } else if (absAmt >= 1000000) {
+                    formattedNum = sign + (absAmt / 1000000).toFixed(2).replace(/\.00$/, '') + 'M';
+                } else {
+                    formattedNum = amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                }
+            }
+
+            return symbol ? (symbol + " " + formattedNum).trim() : formattedNum;
+        }
+
+        function formatCount(value) {
+            var n = Number(value || 0);
+            return n.toLocaleString(window.navigator.language);
+        }
+
+        function renderMetric(data) {
+            var count = Number(data.count || 0);
+            if (data.currency) {
+                currencyInfo = data.currency;
+            }
+
+            if ($valueEl) {
+                $valueEl.text(formatCount(count));
+                $valueEl.attr('title', count.toLocaleString(window.navigator.language));
+                $valueEl.attr('aria-live', 'polite');
+
+                // Success tone (#20A464) when count >= 1, neutral (#102C3F) when 0
+                if (count >= 1) {
+                    $valueEl.addClass('vas-completed-today-success');
+                } else {
+                    $valueEl.removeClass('vas-completed-today-success');
+                }
+            }
+
+            if ($metaEl) {
+                var metaMsg = lbl("VAS_170_FullyReceived", "Fully received");
+                $metaEl.text(metaMsg);
+                $metaEl.attr('title', metaMsg);
+            }
+        }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+/*
         function renderMetric(data) {
             var count = Number(data.count || 0);
 
@@ -138,6 +222,8 @@
                 $metaEl.attr('title', metaMsg);
             }
         }
+*/
+// ----- END OLD CODE -----
 
         function setError() {
             if ($valueEl) {

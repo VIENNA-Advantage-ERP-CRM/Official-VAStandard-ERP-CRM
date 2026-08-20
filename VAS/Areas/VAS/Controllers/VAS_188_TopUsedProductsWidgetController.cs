@@ -124,7 +124,12 @@ namespace VIS.Controllers
                 Log.Log(Level.SEVERE, "VAS_188_TopUsedProductsWidget.GetTopProducts", ex);
                 return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" }), JsonRequestBehavior.AllowGet);
             }
-            return Json(JsonConvert.SerializeObject(new { products = products, success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
+            return Json(JsonConvert.SerializeObject(new { products = products, currency = GetCurrencyInfo(ctx), success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//          return Json(JsonConvert.SerializeObject(new { products = products, success = true }), JsonRequestBehavior.AllowGet);
+// ----- END OLD CODE -----
         }
 
         /// <summary>Endpoint B: Individual issue lines for a specific product in selected period for modal.</summary>
@@ -185,7 +190,12 @@ namespace VIS.Controllers
                 Log.Log(Level.SEVERE, "VAS_188_TopUsedProductsWidget.GetProductUsageDetails", ex);
                 return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" }), JsonRequestBehavior.AllowGet);
             }
-            return Json(JsonConvert.SerializeObject(new { lines = lines, success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
+            return Json(JsonConvert.SerializeObject(new { lines = lines, currency = GetCurrencyInfo(ctx), success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//          return Json(JsonConvert.SerializeObject(new { lines = lines, success = true }), JsonRequestBehavior.AllowGet);
+// ----- END OLD CODE -----
         }
 
         /// <summary>
@@ -195,11 +205,17 @@ namespace VIS.Controllers
         /// </summary>
         private static string BuildAccessibleInventorySql(Ctx ctx, string periodStart, string periodEnd)
         {
+            // Source design (top-used-products-widget.md section 3): "Exclude documents with
+            // DocStatus = Drafted (not yet actual consumption). Posted, Completed, and In Process
+            // count." The previous IN ('CO','CL') silently dropped every In Process document, so
+            // material already issued against an IP document never appeared in the ranking.
+            // Voided ('VO') and Reversed ('RE') stay excluded - they are not consumption either,
+            // which is why this is an explicit include-list rather than DocStatus <> 'DR'.
             string sql = @"
                     SELECT inv.M_Inventory_ID, inv.DocumentNo, inv.MovementDate
                     FROM M_Inventory inv
                     WHERE inv.IsActive = 'Y'
-                      AND inv.DocStatus IN ('CO', 'CL')
+                      AND inv.DocStatus IN ('CO', 'CL', 'IP')
                       AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
                       AND inv.MovementDate >= " + periodStart + @"
                       AND inv.MovementDate < " + periodEnd;
@@ -250,5 +266,59 @@ namespace VIS.Controllers
             }
             return "CAST('" + date.ToString("yyyy-MM-dd") + "' AS DATE)";
         }
+
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
+        /// <summary>
+        /// Retrieves tenant/organization base currency info (ISO code and symbol).
+        /// Checks $C_Currency_ID from context first; falls back to C_AcctSchema if absent.
+        /// </summary>
+        private object GetCurrencyInfo(Ctx ctx)
+        {
+            string iso = "";
+            string symbol = "";
+            int currencyId = ctx.GetContextAsInt("$C_Currency_ID");
+            if (currencyId > 0)
+            {
+                IDataReader cdr = null;
+                try
+                {
+                    cdr = DB.ExecuteReader(
+                        "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @Cur",
+                        new SqlParameter[] { new SqlParameter("@Cur", currencyId) });
+                    if (cdr != null && cdr.Read())
+                    {
+                        iso = Util.GetValueOfString(cdr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                    }
+                }
+                finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
+            }
+
+            if (string.IsNullOrEmpty(iso))
+            {
+                int clientId = ctx.GetAD_Client_ID();
+                IDataReader cdr = null;
+                try
+                {
+                    string sql = @"
+                        SELECT c.ISO_Code, c.CurSymbol
+                        FROM AD_ClientInfo ci
+                        INNER JOIN C_AcctSchema a ON (a.C_AcctSchema_ID = ci.C_AcctSchema1_ID AND a.IsActive = 'Y')
+                        INNER JOIN C_Currency c ON (c.C_Currency_ID = a.C_Currency_ID AND c.IsActive = 'Y')
+                        WHERE ci.AD_Client_ID = @ClientId";
+                    cdr = DB.ExecuteReader(sql, new SqlParameter[] { new SqlParameter("@ClientId", clientId) });
+                    if (cdr != null && cdr.Read())
+                    {
+                        iso = Util.GetValueOfString(cdr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                    }
+                }
+                finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
+            }
+
+            return new { iso = iso, symbol = symbol };
+        }
+// ===== NEW CODE END — currency format =====
     }
 }
+

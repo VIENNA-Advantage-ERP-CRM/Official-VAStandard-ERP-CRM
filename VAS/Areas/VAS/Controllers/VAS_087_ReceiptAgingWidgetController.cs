@@ -70,9 +70,11 @@ namespace VIS.Controllers
                        BPartner.Name AS Supplier,
                        COALESCE(PurchaseOrder.DocumentNo, " + NLiteral("-") + @") AS Linked_PO_No,
                        InOut.MovementDate AS Received_On,
-                       InOut.DocStatus AS Doc_Status
+                       InOut.DocStatus AS Doc_Status,
+                       Warehouse.Name AS Warehouse_Name
                 FROM M_InOut InOut
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
+                LEFT OUTER JOIN M_Warehouse Warehouse ON (Warehouse.M_Warehouse_ID=InOut.M_Warehouse_ID AND Warehouse.IsActive='Y')
                 LEFT OUTER JOIN C_Order PurchaseOrder ON (PurchaseOrder.C_Order_ID=InOut.C_Order_ID AND PurchaseOrder.IsActive='Y')
                 WHERE InOut.IsActive='Y'
                   AND InOut.IsSOTrx='N'
@@ -98,6 +100,7 @@ namespace VIS.Controllers
                        AgingData.Uom,
                        AgingData.Received_On,
                        AgingData.Doc_Status,
+                       AgingData.Warehouse_Name,
                        AgingData.TotalRecords,
                        AgingData.Oldest_Received_On
                 FROM (
@@ -111,6 +114,7 @@ namespace VIS.Controllers
                            MIN(COALESCE(UOM.UOMSymbol, UOM.Name)) AS Uom,
                            HeaderData.Received_On,
                            HeaderData.Doc_Status,
+                           HeaderData.Warehouse_Name,
                            COUNT(1) OVER () AS TotalRecords,
                            MIN(HeaderData.Received_On) OVER () AS Oldest_Received_On
                     FROM (
@@ -124,7 +128,8 @@ namespace VIS.Controllers
                              HeaderData.Supplier,
                              HeaderData.Linked_PO_No,
                              HeaderData.Received_On,
-                             HeaderData.Doc_Status
+                             HeaderData.Doc_Status,
+                             HeaderData.Warehouse_Name
                 ) AgingData
                 ORDER BY AgingData.Received_On ASC, AgingData.GRN_No ASC
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
@@ -168,6 +173,7 @@ namespace VIS.Controllers
                         totalQty = Util.GetValueOfDecimal(dr["Total_Qty"]),
                         uom = Util.GetValueOfString(dr["Uom"]),
                         receivedOn = receivedOn.HasValue ? receivedOn.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture) : "",
+                        warehouse = Util.GetValueOfString(dr["Warehouse_Name"]),
                         statusCode = docStatus,
                         statusText = GetDocStatusName(ctx, docStatus)
                     });
@@ -220,12 +226,22 @@ namespace VIS.Controllers
             string lineConfirmJoin = hasLineConfirmTable
                 ? "LEFT OUTER JOIN M_InOutLineConfirm LineConfirm ON (LineConfirm.M_InOutLine_ID=InOutLine.M_InOutLine_ID AND LineConfirm.IsActive='Y')"
                 : "";
-            string locatorJoin = hasLineConfirmTable
-                ? "LEFT OUTER JOIN M_Locator Locator ON (Locator.M_Locator_ID=LineConfirm.M_Locator_ID AND Locator.IsActive='Y')"
-                : "";
+            // The locator was being read from M_InOutLineConfirm - a CONFIRMATION record that in
+            // practice does not exist (DB 1: 0 confirmation rows against 303 receipt lines), so the
+            // Locator column could only ever render "-". M_InOutLine carries M_Locator_ID directly
+            // and it is populated on 303/303 lines, so that is the real source. The confirmation
+            // locator is kept only as a secondary fallback where the table exists.
+            string locatorJoin =
+                "LEFT OUTER JOIN M_Locator Locator ON (Locator.M_Locator_ID=InOutLine.M_Locator_ID AND Locator.IsActive='Y')"
+                + (hasLineConfirmTable
+                    ? " LEFT OUTER JOIN M_Locator LocatorConfirm ON (LocatorConfirm.M_Locator_ID=LineConfirm.M_Locator_ID AND LocatorConfirm.IsActive='Y')"
+                    : "");
+            // Selected raw - no COALESCE against a string literal. Locator.Value is a national
+            // character set column and mixing it with a literal raises ORA-12704. The JS already
+            // renders "-" for an empty value.
             string locatorSql = hasLineConfirmTable
-                ? "COALESCE(Locator.Value, " + NLiteral("-") + ")"
-                : NLiteral("-");
+                ? "COALESCE(Locator.Value, LocatorConfirm.Value)"
+                : "Locator.Value";
 
             string linesSql = @"
                 SELECT Product.Name AS Item_Name,
