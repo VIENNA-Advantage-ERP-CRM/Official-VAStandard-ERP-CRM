@@ -149,7 +149,7 @@ namespace VASLogic.Models
                   AND EXISTS(SELECT 1 FROM C_PeriodControl pc WHERE pc.C_Period_ID=p.C_Period_ID AND pc.IsActive='Y' AND pc.PeriodStatus=@PeriodStatus)";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            sql += " ORDER BY p.StartDate,p.EndDate,p.C_Period_ID";
+            sql += " ORDER BY p.StartDate DESC,p.EndDate DESC,p.C_Period_ID DESC";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
