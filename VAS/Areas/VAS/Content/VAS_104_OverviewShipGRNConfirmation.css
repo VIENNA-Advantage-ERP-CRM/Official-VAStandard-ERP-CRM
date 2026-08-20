@@ -738,6 +738,51 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+/* The line a shared-source row carries under its headline: a mail's or letter's
+   recipients, a call's number, a meeting's location and state. flex-basis 100%
+   gives it a row of its own so the "when · by whom" stays up on the headline's
+   line, where every other activity row carries it. */
+.vas_104-actSub {
+    order: 4;
+    flex: 0 0 100%;
+    min-width: 0;
+    font-size: 0.6875em;
+    color: var(--gc-muted);
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* A row carrying a message body (a mail or a letter) opens it on click. */
+.vas_104-actRow.vas_104-openable { cursor: pointer; }
+.vas_104-actRow.vas_104-openable:hover { background: var(--gc-info-bg); }
+
+/* The message body, revealed under its row. A SIBLING of the row, not a child,
+   so it spans the card's full width instead of being trapped beside the badge. */
+.vas_104-actBody {
+    padding: 0.625em 0.75em 0.75em;
+    margin: 0 0 0.5em;
+    border-radius: 9px;
+    background: var(--gc-info-bg);
+    border: 1px solid var(--gc-card-bd);
+}
+.vas_104-actMeta {
+    font-size: 0.6875em;
+    color: var(--gc-muted);
+    word-break: break-word;
+}
+.vas_104-actMeta + .vas_104-actMeta { margin-top: 0.125em; }
+/* The message itself keeps the sender's own line breaks. */
+.vas_104-actBody p {
+    margin: 0.5em 0 0;
+    font-size: 0.8125em;
+    color: var(--gc-text);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .vas_104-actWhen {
     flex: none;
     margin-left: auto;

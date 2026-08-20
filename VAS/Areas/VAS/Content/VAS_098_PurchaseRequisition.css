@@ -376,6 +376,17 @@
 .vas_098-src .vas_098-bar i { display:block; height:100%; border-radius:99px }
 .vas_098-src.vas_098-full i { background:var(--rq-success-tx) } .vas_098-src.vas_098-short i { background:var(--rq-warn-tx) }
 .vas_098-src.vas_098-full { color:var(--rq-success-tx); font-weight:500 } .vas_098-src.vas_098-short { color:var(--rq-warn-tx); font-weight:500 }
+/* Received cell: the bar sits ABOVE the received/ordered ratio rather than beside
+   it, so the bar can be wide enough to read as a proportion in a column narrow
+   enough to hold the ratio. Green once the line has everything it asked for,
+   orange while it is short — the same two tones the source cell above uses, so
+   "short" means the same thing wherever it is drawn. */
+.vas_098-recv { display:inline-flex; flex-direction:column; align-items:flex-end; gap:3px; font-size:12.5px; max-width:100% }
+.vas_098-recv .vas_098-bar { width:72px; max-width:100%; height:5px; border-radius:99px; background:#E7EEF4; overflow:hidden; flex:none }
+.vas_098-recv .vas_098-bar i { display:block; height:100%; border-radius:99px }
+.vas_098-recvRatio { line-height:1.2; white-space:nowrap }
+.vas_098-recv.vas_098-full i { background:var(--rq-success-tx) } .vas_098-recv.vas_098-short i { background:var(--rq-warn-tx) }
+.vas_098-recv.vas_098-full { color:var(--rq-success-tx); font-weight:500 } .vas_098-recv.vas_098-short { color:var(--rq-warn-tx); font-weight:500 }
 .vas_098-itfoot { display:flex; align-items:center; justify-content:flex-end; gap:22px; flex-wrap:wrap; padding:10px 16px;
     background:var(--rq-faint-blue); border-top:1px solid var(--rq-border); font-size:13px }
 .vas_098-tf { color:var(--rq-text-2) } .vas_098-tf b { color:var(--rq-text); font-weight:600; margin-left:6px }
@@ -428,6 +439,14 @@
 .vas_098-actbadge.vas_098-po  { background:#E4F0FF; color:#0E5DA8 }
 .vas_098-actbadge.vas_098-grn { background:#CCEFDD; color:#0C5D38 }
 .vas_098-actbadge.vas_098-email { background:#EFEAFF; color:#5F4AA6 }
+/* The shared correspondence / engagement sources. A letter wears the mail's
+   colours — it is the same record in the same table, filed under a different
+   attachment type — while a meeting, a task and a call each take one of their
+   own, so a reader scanning the feed can tell the four apart at a glance. */
+.vas_098-actbadge.vas_098-letter { background:#EFEAFF; color:#5F4AA6 }
+.vas_098-actbadge.vas_098-appt   { background:#E8F2FC; color:#0E5DA8 }
+.vas_098-actbadge.vas_098-task   { background:#FCEFD2; color:#9A6500 }
+.vas_098-actbadge.vas_098-call   { background:#E0F2F1; color:#0B7A6B }
 .vas_098-actmain { flex:1; min-width:0 }
 /* Headline left, "when · by whom" right — wrapping when the two cannot share a
    line. The stamp now carries the actor's name on every row, not just an

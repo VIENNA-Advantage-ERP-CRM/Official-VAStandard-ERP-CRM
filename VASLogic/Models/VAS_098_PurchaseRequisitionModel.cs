@@ -212,6 +212,115 @@
 ///                        is not an edit, and the platform logs plenty of those.
 ///                        The trail said WHICH field moved but never what it moved
 ///                        from or to. Follows VAS_101 / VAS_104.
+///   VAI163   2026-08-20  - The line's unit price is restated onto its selected
+///                          unit through the product's UOM CONVERSION
+///                          (MUOMConversion.GetProductRateFrom, the base units one
+///                          selected unit is) rather than through the ratio between
+///                          the line's own two quantities. QtyEntered is an
+///                          optional column and is not maintained by every path
+///                          that writes a line — a replenishment / project /
+///                          work-order line carries Qty only — so the derived ratio
+///                          collapsed to 1 and the row showed the BASE price under
+///                          a "BOX" label. The quantity is derived from the same
+///                          rate when the line carries no entered quantity, so the
+///                          two still read against each other. The quantity ratio
+///                          remains the fallback for a line whose product has no
+///                          conversion (a charge line, chiefly).
+///                        - LoadBudgetAmount gains its last fallback,
+///                          LoadBudgetForYear: the amount budgeted under ANY GL
+///                          budget of the requisition's tenant and organisation,
+///                          within the fiscal YEAR its document date falls in. The
+///                          two reads above it both require GL_Budget
+///                          .BudgetControlBasis to be 'P' or 'A' — a column only
+///                          meaningful where commitment control is configured, and
+///                          left null by a deployment that merely budgets — so a
+///                          posted budget existed and the footer still read N/A.
+///                          The whole loader no longer returns early when that
+///                          column is absent; only the two reads that need it are
+///                          skipped.
+///                        - The budget overage is recomputed after the fallback
+///                          runs. It was derived in RollUpTotals, which is over
+///                          before any of these reads, so a breach only ever
+///                          reported an amount when a LINE carried the budget.
+///                        - LoadMovementDocuments no longer groups by the value
+///                          sub-select. Oracle rejects a subquery expression in
+///                          GROUP BY outright (ORA-22818), so the statement failed,
+///                          the catch swallowed it, and the Documents section
+///                          listed NO material transfers at all — the aggregate is
+///                          now taken over a derived table and the value read
+///                          beside it. The transfer is also always priced, exactly
+///                          as VAS_103 prices it, so the row shows the same total
+///                          the Material Transfer screen does instead of a dash.
+///                        - GetWindowIdByTable validates AD_Table.AD_Window_ID
+///                          before returning it: the window is only usable when its
+///                          FIRST tab sits on the table, since the panel starts it
+///                          with an equal-query on that table's key column. The
+///                          MIN(SeqNo) test was added to the fallback query alone,
+///                          so a zoom target pointing at a window that carries the
+///                          table on a CHILD tab still came back and the framework
+///                          raised on screen — which is what a click on the field
+///                          service request and the production order chips
+///                          reported. Both are now also filtered by the role's
+///                          window access, and the resolved id travels with the
+///                          payload (LoadOriginWindows) so a chip with no window
+///                          renders as plain text rather than as a link that
+///                          cannot open.
+///   VAI163   2026-08-20  - An Inventory Use issue raised from the requisition now
+///                          reports its total value (LoadInternalUseDocuments),
+///                          summed the way VAS_102 sums its own: QtyInternalUse x
+///                          the line's cost / VA024 unit price. The row reported
+///                          no amount at all, on the argument that an issue's
+///                          value is a costing question — but the issue's own
+///                          screen answers it, and the two should not disagree.
+///                          Restructured over a derived table for the same
+///                          ORA-22818 reason as the movement query.
+///                        - Converted / In Fulfilment now answer for EVERY
+///                          document a requisition can be turned into, not only
+///                          its purchase orders (LoadConversionMilestones): the
+///                          RFQs issued from it, the material transfers and the
+///                          inventory-use issues fulfilling it, alongside the
+///                          purchase and blanket orders LoadLinkedOrderMilestones
+///                          already read. Converted is the EARLIEST of their
+///                          creation stamps and In Fulfilment the earliest
+///                          completion, so a requisition served by a transfer no
+///                          longer sat at "ready to convert" for the life of the
+///                          document. IsConverted is raised by any of them too —
+///                          it was C_OrderLine_ID alone, which only a purchase
+///                          order writes.
+///                        - Lines report what has been RECEIVED against them from
+///                          every fulfilling document, not only from goods
+///                          receipts (LoadReceivedQty): the completed material
+///                          transfers (M_MovementLine.MovementQty) and
+///                          inventory-use issues (M_InventoryLine.QtyInternalUse)
+///                          raised against the line are added to the receipts
+///                          reached through C_OrderLine_ID. All three are stored
+///                          in the product's base unit and are brought onto the
+///                          line's selected unit together.
+///                        - Added LoadBlanketOrderOrigin: the blanket order the
+///                          requisition was raised against, reached from the line's
+///                          Ref_OrderLine_ID either directly (the referenced order
+///                          IS the blanket) or through the release it points at
+///                          (C_OrderLine.C_OrderLine_Blanket_ID, else
+///                          C_Order.C_Order_Blanket — the link is written in two
+///                          places by two different code paths, so both are read).
+///                          IsSOTrx travels with it, so a blanket SALES order opens
+///                          its own screen. LoadSalesOrderOrigin stands down when
+///                          the order it found is that same blanket, so the strip
+///                          never carries one record twice.
+///                        - Window resolution follows VAS_092's order
+///                          (ResolveChipWindow): the window NAMED for the record
+///                          first, and only then the dictionary's table lookup.
+///                          LoadOriginWindows went straight to the table — the last
+///                          resort, meant for a screen that cannot be named — and
+///                          the production order's screen can be: VAS_102 opens it
+///                          as VAMFG_ProductionOrder. Only the two VA075 documents
+///                          have no nameable window left.
+///                        - GetWindowId filters by the ROLE's window access, as
+///                          GetWindowIdByTable does, and walks every candidate
+///                          rather than taking the first row. A window the role
+///                          cannot see raises when the framework starts it, and the
+///                          point of resolving up front is that a chip is drawn as
+///                          plain text instead.
 /// </summary>
 
 using System;
@@ -252,7 +361,7 @@ namespace VASLogic.Models
 
             LoadHeaderExtras(M_Requisition_ID, result);   // guarded custom columns
 
-            result.Lines = LoadLines(M_Requisition_ID);
+            result.Lines = LoadLines(ctx, M_Requisition_ID);
             LoadLineExtras(M_Requisition_ID, result.Lines); // guarded custom columns
             // Real on-hand stock at the source warehouse (needs the id resolved by
             // LoadHeaderExtras above), falling back to the requisition's own
@@ -268,7 +377,15 @@ namespace VASLogic.Models
             // Only when the lines carry no stamped budget of their own — see
             // LoadBudgetAmount.
             if (result.AvailableBudget == 0)
+            {
                 LoadBudgetAmount(M_Requisition_ID, result);
+                // RollUpTotals derives the overage, and it ran before this: a
+                // breach whose budget came from the fallback reported no amount at
+                // all until the figure was in hand.
+                if (result.IsBudgetBreach && result.AvailableBudget > 0 &&
+                    result.EstimatedValue > result.AvailableBudget)
+                    result.BudgetOverage = result.EstimatedValue - result.AvailableBudget;
+            }
 
             LoadMilestones(M_Requisition_ID, result);
 
@@ -498,7 +615,7 @@ namespace VASLogic.Models
         /// category + UOM + requested qty + price + line amount). Child of an
         /// already-authorized requisition, so no separate MRole filter.
         /// </summary>
-        private List<RequisitionLineData> LoadLines(int M_Requisition_ID)
+        private List<RequisitionLineData> LoadLines(Ctx ctx, int M_Requisition_ID)
         {
             List<RequisitionLineData> lines = new List<RequisitionLineData>();
 
@@ -535,6 +652,8 @@ namespace VASLogic.Models
                               rl.M_Product_ID,
                               rl.C_Charge_ID,
                               rl.C_OrderLine_ID,
+                              rl.C_UOM_ID,
+                              p.C_UOM_ID AS ProductUOM_ID,
                               p.Name    AS ProductName,
                               p.Value   AS ProductValue,
                               pcat.Name AS CategoryName,
@@ -570,14 +689,32 @@ namespace VASLogic.Models
                 // UomRatio is how many BASE units one SELECTED unit is (12, for a
                 // 12-EA box). Everything the database stores in the base unit —
                 // PriceActual, M_Storage.QtyOnHand, M_InOutLine.MovementQty — is
-                // brought onto the selected scale with it. It is derived from the
-                // line's own two quantities rather than from a UOM conversion
-                // lookup, so it is exactly the ratio this line was saved with.
+                // brought onto the selected scale with it.
+                //
+                // It comes from the product's own UOM CONVERSION, which is the
+                // definition of the rate and is always there to be read. It used to
+                // be derived from the line's two quantities (Qty / QtyEntered), and
+                // QtyEntered is an optional column that only the requisition WINDOW
+                // maintains — a line written by replenishment, by a project copy or
+                // by a work order carries Qty alone. The derived ratio then
+                // collapsed to 1 and the row showed the product's BASE price under
+                // the selected unit's label, which is exactly the price the panel
+                // exists to restate. The quantity ratio stays as the fallback for a
+                // line whose product has no conversion to read (a charge line,
+                // chiefly).
                 ln.BaseQty       = Util.GetValueOfDecimal(r["Qty"]);
                 ln.RequestedQty  = Util.GetValueOfDecimal(r["QtyEntered"]);
-                if (ln.RequestedQty == 0) ln.RequestedQty = ln.BaseQty;
-                ln.UomRatio      = (ln.RequestedQty != 0 && ln.BaseQty != 0)
-                    ? ln.BaseQty / ln.RequestedQty : 1;
+                ln.UomRatio      = GetUomRatio(ctx,
+                    Util.GetValueOfInt(r["M_Product_ID"]),
+                    Util.GetValueOfInt(r["C_UOM_ID"]),
+                    Util.GetValueOfInt(r["ProductUOM_ID"]));
+                if (ln.UomRatio <= 0 && ln.RequestedQty != 0 && ln.BaseQty != 0)
+                    ln.UomRatio = ln.BaseQty / ln.RequestedQty;
+                if (ln.UomRatio <= 0) ln.UomRatio = 1;
+                // A line with no entered quantity of its own is stated in the
+                // selected unit from the base one, so the figure reads against the
+                // unit the row is labelled with.
+                if (ln.RequestedQty == 0) ln.RequestedQty = ln.BaseQty / ln.UomRatio;
 
                 // Price per SELECTED unit. PriceActual is per base unit, and
                 // MRequisitionLine keeps LineNetAmt = Qty x PriceActual, so scaling
@@ -609,6 +746,46 @@ namespace VASLogic.Models
                 lines.Add(ln);
             }
             return lines;
+        }
+
+        /// <summary>
+        /// How many BASE units one unit of the line's SELECTED unit is — 12 for a
+        /// line keyed in 12-EA boxes of a product held in EA.
+        ///
+        /// This is the rate the platform itself converts a requisition line with:
+        /// MRequisitionLine.BeforeSave writes Qty (base) as
+        /// MUOMConversion.ConvertProductFrom(QtyEntered), which multiplies by the
+        /// product conversion's DIVIDE rate — the same figure
+        /// GetProductRateFrom returns here. Reading the definition rather than
+        /// inferring it from the line's two quantities means the rate is right even
+        /// where QtyEntered was never written, which is every line raised by a
+        /// process rather than typed into the window.
+        ///
+        /// Returns 0 when there is nothing to read — no product, no selected unit,
+        /// or a product with no conversion to that unit — which leaves the caller
+        /// on its quantity-derived fallback. A line already keyed in the product's
+        /// own unit is 1 by definition and is not looked up at all.
+        /// </summary>
+        /// <param name="ctx">User context (client, for the conversion cache).</param>
+        /// <param name="M_Product_ID">The line's product; 0 for a charge line.</param>
+        /// <param name="C_UOM_ID">The line's selected unit.</param>
+        /// <param name="productUomId">The product's own (base) unit.</param>
+        private decimal GetUomRatio(Ctx ctx, int M_Product_ID, int C_UOM_ID, int productUomId)
+        {
+            if (M_Product_ID <= 0 || C_UOM_ID <= 0) return 0;
+            if (productUomId > 0 && productUomId == C_UOM_ID) return 1;
+
+            try
+            {
+                decimal? rate = MUOMConversion.GetProductRateFrom(ctx, M_Product_ID, C_UOM_ID);
+                if (rate.HasValue && rate.Value > 0) return rate.Value;
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetUomRatio (M_Product_ID=" + M_Product_ID +
+                            ", C_UOM_ID=" + C_UOM_ID + "): " + ex.Message);
+            }
+            return 0;
         }
 
         /// <summary>
@@ -798,59 +975,139 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Fills each line's RECEIVED quantity: how much has been booked in against
-        /// it on a COMPLETED goods receipt.
+        /// Fills each line's RECEIVED quantity: how much of what the line asked for
+        /// has actually been delivered against it, across every kind of document
+        /// that can deliver it.
         ///
-        /// The path is the one the whole panel uses to reach downstream documents —
-        /// M_RequisitionLine.C_OrderLine_ID, the order line the conversion process
-        /// wrote back, and from there the receipt lines raised against that order
-        /// line. Only receipts that reached Completed or Closed count: a drafted
-        /// receipt has moved no stock, and reporting its quantity as received would
-        /// claim goods nobody has.
+        ///   Goods receipt   — through M_RequisitionLine.C_OrderLine_ID, the order
+        ///                     line the PO conversion writes back, and from there
+        ///                     the receipt lines raised against that order line
+        ///                     (M_InOutLine.MovementQty).
+        ///   Material transfer — M_MovementLine.M_RequisitionLine_ID
+        ///                     (MovementQty): stock moved in from another warehouse
+        ///                     satisfies the request exactly as a purchase does.
+        ///   Inventory Use   — M_InventoryLine.M_RequisitionLine_ID
+        ///                     (QtyInternalUse): issued straight out of stock.
         ///
-        /// M_InOutLine.MovementQty is in the product's base unit, so it is brought
-        /// onto the line's selected unit like every other stock figure here.
+        /// An RFQ delivers nothing — it asks for prices — so it contributes no
+        /// quantity, and neither does a purchase order on its own: ordering is not
+        /// receiving.
+        ///
+        /// Only documents that reached Completed or Closed count. A drafted one has
+        /// moved no stock, and reporting its quantity as received would claim goods
+        /// nobody has.
+        ///
+        /// All three quantities are stored in the product's BASE unit, so the total
+        /// is brought onto the line's selected unit like every other stock figure
+        /// here. The two module-owned sources are dictionary-guarded and separately
+        /// try/caught, so an absent module drops only its own contribution.
         /// </summary>
         /// <param name="M_Requisition_ID">Owning requisition id.</param>
         /// <param name="lines">Lines to enrich, keyed by line id.</param>
         private void LoadReceivedQty(int M_Requisition_ID, List<RequisitionLineData> lines)
         {
+            Dictionary<int, decimal> byId = new Dictionary<int, decimal>();
+
+            // ----- Goods receipts, through the order line the PO conversion wrote -----
+            AddReceivedQty(M_Requisition_ID, byId, "M_InOut", "",  "",
+                @"SELECT rl.M_RequisitionLine_ID,
+                         COALESCE(SUM(iol.MovementQty), 0) AS ReceivedQty
+                    FROM M_RequisitionLine rl
+                   INNER JOIN M_InOutLine iol
+                           ON (iol.C_OrderLine_ID = rl.C_OrderLine_ID)
+                   INNER JOIN M_InOut io
+                           ON (io.M_InOut_ID = iol.M_InOut_ID)
+                   WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                     AND rl.IsActive  = 'Y'
+                     AND iol.IsActive = 'Y'
+                     AND io.IsActive  = 'Y'
+                     AND io.IsSOTrx   = 'N'
+                     AND io.DocStatus IN ('CO', 'CL')
+                   GROUP BY rl.M_RequisitionLine_ID");
+
+            // ----- Material transfers raised against the line -----
+            AddReceivedQty(M_Requisition_ID, byId, "M_Movement",
+                "M_MovementLine", "M_RequisitionLine_ID",
+                @"SELECT ml.M_RequisitionLine_ID,
+                         COALESCE(SUM(ml.MovementQty), 0) AS ReceivedQty
+                    FROM M_MovementLine ml
+                   INNER JOIN M_Movement m
+                           ON (m.M_Movement_ID = ml.M_Movement_ID)
+                   INNER JOIN M_RequisitionLine rl
+                           ON (rl.M_RequisitionLine_ID = ml.M_RequisitionLine_ID)
+                   WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                     AND rl.IsActive = 'Y'
+                     AND ml.IsActive = 'Y'
+                     AND m.IsActive  = 'Y'
+                     AND m.DocStatus IN ('CO', 'CL')
+                   GROUP BY ml.M_RequisitionLine_ID");
+
+            // ----- Inventory Use issued against the line -----
+            AddReceivedQty(M_Requisition_ID, byId, "M_Inventory",
+                "M_InventoryLine", "M_RequisitionLine_ID",
+                @"SELECT il.M_RequisitionLine_ID,
+                         COALESCE(SUM(il.QtyInternalUse), 0) AS ReceivedQty
+                    FROM M_InventoryLine il
+                   INNER JOIN M_Inventory inv
+                           ON (inv.M_Inventory_ID = il.M_Inventory_ID)
+                   INNER JOIN M_RequisitionLine rl
+                           ON (rl.M_RequisitionLine_ID = il.M_RequisitionLine_ID)
+                   WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                     AND rl.IsActive  = 'Y'
+                     AND il.IsActive  = 'Y'
+                     AND inv.IsActive = 'Y'
+                     AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
+                     AND inv.DocStatus IN ('CO', 'CL')
+                   GROUP BY il.M_RequisitionLine_ID");
+
+            if (byId.Count == 0) return;
+
+            foreach (RequisitionLineData ln in lines)
+            {
+                decimal received;
+                if (!byId.TryGetValue(ln.M_RequisitionLine_ID, out received)) continue;
+                ln.ReceivedQty = ln.UomRatio != 0 ? received / ln.UomRatio : received;
+            }
+        }
+
+        /// <summary>
+        /// Runs one received-quantity query and ADDS its per-line totals into the
+        /// running tally — see <see cref="LoadReceivedQty"/>. Each source is a
+        /// separate delivery of the same request, so they sum rather than compete.
+        /// </summary>
+        /// <param name="M_Requisition_ID">Owning requisition id.</param>
+        /// <param name="byId">Running total, keyed by requisition line id.</param>
+        /// <param name="what">Document being read, for the log line only.</param>
+        /// <param name="guardTable">Table carrying the link column, or "" to skip
+        /// the guard.</param>
+        /// <param name="guardColumn">The link column that must exist.</param>
+        /// <param name="sql">The query. Must select M_RequisitionLine_ID and
+        /// ReceivedQty, and bind @M_Requisition_ID exactly once.</param>
+        private void AddReceivedQty(int M_Requisition_ID, Dictionary<int, decimal> byId,
+                                    string what, string guardTable, string guardColumn,
+                                    string sql)
+        {
+            if (!string.IsNullOrEmpty(guardTable) && !ColumnExists(guardTable, guardColumn))
+                return;
+
             try
             {
-                string sql = @"SELECT rl.M_RequisitionLine_ID,
-                                      COALESCE(SUM(iol.MovementQty), 0) AS ReceivedQty
-                                 FROM M_RequisitionLine rl
-                                INNER JOIN M_InOutLine iol
-                                        ON (iol.C_OrderLine_ID = rl.C_OrderLine_ID)
-                                INNER JOIN M_InOut io
-                                        ON (io.M_InOut_ID = iol.M_InOut_ID)
-                                WHERE rl.M_Requisition_ID = @M_Requisition_ID
-                                  AND rl.IsActive  = 'Y'
-                                  AND iol.IsActive = 'Y'
-                                  AND io.IsActive  = 'Y'
-                                  AND io.IsSOTrx   = 'N'
-                                  AND io.DocStatus IN ('CO', 'CL')
-                                GROUP BY rl.M_RequisitionLine_ID";
                 DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
 
-                Dictionary<int, decimal> byId = new Dictionary<int, decimal>();
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
-                    byId[Util.GetValueOfInt(r["M_RequisitionLine_ID"])] =
-                        Util.GetValueOfDecimal(r["ReceivedQty"]);
-                }
-
-                foreach (RequisitionLineData ln in lines)
-                {
-                    decimal received;
-                    if (!byId.TryGetValue(ln.M_RequisitionLine_ID, out received)) continue;
-                    ln.ReceivedQty = ln.UomRatio != 0 ? received / ln.UomRatio : received;
+                    int lineId = Util.GetValueOfInt(r["M_RequisitionLine_ID"]);
+                    if (lineId <= 0) continue;
+                    decimal running;
+                    byId.TryGetValue(lineId, out running);
+                    byId[lineId] = running + Util.GetValueOfDecimal(r["ReceivedQty"]);
                 }
             }
             catch (Exception ex)
             {
-                _log.Severe("LoadReceivedQty (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
+                _log.Severe("AddReceivedQty/" + what +
+                            " (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
             }
         }
 
@@ -960,6 +1217,8 @@ namespace VASLogic.Models
             d.PostedDate = GetPostedDate(M_Requisition_ID);
 
             LoadLinkedOrderMilestones(M_Requisition_ID, d);
+            // ... and every other document the requisition can be turned into.
+            LoadConversionMilestones(M_Requisition_ID, d);
 
             // The requisition's own close always wins as the closing moment.
             if (d.StatusCode == "CL")
@@ -1108,6 +1367,126 @@ namespace VASLogic.Models
             }
         }
 
+        /// <summary>
+        /// Carries the Converted / In Fulfilment milestones over EVERY document a
+        /// requisition can be turned into, not only its purchase orders.
+        ///
+        /// A requisition is converted the moment something is raised from it. The
+        /// stepper only ever knew about C_Order — reached through
+        /// M_RequisitionLine.C_OrderLine_ID, which is what the PO conversion writes
+        /// back — so a requisition served by a material transfer, answered by an
+        /// RFQ or issued straight out of stock sat at "ready to convert" for the
+        /// life of the document, with the Documents section listing the very
+        /// document that contradicts it.
+        ///
+        /// Each source contributes two stamps:
+        ///   Converted   — when the document was CREATED. The earliest across all
+        ///                 of them wins: conversion happened once, at the first of
+        ///                 them, and a later transfer does not un-convert it.
+        ///   Fulfilment  — when a document that reached Completed or Closed was
+        ///                 last changed. The earliest again: fulfilment began with
+        ///                 the first document to complete.
+        ///
+        /// Purchase and blanket orders are not read here — LoadLinkedOrderMilestones
+        /// already has them, and both are C_Order — but their dates are merged
+        /// with these, so whichever kind came first is the one the stage reports.
+        ///
+        /// Every source is column-guarded and independently try/caught: a schema
+        /// without the module behind one contributes nothing rather than costing
+        /// the stage its other sources.
+        /// </summary>
+        /// <param name="M_Requisition_ID">Selected requisition id.</param>
+        /// <param name="d">Overview payload being populated.</param>
+        private void LoadConversionMilestones(int M_Requisition_ID, RequisitionOverviewData d)
+        {
+            // RFQs issued from the requisition.
+            AddConversionMilestone(M_Requisition_ID, d, "C_RfQ", "C_RfQ", "M_Requisition_ID",
+                @"SELECT q.Created, q.Updated, q.DocStatus
+                    FROM C_RfQ q
+                   WHERE q.M_Requisition_ID = @M_Requisition_ID
+                     AND q.IsActive = 'Y'");
+
+            // Material transfers fulfilling it.
+            AddConversionMilestone(M_Requisition_ID, d, "M_Movement", "M_MovementLine", "M_RequisitionLine_ID",
+                @"SELECT DISTINCT m.M_Movement_ID, m.Created, m.Updated, m.DocStatus
+                    FROM M_Movement m
+                   INNER JOIN M_MovementLine ml ON (ml.M_Movement_ID = m.M_Movement_ID)
+                   INNER JOIN M_RequisitionLine rl
+                           ON (rl.M_RequisitionLine_ID = ml.M_RequisitionLine_ID)
+                   WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                     AND m.IsActive  = 'Y'
+                     AND ml.IsActive = 'Y'
+                     AND rl.IsActive = 'Y'");
+
+            // Inventory Use issues raised against it. Restricted to internal use:
+            // a physical count shares the same tables and is not a conversion.
+            AddConversionMilestone(M_Requisition_ID, d, "M_Inventory", "M_InventoryLine", "M_RequisitionLine_ID",
+                @"SELECT DISTINCT inv.M_Inventory_ID, inv.Created, inv.Updated, inv.DocStatus
+                    FROM M_Inventory inv
+                   INNER JOIN M_InventoryLine il ON (il.M_Inventory_ID = inv.M_Inventory_ID)
+                   INNER JOIN M_RequisitionLine rl
+                           ON (rl.M_RequisitionLine_ID = il.M_RequisitionLine_ID)
+                   WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                     AND inv.IsActive = 'Y'
+                     AND il.IsActive  = 'Y'
+                     AND rl.IsActive  = 'Y'
+                     AND COALESCE(inv.IsInternalUse, 'N') = 'Y'");
+
+            // Anything raised at all IS the conversion. IsConverted used to be
+            // ConvertedLineCount > 0 (RollUpTotals), which counts only the lines a
+            // PURCHASE ORDER was written back onto.
+            if (d.ConvertedDate.HasValue) d.IsConverted = true;
+        }
+
+        /// <summary>
+        /// Runs one "documents raised from this requisition" query and folds its
+        /// rows into the Converted / In Fulfilment stamps — see
+        /// <see cref="LoadConversionMilestones"/>.
+        /// </summary>
+        /// <param name="M_Requisition_ID">Selected requisition id.</param>
+        /// <param name="d">Overview payload being populated.</param>
+        /// <param name="what">Table being read, for the log line only.</param>
+        /// <param name="guardTable">Table carrying the link column.</param>
+        /// <param name="guardColumn">The link column that must exist.</param>
+        /// <param name="sql">The query. Must select Created, Updated and DocStatus,
+        /// and bind @M_Requisition_ID exactly once.</param>
+        private void AddConversionMilestone(int M_Requisition_ID, RequisitionOverviewData d,
+                                            string what, string guardTable, string guardColumn,
+                                            string sql)
+        {
+            if (!ColumnExists(guardTable, guardColumn)) return;
+
+            try
+            {
+                DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    DateTime? created = Util.GetValueOfDateTime(r["Created"]);
+                    DateTime? updated = Util.GetValueOfDateTime(r["Updated"]);
+                    string status     = Util.GetValueOfString(r["DocStatus"]);
+
+                    if (created.HasValue &&
+                        (!d.ConvertedDate.HasValue || created.Value < d.ConvertedDate.Value))
+                        d.ConvertedDate = created;
+
+                    if (status == "CO" || status == "CL")
+                    {
+                        d.HasOrdered = true;
+                        if (updated.HasValue &&
+                            (!d.FulfilmentDate.HasValue || updated.Value < d.FulfilmentDate.Value))
+                            d.FulfilmentDate = updated;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("AddConversionMilestone/" + what +
+                            " (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
+            }
+        }
+
         // ----------------------------------------------------------------- //
         //  Activity                                                          //
         // ----------------------------------------------------------------- //
@@ -1161,6 +1540,9 @@ namespace VASLogic.Models
 
             // E-mails sent against the requisition.
             LoadEmailActivity(M_Requisition_ID, activity);
+
+            // Appointments, tasks, calls and letters filed against it.
+            LoadSharedSourceActivity(M_Requisition_ID, activity);
 
             activity.Sort((a, b) =>
                 b.Created.GetValueOrDefault(DateTime.MinValue)
@@ -1217,6 +1599,10 @@ namespace VASLogic.Models
                                         WHERE UPPER(t.TableName) = 'M_REQUISITION')
                                   AND ma.Record_ID          = @M_Requisition_ID
                                   AND NVL(ma.IsActive, 'Y') = 'Y'
+                                  -- Letters ('I') are a kind of their own and are
+                                  -- read by LoadSharedSourceActivity; without this
+                                  -- they would appear twice, once as an e-mail.
+                                  AND COALESCE(ma.AttachmentType, 'M') <> 'I'
                                   AND (NVL(TRIM(ma.MailAddress), ' ')    <> ' '
                                     OR NVL(TRIM(ma.MailAddressCc), ' ')  <> ' '
                                     OR NVL(TRIM(ma.MailAddressBcc), ' ') <> ' ')
@@ -1490,7 +1876,9 @@ namespace VASLogic.Models
                                       cl.NewValue     AS NewValue,
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
-                                      col.ColumnName  AS FieldColumn
+                                      col.ColumnName  AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId
                                  FROM AD_ChangeLog cl
                                 INNER JOIN AD_Table adt
                                         ON (adt.AD_Table_ID = cl.AD_Table_ID)
@@ -1527,6 +1915,8 @@ namespace VASLogic.Models
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
                                       col.ColumnName  AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId,
                                       l.Line          AS LineNo,
                                       p.Name          AS ProductName
                                  FROM AD_ChangeLog cl
@@ -1586,16 +1976,25 @@ namespace VASLogic.Models
 
             // The move itself. A save that rewrites a field with the value it
             // already had is not an edit, and the platform logs plenty of those.
+            // Compared on the RAW values, before either is resolved: two records
+            // can share a name, and dropping such a row would hide a real edit.
             string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
             string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
             if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) return;
+
+            // ... and then reported as the field SHOWS them, not as the log stored
+            // them: a reference reads as the referenced record's identifier, a list
+            // value as its label, a date as the date alone.
+            string column  = Util.GetValueOfString(r["FieldColumn"]);
+            int refType    = Util.GetValueOfInt(r["RefType"]);
+            int refValueId = Util.GetValueOfInt(r["RefValueId"]);
 
             list.Add(new ActivityData
             {
                 Type        = "updated",
                 FieldName   = field,
-                OldValue    = oldValue,
-                NewValue    = newValue,
+                OldValue    = _changeValues.Display(oldValue, column, refType, refValueId),
+                NewValue    = _changeValues.Display(newValue, column, refType, refValueId),
                 ChangeScope = scope,
                 UserName    = Util.GetValueOfString(r["UserName"]),
                 Created     = at
@@ -1664,6 +2063,48 @@ namespace VASLogic.Models
                             " (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
             }
         }
+
+        /// <summary>
+        /// The correspondence and engagement sources shared with every other
+        /// overview panel: appointments and tasks (AppointmentsInfo, split on
+        /// IsTask), calls (VA048_CallDetails) and letters (MailAttachment1,
+        /// AttachmentType 'I'). Each hangs off the requisition by AD_Table_ID +
+        /// Record_ID.
+        ///
+        /// Mails are NOT taken from here — LoadEmailActivity above reads them with
+        /// the recipient and body detail this panel's mail drawer needs, and now
+        /// excludes letters so the two do not overlap.
+        /// </summary>
+        /// <param name="M_Requisition_ID">Selected requisition id.</param>
+        /// <param name="list">Activity list being populated.</param>
+        private void LoadSharedSourceActivity(int M_Requisition_ID, List<ActivityData> list)
+        {
+            List<VAS_ActivitySourceRow> rows =
+                _activitySources.Load("M_Requisition", M_Requisition_ID, false);
+            foreach (VAS_ActivitySourceRow s in rows)
+            {
+                list.Add(new ActivityData
+                {
+                    Type        = s.Kind,      // appointment | task | call | letter
+                    Text        = s.Title,
+                    Body        = s.Body,
+                    Location    = s.Location,
+                    IsClosed    = s.IsClosed,
+                    IsCancelled = s.IsCancelled,
+                    MailTo     = s.MailTo,
+                    MailCc     = s.MailCc,
+                    MailBcc    = s.MailBcc,
+                    MailFrom   = s.MailFrom,
+                    IsMailSent = s.IsMailSent,
+                    UserName   = s.ActorName,
+                    Created    = s.EventTime
+                });
+            }
+        }
+
+        /// <summary>Reads the appointment / task / call / letter sources every
+        /// overview panel shares (VAS_ActivitySourcesModel).</summary>
+        private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
 
         /// <summary>Loads CM_ChatEntry comments logged against the requisition.</summary>
         private void LoadCommentActivity(int M_Requisition_ID, List<ActivityData> list)
@@ -1749,7 +2190,12 @@ namespace VASLogic.Models
         /// <param name="d">Overview payload being populated.</param>
         private void LoadBudgetAmount(int M_Requisition_ID, RequisitionOverviewData d)
         {
-            if (!ColumnExists("GL_Budget", "BudgetControlBasis")) return;
+            // BudgetControlBasis is what places a budget against the requisition's
+            // date in the two reads below, so they are skipped without it. The last
+            // read does not need it and runs either way — the whole loader used to
+            // return here, and that column is only ever filled where commitment
+            // control is configured.
+            bool hasBasis = ColumnExists("GL_Budget", "BudgetControlBasis");
 
             // Narrowed by the budget CONTROL first — the configuration the platform
             // itself checks a requisition against. Only when that yields nothing is
@@ -1757,10 +2203,14 @@ namespace VASLogic.Models
             // can exist and cover the requisition's date without anyone having set
             // up a commitment control over it, and the footer read N/A on exactly
             // those installs. The controlled figure still wins where there is one.
-            if (ColumnExists("GL_BudgetControl", "CommitmentType"))
+            if (hasBasis && ColumnExists("GL_BudgetControl", "CommitmentType"))
                 LoadControlledBudgetAmount(M_Requisition_ID, d);
-            if (d.AvailableBudget == 0)
+            if (hasBasis && d.AvailableBudget == 0)
                 LoadBudgetForPeriod(M_Requisition_ID, d);
+            // Neither of those can see a budget whose basis was never set, which is
+            // the ordinary state of a budget nobody controls against.
+            if (d.AvailableBudget == 0)
+                LoadBudgetForYear(M_Requisition_ID, d);
         }
 
         /// <summary>
@@ -1920,6 +2370,93 @@ namespace VASLogic.Models
             }
         }
 
+        /// <summary>
+        /// The amount budgeted for the requisition's FISCAL YEAR — the last of the
+        /// three budget reads, and the only one that asks nothing of the budget's
+        /// configuration.
+        ///
+        /// The two above it both require GL_Budget.BudgetControlBasis to name where
+        /// the budget applies ('P' -> a period, 'A' -> a year). That column is part
+        /// of commitment CONTROL, and a deployment that budgets without controlling
+        /// its requisitions against the budget leaves it null — so a budget was
+        /// posted, the requisition sat inside it, and the footer still read N/A.
+        /// That is the case this exists for.
+        ///
+        /// It is read from the budget side instead: the Fact_Acct rows that CARRY a
+        /// GL_Budget_ID (which is what makes a row a budget entry — the platform's
+        /// own BudgetCheck identifies them the same way), belonging to the
+        /// requisition's tenant, visible to its organisation, and posted into a
+        /// period of the fiscal year the requisition's document date falls in. The
+        /// amount is SUM(AmtAcctDr - AmtAcctCr), the same arithmetic as the reads
+        /// above.
+        ///
+        /// It is therefore the BROADEST of the three — a whole year, across every
+        /// budget and account — which is why it runs last and only when the other
+        /// two came back empty. The panel labels it as a requisition-level figure,
+        /// so it is never presented as one line's remaining balance.
+        /// </summary>
+        /// <param name="M_Requisition_ID">Selected requisition id.</param>
+        /// <param name="d">Overview payload being populated.</param>
+        private void LoadBudgetForYear(int M_Requisition_ID, RequisitionOverviewData d)
+        {
+            try
+            {
+                // Inlined for the same reason as the two reads above: the id would
+                // otherwise be bound more than once, and positional binding gives a
+                // repeated name a second, unfilled placeholder. It is an int, so
+                // nothing can be injected.
+                string reqId = M_Requisition_ID.ToString();
+
+                string sql = @"SELECT SUM(fa.AmtAcctDr - fa.AmtAcctCr) AS BudgetAmount
+                                 FROM Fact_Acct fa
+                                INNER JOIN M_Requisition r
+                                        ON (r.M_Requisition_ID = " + reqId + @")
+                                INNER JOIN AD_ClientInfo ci
+                                        ON (ci.AD_Client_ID = fa.AD_Client_ID)
+                                WHERE COALESCE(fa.GL_Budget_ID, 0) > 0
+                                  AND fa.AD_Client_ID = r.AD_Client_ID
+                                  AND fa.AD_Org_ID IN (0, r.AD_Org_ID)
+                                  AND fa.C_Period_ID IN (
+                                        SELECT p.C_Period_ID
+                                          FROM C_Period p
+                                         INNER JOIN C_Year y ON (y.C_Year_ID = p.C_Year_ID)
+                                         WHERE p.IsActive      = 'Y'
+                                           AND y.C_Calendar_ID = ci.C_Calendar_ID
+                                           AND p.C_Year_ID     = (SELECT p2.C_Year_ID
+                                                                    FROM C_Period p2
+                                                                   INNER JOIN C_Year y2
+                                                                           ON (y2.C_Year_ID = p2.C_Year_ID)
+                                                                   WHERE p2.IsActive      = 'Y'
+                                                                     AND y2.C_Calendar_ID = ci.C_Calendar_ID
+                                                                     AND r.DateDoc BETWEEN p2.StartDate
+                                                                                       AND p2.EndDate))";
+
+                DataSet ds = DB.ExecuteDataset(sql, null, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                decimal amount = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["BudgetAmount"]);
+                if (amount != 0)
+                {
+                    d.AvailableBudget = amount;
+                    d.BudgetIsRequisitionLevel = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: the footer keeps reading N/A, exactly as before.
+                _log.Severe("LoadBudgetForYear (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Resolves a change-log value into the text the field shows — a reference
+        /// into the referenced record's identifier, a list code into its label, a
+        /// timestamp into the date alone. Shared with the other overview panels
+        /// (VAS_ChangeLogValueModel). One per request, so its caches last exactly
+        /// as long as the feed being built.
+        /// </summary>
+        private readonly VAS_ChangeLogValueModel _changeValues = new VAS_ChangeLogValueModel();
+
         /// <summary>Single-parameter helper for the requisition-scoped queries.</summary>
         private SqlParameter[] ReqParam(int M_Requisition_ID)
         {
@@ -1952,9 +2489,80 @@ namespace VASLogic.Models
             LoadReplenishmentOrigin(ctx, d);
             LoadProjectOrigin(M_Requisition_ID, d);
             LoadSalesOrderOrigin(M_Requisition_ID, d);
+            LoadBlanketOrderOrigin(M_Requisition_ID, d);
             LoadVA075WorkOrderOrigin(M_Requisition_ID, d);
             LoadVA075FieldServiceReqOrigin(M_Requisition_ID, d);
             LoadProductionOrderOrigin(M_Requisition_ID, d);
+            LoadOriginWindows(ctx, d);
+        }
+
+        /// <summary>
+        /// Resolves, for each chip whose screen the CLIENT cannot name, the window
+        /// the record actually opens in — and says so in the payload.
+        ///
+        /// The VA075 work order, the VA075 field service request and the VAMFG
+        /// production order all belong to modules this solution does not ship, so
+        /// their windows have no name that can be hard-coded on either side and the
+        /// browser's zoom lookup only knows tables the client has cached. The panel
+        /// used to click first and find out afterwards: it asked the server for a
+        /// window at the moment of the click and, failing that, opened whatever the
+        /// zoom lookup returned — which is how a click came to report an error
+        /// instead of a record.
+        ///
+        /// Resolving it here instead means the chip KNOWS before it is drawn. A
+        /// window that resolves makes the chip a link that opens straight into it;
+        /// no window leaves the chip as plain text, still naming the document it
+        /// came from. Nothing on screen can fail.
+        /// </summary>
+        /// <param name="ctx">User context — the role decides what may be opened.</param>
+        /// <param name="d">Overview payload being populated.</param>
+        private void LoadOriginWindows(Ctx ctx, RequisitionOverviewData d)
+        {
+            if (d.VA075_WorkOrder_ID > 0)
+                d.WorkOrderWindowId = ResolveChipWindow(ctx, "", "VA075_WorkOrder");
+            if (d.VA075_FieldServiceReq_ID > 0)
+                d.FieldServiceReqWindowId = ResolveChipWindow(ctx, "", "VA075_FieldServiceReq");
+            // The production order's screen HAS a name — VAS_102 opens it by that
+            // name — so it is asked for first, the way VAS_092 resolves every window
+            // it opens. The two VA075 screens have none that can be hard-coded, and
+            // fall straight through to the dictionary.
+            if (d.VAMFG_M_WorkOrder_ID > 0)
+                d.ProductionOrderWindowId =
+                    ResolveChipWindow(ctx, "VAMFG_ProductionOrder", "VAMFG_M_WorkOrder");
+        }
+
+        /// <summary>
+        /// The window a Reference chip's record opens in, resolved in the order
+        /// VAS_092 resolves every window it navigates to:
+        ///
+        ///   1. the window NAMED for that record, looked up by AD_Window.Name
+        ///      (<see cref="GetWindowId"/>) — the name is the authority wherever
+        ///      there is one, because a table's zoom target cannot tell two kinds
+        ///      of record apart and may not be the screen that maintains it;
+        ///   2. failing that, the window the DICTIONARY says the table opens in
+        ///      (<see cref="GetWindowIdByTable"/>) — the last resort for a module
+        ///      that is not part of this solution and whose screen therefore has no
+        ///      name that can be written down here.
+        ///
+        /// Step 2 is what VAS_092 does not have and does not need: every table it
+        /// opens is one it can name. VAS_098 reaches two VA075 documents that it
+        /// cannot, so it keeps the dictionary behind the name rather than instead
+        /// of it.
+        /// </summary>
+        /// <param name="ctx">User context (client + role).</param>
+        /// <param name="windowName">The window's name, or "" when it has none that
+        /// can be named here.</param>
+        /// <param name="tableName">The record's physical table.</param>
+        /// <returns>The window id, or 0 when the record cannot be opened at all —
+        /// which makes the panel draw the chip as plain text.</returns>
+        private int ResolveChipWindow(Ctx ctx, string windowName, string tableName)
+        {
+            if (!string.IsNullOrEmpty(windowName))
+            {
+                int byName = GetWindowId(ctx, windowName);
+                if (byName > 0) return byName;
+            }
+            return GetWindowIdByTable(ctx, tableName);
         }
 
         /// <summary>
@@ -1996,6 +2604,110 @@ namespace VASLogic.Models
             catch (Exception ex)
             {
                 _log.Severe("LoadSalesOrderOrigin (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// The BLANKET order the requisition was raised against — the standing
+        /// commitment behind the request, as opposed to the ordinary order
+        /// <see cref="LoadSalesOrderOrigin"/> finds.
+        ///
+        /// It is reached from the same place, M_RequisitionLine.Ref_OrderLine_ID,
+        /// by three routes, because the blanket link is written in more than one
+        /// place by more than one piece of code:
+        ///
+        ///   1. The referenced order IS the blanket (C_Order.IsBlanketTrx = 'Y') —
+        ///      a requisition raised directly against the commitment.
+        ///   2. It is a RELEASE of one: C_Order.C_Order_Blanket, stamped on the
+        ///      release header by the platform (MOrder.SetC_Order_Blanket).
+        ///   3. Its LINE is a release of one: C_OrderLine.C_OrderLine_Blanket_ID,
+        ///      written by the copy that creates each release line. This is the
+        ///      route the header one misses — the two are set by different code and
+        ///      a release can carry either.
+        ///
+        /// IsSOTrx travels with the result: C_Order serves both sides of the trade,
+        /// and a blanket SALES order opens a different screen from a blanket
+        /// purchase order. Reporting the wrong one would send the reader to a window
+        /// that cannot show the record.
+        ///
+        /// Every column it rests on is optional and dictionary-guarded — the flag,
+        /// the header link and the line link each enable their own route — so a
+        /// schema carrying none of them simply draws no chip.
+        /// </summary>
+        /// <param name="M_Requisition_ID">Selected requisition id.</param>
+        /// <param name="d">Overview payload being populated.</param>
+        private void LoadBlanketOrderOrigin(int M_Requisition_ID, RequisitionOverviewData d)
+        {
+            if (!ColumnExists("M_RequisitionLine", "Ref_OrderLine_ID")) return;
+
+            bool hasFlag       = ColumnExists("C_Order", "IsBlanketTrx");
+            bool hasHeaderLink = ColumnExists("C_Order", "C_Order_Blanket");
+            bool hasLineLink   = ColumnExists("C_OrderLine", "C_OrderLine_Blanket_ID");
+            if (!hasFlag && !hasHeaderLink && !hasLineLink) return;
+
+            try
+            {
+                // The id is inlined rather than bound: each UNION branch below would
+                // otherwise carry the same bind name again, and positional binding
+                // gives a repeated name a second, unfilled placeholder. It is an
+                // int, so nothing can be injected.
+                string reqId = M_Requisition_ID.ToString();
+                const string REF_JOIN =
+                    @"FROM M_RequisitionLine rl
+                     INNER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = rl.Ref_OrderLine_ID)";
+                string where = @"WHERE rl.M_Requisition_ID = " + reqId + @"
+                                   AND rl.IsActive = 'Y'";
+
+                List<string> sources = new List<string>();
+                if (hasFlag)
+                {
+                    sources.Add(@"SELECT o.C_Order_ID AS BLANKET_ID " + REF_JOIN + @"
+                                   INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                                   " + where + @" AND COALESCE(o.IsBlanketTrx, 'N') = 'Y'");
+                }
+                if (hasHeaderLink)
+                {
+                    sources.Add(@"SELECT o.C_Order_Blanket AS BLANKET_ID " + REF_JOIN + @"
+                                   INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                                   " + where + @" AND COALESCE(o.C_Order_Blanket, 0) > 0");
+                }
+                if (hasLineLink)
+                {
+                    sources.Add(@"SELECT bol.C_Order_ID AS BLANKET_ID " + REF_JOIN + @"
+                                   INNER JOIN C_OrderLine bol
+                                           ON (bol.C_OrderLine_ID = ol.C_OrderLine_Blanket_ID)
+                                   " + where + @" AND COALESCE(ol.C_OrderLine_Blanket_ID, 0) > 0");
+                }
+
+                string sql = @"SELECT bo.C_Order_ID, bo.DocumentNo, bo.IsSOTrx
+                                 FROM C_Order bo
+                                WHERE bo.IsActive = 'Y'
+                                  AND bo.C_Order_ID IN ("
+                                 + string.Join(" UNION ", sources.ToArray()) + @")
+                                ORDER BY bo.DocumentNo";
+                DataSet ds = DB.ExecuteDataset(sql, null, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                d.BlanketOrderId      = Util.GetValueOfInt(r["C_Order_ID"]);
+                d.BlanketOrderNo      = Util.GetValueOfString(r["DocumentNo"]);
+                d.BlanketOrderIsSOTrx = Util.GetValueOfString(r["IsSOTrx"]) == "Y";
+                d.BlanketOrderCount   = ds.Tables[0].Rows.Count;
+
+                // The plain Order chip stands down when it found this same record —
+                // a requisition raised straight against a blanket reaches it through
+                // Ref_OrderLine_ID, so both loaders land on it and the strip would
+                // carry one document twice, under two different names.
+                if (d.RefOrderId > 0 && d.RefOrderId == d.BlanketOrderId)
+                {
+                    d.RefOrderId    = 0;
+                    d.RefOrderNo    = "";
+                    d.RefOrderCount = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadBlanketOrderOrigin (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
             }
         }
 
@@ -2088,7 +2800,10 @@ namespace VASLogic.Models
                 DataRow r2 = ds.Tables[0].Rows[0];
                 recordId   = Util.GetValueOfInt(r2["REF_ID"]);
                 documentNo = Util.GetValueOfString(r2["DocumentNo"]);
-                if (string.IsNullOrEmpty(documentNo)) documentNo = "#" + recordId;
+                // No "#id" fallback. An internal key is not a document number, and
+                // printing one tells the reader nothing they can quote to anyone.
+                // The id still travels — the panel draws the chip on THAT, with its
+                // label alone, and the chip still opens the record.
                 count      = ds.Tables[0].Rows.Count;
             }
             catch (Exception ex)
@@ -2302,8 +3017,8 @@ namespace VASLogic.Models
                 DataRow r = ds.Tables[0].Rows[0];
                 d.VAMFG_M_WorkOrder_ID   = Util.GetValueOfInt(r["VAMFG_M_WorkOrder_ID"]);
                 d.ProductionOrderNo      = Util.GetValueOfString(r["DocumentNo"]);
-                if (string.IsNullOrEmpty(d.ProductionOrderNo))
-                    d.ProductionOrderNo = "#" + d.VAMFG_M_WorkOrder_ID;
+                // No "#id" fallback — see LoadVA075Reference. The chip is drawn on
+                // the id, not on the number.
                 d.ProductionOrderCount   = ds.Tables[0].Rows.Count;
             }
             catch (Exception ex)
@@ -2461,7 +3176,8 @@ namespace VASLogic.Models
         /// M_MovementLine.M_RequisitionLine_ID. That column belongs to the DTD001
         /// distribution module, which is not part of this solution, so it is
         /// dictionary-guarded: without it the section simply lists no transfers.
-        /// A movement carries no monetary total, so the row reports no amount.
+        /// Each row carries the transfer's total value, the same figure the
+        /// Material Transfer screen shows for it.
         /// </summary>
         private void LoadMovementDocuments(int M_Requisition_ID, List<RequisitionDocumentData> docs)
         {
@@ -2474,38 +3190,43 @@ namespace VASLogic.Models
                 // this requisition raised, because the figure names what that
                 // document is worth, which is what the transfer screen shows.
                 //
-                // The rate is the same one the Material Transfer overview values a
-                // line at: the line's own cost price, falling back to the VA024
-                // unit price. Both are optional module columns, so the expression
-                // is built from whichever the schema has and collapses to a
-                // constant 0 when it has neither — and a schema that can price
-                // nothing reports NO amount rather than a zero the reader would
-                // take for a free transfer.
+                // The rate is exactly the one VAS_103 values a transfer line at:
+                // the line's own cost price, falling back to the VA024 unit price,
+                // and 0 where the schema carries neither. Reporting the same
+                // arithmetic is the point — the two screens are talking about the
+                // same document, and this row used to say nothing at all.
                 string rateExpr = BuildMovementRateExpr();
-                string valueSel = (rateExpr == null)
-                    ? "CAST(NULL AS DECIMAL(20,4))"
-                    : @"(SELECT NVL(SUM(NVL(ml2.MovementQty, 0) * " + rateExpr + @"), 0)
-                          FROM M_MovementLine ml2
-                         WHERE ml2.M_Movement_ID = m.M_Movement_ID
-                           AND ml2.IsActive      = 'Y')";
 
-                string sql = @"SELECT m.M_Movement_ID,
-                                      m.DocumentNo,
-                                      m.MovementDate,
-                                      m.DocStatus,
-                                      " + valueSel + @" AS MovementValue,
-                                      COUNT(ml.M_MovementLine_ID) AS LineCount
-                                 FROM M_MovementLine ml
-                                INNER JOIN M_Movement m
-                                        ON (m.M_Movement_ID = ml.M_Movement_ID)
-                                INNER JOIN M_RequisitionLine rl
-                                        ON (rl.M_RequisitionLine_ID = ml.M_RequisitionLine_ID)
-                                WHERE rl.M_Requisition_ID = @M_Requisition_ID
-                                  AND ml.IsActive = 'Y'
-                                  AND rl.IsActive = 'Y'
-                                GROUP BY m.M_Movement_ID, m.DocumentNo, m.MovementDate,
-                                         m.DocStatus, " + valueSel + @"
-                                ORDER BY m.MovementDate, m.DocumentNo";
+                // The value is read OUTSIDE the aggregate rather than beside it.
+                // Oracle rejects a subquery expression in GROUP BY (ORA-22818), so
+                // grouping by this sub-select failed the statement outright — the
+                // catch below swallowed it and the Documents section listed no
+                // material transfers at all.
+                string sql = @"SELECT x.M_Movement_ID,
+                                      x.DocumentNo,
+                                      x.MovementDate,
+                                      x.DocStatus,
+                                      x.LineCount,
+                                      (SELECT NVL(SUM(NVL(ml2.MovementQty, 0) * " + rateExpr + @"), 0)
+                                         FROM M_MovementLine ml2
+                                        WHERE ml2.M_Movement_ID = x.M_Movement_ID
+                                          AND ml2.IsActive      = 'Y') AS MovementValue
+                                 FROM (SELECT m.M_Movement_ID,
+                                              m.DocumentNo,
+                                              m.MovementDate,
+                                              m.DocStatus,
+                                              COUNT(ml.M_MovementLine_ID) AS LineCount
+                                         FROM M_MovementLine ml
+                                        INNER JOIN M_Movement m
+                                                ON (m.M_Movement_ID = ml.M_Movement_ID)
+                                        INNER JOIN M_RequisitionLine rl
+                                                ON (rl.M_RequisitionLine_ID = ml.M_RequisitionLine_ID)
+                                        WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                                          AND ml.IsActive = 'Y'
+                                          AND rl.IsActive = 'Y'
+                                        GROUP BY m.M_Movement_ID, m.DocumentNo,
+                                                 m.MovementDate, m.DocStatus) x
+                                ORDER BY x.MovementDate, x.DocumentNo";
                 DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
 
@@ -2517,8 +3238,7 @@ namespace VASLogic.Models
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         DocDate    = Util.GetValueOfDateTime(r["MovementDate"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
-                        Amount     = (rateExpr == null)
-                            ? null : (decimal?)Util.GetValueOfDecimal(r["MovementValue"]),
+                        Amount     = Util.GetValueOfDecimal(r["MovementValue"]),
                         LineCount  = Util.GetValueOfInt(r["LineCount"]),
                         TableName  = "M_Movement",
                         RecordId   = Util.GetValueOfInt(r["M_Movement_ID"])
@@ -2542,6 +3262,9 @@ namespace VASLogic.Models
         ///
         /// The link column belongs to the distribution module, so it is
         /// dictionary-guarded: without it the section simply lists no issues.
+        ///
+        /// Each row carries the issue's total value, the same figure the Inventory
+        /// Use screen shows for it.
         /// </summary>
         private void LoadInternalUseDocuments(int M_Requisition_ID, List<RequisitionDocumentData> docs)
         {
@@ -2549,24 +3272,48 @@ namespace VASLogic.Models
 
             try
             {
-                string sql = @"SELECT inv.M_Inventory_ID,
-                                      inv.DocumentNo,
-                                      inv.MovementDate,
-                                      inv.DocStatus,
-                                      COUNT(il.M_InventoryLine_ID) AS LineCount
-                                 FROM M_InventoryLine il
-                                INNER JOIN M_Inventory inv
-                                        ON (inv.M_Inventory_ID = il.M_Inventory_ID)
-                                INNER JOIN M_RequisitionLine rl
-                                        ON (rl.M_RequisitionLine_ID = il.M_RequisitionLine_ID)
-                                WHERE rl.M_Requisition_ID = @M_Requisition_ID
-                                  AND il.IsActive  = 'Y'
-                                  AND rl.IsActive  = 'Y'
-                                  AND inv.IsActive = 'Y'
-                                  AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
-                                GROUP BY inv.M_Inventory_ID, inv.DocumentNo,
-                                         inv.MovementDate, inv.DocStatus
-                                ORDER BY inv.MovementDate, inv.DocumentNo";
+                // The issue's value, over the WHOLE document's lines — every line,
+                // not only the ones this requisition raised, because the figure
+                // names what that document is worth.
+                //
+                // It is VAS_102's own arithmetic: the issued quantity
+                // (QtyInternalUse) at the line's cost price, falling back to the
+                // VA024 unit price. The row used to report NOTHING, on the argument
+                // that an issue's value is a costing question the document does not
+                // answer — but its own screen answers it, and a dash here against a
+                // figure there is just the two screens disagreeing.
+                //
+                // Read outside the aggregate, over a derived table: Oracle rejects a
+                // subquery expression in GROUP BY (ORA-22818).
+                string rateExpr = BuildInventoryRateExpr();
+
+                string sql = @"SELECT x.M_Inventory_ID,
+                                      x.DocumentNo,
+                                      x.MovementDate,
+                                      x.DocStatus,
+                                      x.LineCount,
+                                      (SELECT NVL(SUM(NVL(il2.QtyInternalUse, 0) * " + rateExpr + @"), 0)
+                                         FROM M_InventoryLine il2
+                                        WHERE il2.M_Inventory_ID = x.M_Inventory_ID
+                                          AND il2.IsActive       = 'Y') AS IssueValue
+                                 FROM (SELECT inv.M_Inventory_ID,
+                                              inv.DocumentNo,
+                                              inv.MovementDate,
+                                              inv.DocStatus,
+                                              COUNT(il.M_InventoryLine_ID) AS LineCount
+                                         FROM M_InventoryLine il
+                                        INNER JOIN M_Inventory inv
+                                                ON (inv.M_Inventory_ID = il.M_Inventory_ID)
+                                        INNER JOIN M_RequisitionLine rl
+                                                ON (rl.M_RequisitionLine_ID = il.M_RequisitionLine_ID)
+                                        WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                                          AND il.IsActive  = 'Y'
+                                          AND rl.IsActive  = 'Y'
+                                          AND inv.IsActive = 'Y'
+                                          AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
+                                        GROUP BY inv.M_Inventory_ID, inv.DocumentNo,
+                                                 inv.MovementDate, inv.DocStatus) x
+                                ORDER BY x.MovementDate, x.DocumentNo";
                 DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
 
@@ -2578,9 +3325,7 @@ namespace VASLogic.Models
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         DocDate    = Util.GetValueOfDateTime(r["MovementDate"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
-                        // An issue's value is a costing question the document does
-                        // not answer on its own, so the row reports none.
-                        Amount     = null,
+                        Amount     = Util.GetValueOfDecimal(r["IssueValue"]),
                         LineCount  = Util.GetValueOfInt(r["LineCount"]),
                         TableName  = "M_Inventory",
                         RecordId   = Util.GetValueOfInt(r["M_Inventory_ID"])
@@ -2594,22 +3339,40 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// The unit-rate expression an inventory-use line is valued at, over an
+        /// M_InventoryLine aliased "il2": the line's own cost price, else the VA024
+        /// unit price, else 0. VAS_102's BuildRateExpr, column for column, so the
+        /// value reported here is the one that document's own screen shows.
+        /// </summary>
+        private string BuildInventoryRateExpr()
+        {
+            List<string> cols = new List<string>();
+            if (ColumnExists("M_InventoryLine", "CurrentCostPrice")) cols.Add("il2.CurrentCostPrice");
+            if (ColumnExists("M_InventoryLine", "VA024_UnitPrice"))  cols.Add("il2.VA024_UnitPrice");
+            if (cols.Count == 0) return "0";
+            return "COALESCE(" + string.Join(", ", cols.ToArray()) + ", 0)";
+        }
+
+        /// <summary>
         /// The unit-rate expression a material-transfer line is valued at, over an
         /// M_MovementLine aliased "ml2": the line's own cost price, else the VA024
-        /// unit price. Both are optional module columns.
+        /// unit price. Both are optional module columns, so the expression is built
+        /// from whichever the schema has and collapses to a constant 0 when it has
+        /// neither.
         ///
-        /// Returns NULL when the schema carries neither, which tells the caller to
-        /// report no amount at all rather than a zero — "0.00" against a real
-        /// transfer reads as a document worth nothing, where a blank cell says the
-        /// schema does not record a value. Mirrors how the Material Transfer
-        /// overview prices its own lines.
+        /// This is VAS_103's BuildRateExpr, column for column and fallback for
+        /// fallback, so a transfer listed here is worth what the Material Transfer
+        /// screen says it is worth. It used to report NOTHING on a schema that
+        /// prices neither way — on the argument that a blank cell is honester than
+        /// a zero — which left the amount reading as a dash while the transfer's
+        /// own screen showed a figure beside it.
         /// </summary>
         private string BuildMovementRateExpr()
         {
             List<string> cols = new List<string>();
             if (ColumnExists("M_MovementLine", "CurrentCostPrice")) cols.Add("ml2.CurrentCostPrice");
             if (ColumnExists("M_MovementLine", "VA024_UnitPrice"))  cols.Add("ml2.VA024_UnitPrice");
-            if (cols.Count == 0) return null;
+            if (cols.Count == 0) return "0";
             return "COALESCE(" + string.Join(", ", cols.ToArray()) + ", 0)";
         }
 
@@ -2620,13 +3383,20 @@ namespace VASLogic.Models
         /// is only ever turned into an id here, against the dictionary.
         ///
         /// Restricted to windows this tenant can see (AD_Client_ID 0 or its own),
-        /// preferring the tenant's own row over the system one. Whether the ROLE
-        /// may open it is the platform's call, made when the window is started.
-        /// Ported from VAS_092.
+        /// preferring the tenant's own row over the system one, and to windows the
+        /// ROLE may actually open. Ported from VAS_092.
+        ///
+        /// The role test is the one thing this does that VAS_092's does not. A
+        /// window the role cannot see raises when the framework starts it, and a
+        /// chip is better drawn as plain text than as a link that reports an error
+        /// — which is the whole reason this panel resolves its windows up front.
+        /// Every candidate is offered, so a system window the role is shut out of
+        /// does not hide the tenant's own copy of it.
         /// </summary>
-        /// <param name="ctx">User context (client).</param>
+        /// <param name="ctx">User context (client + role).</param>
         /// <param name="windowName">Window name to resolve.</param>
-        /// <returns>The window id, or 0 when the name resolves to nothing.</returns>
+        /// <returns>The window id, or 0 when the name resolves to nothing the
+        /// caller can open.</returns>
         public int GetWindowId(Ctx ctx, string windowName)
         {
             if (string.IsNullOrEmpty(windowName)) return 0;
@@ -2644,9 +3414,14 @@ namespace VASLogic.Models
                     new SqlParameter("@AD_Client_ID", ctx == null ? 0 : ctx.GetAD_Client_ID())
                 };
                 DataSet ds = DB.ExecuteDataset(sql, param, null);
-                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
-                    return 0;
-                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+                if (ds == null || ds.Tables.Count == 0) return 0;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    int id = Util.GetValueOfInt(r["AD_Window_ID"]);
+                    if (id > 0 && HasWindowAccess(ctx, id)) return id;
+                }
+                return 0;
             }
             catch (Exception ex)
             {
@@ -2671,42 +3446,58 @@ namespace VASLogic.Models
         /// Each statement carries a single bind name, occurring once: positional
         /// binding gives a repeated name a second, unfilled placeholder.
         /// </summary>
-        /// <param name="ctx">User context (unused today; kept for symmetry with
-        /// <see cref="GetWindowId"/>, which filters by client).</param>
+        /// <param name="ctx">User context — the role decides whether the window it
+        /// resolves may be opened at all.</param>
         /// <param name="tableName">Physical table name, e.g. "VA075_WorkOrder".</param>
-        /// <returns>The window id, or 0 when the table has no window at all.</returns>
+        /// <returns>The window id, or 0 when the table has no window the caller can
+        /// open the record in.</returns>
         public int GetWindowIdByTable(Ctx ctx, string tableName)
         {
             if (string.IsNullOrEmpty(tableName)) return 0;
             string name = tableName.Trim();
             try
             {
+                // The table's own zoom target, ACCEPTED ONLY when that window's
+                // first tab sits on this table.
+                //
+                // The panel starts the window with an equal-query on the table's key
+                // column, and the framework runs that query against the FIRST tab —
+                // so a zoom target whose first tab is some other table is opened
+                // with a column it does not have and raises on screen. That is what
+                // a click on the field service request and the production order
+                // chips reported: not "cannot open", but an error out of a window
+                // asked a question it could not answer. The test below used to guard
+                // the fallback query only, which is why the zoom target still got
+                // through.
                 string sql = @"SELECT t.AD_Window_ID
                                  FROM AD_Table t
                                 WHERE UPPER(t.TableName) = UPPER(@TableName)
                                   AND t.IsActive         = 'Y'
-                                  AND COALESCE(t.AD_Window_ID, 0) > 0";
+                                  AND COALESCE(t.AD_Window_ID, 0) > 0
+                                  AND EXISTS (SELECT 1
+                                                FROM AD_Tab tb
+                                               WHERE tb.AD_Window_ID = t.AD_Window_ID
+                                                 AND tb.AD_Table_ID  = t.AD_Table_ID
+                                                 AND tb.IsActive     = 'Y'
+                                                 AND tb.SeqNo = (SELECT MIN(tb2.SeqNo)
+                                                                   FROM AD_Tab tb2
+                                                                  WHERE tb2.AD_Window_ID = t.AD_Window_ID
+                                                                    AND tb2.IsActive     = 'Y'))";
                 DataSet ds = DB.ExecuteDataset(
                     sql, new SqlParameter[] { new SqlParameter("@TableName", name) }, null);
-                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                if (ds != null && ds.Tables.Count > 0)
                 {
-                    int id = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
-                    if (id > 0) return id;
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        int id = Util.GetValueOfInt(r["AD_Window_ID"]);
+                        if (id > 0 && HasWindowAccess(ctx, id)) return id;
+                    }
                 }
 
-                // No zoom target on the table itself — take the window whose FIRST
-                // tab sits on this table, which is the screen that maintains it.
-                //
-                // "First tab" has to be enforced, not just intended. Without the
-                // MIN(SeqNo) test below this returned ANY window carrying the table
-                // on ANY tab, ordered by SeqNo across every window at once — so a
-                // table that appears as a CHILD tab somewhere could win. The panel
-                // then started that window with an equal-query on the child's key
-                // column, which the window's own first tab does not have, and the
-                // framework raised on screen. That is what a click on the VA075
-                // field service request and the VAMFG production order chips
-                // reported: not "cannot open", but an error from a window opened
-                // with a query it could not run.
+                // No usable zoom target on the table itself — take the window whose
+                // FIRST tab sits on this table, which is the screen that maintains
+                // it. Every candidate is offered, so one the role cannot open does
+                // not shut out the next.
                 sql = @"SELECT tb.AD_Window_ID
                           FROM AD_Tab tb
                          INNER JOIN AD_Table t ON (t.AD_Table_ID = tb.AD_Table_ID)
@@ -2720,14 +3511,45 @@ namespace VASLogic.Models
                          ORDER BY tb.SeqNo, tb.AD_Tab_ID";
                 ds = DB.ExecuteDataset(
                     sql, new SqlParameter[] { new SqlParameter("@TableName", name) }, null);
-                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
-                    return 0;
-                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+                if (ds == null || ds.Tables.Count == 0) return 0;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    int id = Util.GetValueOfInt(r["AD_Window_ID"]);
+                    if (id > 0 && HasWindowAccess(ctx, id)) return id;
+                }
+                return 0;
             }
             catch (Exception ex)
             {
                 _log.Severe("GetWindowIdByTable (" + name + "): " + ex.Message);
                 return 0;
+            }
+        }
+
+        /// <summary>
+        /// Whether the caller's role may open the window. A window the role cannot
+        /// see raises when it is started, so a chip pointing at one is better left
+        /// as plain text — which is what returning 0 from the resolvers above makes
+        /// the panel do.
+        ///
+        /// A failure to ASK counts as access: this is a display decision, not a
+        /// security boundary, and the platform enforces the real one when the
+        /// window is started.
+        /// </summary>
+        /// <param name="ctx">User context (role).</param>
+        /// <param name="AD_Window_ID">Window to test.</param>
+        private bool HasWindowAccess(Ctx ctx, int AD_Window_ID)
+        {
+            if (ctx == null || AD_Window_ID <= 0) return false;
+            try
+            {
+                return MRole.GetDefault(ctx, false).GetWindowAccess(AD_Window_ID) ?? false;
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("HasWindowAccess (AD_Window_ID=" + AD_Window_ID + "): " + ex.Message);
+                return true;
             }
         }
 
@@ -2746,8 +3568,9 @@ namespace VASLogic.Models
             public string    DocumentNo { get; set; }
             public DateTime? DocDate    { get; set; }
             public string    DocStatus  { get; set; }
-            // Null for a document that has no monetary total of its own (an RFQ,
-            // a material transfer) — distinct from a genuine zero.
+            // Null for a document this schema records no total for (an RFQ without
+            // C_RfQ.TotalAmt, an inventory issue) — distinct from a genuine zero.
+            // A material transfer is always valued, exactly as VAS_103 values it.
             public decimal?  Amount     { get; set; }
             public int       LineCount  { get; set; }
             public string    TableName  { get; set; }
@@ -2815,6 +3638,12 @@ namespace VASLogic.Models
             // for the first time.
             public string    OldValue    { get; set; }
             public string    NewValue    { get; set; }
+
+            // Appointment / task rows (AppointmentsInfo): where the meeting is and
+            // whether it has been dealt with. Empty on every other type.
+            public string    Location    { get; set; }
+            public bool      IsClosed    { get; set; }
+            public bool      IsCancelled { get; set; }
 
             // E-mail rows only (MailAttachment1). Body travels with the row so the
             // panel can reveal it on click without a second round trip.
@@ -2910,6 +3739,15 @@ namespace VASLogic.Models
             public string    RefOrderNo      { get; set; }
             public bool      RefOrderIsSOTrx { get; set; }
             public int       RefOrderCount   { get; set; }
+            // The BLANKET order behind that reference — the standing commitment the
+            // requisition draws on, reached either directly or through the release
+            // it points at (LoadBlanketOrderOrigin). Its own chip, and its own
+            // screen: a blanket sales order does not open where a blanket purchase
+            // order does, hence the side flag.
+            public int       BlanketOrderId      { get; set; }
+            public string    BlanketOrderNo      { get; set; }
+            public bool      BlanketOrderIsSOTrx { get; set; }
+            public int       BlanketOrderCount   { get; set; }
             public int       VA075_WorkOrder_ID { get; set; }
             public string    WorkOrderNo     { get; set; }  // VA075 maintenance work order
             public int       WorkOrderCount  { get; set; }
@@ -2919,6 +3757,14 @@ namespace VASLogic.Models
             public int       VAMFG_M_WorkOrder_ID { get; set; }
             public string    ProductionOrderNo    { get; set; }
             public int       ProductionOrderCount { get; set; }
+            // The window each of the three module chips opens in, resolved on the
+            // server because their modules are not part of this solution and their
+            // screens cannot be named on the client (LoadOriginWindows). 0 means
+            // there is none the role can open, and the chip is drawn as plain text
+            // rather than as a link that would fail.
+            public int       WorkOrderWindowId        { get; set; }
+            public int       FieldServiceReqWindowId  { get; set; }
+            public int       ProductionOrderWindowId  { get; set; }
 
             // Progress milestone dates
             public DateTime? PostedDate     { get; set; }   // earliest Fact_Acct row

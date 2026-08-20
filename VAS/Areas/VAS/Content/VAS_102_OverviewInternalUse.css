@@ -97,6 +97,10 @@
  *                          "was X → now Y" under the field's name, the old
  *                          value struck through and the new one carrying the
  *                          row's colour. Matches VAS_101 / VAS_104.
+ *   VAI163   2026-08-19  - Dropped .vas_102-baseUom. The Available column no
+ *                          longer prints the base unit after the figure — the
+ *                          column heading says it once — so the rule had nothing
+ *                          left to style.
  ***********************************************************/
 
 .vas_102-root {
@@ -925,15 +929,6 @@
     overflow-wrap: break-word;
     word-break: break-word;
     line-height: 1.45;
-}
-
-/* The base unit named after the on-hand figure. Muted and a size down, so the
-   quantity still reads first. */
-.vas_102-baseUom {
-    margin-left: 0.3125em;
-    color: var(--iu-muted);
-    font-size: 0.9231em;
-    font-weight: 400;
 }
 
 .vas_102-actWhen {
