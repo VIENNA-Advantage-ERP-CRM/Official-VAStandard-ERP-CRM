@@ -66,7 +66,10 @@
         var $pageText = null;
 
         var currentPage = 1;
-        var currentPageSize = 8;
+        /* Lines the popup holds before paging. MUST stay in step with --vas-rows in
+           VAS_159_PositiveVarianceQtyWidget.css, which sizes the dialog to exactly this many rows. */
+        var MODAL_PAGE_ROWS = 7;
+        var currentPageSize = MODAL_PAGE_ROWS;
         var currentTotalRows = 0;
         var isModalOpen = false;
 
@@ -227,13 +230,19 @@
             $root.focus();
         }
 
+        /* The popup now holds a FIXED number of lines and is sized from that count in CSS, so the
+           page size is no longer derived from the viewport. The old version guessed a 36px row
+           height, which was wrong at any zoom or resolution where the em-based rows were not 36px,
+           and it made the popup resize as the window changed. */
         function calculateAdaptivePageSize() {
-            var vh = $(window).height();
-            var availableHeight = vh - 172;
-            var approxRowHeight = 36;
-            var calcRows = Math.floor(availableHeight / approxRowHeight);
+            currentPageSize = MODAL_PAGE_ROWS;
+        }
 
-            currentPageSize = Math.max(3, Math.min(8, calcRows));
+        /* Invisible spacers so a short page occupies the same height as a full one. */
+        function appendFillerRows(count) {
+            for (var f = 0; f < count; f++) {
+                $modalBody.append('<div class="vas-pos-var-row vas-pos-var-filler" aria-hidden="true">&nbsp;</div>');
+            }
         }
 
         function buildModalDOM() {
@@ -393,6 +402,9 @@
                 $modalBody.append($row);
             }
 
+            // Hold the popup at MODAL_PAGE_ROWS lines regardless of what this page holds.
+            appendFillerRows(Math.max(0, currentPageSize - rows.length));
+
             var startIdx = ((currentPage - 1) * currentPageSize) + 1;
             var endIdx = Math.min(currentTotalRows, currentPage * currentPageSize);
             $modalFooterHelper.text("Showing " + startIdx + "–" + endIdx + " of " + currentTotalRows);
@@ -404,6 +416,7 @@
 
         function renderModalEmpty() {
             $modalBody.html('<div class="vas-pos-var-empty">' + escapeHtml(lbl("VAS_159_NoPosVarLinesMonth", "No positive variance lines this month")) + '</div>');
+            appendFillerRows(Math.max(0, currentPageSize - 1));
             $modalFooterHelper.text("Showing 0 of 0");
             $pageText.text("1 of 1");
             $btnPrev.prop('disabled', true);

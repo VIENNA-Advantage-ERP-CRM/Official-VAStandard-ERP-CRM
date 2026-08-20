@@ -22,7 +22,9 @@
  *  6  | Aging                              | VAS_087_Aging
  *  7  | Receipt Lines                      | VAS_087_ReceiptLines
  *  8  | Received                           | VAS_087_Received
- *  9  | Location                           | VAS_087_Location
+ *  9  | Locator                            | VAS_087_Locator
+ *      | UOM                                | VAS_087_UOM
+ *      | Warehouse                          | VAS_087_Warehouse
  */
 ; VAS = window.VAS || {};
 
@@ -115,6 +117,19 @@
         function formatQtyWithUom(value, uom) {
             var text = formatQty(value);
             return uom ? text + " " + uom : text;
+        }
+
+        /* "Received on" shows the date only - the receipt carries no meaningful time component,
+           so the old formatDateTime rendered a misleading "12:00 AM" on every row. */
+        function formatDateOnly(value) {
+            if (!value) { return "-"; }
+            var d = new Date(value);
+            if (isNaN(d.getTime())) { return value; }
+            return d.toLocaleDateString(window.navigator.language, {
+                day: "2-digit",
+                month: "short",
+                year: "numeric"
+            });
         }
 
         function formatDateTime(value) {
@@ -451,8 +466,8 @@
                 field(lbl("VAS_087_GRN", "GRN"), header.grnNo, true) +
                 field(lbl("VAS_087_LinkedPO", "Linked PO"), header.linkedPoNo) +
                 field(lbl("VAS_087_Supplier", "Supplier"), header.supplier) +
-                field(lbl("VAS_087_QtyReceived", "Qty received"), formatQtyWithUom(header.totalQty, header.uom)) +
-                field(lbl("VAS_087_ReceivedOn", "Received on"), formatDateTime(header.receivedOn)) +
+                field(lbl("VAS_087_Warehouse", "Warehouse"), header.warehouse) +
+                field(lbl("VAS_087_ReceivedOn", "Received on"), formatDateOnly(header.receivedOn)) +
                 field(lbl("VAS_087_Status", "Status"), getStatusText(header)) +
                 '</div>' +
                 '<div class="vas-rag-lines-title">' + escapeHtml(lbl("VAS_087_ReceiptLines", "Receipt Lines")) + '</div>' +
@@ -476,7 +491,9 @@
                 body +=
                     '<tr>' +
                     '<td class="vas-rag-l-item" title="' + escapeHtml(ln.itemName) + '"><span class="vas-rag-trunc">' + escapeHtml(ln.itemName) + '</span></td>' +
-                    '<td class="vas-rag-l-num" title="' + escapeHtml(formatQtyWithUom(ln.receivedQty, ln.uom)) + '">' + escapeHtml(formatQtyWithUom(ln.receivedQty, ln.uom)) + '</td>' +
+                    // Qty and UOM are separate columns now - the cell used to read "2 Ea".
+                    '<td class="vas-rag-l-num" title="' + escapeHtml(formatQty(ln.receivedQty)) + '">' + escapeHtml(formatQty(ln.receivedQty)) + '</td>' +
+                    '<td class="vas-rag-l-uom" title="' + escapeHtml(ln.uom || "-") + '">' + escapeHtml(ln.uom || "-") + '</td>' +
                     '<td class="vas-rag-l-location" title="' + escapeHtml(ln.locatorCode || "-") + '">' + escapeHtml(ln.locatorCode || "-") + '</td>' +
                     '<td class="vas-rag-l-status" title="' + escapeHtml(ln.status || "-") + '">' + escapeHtml(ln.status || "-") + '</td>' +
                     '</tr>';
@@ -487,7 +504,8 @@
                 '<thead><tr>' +
                 '<th class="vas-rag-l-item">' + escapeHtml(lbl("VAS_087_Item", "Item")) + '</th>' +
                 '<th class="vas-rag-l-num">' + escapeHtml(lbl("VAS_087_Received", "Received")) + '</th>' +
-                '<th class="vas-rag-l-location">' + escapeHtml(lbl("VAS_087_Location", "Location")) + '</th>' +
+                '<th class="vas-rag-l-uom">' + escapeHtml(lbl("VAS_087_UOM", "UOM")) + '</th>' +
+                '<th class="vas-rag-l-location">' + escapeHtml(lbl("VAS_087_Locator", "Locator")) + '</th>' +
                 '<th class="vas-rag-l-status">' + escapeHtml(lbl("VAS_087_Status", "Status")) + '</th>' +
                 '</tr></thead><tbody>' + body + '</tbody></table></div>';
 

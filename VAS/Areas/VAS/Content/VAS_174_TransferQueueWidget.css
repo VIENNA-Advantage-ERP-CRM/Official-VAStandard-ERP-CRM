@@ -15,7 +15,12 @@
     height: 100%;
     box-sizing: border-box;
     font-family: 'Roboto', sans-serif;
-    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 480px)) * 0.045), 24px);
+    /* Same scale as VAS_165 Location Wise Count: capped at 20px, driven by this
+       widget's own inline size. A 24px cap made every em-based header part
+       (band padding, filter dropdowns) render ~20% larger than the rest of
+       the dashboard. */
+    font-size: clamp(16px, 1.2cqi, 20px);
+    font-size: clamp(16px, calc(var(--widget-inline-size, 380px) * 0.045), 20px);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
     border: 2px solid #FFFFFF;
     border-radius: 14px;
@@ -36,35 +41,42 @@
 .vas-174-header-row {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 0.5em;
+    box-sizing: border-box;
     flex-shrink: 0;
+    /* Padding + rule copied from VAS_165 Location Wise Count, which is what
+       gives that widget its separated header band. */
+    padding: 0.5em 0.5em;
+    border-bottom: 1px solid #C5D2DD;
+    background: transparent;
 }
 
 .vas-174-left-cluster {
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.625em;
     min-width: 0;
     flex: 1;
 }
 
 .vas-174-icon-well {
-    width: 2em;
-    height: 2em;
-    min-width: 2em;
-    min-height: 2em;
-    border-radius: 10px;
-    background: rgba(0, 131, 218, 0.10);
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.12);
     display: flex;
     align-items: center;
     justify-content: center;
     color: #0083DA;
+    font-size: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
     flex-shrink: 0;
 }
 
 .vas-174-icon-well svg {
-    width: 1.1em;
-    height: 1.1em;
+    width: 1em;
+    height: 1em;
     display: block;
     stroke: #0083DA;
 }
@@ -73,12 +85,12 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
-    flex: 1;
 }
 
 .vas-174-title {
-    font-weight: 500;
-    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 18px);
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     color: #102C3F;
     line-height: 1.2;
     white-space: nowrap;
@@ -87,8 +99,9 @@
 }
 
 .vas-174-subtitle {
+    font-family: 'Roboto', sans-serif;
     font-weight: 400;
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.009625), 14px);
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
     margin-top: 2px;
     white-space: nowrap;

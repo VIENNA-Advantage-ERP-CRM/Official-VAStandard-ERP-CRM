@@ -11,7 +11,7 @@
  *
  * AD_Message keys used (add via System Messages):
  *   VAS_091_Placeholder       => "Search receipts by GRN no., supplier, PO no., reference, warehouse..."
- *   VAS_091_Kind              => "Material Receipt"
+ *   VAS_091_Kind              => "Goods Receipt Note"
  *   VAS_DocSearch_TypeToSearch=> "Type at least 2 characters to search"
  *   VAS_DocSearch_NoResults   => "No matching documents"
  *   VAS_DocSearch_Error       => "Search failed. Please try again."
@@ -29,7 +29,10 @@
         var PLACEHOLDER_K = 'VAS_091_Placeholder';
         var PLACEHOLDER_D = 'Search receipts by GRN no., supplier, PO no., reference, warehouse...';
         var KIND_K        = 'VAS_091_Kind';
-        var KIND_D        = 'Material Receipt';
+        // Screen name is "Goods Receipt Note (GRN)"; the result chip used to read
+        // "Material Receipt", so the same document was named two different things.
+        // VAS_091_Kind has no AD_Message row on DB 2, so this fallback is what renders.
+        var KIND_D        = 'Goods Receipt Note';
 
         this.frame;
         this.windowNo;

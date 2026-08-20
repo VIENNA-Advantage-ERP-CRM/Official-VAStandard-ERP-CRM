@@ -409,6 +409,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_172_PendingTransferConfirmationWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_173_TransfersByWarehouseWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_174_TransferQueueWidgetController.cs" />
+
     <Compile Include="Areas\VAS\Controllers\VAS_LeadController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_RequestController.cs" />
@@ -467,6 +468,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_172_PendingTransferConfirmationWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_173_TransfersByWarehouseWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_174_TransferQueueWidget.js" />
+
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_092_OverviewPurchaseOrder.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_123_QuotationRightPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_167_PurchaseOrderLandedCost.js" />
@@ -949,6 +951,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_172_PendingTransferConfirmationWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_173_TransfersByWarehouseWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_174_TransferQueueWidgetController.cs" />
+
     <Content Include="Areas\VAS\Content\VAS_156_CountedMTDWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_156_CountedMTDWidget.js" />
     <Content Include="Areas\VAS\Content\VAS_157_VarianceLinesWidget.css" />
@@ -1009,6 +1012,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_172_PendingTransferConfirmationWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_173_TransfersByWarehouseWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_174_TransferQueueWidget.js" />
+
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>

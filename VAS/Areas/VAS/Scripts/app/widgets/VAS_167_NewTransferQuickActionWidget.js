@@ -52,6 +52,62 @@
                 .replace(/'/g, '&#039;');
         }
 
+// ===== NEW CODE START — currency format (agent C01, 2026-08-19) =====
+        /**
+         * Formats a monetary value according to the organization's currency ISO code and symbol.
+         * @param {number|string} val - Raw monetary amount
+         * @param {Object} currencyInfo - Currency meta object { iso: string, symbol: string }
+         * @returns {string} Formatted string
+         */
+        function formatCurrency(val, currencyInfo) {
+            var iso = (currencyInfo && currencyInfo.iso) ? String(currencyInfo.iso).toUpperCase() : '';
+            var symbol = (currencyInfo && currencyInfo.symbol) ? String(currencyInfo.symbol) : '';
+            var num = Number(val);
+            if (val === null || val === undefined || isNaN(num)) {
+                num = 0;
+            }
+            var absNum = Math.abs(num);
+            var isNegative = num < 0;
+            var formattedStr = '';
+
+            var isIndian = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'].indexOf(iso) !== -1;
+
+            if (isIndian) {
+                if (absNum >= 10000000) {
+                    formattedStr = (absNum / 10000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + ' Cr';
+                } else if (absNum >= 100000) {
+                    formattedStr = (absNum / 100000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + ' Lakh';
+                } else {
+                    var parts = absNum.toFixed(2).split('.');
+                    var intPart = parts[0];
+                    var decPart = parts[1] === '00' ? '' : '.' + parts[1];
+                    var lastThree = intPart.substring(intPart.length - 3);
+                    var otherNumbers = intPart.substring(0, intPart.length - 3);
+                    if (otherNumbers !== '') {
+                        lastThree = ',' + lastThree;
+                    }
+                    formattedStr = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree + decPart;
+                }
+            } else {
+                if (absNum >= 1000000000) {
+                    formattedStr = (absNum / 1000000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + 'B';
+                } else if (absNum >= 1000000) {
+                    formattedStr = (absNum / 1000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + 'M';
+                } else {
+                    var parts = absNum.toFixed(2).split('.');
+                    var decPart = parts[1] === '00' ? '' : '.' + parts[1];
+                    formattedStr = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + decPart;
+                }
+            }
+
+            return (isNegative ? '-' : '') + (symbol ? symbol + ' ' : '') + formattedStr;
+        }
+// ===== NEW CODE END — currency format =====
+
+// ----- OLD CODE (kept for rollback, do not delete) -----
+// (No prior currency formatting function existed in this quick action tile)
+// ----- END OLD CODE -----
+
         // Open the widget's configured window directly on a NEW record
         // through the widget framework's value-changed channel.
         function openNewTransfer() {

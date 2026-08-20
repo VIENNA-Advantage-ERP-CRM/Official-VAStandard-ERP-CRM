@@ -290,6 +290,7 @@ import "../app/widgets/VAS_054_TopCounterpartiesCashJournalWidget.js";
 import "../app/widgets/VAS_055_CashByCategoryCashJournalWidget.js";
 import "../app/tabpanel/VAS_065_APInvoicePanel.js";
 import "../app/tabpanel/VAS_074_CreateInvoiceLinePanel.js";
+import "../app/tabpanel/VAS_107_CreateOrderBottomPanel.js";
 import "../app/widgets/VAS_056_AutoAllocatedAPPaymentWidget.js";
 import "../app/widgets/VAS_072_MatchSuggestionAPPayment.js";
 import "../app/tabpanel/VAS_105_AccountRightPanel.js";
@@ -326,4 +327,5 @@ import "../app/widgets/VAS_171_InitiatedMTDWidget.js";
 import "../app/widgets/VAS_172_PendingTransferConfirmationWidget.js";
 import "../app/widgets/VAS_173_TransfersByWarehouseWidget.js";
 import "../app/widgets/VAS_174_TransferQueueWidget.js";
-import "../app/tabpanel/VAS_107_CreateOrderBottomPanel.js";
+
+
