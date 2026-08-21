@@ -101,6 +101,18 @@
  *                          longer prints the base unit after the figure — the
  *                          column heading says it once — so the rule had nothing
  *                          left to style.
+ *   VAI163   2026-08-21  Nothing overlaps anything at any zoom level. The issue
+ *                        table had minmax(0, Nfr) tracks but no cell rule — only
+ *                        half the fix, since a grid ITEM keeps min-width:auto and
+ *                        stayed as wide as its text, printing over the column
+ *                        beside it. Cells now carry min-width:0 with
+ *                        overflow:hidden. In the activity feed the tag and the
+ *                        "when · by whom" stamp sat in `auto` tracks whose floor
+ *                        is their own nowrap content, so the description column
+ *                        collapsed first and then the stamp simply ran on over the
+ *                        tag; both take min-width:0 and truncate now. Stage labels
+ *                        break inside their word, and the header grids took the
+ *                        minmax floor.
  ***********************************************************/
 
 .vas_102-root {
@@ -312,10 +324,10 @@
 .vas_102-fVal.vas_102-is-link { color: var(--iu-link); }
 
 @container (max-width: 460px) {
-    .vas_102-hdrCard { grid-template-columns: 1fr; }
+    .vas_102-hdrCard { grid-template-columns: minmax(0, 1fr); }
     .vas_102-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--iu-row-div); padding-bottom: 0.75em; }
     /* Two field columns are too cramped this narrow — back to a single stack. */
-    .vas_102-hdrColR { grid-template-columns: 1fr; }
+    .vas_102-hdrColR { grid-template-columns: minmax(0, 1fr); }
     .vas_102-hdrTop  { flex-direction: column; }
     .vas_102-hdrPills { justify-content: flex-start; }
 }
@@ -654,16 +666,23 @@
     min-width: 0;
 }
 
+/* A stage name is a single unbreakable word ("Completed", "Issued"). The step is
+   allowed to shrink (min-width:0), so without a break inside the word the label
+   paints over the stage beside it; without the shrink it would set the stepper's
+   floor and push the panel sideways instead. Breaking inside the word keeps every
+   stage on one rail at any panel width or zoom level. */
 .vas_102-stepTitle {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--iu-text);
+    overflow-wrap: anywhere;
 }
 
 .vas_102-stepMeta {
     font-size: 0.6875em;
     color: var(--iu-muted);
     margin-top: 0.25em;
+    overflow-wrap: anywhere;
 }
 .vas_102-step.vas_102-is-active .vas_102-stepMeta { color: #E08A1E; font-weight: 600; }
 
@@ -695,6 +714,19 @@
         minmax(0, 2.2fr) minmax(0, 1fr)   minmax(0, 0.7fr) minmax(0, 0.9fr)
         minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 0.9fr);
 }
+
+/* Cells clip inside their own track rather than spilling out of it. The tracks
+   above are minmax(0, Nfr), so a track compresses freely — but a grid ITEM keeps
+   min-width:auto, which is its own content-based minimum, so the cell stayed as
+   wide as its text and printed straight over the column beside it. min-width:0
+   plus overflow:hidden is what confines a cell to the track it was given. Header
+   and body are separate grid containers, so this is also what keeps a body column
+   under the heading that names it. Numeric and header cells never wrap — a
+   wrapped figure would sit off the shared baseline. */
+.vas_102-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vas_102-tHead > span,
+.vas_102-tRow > span.vas_102-ta-r,
+.vas_102-tRow > span.vas_102-ta-c { white-space: nowrap; }
 
 .vas_102-tHead {
     background: #F5F8FB;
@@ -869,7 +901,7 @@
 /* tag | what happened | when · by whom */
 .vas_102-actRow {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.75em;
     padding: 0.5625em 0.875em;
@@ -931,18 +963,30 @@
     line-height: 1.45;
 }
 
+/* The stamp sits in an `auto` track, whose floor is its own content — and it is
+   nowrap and carries the actor's name, so it is the longest thing on the row.
+   Without a minimum of its own it could not give way: the 1fr description column
+   collapsed to nothing first and then the stamp simply ran on over the tag beside
+   it. min-width:0 lets the auto track shrink below its content, and the ellipsis
+   is what the reader gets instead of an overlap; the full stamp stays on the
+   row's tooltip. The tag takes the same guard for the same reason. */
 .vas_102-actWhen {
     flex: none;
+    min-width: 0;
     text-align: right;
     color: var(--iu-muted);
     font-size: 0.9231em; /* ~0.75em against the body anchor */
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+
+.vas_102-actRow > .vas_102-actTag { min-width: 0; max-width: 100%; overflow: hidden; }
 
 /* An activity carrying a body (e-mail) opens on click — only those rows make
    room for the caret, so every other row keeps the three-column layout. */
 .vas_102-actRow.vas_102-is-openable {
-    grid-template-columns: auto 1fr auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     cursor: pointer;
 }
 .vas_102-actRow.vas_102-is-openable:hover { background: #F7FBFE; }
@@ -977,8 +1021,8 @@
 /* Narrow panels: drop the timestamp onto its own line under the description.
    The caret stays on the first line, beside the subject it opens. */
 @container (max-width: 460px) {
-    .vas_102-actRow { grid-template-columns: auto 1fr; }
-    .vas_102-actRow.vas_102-is-openable { grid-template-columns: auto 1fr auto; }
+    .vas_102-actRow { grid-template-columns: auto minmax(0, 1fr); }
+    .vas_102-actRow.vas_102-is-openable { grid-template-columns: auto minmax(0, 1fr) auto; }
     .vas_102-actWhen { grid-column: 2; text-align: left; }
     .vas_102-actRow.vas_102-is-openable .vas_102-actCaret { grid-column: 3; grid-row: 1; }
 }
@@ -1016,4 +1060,13 @@
 .vas_102-cvNew {
     color: var(--iu-text); font-weight: 700;
     overflow-wrap: break-word; word-break: break-word;
+}
+
+/* Each e-mail sent against an appointment or task, inside that row's drawer.
+   The second and later ones are ruled off, so several notices about the same
+   meeting do not read as one long message. */
+.vas_102-actMailSplit {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--iu-card-bd);
 }

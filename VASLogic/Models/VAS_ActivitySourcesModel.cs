@@ -15,6 +15,10 @@
 ///               type. Ten copies of the same five statements is the thing this
 ///               exists to avoid.
 ///
+///               An appointment or task additionally carries the e-mails filed
+///               against IT — MailAttachment1 anchored on AppointmentsInfo rather
+///               than on the panel's own table — in its Mails list.
+///
 ///               Chat (CM_Chat / CM_ChatEntry) is deliberately NOT here. Every
 ///               panel already loads it, and its rows carry panel-specific
 ///               shaping; a second loader would only duplicate the entries.
@@ -25,6 +29,14 @@
 ///                        already read all of them for a business partner, and
 ///                        the guarded appointment reader in
 ///                        VAS_190_ProductOverviewRightPanelModel.
+///   VAI163   2026-08-21  Appointments and tasks now carry the e-mails sent
+///                        against them (Mails / VAS_ActivityMailRow): recipient
+///                        (MailAddress), subject (Title), body (TextMsg), when
+///                        (Created) and who sent it (CreatedBy). Read in ONE
+///                        query for the whole feed rather than one per row, and
+///                        anchored on AppointmentsInfo — the panel's own table
+///                        holds the correspondence about the DOCUMENT, which is
+///                        a different set of mails and already loaded.
 /// </summary>
 
 using System;
@@ -39,6 +51,28 @@ using VAdvantage.Utility;
 
 namespace VASLogic.Models
 {
+    /// <summary>
+    /// One e-mail sent against an appointment or task (MailAttachment1, anchored
+    /// on AppointmentsInfo). Carried by the appointment / task row it belongs to
+    /// rather than standing on its own in the feed: the mail is a detail OF the
+    /// engagement, and a reader scanning the timeline is looking for the meeting,
+    /// not for each notice it generated.
+    /// </summary>
+    public class VAS_ActivityMailRow
+    {
+        public int       MailId  { get; set; }
+        /// <summary>MailAddress — who it went to.</summary>
+        public string    MailTo  { get; set; }
+        /// <summary>Title.</summary>
+        public string    Subject { get; set; }
+        /// <summary>TextMsg, already flattened to readable text.</summary>
+        public string    Body    { get; set; }
+        /// <summary>CreatedBy, resolved to the user's name.</summary>
+        public string    SentBy  { get; set; }
+        /// <summary>Created.</summary>
+        public DateTime? SentOn  { get; set; }
+    }
+
     /// <summary>
     /// One correspondence / engagement entry, in a shape every panel can map
     /// into its own activity type. Fields not meaningful for a Kind are left at
@@ -64,6 +98,10 @@ namespace VASLogic.Models
         public DateTime? EndDate     { get; set; }
         public bool      IsClosed    { get; set; }
         public bool      IsCancelled { get; set; }
+        /// <summary>E-mails sent against THIS appointment or task. Never null —
+        /// an empty list where there are none, so a caller can enumerate without
+        /// guarding. Empty for every other Kind.</summary>
+        public List<VAS_ActivityMailRow> Mails { get; set; }
 
         // Letter / mail
         public string    MailTo     { get; set; }
@@ -91,6 +129,7 @@ namespace VASLogic.Models
         private static bool? _apptUsable;
         private static bool? _callUsable;
         private static bool? _mailUsable;
+        private static bool? _apptMailUsable;
 
         /// <summary>AD_Table_ID by table name — resolved once per app.</summary>
         private static readonly Dictionary<string, int> _tableIds =
@@ -115,7 +154,15 @@ namespace VASLogic.Models
             int tableId = TableId(tableName);
             if (tableId <= 0) return rows;
 
-            LoadAppointments(tableId, recordId, rows);
+            // Every AppointmentsInfo_ID this record has, mapped to the feed entry
+            // that speaks for it. Several ids can point at ONE entry: the reader
+            // collapses a meeting's per-attendee rows, and a mail filed against
+            // any of them belongs to the meeting the reader sees.
+            Dictionary<int, VAS_ActivitySourceRow> apptOwners =
+                new Dictionary<int, VAS_ActivitySourceRow>();
+
+            LoadAppointments(tableId, recordId, rows, apptOwners);
+            LoadAppointmentMails(apptOwners);
             LoadCalls(tableId, recordId, rows);
             LoadMailAttachments(tableId, recordId, rows, includeMail);
 
@@ -170,7 +217,11 @@ namespace VASLogic.Models
         /// id, so the first seen wins and the entry stays stable between refreshes.
         /// Follows VAS_190.
         /// </summary>
-        private void LoadAppointments(int tableId, int recordId, List<VAS_ActivitySourceRow> rows)
+        /// <param name="apptOwners">Filled with every AppointmentsInfo_ID seen,
+        /// each pointing at the entry that survived de-duplication — so a mail
+        /// filed against a collapsed attendee row still finds its meeting.</param>
+        private void LoadAppointments(int tableId, int recordId, List<VAS_ActivitySourceRow> rows,
+                                      Dictionary<int, VAS_ActivitySourceRow> apptOwners)
         {
             if (_apptUsable == false) return;
 
@@ -199,21 +250,35 @@ namespace VASLogic.Models
                 _apptUsable = true;
                 if (ds == null || ds.Tables.Count == 0) return;
 
-                List<string> seenMeetings = new List<string>();
+                // The entry each meeting collapsed to, by its key — so a later
+                // attendee row can point its own id at the entry that survived.
+                Dictionary<string, VAS_ActivitySourceRow> keptByMeeting =
+                    new Dictionary<string, VAS_ActivitySourceRow>();
+
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
                     DateTime? start = Util.GetValueOfDateTime(r["StartDate"]);
                     string subject  = Util.GetValueOfString(r["Subject"]);
+                    int apptId      = Util.GetValueOfInt(r["AppointmentsInfo_ID"]);
                     string key = (start.HasValue ? start.Value.ToString("yyyyMMddHHmm") : "")
                                + "|" + subject;
-                    if (seenMeetings.Contains(key)) continue;
-                    seenMeetings.Add(key);
+
+                    VAS_ActivitySourceRow kept;
+                    if (keptByMeeting.TryGetValue(key, out kept))
+                    {
+                        // Another attendee's row for a meeting already in the feed.
+                        // The row itself is dropped, but its id is not: a mail may
+                        // have been filed against THIS row, and it belongs to the
+                        // meeting the reader sees.
+                        if (apptId > 0 && apptOwners != null) apptOwners[apptId] = kept;
+                        continue;
+                    }
 
                     bool isTask = Util.GetValueOfString(r["IsTask"]) == "Y";
-                    rows.Add(new VAS_ActivitySourceRow
+                    VAS_ActivitySourceRow row = new VAS_ActivitySourceRow
                     {
                         Kind        = isTask ? "task" : "appointment",
-                        RecordId    = Util.GetValueOfInt(r["AppointmentsInfo_ID"]),
+                        RecordId    = apptId,
                         Title       = subject,
                         Body        = Util.GetValueOfString(r["Description"]),
                         Location    = Util.GetValueOfString(r["Location"]),
@@ -222,11 +287,16 @@ namespace VASLogic.Models
                         IsClosed    = Util.GetValueOfString(r["IsClosed"]) == "Y",
                         IsCancelled = Util.GetValueOfString(r["IsCancelled"]) == "Y",
                         ActorName   = Util.GetValueOfString(r["ActorName"]),
+                        Mails       = new List<VAS_ActivityMailRow>(),
                         // Dated by when it is SCHEDULED, which is what a reader
                         // scanning a timeline for a meeting is looking for; the
                         // create stamp only stands in where there is no start.
                         EventTime   = start ?? Util.GetValueOfDateTime(r["Created"])
-                    });
+                    };
+
+                    rows.Add(row);
+                    keptByMeeting[key] = row;
+                    if (apptId > 0 && apptOwners != null) apptOwners[apptId] = row;
                 }
             }
             catch (Exception ex)
@@ -236,6 +306,158 @@ namespace VASLogic.Models
                 _apptUsable = false;
                 _log.Severe("LoadAppointments (table=" + tableId + ", record=" + recordId + "): " + ex.Message);
             }
+        }
+
+        // ----------------------------------------------------------------- //
+        //  E-mails sent against an appointment or task                       //
+        // ----------------------------------------------------------------- //
+
+        /// <summary>
+        /// Attaches the e-mails filed against each appointment / task to the row
+        /// that owns them: MailAttachment1 where AD_Table_ID is AppointmentsInfo
+        /// and Record_ID is the AppointmentsInfo_ID — the same polymorphic link
+        /// every other source uses, pointed at the engagement instead of at the
+        /// document.
+        ///
+        /// One query for the WHOLE feed, keyed back by Record_ID. A meeting-heavy
+        /// record would otherwise issue a query per row, and the feed is built on
+        /// every panel open.
+        ///
+        /// Letters ('I') are left out: this reports what was E-MAILED about the
+        /// engagement, and an inbound letter filed against a meeting is neither
+        /// sent nor addressed by the person reading the feed. Read as "not 'I'"
+        /// for the reason LoadMailAttachments gives — the value varies between
+        /// installations and some leave it null, so demanding 'M' would hide
+        /// mails that are really there.
+        /// </summary>
+        private void LoadAppointmentMails(Dictionary<int, VAS_ActivitySourceRow> apptOwners)
+        {
+            if (apptOwners == null || apptOwners.Count == 0) return;
+
+            Dictionary<int, List<VAS_ActivityMailRow>> mails =
+                MailsForAppointments(new List<int>(apptOwners.Keys));
+            if (mails.Count == 0) return;
+
+            // Owners that gathered mail from more than one attendee row, so their
+            // merged list can be put back into date order below.
+            List<VAS_ActivitySourceRow> merged = new List<VAS_ActivitySourceRow>();
+
+            foreach (KeyValuePair<int, List<VAS_ActivityMailRow>> pair in mails)
+            {
+                VAS_ActivitySourceRow owner;
+                if (!apptOwners.TryGetValue(pair.Key, out owner)) continue;
+                if (owner.Mails == null) owner.Mails = new List<VAS_ActivityMailRow>();
+
+                if (owner.Mails.Count > 0 && !merged.Contains(owner)) merged.Add(owner);
+                owner.Mails.AddRange(pair.Value);
+            }
+
+            // Each chunk and each attendee row arrives newest-first on its own;
+            // two of them concatenated are not, so a meeting whose mails came from
+            // several rows is re-sorted rather than left interleaved.
+            foreach (VAS_ActivitySourceRow owner in merged)
+            {
+                owner.Mails.Sort(delegate (VAS_ActivityMailRow a, VAS_ActivityMailRow b)
+                {
+                    return b.SentOn.GetValueOrDefault(DateTime.MinValue)
+                            .CompareTo(a.SentOn.GetValueOrDefault(DateTime.MinValue));
+                });
+            }
+        }
+
+        /// <summary>
+        /// The e-mails filed against each of these appointment / task ids, keyed
+        /// by the id that owns them. Ids with no mail are simply absent.
+        ///
+        /// Public because a panel may read AppointmentsInfo with a loader of its
+        /// own — VAS_190 does, with its own de-duplication and column guards — and
+        /// would otherwise have to repeat this query to say the same thing.
+        /// </summary>
+        /// <param name="appointmentIds">AppointmentsInfo_ID values. Duplicates and
+        /// non-positive ids are ignored.</param>
+        public Dictionary<int, List<VAS_ActivityMailRow>> MailsForAppointments(List<int> appointmentIds)
+        {
+            Dictionary<int, List<VAS_ActivityMailRow>> byOwner =
+                new Dictionary<int, List<VAS_ActivityMailRow>>();
+            if (_apptMailUsable == false || appointmentIds == null ||
+                appointmentIds.Count == 0) return byOwner;
+
+            // Distinct, so a caller that has not collapsed its own duplicates does
+            // not put the same id in the IN list twice.
+            List<int> ids = new List<int>();
+            foreach (int id in appointmentIds)
+            {
+                if (id > 0 && !ids.Contains(id)) ids.Add(id);
+            }
+            if (ids.Count == 0) return byOwner;
+
+            int apptTableId = TableId("AppointmentsInfo");
+            if (apptTableId <= 0) { _apptMailUsable = false; return byOwner; }
+
+            try
+            {
+                // Chunked: an IN list is capped at 1000 entries on Oracle, and a
+                // record with a long meeting history would otherwise raise
+                // ORA-01795 rather than simply showing no mails.
+                const int CHUNK = 900;
+                for (int from = 0; from < ids.Count; from += CHUNK)
+                {
+                    int take = Math.Min(CHUNK, ids.Count - from);
+                    string idList = string.Join(",", ids.GetRange(from, take).ConvertAll(
+                        delegate (int i) { return i.ToString(); }).ToArray());
+
+                    // Every value inlined is an int this class resolved itself, so
+                    // there is nothing to bind — and a bind name may appear only
+                    // once under positional binding.
+                    string sql = @"SELECT ma.MailAttachment1_ID,
+                                          ma.Record_ID,
+                                          ma.Title,
+                                          ma.TextMsg,
+                                          ma.MailAddress,
+                                          ma.Created,
+                                          u.Name AS ActorName
+                                     FROM MailAttachment1 ma
+                                     LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy)
+                                    WHERE ma.AD_Table_ID = " + apptTableId + @"
+                                      AND ma.Record_ID IN (" + idList + @")
+                                      AND COALESCE(ma.IsActive, 'Y') = 'Y'
+                                      AND COALESCE(ma.AttachmentType, 'M') <> 'I'
+                                    ORDER BY ma.Created DESC,
+                                             ma.MailAttachment1_ID DESC";
+                    DataSet ds = DB.ExecuteDataset(sql, null, null);
+                    _apptMailUsable = true;
+                    if (ds == null || ds.Tables.Count == 0) continue;
+
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        int ownerId = Util.GetValueOfInt(r["Record_ID"]);
+                        if (ownerId <= 0) continue;
+                        if (!byOwner.ContainsKey(ownerId))
+                            byOwner[ownerId] = new List<VAS_ActivityMailRow>();
+
+                        byOwner[ownerId].Add(new VAS_ActivityMailRow
+                        {
+                            MailId  = Util.GetValueOfInt(r["MailAttachment1_ID"]),
+                            Subject = Util.GetValueOfString(r["Title"]),
+                            // Flattened here for the reason the other mail reader
+                            // gives: the panels render a body as TEXT, and a mail
+                            // sent as HTML stores its markup in TextMsg.
+                            Body    = MailBodyToText(Util.GetValueOfString(r["TextMsg"])),
+                            MailTo  = Util.GetValueOfString(r["MailAddress"]),
+                            SentBy  = Util.GetValueOfString(r["ActorName"]),
+                            SentOn  = Util.GetValueOfDateTime(r["Created"])
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // No MailAttachment1 on this schema, or no AppointmentsInfo entry
+                // in the dictionary. Remembered so the next record skips it.
+                _apptMailUsable = false;
+                _log.Severe("MailsForAppointments: " + ex.Message);
+            }
+            return byOwner;
         }
 
         // ----------------------------------------------------------------- //

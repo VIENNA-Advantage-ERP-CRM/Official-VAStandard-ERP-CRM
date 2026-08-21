@@ -78,6 +78,21 @@
  *                          "was X → now Y" under the field's name, the old
  *                          value struck through and the new one carrying the
  *                          row's colour. Matches VAS_101 / VAS_104.
+ *   VAI163   2026-08-21  Nothing overlaps anything at any zoom level. The line
+ *                        table's tracks were bare Nfr and its cells never
+ *                        clipped, so at 80% zoom (where the panel reports ~1.25x
+ *                        more CSS pixels for the same physical width) a long
+ *                        product name or locator widened its own column and
+ *                        printed over the one beside it — and since the header
+ *                        row and every body row are SEPARATE grid containers,
+ *                        each sized its columns from its own content and the
+ *                        headings stopped standing over their figures. Tracks are
+ *                        now minmax(0, Nfr) and cells carry min-width:0 with
+ *                        overflow:hidden, which is the pair that confines a cell
+ *                        to the track it was given. Stage labels break inside
+ *                        their word (overflow-wrap) so a shrunken step cannot
+ *                        paint over its neighbour, and the snapshot / header
+ *                        grids took the same minmax floor.
  ***********************************************************/
 
 .vas_103-root {
@@ -243,7 +258,7 @@
    leaves the identity half empty. */
 .vas_103-hdrCard {
     display: grid;
-    grid-template-columns: 40% 1fr;
+    grid-template-columns: 40% minmax(0, 1fr);
     gap: 0.875em 1.75em;
     border: 1px solid var(--mt-card-bd);
     border-radius: var(--mt-card-radius);
@@ -283,10 +298,10 @@
 .vas_103-fVal.vas_103-is-link { color: var(--mt-link); }
 
 @container (max-width: 460px) {
-    .vas_103-hdrCard { grid-template-columns: 1fr; }
+    .vas_103-hdrCard { grid-template-columns: minmax(0, 1fr); }
     .vas_103-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--mt-row-div); padding-bottom: 0.75em; }
     /* Two field columns are too cramped this narrow — back to a single stack. */
-    .vas_103-hdrColR { grid-template-columns: 1fr; }
+    .vas_103-hdrColR { grid-template-columns: minmax(0, 1fr); }
     .vas_103-hdrTop  { flex-direction: column; }
     .vas_103-hdrPills { justify-content: flex-start; }
 }
@@ -443,11 +458,11 @@
    strip is two cards or three, never a fixed four with a hole in it. */
 .vas_103-snap {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.75em;
 }
-.vas_103-snap.vas_103-cards-2 { grid-template-columns: repeat(2, 1fr); }
-.vas_103-snap.vas_103-cards-3 { grid-template-columns: repeat(3, 1fr); }
+.vas_103-snap.vas_103-cards-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.vas_103-snap.vas_103-cards-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .vas_103-metric {
     min-width: 0;
@@ -509,10 +524,10 @@
 }
 
 @container (max-width: 620px) {
-    .vas_103-snap { grid-template-columns: repeat(2, 1fr); }
+    .vas_103-snap { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container (max-width: 340px) {
-    .vas_103-snap { grid-template-columns: 1fr; }
+    .vas_103-snap { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ----------------------------------------------------------- */
@@ -585,16 +600,23 @@
     min-width: 0;
 }
 
+/* A stage name is a single unbreakable word ("Completed", "In Transit"). The
+   step is allowed to shrink (min-width:0), so without a break inside the word the
+   label paints over the stage beside it; without the shrink it would set the
+   stepper's floor and push the panel sideways instead. Breaking inside the word
+   keeps all five stages on one rail at any panel width or zoom level. */
 .vas_103-stepTitle {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--mt-text);
+    overflow-wrap: anywhere;
 }
 
 .vas_103-stepMeta {
     font-size: 0.6875em;
     color: var(--mt-muted);
     margin-top: 0.25em;
+    overflow-wrap: anywhere;
 }
 .vas_103-step.vas_103-is-active .vas_103-stepMeta { color: #E08A1E; font-weight: 600; }
 
@@ -609,14 +631,36 @@
 }
 
 /* 6 columns. The Source column is gone — per line it was a badge reading
-   "Manual" on almost every row, and Generated From already names the origin. */
+   "Manual" on almost every row, and Generated From already names the origin.
+
+   Every track is minmax(0, Nfr). A bare Nfr track cannot shrink below its own
+   content, so a long product name or locator widened its column and pushed the
+   rest of the row out of alignment — and because the header and each body row
+   are SEPARATE grid containers, each one sized its tracks from its own content
+   and the columns stopped lining up with each other altogether. Proportional
+   tracks with a floor of 0 resolve to the same widths in every row at every panel
+   width and zoom level. */
 .vas_103-tRow {
     display: grid;
     align-items: center;
     gap: 0.625em;
     padding: 0.625em 0.875em;
-    grid-template-columns: 2.6fr 1.15fr 1.15fr 0.7fr 0.95fr 1.15fr;
+    grid-template-columns:
+        minmax(0, 2.6fr) minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 0.7fr)
+        minmax(0, 0.95fr) minmax(0, 1.15fr);
 }
+
+/* The other half of the same fix: a grid ITEM keeps min-width:auto, its own
+   content-based minimum, so a cell stayed as wide as its text and printed
+   straight over the column beside it even once the track could compress.
+   min-width:0 plus overflow:hidden confines a cell to the track it was given;
+   the item cell's children carry their own ellipsis, so it is unharmed by the
+   clip. Numeric and header cells never wrap — a wrapped figure would sit off the
+   shared baseline. */
+.vas_103-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vas_103-tHead > span,
+.vas_103-tRow > span.vas_103-ta-r,
+.vas_103-tRow > span.vas_103-ta-c { white-space: nowrap; }
 
 .vas_103-tHead {
     background: #F5F8FB;
@@ -904,6 +948,14 @@
     word-break: break-word;
 }
 .vas_103-actMeta + .vas_103-actMeta { margin-top: 0.125em; }
+/* Each e-mail sent against an appointment or task, inside that row's drawer.
+   The second and later ones are ruled off, so several notices about the same
+   meeting do not read as one long message. */
+.vas_103-actMailSplit {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--gc-card-bd);
+}
 /* The message itself keeps the sender's own line breaks. */
 .vas_103-actBody p {
     margin: 0.5em 0 0;

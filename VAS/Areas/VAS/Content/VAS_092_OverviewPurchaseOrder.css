@@ -158,6 +158,11 @@
  *                        Drop Shipment prints the word "Yes" / "No" as an
  *                        ordinary header field again, so there is no tick or
  *                        cross left to paint.
+ *   VAI163   2026-08-21  The header card and the snapshot took the minmax(0, 1fr)
+ *                        floor the line tables already had, so every flexible
+ *                        track in the panel now has a floor of 0 rather than its
+ *                        own content. Consistency pass — this panel's cells
+ *                        already clipped, so nothing here was overlapping.
  ***********************************************************/
 
 .vas_092-root {
@@ -369,7 +374,7 @@
    a tall column that leaves the vendor half empty. */
 .vas_092-hdrCard {
     display: grid;
-    grid-template-columns: 40% 1fr;
+    grid-template-columns: 40% minmax(0, 1fr);
     gap: 0.875em 1.75em;
     border: 1px solid var(--vaspo-card-bd);
     border-radius: var(--vaspo-card-radius);
@@ -410,10 +415,10 @@
 
 /* Narrow panels: stack the two columns and drop the pills below the title. */
 @container (max-width: 460px) {
-    .vas_092-hdrCard { grid-template-columns: 1fr; }
+    .vas_092-hdrCard { grid-template-columns: minmax(0, 1fr); }
     .vas_092-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--vaspo-row-div); padding-bottom: 0.75em; }
     /* Two field columns are too cramped this narrow — back to a single stack. */
-    .vas_092-hdrColR { grid-template-columns: 1fr; }
+    .vas_092-hdrColR { grid-template-columns: minmax(0, 1fr); }
     .vas_092-hdrTop  { flex-direction: column; }
     .vas_092-hdrPills { justify-content: flex-start; }
 }
@@ -563,7 +568,7 @@
 /* ----------------------------------------------------------- */
 .vas_092-snap {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.75em;
 }
 
@@ -1426,4 +1431,13 @@
 .vas_092-cvNew {
     color: var(--vaspo-text); font-weight: 700;
     overflow-wrap: break-word; word-break: break-word;
+}
+
+/* Each e-mail sent against an appointment or task, inside that row's drawer.
+   The second and later ones are ruled off, so several notices about the same
+   meeting do not read as one long message. */
+.vas_092-actMailSplit {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--vaspo-card-bd);
 }

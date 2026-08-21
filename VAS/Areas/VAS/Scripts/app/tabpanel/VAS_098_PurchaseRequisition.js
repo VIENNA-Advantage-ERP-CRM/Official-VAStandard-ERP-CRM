@@ -381,6 +381,11 @@
  *                          resort for a screen that cannot be named, and the
  *                          production order's can. The two VA075 documents still
  *                          fall through to it, since theirs genuinely cannot.
+ *   VAI163   2026-08-21  Activity: a Task or Appointment row now says how many
+ *                        e-mails were sent against it, and opens on click onto
+ *                        each one - who it went to, its subject, when it went
+ *                        and who sent it, then the message itself. The body is
+ *                        shown ONLY once the row is opened.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -2028,6 +2033,12 @@
                 if (a.Location) bits.push(a.Location);
                 if (a.IsCancelled) bits.push(msg("ActCancelled", "Cancelled"));
                 else if (a.IsClosed) bits.push(msg("ActCompleted", "Completed"));
+                // What was e-mailed about this meeting or task. The count only —
+                // the addresses, subjects and bodies are in the drawer, and a
+                // meeting that generated several notices would otherwise push
+                // everything else off the sub-line.
+                var apptMails = activityMails(a);
+                if (apptMails.length) bits.push(mailCountLabel(apptMails.length));
                 if (bits.length) {
                     var sub = bits.join(" · ");
                     $main.append($('<div class="vas_098-actsub"></div>')
@@ -2050,15 +2061,23 @@
 
             // Rows carrying a body are clickable; the caret shows the state.
             if (hasActivityBody(a)) {
-                $row.addClass("vas_098-openable")
-                    .attr("title", msg("ShowMailBody", "Click to read the message"));
+                // A meeting or task opens onto the e-mails sent about it; every
+                // other openable row onto its own message.
+                var isAppt = (a.Type === "appointment" || a.Type === "task");
+                var showHint = isAppt
+                    ? msg("ShowMails", "Click to read the e-mails")
+                    : msg("ShowMailBody", "Click to read the message");
+                var hideHint = isAppt
+                    ? msg("HideMails", "Click to hide the e-mails")
+                    : msg("HideMailBody", "Click to hide the message");
+
+                $row.addClass("vas_098-openable").attr("title", showHint);
                 $row.on("click", function () {
                     var $panel = $row.next(".vas_098-actbody");
                     if (!$panel.length) return;
                     var nowOpen = !$row.hasClass("vas_098-open");
                     $row.toggleClass("vas_098-open", nowOpen)
-                        .attr("title", nowOpen ? msg("HideMailBody", "Click to hide the message")
-                                               : msg("ShowMailBody", "Click to read the message"));
+                        .attr("title", nowOpen ? hideHint : showHint);
                     $panel.toggle(nowOpen);
                 });
             }
@@ -2070,9 +2089,27 @@
         // stays a plain, non-clickable row.
         // A letter opens like a mail: it is the same record in the same table,
         // with the same body and the same addresses on it.
+        // A meeting or task opens onto the e-mails sent against it instead.
         function hasActivityBody(a) {
-            return !!(a && (a.Type === "email" || a.Type === "letter") &&
-                      a.Body && String(a.Body).trim());
+            if (!a) return false;
+            if (a.Type === "email" || a.Type === "letter") {
+                return !!(a.Body && String(a.Body).trim());
+            }
+            if (a.Type === "appointment" || a.Type === "task") {
+                return activityMails(a).length > 0;
+            }
+            return false;
+        }
+
+        // The e-mails sent against an appointment or task (MailAttachment1 keyed
+        // on AppointmentsInfo). Always an array, so callers can count and loop
+        // without guarding.
+        function activityMails(a) {
+            return (a && a.Mails && a.Mails.length) ? a.Mails : [];
+        }
+
+        function mailCountLabel(n) {
+            return n + " " + (n === 1 ? msg("Email", "email") : msg("Emails", "emails"));
         }
 
         // The e-mail body, collapsed beneath its activity row. The full recipient
@@ -2082,12 +2119,53 @@
             if (!hasActivityBody(a)) return null;
 
             var $panel = $('<div class="vas_098-actbody" style="display:none;"></div>');
+
+            // An appointment or task opens onto the e-mails sent about it, each
+            // with its own recipient, subject, moment and sender. They are listed
+            // newest first (model order).
+            if (a.Type === "appointment" || a.Type === "task") {
+                var mails = activityMails(a);
+                for (var i = 0; i < mails.length; i++) {
+                    $panel.append(activityMailEntry(mails[i], i > 0));
+                }
+                return $panel;
+            }
+
             appendMailMeta($panel, "MailFrom", "From:", a.MailFrom);
             appendMailMeta($panel, "MailTo",   "To:",   a.MailTo);
             appendMailMeta($panel, "MailCc",   "Cc:",   a.MailCc);
             appendMailMeta($panel, "MailBcc",  "Bcc:",  a.MailBcc);
             $panel.append($('<p></p>').text(String(a.Body).trim()));
             return $panel;
+        }
+
+        // One e-mail inside an appointment's or task's drawer: who it went to and
+        // what it was about, then when and by whom, then the message. Separated
+        // from the one before it so several notices do not read as one.
+        function activityMailEntry(m, separated) {
+            var $wrap = $('<div class="vas_098-actmailitem"></div>');
+            if (separated) $wrap.addClass("vas_098-actmailsplit");
+
+            appendMailMeta($wrap, "MailTo", "To:", m.MailTo);
+            appendMailMeta($wrap, "MailSubject", "Subject:",
+                (m.Subject && String(m.Subject).trim())
+                    ? m.Subject : msg("NoSubject", "(no subject)"));
+
+            // "when · by whom", the same two parts in the same order as the row
+            // above it.
+            var when = formatDateTime(m.SentOn);
+            if (m.SentBy) {
+                when = when ? when + " · " + msg("By", "by") + " " + m.SentBy
+                            : msg("By", "by") + " " + m.SentBy;
+            }
+            if (when) $wrap.append($('<div class="vas_098-actmeta"></div>').text(when));
+
+            // The body is the thing the click was for; a mail filed without one
+            // still shows its envelope rather than an empty gap.
+            if (m.Body && String(m.Body).trim()) {
+                $wrap.append($('<p></p>').text(String(m.Body).trim()));
+            }
+            return $wrap;
         }
 
         function appendMailMeta($panel, key, fallback, value) {

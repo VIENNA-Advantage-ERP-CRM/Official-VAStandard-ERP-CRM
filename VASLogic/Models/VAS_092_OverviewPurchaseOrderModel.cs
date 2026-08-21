@@ -318,6 +318,14 @@
 ///                        The no-real-edit test compares the RAW values, before
 ///                        either is resolved: two records can share a name, and
 ///                        dropping such a row would hide a real edit.
+///   VAI163   2026-08-21  Activity: an appointment or task now carries the
+///                        e-mails sent against IT - MailAttachment1 keyed on
+///                        AppointmentsInfo rather than on this panel's own
+///                        table - with the recipient (MailAddress), subject
+///                        (Title), when (Created) and who sent it (CreatedBy).
+///                        The body (TextMsg, flattened) travels with the row so
+///                        the panel reveals it on click. Read in one query for
+///                        the whole feed through VAS_ActivitySourcesModel.
 /// </summary>
 
 using System;
@@ -1518,6 +1526,8 @@ namespace VASLogic.Models
                     MailBcc     = s.MailBcc,
                     MailFrom    = s.MailFrom,
                     IsMailSent  = s.IsMailSent,
+                    // An appointment or task brings the mails sent against it.
+                    Mails       = s.Mails,
                     UserName    = s.ActorName,
                     Created     = s.EventTime
                 });
@@ -3173,6 +3183,14 @@ namespace VASLogic.Models
             public string    MailBcc         { get; set; }
             public string    MailFrom        { get; set; }
             public bool      IsMailSent      { get; set; }
+
+            /// <summary>The e-mails sent against an APPOINTMENT or TASK itself
+            /// (MailAttachment1 anchored on AppointmentsInfo): recipient, subject,
+            /// body, when and by whom. Distinct from the mail fields above, which
+            /// are correspondence about the ORDER. Empty on every other type; the
+            /// bodies travel with the row so the panel reveals them on click
+            /// without a second round trip.</summary>
+            public List<VAS_ActivityMailRow> Mails { get; set; }
         }
 
         /// <summary>An e-mail sent against the order (MailAttachment1).</summary>

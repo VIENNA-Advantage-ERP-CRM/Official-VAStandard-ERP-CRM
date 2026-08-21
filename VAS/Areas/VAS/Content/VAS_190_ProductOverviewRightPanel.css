@@ -46,6 +46,14 @@
  *                          carries the attribute set the detail line is for, and
  *                          clipped, the one thing that tells two rows of the same
  *                          parent apart lived on the tooltip alone.
+ *   VAI163   2026-08-21  Nothing overlaps anything at any zoom level. The hero and
+ *                        detail cards' two halves took the minmax(0, 1fr) floor,
+ *                        so a long value can no longer widen its half and push the
+ *                        other out from under it. The grid header's cells carry
+ *                        min-width:0 to match the body's. In the compact and
+ *                        entity lists the right-hand value still holds its width
+ *                        (the label gives way first) but clips rather than running
+ *                        back over the label when even that is not enough.
  ***********************************************************/
 
 .vas_190-root {
@@ -225,10 +233,13 @@
 .vas_190-statusLine.vas_190-lineRisk { color: var(--p190-crit-tx); }
 .vas_190-statusLine.vas_190-lineWarn { color: var(--p190-warn-tx); }
 
+/* minmax(0, 1fr), not a bare 1fr: a bare fr track cannot shrink below its own
+   content, so one long value widened its half of the card and pushed the other
+   half out from under it. */
 .vas_190-heroGrid {
     margin-top: 0.75em;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     column-gap: 0.875em;
     row-gap: 0.375em;
 }
@@ -270,7 +281,7 @@
     background: #FFFFFF;
     padding: 0.875em;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     column-gap: 0.875em;
     row-gap: 0.625em;
 }
@@ -318,13 +329,20 @@
     white-space: nowrap;
 }
 
-.vas_190-clRhs { flex-shrink: 0; display: flex; align-items: center; gap: 0.625em; }
+/* The right-hand side holds its width (flex-shrink:0) so the figure is never the
+   part that gives way — the label on the left shrinks first. min-width:0 with a
+   clip is the floor under that: where even the right side alone is wider than the
+   row, it truncates rather than running back over the label. */
+.vas_190-clRhs { flex-shrink: 0; min-width: 0; max-width: 100%; display: flex; align-items: center; gap: 0.625em; }
 .vas_190-clVal {
+    min-width: 0;
     font-weight: 700;
     font-size: 0.8125em;
     color: var(--p190-text);
     text-align: right;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .vas_190-clSub {
     display: block;
@@ -416,9 +434,13 @@
     word-break: break-word;
     line-height: 1.45;
 }
-.vas_190-eVal { flex-shrink: 0; text-align: right; }
-.vas_190-eV { font-weight: 700; font-size: 0.9375em; color: var(--p190-text); white-space: nowrap; }
-.vas_190-eS { font-weight: 400; font-size: 0.75em; color: var(--p190-muted); white-space: nowrap; }
+/* Same as the compact list: the value holds its width so the title shrinks
+   first, and clips rather than overlapping it if even that is not enough. */
+.vas_190-eVal { flex-shrink: 0; min-width: 0; max-width: 100%; text-align: right; }
+.vas_190-eV { font-weight: 700; font-size: 0.9375em; color: var(--p190-text); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+.vas_190-eS { font-weight: 400; font-size: 0.75em; color: var(--p190-muted); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
 
 /* ----------------------------------------------------------- */
 /*  Data grid (stock details, transactions)                     */
@@ -450,6 +472,7 @@
     font-weight: 500;
     font-size: 0.6875em;
     color: var(--p190-muted);
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -735,3 +758,12 @@
 [dir="rtl"] .vas_190-actBody { padding-left: 0.875em; padding-right: 2.5em; }
 [dir="rtl"] .vas_190-actCaret svg { transform: scaleX(-1); }
 [dir="rtl"] .vas_190-actRow.vas_190-is-open .vas_190-actCaret { transform: rotate(-90deg); }
+
+/* Each e-mail sent against an appointment or task, inside that row's drawer.
+   The second and later ones are ruled off, so several notices about the same
+   meeting do not read as one long message. */
+.vas_190-actMailSplit {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--p190-divider);
+}

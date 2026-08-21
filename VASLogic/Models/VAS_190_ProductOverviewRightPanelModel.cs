@@ -185,6 +185,14 @@
 ///                        - An order row carries the order's own DatePromised, so
 ///                          a row with something still to move can say when it is
 ///                          due.
+///   VAI163   2026-08-21  Activity: an appointment or task now carries the
+///                        e-mails sent against IT - MailAttachment1 keyed on
+///                        AppointmentsInfo rather than on this panel's own
+///                        table - with the recipient (MailAddress), subject
+///                        (Title), when (Created) and who sent it (CreatedBy).
+///                        The body (TextMsg, flattened) travels with the row so
+///                        the panel reveals it on click. Read in one query for
+///                        the whole feed through VAS_ActivitySourcesModel.
 /// </summary>
 
 using System;
@@ -3415,21 +3423,34 @@ namespace VASLogic.Models
             // with five identical entries. Collapsed on (StartDate, Subject) —
             // the rows arrive ordered by id, so the first one seen wins and the
             // entry stays stable between refreshes.
-            List<string> seenMeetings = new List<string>();
+            // The entry each meeting collapsed to, and every AppointmentsInfo_ID
+            // that points at it. Several ids can name one entry: a mail filed
+            // against a dropped attendee row still belongs to the meeting the
+            // reader sees. Gathered first so the mails cost ONE query for the
+            // whole feed rather than one per meeting.
+            Dictionary<string, ActivityData> keptByMeeting =
+                new Dictionary<string, ActivityData>();
+            Dictionary<int, ActivityData> ownerById = new Dictionary<int, ActivityData>();
 
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 bool isTask = Util.GetValueOfString(r["IsTask"]) == "Y";
                 DateTime? start = Util.GetValueOfDateTime(r["StartDate"]);
+                int apptId = Util.GetValueOfInt(r["AppointmentsInfo_ID"]);
 
                 string meetingKey = (start.HasValue ? start.Value.ToString("s") : "")
                                   + "|" + Util.GetValueOfString(r["Subject"]);
-                if (seenMeetings.Contains(meetingKey)) continue;
-                seenMeetings.Add(meetingKey);
 
-                list.Add(new ActivityData
+                ActivityData kept;
+                if (keptByMeeting.TryGetValue(meetingKey, out kept))
                 {
-                    Id          = Util.GetValueOfInt(r["AppointmentsInfo_ID"]),
+                    if (apptId > 0) ownerById[apptId] = kept;
+                    continue;
+                }
+
+                ActivityData a = new ActivityData
+                {
+                    Id          = apptId,
                     Type        = isTask ? "task" : "appointment",
                     Title       = Util.GetValueOfString(r["Subject"]),
                     Body        = Util.GetValueOfString(r["Description"]),
@@ -3439,7 +3460,53 @@ namespace VASLogic.Models
                     StartDate   = start,
                     EndDate     = Util.GetValueOfDateTime(r["EndDate"]),
                     Actor       = Util.GetValueOfString(r["ActorName"]),
+                    Mails       = new List<VAS_ActivityMailRow>(),
                     EventDate   = start.HasValue ? start : Util.GetValueOfDateTime(r["Created"])
+                };
+                list.Add(a);
+                keptByMeeting[meetingKey] = a;
+                if (apptId > 0) ownerById[apptId] = a;
+            }
+
+            AttachAppointmentMails(ownerById);
+        }
+
+        /// <summary>
+        /// Hangs the e-mails sent against each task / appointment on the row that
+        /// owns them (MailAttachment1 keyed on AppointmentsInfo). The query is the
+        /// shared reader's, so this panel's own appointment loader does not have to
+        /// repeat it.
+        /// </summary>
+        private void AttachAppointmentMails(Dictionary<int, ActivityData> ownerById)
+        {
+            if (ownerById == null || ownerById.Count == 0) return;
+
+            Dictionary<int, List<VAS_ActivityMailRow>> mails =
+                _activitySources.MailsForAppointments(new List<int>(ownerById.Keys));
+            if (mails.Count == 0) return;
+
+            // Entries that gathered mail from more than one attendee row, so the
+            // merged list can be put back into date order below.
+            List<ActivityData> merged = new List<ActivityData>();
+
+            foreach (KeyValuePair<int, List<VAS_ActivityMailRow>> pair in mails)
+            {
+                ActivityData owner;
+                if (!ownerById.TryGetValue(pair.Key, out owner)) continue;
+                if (owner.Mails == null) owner.Mails = new List<VAS_ActivityMailRow>();
+
+                if (owner.Mails.Count > 0 && !merged.Contains(owner)) merged.Add(owner);
+                owner.Mails.AddRange(pair.Value);
+            }
+
+            // Each attendee row's mails arrive newest-first on their own; two of
+            // those lists concatenated are not.
+            foreach (ActivityData owner in merged)
+            {
+                owner.Mails.Sort(delegate (VAS_ActivityMailRow a, VAS_ActivityMailRow b)
+                {
+                    return b.SentOn.GetValueOrDefault(DateTime.MinValue)
+                            .CompareTo(a.SentOn.GetValueOrDefault(DateTime.MinValue));
                 });
             }
         }
@@ -4062,6 +4129,13 @@ namespace VASLogic.Models
             public bool      IsCancelled { get; set; }
             public DateTime? StartDate   { get; set; }
             public DateTime? EndDate     { get; set; }
+            /// <summary>The e-mails sent against the TASK or APPOINTMENT itself
+            /// (MailAttachment1 anchored on AppointmentsInfo): recipient, subject,
+            /// body, when and by whom. Distinct from the mail fields above, which
+            /// are correspondence about the PRODUCT. Empty on every other type;
+            /// the bodies travel with the row so the panel reveals them on click
+            /// without a second round trip.</summary>
+            public List<VAS_ActivityMailRow> Mails { get; set; }
         }
 
         /// <summary>

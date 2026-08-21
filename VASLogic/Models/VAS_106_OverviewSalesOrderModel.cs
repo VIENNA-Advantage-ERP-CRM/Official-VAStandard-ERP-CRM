@@ -237,6 +237,14 @@
 ///                            alone found nothing on either.
 ///                        Every predicate is COALESCE rather than NVL, so the
 ///                        statements read the same on Oracle and PostgreSQL.
+///   VAI163   2026-08-21  Activity: an appointment or task now carries the
+///                        e-mails sent against IT - MailAttachment1 keyed on
+///                        AppointmentsInfo rather than on this panel's own
+///                        table - with the recipient (MailAddress), subject
+///                        (Title), when (Created) and who sent it (CreatedBy).
+///                        The body (TextMsg, flattened) travels with the row so
+///                        the panel reveals it on click. Read in one query for
+///                        the whole feed through VAS_ActivitySourcesModel.
 /// </summary>
 
 using System;
@@ -2603,6 +2611,8 @@ namespace VASLogic.Models
                     MailBcc     = s.MailBcc,
                     MailFrom    = s.MailFrom,
                     IsMailSent  = s.IsMailSent,
+                    // An appointment or task brings the mails sent against it.
+                    Mails       = s.Mails,
                     ActorName   = s.ActorName,
                     EventTime   = s.EventTime
                 });
@@ -2832,6 +2842,14 @@ namespace VASLogic.Models
             public string   Location    { get; set; }
             public bool     IsClosed    { get; set; }
             public bool     IsCancelled { get; set; }
+
+            /// <summary>The e-mails sent against an APPOINTMENT or TASK itself
+            /// (MailAttachment1 anchored on AppointmentsInfo): recipient, subject,
+            /// body, when and by whom. Distinct from the mail fields above, which
+            /// are correspondence about the ORDER. Empty on every other event
+            /// type; the bodies travel with the row so the panel reveals them on
+            /// click without a second round trip.</summary>
+            public List<VAS_ActivityMailRow> Mails { get; set; }
         }
 
         public class NoteData
