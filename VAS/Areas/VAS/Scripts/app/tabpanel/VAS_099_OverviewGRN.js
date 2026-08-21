@@ -963,7 +963,7 @@
             // both order kinds live in C_Order.
             if (data.PONo || data.PurchaseOrderId > 0) {
                 $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_099_AgainstPO"),
-                    data.PONo || ("#" + data.PurchaseOrderId),
+                    data.PONo || "",
                     null, "info", "C_Order", data.PurchaseOrderId, false));
                 any = true;
             }
@@ -978,7 +978,7 @@
             // sales transaction so the framework resolves the Sales Order window.
             if (data.RefOrderDocNo || data.RefOrderId > 0) {
                 $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_099_ReferenceSalesOrder"),
-                    data.RefOrderDocNo || ("#" + data.RefOrderId),
+                    data.RefOrderDocNo || "",
                     null, "success", "C_Order", data.RefOrderId, true));
                 any = true;
             }
@@ -1784,7 +1784,17 @@
             confirmation: { tone: "warning", icon: "clipboardCheck", tagKey: "VAS_099_TagConfirmation", tagText: "Confirmation", titleKey: "VAS_099_ActConfirmation", titleText: "Receipt confirmation raised" },
             invoice:      { tone: "info",    icon: "doc",            tagKey: "VAS_099_TagInvoice",      tagText: "Invoice",      titleKey: "VAS_099_ActInvoice",      titleText: "Vendor invoice raised" },
             note:         { tone: "neutral", icon: "mail",           tagKey: "VAS_099_TagNote",         tagText: "Note",         titleKey: null,                      titleText: "" },
-            email:        { tone: "purple",  icon: "mail",           tagKey: "VAS_099_TagEmail",        tagText: "Email",        titleKey: null,                      titleText: "" }
+            email:        { tone: "purple",  icon: "mail",           tagKey: "VAS_099_TagEmail",        tagText: "Email",        titleKey: null,                      titleText: "" },
+            // The correspondence and engagement sources shared with every other
+            // overview panel (model side, VAS_ActivitySourcesModel): meetings and
+            // tasks from AppointmentsInfo, calls from VA048_CallDetails, and the
+            // inbound letters MailAttachment1 files under AttachmentType 'I'.
+            // titleKey null on all four: each headlines with its OWN subject, note
+            // or title, falling back to what its tag says it is.
+            appointment:  { tone: "info",    icon: "clipboardCheck", tagKey: "VAS_099_TagAppointment",  tagText: "Meeting",      titleKey: null,                      titleText: "" },
+            task:         { tone: "warning", icon: "check",          tagKey: "VAS_099_TagTask",         tagText: "Task",         titleKey: null,                      titleText: "" },
+            call:         { tone: "success", icon: "phone",          tagKey: "VAS_099_TagCall",         tagText: "Call",         titleKey: null,                      titleText: "" },
+            letter:       { tone: "purple",  icon: "mail",           tagKey: "VAS_099_TagLetter",       tagText: "Letter",       titleKey: null,                      titleText: "" }
         };
 
         // The receipt's audit trail, newest first: who created it, who changed it
@@ -1878,7 +1888,24 @@
             // An e-mail names its recipients under the subject — every address on
             // the To, Cc and Bcc lists, in full. No tooltip: the line is no
             // longer an abridgement of something the reader has to hover to see.
-            if (a.Type === "email") {
+            // A LETTER names its addresses here too — it is the same record in the
+            // same table, filed under a different attachment type.
+            if (a.Type === "call" && a.MailTo) {
+                $title.append($('<small class="vas_099-actSub"></small>')
+                    .text(a.MailTo).attr("title", a.MailTo));
+            }
+            if (a.Type === "appointment" || a.Type === "task") {
+                var apptBits = [];
+                if (a.Location) apptBits.push(a.Location);
+                if (a.IsCancelled) apptBits.push(msg("VAS_099_ActCancelled", "Cancelled"));
+                else if (a.IsClosed) apptBits.push(msg("VAS_099_ActCompleted2", "Completed"));
+                if (apptBits.length) {
+                    var apptSub = apptBits.join(" · ");
+                    $title.append($('<small class="vas_099-actSub"></small>')
+                        .text(apptSub).attr("title", apptSub));
+                }
+            }
+            if (a.Type === "email" || a.Type === "letter") {
                 var to = recipientSummary(a);
                 if (to) {
                     $title.append($('<small class="vas_099-actSub"></small>').text(to));
@@ -1929,8 +1956,13 @@
 
         function activityTitle(a, meta) {
             if (a.Type === "note") return (a.Text || "").trim();
-            if (a.Type === "email") {
+            if (a.Type === "email" || a.Type === "letter") {
                 return (a.Text || "").trim() || msg("VAS_099_NoSubject", "(no subject)");
+            }
+            // A meeting, task or call headlines with its own subject or note; with
+            // none, the KIND stands in rather than borrowing another type's words.
+            if (a.Type === "appointment" || a.Type === "task" || a.Type === "call") {
+                return (a.Text || "").trim() || msg(meta.tagKey, meta.tagText);
             }
             // A field-level edit headlines with the FIELD that changed — the row's
             // tag already says "Updated", and the field is what tells one edit
@@ -1947,7 +1979,8 @@
         // Only an e-mail carries a body worth opening; a mail stored without one
         // stays a plain, non-clickable row.
         function hasActivityBody(a) {
-            return a && a.Type === "email" && !!(a.Body && String(a.Body).trim());
+            return a && (a.Type === "email" || a.Type === "letter") &&
+                   !!(a.Body && String(a.Body).trim());
         }
 
         // The e-mail body, collapsed beneath its activity row. The full recipient

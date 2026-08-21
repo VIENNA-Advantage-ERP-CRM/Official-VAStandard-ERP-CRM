@@ -108,6 +108,15 @@
  *                          "was X → now Y" under the field's name, the old
  *                          value struck through and the new one carrying the
  *                          row's colour. Matches VAS_101 / VAS_104.
+ *   VAI163   2026-08-20  The Quality track floors at min-content rather than 0.
+ *                        Its cells hold a tick, but its HEADING holds the word
+ *                        "Quality", and at minmax(0, 0.7fr) — the narrowest track
+ *                        in the row — the word was cut off by the table's own
+ *                        overflow, so the one column whose label explains what
+ *                        its marks MEAN was the one column that could not be
+ *                        read. min-content is the width of the longest
+ *                        unbreakable word in the column, so the heading fits in
+ *                        any language and the track still flexes above it.
  ***********************************************************/
 
 .vas_100-root {
@@ -686,11 +695,19 @@
    the delivery has QA parameters — the panel does not draw the column at all
    otherwise, so the table must not reserve room for it either. The item column
    gives up the width: it is the widest track and the one that ellipsises most
-   gracefully. */
+   gracefully.
+
+   That track's floor is min-content, not 0. Its cells hold a tick, but its
+   HEADING holds the word "Quality", and at minmax(0, 0.7fr) — the narrowest
+   track in the row — the word was cut off by the table's own overflow: the
+   column that says what the ticks MEAN was the one column whose label could not
+   be read. min-content is the width of the longest unbreakable word in the
+   column, so the heading always fits, in any language, and the track still
+   flexes above that floor like the rest. */
 .vas_100-table.vas_100-has-q .vas_100-tRow {
     grid-template-columns:
         minmax(0, 2.2fr) minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 1.1fr)
-        minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 0.7fr);
+        minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(min-content, 0.7fr);
 }
 
 .vas_100-tHead {

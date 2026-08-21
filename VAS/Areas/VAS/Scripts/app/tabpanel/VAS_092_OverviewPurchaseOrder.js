@@ -320,6 +320,22 @@
  *                        answered in words to a reader who found the tooltip
  *                        or ran a screen reader. headerFlagField and the
  *                        "cross" icon went with it — nothing else drew one.
+ *   VAI163   2026-08-20  - The Order Total card leads with the NET amount
+ *                          (data.SubTotal, which is GrandTotal − Tax and so stays
+ *                          net on a tax-inclusive price list) over "<ISO> ·
+ *                          Exclusive Taxes". It led with the grand total under
+ *                          "Inclusive Taxes". The card's name, tone, shape and
+ *                          sub-line format are unchanged, so it still reads as one
+ *                          of the four. VAS_092_ExclTaxFreight is the new key;
+ *                          VAS_092_InclTaxFreight is no longer used.
+ *                        - An "updated" activity row shows the field's DISPLAY
+ *                          value rather than the raw one the change log stores:
+ *                          a reference reads as the record's name, a list value as
+ *                          its label, and a date as the date alone (model side,
+ *                          DisplayChangeValue). changeValueText renders a
+ *                          yyyy-MM-dd value in the reader's locale, building the
+ *                          Date from local parts so a bare ISO date cannot roll
+ *                          back a day west of Greenwich.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -452,7 +468,11 @@
             VAS_092_Plan: "Plan",
             VAS_092_More: "more",
             // Snapshot
+            // VAS_092_InclTaxFreight is unused: the Order Total card leads with
+            // the NET amount now, so its sub-line reads Exclusive Taxes. Kept as a
+            // default in case a tenant still has the key seeded.
             VAS_092_InclTaxFreight: "Inclusive Taxes",
+            VAS_092_ExclTaxFreight: "Exclusive Taxes",
             VAS_092_OrderTotal: "Order Total",
             VAS_092_ExpectedDelivery: "Expected Delivery",
             VAS_092_LineItems: "Line Items",
@@ -599,6 +619,13 @@
             VAS_092_TagClosed: "Closed",
             VAS_092_TagInvalidated: "Invalid",
             VAS_092_TagUpdated: "Updated",
+            // The shared correspondence / engagement sources.
+            VAS_092_TagAppointment: "Meeting",
+            VAS_092_TagTask: "Task",
+            VAS_092_TagCall: "Call",
+            VAS_092_TagLetter: "Letter",
+            VAS_092_ActCancelled: "Cancelled",
+            VAS_092_ActCompleted: "Completed",
             VAS_092_ActUpdated: "Order updated",
             VAS_092_ActFieldUpdated: "Updated",
             VAS_092_RecentActivity: "Activity",
@@ -1029,7 +1056,11 @@
             // RFQ — the request for quotation the PO was raised from
             // (C_RfQResponse.C_Order_ID).
             if (data.RfqId > 0) {
-                var rfqVal = data.RfqNo || ("#" + data.RfqId);
+                // No "#id" fallback on any chip below: an internal key is not a
+                // document number, and printing one tells the reader nothing they
+                // can act on. Where the model could not resolve an identifier the
+                // chip carries its LABEL alone and still opens the record.
+                var rfqVal = data.RfqNo || "";
                 if (data.RfqCount > 1)
                     rfqVal += " +" + (data.RfqCount - 1) + " " + getMsg("VAS_092_More");
                 $chips.append(originChip("clipboardCheck", getMsg("VAS_092_Rfq"), rfqVal,
@@ -1040,7 +1071,7 @@
             // Project — the project line this PO was generated for
             // (C_ProjectLine.C_OrderPO_ID).
             if (data.ProjectId > 0) {
-                var projVal = data.ProjectNo || data.ProjectName || ("#" + data.ProjectId);
+                var projVal = data.ProjectNo || data.ProjectName || "";
                 if (data.ProjectCount > 1)
                     projVal += " +" + (data.ProjectCount - 1) + " " + getMsg("VAS_092_More");
                 $chips.append(originChip("doc", getMsg("VAS_092_Project"), projVal,
@@ -1052,7 +1083,7 @@
             // (C_Order.C_Order_Blanket). Opened on the purchase side: the blanket
             // is itself a C_Order, so isSOTrx stays false.
             if (data.BlanketOrderId > 0) {
-                var blanketVal = data.BlanketOrderNo || ("#" + data.BlanketOrderId);
+                var blanketVal = data.BlanketOrderNo || "";
                 // A release can draw on more than one blanket when the link is
                 // read from the lines; the first is named and the rest counted.
                 if (data.BlanketOrderCount > 1) {
@@ -1066,7 +1097,7 @@
             // Contract reference — C_Order.VAS_ContractMaster_ID.
             if (data.ContractMasterId > 0) {
                 $chips.append(originChip("doc", getMsg("VAS_092_Contract"),
-                    data.ContractMasterNo || ("#" + data.ContractMasterId),
+                    data.ContractMasterNo || "",
                     null, "purple", "VAS_ContractMaster", data.ContractMasterId));
                 any = true;
             }
@@ -1075,7 +1106,7 @@
             // (VAMRP_PlanRun_ID). A planned PO is not a manual one, and used to
             // fall through to the "Manual" chip because nothing read the plan.
             if (data.PlanRunId > 0) {
-                var planVal = data.PlanRunNo || ("#" + data.PlanRunId);
+                var planVal = data.PlanRunNo || "";
                 if (data.PlanRunCount > 1)
                     planVal += " +" + (data.PlanRunCount - 1) + " " + getMsg("VAS_092_More");
                 $chips.append(originChip("factory", getMsg("VAS_092_Plan"), planVal,
@@ -1122,12 +1153,23 @@
         function renderSnapshot() {
             var $snap = $('<section class="vas_092-snap"></section>');
 
-            // Order Total — grand total (tax inclusive).
+            // Order Total — the card keeps its name; the FIGURE is the NET amount,
+            // the order's subtotal before tax.
+            //
+            // SubTotal, not TotalLines: it is GrandTotal − TaxAmt (model side), so
+            // on a tax-INCLUSIVE price list — where C_Order.TotalLines carries the
+            // gross — it is still the net figure, and it is the same number the
+            // lines table foots with.
+            //
+            // The sub-line is what distinguishes the two totals, so it says
+            // outright which one this is rather than leaving the reader to infer it
+            // from the label. Same shape as before (ISO · basis), so the card sits
+            // beside the other three unchanged.
             var totalSub = (data.ISO_Code || "");
-            var incl = getMsg("VAS_092_InclTaxFreight");
-            totalSub = totalSub ? totalSub + " · " + incl : incl;
+            var excl = getMsg("VAS_092_ExclTaxFreight");
+            totalSub = totalSub ? totalSub + " · " + excl : excl;
             $snap.append(metricCard("total", "coins", getMsg("VAS_092_OrderTotal"),
-                formatAmount(+data.GrandTotal || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision),
+                formatAmount(+data.SubTotal || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision),
                 totalSub, null));
 
             // Expected Delivery — promised date + delivery-status caption.
@@ -2261,7 +2303,19 @@
             reversed:    { tone: "risk",    icon: "alert",  tagKey: "VAS_092_TagReversed",    titleKey: null },
             closed:      { tone: "neutral", icon: "check",  tagKey: "VAS_092_TagClosed",      titleKey: null },
             invalidated: { tone: "warning", icon: "alert",  tagKey: "VAS_092_TagInvalidated", titleKey: null },
-            updated:     { tone: "info",    icon: "pencil", tagKey: "VAS_092_TagUpdated",     titleKey: "VAS_092_ActUpdated" }
+            updated:     { tone: "info",    icon: "pencil", tagKey: "VAS_092_TagUpdated",     titleKey: "VAS_092_ActUpdated" },
+            // The correspondence and engagement sources shared with every other
+            // overview panel (model side, VAS_ActivitySourcesModel): meetings and
+            // tasks from AppointmentsInfo, calls from VA048_CallDetails, and the
+            // inbound letters MailAttachment1 files under AttachmentType 'I'.
+            //
+            // titleKey null on all four: each headlines with its OWN subject, note
+            // or title, falling back to what its tag says it is — a call with no
+            // note reads "Call".
+            appointment: { tone: "info",    icon: "calendar", tagKey: "VAS_092_TagAppointment", titleKey: null },
+            task:        { tone: "warning", icon: "check",    tagKey: "VAS_092_TagTask",        titleKey: null },
+            call:        { tone: "success", icon: "phone",    tagKey: "VAS_092_TagCall",        titleKey: null },
+            letter:      { tone: "purple",  icon: "mail",     tagKey: "VAS_092_TagLetter",      titleKey: null }
         };
 
         // Maximum activity rows shown per page; the feed paginates beyond this.
@@ -2350,13 +2404,36 @@
         // the log recorded as empty reads as an em dash rather than as a blank, so
         // a cleared field is visibly cleared instead of looking like a rendering
         // gap. Follows VAS_101 / VAS_104.
+        // A changed DATE arrives as yyyy-MM-dd (model side, which drops the time
+        // the change log stores against a date field). It is rendered in the
+        // reader's own locale here, like every other date on the panel.
+        //
+        // The parts are read out and handed to the Date constructor as LOCAL
+        // numbers rather than parsed from the string: JavaScript reads a bare
+        // "2026-08-20" as UTC midnight, which renders as the 19th anywhere west of
+        // Greenwich — the day-rollover this panel's date handling exists to avoid.
+        var ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+        function changeValueText(value) {
+            var s = (value === null || value === undefined) ? "" : String(value);
+            var m = ISO_DATE.exec(s);
+            if (!m) return s;
+            var d = new Date(+m[1], +m[2] - 1, +m[3]);
+            if (isNaN(d.getTime())) return s;
+            try {
+                return d.toLocaleDateString(window.navigator.language,
+                    { year: "numeric", month: "short", day: "2-digit" });
+            } catch (e) { return s; }
+        }
+
         function changeDelta(a) {
             var $d = $('<small class="vas_092-actSub vas_092-actDelta"></small>');
             var blank = "—";
-            $d.append($('<span class="vas_092-cvOld"></span>').text(a.OldValue || blank));
+            var oldTxt = changeValueText(a.OldValue) || blank;
+            var newTxt = changeValueText(a.NewValue) || blank;
+            $d.append($('<span class="vas_092-cvOld"></span>').text(oldTxt));
             $d.append($('<span class="vas_092-cvArrow"></span>').text("→"));
-            $d.append($('<span class="vas_092-cvNew"></span>').text(a.NewValue || blank));
-            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            $d.append($('<span class="vas_092-cvNew"></span>').text(newTxt));
+            $d.attr("title", oldTxt + " → " + newTxt);
             return $d;
         }
 
@@ -2377,10 +2454,33 @@
             // An e-mail names its recipients under the subject — every address on
             // the To, Cc and Bcc lists, in full. No tooltip: the line is no
             // longer an abridgement of something the reader has to hover to see.
-            if (a.Type === "email") {
+            // ... and so does a LETTER, which is the same record filed under a
+            // different attachment type.
+            if (a.Type === "email" || a.Type === "letter") {
                 var to = recipientSummary(a);
                 if (to) {
                     $title.append($('<small class="vas_092-actSub"></small>').text(to));
+                }
+            }
+
+            // A call names the number it reached, where one was recorded — the
+            // same slot answering the same question.
+            if (a.Type === "call" && a.MailTo) {
+                $title.append($('<small class="vas_092-actSub"></small>')
+                    .text(a.MailTo).attr("title", a.MailTo));
+            }
+
+            // A meeting or task names where it is and whether it has been dealt
+            // with; a cancelled one says so rather than reading as still open.
+            if (a.Type === "appointment" || a.Type === "task") {
+                var apptBits = [];
+                if (a.Location) apptBits.push(a.Location);
+                if (a.IsCancelled) apptBits.push(getMsg("VAS_092_ActCancelled"));
+                else if (a.IsClosed) apptBits.push(getMsg("VAS_092_ActCompleted"));
+                if (apptBits.length) {
+                    var apptSub = apptBits.join(" · ");
+                    $title.append($('<small class="vas_092-actSub"></small>')
+                        .text(apptSub).attr("title", apptSub));
                 }
             }
 
@@ -2421,8 +2521,12 @@
             return $row;
         }
 
+        // A letter opens like a mail: it is the same record in the same table,
+        // filed under a different attachment type, with the same body and the
+        // same addresses on it.
         function hasActivityBody(a) {
-            return a && a.Type === "email" && !!(a.Body && String(a.Body).trim());
+            return a && (a.Type === "email" || a.Type === "letter") &&
+                   !!(a.Body && String(a.Body).trim());
         }
 
         // The e-mail body, collapsed beneath its activity row. The full recipient
