@@ -187,6 +187,11 @@ namespace VASLogic.Models
                 new LineValueStrategy("M_InOut", "M_InOutLine", "M_InOut_ID",
                     new string[] { "MovementQty" }, "QtyInternalUse"),
 
+                /* Same shape as a receipt line: one quantity that moved, valued at
+                   the line's own stored cost. */
+                new LineValueStrategy("M_Movement", "M_MovementLine", "M_Movement_ID",
+                    new string[] { "MovementQty" }, ""),
+
                 /* A physical inventory posts the DIFFERENCE it found - counted less
                    booked - while an internal-use inventory posts QtyInternalUse and
                    leaves both of those at zero. Summing the two forms is what makes
