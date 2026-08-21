@@ -179,6 +179,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_192_CurrentPeriodWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_193_PreviousPeriodWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_196_PeriodControlMatrixWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_198_UnPostedAccountEntriesWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_199_PaymentAllocationStatusWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_200_BankReconcilationWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_201_UnMatchedGRNInvoiceWidgetController.cs" />
@@ -1000,6 +1001,8 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\PeriodControl\VAS_193_PreviousPeriodWidget.js" />
     <Content Include="Areas\VAS\Content\VAS_196_PeriodControlMatrixWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\PeriodControl\VAS_196_PeriodControlMatrixWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_198_UnPostedAccountEntriesWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\PeriodControl\VAS_198_UnPostedAccountEntriesWidget.js" />
     <Content Include="Areas\VAS\Content\VAS_199_PaymentAllocationStatusWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\PeriodControl\VAS_199_PaymentAllocationStatusWidget.js" />
     <Content Include="Areas\VAS\Content\VAS_200_BankReconcilationWidget.css" />

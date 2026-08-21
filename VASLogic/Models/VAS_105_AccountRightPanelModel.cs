@@ -653,11 +653,13 @@ namespace VAS.Models
                     sbCC.Append("       COALESCE(CURRENCYCONVERT(ct.GrandTotal, ct.C_Currency_ID, cs.C_Currency_ID,");
                     sbCC.Append("           COALESCE(ct.StartDate, CURRENT_DATE), NULL,");
                     sbCC.Append("           ct.AD_Client_ID, ct.AD_Org_ID), ct.GrandTotal) AS value,");
-                    sbCC.Append("       p.Name AS product_name");
+                    sbCC.Append("       p.Name AS product_name,");
+                    sbCC.Append("       COALESCE(asi.Description, N'') AS attribute_desc");
                     sbCC.Append("  FROM C_Contract ct");
                     sbCC.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = ct.AD_Client_ID)");
                     sbCC.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
                     sbCC.Append("  LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = ct.M_Product_ID)");
+                    sbCC.Append("  LEFT OUTER JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = ct.M_AttributeSetInstance_ID AND ct.M_AttributeSetInstance_ID > 0)");
                     sbCC.Append(" WHERE ct.IsActive = 'Y' AND ct.C_BPartner_ID = @bPartnerIdCC");
 
                     string accessCC = MRole.GetDefault(ctx).AddAccessSQL(
@@ -684,9 +686,10 @@ namespace VAS.Models
                             item.statusCode  = Util.GetValueOfString(row["status_code"]);
                             item.renewalCode = Util.GetValueOfString(row["renewal_code"]);
                             item.renewalName = row["renewal_name"] != DBNull.Value ? Util.GetValueOfString(row["renewal_name"]) : "";
-                            item.value       = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
-                            item.productName = Util.GetValueOfString(row["product_name"]);
-                            item.source      = "CC";
+                            item.value         = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                            item.productName   = Util.GetValueOfString(row["product_name"]);
+                            item.attributeDesc = Util.GetValueOfString(row["attribute_desc"]);
+                            item.source        = "CC";
                             items.Add(item);
                         }
                     }
@@ -754,9 +757,10 @@ namespace VAS.Models
                             item.statusCode  = Util.GetValueOfString(row["status_code"]);
                             item.renewalCode = Util.GetValueOfString(row["renewal_code"]);
                             item.renewalName = row["renewal_name"] != DBNull.Value ? Util.GetValueOfString(row["renewal_name"]) : "";
-                            item.value       = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
-                            item.productName = "";
-                            item.source      = "VM";
+                            item.value         = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                            item.productName   = "";
+                            item.attributeDesc = "";
+                            item.source        = "VM";
                             items.Add(item);
                         }
                     }
@@ -790,9 +794,11 @@ namespace VAS.Models
 
                         var sbProd = new StringBuilder();
                         sbProd.Append("SELECT vl.VAS_ContractMaster_ID AS master_id,");
-                        sbProd.Append("       p.Name AS product_name");
+                        sbProd.Append("       p.Name AS product_name,");
+                        sbProd.Append("       COALESCE(asi.Description, N'') AS attribute_desc");
                         sbProd.Append("  FROM VAS_ContractLine vl");
                         sbProd.Append("  INNER JOIN M_Product p ON (p.M_Product_ID = vl.M_Product_ID)");
+                        sbProd.Append("  LEFT OUTER JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = vl.M_AttributeSetInstance_ID AND vl.M_AttributeSetInstance_ID > 0)");
                         sbProd.Append(" WHERE vl.IsActive = 'Y' AND vl.M_Product_ID > 0");
                         sbProd.Append("   AND vl.VAS_ContractMaster_ID IN (");
                         sbProd.Append(sbIds);
@@ -800,22 +806,27 @@ namespace VAS.Models
 
                         DataSet dsProd = DB.ExecuteDataset(sbProd.ToString(), null, null);
 
-                        // Aggregate product names per contract master
-                        var productMap = new Dictionary<int, List<string>>();
+                        // Aggregate product names and collect first attribute description per contract master
+                        var productMap   = new Dictionary<int, List<string>>();
+                        var attributeMap = new Dictionary<int, string>();
                         if (dsProd != null && dsProd.Tables.Count > 0)
                         {
                             foreach (DataRow row in dsProd.Tables[0].Rows)
                             {
-                                int masterId  = Util.GetValueOfInt(row["master_id"]);
-                                string pName  = Util.GetValueOfString(row["product_name"]);
+                                int masterId    = Util.GetValueOfInt(row["master_id"]);
+                                string pName    = Util.GetValueOfString(row["product_name"]);
+                                string attrDesc = Util.GetValueOfString(row["attribute_desc"]);
                                 if (!productMap.ContainsKey(masterId))
                                     productMap[masterId] = new List<string>();
                                 if (!string.IsNullOrEmpty(pName) && !productMap[masterId].Contains(pName))
                                     productMap[masterId].Add(pName);
+                                // Keep first non-empty attribute description for this contract master
+                                if (!attributeMap.ContainsKey(masterId) && !string.IsNullOrEmpty(attrDesc))
+                                    attributeMap[masterId] = attrDesc;
                             }
                         }
 
-                        // Apply aggregated product names back to the VM items
+                        // Apply aggregated product names and attribute descriptions back to the VM items
                         foreach (dynamic it in items)
                         {
                             var dict = (IDictionary<string, object>)it;
@@ -824,6 +835,8 @@ namespace VAS.Models
                                 int masterId = (int)dict["id"];
                                 if (productMap.ContainsKey(masterId))
                                     it.productName = string.Join(", ", productMap[masterId]);
+                                if (attributeMap.ContainsKey(masterId))
+                                    it.attributeDesc = attributeMap[masterId];
                             }
                         }
                     }
@@ -1206,16 +1219,12 @@ namespace VAS.Models
                 sb.Append("           (SELECT TO_CHAR(MIN(ps.DueDate),'YYYY-MM-DD')");
                 sb.Append("              FROM C_InvoicePaySchedule ps");
                 sb.Append("             WHERE ps.C_Invoice_ID = i.C_Invoice_ID AND ps.IsActive = 'Y'),");
-                sb.Append("           TO_CHAR(i.DueDate,'YYYY-MM-DD')) AS due_date,");
+                sb.Append("           N'') AS due_date,");
                 sb.Append("       CURRENCYCONVERT(i.GrandTotal, i.C_Currency_ID, cs.C_Currency_ID,");
                 sb.Append("           i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID) AS amount,");
-                sb.Append("       COALESCE(CURRENCYCONVERT(i.PaidAmt, i.C_Currency_ID, cs.C_Currency_ID,");
-                sb.Append("           i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS paid_amt,");
                 sb.Append("       CASE WHEN i.IsPaid = 'Y' THEN 'Paid'");
-                sb.Append("            WHEN COALESCE(");
-                sb.Append("                     (SELECT MIN(ps.DueDate) FROM C_InvoicePaySchedule ps");
-                sb.Append("                       WHERE ps.C_Invoice_ID = i.C_Invoice_ID AND ps.IsActive = 'Y'),");
-                sb.Append("                     i.DueDate) < CURRENT_DATE THEN 'Overdue'");
+                sb.Append("            WHEN (SELECT MIN(ps.DueDate) FROM C_InvoicePaySchedule ps");
+                sb.Append("                   WHERE ps.C_Invoice_ID = i.C_Invoice_ID AND ps.IsActive = 'Y') < CURRENT_DATE THEN 'Overdue'");
                 sb.Append("            ELSE 'Open' END AS pay_status");
                 sb.Append("  FROM C_Invoice i");
                 sb.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = i.AD_Client_ID)");
@@ -1249,8 +1258,6 @@ namespace VAS.Models
                         item.dueDate = Util.GetValueOfString(row["due_date"]);
                         item.amount = row["amount"] != DBNull.Value
                             ? Convert.ToDecimal(row["amount"]) : 0m;
-                        item.paid = row["paid_amt"] != DBNull.Value
-                            ? Convert.ToDecimal(row["paid_amt"]) : 0m;
                         item.payStatus = Util.GetValueOfString(row["pay_status"]);
                         items.Add(item);
                     }
@@ -1305,7 +1312,15 @@ namespace VAS.Models
                 sb.Append("       NULL AS status_code,");
                 sb.Append("       TO_CHAR(p.DateFinish,'YYYY-MM-DD') AS due,");
                 sb.Append("       lead.Name AS lead,");
-                sb.Append("       CURRENCYCONVERT(p.PlannedAmt, p.C_Currency_ID, cs.C_Currency_ID, p.DateContract, NULL, p.AD_Client_ID, p.AD_Org_ID) AS budget,");
+                // Budget source depends on the project's line level:
+                // 'P' (Project) → sum of direct project lines (C_ProjectLine.C_Project_ID)
+                // Any other value (Phase/Task/TaskLine) → sum of phase planned amounts (C_ProjectPhase)
+                sb.Append("       CURRENCYCONVERT(");
+                sb.Append("           CASE WHEN p.ProjectLineLevel = 'P'");
+                sb.Append("                THEN COALESCE((SELECT SUM(pl.PlannedAmt) FROM C_ProjectLine pl WHERE pl.C_Project_ID = p.C_Project_ID AND pl.IsActive = 'Y'), 0)");
+                sb.Append("                ELSE COALESCE((SELECT SUM(ph.PlannedAmt) FROM C_ProjectPhase ph WHERE ph.C_Project_ID = p.C_Project_ID AND ph.IsActive = 'Y'), 0)");
+                sb.Append("           END,");
+                sb.Append("           p.C_Currency_ID, cs.C_Currency_ID, p.DateContract, NULL, p.AD_Client_ID, p.AD_Org_ID) AS budget,");
                 sb.Append("       TO_CHAR(p.DateContract,'YYYY-MM-DD') AS start_date,");
                 sb.Append("       p.Description");
                 sb.Append("  FROM C_Project p");

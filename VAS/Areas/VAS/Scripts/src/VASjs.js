@@ -330,6 +330,7 @@ import "../app/widgets/VAS_174_TransferQueueWidget.js";
 import "../app/widgets/PeriodControl/VAS_192_CurrentPeriodWidget.js";
 import "../app/widgets/PeriodControl/VAS_193_PreviousPeriodWidget.js";
 import "../app/widgets/PeriodControl/VAS_196_PeriodControlMatrixWidget.js";
+import "../app/widgets/PeriodControl/VAS_198_UnPostedAccountEntriesWidget.js";
 import "../app/widgets/PeriodControl/VAS_199_PaymentAllocationStatusWidget.js";
 import "../app/widgets/PeriodControl/VAS_200_BankReconcilationWidget.js";
 import "../app/widgets/PeriodControl/VAS_201_UnMatchedGRNInvoiceWidget.js";

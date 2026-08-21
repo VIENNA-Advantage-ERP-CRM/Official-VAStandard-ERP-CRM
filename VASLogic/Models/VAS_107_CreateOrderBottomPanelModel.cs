@@ -829,7 +829,7 @@ namespace VASLogic.Models
             foreach (string cn in GetLineProjectionColumns(AD_Tab_IDs))
                 cols.Append("ol.").Append(cn).Append(", ");
             if (cols.Length == 0)
-                cols.Append("ol.C_OrderLine_ID, ol.Line, ol.M_Product_ID, ol.C_Charge_ID, ol.QtyOrdered, ol.C_UOM_ID, ol.PriceEntered, ol.C_Tax_ID, ol.TaxAmt, ol.TaxableAmt, ol.LineNetAmt, ol.LineTotalAmt, ol.M_AttributeSetInstance_ID, ol.Description, ");
+                cols.Append("ol.C_OrderLine_ID, ol.Line, ol.M_Product_ID, ol.C_Charge_ID, ol.QtyEntered, ol.QtyOrdered, ol.C_UOM_ID, ol.PriceEntered, ol.C_Tax_ID, ol.TaxAmt, ol.TaxableAmt, ol.LineNetAmt, ol.LineTotalAmt, ol.M_AttributeSetInstance_ID, ol.Description, ");
 
             string sql = "SELECT " + cols.ToString() +
                 @"COALESCE(p.Name, N'') AS VASOLDISP_ProductName,
@@ -873,6 +873,7 @@ namespace VASLogic.Models
                 row.ChargeName = Util.GetValueOfString(r["VASOLDISP_ChargeName"]);
                 row.Description = Util.GetValueOfString(r["Description"]);
                 row.QtyOrdered = Util.GetValueOfDecimal(r["QtyOrdered"]);
+                row.QtyEntered = dt.Columns.Contains("QtyEntered") ? Util.GetValueOfDecimal(r["QtyEntered"]) : row.QtyOrdered;
                 row.C_UOM_ID = Util.GetValueOfInt(r["C_UOM_ID"]);
                 row.UOMName = Util.GetValueOfString(r["VASOLDISP_UOMName"]);
                 row.PriceEntered = Util.GetValueOfDecimal(r["PriceEntered"]);
@@ -986,8 +987,15 @@ namespace VASLogic.Models
             // before the column migration runs, so the column may be absent on C_Order
             // even when the check returns true. TCS is read from C_OrderLine.VA106_TCSAmount
             // in the second query below where it is reliably present when VA106 is installed.
+            // Sub Total must be the taxable base (net of tax), not the gross LineNetAmt stored in
+            // C_Order.TotalLines. For a tax-inclusive price list, TotalLines = sum of LineNetAmt
+            // which embeds the tax, so it is LARGER than the taxable base. Using SUM(TaxableAmt)
+            // from C_OrderLine mirrors VAS_074's SUM(TaxBaseAmt) pattern and is correct for both
+            // tax-inclusive and tax-exclusive price lists.
             string sql = @"SELECT t.Name AS TaxName, ot.TaxAmt, ot.TaxBaseAmt,
-                                  co.TotalLines, co.GrandTotal, cy.CurSymbol, cy.StdPrecision
+                                  (SELECT COALESCE(SUM(ol2.TaxableAmt), 0) FROM C_OrderLine ol2
+                                   WHERE ol2.C_Order_ID = co.C_Order_ID AND ol2.IsActive = 'Y') AS TotalLines,
+                                  co.GrandTotal, cy.CurSymbol, cy.StdPrecision
                            FROM C_Order co
                            INNER JOIN C_OrderTax ot ON (ot.C_Order_ID = co.C_Order_ID)
                            INNER JOIN C_Tax t ON (t.C_Tax_ID = ot.C_Tax_ID)
@@ -1074,7 +1082,7 @@ namespace VASLogic.Models
         private static readonly string[] ESSENTIAL_LINE_COLUMNS = new string[]
         {
             "C_OrderLine_ID", "C_Order_ID", "Line", "M_Product_ID", "C_Charge_ID",
-            "QtyOrdered", "C_UOM_ID", "PriceEntered", "C_Tax_ID", "TaxAmt",
+            "QtyEntered", "QtyOrdered", "C_UOM_ID", "PriceEntered", "C_Tax_ID", "TaxAmt",
             "TaxableAmt", "LineNetAmt", "LineTotalAmt", "M_AttributeSetInstance_ID", "Description"
         };
 
@@ -1429,6 +1437,17 @@ namespace VASLogic.Models
                 line.SetM_Product_ID(req.M_Product_ID, true);
                 if (req.M_AttributeSetInstance_ID > 0)
                     line.SetM_AttributeSetInstance_ID(req.M_AttributeSetInstance_ID);
+
+                // On a sales order, when the client has not yet supplied a UOM (fresh product
+                // selection), prefer the product's Sales UOM (VAS_SalesUOM_Id) over the primary
+                // unit set by SetM_Product_ID. A UOM already on the line (req.C_UOM_ID > 0)
+                // means the user changed it deliberately — that is preserved below.
+                if (req.C_UOM_ID <= 0 && order.IsSOTrx())
+                {
+                    int salesUomId = GetProductSalesUomId(ctx, req.M_Product_ID);
+                    if (salesUomId > 0)
+                        line.SetC_UOM_ID(salesUomId);
+                }
             }
             else if (req.C_Charge_ID > 0)
             {
@@ -1439,7 +1458,9 @@ namespace VASLogic.Models
                 return line;
             }
 
-            decimal qty = req.QtyOrdered > 0 ? req.QtyOrdered : 1;
+            // Prefer QtyEntered (the user-visible quantity in the entered UOM). Fall back to
+            // QtyOrdered when QtyEntered was not supplied by the client (older callers).
+            decimal qty = req.QtyEntered > 0 ? req.QtyEntered : (req.QtyOrdered > 0 ? req.QtyOrdered : 1);
             line.SetQty(qty);
 
             if (req.C_UOM_ID > 0)
@@ -1703,6 +1724,22 @@ namespace VASLogic.Models
         private int GetDefaultUomId(Ctx ctx)
         {
             return MUOM.GetDefault_UOM_ID(ctx);
+        }
+
+        /// <summary>
+        /// Returns the Sales UOM (VAS_SalesUOM_Id) configured on the product master for sales orders.
+        /// Returns 0 when no Sales UOM is defined or the product does not exist.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="productId">M_Product_ID to look up</param>
+        /// <returns>VAS_SalesUOM_Id from M_Product, or 0 if not set</returns>
+        private int GetProductSalesUomId(Ctx ctx, int productId)
+        {
+            if (productId <= 0) return 0;
+            string sql = "SELECT p.VAS_SalesUOM_Id FROM M_Product p WHERE p.M_Product_ID = @M_Product_ID AND p.IsActive = 'Y'";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            object val = DB.ExecuteScalar(sql, new SqlParameter[] { new SqlParameter("@M_Product_ID", productId) }, null);
+            return Util.GetValueOfInt(val);
         }
 
         #endregion
@@ -1988,7 +2025,9 @@ namespace VASLogic.Models
                         line.SetM_Product_ID(0);
                     }
 
-                    decimal qty = input.QtyOrdered > 0 ? input.QtyOrdered : 1;
+                    // Prefer QtyEntered (the user-visible quantity in the entered UOM). Fall back to
+                    // QtyOrdered when QtyEntered was not supplied by the client (older callers).
+                    decimal qty = input.QtyEntered > 0 ? input.QtyEntered : (input.QtyOrdered > 0 ? input.QtyOrdered : 1);
                     line.SetQty(qty);
 
                     if (input.C_UOM_ID > 0)
@@ -2247,6 +2286,7 @@ namespace VASLogic.Models
         public int M_Product_ID { get; set; }
         public int C_Charge_ID { get; set; }
         public int M_AttributeSetInstance_ID { get; set; }
+        public decimal QtyEntered { get; set; }
         public decimal QtyOrdered { get; set; }
         public int C_UOM_ID { get; set; }
         public decimal PriceEntered { get; set; }
@@ -2279,6 +2319,7 @@ namespace VASLogic.Models
         public int C_Charge_ID { get; set; }
         public string ChargeName { get; set; }
         public string Description { get; set; }
+        public decimal QtyEntered { get; set; }
         public decimal QtyOrdered { get; set; }
         public int C_UOM_ID { get; set; }
         public string UOMName { get; set; }
@@ -2328,6 +2369,7 @@ namespace VASLogic.Models
         public int M_Product_ID { get; set; }
         public int C_Charge_ID { get; set; }
         public int M_AttributeSetInstance_ID { get; set; }
+        public decimal QtyEntered { get; set; }
         public decimal QtyOrdered { get; set; }
         public int C_UOM_ID { get; set; }
         public decimal PriceEntered { get; set; }

@@ -49,6 +49,10 @@
         var _ordersOffset     = 0;
         var _invoicesOffset   = 0;
 
+        // Engagement timeline client-side pagination (15 touches per page)
+        var ENGAGEMENT_PER_PAGE = 15;
+        var _engPage            = 0;
+
 
         // Opps / contracts client-side pagination (5 rows per page)
         var OPP_PAGE_SIZE  = 5;
@@ -772,6 +776,7 @@
                         '</div>' +
                         '<div style="margin-top:0.25em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.typeCode || '') + ' · ' + esc(term) + '</div>' +
                         (c.productName ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.productName) + '</div>' : (c.description ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.description) + '</div>' : '')) +
+                        (c.attributeDesc ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.attributeDesc) + '</div>' : '') +
                       '</div>' +
                       '<div style="font-size:0.875em;font-weight:700;color:var(--acct-text);white-space:nowrap;">' + esc(fmtFull(toNum(c.value), sym, prec)) + '</div>' +
                     '</div>';
