@@ -468,7 +468,15 @@ namespace VAdvantage.Model
                     }
                     if (ds.Tables[0].Rows[i]["UserLevel"] != null && ds.Tables[0].Rows[i]["UserLevel"] != DBNull.Value)
                     {
-                        role.SetUserLevel(ds.Tables[0].Rows[i]["UserLevel"].ToString());
+                        // change done to handle the user level
+                        // as this role is getting created in tenant so 
+                        // the role doesn't have any relevance if the UserLevel is set to System
+                        if (ds.Tables[0].Rows[i]["UserLevel"].ToString().Trim().Equals("S"))
+                        {
+                            role.SetUserLevel(MRole.USERLEVEL_ClientPlusOrganization);
+                        }
+                        else
+                            role.SetUserLevel(ds.Tables[0].Rows[i]["UserLevel"].ToString());
                     }
                     if (ds.Tables[0].Rows[i]["IsManual"] != null && ds.Tables[0].Rows[i]["IsManual"] != DBNull.Value)
                     {
@@ -779,7 +787,7 @@ namespace VAdvantage.Model
                                     log.Info(" WidgetAcessNotSaved");
                                 }
                             }
-                        }                        
+                        }
                     }
                 }
             }
@@ -3205,30 +3213,30 @@ namespace VAdvantage.Model
 
                 #region Lakhwinder 29Jan2020
                 //Adding new DocBaseType
-                int docBasetypeID = Util.GetValueOfInt(DB.ExecuteScalar("Select C_DocBaseType_ID from C_DocBaseType WHERE docbasetype='MMC'", null,m_trx));
+                int docBasetypeID = Util.GetValueOfInt(DB.ExecuteScalar("Select C_DocBaseType_ID from C_DocBaseType WHERE docbasetype='MMC'", null, m_trx));
                 if (docBasetypeID < 1)//INSERT DocBaseType
                 {
-                   
+
                     DB.ExecuteQuery(@"INSERT INTO C_DocBaseType (AD_Client_ID,AD_Org_ID,C_DocBaseType_ID,Created,CreatedBy,Description,DocBaseType,EntityType,IsActive,Name,Updated,UpdatedBy) VALUES (
                                             0,
                                             0,
                                             (SELECT MAX(C_DOCBASETYPE_ID) + 1 FROM C_DocBaseType),
-                                           "+ GlobalVariable.TO_DATE(DateTime.Now, false) + @",
+                                           " + GlobalVariable.TO_DATE(DateTime.Now, false) + @",
                                              " + m_ctx.GetAD_User_ID() + @",
                                             '*** System Maintained ***',
-                                            '" + MDocBaseType.DOCBASETYPE_MoveConfirmation+ @"',
+                                            '" + MDocBaseType.DOCBASETYPE_MoveConfirmation + @"',
                                             'D',
                                             'Y',
                                             'Move Confirmation',
                                              " + GlobalVariable.TO_DATE(DateTime.Now, false) + @",
                                             " + m_ctx.GetAD_User_ID() + @",
-                                        ) ", null,m_trx);
-                    
-                
+                                        ) ", null, m_trx);
+
+
                 }
                 CreateDocType("Move Confirmation", "Move Confirmation",
                     MDocBaseType.DOCBASETYPE_MoveConfirmation, null, 0, 0,
-                    0, GL_MM,String.Empty);
+                    0, GL_MM, String.Empty);
 
                 docBasetypeID = Util.GetValueOfInt(DB.ExecuteScalar("Select C_DocBaseType_ID from C_DocBaseType WHERE docbasetype='SRC'", null, m_trx));
                 if (docBasetypeID < 1)//INSERT DocBaseType
@@ -3239,7 +3247,7 @@ namespace VAdvantage.Model
                                             0,
                                             (SELECT MAX(C_DOCBASETYPE_ID) + 1 FROM C_DocBaseType),
                                              " + GlobalVariable.TO_DATE(DateTime.Now, false) + @",
-                                            "+m_ctx.GetAD_User_ID()+@",
+                                            " + m_ctx.GetAD_User_ID() + @",
                                             '*** System Maintained ***',
                                             '" + MDocBaseType.DOCBASETYPE_ShipReceiptConfirmation + @"',
                                             'D',
@@ -3247,7 +3255,7 @@ namespace VAdvantage.Model
                                             'Ship/Receipt Confirmation',
                                              " + GlobalVariable.TO_DATE(DateTime.Now, false) + @",
                                             100
-                                        ) ", null, m_trx);                 
+                                        ) ", null, m_trx);
 
                 }
                 CreateDocType("Ship/Receipt Confirmation", "Ship/Receipt Confirmation",
@@ -3398,7 +3406,7 @@ namespace VAdvantage.Model
             if (DocSubTypeSO != null)
                 dt.SetDocSubTypeSO(DocSubTypeSO);
 
-            
+
             // For Blanket Order Set Document Type of Release
             if (C_DocTypeShipment_ID != 0)
             {
