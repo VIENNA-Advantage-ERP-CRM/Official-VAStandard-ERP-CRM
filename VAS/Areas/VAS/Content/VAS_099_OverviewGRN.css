@@ -945,7 +945,7 @@
    keeps the shrink-to-fit box inside the track so a long figure still clips
    with the ellipsis its cell already carries. */
 .vas_099-qpMini .vas_099-qpMiniRow > span.vas_099-ta-r {
-    justify-self: end;
+   /* justify-self: end;*/
     max-width: 100%;
     text-align: right;
     font-variant-numeric: tabular-nums;

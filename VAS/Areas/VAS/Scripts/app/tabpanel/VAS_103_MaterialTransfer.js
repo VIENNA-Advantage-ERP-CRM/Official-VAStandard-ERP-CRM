@@ -569,7 +569,7 @@
                 // The document number needs the VAMFG module to be readable; the
                 // chip still opens the record without it.
                 $row.append(originChip(VIS.Msg.getMsg("VAS_103_ProductionOrder"),
-                    data.WorkOrderNo || ("#" + data.WorkOrderId), data.WorkOrderCount,
+                    data.WorkOrderNo || "", data.WorkOrderCount,
                     "VAMFG_M_WorkOrder", data.WorkOrderId, null));
                 any = true;
             }
@@ -966,7 +966,24 @@
             Confirmation: { tone: "warning", icon: "clock",  label: "Confirmation" },
             Confirmed:    { tone: "success", icon: "check",  label: "Confirmed" },
             // One row per FIELD that changed, not one per save (model side).
-            Updated:      { tone: "info",    icon: "pencil", label: "Updated" }
+            Updated:      { tone: "info",    icon: "pencil", label: "Updated" },
+            // The correspondence and engagement sources shared with every other
+            // overview panel (model side, VAS_ActivitySourcesModel): meetings and
+            // tasks from AppointmentsInfo, calls from VA048_CallDetails, and the
+            // letters and mails MailAttachment1 holds, split on AttachmentType.
+            //
+            // Lower-case keys, unlike the rest of this map: the key is matched
+            // against EventType exactly as the model emits it, and the shared
+            // reader names its kinds in lower case so every panel tags them alike.
+            // Each names its message key outright. The badge otherwise builds one
+            // as "VAS_103_Act" + EventType, and these five types are lower-case
+            // (the shared reader's naming), which would have asked the dictionary
+            // for VAS_103_Actappointment — a key nobody would think to seed.
+            appointment:  { tone: "info",    icon: "calendar", label: "Meeting", key: "VAS_103_TagAppointment" },
+            task:         { tone: "warning", icon: "check",    label: "Task",    key: "VAS_103_TagTask" },
+            call:         { tone: "success", icon: "phone",    label: "Call",    key: "VAS_103_TagCall" },
+            letter:       { tone: "purple",  icon: "mail",     label: "Letter",  key: "VAS_103_TagLetter" },
+            email:        { tone: "purple",  icon: "mail",     label: "Email",   key: "VAS_103_TagEmail" }
         };
 
         // Maximum activity rows shown per page; the feed paginates beyond this.
@@ -999,7 +1016,14 @@
                 var end = Math.min(rows.length, start + ACTIVITY_PER_PAGE);
 
                 $card.empty();
-                for (var i = start; i < end; i++) $card.append(activityRow(rows[i]));
+                for (var i = start; i < end; i++) {
+                    $card.append(activityRow(rows[i]));
+                    // The message body is a SIBLING of the row, not a child, so it
+                    // spans the card's full width instead of being trapped beside
+                    // the badge. The row's own click toggles it.
+                    var $msg = activityBody(rows[i]);
+                    if ($msg) $card.append($msg);
+                }
 
                 buildPager($pager, activityPage, pageCount, rows.length, start, end,
                     function (p) { activityPage = p; paintPage(); });
@@ -1063,7 +1087,8 @@
             var $badge = $('<span class="vas_103-actBadge"></span>')
                 .addClass("vas_103-tone-" + meta.tone);
             $badge.append(svgIcon(meta.icon));
-            $badge.append($('<span></span>').text(getMsg("VAS_103_Act" + a.EventType, meta.label)));
+            $badge.append($('<span></span>').text(
+                getMsg(meta.key || ("VAS_103_Act" + a.EventType), meta.label)));
             $row.append($badge);
 
             var $main = $('<div class="vas_103-actMain"></div>');
@@ -1093,8 +1118,86 @@
             // ...and the move itself: what the field held before the edit and
             // what it holds after, on a sub-line of its own.
             if (a.OldValue || a.NewValue) $main.append(changeDelta(a));
+
+            // A mail or letter names its recipients under the subject; a call the
+            // number it reached; a meeting or task where it is and whether it has
+            // been dealt with. All on the same sub-line, answering the same
+            // question of who or where.
+            var sub = activitySubLine(a);
+            if (sub) {
+                $main.append($('<small class="vas_103-actSub"></small>')
+                    .text(sub).attr("title", sub));
+            }
             $row.append($main);
+
+            // Rows carrying a message are clickable; the drawer sits beneath.
+            if (hasActivityBody(a)) {
+                $row.addClass("vas_103-openable")
+                    .attr("title", getMsg("VAS_103_ShowMailBody", "Click to read the message"));
+                $row.on("click", function () {
+                    var $panel = $row.next(".vas_103-actBody");
+                    if (!$panel.length) return;
+                    var nowOpen = !$row.hasClass("vas_103-open");
+                    $row.toggleClass("vas_103-open", nowOpen);
+                    $panel.toggle(nowOpen);
+                });
+            }
             return $row;
+        }
+
+        // What a shared-source row says under its headline.
+        function activitySubLine(a) {
+            if (a.EventType === "email" || a.EventType === "letter") {
+                var bits = [];
+                appendAddressBit(bits, "VAS_103_MailTo",  "To:",  a.MailTo);
+                appendAddressBit(bits, "VAS_103_MailCc",  "Cc:",  a.MailCc);
+                appendAddressBit(bits, "VAS_103_MailBcc", "Bcc:", a.MailBcc);
+                return bits.join(" · ");
+            }
+            if (a.EventType === "call") return a.MailTo || "";
+            if (a.EventType === "appointment" || a.EventType === "task") {
+                var parts = [];
+                if (a.Location) parts.push(a.Location);
+                if (a.IsCancelled) parts.push(getMsg("VAS_103_ActCancelled", "Cancelled"));
+                else if (a.IsClosed) parts.push(getMsg("VAS_103_ActDone", "Completed"));
+                return parts.join(" · ");
+            }
+            return "";
+        }
+
+        function appendAddressBit(bits, key, fallback, value) {
+            var text = (value === null || value === undefined) ? "" : String(value).trim();
+            if (!text) return;
+            bits.push(getMsg(key, fallback) + " " + text);
+        }
+
+        // Only a mail or a letter has a message to reveal — they are the same
+        // record in the same table, filed under different attachment types.
+        function hasActivityBody(a) {
+            return !!(a && (a.EventType === "email" || a.EventType === "letter") &&
+                      a.Body && String(a.Body).trim());
+        }
+
+        // The message body, collapsed beneath its activity row. The full envelope
+        // (From / To / Cc / Bcc) heads it, so every address the message went to is
+        // on screen once the reader opens it. The body arrives already flattened to
+        // text (model side), since a mail sent as HTML stores its markup.
+        function activityBody(a) {
+            if (!hasActivityBody(a)) return null;
+
+            var $panel = $('<div class="vas_103-actBody" style="display:none;"></div>');
+            appendMailMeta($panel, "VAS_103_MailFrom", "From:", a.MailFrom);
+            appendMailMeta($panel, "VAS_103_MailTo",   "To:",   a.MailTo);
+            appendMailMeta($panel, "VAS_103_MailCc",   "Cc:",   a.MailCc);
+            appendMailMeta($panel, "VAS_103_MailBcc",  "Bcc:",  a.MailBcc);
+            $panel.append($('<p></p>').text(String(a.Body).trim()));
+            return $panel;
+        }
+
+        function appendMailMeta($panel, key, fallback, value) {
+            if (!value || !String(value).trim()) return;
+            $panel.append($('<div class="vas_103-actMeta"></div>')
+                .text(getMsg(key, fallback) + " " + String(value).trim()));
         }
 
         function activityTitle(a) {
@@ -1112,6 +1215,17 @@
             // apart from the next.
             if (a.EventType === "Updated" && a.FieldName)
                 return getMsg("VAS_103_ActFieldUpdated", "Updated") + " " + a.FieldName;
+            // A mail or letter headlines with its subject; a meeting, task or call
+            // with its own subject or note. With none, the KIND stands in rather
+            // than leaving the row blank.
+            if (a.EventType === "email" || a.EventType === "letter") {
+                return (a.Title || "").trim() || getMsg("VAS_103_NoSubject", "(no subject)");
+            }
+            if (a.EventType === "appointment" || a.EventType === "task" ||
+                a.EventType === "call") {
+                var m = ACT_TYPES[a.EventType];
+                return (a.Title || "").trim() || (m ? m.label : "");
+            }
             return a.Title || "";
         }
 
@@ -1234,6 +1348,11 @@
             chevRight: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
             user:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
             calendar: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>',
+            // For the shared correspondence sources: a call and a mail / letter
+            // each need a mark of their own, or they would share the note icon and
+            // the tag text would be the only thing telling them apart.
+            phone:    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg>',
+            mail:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>',
             box:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>',
             coins:    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5"/><path d="M14.5 4.2a5 5 0 0 1 0 15.6"/><path d="M7 18.7a5 5 0 0 0 6 0"/></svg>',
             layers:   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>',

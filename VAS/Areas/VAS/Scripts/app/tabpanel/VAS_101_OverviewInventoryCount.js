@@ -1030,7 +1030,10 @@
             // screen — VA075 is not part of this solution, so the window is
             // resolved from the dictionary (see resolveWindowIdByTable).
             if (data.VA075_WorkOrder_ID > 0) {
-                var woVal = (data.WorkOrderNo || "").trim() || ("#" + data.VA075_WorkOrder_ID);
+                // No "#id" fallback: an internal key is not a document number. A
+                // work order whose identifier could not be read draws its chip
+                // with the label alone, and the chip still opens the record.
+                var woVal = (data.WorkOrderNo || "").trim();
                 // A count can draw on more than one work order across its lines;
                 // the first is named and the rest counted, as the origin chips on
                 // the Purchase Order overview do.
@@ -1152,7 +1155,17 @@
             updated:     { tone: "info",    icon: "pencil", tagKey: "VAS_101_TagUpdated",     tagText: "Updated",      titleKey: "VAS_101_ActUpdated", titleText: "Inventory count updated" },
             posted:      { tone: "purple",  icon: "coins",  tagKey: "VAS_101_TagPosted",      tagText: "Posted",       titleKey: "VAS_101_ActPosted", titleText: "Posted to accounting" },
             note:        { tone: "neutral", icon: "note",   tagKey: "VAS_101_TagNote",        tagText: "Note",         titleKey: null, titleText: "" },
-            email:       { tone: "purple",  icon: "mail",   tagKey: "VAS_101_TagEmail",       tagText: "Email",        titleKey: null, titleText: "" }
+            email:       { tone: "purple",  icon: "mail",   tagKey: "VAS_101_TagEmail",       tagText: "Email",        titleKey: null, titleText: "" },
+            // The correspondence and engagement sources shared with every other
+            // overview panel (model side, VAS_ActivitySourcesModel): meetings and
+            // tasks from AppointmentsInfo, calls from VA048_CallDetails, and the
+            // inbound letters MailAttachment1 files under AttachmentType 'I'.
+            // titleKey null on all four: each headlines with its OWN subject, note
+            // or title, falling back to what its tag says it is.
+            appointment: { tone: "info",    icon: "calendar", tagKey: "VAS_101_TagAppointment", tagText: "Meeting", titleKey: null, titleText: "" },
+            task:        { tone: "warning", icon: "check",  tagKey: "VAS_101_TagTask",        tagText: "Task",         titleKey: null, titleText: "" },
+            call:        { tone: "success", icon: "user",   tagKey: "VAS_101_TagCall",        tagText: "Call",         titleKey: null, titleText: "" },
+            letter:      { tone: "purple",  icon: "mail",   tagKey: "VAS_101_TagLetter",      tagText: "Letter",       titleKey: null, titleText: "" }
         };
 
         // Maximum activity rows shown per page; the feed paginates beyond this.
@@ -1222,7 +1235,24 @@
             // the To, Cc and Bcc lists, in full. The line wraps (stylesheet), so a
             // long list is read on the row itself rather than hidden behind a
             // count the reader would have to open the message to resolve.
-            if (a.Type === "email") {
+            // A LETTER names its addresses here too — it is the same record in the
+            // same table, filed under a different attachment type.
+            if (a.Type === "call" && a.MailTo) {
+                $title.append($('<small class="vas_101-actSub"></small>')
+                    .text(a.MailTo).attr("title", a.MailTo));
+            }
+            if (a.Type === "appointment" || a.Type === "task") {
+                var apptBits = [];
+                if (a.Location) apptBits.push(a.Location);
+                if (a.IsCancelled) apptBits.push(msg("VAS_101_ActCancelled", "Cancelled"));
+                else if (a.IsClosed) apptBits.push(msg("VAS_101_ActDone", "Completed"));
+                if (apptBits.length) {
+                    var apptSub = apptBits.join(" · ");
+                    $title.append($('<small class="vas_101-actSub"></small>')
+                        .text(apptSub).attr("title", apptSub));
+                }
+            }
+            if (a.Type === "email" || a.Type === "letter") {
                 var to = recipientSummary(a);
                 if (to) $title.append($('<small class="vas_101-actSub"></small>').text(to));
             }
@@ -1272,8 +1302,13 @@
 
         // Follows VAS_092's rule exactly.
         function activityTitle(a, meta) {
-            if (a.Type === "email") {
+            if (a.Type === "email" || a.Type === "letter") {
                 return (a.Text || "").trim() || msg("VAS_101_NoSubject", "(no subject)");
+            }
+            // A meeting, task or call headlines with its own subject or note; with
+            // none, the KIND stands in rather than borrowing another type's words.
+            if (a.Type === "appointment" || a.Type === "task" || a.Type === "call") {
+                return (a.Text || "").trim() || msg(meta.tagKey, meta.tagText);
             }
             // Free-text types (note, and every workflow lifecycle row) headline
             // with their own text; an untitled one falls back to what its tag
@@ -1308,7 +1343,8 @@
         // Only an e-mail carries a body worth opening; a mail stored without one
         // stays a plain, non-clickable row.
         function hasActivityBody(a) {
-            return !!(a && a.Type === "email" && a.Body && String(a.Body).trim());
+            return !!(a && (a.Type === "email" || a.Type === "letter") &&
+                      a.Body && String(a.Body).trim());
         }
 
         // The e-mail body, collapsed beneath its activity row. The full recipient

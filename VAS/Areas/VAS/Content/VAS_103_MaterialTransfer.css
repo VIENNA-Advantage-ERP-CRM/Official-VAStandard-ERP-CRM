@@ -885,6 +885,35 @@
     word-break: break-word;
 }
 
+/* A row carrying a message body (a mail or a letter) opens it on click. */
+.vas_103-actRow.vas_103-openable { cursor: pointer; }
+.vas_103-actRow.vas_103-openable:hover { background: var(--mt-faint-blue, #F5F9FD); }
+
+/* The message body, revealed under its row. A SIBLING of the row, not a child,
+   so it spans the card's full width instead of being trapped beside the badge. */
+.vas_103-actBody {
+    padding: 0.625em 0.75em 0.75em;
+    margin: 0 0 0.5em;
+    border-radius: 9px;
+    background: var(--mt-faint-blue, #F5F9FD);
+    border: 1px solid var(--mt-card-bd, #DCE6EF);
+}
+.vas_103-actMeta {
+    font-size: 0.6875em;
+    color: var(--mt-muted);
+    word-break: break-word;
+}
+.vas_103-actMeta + .vas_103-actMeta { margin-top: 0.125em; }
+/* The message itself keeps the sender's own line breaks. */
+.vas_103-actBody p {
+    margin: 0.5em 0 0;
+    font-size: 0.8125em;
+    color: var(--mt-text);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .vas_103-actWhen {
     flex: none;
     margin-left: auto;

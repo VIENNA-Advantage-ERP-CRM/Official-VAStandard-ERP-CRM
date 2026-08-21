@@ -92,6 +92,31 @@
 ///                        named as a blanket, and C_Order_Blanket is read under an
 ///                        AD_Column guard as the module column it is. Ported from
 ///                        VAS_092's LoadOrigins/BlanketOrder.
+///   VAI163   2026-08-19  The blanket order reference is read the way VAS_092
+///                        reads it. This was ported from that panel BEFORE its
+///                        two corrections, so it kept all three of the faults
+///                        they fixed and a release order's card showed no blanket
+///                        at all:
+///                          - the ColumnExists("C_Order","C_Order_Blanket") gate
+///                            is gone (it answers "absent" whenever AD_Column
+///                            lacks the row, and its scalar sub-select RAISES
+///                            where AD_Table has more than one row named C_Order —
+///                            the catch turning that into "no such column"). The
+///                            statement is attempted, and a schema that really
+///                            has no such column reports it once per process;
+///                          - IsBlanketTrx = 'Y' is no longer required on the
+///                            parent, a second optional flag that hid the
+///                            reference wherever it is not carried;
+///                          - and the LINES are read when the header names
+///                            nothing (LoadBlanketOrderReferenceFromLines). The
+///                            two records of the link are written by DIFFERENT
+///                            code — C_Order.C_Order_Blanket only by
+///                            CreateReleaseDocFromBO, C_OrderLine.
+///                            C_OrderLine_Blanket_ID by MOrder.CopyFrom for any
+///                            release document type — so an order raised through
+///                            any other path carries it on its lines ONLY.
+///                        NVL gave way to COALESCE, and BlanketOrderCount reports
+///                        a release drawing on more than one blanket.
 /// </summary>
 
 using System;
@@ -936,43 +961,144 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// Remembers whether the blanket lookup is usable against this schema, so
+        /// a database that genuinely has no C_Order_Blanket column reports its
+        /// error once rather than on every order the panel opens.
+        /// Null = not tried yet, false = the statement failed, true = it ran.
+        /// </summary>
+        private static bool? _blanketLookupUsable;
+
+        /// <summary>
         /// Reads the blanket purchase order this order was released against, so
-        /// the panel can name it and open it. A release order points back at its
-        /// blanket through C_Order.C_Order_Blanket, and the blanket itself is the
-        /// order carrying IsBlanketTrx = 'Y' — that flag is re-checked on the
-        /// parent so a stale reference to a non-blanket order cannot show up here.
+        /// the panel can name it and open it.
         ///
-        /// C_Order_Blanket is a module column that not every schema carries, so
-        /// the read sits behind its own AD_Column guard. Non-fatal either way: a
-        /// failure just leaves the card without the reference.
+        /// Three things this deliberately no longer does, each of which was on its
+        /// own enough to leave a release order's card with no blanket on it — and
+        /// each already corrected on VAS_092, which this reader was ported from
+        /// before those corrections were made:
+        ///
+        ///   - It is not gated on ColumnExists("C_Order","C_Order_Blanket"). That
+        ///     dictionary guard was the single point at which the reference failed
+        ///     on BOTH databases: the column is written by the platform
+        ///     (MOrder.SetC_Order_Blanket), but a deployment whose AD_Column has no
+        ///     row for it — or whose AD_Table carries more than one row named
+        ///     C_Order, which made the guard's scalar sub-select raise rather than
+        ///     answer — reported it absent however good the data was. The statement
+        ///     is attempted instead, and a genuinely missing column throws once.
+        ///   - It does not require IsBlanketTrx = 'Y' on the parent. The release
+        ///     order's own reference is the part of the link the platform always
+        ///     writes; demanding a second optional flag on the other end hid the
+        ///     reference wherever that flag is not carried.
+        ///   - It does not stop at the header. See
+        ///     <see cref="LoadBlanketOrderReferenceFromLines"/> — the link is
+        ///     recorded in two places, by different code, and the header is the
+        ///     half that is often not written.
+        ///
+        /// COALESCE rather than NVL, so the statement reads the same on Oracle and
+        /// PostgreSQL.
         /// </summary>
         /// <param name="C_Order_ID">Selected purchase order id.</param>
         /// <param name="d">Panel payload being populated.</param>
         private void LoadBlanketOrderReference(int C_Order_ID, LandedCostPanelData d)
         {
-            if (!ColumnExists("C_Order", "C_Order_Blanket")) return;
+            // The header reference first — it names the blanket outright.
+            if (_blanketLookupUsable != false)
+            {
+                try
+                {
+                    string sql = @"SELECT bo.C_Order_ID  AS BlanketId,
+                                          bo.DocumentNo  AS BlanketNo
+                                     FROM C_Order o
+                                     INNER JOIN C_Order bo
+                                            ON (bo.C_Order_ID = o.C_Order_Blanket)
+                                    WHERE o.C_Order_ID = @C_Order_ID
+                                      AND COALESCE(bo.IsActive, 'Y') = 'Y'";
+                    DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                    _blanketLookupUsable = true;
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        DataRow r0 = ds.Tables[0].Rows[0];
+                        d.BlanketOrderId = Util.GetValueOfInt(r0["BlanketId"]);
+                        d.BlanketOrderNo = Util.GetValueOfString(r0["BlanketNo"]);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Almost certainly "no such column" on a schema without the
+                    // blanket module. Recorded so the next order skips the attempt.
+                    _blanketLookupUsable = false;
+                    _log.Severe("LoadBlanketOrderReference/header (C_Order_ID="
+                                + C_Order_ID + "): " + ex.Message);
+                }
+            }
+
+            LoadBlanketOrderReferenceFromLines(C_Order_ID, d);
+        }
+
+        /// <summary>
+        /// Remembers whether the line-level blanket lookup is usable against this
+        /// schema, so a database without C_OrderLine_Blanket_ID reports it once
+        /// rather than on every order the panel opens.
+        /// </summary>
+        private static bool? _blanketLineLookupUsable;
+
+        /// <summary>
+        /// The blanket this order was released against, resolved through its LINES
+        /// (C_OrderLine.C_OrderLine_Blanket_ID -> the blanket's own order line ->
+        /// that line's order).
+        ///
+        /// This is what makes the reference appear for release orders the header
+        /// column does not describe, and that is not a rare case: the two records
+        /// of the link are written by DIFFERENT code. C_Order.C_Order_Blanket is
+        /// stamped only by the CreateReleaseDocFromBO process, which sets it
+        /// explicitly after copying, whereas the LINE reference is written by
+        /// MOrder.CopyFrom for ANY document whose type IsReleaseDocument(). A
+        /// release order raised through any other path records its blanket on the
+        /// lines ONLY, and a reader that stops at the header finds nothing to show
+        /// — on every database, which is why this never looked like a portability
+        /// fault.
+        ///
+        /// Distinct blanket orders are counted, so a release drawing on more than
+        /// one blanket can report the first with a tally. Ordered by id so the
+        /// choice is stable between loads.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected purchase order id.</param>
+        /// <param name="d">Panel payload being populated.</param>
+        private void LoadBlanketOrderReferenceFromLines(int C_Order_ID, LandedCostPanelData d)
+        {
+            if (_blanketLineLookupUsable == false) return;
 
             try
             {
-                string sql = @"SELECT bo.C_Order_ID  AS BlanketId,
-                                      bo.DocumentNo  AS BlanketNo
-                                 FROM C_Order o
-                                 INNER JOIN C_Order bo
-                                        ON (bo.C_Order_ID = o.C_Order_Blanket)
-                                WHERE o.C_Order_ID = @C_Order_ID
-                                  AND NVL(bo.IsBlanketTrx, 'N') = 'Y'
-                                  AND NVL(bo.IsActive, 'Y')     = 'Y'";
+                string sql = @"SELECT bo.C_Order_ID AS BlanketId,
+                                      MAX(bo.DocumentNo) AS BlanketNo
+                                 FROM C_OrderLine ol
+                                INNER JOIN C_OrderLine bol
+                                        ON (bol.C_OrderLine_ID = ol.C_OrderLine_Blanket_ID)
+                                INNER JOIN C_Order bo
+                                        ON (bo.C_Order_ID = bol.C_Order_ID)
+                                WHERE ol.C_Order_ID = @C_Order_ID
+                                  AND COALESCE(ol.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(bo.IsActive, 'Y') = 'Y'
+                                GROUP BY bo.C_Order_ID
+                                ORDER BY bo.C_Order_ID";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
-                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                {
-                    DataRow r0 = ds.Tables[0].Rows[0];
-                    d.BlanketOrderId = Util.GetValueOfInt(r0["BlanketId"]);
-                    d.BlanketOrderNo = Util.GetValueOfString(r0["BlanketNo"]);
-                }
+                _blanketLineLookupUsable = true;
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                d.BlanketOrderId    = Util.GetValueOfInt(r["BlanketId"]);
+                d.BlanketOrderNo    = Util.GetValueOfString(r["BlanketNo"]);
+                d.BlanketOrderCount = ds.Tables[0].Rows.Count;
             }
             catch (Exception ex)
             {
-                _log.Severe("LoadBlanketOrderReference (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                // A schema without C_OrderLine_Blanket_ID simply has no line-level
+                // link to read. Recorded so the next order skips the attempt.
+                _blanketLineLookupUsable = false;
+                _log.Severe("LoadBlanketOrderReference/lines (C_Order_ID="
+                            + C_Order_ID + "): " + ex.Message);
             }
         }
 
@@ -1648,11 +1774,16 @@ namespace VASLogic.Models
             /// <summary>That sales order's DocumentNo.</summary>
             public string    SalesOrderNo        { get; set; }
             /// <summary>Blanket purchase order this order was released against
-            /// (C_Order.C_Order_Blanket, where the parent carries
-            /// IsBlanketTrx = 'Y'); 0 when there is none.</summary>
+            /// (C_Order.C_Order_Blanket, else the blanket reached through the
+            /// order's LINES); 0 when there is none.</summary>
             public int       BlanketOrderId      { get; set; }
             /// <summary>That blanket order's DocumentNo.</summary>
             public string    BlanketOrderNo      { get; set; }
+            /// <summary>Distinct blanket orders this one draws on. More than one
+            /// is possible when the link is carried by the LINES, which can each
+            /// release from a different blanket; the card names the first and
+            /// hints the rest. 0 or 1 when the header named it outright.</summary>
+            public int       BlanketOrderCount   { get; set; }
             /// <summary>MRP plan run the order was generated by
             /// (VAMRP_PlanRun_ID); 0 when there is none, and always 0 on a
             /// deployment without the optional VAMRP module.</summary>

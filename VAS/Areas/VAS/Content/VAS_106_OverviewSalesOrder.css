@@ -147,6 +147,22 @@
  *                          "was X → now Y" under the field's name, the old
  *                          value struck through and the new one carrying the
  *                          row's colour. Matches VAS_101 / VAS_104.
+ *   VAI163   2026-08-20  The line-history drawer INHERITS the lines table's row
+ *                        grid instead of declaring its own. Its rules restated
+ *                        the first six tracks in the same proportions, which is
+ *                        not the same grid: the line row also carries the 2em
+ *                        action track and the Contract track and one more gap,
+ *                        so an fr resolved to a different width on each and every
+ *                        drawer column came out narrower than the one above it.
+ *                        The 1.25em left indent shifted the whole block on top of
+ *                        that, and the drawer's own card border inset it a further
+ *                        pixel. All three are gone — the indent is an inset shadow
+ *                        now, which occupies no layout width — and with them the
+ *                        two -lhTable grid rules and their -no-discount pairing,
+ *                        since the drawer simply wears whichever grid the table
+ *                        is wearing. Its header is quieted to suit
+ *                        (.vas_106-lhTable .vas_106-tHead) and its rows do not
+ *                        light up under the pointer, nothing there being clickable.
  ***********************************************************/
 
 .vas_106-root {
@@ -558,32 +574,42 @@
 }
 /* Line change history, in a drawer under the line it belongs to.
 
-   Its table sits on the SAME six tracks as the lines table (minus the Contract
-   column, which a past version has nothing to say about), so every figure lands
-   under the column it belongs to on the line above. It carries the lines table's
-   min-width too, so when that table is scrolled sideways the drawer travels with
-   it rather than stopping at the edge of the visible box. */
-.vas_106-lineHist { padding: 0 0 0.625em 1.25em; background: var(--vaso-faint-blue); }
-/* The drawer no longer carries a floor width per column set: it shares the
-   lines table's tracks, and those now compress with the panel instead of
-   scrolling, so there is no scrolled width for its tint to run out to. */
-.vas_106-lhTable { margin-top: 0.5em; }
-/* Both drawer rules are qualified by .vas_106-linesTable so they outrank the
-   table's own variant grids above — the drawer is INSIDE that table, and a
-   two-class rule here would lose to the three-class .no-contract / .no-discount
-   selectors and put the drawer's six figures on the line row's tracks. */
-.vas_106-linesTable .vas_106-lhTable .vas_106-tRow {
-    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
-                           minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 1fr);
-    min-width: 0;
+   The drawer INHERITS the lines table's own row grid rather than restating it,
+   which is the only way its figures can actually land under the columns they
+   belong to. It used to declare its own six tracks in the same PROPORTIONS as
+   the line row's first six — which is not the same thing at all: the line row
+   also carries the 2em action track and the Contract track, and one more gap per
+   extra column, so the free space an fr divides up is a different amount on each
+   of the two grids and every drawer column came out narrower than the one above
+   it. The left indent below did the rest, shifting the whole drawer sideways.
+
+   Its cells therefore land on tracks 1..n of the line row — Changed on under
+   Item, Qty under Qty, and Updated by under Delivered — and the action and
+   Contract tracks are simply left empty. That also means the -no-contract /
+   -no-discount variants need no drawer rule of their own: the drawer is inside
+   that table and takes whichever grid the table is wearing.
+
+   The indent is drawn as an inset shadow, not as padding: a rule that occupies
+   layout width would put the drawer back off-grid, and the point of the marker
+   is only to say this block hangs off the row above. */
+.vas_106-lineHist {
+    padding: 0 0 0.5em 0; background: var(--vaso-faint-blue);
+    box-shadow: inset 0.1875em 0 0 0 var(--vaso-card-bd);
 }
-/* The drawer drops its Disc column with the table above it, so its figures stay
-   under the same headings. */
-.vas_106-linesTable.vas_106-no-discount .vas_106-lhTable .vas_106-tRow {
-    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.5fr) minmax(0, 0.9fr)
-                           minmax(0, 0.9fr) minmax(0, 1fr);
-    min-width: 0;
+/* No border, no radius, no white ground: the drawer is part of the row above it,
+   not a card nested inside one — and a border would inset its content by a pixel
+   on each side, off the tracks it shares. */
+.vas_106-lhTable {
+    margin-top: 0; border: none; border-radius: 0; background: transparent;
 }
+/* The drawer's own header repeats the columns the figures sit under, so it is
+   quieter than the table's — no bottom rule, and it shares the drawer's tint
+   rather than painting its own band across it. */
+.vas_106-lhTable .vas_106-tHead { background: transparent; border-bottom: none; padding-bottom: 0.25em; }
+/* The rows keep their divider — several versions of one line read as a list —
+   but not the hover tint: nothing in the drawer is clickable, and a row that
+   lights up under the pointer says otherwise. */
+.vas_106-lhTable .vas_106-tBody:hover { background: transparent; }
 /* When the change was made, with that version's own note under it. */
 .vas_106-lhWhen { min-width: 0; display: flex; flex-direction: column; }
 .vas_106-lhWhen small {
