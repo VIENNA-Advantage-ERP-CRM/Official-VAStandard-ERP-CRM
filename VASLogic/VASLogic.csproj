@@ -164,6 +164,7 @@
     <Compile Include="Models\VAS_196_PeriodControlMatrixModel.cs" />
     <Compile Include="Models\VAS_199_PaymentAllocationStatusModel.cs" />
     <Compile Include="Models\VAS_200_BankReconcilationModel.cs" />
+    <Compile Include="Models\VAS_201_UnMatchedGRNInvoiceModel.cs" />
     <Compile Include="Models\VAS_100_OverviewDOModel.cs" />
     <Compile Include="Models\VAS_101_OverviewInventoryCountModel.cs" />
     <Compile Include="Models\VAS_102_OverviewInternalUseModel.cs" />
