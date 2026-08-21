@@ -335,7 +335,7 @@
     border: 1px solid #E4EDF4;
     border-radius: 12px;
     box-shadow: 0 16px 40px rgba(8, 24, 38, .22);
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     color: #102C3F;
 }
 
@@ -435,7 +435,7 @@
     background: #FFFFFF;
     border-radius: 16px;
     box-shadow: 0 24px 60px rgba(8, 24, 38, .3);
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     color: #102C3F;
 }
 

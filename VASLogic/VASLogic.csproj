@@ -164,6 +164,7 @@
     <Compile Include="Models\VAS_192_CurrentPeriodModel.cs" />
     <Compile Include="Models\VAS_193_PreviousPeriodModel.cs" />
     <Compile Include="Models\VAS_196_PeriodControlMatrixModel.cs" />
+    <Compile Include="Models\VAS_197_UnProcessedDocumentsModel.cs" />
     <Compile Include="Models\VAS_198_UnPostedAccountEntriesModel.cs" />
     <Compile Include="Models\VAS_199_PaymentAllocationStatusModel.cs" />
     <Compile Include="Models\VAS_200_BankReconcilationModel.cs" />

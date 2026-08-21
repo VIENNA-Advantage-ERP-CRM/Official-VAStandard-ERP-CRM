@@ -1,6 +1,6 @@
-﻿/******************************************************
+/******************************************************
  * Module Name    : VASLogic
- * Purpose        : Unposted Accounting Entries dashboard widget data
+ * Purpose        : Open / Unprocessed Documents dashboard widget data
  * chronological  : Development
  * Created Date   : 2026-08-21
  * Created by     : VAI154
@@ -20,48 +20,40 @@ using VAdvantage.Utility;
 namespace VASLogic.Models
 {
     /// <summary>
-    /// Module Name : VAS_198_UnPostedAccountEntries
-    /// Purpose     : Backs the VAS_198_UnPostedAccountEntriesWidget dashboard widget.
-    ///               Every accounting document of ONE open period that has reached a
-    ///               completed / closed state but carries no accounting entry
-    ///               (COALESCE(Posted,'N')&lt;&gt;'Y'), grouped by transaction type, each
-    ///               with a document count, a base-currency value and an openable
-    ///               paged record list.
+    /// Module Name : VAS_197_UnProcessedDocuments
+    /// Purpose     : Backs the VAS_197_UnProcessedDocumentsWidget dashboard widget.
+    ///               Every document of ONE open accounting period that has NOT reached
+    ///               a settled state - anything whose DocStatus is not Completed,
+    ///               Closed, Reversed or Voided - grouped by the screen it belongs to,
+    ///               each with a document count, the age of its oldest item, a
+    ///               base-currency value and an openable paged record list.
     ///
-    ///               NOTHING here is hard-coded to C_Invoice / M_InOut / C_Payment /
-    ///               GL_Journal. The transaction types are DISCOVERED from the
-    ///               Application Dictionary:
+    ///               The sibling of VAS_198_UnPostedAccountEntries, and deliberately
+    ///               its mirror image: that widget chases documents that are finished
+    ///               but not yet in the ledger, this one chases documents that are not
+    ///               finished at all. Same discovery, same period chip, same paging,
+    ///               same Zoom - a different question.
     ///
-    ///                 AD_Table -> AD_Column(Posted) -> AD_Field -> AD_Tab -> AD_Window
+    ///               NOTHING here is hard-coded to C_Invoice / C_Order / C_Payment /
+    ///               GL_Journal. The document types are DISCOVERED from the
+    ///               Application Dictionary: a table qualifies when it is an active,
+    ///               non-view physical table carrying an active DocStatus column - the
+    ///               column IS the definition of a document that can be open.
     ///
-    ///               A table qualifies when it is an active, non-view physical table
-    ///               carrying an active Posted column that is actually DISPLAYED on an
-    ///               active tab of an active window. That last condition keeps purely
-    ///               technical tables with a Posted column out of a user-facing card.
-    ///
-    ///               A row of the card is a SCREEN, not a table: one table displayed
-    ///               on several windows is several rows, so C_Invoice appears as AP
-    ///               Invoice / AR Invoice / Expense Invoice, M_InOut as GRN / Delivery
-    ///               Order / the return flavours, C_Order as Purchase Order / Sales
-    ///               Order / RMA / Blanket, C_Payment as AP Payment / AR Receipt,
-    ///               M_Inventory as Inventory Count / Internal Use. Nothing in that
-    ///               list is coded here - the names are the tenant's own windows,
-    ///               translated for the session language.
-    ///
-    ///               What makes two windows over one table different LISTS rather than
-    ///               the same list twice is the tab's own WhereClause - the predicate
-    ///               the framework itself applies when it opens that window. It is
-    ///               added to each screen's query, and because a WhereClause qualifies
-    ///               its columns with the TABLE name, every generated statement aliases
-    ///               the source table to its own name rather than to something short.
+    ///               A row of the card is a SCREEN, not a table: one table shown on
+    ///               several windows is several rows, so C_Invoice appears as AP
+    ///               Invoice / AR Invoice / Expense Invoice and C_Order as Purchase
+    ///               Order / Sales Order / RMA. What makes two windows over one table
+    ///               different LISTS rather than the same list twice is the tab's own
+    ///               WhereClause - the predicate the framework itself applies when it
+    ///               opens that window. Because a WhereClause qualifies its columns
+    ///               with the TABLE name, every generated statement aliases the source
+    ///               table to its own name rather than to something short.
     ///
     ///               Where those clauses cannot separate the windows - a clause with
     ///               @context@ variables this widget cannot resolve, or none at all -
-    ///               the table collapses back to ONE row covering all its records.
-    ///               One honest row beats several rows each listing the same documents.
-    ///
-    ///               Zoom therefore needs no rule at all: a row IS a screen, so it
-    ///               opens that screen.
+    ///               the table collapses back to ONE row covering all its records. One
+    ///               honest row beats several rows each listing the same documents.
     ///
     ///               Dynamic SQL, safely: a bind parameter cannot be a table or column
     ///               identifier, so the physical statement is composed server-side -
@@ -71,11 +63,10 @@ namespace VASLogic.Models
     ///               business filter (client, period bounds, base currency) stays a
     ///               parameter.
     ///
-    ///               Valuation is deliberately NOT metadata-driven. Different
-    ///               transaction tables store value differently and a column merely
-    ///               named ...Amt / ...Total is not evidence of an accounting value,
-    ///               so it comes from one of two trusted maps and is then CONFIRMED
-    ///               to exist by the same dictionary probe:
+    ///               Valuation is deliberately NOT metadata-driven. Different tables
+    ///               store value differently and a column merely named ...Amt is not
+    ///               evidence of an accounting value, so it comes from one of two
+    ///               trusted maps and is then CONFIRMED to exist by the same probe:
     ///
     ///                 header total   <see cref="AmountColumnByTable"/> - GrandTotal,
     ///                                PayAmt, TotalDr - in the document's own
@@ -90,31 +81,28 @@ namespace VASLogic.Models
     ///                                never converted again
     ///
     ///               A discovered table in neither map reports its document count and
-    ///               no value - that is safer than reporting the wrong accounting
-    ///               figure.
+    ///               no value - safer than reporting the wrong accounting figure.
     ///
     ///               Period source: the open periods of the tenant's PRIMARY calendar
     ///               (AD_ClientInfo.C_Calendar_ID) - a period qualifies when at least
     ///               one active C_PeriodControl row of it is Open. Documents are
     ///               bounded by DateAcct, or by MovementDate on the inventory tables
     ///               that carry no DateAcct at all - a short explicit fallback, not a
-    ///               scan for anything date-shaped. A table with neither column is
-    ///               excluded rather than bounded by a guessed one.
+    ///               scan for anything date-shaped. A table with neither is excluded.
     ///
     ///               MRole row-level security is applied to the main physical table of
     ///               every user-facing query: C_Period alias p, AD_Table alias t for
-    ///               the dictionary probes, and the DISCOVERED table alias src for
-    ///               each transaction query - each source is filtered independently,
-    ///               never once over a combined result. GROUP BY, ORDER BY and the
-    ///               paging suffix are appended AFTER AddAccessSQL so the FROM-clause
-    ///               parser is not confused by a trailing clause. Compatible with
-    ///               PostgreSQL and Oracle.
+    ///               the dictionary probes, and the DISCOVERED table for each screen -
+    ///               each filtered independently, never once over a combined result.
+    ///               GROUP BY, ORDER BY and the paging suffix are appended AFTER
+    ///               AddAccessSQL so the FROM-clause parser is not confused by a
+    ///               trailing clause. Compatible with PostgreSQL and Oracle.
     /// Chronological development:
     ///   VAI154      2026-08-21 Created
     /// </summary>
-    public class VAS_198_UnPostedAccountEntriesModel
+    public class VAS_197_UnProcessedDocumentsModel
     {
-        private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_198_UnPostedAccountEntriesModel).FullName);
+        private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_197_UnProcessedDocumentsModel).FullName);
 
         /* Error tokens; the client resolves the label. */
         public const string ERROR_INVALID_REQUEST = "INVALID";
@@ -123,12 +111,15 @@ namespace VASLogic.Models
         /* C_PeriodControl.PeriodStatus stored code for an open control row. */
         private const string PERIODSTATUS_Open = "O";
 
-        /* The dictionary column that marks a table as an accounting source, and the
-           document states worth chasing. A document that is still drafted or in
-           progress is not an unposted accounting entry - it is unfinished work, and
-           belongs to a different widget. */
-        private const string COLUMN_POSTED = "Posted";
-        private const string DOCSTATUS_ACTIONABLE = "'CO','CL'";
+        /* The dictionary column that marks a table as holding documents, and the
+           states that mean a document is FINISHED. Anything else - drafted, in
+           progress, invalid, waiting on approval, whatever the tenant has configured
+           - is work still open, which is what this widget lists.
+
+           Completed, Closed, Reversed, Voided. Stored codes compared against a
+           column, so no N prefix (see the SQL coding standards). */
+        private const string COLUMN_DOCSTATUS = "DocStatus";
+        private const string DOCSTATUS_SETTLED = "'CO','CL','RE','VO'";
 
         /* Detail paging guard rails. The client asks for a page size; anything
            outside this band is clamped so a crafted request cannot pull a whole
@@ -147,14 +138,14 @@ namespace VASLogic.Models
         private const int WHERECLAUSE_MAX = 500;
 
         /// <summary>
-        /// The trusted amount strategy: which column carries the accounting value of
-        /// a given transaction table. Deliberately a fixed map and NOT a metadata
-        /// scan - a column called PayAmt on one table is the document's value, on
-        /// another it is a line's share of one, and no dictionary flag distinguishes
-        /// them. A table absent from this map shows its count with no value.
-        /// Every entry is still confirmed against AD_Column before it is used, so a
-        /// map row for a column a given installation does not have degrades to "no
-        /// value" instead of failing the query.
+        /// The trusted amount strategy: which column carries the value of a given
+        /// document table. Deliberately a fixed map and NOT a metadata scan - a column
+        /// called PayAmt on one table is the document's value, on another it is a
+        /// line's share of one, and no dictionary flag distinguishes them. A table
+        /// absent from this map shows its count with no value. Every entry is still
+        /// confirmed against AD_Column before it is used, so a map row for a column a
+        /// given installation does not have degrades to "no value" instead of failing
+        /// the query.
         /// </summary>
         private static readonly Dictionary<string, string> AmountColumnByTable =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -168,32 +159,25 @@ namespace VASLogic.Models
         /// <summary>
         /// The second trusted amount strategy, for documents whose value lives on
         /// their LINES rather than in a header total: an inventory movement has no
-        /// GrandTotal, and its accounting value is the stored cost of what moved.
+        /// GrandTotal, and its value is the stored cost of what moved.
         ///
-        /// The cost columns are the very ones the posting process uses, so the figure
-        /// on the card is the figure that will hit the ledger. They are declared PER
-        /// STRATEGY, not shared, because the tables do not agree on which one carries
-        /// it: a receipt or a movement line values at its posting cost falling back to
-        /// its standing one, while an inventory line values at PriceCost. Those costs
-        /// are ALREADY in the tenant's base currency, which is why a line strategy
-        /// never goes near currencyConvert: converting a base-currency cost a second
-        /// time would silently inflate it.
+        /// Those costs are ALREADY in the tenant's base currency, which is why a line
+        /// strategy never goes near currencyConvert. Like the header map this is a
+        /// fixed list, and every column it names - link, quantity and cost alike - is
+        /// confirmed against AD_Column before it reaches the SQL.
         ///
-        /// Like the header map this is a fixed list, and every column it names -
-        /// link, quantity and cost alike - is confirmed against AD_Column before it
-        /// reaches the SQL. A strategy whose columns this installation does not have
-        /// degrades to "no value" rather than to a wrong number or a broken query.
+        /// The cost columns are per strategy, not shared, because the tables do not
+        /// agree on which one carries the figure: a receipt or a movement line values
+        /// at its posting cost falling back to its standing one, while an inventory
+        /// line carries PriceCost.
         /// </summary>
         private static readonly List<LineValueStrategy> LineValueStrategies =
             new List<LineValueStrategy>
             {
-                /* A receipt line's quantity is a single column. */
                 new LineValueStrategy("M_InOut", "M_InOutLine", "M_InOut_ID",
                     new string[] { "MovementQty" }, "QtyInternalUse",
                     new string[] { "PostCurrentCostPrice", "CurrentCostPrice" }),
 
-                /* Same shape as a receipt line: one quantity that moved, valued at
-                   the line's own stored cost. */
                 new LineValueStrategy("M_Movement", "M_MovementLine", "M_Movement_ID",
                     new string[] { "MovementQty" }, "",
                     new string[] { "PostCurrentCostPrice", "CurrentCostPrice" }),
@@ -201,8 +185,7 @@ namespace VASLogic.Models
                 /* A physical inventory posts the DIFFERENCE it found - counted less
                    booked - while an internal-use inventory posts QtyInternalUse and
                    leaves both of those at zero. Summing the two forms is what makes
-                   one expression serve both, and it is why the quantity here is a
-                   difference rather than a column.
+                   one expression serve both.
 
                    PriceCost is what an inventory line values at, and it is already a
                    base-currency figure. The two receipt-style cost columns stay in the
@@ -213,23 +196,40 @@ namespace VASLogic.Models
                     new string[] { "PriceCost", "PostCurrentCostPrice", "CurrentCostPrice" })
             };
 
-        /* Every AD-managed table records its author in CreatedBy, which points at
-           AD_User. Probed like the line tables so a schema without the split-name
-           columns still gets a name rather than a broken query. */
-        private const string TABLE_USER = "AD_User";
-        private const string COLUMN_CREATEDBY = "CreatedBy";
-        private const string COLUMN_NAME = "Name";
-        private const string COLUMN_FIRSTNAME = "FirstName";
-        private const string COLUMN_LASTNAME = "LastName";
-
         /* Columns the dictionary probe reports on, beyond the table's own key. Each
            is optional: the generated statement adapts to what the table actually
            has rather than assuming a shape. */
         private const string COLUMN_DOCUMENTNO = "DocumentNo";
         private const string COLUMN_DATEACCT = "DateAcct";
         private const string COLUMN_MOVEMENTDATE = "MovementDate";
-        private const string COLUMN_DOCSTATUS = "DocStatus";
         private const string COLUMN_DOCTYPE = "C_DocType_ID";
+        private const string COLUMN_DOCTYPETARGET = "C_DocTypeTarget_ID";
+
+        /// <summary>
+        /// Which document-type column actually says what a document IS, per table.
+        ///
+        /// An order or an invoice carries two: C_DocType_ID, which holds the base
+        /// type, and C_DocTypeTarget_ID, which holds the one the user chose. The two
+        /// are only reconciled when the document COMPLETES - and nothing in this
+        /// widget has completed, by definition. Reading C_DocType_ID here would label
+        /// every drafted order with the generic base type instead of "Purchase Order"
+        /// or "Blanket Order".
+        ///
+        /// A fixed map rather than a rule like "prefer Target wherever it exists":
+        /// which of the two is authoritative is a fact about the document's lifecycle,
+        /// not something a column's presence can be read to imply. Every entry is
+        /// still confirmed against AD_Column before it is used, so a table that turns
+        /// out not to have the target column falls back to C_DocType_ID rather than
+        /// failing the query. Tables absent from the map use C_DocType_ID, which is
+        /// the only one they have.
+        /// </summary>
+        private static readonly Dictionary<string, string> DocTypeColumnByTable =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "C_Order", COLUMN_DOCTYPETARGET },
+                { "C_Invoice", COLUMN_DOCTYPETARGET }
+            };
+        private const string COLUMN_BPARTNER = "C_BPartner_ID";
         private const string COLUMN_CURRENCY = "C_Currency_ID";
         private const string COLUMN_CONVERSIONTYPE = "C_ConversionType_ID";
 
@@ -239,14 +239,14 @@ namespace VASLogic.Models
 
         /// <summary>
         /// Bootstraps the widget in one round trip: every selectable open period of
-        /// the primary calendar, the period to preselect, and that period's unposted
-        /// transaction types.
+        /// the primary calendar, the period to preselect, and that period's open
+        /// document types.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
-        /// <returns>Populated <see cref="UnPostedBootstrap"/> (never null).</returns>
-        public UnPostedBootstrap GetBootstrap(Ctx ctx)
+        /// <returns>Populated <see cref="UnProcessedBootstrap"/> (never null).</returns>
+        public UnProcessedBootstrap GetBootstrap(Ctx ctx)
         {
-            UnPostedBootstrap result = new UnPostedBootstrap();
+            UnProcessedBootstrap result = new UnProcessedBootstrap();
             result.Periods = new List<PeriodItem>();
             result.Data = new PeriodData();
 
@@ -402,16 +402,12 @@ namespace VASLogic.Models
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Every transaction table this widget may read, discovered from the
-        /// Application Dictionary and already reduced to the ones it can actually
-        /// use. Two flat queries rather than one nested statement: the column probe
-        /// and the screen lookup are joined in memory, because a single query
-        /// carrying both the per-column aggregation and the three-join screen EXISTS
-        /// is exactly the shape the AddAccessSQL parser handles badly.
+        /// Every screen this widget may read, discovered from the Application
+        /// Dictionary and already reduced to the ones it can actually use.
         ///
         /// A discovered table is dropped when it has no key column (nothing to zoom
-        /// to) or no DateAcct column (nothing to bound by the period) - never when it
-        /// merely has no amount strategy.
+        /// to), no usable accounting date (nothing to bound by the period), or no
+        /// screen at all - never when it merely has no amount strategy.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <returns>Usable sources, ordered by display name (never null).</returns>
@@ -429,14 +425,10 @@ namespace VASLogic.Models
 
             foreach (SourceItem item in byTable.Values)
             {
-                /* No key: the modal could not offer a Zoom, and the row would be a
-                   dead end. No accounting date at all - neither DateAcct nor the one
-                   trusted alternative - and the period filter this whole widget is
-                   about could not be applied, so the source is excluded rather than
-                   bounded by a guessed column. */
                 if (!IsSafeIdentifier(item.TableName)) { continue; }
                 if (!IsSafeIdentifier(item.KeyColumn)) { continue; }
                 if (!IsSafeIdentifier(item.DateColumn)) { continue; }
+                if (!IsSafeIdentifier(item.DocStatusColumn)) { continue; }
 
                 List<ScreenItem> screens;
                 if (!screensByTable.TryGetValue(item.AD_Table_ID, out screens)) { continue; }
@@ -466,8 +458,8 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Probes the dictionary for every active, non-view physical table carrying
-        /// an active Posted column, and reports which of the columns this widget can
+        /// Probes the dictionary for every active, non-view physical table carrying an
+        /// active DocStatus column, and reports which of the columns this widget can
         /// use each one actually has. One row per table - the MAX(CASE ...) form
         /// collapses the column rows rather than returning one row per column.
         /// </summary>
@@ -482,11 +474,14 @@ namespace VASLogic.Models
                        t.TableName AS Table_Name,
                        t.Name AS Table_Display_Name,
                        MAX(CASE WHEN c.IsKey='Y' THEN c.ColumnName END) AS Key_Column,
+                       MAX(CASE WHEN c.ColumnName='" + COLUMN_DOCSTATUS + @"' THEN c.ColumnName END) AS Doc_Status_Column,
+                       MAX(CASE WHEN c.ColumnName='" + COLUMN_DOCSTATUS + @"' THEN c.AD_Reference_Value_ID END) AS Doc_Status_Reference_ID,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_DOCUMENTNO + @"' THEN c.ColumnName END) AS Document_No_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_DATEACCT + @"' THEN c.ColumnName END) AS Date_Acct_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_MOVEMENTDATE + @"' THEN c.ColumnName END) AS Movement_Date_Column,
-                       MAX(CASE WHEN c.ColumnName='" + COLUMN_DOCSTATUS + @"' THEN c.ColumnName END) AS Doc_Status_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_DOCTYPE + @"' THEN c.ColumnName END) AS Doc_Type_Column,
+                       MAX(CASE WHEN c.ColumnName='" + COLUMN_DOCTYPETARGET + @"' THEN c.ColumnName END) AS Doc_Type_Target_Column,
+                       MAX(CASE WHEN c.ColumnName='" + COLUMN_BPARTNER + @"' THEN c.ColumnName END) AS BPartner_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_CURRENCY + @"' THEN c.ColumnName END) AS Currency_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_CONVERSIONTYPE + @"' THEN c.ColumnName END) AS Conversion_Type_Column,
                        MAX(CASE WHEN c.ColumnName=@AmountColumnA THEN c.ColumnName END) AS Amount_Column_A,
@@ -496,7 +491,7 @@ namespace VASLogic.Models
                 INNER JOIN AD_Column c ON (c.AD_Table_ID=t.AD_Table_ID AND c.IsActive='Y')
                 WHERE t.IsActive='Y'
                   AND COALESCE(t.IsView,'N')='N'
-                  AND EXISTS(SELECT 1 FROM AD_Column pc WHERE pc.AD_Table_ID=t.AD_Table_ID AND pc.ColumnName='" + COLUMN_POSTED + @"' AND pc.IsActive='Y')";
+                  AND EXISTS(SELECT 1 FROM AD_Column sc WHERE sc.AD_Table_ID=t.AD_Table_ID AND sc.ColumnName='" + COLUMN_DOCSTATUS + @"' AND sc.IsActive='Y')";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "t", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -504,9 +499,6 @@ namespace VASLogic.Models
             sql += " GROUP BY t.AD_Table_ID,t.TableName,t.Name";
             sql += " ORDER BY t.TableName";
 
-            /* The three distinct amount columns the trusted map names, bound rather
-               than inlined - they are the only value-bearing columns the probe looks
-               for, and binding them keeps the map the single place they are listed. */
             string[] amountColumns = DistinctAmountColumns();
 
             SqlParameter[] parameters = new SqlParameter[]
@@ -529,12 +521,14 @@ namespace VASLogic.Models
                 item.TableName = Util.GetValueOfString(dr["Table_Name"]);
                 item.TableDisplayName = Util.GetValueOfString(dr["Table_Display_Name"]);
                 item.KeyColumn = Util.GetValueOfString(dr["Key_Column"]);
+                item.DocStatusColumn = Util.GetValueOfString(dr["Doc_Status_Column"]);
+                item.DocStatusReferenceId = Util.GetValueOfInt(dr["Doc_Status_Reference_ID"]);
                 item.DocumentNoColumn = Util.GetValueOfString(dr["Document_No_Column"]);
                 item.DateAcctColumn = Util.GetValueOfString(dr["Date_Acct_Column"]);
                 item.MovementDateColumn = Util.GetValueOfString(dr["Movement_Date_Column"]);
                 item.DateColumn = ResolveDateColumn(item);
-                item.DocStatusColumn = Util.GetValueOfString(dr["Doc_Status_Column"]);
-                item.DocTypeColumn = Util.GetValueOfString(dr["Doc_Type_Column"]);
+                item.DocTypeColumn = ResolveDocTypeColumn(item.TableName, dr);
+                item.BPartnerColumn = Util.GetValueOfString(dr["BPartner_Column"]);
                 item.CurrencyColumn = Util.GetValueOfString(dr["Currency_Column"]);
                 item.ConversionTypeColumn = Util.GetValueOfString(dr["Conversion_Type_Column"]);
 
@@ -571,11 +565,82 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// The value column of one discovered table: the trusted map's choice, only
+        /// when the dictionary probe confirmed the table really carries it.
+        /// </summary>
+        /// <param name="tableName">Discovered physical table name.</param>
+        /// <param name="row">The probe row for that table.</param>
+        /// <returns>Confirmed amount column, or "" when the table has no strategy.</returns>
+        private string ResolveAmountColumn(string tableName, DataRow row)
+        {
+            string wanted;
+            if (string.IsNullOrEmpty(tableName)
+                || !AmountColumnByTable.TryGetValue(tableName, out wanted)) { return ""; }
+
+            string[] found = new string[]
+            {
+                Util.GetValueOfString(row["Amount_Column_A"]),
+                Util.GetValueOfString(row["Amount_Column_B"]),
+                Util.GetValueOfString(row["Amount_Column_C"])
+            };
+
+            for (int i = 0; i < found.Length; i++)
+            {
+                if (wanted.Equals(found[i], StringComparison.OrdinalIgnoreCase)) { return found[i]; }
+            }
+
+            return "";
+        }
+
+        /// <summary>
+        /// Which column this table's document type is read from - see
+        /// <see cref="DocTypeColumnByTable"/> for why an order and an invoice are read
+        /// from the TARGET type while everything else is read from the plain one.
+        /// </summary>
+        /// <param name="tableName">Discovered physical table name.</param>
+        /// <param name="row">The probe row for that table.</param>
+        /// <returns>Confirmed document-type column, or "" when the table has none.</returns>
+        private string ResolveDocTypeColumn(string tableName, DataRow row)
+        {
+            string plain = Util.GetValueOfString(row["Doc_Type_Column"]);
+            string target = Util.GetValueOfString(row["Doc_Type_Target_Column"]);
+
+            string preferred;
+            if (!string.IsNullOrEmpty(tableName)
+                && DocTypeColumnByTable.TryGetValue(tableName, out preferred)
+                && COLUMN_DOCTYPETARGET.Equals(preferred, StringComparison.OrdinalIgnoreCase)
+                && IsSafeIdentifier(target))
+            {
+                return target;
+            }
+
+            return plain;
+        }
+
+        /// <summary>
+        /// The column the period bounds are applied to: DateAcct where the table has
+        /// one, otherwise MovementDate.
+        ///
+        /// A SHORT, EXPLICIT fallback list, not a scan for anything date-shaped.
+        /// Guessing between DateTrx / MovementDate / DateInvoiced is ruled out because
+        /// those three mean different things - but MovementDate is the accounting date
+        /// of the inventory documents that have no DateAcct at all: for those the
+        /// movement IS the accounting event. Nothing else is accepted.
+        /// </summary>
+        /// <param name="item">Discovered source carrying both probe results.</param>
+        /// <returns>The date column to bound by, or "" when the table has neither.</returns>
+        private string ResolveDateColumn(SourceItem item)
+        {
+            if (IsSafeIdentifier(item.DateAcctColumn)) { return item.DateAcctColumn; }
+            if (IsSafeIdentifier(item.MovementDateColumn)) { return item.MovementDateColumn; }
+            return "";
+        }
+
+        /// <summary>
         /// Attaches the two SQL fragments that depend on OTHER tables' columns: the
         /// line-level value expression, where a <see cref="LineValueStrategies"/>
-        /// entry names the table, and the author name every source shows. One
-        /// dictionary read covers every table involved. A source that already has a
-        /// header amount column keeps it - a table never carries both.
+        /// entry names the table, and the business-partner name. One dictionary read
+        /// covers every table involved.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="byTable">Discovered tables, keyed by AD_Table_ID.</param>
@@ -584,12 +649,8 @@ namespace VASLogic.Models
             Dictionary<string, List<string>> lineColumns = ReadLineColumns(ctx);
             if (lineColumns.Count == 0) { return; }
 
-            string createdByExpr = BuildCreatedByExpr(lineColumns);
-
             foreach (SourceItem item in byTable.Values)
             {
-                item.CreatedByExpr = createdByExpr;
-
                 if (!string.IsNullOrEmpty(item.AmountColumn)) { continue; }
 
                 LineValueStrategy strategy = FindLineStrategy(item.TableName);
@@ -600,40 +661,9 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// How to read the name of whoever created a document, over the alias "usr".
-        ///
-        /// AD_User.Name is the display name and is what nearly every installation
-        /// carries, but some store the name split across FirstName / LastName and
-        /// leave Name empty - so the split form is used as a fallback, and only when
-        /// the dictionary confirms both columns exist. The same expression serves
-        /// every source, because CreatedBy is on every AD-managed table.
-        /// </summary>
-        /// <param name="columns">Confirmed columns per probed table.</param>
-        /// <returns>Scalar expression over alias usr, or "" when AD_User is unusable.</returns>
-        private string BuildCreatedByExpr(Dictionary<string, List<string>> columns)
-        {
-            List<string> userColumns;
-            if (!columns.TryGetValue(TABLE_USER, out userColumns)) { return ""; }
-            if (!HasColumn(userColumns, COLUMN_NAME)) { return ""; }
-
-            string name = "usr." + COLUMN_NAME;
-
-            if (HasColumn(userColumns, COLUMN_FIRSTNAME) && HasColumn(userColumns, COLUMN_LASTNAME))
-            {
-                /* NULLIF turns a stored empty name into a miss so the split form can
-                   take over; || is the concatenation both back ends share. */
-                name = "COALESCE(NULLIF(usr." + COLUMN_NAME + ",N''),"
-                     + "NULLIF(TRIM(COALESCE(usr." + COLUMN_FIRSTNAME + ",N'') || ' ' || COALESCE(usr."
-                     + COLUMN_LASTNAME + ",N'')),N''))";
-            }
-
-            return "COALESCE(" + name + ",N'')";
-        }
-
-        /// <summary>
-        /// The active column names of every line table the strategies refer to.
-        /// Read in one statement rather than one per strategy - there are only ever a
-        /// handful of line tables, and they do not change between requests.
+        /// The active column names of every line table the strategies refer to. Read
+        /// in one statement rather than one per strategy - there are only ever a
+        /// handful, and they do not change between requests.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <returns>Line table name -> its active column names (never null).</returns>
@@ -645,23 +675,12 @@ namespace VASLogic.Models
             List<SqlParameter> parameters = new List<SqlParameter>();
             StringBuilder inList = new StringBuilder();
 
-            List<string> wanted = new List<string>();
             for (int i = 0; i < LineValueStrategies.Count; i++)
-            {
-                wanted.Add(LineValueStrategies[i].LineTable);
-            }
-
-            /* AD_User rides along: the author name is built from whichever of its name
-               columns this installation actually has, and one probe is cheaper than
-               two. */
-            wanted.Add(TABLE_USER);
-
-            for (int i = 0; i < wanted.Count; i++)
             {
                 string bind = "@ProbeTable" + i.ToString(CultureInfo.InvariantCulture);
                 if (inList.Length > 0) { inList.Append(","); }
                 inList.Append(bind);
-                parameters.Add(new SqlParameter(bind, wanted[i]));
+                parameters.Add(new SqlParameter(bind, LineValueStrategies[i].LineTable));
             }
 
             if (inList.Length == 0) { return map; }
@@ -719,27 +738,21 @@ namespace VASLogic.Models
         /// is assembled from whatever columns the table turned out to have, and a
         /// GROUP BY would then have to repeat every one of those expressions exactly -
         /// which the two back ends disagree about often enough to be a real hazard.
-        /// The sub-select keeps both the count query and the detail query flat.
         /// </summary>
         /// <param name="item">Discovered source (supplies the header alias' key).</param>
         /// <param name="strategy">Trusted strategy declared for its table.</param>
         /// <param name="lineColumns">Confirmed columns per line table.</param>
-        /// <returns>Scalar expression over alias src, or "" when unusable.</returns>
+        /// <returns>Scalar expression over the source alias, or "" when unusable.</returns>
         private string BuildLineValueExpr(SourceItem item, LineValueStrategy strategy,
             Dictionary<string, List<string>> lineColumns)
         {
             List<string> columns;
             if (!lineColumns.TryGetValue(strategy.LineTable, out columns)) { return ""; }
             if (!IsSafeIdentifier(strategy.LineTable)) { return ""; }
-
-            /* The header's key is the join target and has not been validated yet at
-               this point in discovery - the caller's own check comes later. */
             if (!IsSafeIdentifier(item.KeyColumn)) { return ""; }
 
             if (!HasColumn(columns, strategy.LinkColumn)) { return ""; }
 
-            /* Every required quantity column must be present - a partial quantity
-               would value the document wrongly rather than not at all. */
             for (int i = 0; i < strategy.QtyColumns.Length; i++)
             {
                 if (!HasColumn(columns, strategy.QtyColumns[i])) { return ""; }
@@ -752,17 +765,14 @@ namespace VASLogic.Models
                 ? "(COALESCE(ln." + strategy.QtyColumns[0] + ",0)-COALESCE(ln." + strategy.QtyColumns[1] + ",0))"
                 : "COALESCE(ln." + strategy.QtyColumns[0] + ",0)";
 
-            /* The optional quantity is a second document FORM sharing one line table
-               (internal use beside a physical count), so it adds to the quantity
-               rather than replacing it - the two are never both non-zero on one line. */
             if (!string.IsNullOrEmpty(strategy.OptionalQtyColumn)
                 && HasColumn(columns, strategy.OptionalQtyColumn))
             {
                 qty = "(" + qty + "+COALESCE(ln." + strategy.OptionalQtyColumn + ",0))";
             }
 
-            /* ABS per LINE, not on the sum: a count that found two products short and
-               one over is exposure on all three, not the net of them. */
+            /* ABS per LINE, not on the sum: a document that moved two products one way
+               and one the other is exposure on all three, not the net of them. */
             return "(SELECT COALESCE(SUM(ABS((" + cost + ")*" + qty + ")),0)"
                  + " FROM " + strategy.LineTable + " ln"
                  + " WHERE ln." + strategy.LinkColumn + "=" + SourceAlias(item) + "." + item.KeyColumn
@@ -830,61 +840,13 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// The column the period bounds are applied to: DateAcct where the table has
-        /// one, otherwise MovementDate.
+        /// Every screen each discovered table appears on - all of them, not one: the
+        /// SCREEN is what a card row stands for, so a table shown on four windows is
+        /// four candidate rows.
         ///
-        /// This is a SHORT, EXPLICIT fallback list, not a scan for anything that
-        /// looks like a date. §19 rules out guessing between DateTrx / MovementDate /
-        /// DateInvoiced precisely because those three mean different things - but it
-        /// permits a trusted mapping, and MovementDate is the accounting date of the
-        /// inventory documents that have no DateAcct at all (movements, physical
-        /// inventories): for those the movement IS the accounting event. Nothing else
-        /// is accepted; a table with neither column is still excluded.
-        /// </summary>
-        /// <param name="item">Discovered source carrying both probe results.</param>
-        /// <returns>The date column to bound by, or "" when the table has neither.</returns>
-        private string ResolveDateColumn(SourceItem item)
-        {
-            if (IsSafeIdentifier(item.DateAcctColumn)) { return item.DateAcctColumn; }
-            if (IsSafeIdentifier(item.MovementDateColumn)) { return item.MovementDateColumn; }
-            return "";
-        }
-
-        /// <summary>
-        /// The value column of one discovered table: the trusted map's choice, only
-        /// when the dictionary probe confirmed the table really carries it.
-        /// </summary>
-        /// <param name="tableName">Discovered physical table name.</param>
-        /// <param name="row">The probe row for that table.</param>
-        /// <returns>Confirmed amount column, or "" when the table has no strategy.</returns>
-        private string ResolveAmountColumn(string tableName, DataRow row)
-        {
-            string wanted;
-            if (string.IsNullOrEmpty(tableName)
-                || !AmountColumnByTable.TryGetValue(tableName, out wanted)) { return ""; }
-
-            string[] found = new string[]
-            {
-                Util.GetValueOfString(row["Amount_Column_A"]),
-                Util.GetValueOfString(row["Amount_Column_B"]),
-                Util.GetValueOfString(row["Amount_Column_C"])
-            };
-
-            for (int i = 0; i < found.Length; i++)
-            {
-                if (wanted.Equals(found[i], StringComparison.OrdinalIgnoreCase)) { return found[i]; }
-            }
-
-            return "";
-        }
-
-        /// <summary>
-        /// Every screen each discovered table's Posted field is displayed on - all of
-        /// them, not one: the SCREEN is what a card row stands for, so a table shown
-        /// on four windows is four candidate rows.
-        ///
-        /// The tab's own WhereClause comes back with each: it is what makes two
-        /// windows over one table different lists rather than the same list twice.
+        /// AD_Tab points at its table directly, so a window is "over" a table when it
+        /// has an active, displayed tab for it - no field-level detour, and no
+        /// dependence on any particular column being on screen.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <returns>Screens grouped by AD_Table_ID, each list in a stable order.</returns>
@@ -894,41 +856,31 @@ namespace VASLogic.Models
 
             /* AD_Window carries no DisplayName column in this schema, so the screen
                name is AD_Window.Name, preferring its translation for the session
-               language where one is seeded. The tab name is translated the same way -
-               it is what disambiguates two sources on one window. */
+               language. The tab name is translated the same way - it is what
+               disambiguates two sources on one window. */
             string sql = @"
-                SELECT DISTINCT t.AD_Table_ID AS AD_Table_ID,
+                SELECT DISTINCT tab.AD_Table_ID AS AD_Table_ID,
                        tab.AD_Tab_ID AS AD_Tab_ID,
                        COALESCE(tabtrl.Name,tab.Name,N'') AS Tab_Name,
                        tab.SeqNo AS Tab_Seq_No,
                        COALESCE(tab.WhereClause,N'') AS Tab_Where_Clause,
                        w.AD_Window_ID AS AD_Window_ID,
                        COALESCE(wtrl.Name,w.DisplayName,N'') AS Window_Name
-                FROM AD_Table t
-                INNER JOIN AD_Column c ON (c.AD_Table_ID=t.AD_Table_ID)
-                INNER JOIN AD_Field f ON (f.AD_Column_ID=c.AD_Column_ID)
-                INNER JOIN AD_Tab tab ON (tab.AD_Tab_ID=f.AD_Tab_ID)
+                FROM AD_Tab tab
                 INNER JOIN AD_Window w ON (w.AD_Window_ID=tab.AD_Window_ID)
                 INNER JOIN AD_Menu m ON (m.AD_Window_ID=w.AD_Window_ID)
                 LEFT OUTER JOIN AD_Window_Trl wtrl ON (wtrl.AD_Window_ID=w.AD_Window_ID AND wtrl.AD_Language=@AD_Language AND wtrl.IsActive='Y')
                 LEFT OUTER JOIN AD_Tab_Trl tabtrl ON (tabtrl.AD_Tab_ID=tab.AD_Tab_ID AND tabtrl.AD_Language=@AD_Language AND tabtrl.IsActive='Y')
-                WHERE t.IsActive='Y' 
+                WHERE tab.IsActive='Y'
                   AND m.IsActive = 'Y'
-                  AND c.IsActive='Y'
-                  AND c.ColumnName='" + COLUMN_POSTED + @"'
-                  AND f.IsActive='Y'
-                  /*AND f.IsDisplayed='Y'*/
-                  AND t.IsView = 'N' 
-                  AND tab.IsActive='Y'
                   AND tab.IsDisplayed='Y'
                   AND w.IsActive='Y'";
 
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "t", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "tab", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             /* A total order, so the same installation always produces the same rows in
-               the same sequence - the first tab of a window is the one whose clause
-               represents that window. */
-            sql += " ORDER BY t.AD_Table_ID,Window_Name,tab.SeqNo,w.AD_Window_ID,tab.AD_Tab_ID";
+               the same sequence - the first tab of a window speaks for that window. */
+            sql += " ORDER BY tab.AD_Table_ID,Window_Name,tab.SeqNo,w.AD_Window_ID,tab.AD_Tab_ID";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
@@ -957,8 +909,8 @@ namespace VASLogic.Models
 
                 if (!byTable.ContainsKey(tableId)) { byTable[tableId] = new List<ScreenItem>(); }
 
-                /* One window can display the Posted field on more than one tab; the
-                   first (lowest SeqNo, by the ORDER BY above) speaks for the window. */
+                /* One window can show the same table on more than one tab; the first
+                   (lowest SeqNo, by the ORDER BY above) speaks for the window. */
                 List<ScreenItem> screens = byTable[tableId];
                 bool seen = false;
                 for (int s = 0; s < screens.Count; s++)
@@ -972,23 +924,20 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Turns one discovered table into the card rows it deserves: one per SCREEN
-        /// its Posted field appears on.
+        /// Turns one discovered table into the card rows it deserves: one per SCREEN.
         ///
         /// Two windows over one table are only different rows if their records can be
         /// told apart, and what tells them apart is the tab's own WhereClause - the
         /// very predicate the framework applies when it opens that window. Where the
         /// clause is usable, each window becomes its own row: Purchase Order beside
-        /// Sales Order, GRN beside Delivery Order, all over one physical table.
+        /// Sales Order, both over C_Order.
         ///
         /// Where it is not - a clause carrying @context@ variables this widget cannot
         /// resolve, or no clause at all - the windows cannot be separated, and the
-        /// table collapses back to ONE row covering all of its records. That is the
-        /// deliberate choice: one honest row beats several rows each listing the same
-        /// documents.
+        /// table collapses back to ONE row covering all of its records.
         /// </summary>
         /// <param name="item">Discovered table.</param>
-        /// <param name="screens">Every screen its Posted field is displayed on.</param>
+        /// <param name="screens">Every screen it appears on.</param>
         /// <returns>One or more sources (never null; empty when there is no screen).</returns>
         private List<SourceItem> SplitByScreen(SourceItem item, List<ScreenItem> screens)
         {
@@ -1037,17 +986,18 @@ namespace VASLogic.Models
             copy.TableName = item.TableName;
             copy.TableDisplayName = item.TableDisplayName;
             copy.KeyColumn = item.KeyColumn;
+            copy.DocStatusColumn = item.DocStatusColumn;
+            copy.DocStatusReferenceId = item.DocStatusReferenceId;
             copy.DocumentNoColumn = item.DocumentNoColumn;
             copy.DateAcctColumn = item.DateAcctColumn;
             copy.MovementDateColumn = item.MovementDateColumn;
             copy.DateColumn = item.DateColumn;
-            copy.DocStatusColumn = item.DocStatusColumn;
             copy.DocTypeColumn = item.DocTypeColumn;
+            copy.BPartnerColumn = item.BPartnerColumn;
             copy.CurrencyColumn = item.CurrencyColumn;
             copy.ConversionTypeColumn = item.ConversionTypeColumn;
             copy.AmountColumn = item.AmountColumn;
             copy.LineValueExpr = item.LineValueExpr;
-            copy.CreatedByExpr = item.CreatedByExpr;
 
             copy.AD_Window_ID = screen.AD_Window_ID;
             copy.AD_Tab_ID = screen.AD_Tab_ID;
@@ -1085,8 +1035,8 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// The label a widget row carries, in the preference order the screen the
-        /// user would actually navigate to comes first.
+        /// The label a widget row carries, in the preference order the screen the user
+        /// would actually navigate to comes first.
         /// </summary>
         /// <param name="item">Discovered source.</param>
         /// <returns>Display name (never null or empty for a usable source).</returns>
@@ -1099,10 +1049,9 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Two tables can be displayed on the SAME window (header and a posted child
-        /// tab, for instance), and two rows reading "Material Receipt" would be
-        /// indistinguishable. Only the colliding rows are qualified with their tab
-        /// name; a name that is already unique is left alone.
+        /// Two tables can be displayed on the SAME window (a header and a child tab),
+        /// and two rows reading "Material Receipt" would be indistinguishable. Only
+        /// the colliding rows are qualified with their tab name.
         /// </summary>
         /// <param name="sources">Discovered sources, already sorted by display name.</param>
         private void DisambiguateDisplayNames(List<SourceItem> sources)
@@ -1126,10 +1075,10 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Guards every identifier that reaches the generated SQL. The names come
-        /// from the Application Dictionary rather than from the client, so this is a
-        /// belt-and-braces check - but a dictionary is data, and data can be edited,
-        /// so nothing is concatenated that is not a plain unqualified identifier.
+        /// Guards every identifier that reaches the generated SQL. The names come from
+        /// the Application Dictionary rather than from the client, so this is a
+        /// belt-and-braces check - but a dictionary is data, and data can be edited, so
+        /// nothing is concatenated that is not a plain unqualified identifier.
         /// </summary>
         /// <param name="identifier">Table or column name returned by the dictionary.</param>
         /// <returns>true when the name is safe to concatenate.</returns>
@@ -1153,13 +1102,13 @@ namespace VASLogic.Models
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // §3  The transaction-type figures
+        // §3  The screen figures
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// The unposted document count and base-currency value of every discovered
-        /// transaction type, for one period. Types with nothing outstanding are left
-        /// out - the card is a work list, and a row reading zero is not work.
+        /// The open document count, oldest date and base-currency value of every
+        /// discovered screen, for one period. Screens with nothing outstanding are
+        /// left out - the card is a work list, and a row reading zero is not work.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="periodId">C_Period_ID selected by the user.</param>
@@ -1188,18 +1137,13 @@ namespace VASLogic.Models
 
             List<SourceItem> sources = DiscoverSources(ctx);
 
-            /* One aggregate query per discovered table, deliberately. Each source is
-               a DIFFERENT physical table, so there is no single pass to share, and
-               MRole has to be applied to each one independently (§23) - a combined
-               UNION filtered once afterwards would leak rows across roles. A source
-               that fails is logged and skipped rather than blanking the whole card:
-               one mis-configured dictionary row must not cost the user the other
-               twenty transaction types.
-
-               "Source" here is a SCREEN, not a table: a table displayed on four
-               windows is four queries, each carrying that window's own tab filter, so
-               Purchase Order and Sales Order report their own figures out of one
-               C_Order table. */
+            /* One aggregate query per discovered screen, deliberately. Each source is
+               a DIFFERENT physical table (or a differently filtered view of one), so
+               there is no single pass to share, and MRole has to be applied to each
+               independently - a combined UNION filtered once afterwards would leak
+               rows across roles. A source that fails is logged and skipped rather than
+               blanking the whole card: one mis-configured dictionary row must not cost
+               the user the other twenty screens. */
             for (int i = 0; i < sources.Count; i++)
             {
                 SourceTotal total = ReadSourceTotal(ctx, sources[i], period, baseCurrency);
@@ -1210,7 +1154,7 @@ namespace VASLogic.Models
             }
 
             /* Biggest exposure first: the card shows only as many rows as its cell
-               fits, so the first page has to be the page worth reading. Types with no
+               fits, so the first page has to be the page worth reading. Screens with no
                amount strategy fall to the bottom of the value order and are then
                ordered by count. */
             result.Sources.Sort(delegate (SourceTotal a, SourceTotal b)
@@ -1228,11 +1172,10 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Count and base value of the unposted documents behind ONE screen.
+        /// Count, oldest date and base value of the open documents behind ONE screen.
         ///
         /// The screen's own tab filter is part of the WHERE clause, so a table shown
-        /// on several windows reports a different figure for each: Purchase Order and
-        /// Sales Order both read C_Order, and each counts only its own.
+        /// on several windows reports a different figure for each.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="source">Discovered, already validated source.</param>
@@ -1267,15 +1210,19 @@ namespace VASLogic.Models
             string rowValue = total.HasValue ? SourceValueExpr(source, baseCurrency) : "0";
 
             string inner = @"
-                SELECT " + rowValue + @" AS Row_Value
+                SELECT " + rowValue + @" AS Row_Value,
+                       " + alias + "." + source.DateColumn + @" AS Row_Date
                 FROM " + source.TableName + " " + alias + @"
                 WHERE " + SourceWhere(source);
 
             inner = MRole.GetDefault(ctx).AddAccessSQL(inner, alias, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
+            /* The oldest date is what the card's "oldest 03 Apr" reads from - a count
+               says how much is outstanding, the age says how badly. */
             string sql = @"
                 SELECT COUNT(1) AS Record_Count,
-                       SUM(SourceRows.Row_Value) AS Base_Value
+                       SUM(SourceRows.Row_Value) AS Base_Value,
+                       MIN(SourceRows.Row_Date) AS Oldest_Date
                 FROM (" + inner + @") SourceRows";
 
             /* Appearance order: the value expression binds the base currency, then
@@ -1291,7 +1238,7 @@ namespace VASLogic.Models
             }
             catch (Exception ex)
             {
-                Log.Log(Level.SEVERE, "VAS_198_UnPostedAccountEntries.ReadSourceTotal " + source.TableName, ex);
+                Log.Log(Level.SEVERE, "VAS_197_UnProcessedDocuments.ReadSourceTotal " + source.TableName, ex);
                 return null;
             }
 
@@ -1300,26 +1247,25 @@ namespace VASLogic.Models
             DataRow row = ds.Tables[0].Rows[0];
             total.RecordCount = Util.GetValueOfInt(row["Record_Count"]);
             total.BaseValue = Util.GetValueOfDecimal(row["Base_Value"]);
+            total.OldestDate = Util.GetValueOfDateTime(row["Oldest_Date"]);
 
             return total;
         }
-
 
         // ─────────────────────────────────────────────────────────────────────
         // §4  Detail (server-side paging)
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// One page of the unposted documents of one transaction type, plus the total
-        /// row count so the client can page without holding the whole set. The type is
-        /// a SCREEN, identified by AD_Table_ID plus AD_Window_ID and re-discovered
-        /// here - the client never supplies a table name, a column name or a filter.
+        /// One page of the open documents of one screen, plus the total row count so
+        /// the client can page without holding the whole set. The screen is identified
+        /// by AD_Table_ID plus AD_Window_ID and re-discovered here - the client never
+        /// supplies a table name, a column name or a filter.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="periodId">C_Period_ID selected by the user.</param>
-        /// <param name="tableId">AD_Table_ID of the transaction type opened.</param>
-        /// <param name="windowId">AD_Window_ID of the screen opened - the second half
-        /// of the row's identity, since one table can appear on several.</param>
+        /// <param name="tableId">AD_Table_ID of the screen opened.</param>
+        /// <param name="windowId">AD_Window_ID of the screen opened.</param>
         /// <param name="pageNo">1-based page number.</param>
         /// <param name="pageSize">Rows per page (clamped server-side).</param>
         /// <returns>Populated <see cref="RecordPage"/> (never null).</returns>
@@ -1327,7 +1273,7 @@ namespace VASLogic.Models
             int pageNo, int pageSize)
         {
             RecordPage result = new RecordPage();
-            result.Rows = new List<UnPostedRow>();
+            result.Rows = new List<UnProcessedRow>();
             result.AD_Table_ID = tableId;
             result.AD_Window_ID = windowId;
             result.C_Period_ID = periodId;
@@ -1359,16 +1305,15 @@ namespace VASLogic.Models
             result.DateColumn = source.DateColumn;
             result.AD_Window_ID = source.AD_Window_ID;
             result.HasValue = HasValueStrategy(source);
+            result.HasDocType = IsSafeIdentifier(source.DocTypeColumn);
+            result.HasBPartner = IsSafeIdentifier(source.BPartnerColumn);
 
-            /* A line-valued type reports no document currency even if its table
+            /* A line-valued screen reports no document currency even if its table
                happens to carry the column: the figure shown is a sum of stored
                base-currency costs, so labelling it with a document currency would
                attach the wrong unit to a correct number. */
             result.HasCurrency = IsSafeIdentifier(source.CurrencyColumn)
                 && string.IsNullOrEmpty(source.LineValueExpr);
-
-            result.HasDocType = IsSafeIdentifier(source.DocTypeColumn);
-            result.HasCreatedBy = !string.IsNullOrEmpty(source.CreatedByExpr);
 
             if (pageSize < PAGESIZE_MIN || pageSize > PAGESIZE_MAX) { pageSize = PAGESIZE_DEFAULT; }
             if (pageNo < 1) { pageNo = 1; }
@@ -1403,19 +1348,22 @@ namespace VASLogic.Models
 
             result.Rows = ReadSourceRows(ctx, source, period, baseCurrency, pageNo, pageSize);
 
+            /* DocStatus is a List reference: the stored codes are not human-readable
+               and must never be printed raw. One lookup per request, not per row. */
+            result.DocStatusNames = GetRefListNames(ctx, source.DocStatusReferenceId);
+
             return result;
         }
 
         /// <summary>
         /// Re-runs discovery and returns the one source the client asked for.
-        /// Discovery is a pair of dictionary queries, not a scan of transaction data,
-        /// so re-running it per request costs little and keeps the server the only
-        /// authority on which identifiers are legal.
+        /// Discovery is a handful of dictionary queries, not a scan of transaction
+        /// data, so re-running it per request costs little and keeps the server the
+        /// only authority on which identifiers are legal.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="tableId">AD_Table_ID the client selected.</param>
-        /// <param name="windowId">AD_Window_ID the client selected - the other half of
-        /// a row's identity, since one table can be several rows.</param>
+        /// <param name="windowId">AD_Window_ID the client selected.</param>
         /// <returns>The matching source, or null when it is not a discovered one.</returns>
         private SourceItem FindSource(Ctx ctx, int tableId, int windowId)
         {
@@ -1441,11 +1389,11 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// One page of unposted documents of a discovered table. Every column beyond
-        /// the key and the accounting date is optional, so the SELECT list is built
-        /// from what the dictionary confirmed the table has; a missing column becomes
-        /// a typed literal rather than an absent result column, so the reader below
-        /// can address every column by name unconditionally.
+        /// One page of open documents of a discovered screen. Every column beyond the
+        /// key, the date and the status is optional, so the SELECT list is built from
+        /// what the dictionary confirmed the table has; a missing column becomes a
+        /// typed literal rather than an absent result column, so the reader below can
+        /// address every column by name unconditionally.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="source">Discovered, already validated source.</param>
@@ -1454,17 +1402,17 @@ namespace VASLogic.Models
         /// <param name="pageNo">1-based page number (already clamped).</param>
         /// <param name="pageSize">Rows per page (already clamped).</param>
         /// <returns>Materialised rows (never null).</returns>
-        private List<UnPostedRow> ReadSourceRows(Ctx ctx, SourceItem source, PeriodItem period,
+        private List<UnProcessedRow> ReadSourceRows(Ctx ctx, SourceItem source, PeriodItem period,
             BaseCurrency baseCurrency, int pageNo, int pageSize)
         {
-            List<UnPostedRow> rows = new List<UnPostedRow>();
+            List<UnProcessedRow> rows = new List<UnProcessedRow>();
 
             string alias = SourceAlias(source);
 
             bool hasDoc = IsSafeIdentifier(source.DocumentNoColumn);
             bool hasDocType = IsSafeIdentifier(source.DocTypeColumn);
+            bool hasBPartner = IsSafeIdentifier(source.BPartnerColumn);
             bool hasCurrency = IsSafeIdentifier(source.CurrencyColumn);
-            bool hasCreatedBy = !string.IsNullOrEmpty(source.CreatedByExpr);
             bool hasAmount = HasValueStrategy(source);
             bool isLineValued = !string.IsNullOrEmpty(source.LineValueExpr);
 
@@ -1474,31 +1422,34 @@ namespace VASLogic.Models
               .Append(" AS Document_No");
             sb.Append(",").Append(alias).Append(".").Append(source.DateColumn).Append(" AS Date_Acct");
 
+            /* The stored status code; the client resolves it against DocStatusNames.
+               Always present - it is what made this table a source in the first
+               place. */
+            sb.Append(",COALESCE(").Append(alias).Append(".").Append(source.DocStatusColumn)
+              .Append(",N'') AS Doc_Status");
+
             /* The document type, preferring its translation for the session language.
-               One screen can carry several document types - a Purchase Order window
-               holds standard orders and blanket orders alike - so this column is what
-               tells the rows of one list apart. A table without a C_DocType_ID column
-               simply has none to show. */
+               One screen can carry several types - a Purchase Order window holds
+               standard and blanket orders alike - so this is what tells the rows of
+               one list apart. The join target is whichever column ResolveDocTypeColumn
+               chose; both are foreign keys into C_DocType, so the join is the same
+               either way. */
             sb.Append(",").Append(hasDocType ? "COALESCE(dttrl.Name,dt.Name,N'')" : "N''")
               .Append(" AS Doc_Type_Name");
 
-            /* The document's own currency, and its own value in it. Without a
-               currency column there is nothing to label a document amount with. */
+            /* Who the document is with - the other party to chase. */
+            sb.Append(",").Append(hasBPartner ? "COALESCE(bp.Name,N'')" : "N''")
+              .Append(" AS Business_Partner_Name");
+
             sb.Append(",").Append(hasCurrency ? "COALESCE(cur.ISO_Code,N'')" : "N''").Append(" AS Currency_Iso");
             sb.Append(",").Append(hasCurrency ? "COALESCE(cur.CurSymbol,cur.ISO_Code,N'')" : "N''")
               .Append(" AS Currency_Symbol");
             sb.Append(",").Append(hasCurrency ? "COALESCE(cur.StdPrecision,2)" : "2").Append(" AS Currency_Precision");
 
-            /* Who raised the document - the person to go and ask why it is still
-               unposted, which is usually the next thing the reader wants. */
-            sb.Append(",").Append(hasCreatedBy ? source.CreatedByExpr : "N''").Append(" AS Created_By_Name");
-
-            /* The document's own value in its own currency - the only amount the
-               record list shows. The converted totals belong to the card, which is
-               where figures in different currencies are added together; a list of
-               records is not, so nothing here is converted and the statement binds no
-               currency at all. A line-valued document has no document currency in the
-               first place: its stored costs are base-currency figures already. */
+            /* The document's value in its own currency - the only amount the record
+               list shows. The converted totals belong to the card, which is where
+               figures in different currencies are added together; a list of records is
+               not, so nothing here is converted and the statement binds no currency. */
             string documentValue = "0";
             if (isLineValued) { documentValue = source.LineValueExpr; }
             else if (hasAmount) { documentValue = "ABS(COALESCE(" + alias + "." + source.AmountColumn + ",0))"; }
@@ -1512,29 +1463,30 @@ namespace VASLogic.Models
                   .Append(source.DocTypeColumn).Append(" AND dt.IsActive='Y')");
                 sb.Append(" LEFT OUTER JOIN C_DocType_Trl dttrl ON (dttrl.C_DocType_ID=dt.C_DocType_ID AND dttrl.AD_Language=@AD_Language AND dttrl.IsActive='Y')");
             }
+            if (hasBPartner)
+            {
+                /* LEFT OUTER: a document raised against a partner since deactivated
+                   must still appear - it is exactly the kind that stays open. */
+                sb.Append(" LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=").Append(alias).Append(".")
+                  .Append(source.BPartnerColumn).Append(")");
+            }
             if (hasCurrency)
             {
                 sb.Append(" LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=").Append(alias).Append(".")
                   .Append(source.CurrencyColumn).Append(")");
-            }
-            if (hasCreatedBy)
-            {
-                /* LEFT OUTER, not INNER: a document raised by a user since deactivated
-                   must still appear in the list - it is exactly the kind that goes
-                   unposted. */
-                sb.Append(" LEFT OUTER JOIN ").Append(TABLE_USER).Append(" usr ON (usr.AD_User_ID=")
-                  .Append(alias).Append(".").Append(COLUMN_CREATEDBY).Append(")");
             }
             sb.Append(" WHERE ").Append(SourceWhere(source));
 
             string sql = MRole.GetDefault(ctx).AddAccessSQL(sb.ToString(), alias,
                 MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            /* ORDER BY and the paging suffix go on AFTER the access SQL. Newest
-               accounting date first, then the key so the order is total and a page
-               boundary never repeats or drops a row. */
-            sql += " ORDER BY " + alias + "." + source.DateColumn + " DESC,"
-                 + alias + "." + source.KeyColumn + " DESC";
+            /* ORDER BY and the paging suffix go on AFTER the access SQL. OLDEST first
+               here, unlike the sibling widget: an open document is a queue, and the
+               one that has waited longest is the one to deal with. The key breaks
+               ties, so the order is total and a page boundary never repeats or drops
+               a row. */
+            sql += " ORDER BY " + alias + "." + source.DateColumn + " ASC,"
+                 + alias + "." + source.KeyColumn + " ASC";
             sql += PagingSuffix(pageSize, (pageNo - 1) * pageSize);
 
             /* Appearance order: the document-type join binds the language, then the
@@ -1551,7 +1503,7 @@ namespace VASLogic.Models
             }
             catch (Exception ex)
             {
-                Log.Log(Level.SEVERE, "VAS_198_UnPostedAccountEntries.ReadSourceRows " + source.TableName, ex);
+                Log.Log(Level.SEVERE, "VAS_197_UnProcessedDocuments.ReadSourceRows " + source.TableName, ex);
                 return rows;
             }
 
@@ -1562,12 +1514,13 @@ namespace VASLogic.Models
             {
                 DataRow dr = dt.Rows[i];
 
-                UnPostedRow row = new UnPostedRow();
+                UnProcessedRow row = new UnProcessedRow();
                 row.Record_ID = Util.GetValueOfInt(dr["Record_ID"]);
                 row.DocumentNo = Util.GetValueOfString(dr["Document_No"]);
                 row.DateAcct = Util.GetValueOfDateTime(dr["Date_Acct"]);
+                row.BusinessPartnerName = Util.GetValueOfString(dr["Business_Partner_Name"]);
                 row.DocumentType = Util.GetValueOfString(dr["Doc_Type_Name"]);
-                row.CreatedByName = Util.GetValueOfString(dr["Created_By_Name"]);
+                row.DocStatus = Util.GetValueOfString(dr["Doc_Status"]);
                 row.CurrencyIso = Util.GetValueOfString(dr["Currency_Iso"]);
                 row.CurrencySymbol = Util.GetValueOfString(dr["Currency_Symbol"]);
                 row.CurrencyPrecision = Util.GetValueOfInt(dr["Currency_Precision"]);
@@ -1591,10 +1544,9 @@ namespace VASLogic.Models
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// The WHERE body every query against a discovered table shares: the tenant,
-        /// the active flag, the unposted test, the actionable document states (only
-        /// where the table has a DocStatus column - §9 forbids applying it blindly)
-        /// and the selected period's bounds on the accounting date.
+        /// The WHERE body every query against a discovered screen shares: the tenant,
+        /// the active flag, the not-yet-settled test, the selected period's bounds on
+        /// the accounting date, and the screen's own tab filter.
         /// </summary>
         /// <param name="source">Discovered, already validated source.</param>
         /// <returns>WHERE body, without the WHERE keyword.</returns>
@@ -1607,15 +1559,13 @@ namespace VASLogic.Models
             sb.Append(alias).Append(".AD_Client_ID=@AD_Client_ID");
             sb.Append(" AND ").Append(alias).Append(".IsActive='Y'");
 
-            /* Null-safe: a document that has never been through the posting process
-               carries NULL rather than 'N' on some sources. */
-            sb.Append(" AND COALESCE(").Append(alias).Append(".").Append(COLUMN_POSTED).Append(",'N')<>'Y'");
-
-            if (IsSafeIdentifier(source.DocStatusColumn))
-            {
-                sb.Append(" AND ").Append(alias).Append(".").Append(source.DocStatusColumn)
-                  .Append(" IN (").Append(DOCSTATUS_ACTIONABLE).Append(")");
-            }
+            /* The heart of the widget: everything that has NOT settled. Spelled with
+               an explicit IS NULL rather than left to COALESCE, because NOT IN against
+               a NULL yields NULL - which would silently drop every document whose
+               status has never been set, and those are the most open of all. */
+            sb.Append(" AND (").Append(alias).Append(".").Append(source.DocStatusColumn).Append(" IS NULL")
+              .Append(" OR ").Append(alias).Append(".").Append(source.DocStatusColumn)
+              .Append(" NOT IN (").Append(DOCSTATUS_SETTLED).Append("))");
 
             sb.Append(" AND ").Append(alias).Append(".").Append(source.DateColumn).Append(">=@StartDate");
             sb.Append(" AND ").Append(alias).Append(".").Append(source.DateColumn).Append("<=@EndDate");
@@ -1667,43 +1617,6 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// One document's value in the tenant's base currency: its own amount when it
-        /// is already in that currency, otherwise converted through the standard
-        /// currencyConvert function at the document's own accounting date and
-        /// conversion type. Absolute, so a credit document adds exposure rather than
-        /// cancelling one out - the card counts work outstanding, not a net balance.
-        /// A source with no currency column is taken to be in the base currency
-        /// already, which is what an amount stored without one means.
-        /// </summary>
-        /// <param name="source">Discovered, already validated source.</param>
-        /// <param name="baseCurrency">Tenant base currency.</param>
-        /// <returns>Scalar expression over the source alias.</returns>
-        private string SourceValueExpr(SourceItem source, BaseCurrency baseCurrency)
-        {
-            /* A line strategy is already a base-currency figure - the stored costs it
-               sums are held in the tenant's currency - so it is returned untouched.
-               Passing it through currencyConvert would inflate it a second time. */
-            if (!string.IsNullOrEmpty(source.LineValueExpr)) { return source.LineValueExpr; }
-
-            string alias = SourceAlias(source);
-            string amount = "COALESCE(" + alias + "." + source.AmountColumn + ",0)";
-
-            if (baseCurrency.C_Currency_ID <= 0 || !IsSafeIdentifier(source.CurrencyColumn))
-            {
-                return "ABS(" + amount + ")";
-            }
-
-            string conversionType = IsSafeIdentifier(source.ConversionTypeColumn)
-                ? alias + "." + source.ConversionTypeColumn
-                : "NULL";
-
-            return "CASE WHEN " + alias + "." + source.CurrencyColumn + "=@BaseCurrencyIdA THEN ABS(" + amount + ")"
-                 + " ELSE ABS(COALESCE(currencyConvert(" + amount + "," + alias + "." + source.CurrencyColumn
-                 + ",@BaseCurrencyIdB," + alias + "." + source.DateColumn + "," + conversionType
-                 + "," + alias + ".AD_Client_ID," + alias + ".AD_Org_ID),0)) END";
-        }
-
-        /// <summary>
         /// Whether this source can be valued at all - by a header amount column or by
         /// a line strategy. Neither means the card and the record list both show a
         /// dash instead of a figure nobody can vouch for.
@@ -1737,6 +1650,41 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// One document's value in the tenant's base currency: its own amount when it
+        /// is already in that currency, otherwise converted through the standard
+        /// currencyConvert function at the document's own date and conversion type.
+        /// Absolute, so a credit document adds exposure rather than cancelling one out
+        /// - the card counts work outstanding, not a net balance.
+        /// </summary>
+        /// <param name="source">Discovered, already validated source.</param>
+        /// <param name="baseCurrency">Tenant base currency.</param>
+        /// <returns>Scalar expression over the source alias.</returns>
+        private string SourceValueExpr(SourceItem source, BaseCurrency baseCurrency)
+        {
+            /* A line strategy is already a base-currency figure - the stored costs it
+               sums are held in the tenant's currency - so it is returned untouched.
+               Passing it through currencyConvert would inflate it a second time. */
+            if (!string.IsNullOrEmpty(source.LineValueExpr)) { return source.LineValueExpr; }
+
+            string alias = SourceAlias(source);
+            string amount = "COALESCE(" + alias + "." + source.AmountColumn + ",0)";
+
+            if (baseCurrency.C_Currency_ID <= 0 || !IsSafeIdentifier(source.CurrencyColumn))
+            {
+                return "ABS(" + amount + ")";
+            }
+
+            string conversionType = IsSafeIdentifier(source.ConversionTypeColumn)
+                ? alias + "." + source.ConversionTypeColumn
+                : "NULL";
+
+            return "CASE WHEN " + alias + "." + source.CurrencyColumn + "=@BaseCurrencyIdA THEN ABS(" + amount + ")"
+                 + " ELSE ABS(COALESCE(currencyConvert(" + amount + "," + alias + "." + source.CurrencyColumn
+                 + ",@BaseCurrencyIdB," + alias + "." + source.DateColumn + "," + conversionType
+                 + "," + alias + ".AD_Client_ID," + alias + ".AD_Org_ID),0)) END";
+        }
+
+        /// <summary>
         /// Binds the currency id behind the conversion expression. The expression is
         /// emitted at most once per statement, so there is one pair of binds.
         /// </summary>
@@ -1767,6 +1715,51 @@ namespace VASLogic.Models
                 return " OFFSET " + offset + " ROWS FETCH NEXT " + pageSize + " ROWS ONLY";
             }
             return " LIMIT " + pageSize + " OFFSET " + offset;
+        }
+
+        /// <summary>
+        /// Every value of one List reference, translated for the session language, as
+        /// code -> display name. Read once per detail request rather than once per
+        /// row, so a page of eight documents still costs one lookup.
+        /// </summary>
+        /// <param name="ctx">Session context (supplies the UI language).</param>
+        /// <param name="referenceId">AD_Column.AD_Reference_Value_ID of the list column.</param>
+        /// <returns>Code -> display name (never null; empty when the column is not
+        /// list-based).</returns>
+        private Dictionary<string, string> GetRefListNames(Ctx ctx, int referenceId)
+        {
+            Dictionary<string, string> names = new Dictionary<string, string>();
+            if (ctx == null || referenceId <= 0) { return names; }
+
+            /* The translation is a LEFT OUTER JOIN so an untranslated value still
+               returns its base name, and the COALESCE falls back to the raw code
+               rather than to nothing. */
+            string sql = @"
+                SELECT rl.Value AS Ref_Value,
+                       COALESCE(rlt.Name,rl.Name,rl.Value) AS Display_Name
+                FROM AD_Ref_List rl
+                LEFT OUTER JOIN AD_Ref_List_Trl rlt ON (rlt.AD_Ref_List_ID=rl.AD_Ref_List_ID AND rlt.AD_Language=@AD_Language AND rlt.IsActive='Y')
+                WHERE rl.AD_Reference_ID=@AD_Reference_ID
+                  AND rl.IsActive='Y'";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@AD_Language", ctx.GetAD_Language()),
+                new SqlParameter("@AD_Reference_ID", referenceId)
+            };
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
+            if (ds == null || ds.Tables.Count == 0) { return names; }
+
+            DataTable dt = ds.Tables[0];
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                string code = Util.GetValueOfString(dt.Rows[i]["Ref_Value"]);
+                if (string.IsNullOrEmpty(code)) { continue; }
+                names[code] = Util.GetValueOfString(dt.Rows[i]["Display_Name"]);
+            }
+
+            return names;
         }
 
         /// <summary>
@@ -1820,10 +1813,10 @@ namespace VASLogic.Models
             public int C_Period_ID { get; set; }
             public string Name { get; set; }
 
-            /// <summary>Inclusive lower bound applied to the document's DateAcct.</summary>
+            /// <summary>Inclusive lower bound applied to the document's date.</summary>
             public DateTime? StartDate { get; set; }
 
-            /// <summary>Inclusive upper bound applied to the document's DateAcct.</summary>
+            /// <summary>Inclusive upper bound applied to the document's date.</summary>
             public DateTime? EndDate { get; set; }
 
             public int C_Year_ID { get; set; }
@@ -1832,9 +1825,9 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// One discovered transaction table and everything the generated SQL needs to
-        /// know about it. Server-side only - the client never sees a table or column
-        /// name it could send back.
+        /// One discovered screen and everything the generated SQL needs to know about
+        /// it. Server-side only - the client never sees a table name, a column name or
+        /// a WhereClause it could send back.
         /// </summary>
         private class SourceItem
         {
@@ -1848,13 +1841,27 @@ namespace VASLogic.Models
             /// <summary>IsKey column - the Zoom target and the sort tie-break.</summary>
             public string KeyColumn { get; set; }
 
-            /* Optional columns; "" when the table does not have them. DocStatus is
-               a filter only - it decides whether the actionable-state predicate can
-               be applied at all, and is never displayed. */
+            /// <summary>
+            /// The column that made this table a source. Always present, and always
+            /// both filtered on and displayed.
+            /// </summary>
+            public string DocStatusColumn { get; set; }
+
+            /// <summary>List reference behind DocStatus, for the code -> name map.</summary>
+            public int DocStatusReferenceId { get; set; }
+
+            /* Optional columns; "" when the table does not have them. */
             public string DocumentNoColumn { get; set; }
             public string DateAcctColumn { get; set; }
             public string MovementDateColumn { get; set; }
-            public string DocStatusColumn { get; set; }
+            public string BPartnerColumn { get; set; }
+
+            /// <summary>
+            /// Which column the document type is read from - already resolved by
+            /// <see cref="ResolveDocTypeColumn"/>, so it is C_DocTypeTarget_ID on an
+            /// order or an invoice and C_DocType_ID elsewhere. Everything downstream
+            /// uses THIS and never either raw probe result.
+            /// </summary>
             public string DocTypeColumn { get; set; }
             public string CurrencyColumn { get; set; }
             public string ConversionTypeColumn { get; set; }
@@ -1876,14 +1883,6 @@ namespace VASLogic.Models
             /// </summary>
             public string LineValueExpr { get; set; }
 
-            /// <summary>
-            /// How to read the author's name over alias usr, or "" when AD_User could
-            /// not be probed. The same for every source - CreatedBy is on every
-            /// AD-managed table - but carried here so the row builder needs nothing
-            /// but the source in front of it.
-            /// </summary>
-            public string CreatedByExpr { get; set; }
-
             /* The screen this source stands for - its name, its Zoom target, and the
                tab filter that separates it from the table's other screens. */
             public int AD_Window_ID { get; set; }
@@ -1900,8 +1899,8 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// One screen a discovered table's Posted field is displayed on. Server-side
-        /// only - the WhereClause it carries is never sent anywhere.
+        /// One screen a discovered table appears on. Server-side only - the
+        /// WhereClause it carries is never sent anywhere.
         /// </summary>
         private class ScreenItem
         {
@@ -1913,10 +1912,9 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// One transaction type's headline figures. A "type" is a SCREEN - a table AND
-        /// a window - because Purchase Order and Sales Order are two screens over one
-        /// C_Order table, so that pair is what identifies the row and what the client
-        /// sends back to open it.
+        /// One screen's headline figures. A row is a table AND a window, because
+        /// Purchase Order and Sales Order are two screens over one C_Order table, so
+        /// that pair is what identifies the row and what the client sends back.
         /// </summary>
         public class SourceTotal
         {
@@ -1928,14 +1926,20 @@ namespace VASLogic.Models
             /// <summary>The screen's name, already disambiguated.</summary>
             public string DisplayName { get; set; }
 
-            /// <summary>Unposted documents of this type in the period.</summary>
+            /// <summary>Open documents of this screen in the period.</summary>
             public int RecordCount { get; set; }
+
+            /// <summary>
+            /// The date of the oldest one - what the card's "oldest 03 Apr" reads. A
+            /// count says how much is outstanding; this says how badly.
+            /// </summary>
+            public DateTime? OldestDate { get; set; }
 
             /// <summary>Total in the tenant's base currency; 0 when HasValue is false.</summary>
             public decimal BaseValue { get; set; }
 
             /// <summary>
-            /// false when this table has no trusted amount strategy - the client shows
+            /// false when this screen has no trusted amount strategy - the client shows
             /// a dash rather than a figure it cannot vouch for.
             /// </summary>
             public bool HasValue { get; set; }
@@ -1953,10 +1957,10 @@ namespace VASLogic.Models
             public int C_Period_ID { get; set; }
             public string PeriodName { get; set; }
 
-            /// <summary>Types with at least one unposted document, biggest value first.</summary>
+            /// <summary>Screens with at least one open document, biggest value first.</summary>
             public List<SourceTotal> Sources { get; set; }
 
-            /// <summary>Documents across every type - the footer's headline figure.</summary>
+            /// <summary>Documents across every screen - the footer's headline figure.</summary>
             public int TotalRecordCount { get; set; }
 
             public string BaseCurrencyIso { get; set; }
@@ -1968,7 +1972,7 @@ namespace VASLogic.Models
         }
 
         /// <summary>Everything the bootstrap round trip returns.</summary>
-        public class UnPostedBootstrap
+        public class UnProcessedBootstrap
         {
             public List<PeriodItem> Periods { get; set; }
             public int C_Period_ID { get; set; }
@@ -1976,8 +1980,8 @@ namespace VASLogic.Models
             public PeriodData Data { get; set; }
         }
 
-        /// <summary>One unposted document in the detail list.</summary>
-        public class UnPostedRow
+        /// <summary>One open document in the detail list.</summary>
+        public class UnProcessedRow
         {
             /// <summary>Key-column value - the Zoom's record id.</summary>
             public int Record_ID { get; set; }
@@ -1988,13 +1992,22 @@ namespace VASLogic.Models
             public DateTime? DateAcct { get; set; }
 
             /// <summary>
-            /// C_DocType name, translated for the session language. Empty when the
-            /// table carries no C_DocType_ID column.
+            /// Stored DocStatus code; the client resolves it against DocStatusNames
+            /// and reads the pill's tone off the CODE, so the tone survives every
+            /// language.
+            /// </summary>
+            public string DocStatus { get; set; }
+
+            /// <summary>
+            /// C_DocType name, translated. Read from the TARGET type on an order or
+            /// an invoice, because the plain one is not reconciled until the document
+            /// completes and nothing in this list has. Empty when the table carries no
+            /// document-type column at all.
             /// </summary>
             public string DocumentType { get; set; }
 
-            /// <summary>Display name of whoever raised the document.</summary>
-            public string CreatedByName { get; set; }
+            /// <summary>Who the document is with. Empty without a C_BPartner_ID column.</summary>
+            public string BusinessPartnerName { get; set; }
 
             /* Document currency. */
             public string CurrencyIso { get; set; }
@@ -2002,9 +2015,9 @@ namespace VASLogic.Models
             public int CurrencyPrecision { get; set; }
 
             /// <summary>
-            /// The document's own value in its own currency; 0 without a strategy.
-            /// The only amount the record list carries - converted totals belong to
-            /// the card, not to a list of individual records.
+            /// The document's own value in its own currency; 0 without a strategy. The
+            /// only amount the record list carries - converted totals belong to the
+            /// card, not to a list of individual records.
             /// </summary>
             public decimal DocumentValue { get; set; }
         }
@@ -2018,7 +2031,7 @@ namespace VASLogic.Models
             public int C_Period_ID { get; set; }
             public string PeriodName { get; set; }
 
-            public List<UnPostedRow> Rows { get; set; }
+            public List<UnProcessedRow> Rows { get; set; }
 
             public int Total { get; set; }
             public int PageNo { get; set; }
@@ -2030,42 +2043,31 @@ namespace VASLogic.Models
             /// <summary>
             /// Which date column the rows were bounded and sorted by - DateAcct, or
             /// MovementDate on a table that has no DateAcct. The client captions the
-            /// date column from this, so a movement-dated type is not mislabelled
+            /// date column from this, so a movement-dated screen is not mislabelled
             /// "Account Date".
             /// </summary>
             public string DateColumn { get; set; }
 
-            /// <summary>Window the Zoom opens.</summary>
+            /// <summary>
+            /// The screen. Half of the row's identity, and the window the Zoom opens.
+            /// </summary>
             public int AD_Window_ID { get; set; }
 
             /// <summary>
-            /// false when the type has no trusted amount strategy - both amount
-            /// columns then render as a dash rather than a figure nobody can vouch
-            /// for, matching the dash the card row already shows.
+            /// false when the screen has no trusted amount strategy - the amount
+            /// renders as a dash rather than a figure nobody can vouch for.
             /// </summary>
             public bool HasValue { get; set; }
 
-            /// <summary>
-            /// false when the table carries no C_Currency_ID column at all. The
-            /// client DROPS the currency column entirely in that case rather than
-            /// printing a blank one - there is no document currency to report, and an
-            /// empty column reads as missing data instead of as "not applicable".
-            /// The document amount is then a base-currency figure.
-            /// </summary>
+            /* Which optional columns the list should show at all. A column with
+               nothing behind it is DROPPED rather than printed blank: a column of
+               empty cells reads as missing data instead of as "not applicable". */
+            public bool HasDocType { get; set; }
+            public bool HasBPartner { get; set; }
             public bool HasCurrency { get; set; }
 
-            /// <summary>
-            /// false when the table carries no C_DocType_ID column. Dropped from the
-            /// list for the same reason as the currency column: a column of blanks
-            /// says nothing, and this type simply has no document types.
-            /// </summary>
-            public bool HasDocType { get; set; }
-
-            /// <summary>
-            /// false only when AD_User could not be probed at all - CreatedBy itself
-            /// is on every AD-managed table, so this is near-always true.
-            /// </summary>
-            public bool HasCreatedBy { get; set; }
+            /// <summary>Stored DocStatus code -> translated display name.</summary>
+            public Dictionary<string, string> DocStatusNames { get; set; }
 
             public string BaseCurrencyIso { get; set; }
             public string BaseCurrencySymbol { get; set; }
@@ -2082,9 +2084,7 @@ namespace VASLogic.Models
         /// </summary>
         private class LineValueStrategy
         {
-            /// <summary>
-            /// Declares a strategy.
-            /// </summary>
+            /// <summary>Declares a strategy.</summary>
             /// <param name="tableName">Header table the strategy values.</param>
             /// <param name="lineTable">Line table carrying the quantities and costs.</param>
             /// <param name="linkColumn">Line column pointing back at the header key.</param>
