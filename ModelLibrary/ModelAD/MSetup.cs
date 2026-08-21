@@ -473,7 +473,7 @@ namespace VAdvantage.Model
                         // the role doesn't have any relevance if the UserLevel is set to System
                         if (ds.Tables[0].Rows[i]["UserLevel"].ToString().Trim().Equals("S"))
                         {
-                            role.SetUserLevel(" CO");
+                            role.SetUserLevel(MRole.USERLEVEL_ClientPlusOrganization);
                         }
                         else
                             role.SetUserLevel(ds.Tables[0].Rows[i]["UserLevel"].ToString());
