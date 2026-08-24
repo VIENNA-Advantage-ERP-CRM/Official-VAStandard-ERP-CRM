@@ -211,6 +211,11 @@ namespace VASLogic.Models
         private const string COLUMN_DOCUMENTNO = "DocumentNo";
         private const string COLUMN_DATEACCT = "DateAcct";
         private const string COLUMN_MOVEMENTDATE = "MovementDate";
+
+        /* The accounting date of a bank statement. C_BankStatement has no DateAcct on
+           its header - only its lines do - so without this the table resolves to no
+           usable date column and never reaches the card. */
+        private const string COLUMN_STATEMENTDATE = "StatementDate";
         private const string COLUMN_DOCTYPE = "C_DocType_ID";
         private const string COLUMN_DOCTYPETARGET = "C_DocTypeTarget_ID";
 
@@ -488,6 +493,7 @@ namespace VASLogic.Models
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_DOCUMENTNO + @"' THEN c.ColumnName END) AS Document_No_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_DATEACCT + @"' THEN c.ColumnName END) AS Date_Acct_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_MOVEMENTDATE + @"' THEN c.ColumnName END) AS Movement_Date_Column,
+                       MAX(CASE WHEN c.ColumnName='" + COLUMN_STATEMENTDATE + @"' THEN c.ColumnName END) AS Statement_Date_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_DOCTYPE + @"' THEN c.ColumnName END) AS Doc_Type_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_DOCTYPETARGET + @"' THEN c.ColumnName END) AS Doc_Type_Target_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_BPARTNER + @"' THEN c.ColumnName END) AS BPartner_Column,
@@ -535,6 +541,7 @@ namespace VASLogic.Models
                 item.DocumentNoColumn = Util.GetValueOfString(dr["Document_No_Column"]);
                 item.DateAcctColumn = Util.GetValueOfString(dr["Date_Acct_Column"]);
                 item.MovementDateColumn = Util.GetValueOfString(dr["Movement_Date_Column"]);
+                item.StatementDateColumn = Util.GetValueOfString(dr["Statement_Date_Column"]);
                 item.DateColumn = ResolveDateColumn(item);
                 item.DocTypeColumn = ResolveDocTypeColumn(item.TableName, dr);
                 item.BPartnerColumn = Util.GetValueOfString(dr["BPartner_Column"]);
@@ -628,20 +635,33 @@ namespace VASLogic.Models
 
         /// <summary>
         /// The column the period bounds are applied to: DateAcct where the table has
-        /// one, otherwise MovementDate.
+        /// one, else MovementDate, else StatementDate.
         ///
         /// A SHORT, EXPLICIT fallback list, not a scan for anything date-shaped.
-        /// Guessing between DateTrx / MovementDate / DateInvoiced is ruled out because
-        /// those three mean different things - but MovementDate is the accounting date
-        /// of the inventory documents that have no DateAcct at all: for those the
-        /// movement IS the accounting event. Nothing else is accepted.
+        /// Guessing between DateTrx / DateOrdered / DateInvoiced is ruled out because
+        /// those three mean different things. The other two are admitted because for
+        /// their documents they ARE the accounting date, and the platform itself treats
+        /// them that way:
+        ///
+        ///   MovementDate    the inventory documents carry no DateAcct at all - for
+        ///                   those the movement is the accounting event.
+        ///   StatementDate   C_BankStatement likewise has no DateAcct on the header
+        ///                   (only its lines do), and MBankStatement tests the period
+        ///                   with MPeriod.IsOpen(ctx, GetStatementDate(), ...). Without
+        ///                   this third fallback the whole table resolved to no date
+        ///                   column and was dropped from discovery in silence.
+        ///
+        /// Nothing else is accepted; a table with none of the three is still excluded.
+        /// Chronological development:
+        ///   VAI145      2026-08-24 StatementDate admitted (C_BankStatement)
         /// </summary>
-        /// <param name="item">Discovered source carrying both probe results.</param>
-        /// <returns>The date column to bound by, or "" when the table has neither.</returns>
+        /// <param name="item">Discovered source carrying the probe results.</param>
+        /// <returns>The date column to bound by, or "" when the table has none.</returns>
         private string ResolveDateColumn(SourceItem item)
         {
             if (IsSafeIdentifier(item.DateAcctColumn)) { return item.DateAcctColumn; }
             if (IsSafeIdentifier(item.MovementDateColumn)) { return item.MovementDateColumn; }
+            if (IsSafeIdentifier(item.StatementDateColumn)) { return item.StatementDateColumn; }
             return "";
         }
 
@@ -889,7 +909,7 @@ namespace VASLogic.Models
                   AND c.ColumnName='" + COLUMN_DOCSTATUS+ @"'
                   AND w.IsActive='Y'";
 
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "tab", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "t", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             /* A total order, so the same installation always produces the same rows in
                the same sequence - the first tab of a window speaks for that window. */
@@ -958,17 +978,24 @@ namespace VASLogic.Models
             if (screens == null || screens.Count == 0) { return result; }
 
             List<ScreenItem> separable = new List<ScreenItem>();
+            List<ScreenItem> unfiltered = new List<ScreenItem>();
+
             for (int i = 0; i < screens.Count; i++)
             {
-                if (IsUsableWhereClause(screens[i].WhereClause)
-                    && screens[i].WhereClause.Trim().Length > 0)
+                string clause = screens[i].WhereClause;
+
+                if (clause != null && clause.Trim().Length > 0 && IsUsableWhereClause(clause))
                 {
                     separable.Add(screens[i]);
                 }
+                else
+                {
+                    unfiltered.Add(screens[i]);
+                }
             }
 
-            /* Fewer than two separable screens means there is nothing to separate. */
-            if (separable.Count < 2)
+            /* Nothing separable: one row covering every record of the table. */
+            if (separable.Count == 0)
             {
                 SourceItem single = CloneForScreen(item, screens[0]);
                 single.WhereClause = "";
@@ -981,7 +1008,54 @@ namespace VASLogic.Models
                 result.Add(CloneForScreen(item, separable[i]));
             }
 
+            /* A window with NO filter of its own is that table's catch-all, and it must
+               still get a row.
+
+               Dropping it - which is what happened before - loses documents outright:
+               C_Order's Sales Order tab carries no WhereClause while Purchase Order,
+               Quotation and Blanket Order all carry one, so an ordinary sales order
+               matched none of the surviving rows and appeared nowhere on the card. Its
+               row is therefore the COMPLEMENT of its filtered siblings: everything the
+               other screens did not claim. That keeps the split exhaustive without
+               double counting, which a plain unfiltered row would not.
+
+               One caveat, deliberately left: if a sibling clause tests a NULLable
+               column, NOT(clause) is NULL for those rows and they still fall outside
+               every row. Making that airtight needs boolean COALESCE, which Oracle has
+               no portable form of. */
+            if (unfiltered.Count > 0)
+            {
+                SourceItem rest = CloneForScreen(item, unfiltered[0]);
+                rest.WhereClause = NegateClauses(separable);
+                result.Add(rest);
+
+                if (unfiltered.Count > 1)
+                {
+                    Log.Log(Level.WARNING, "VAS_197: " + item.TableName + " has "
+                        + unfiltered.Count + " screens with no usable filter; '"
+                        + unfiltered[0].WindowName + "' represents them all as the catch-all row");
+                }
+            }
+
             return result;
+        }
+
+        /// <summary>
+        /// The complement of a set of screen filters: everything none of them claims.
+        /// </summary>
+        /// <param name="screens">Screens carrying resolved, usable clauses.</param>
+        /// <returns>Predicate fragment, or "" when there is nothing to negate.</returns>
+        private string NegateClauses(List<ScreenItem> screens)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            for (int i = 0; i < screens.Count; i++)
+            {
+                if (sb.Length > 0) { sb.Append(" AND "); }
+                sb.Append("NOT (").Append(screens[i].WhereClause).Append(")");
+            }
+
+            return sb.ToString();
         }
 
         /// <summary>
@@ -1004,6 +1078,7 @@ namespace VASLogic.Models
             copy.DocumentNoColumn = item.DocumentNoColumn;
             copy.DateAcctColumn = item.DateAcctColumn;
             copy.MovementDateColumn = item.MovementDateColumn;
+            copy.StatementDateColumn = item.StatementDateColumn;
             copy.DateColumn = item.DateColumn;
             copy.DocTypeColumn = item.DocTypeColumn;
             copy.BPartnerColumn = item.BPartnerColumn;
@@ -1920,6 +1995,9 @@ namespace VASLogic.Models
             public string DocumentNoColumn { get; set; }
             public string DateAcctColumn { get; set; }
             public string MovementDateColumn { get; set; }
+
+            /// <summary>StatementDate probe - the bank statement's accounting date.</summary>
+            public string StatementDateColumn { get; set; }
             public string BPartnerColumn { get; set; }
 
             /// <summary>

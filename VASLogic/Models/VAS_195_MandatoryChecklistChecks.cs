@@ -43,11 +43,26 @@ namespace VASLogic.Models
     ///               live installation of those modules - they are guarded precisely so
     ///               that being wrong degrades the row instead of the checklist.
     ///
+    ///               DOCUMENT DISCOVERY. Checks 01 and 02 do NOT work from a list of
+    ///               tables kept in this file. They ask the Application Dictionary which
+    ///               tables behave like documents - a DocStatus column, a key, a usable
+    ///               date, and at least one active menu-reachable window - which is the
+    ///               same definition VAS_197 and VAS_198 use, so the checklist covers
+    ///               exactly what those widgets cover. A hand-kept list was the earlier
+    ///               design and it was wrong in the way hand-kept lists always are:
+    ///               whatever nobody remembered to add simply never appeared, and
+    ///               nothing said so. The menu requirement is what keeps staging and
+    ///               workflow tables out; they carry a DocStatus but no user opens one.
+    ///               Check 15 keeps a fixed list, because "does this document move
+    ///               stock" is not a question the dictionary answers.
+    ///
     ///               UNION CHECKS. Checks 01, 02, 04, 11 and 15 span several physical
     ///               tables. Each branch is built and secured on its OWN main alias and
     ///               only then combined with UNION ALL; the combined statement is never
     ///               re-secured, and the framework's count runner wraps it as a derived
-    ///               table rather than applying MRole a second time.
+    ///               table rather than applying MRole a second time. With discovery in
+    ///               play checks 01 and 02 can reach a few dozen branches, which is the
+    ///               cost of covering everything rather than a chosen few.
     /// Chronological development:
     ///   VAI154      2026-08-24 Created
     /// </summary>
@@ -68,52 +83,420 @@ namespace VASLogic.Models
            Rejected. VA009 module column; probed before use. */
         private const string COLUMN_EXECUTION_STATUS = "VA009_ExecutionStatus";
 
-        /// <summary>
-        /// The document registry. Server-controlled and never influenced by the browser:
-        /// checks 01, 02 and 15 iterate THIS list, so a table can only be examined
-        /// because it is named here.
-        ///
-        /// Two flags decide which checks see an entry, and they are independent:
-        ///   ExpectsAccounting  the document is expected to reach the ledger, so check
-        ///                      02 may ask whether it posted. An entry without it is
-        ///                      visible to check 01 only.
-        ///   IsInventory        the document moves stock, so check 15 examines it.
-        ///
-        /// C_Order is the one entry with NEITHER: an order is real work that a period
-        /// close should surface while it is still open, but it creates no Fact_Acct row
-        /// and carries no Posted column, so asking whether it posted would be a question
-        /// with no answer. It therefore appears under check 01 and nowhere else.
-        /// </summary>
-        /// <returns>Registered documents (never null).</returns>
-        private List<DocDef> PostingDocuments()
+        /* The date column a discovered document is bounded by, in preference order.
+           DateAcct first because the period filter must mean the same thing for every
+           table on the card; MovementDate for the inventory documents that carry no
+           accounting date at all, where the movement IS the accounting event. This is a
+           short trusted list, not a scan for anything date-shaped - DateOrdered,
+           DateInvoiced and DatePromised mean different things and guessing between them
+           would silently rebase the period. */
+        private static readonly string[] DateColumnPreference =
+            new string[] { "DateAcct", "MovementDate", "StatementDate" };
+
+        /* The amount column shown in the detail list, in preference order. First match
+           wins; a table with none of them shows no amount rather than a wrong one. */
+        private static readonly string[] AmountColumnPreference = new string[]
         {
-            List<DocDef> docs = new List<DocDef>();
+            "GrandTotal", "PayAmt", "ControlAmt", "StatementDifference",
+            "TotalDifference", "VAFAM_DepreciatedAmt", "LineTotalAmt"
+        };
 
-            docs.Add(NewDoc("C_Order", "C_Order_ID", "DateAcct", "GrandTotal", false, false));
-            docs.Add(NewDoc("C_Invoice", "C_Invoice_ID", "DateAcct", "GrandTotal", true, false));
-            docs.Add(NewDoc("C_Payment", "C_Payment_ID", "DateAcct", "PayAmt", true, false));
+        /* Inventory movement documents for check 15. Deliberately a fixed list rather
+           than a discovery: "does this document move stock" is not a question the
+           dictionary answers, and check 15 goes on to look for M_Transaction rows
+           through line references that only these tables have. */
+        private static readonly string[] InventoryTables =
+            new string[] { "M_InOut", "M_Inventory", "M_Movement" };
 
-            /* Cash journal. Its amount is StatementDifference - the net movement of the
-               journal - because a cash journal has no GrandTotal: its beginning and
-               ending balances are positions, not a document value, and only the
-               difference between them is what this journal did. DateAcct rather than
-               StatementDate, even though MCash keeps the two equal, because every other
-               entry here is bounded by its accounting date and the period filter must
-               mean the same thing for all of them. */
-            docs.Add(NewDoc("C_Cash", "C_Cash_ID", "DateAcct", "StatementDifference", true, false));
+        /* Discovered documents, cached per request - checks 01 and 02 both need them. */
+        private List<DocDef> _discovered;
 
-            docs.Add(NewDoc("GL_Journal", "GL_Journal_ID", "DateAcct", "ControlAmt", true, false));
-            docs.Add(NewDoc("M_InOut", "M_InOut_ID", "DateAcct", "", true, true));
-            docs.Add(NewDoc("M_Inventory", "M_Inventory_ID", "MovementDate", "", true, true));
-            docs.Add(NewDoc("M_Movement", "M_Movement_ID", "MovementDate", "", true, true));
+        /// <summary>
+        /// Every table in this installation that behaves like a document, discovered
+        /// from the Application Dictionary rather than from a list maintained here.
+        ///
+        /// A table qualifies when it has a DocStatus column, a key column, a usable date
+        /// column, and at least one active, menu-reachable window over it - the same
+        /// definition of "a document with a screen" that VAS_197 and VAS_198 use, so the
+        /// checklist covers exactly what those widgets cover rather than a hand-kept
+        /// subset that silently omits whatever nobody remembered to add. The menu
+        /// requirement is what keeps staging and workflow tables out: they carry a
+        /// DocStatus but no user ever opens one.
+        ///
+        /// Still server-controlled, and still nothing the browser can influence - the
+        /// browser sends a check code, and every table name reaching SQL comes from
+        /// AD_Table and is re-validated by IsSafeIdentifier.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <returns>Discovered documents (never null).</returns>
+        private List<DocDef> DiscoverDocuments(Ctx ctx)
+        {
+            if (_discovered != null) { return _discovered; }
 
-            /* Module documents - present only where the module is installed. */
-            docs.Add(NewDoc("VAFAM_AssetDepreciation", "VAFAM_AssetDepreciation_ID", "DateAcct",
-                "VAFAM_DepreciatedAmt", true, false));
-            docs.Add(NewDoc("M_InventoryRevaluation", "M_InventoryRevaluation_ID", "DateAcct",
-                "TotalDifference", true, false));
+            _discovered = new List<DocDef>();
 
-            return docs;
+            StringBuilder select = new StringBuilder();
+            select.Append(@"
+                SELECT t.AD_Table_ID AS AD_Table_ID,
+                       t.TableName AS Table_Name,
+                       MAX(CASE WHEN c.IsKey='Y' THEN c.ColumnName END) AS Key_Column");
+
+            /* One probed column per name the branch builder may need. Listing them here
+               costs one query for the whole card; probing them per table would cost one
+               per table per check. */
+            AppendProbe(select, "DocumentNo");
+            AppendProbe(select, "Posted");
+            AppendProbe(select, "Processed");
+            AppendProbe(select, "C_BPartner_ID");
+            AppendProbe(select, "C_Currency_ID");
+            AppendProbe(select, "C_DocType_ID");
+            AppendProbe(select, "C_DocTypeTarget_ID");
+
+            for (int i = 0; i < DateColumnPreference.Length; i++) { AppendProbe(select, DateColumnPreference[i]); }
+            for (int i = 0; i < AmountColumnPreference.Length; i++) { AppendProbe(select, AmountColumnPreference[i]); }
+
+            select.Append(@"
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (c.AD_Table_ID=t.AD_Table_ID AND c.IsActive='Y')
+                WHERE t.IsActive='Y'
+                  /* COALESCE, not a bare comparison: AD_Table.IsView is NULLable and is
+                     unset on most tables, so 't.IsView=''N''' is NULL - never true - and
+                     silently discovers nothing at all. VAS_197 and VAS_198 guard it the
+                     same way. */
+                  AND COALESCE(t.IsView,'N')='N'
+                  AND EXISTS(SELECT 1 FROM AD_Column dc WHERE dc.AD_Table_ID=t.AD_Table_ID AND dc.ColumnName='DocStatus' AND dc.IsActive='Y')
+                  AND EXISTS(SELECT 1 FROM AD_Tab tab INNER JOIN AD_Window w ON (w.AD_Window_ID=tab.AD_Window_ID) INNER JOIN AD_Menu m ON (m.AD_Window_ID=w.AD_Window_ID) WHERE tab.AD_Table_ID=t.AD_Table_ID AND tab.IsActive='Y' AND w.IsActive='Y' AND m.IsActive='Y')
+                GROUP BY t.AD_Table_ID,t.TableName
+                ORDER BY t.TableName");
+
+            DataSet ds = DB.ExecuteDataset(select.ToString(), new SqlParameter[] { }, null);
+            if (ds == null || ds.Tables.Count == 0) { return _discovered; }
+
+            DataTable dt = ds.Tables[0];
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                DocDef def = ReadDiscoveredDoc(dt.Rows[i]);
+                if (def != null) { _discovered.Add(def); }
+            }
+
+            Log.Log(Level.INFO, "VAS_195: discovered " + _discovered.Count
+                + " document tables for the unprocessed / unposted checks");
+
+            /* The screen split is an ENHANCEMENT over the table branch, never a
+               precondition for it. If screen resolution fails - a dictionary the parser
+               dislikes, a clause that will not resolve - the checks must still report
+               their documents at table granularity rather than reporting nothing at
+               all. Losing the split costs a grouping; losing the fallback costs the
+               whole check. */
+            try
+            {
+                List<DocDef> byScreen = ExpandByScreen(ctx, _discovered);
+                if (byScreen.Count > 0) { _discovered = byScreen; }
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_195: screen split failed; falling back to "
+                    + "table-level document branches", ex);
+            }
+
+            RankByScreen(_discovered);
+
+            Log.Log(Level.INFO, "VAS_195: " + _discovered.Count + " document branches after the screen split");
+
+            return _discovered;
+        }
+
+        /// <summary>
+        /// Gives each discovered table its primary SCREEN - the window a reader would
+        /// open it on - for labelling, grouping and drill-down navigation. One branch
+        /// per table, exactly as before: this does NOT split a table into one branch per
+        /// screen.
+        ///
+        /// It did, briefly, and that was wrong. Splitting C_Order into Sales Order /
+        /// Purchase Order / Sales Quotation / Blanket Order needs each branch to carry
+        /// its tab's WhereClause, and applying those clauses emptied every branch of
+        /// checks 01 and 02 - the checks reported a clean PASS over a period that was
+        /// not clean. A filter that silently reports nothing is far worse on a close
+        /// checklist than a grouping that is coarser than one would like, so the filter
+        /// is gone until its behaviour against this installation's actual AD_Tab data
+        /// has been confirmed rather than assumed.
+        ///
+        /// The PRIMARY screen is the one whose tab carries no filter of its own - the
+        /// window that shows the whole table - falling back to the first screen found.
+        /// That is the right window to open a record on and the right name to group by.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="tables">Discovered tables, labelled in place.</param>
+        /// <returns>The same tables, one entry each (never null).</returns>
+        private List<DocDef> ExpandByScreen(Ctx ctx, List<DocDef> tables)
+        {
+            if (tables.Count == 0) { return tables; }
+
+            Dictionary<int, List<ScreenDef>> byTable = ReadScreens(ctx, tables);
+
+            for (int t = 0; t < tables.Count; t++)
+            {
+                DocDef table = tables[t];
+
+                List<ScreenDef> screens;
+                if (!byTable.TryGetValue(table.AD_Table_ID, out screens) || screens.Count == 0)
+                {
+                    continue;
+                }
+
+                ScreenDef primary = screens[0];
+                for (int s = 0; s < screens.Count; s++)
+                {
+                    if (string.IsNullOrEmpty(screens[s].WhereClause)) { primary = screens[s]; break; }
+                }
+
+                table.AD_Window_ID = primary.AD_Window_ID;
+                table.ScreenLabel = primary.WindowName;
+
+                /* Deliberately left empty - see the note above. */
+                table.WhereClause = "";
+            }
+
+            return tables;
+        }
+
+        /// <summary>
+        /// Every active, menu-reachable screen each discovered table is shown on, with
+        /// its tab filter already resolved against the session context.
+        ///
+        /// One window can show a table on more than one tab; the first (lowest SeqNo)
+        /// speaks for the window.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="tables">Discovered tables.</param>
+        /// <returns>Screens grouped by AD_Table_ID (never null).</returns>
+        private Dictionary<int, List<ScreenDef>> ReadScreens(Ctx ctx, List<DocDef> tables)
+        {
+            Dictionary<int, List<ScreenDef>> byTable = new Dictionary<int, List<ScreenDef>>();
+
+            List<int> tableIds = new List<int>();
+            for (int i = 0; i < tables.Count; i++)
+            {
+                if (tables[i].AD_Table_ID > 0) { tableIds.Add(tables[i].AD_Table_ID); }
+            }
+            if (tableIds.Count == 0) { return byTable; }
+
+            List<SqlParameter> parameters = Binds();
+            parameters.Add(new SqlParameter("@AD_Language", ctxLanguage(ctx)));
+            string inList = BuildIdInList(tableIds, "@AD_Table_ID", parameters);
+
+            string sql = @"
+                SELECT DISTINCT tab.AD_Table_ID AS AD_Table_ID,
+                       tab.AD_Tab_ID AS AD_Tab_ID,
+                       tab.SeqNo AS Tab_Seq_No,
+                       COALESCE(tab.WhereClause,N'') AS Tab_Where_Clause,
+                       w.AD_Window_ID AS AD_Window_ID,
+                       COALESCE(wtrl.Name,w.DisplayName,w.Name,N'') AS Window_Name
+                FROM AD_Tab tab
+                INNER JOIN AD_Window w ON (w.AD_Window_ID=tab.AD_Window_ID)
+                INNER JOIN AD_Menu m ON (m.AD_Window_ID=w.AD_Window_ID)
+                LEFT OUTER JOIN AD_Window_Trl wtrl ON (wtrl.AD_Window_ID=w.AD_Window_ID AND wtrl.AD_Language=@AD_Language AND wtrl.IsActive='Y')
+                WHERE tab.IsActive='Y'
+                  AND tab.IsDisplayed='Y'
+                  AND w.IsActive='Y'
+                  AND m.IsActive='Y'
+                  AND tab.AD_Table_ID IN (" + inList + @")
+                ORDER BY tab.AD_Table_ID,Window_Name,tab.SeqNo,w.AD_Window_ID,tab.AD_Tab_ID";
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters.ToArray(), null);
+            if (ds == null || ds.Tables.Count == 0) { return byTable; }
+
+            DataTable dt = ds.Tables[0];
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                DataRow dr = dt.Rows[i];
+
+                int tableId = Util.GetValueOfInt(dr["AD_Table_ID"]);
+                int windowId = Util.GetValueOfInt(dr["AD_Window_ID"]);
+                if (tableId <= 0 || windowId <= 0) { continue; }
+
+                if (!byTable.ContainsKey(tableId)) { byTable[tableId] = new List<ScreenDef>(); }
+
+                List<ScreenDef> screens = byTable[tableId];
+
+                bool seen = false;
+                for (int s = 0; s < screens.Count; s++)
+                {
+                    if (screens[s].AD_Window_ID == windowId) { seen = true; break; }
+                }
+                if (seen) { continue; }
+
+                ScreenDef screen = new ScreenDef();
+                screen.AD_Window_ID = windowId;
+                screen.WindowName = Util.GetValueOfString(dr["Window_Name"]);
+                screen.WhereClause = ResolveWhereClause(ctx, Util.GetValueOfString(dr["Tab_Where_Clause"]));
+
+                screens.Add(screen);
+            }
+
+            return byTable;
+        }
+
+        /// <summary>
+        /// Resolves a tab's WhereClause against the SESSION context and returns the
+        /// usable text, or "" when it cannot be used here.
+        ///
+        /// Parsed with window number 0: this widget has no window and no current record,
+        /// so only global context resolves - which is the point. A clause carrying only
+        /// @#AD_Client_ID@ and its kind works; one needing a window-level variable does
+        /// not, and is refused rather than half-resolved, because a half-resolved
+        /// predicate does not fail loudly, it silently returns the wrong rows. The
+        /// injection checks run on the RESOLVED text, so a context value cannot smuggle
+        /// in a terminator or a comment.
+        /// </summary>
+        /// <param name="ctx">Session context (supplies the global variables).</param>
+        /// <param name="clause">AD_Tab.WhereClause, possibly empty.</param>
+        /// <returns>The resolved, checked clause, or "".</returns>
+        private string ResolveWhereClause(Ctx ctx, string clause)
+        {
+            if (clause == null) { return ""; }
+
+            string text = clause.Trim();
+            if (text.Length == 0 || text.Length > 2000) { return ""; }
+
+            if (text.IndexOf('@') >= 0)
+            {
+                try
+                {
+                    text = Env.ParseContext(ctx, 0, text, false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Log(Level.WARNING, "VAS_195: a tab WhereClause could not be resolved "
+                        + "against the session context and is ignored", ex);
+                    return "";
+                }
+
+                if (string.IsNullOrEmpty(text)) { return ""; }
+                text = text.Trim();
+            }
+
+            if (text.IndexOf('@') >= 0) { return ""; }
+            if (text.IndexOf(';') >= 0) { return ""; }
+            if (text.IndexOf("--", StringComparison.Ordinal) >= 0) { return ""; }
+            if (text.IndexOf("/*", StringComparison.Ordinal) >= 0) { return ""; }
+
+            return text;
+        }
+
+        /// <summary>
+        /// Gives each discovered SCREEN a sort rank in screen-name order.
+        ///
+        /// The rank exists because the screen label is resolved AFTER the query - the
+        /// framework's document resolver fills it in from AD_Window once the page is
+        /// materialised - so there is no screen column in the SQL to sort on. Each UNION
+        /// branch instead carries its table's rank as a plain integer, which the ORDER BY
+        /// can reach. An integer and not the label itself: a name would have to be
+        /// escaped into every branch, and a sort key nobody displays has no business
+        /// being a string literal in generated SQL.
+        ///
+        /// The label itself already arrived with the screen, so this is a sort and a
+        /// numbering, not another query. A branch whose label could not be resolved
+        /// sorts LAST rather than first, so an unnamed screen never leads the list.
+        /// </summary>
+        /// <param name="docs">Discovered screens, ranked in place.</param>
+        private void RankByScreen(List<DocDef> docs)
+        {
+            if (docs.Count == 0) { return; }
+
+            docs.Sort(delegate (DocDef a, DocDef b)
+            {
+                bool aBlank = string.IsNullOrEmpty(a.ScreenLabel);
+                bool bBlank = string.IsNullOrEmpty(b.ScreenLabel);
+
+                if (aBlank != bBlank) { return aBlank ? 1 : -1; }
+                if (aBlank) { return string.Compare(a.TableName, b.TableName, StringComparison.CurrentCultureIgnoreCase); }
+
+                int byLabel = string.Compare(a.ScreenLabel, b.ScreenLabel, StringComparison.CurrentCultureIgnoreCase);
+                return byLabel != 0 ? byLabel
+                    : string.Compare(a.TableName, b.TableName, StringComparison.CurrentCultureIgnoreCase);
+            });
+
+            for (int i = 0; i < docs.Count; i++) { docs[i].ScreenRank = i + 1; }
+        }
+
+        /// <summary>Adds one MAX(CASE ...) probe column to the discovery SELECT.</summary>
+        /// <param name="select">Statement being built.</param>
+        /// <param name="columnName">Column being probed.</param>
+        private void AppendProbe(StringBuilder select, string columnName)
+        {
+            select.Append(",MAX(CASE WHEN c.ColumnName='").Append(columnName)
+                  .Append("' THEN c.ColumnName END) AS Col_").Append(columnName);
+        }
+
+        /// <summary>
+        /// Turns one discovery row into a usable document, or null when the table cannot
+        /// be queried safely: no key to zoom to, no date to bound by, or a name that
+        /// fails the identifier guard.
+        /// </summary>
+        /// <param name="row">Discovery result row.</param>
+        /// <returns>Populated <see cref="DocDef"/>, or null.</returns>
+        private DocDef ReadDiscoveredDoc(DataRow row)
+        {
+            DocDef def = new DocDef();
+            def.AD_Table_ID = Util.GetValueOfInt(row["AD_Table_ID"]);
+            def.TableName = Util.GetValueOfString(row["Table_Name"]);
+            def.KeyColumn = Util.GetValueOfString(row["Key_Column"]);
+
+            if (!IsSafeIdentifier(def.TableName) || !IsSafeIdentifier(def.KeyColumn)) { return null; }
+
+            def.DateColumn = FirstProbed(row, DateColumnPreference);
+            if (!IsSafeIdentifier(def.DateColumn)) { return null; }
+
+            def.AmountColumn = FirstProbed(row, AmountColumnPreference);
+            def.HasAmount = IsSafeIdentifier(def.AmountColumn);
+
+            def.HasPosted = Probed(row, "Posted");
+            def.HasProcessed = Probed(row, "Processed");
+            def.HasDocumentNo = Probed(row, "DocumentNo");
+            def.HasBPartner = Probed(row, "C_BPartner_ID");
+            def.HasCurrency = Probed(row, "C_Currency_ID");
+            def.DocTypeKey = DocTypeKeyExpr("doc", Probed(row, "C_DocType_ID"), Probed(row, "C_DocTypeTarget_ID"));
+
+            def.IsInventory = IsInventoryTable(def.TableName);
+
+            return def;
+        }
+
+        /// <summary>Whether a probed column came back present.</summary>
+        /// <param name="row">Discovery result row.</param>
+        /// <param name="columnName">Column probed.</param>
+        /// <returns>true when the table carries it.</returns>
+        private bool Probed(DataRow row, string columnName)
+        {
+            string alias = "Col_" + columnName;
+            if (!row.Table.Columns.Contains(alias)) { return false; }
+            return !string.IsNullOrEmpty(Util.GetValueOfString(row[alias]));
+        }
+
+        /// <summary>The first column of a preference list the table actually carries.</summary>
+        /// <param name="row">Discovery result row.</param>
+        /// <param name="preference">Candidate columns, best first.</param>
+        /// <returns>The chosen column name, or "".</returns>
+        private string FirstProbed(DataRow row, string[] preference)
+        {
+            for (int i = 0; i < preference.Length; i++)
+            {
+                if (Probed(row, preference[i])) { return preference[i]; }
+            }
+            return "";
+        }
+
+        /// <summary>Whether a discovered table is one of the inventory movement documents.</summary>
+        /// <param name="tableName">Physical table name.</param>
+        /// <returns>true when check 15 should examine it.</returns>
+        private bool IsInventoryTable(string tableName)
+        {
+            for (int i = 0; i < InventoryTables.Length; i++)
+            {
+                if (InventoryTables[i].Equals(tableName, StringComparison.OrdinalIgnoreCase)) { return true; }
+            }
+            return false;
         }
 
         /// <summary>
@@ -145,64 +528,30 @@ namespace VASLogic.Models
             return "";
         }
 
-        /// <summary>Builds one posting-document registry entry.</summary>
-        /// <param name="tableName">Physical table name.</param>
-        /// <param name="keyColumn">Primary key column.</param>
-        /// <param name="dateColumn">Effective/accounting date column.</param>
-        /// <param name="amountColumn">Document amount column, or "" when it has none.</param>
-        /// <param name="expectsAccounting">Whether the document is expected to post.</param>
-        /// <param name="isInventory">Whether it is an inventory movement document.</param>
-        /// <returns>Populated <see cref="DocDef"/>.</returns>
-        private DocDef NewDoc(string tableName, string keyColumn, string dateColumn,
-            string amountColumn, bool expectsAccounting, bool isInventory)
-        {
-            DocDef def = new DocDef();
-            def.TableName = tableName;
-            def.KeyColumn = keyColumn;
-            def.DateColumn = dateColumn;
-            def.AmountColumn = amountColumn;
-            def.ExpectsAccounting = expectsAccounting;
-            def.IsInventory = isInventory;
-            return def;
-        }
-
         /// <summary>
-        /// The registry entries this installation can actually query: table present,
-        /// key/date columns present, and the document columns the checks rely on
-        /// present. Everything else is skipped silently - an uninstalled module is not
-        /// an error.
+        /// The discovered documents one check should examine.
+        ///
+        /// Check 01 takes everything - anything with a DocStatus can be left unfinished.
+        /// Check 02 takes only what carries a Posted column: a table without one cannot
+        /// be judged unposted, and treating its absence as "not posted" would
+        /// manufacture failures out of documents that never post at all.
+        /// Check 15 takes the inventory movement documents.
         /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="inventoryOnly">Restrict to inventory movement documents.</param>
-        /// <param name="postingOnly">Restrict to documents expected to post.</param>
-        /// <returns>Usable registry entries (never null).</returns>
-        private List<DocDef> UsableDocuments(bool inventoryOnly, bool postingOnly)
+        /// <param name="postedOnly">Restrict to documents carrying a Posted column.</param>
+        /// <returns>Usable documents (never null).</returns>
+        private List<DocDef> UsableDocuments(Ctx ctx, bool inventoryOnly, bool postedOnly)
         {
             List<DocDef> usable = new List<DocDef>();
-            List<DocDef> all = PostingDocuments();
+            List<DocDef> all = DiscoverDocuments(ctx);
 
             for (int i = 0; i < all.Count; i++)
             {
                 DocDef def = all[i];
 
                 if (inventoryOnly && !def.IsInventory) { continue; }
-                if (postingOnly && !def.ExpectsAccounting) { continue; }
-
-                if (!TableExists(def.TableName)) { continue; }
-                if (!ColumnExists(def.TableName, def.KeyColumn)) { continue; }
-                if (!ColumnExists(def.TableName, def.DateColumn)) { continue; }
-                if (!ColumnExists(def.TableName, "DocStatus")) { continue; }
-
-                def.HasPosted = ColumnExists(def.TableName, "Posted");
-                def.HasProcessed = ColumnExists(def.TableName, "Processed");
-                def.HasDocumentNo = ColumnExists(def.TableName, "DocumentNo");
-                def.HasBPartner = ColumnExists(def.TableName, "C_BPartner_ID");
-                def.HasCurrency = ColumnExists(def.TableName, "C_Currency_ID");
-                def.DocTypeKey = DocTypeKeyExpr("doc",
-                    ColumnExists(def.TableName, "C_DocType_ID"),
-                    ColumnExists(def.TableName, "C_DocTypeTarget_ID"));
-                def.HasAmount = !string.IsNullOrEmpty(def.AmountColumn)
-                    && ColumnExists(def.TableName, def.AmountColumn);
-                def.AD_Table_ID = TableId(def.TableName);
+                if (postedOnly && !def.HasPosted) { continue; }
 
                 usable.Add(def);
             }
@@ -410,7 +759,7 @@ namespace VASLogic.Models
         /// <returns>Populated <see cref="DetailSpec"/>, or null when no table qualifies.</returns>
         private DetailSpec Spec01(CheckContext c)
         {
-            List<DocDef> docs = UsableDocuments(false, false);
+            List<DocDef> docs = UsableDocuments(c.Ctx, false, false);
             if (docs.Count == 0) { return null; }
 
             List<SqlParameter> parameters = Binds();
@@ -421,21 +770,28 @@ namespace VASLogic.Models
                 DocDef d = docs[i];
                 string suffix = (i + 1).ToString(CultureInfo.InvariantCulture);
 
-                string pending = d.HasProcessed
-                    ? "(doc.DocStatus IN (" + DOCSTATUS_OpenList + ") OR COALESCE(doc.Processed,'N')='N')"
-                    : "doc.DocStatus IN (" + DOCSTATUS_OpenList + ")";
+                string a = Alias(d);
 
-                string where = "doc.IsActive='Y' AND doc.DocStatus NOT IN (" + DOCSTATUS_DeadList + ")"
+                string pending = d.HasProcessed
+                    ? "(" + a + ".DocStatus IN (" + DOCSTATUS_OpenList + ") OR COALESCE(" + a + ".Processed,'N')='N')"
+                    : a + ".DocStatus IN (" + DOCSTATUS_OpenList + ")";
+
+                string where = a + ".IsActive='Y' AND " + a + ".DocStatus NOT IN (" + DOCSTATUS_DeadList + ")"
                     + " AND " + pending
-                    + " AND " + PeriodWhere(c, "doc", d.DateColumn, suffix, parameters);
+                    + " AND " + PeriodWhere(c, a, d.DateColumn, suffix, parameters)
+                    + ScreenFilter(d);
 
                 string branch = DocBranchSelect(d, suffix, parameters) + " WHERE " + where;
 
                 if (i > 0) { sql.Append(" UNION ALL "); }
-                sql.Append(SecureBranch(c, branch, "doc"));
+                sql.Append(SecureBranch(c, branch, a));
             }
 
-            return Spec(sql.ToString(), "", "Doc_Date DESC,Doc_Number DESC", parameters, DocColumns());
+            /* Grouped by screen, newest first inside each group. Screen_Sort is a
+               selected column of every branch, which is what lets a UNION's ORDER BY
+               reach it. */
+            return Spec(sql.ToString(), "", "Screen_Sort,Doc_Date DESC,Doc_Number DESC",
+                parameters, DocColumns(false));
         }
 
         /// <summary>
@@ -443,27 +799,33 @@ namespace VASLogic.Models
         /// branches of a UNION really do line up column for column. Columns a given
         /// table does not carry are emitted as typed literals rather than omitted.
         /// </summary>
-        /// <param name="d">Registry entry for this branch.</param>
+        /// <param name="d">Discovered screen for this branch.</param>
         /// <param name="suffix">Unique bind suffix for this branch.</param>
         /// <param name="parameters">Bind list being built, in appearance order.</param>
-        /// <returns>SELECT ... FROM fragment aliased `doc`.</returns>
+        /// <returns>SELECT ... FROM fragment aliased to the table's own name.</returns>
         private string DocBranchSelect(DocDef d, string suffix, List<SqlParameter> parameters)
         {
+            string a = Alias(d);
             StringBuilder sql = new StringBuilder();
 
             sql.Append("SELECT ").Append(d.AD_Table_ID).Append(" AS ").Append(TECH_TABLE)
-               .Append(",doc.").Append(d.KeyColumn).Append(" AS ").Append(TECH_RECORD)
-               .Append(",0 AS ").Append(TECH_WINDOW)
-               .Append(",").Append(d.HasDocumentNo ? "COALESCE(doc.DocumentNo,N'')" : "N''").Append(" AS Doc_Number")
-               .Append(",doc.").Append(d.DateColumn).Append(" AS Doc_Date")
-               .Append(",doc.DocStatus AS Doc_Status")
+               .Append(",").Append(a).Append(".").Append(d.KeyColumn).Append(" AS ").Append(TECH_RECORD)
+               /* The screen's OWN window, so the drill-down opens the record on the
+                  screen the row came from rather than on the table's default one. */
+               .Append(",").Append(d.AD_Window_ID).Append(" AS ").Append(TECH_WINDOW)
+               /* Sort key only - never declared as a column, so the page materialiser
+                  ignores it and the reader never sees it. */
+               .Append(",").Append(d.ScreenRank).Append(" AS Screen_Sort")
+               .Append(",").Append(d.HasDocumentNo ? "COALESCE(" + a + ".DocumentNo,N'')" : "N''").Append(" AS Doc_Number")
+               .Append(",").Append(a).Append(".").Append(d.DateColumn).Append(" AS Doc_Date")
+               .Append(",").Append(a).Append(".DocStatus AS Doc_Status")
                .Append(",").Append(string.IsNullOrEmpty(d.DocTypeKey) ? "N''" : "COALESCE(dt.Name,N'')").Append(" AS Doc_Type")
                .Append(",COALESCE(org.Name,N'') AS Org_Name")
                .Append(",").Append(d.HasBPartner ? "COALESCE(bp.Name,N'')" : "N''").Append(" AS Partner_Name")
                .Append(",").Append(d.HasCurrency ? "COALESCE(cur.ISO_Code,N'')" : "N''").Append(" AS Currency_Iso")
-               .Append(",").Append(d.HasAmount ? "COALESCE(doc." + d.AmountColumn + ",0)" : "0").Append(" AS Doc_Amount")
-               .Append(" FROM ").Append(d.TableName).Append(" doc")
-               .Append(" LEFT OUTER JOIN AD_Org org ON (org.AD_Org_ID=doc.AD_Org_ID)");
+               .Append(",").Append(d.HasAmount ? "COALESCE(" + a + "." + d.AmountColumn + ",0)" : "0").Append(" AS Doc_Amount")
+               .Append(" FROM ").Append(d.TableName).Append(" ").Append(a)
+               .Append(" LEFT OUTER JOIN AD_Org org ON (org.AD_Org_ID=").Append(a).Append(".AD_Org_ID)");
 
             if (!string.IsNullOrEmpty(d.DocTypeKey))
             {
@@ -471,23 +833,68 @@ namespace VASLogic.Models
             }
             if (d.HasBPartner)
             {
-                sql.Append(" LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=doc.C_BPartner_ID)");
+                sql.Append(" LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=").Append(a).Append(".C_BPartner_ID)");
             }
             if (d.HasCurrency)
             {
-                sql.Append(" LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=doc.C_Currency_ID)");
+                sql.Append(" LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=").Append(a).Append(".C_Currency_ID)");
             }
 
             return sql.ToString();
         }
 
-        /// <summary>The shared column set of the posting-document checks.</summary>
+        /// <summary>
+        /// The alias every branch gives its source table.
+        ///
+        /// A short fixed alias, because no branch carries a tab WhereClause any more.
+        /// Were one ever reintroduced, this would have to become the table's own name -
+        /// a tab clause qualifies its columns with the TABLE name ("C_Order.IsSOTrx"),
+        /// which an alias of "doc" cannot resolve. That is why VAS_197 aliases each
+        /// table to itself, and why this method exists rather than the string being
+        /// written out at each of the three call sites.
+        /// </summary>
+        /// <param name="d">Discovered document.</param>
+        /// <returns>The alias, which is also what MRole is applied to.</returns>
+        private string Alias(DocDef d)
+        {
+            return "doc";
+        }
+
+        /// <summary>
+        /// The screen's own filter. Always empty today - see the note on
+        /// <see cref="ExpandByScreen"/> - and kept as the single place a per-screen
+        /// predicate would be reintroduced once its behaviour has been verified against
+        /// real AD_Tab data.
+        /// </summary>
+        /// <param name="d">Discovered document.</param>
+        /// <returns>Predicate fragment, or "" when there is no filter.</returns>
+        private string ScreenFilter(DocDef d)
+        {
+            if (string.IsNullOrEmpty(d.WhereClause)) { return ""; }
+            return " AND (" + d.WhereClause + ")";
+        }
+
+        /// <summary>
+        /// The shared column set of the document checks.
+        ///
+        /// Checks 01 and 02 leave the Screen column OUT while still sorting by it: the
+        /// rows arrive grouped screen by screen, and a column repeating the same value
+        /// down each group earns less than the width it costs - the document number and
+        /// its type already say what the record is. Check 15 keeps the column, because
+        /// its three inventory documents interleave by date rather than group.
+        /// </summary>
+        /// <param name="withScreen">Whether to declare the Screen column.</param>
         /// <returns>Declared columns.</returns>
-        private List<ColumnDef> DocColumns()
+        private List<ColumnDef> DocColumns(bool withScreen)
         {
             List<ColumnDef> columns = new List<ColumnDef>();
-            columns.Add(Col("Screen", "VAS_195_Screen", "Screen", COLTYPE_SCREEN, 1.2m));
-            columns.Add(Col("Doc_Number", "DocumentNo", "Document No", COLTYPE_DOC, 1.2m));
+            if (withScreen) { columns.Add(Col("Screen", "VAS_195_Screen", "Screen", COLTYPE_SCREEN, 1.2m)); }
+
+            /* Wider without a Screen column of its own: the document cell then carries
+               the screen name on a second line, and a window name is routinely longer
+               than the document number above it. */
+            columns.Add(Col("Doc_Number", "DocumentNo", "Document No", COLTYPE_DOC,
+                withScreen ? 1.2m : 1.7m));
             columns.Add(Col("Doc_Date", "VAS_195_AccountDate", "Account Date", COLTYPE_DATE, 0.9m));
             columns.Add(Col("Doc_Type", "VAS_195_DocumentType", "Document Type", COLTYPE_TEXT, 1.1m));
             columns.Add(Col("Doc_Status", "VAS_195_DocStatus", "Status", COLTYPE_BADGE, 0.8m));
@@ -525,12 +932,7 @@ namespace VASLogic.Models
         /// <returns>Populated <see cref="DetailSpec"/>, or null when no table qualifies.</returns>
         private DetailSpec Spec02(CheckContext c)
         {
-            List<DocDef> all = UsableDocuments(false, true);
-            List<DocDef> docs = new List<DocDef>();
-            for (int i = 0; i < all.Count; i++)
-            {
-                if (all[i].HasPosted) { docs.Add(all[i]); }
-            }
+            List<DocDef> docs = UsableDocuments(c.Ctx, false, true);
             if (docs.Count == 0) { return null; }
 
             List<SqlParameter> parameters = Binds();
@@ -541,17 +943,24 @@ namespace VASLogic.Models
                 DocDef d = docs[i];
                 string suffix = (i + 1).ToString(CultureInfo.InvariantCulture);
 
-                string where = "doc.IsActive='Y' AND doc.DocStatus IN (" + DOCSTATUS_FinalList + ")"
-                    + " AND COALESCE(doc.Posted,'N')<>'Y'"
-                    + " AND " + PeriodWhere(c, "doc", d.DateColumn, suffix, parameters);
+                string a = Alias(d);
+
+                string where = a + ".IsActive='Y' AND " + a + ".DocStatus IN (" + DOCSTATUS_FinalList + ")"
+                    + " AND COALESCE(" + a + ".Posted,'N')<>'Y'"
+                    + " AND " + PeriodWhere(c, a, d.DateColumn, suffix, parameters)
+                    + ScreenFilter(d);
 
                 string branch = DocBranchSelect(d, suffix, parameters) + " WHERE " + where;
 
                 if (i > 0) { sql.Append(" UNION ALL "); }
-                sql.Append(SecureBranch(c, branch, "doc"));
+                sql.Append(SecureBranch(c, branch, a));
             }
 
-            return Spec(sql.ToString(), "", "Doc_Date DESC,Doc_Number DESC", parameters, DocColumns());
+            /* Grouped by screen, newest first inside each group. Screen_Sort is a
+               selected column of every branch, which is what lets a UNION's ORDER BY
+               reach it. */
+            return Spec(sql.ToString(), "", "Screen_Sort,Doc_Date DESC,Doc_Number DESC",
+                parameters, DocColumns(false));
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -1865,7 +2274,7 @@ namespace VASLogic.Models
         /// <returns>Populated <see cref="DetailSpec"/>, or null when no table qualifies.</returns>
         private DetailSpec Spec15(CheckContext c)
         {
-            List<DocDef> docs = UsableDocuments(true, false);
+            List<DocDef> docs = UsableDocuments(c.Ctx, true, false);
             if (docs.Count == 0) { return null; }
 
             List<SqlParameter> parameters = Binds();
@@ -1876,21 +2285,29 @@ namespace VASLogic.Models
                 DocDef d = docs[i];
                 string suffix = "V" + (i + 1).ToString(CultureInfo.InvariantCulture);
 
-                string pending = d.HasProcessed
-                    ? "(doc.DocStatus IN (" + DOCSTATUS_OpenList + ") OR COALESCE(doc.Processed,'N')='N')"
-                    : "doc.DocStatus IN (" + DOCSTATUS_OpenList + ")";
+                string a = Alias(d);
 
-                string where = "doc.IsActive='Y' AND doc.DocStatus NOT IN (" + DOCSTATUS_DeadList + ")"
+                string pending = d.HasProcessed
+                    ? "(" + a + ".DocStatus IN (" + DOCSTATUS_OpenList + ") OR COALESCE(" + a + ".Processed,'N')='N')"
+                    : a + ".DocStatus IN (" + DOCSTATUS_OpenList + ")";
+
+                string where = a + ".IsActive='Y' AND " + a + ".DocStatus NOT IN (" + DOCSTATUS_DeadList + ")"
                     + " AND " + pending
-                    + " AND " + PeriodWhere(c, "doc", d.DateColumn, suffix, parameters);
+                    + " AND " + PeriodWhere(c, a, d.DateColumn, suffix, parameters)
+                    + ScreenFilter(d);
 
                 string branch = DocBranchSelect(d, suffix, parameters) + " WHERE " + where;
 
                 if (i > 0) { sql.Append(" UNION ALL "); }
-                sql.Append(SecureBranch(c, branch, "doc"));
+                sql.Append(SecureBranch(c, branch, a));
             }
 
-            return Spec(sql.ToString(), "", "Doc_Date DESC,Doc_Number DESC", parameters, DocColumns());
+            /* Straight date order, and the Screen column stays. Unlike checks 01 and 02
+               this list spans only three inventory documents, which interleave by date
+               rather than group - grouping three screens would just hide the
+               chronology without saving any width. */
+            return Spec(sql.ToString(), "", "Doc_Date DESC,Doc_Number DESC",
+                parameters, DocColumns(true));
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -2659,7 +3076,18 @@ namespace VASLogic.Models
         /// <returns>AD_Language code.</returns>
         private string ctxLanguage(CheckContext c)
         {
-            string language = c.Ctx.GetAD_Language();
+            return ctxLanguage(c.Ctx);
+        }
+
+        /// <summary>
+        /// The session language, defaulted defensively. Overload for the discovery pass,
+        /// which runs before a CheckContext exists.
+        /// </summary>
+        /// <param name="ctx">Session context.</param>
+        /// <returns>AD_Language code.</returns>
+        private string ctxLanguage(Ctx ctx)
+        {
+            string language = ctx == null ? "" : ctx.GetAD_Language();
             return string.IsNullOrEmpty(language) ? "en_US" : language;
         }
 
@@ -2677,8 +3105,29 @@ namespace VASLogic.Models
             public string KeyColumn { get; set; }
             public string DateColumn { get; set; }
             public string AmountColumn { get; set; }
-            public bool ExpectsAccounting { get; set; }
             public bool IsInventory { get; set; }
+
+            /// <summary>The screen this branch stands for; the sort order's basis.</summary>
+            public string ScreenLabel { get; set; }
+
+            /// <summary>
+            /// The screen's window - what the drill-down opens, so a row lands on the
+            /// screen it came from rather than on the table's default one.
+            /// </summary>
+            public int AD_Window_ID { get; set; }
+
+            /// <summary>
+            /// The tab filter that makes this branch a different list from its siblings,
+            /// already resolved against the session context; "" when the branch covers
+            /// the whole table.
+            /// </summary>
+            public string WhereClause { get; set; }
+
+            /// <summary>
+            /// 1-based position in screen-name order, emitted into each UNION branch as
+            /// the sort key the resolved screen label cannot be.
+            /// </summary>
+            public int ScreenRank { get; set; }
 
             public int AD_Table_ID { get; set; }
             public bool HasPosted { get; set; }
@@ -2693,6 +3142,19 @@ namespace VASLogic.Models
             /// TARGET type; "" when the table carries no document type at all.
             /// </summary>
             public string DocTypeKey { get; set; }
+        }
+
+        /// <summary>
+        /// One screen a discovered table is shown on: the window to open, its name, and
+        /// the tab filter that tells it apart from the table's other screens.
+        /// </summary>
+        private class ScreenDef
+        {
+            public int AD_Window_ID { get; set; }
+            public string WindowName { get; set; }
+
+            /// <summary>Resolved and checked; "" when the tab carries no usable filter.</summary>
+            public string WhereClause { get; set; }
         }
 
         /// <summary>One configured control account and its closing balance.</summary>

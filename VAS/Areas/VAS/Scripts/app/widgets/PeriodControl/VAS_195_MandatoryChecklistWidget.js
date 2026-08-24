@@ -128,9 +128,15 @@
         INVALID: { key: 'VAS_192_CouldntLoad', text: "Couldn't load" }
     };
 
-    /* Seven rows per card page - the reference design's own count, and what fits a
-       6x2 cell without an inner scrollbar. */
-    var CARD_PAGE_SIZE = 7;
+    /* Card page size is ADAPTIVE: seven is the reference design's count at its own
+       cell size, but a widget resized taller should show more rows rather than more
+       pages, and one resized shorter must not spill rows behind a clipped edge. Seven
+       is therefore only the starting guess, replaced by a measurement once the first
+       page has been painted and whenever the cell changes size.
+       The ceiling exists so a very tall cell cannot ask for more rows than the
+       checklist has. */
+    var CARD_PAGE_START = 7;
+    var CARD_PAGE_MAX = 23;
     var MODAL_PAGE_SIZE = 25;
 
     /* Starting estimate for the detail grid's row / header heights, in px. It only
@@ -174,6 +180,12 @@
         var _data = null;
         var _schema = null;
         var _cardPage = 1;
+        var _cardPageSize = CARD_PAGE_START;
+
+        /* Re-entrancy guard: the repaint that follows a page-size change resizes the
+           list, which wakes the observer that measured it. Without this the two would
+           chase each other. */
+        var _sizingPage = false;
 
         /* In-flight guard: a period change while one is already running is ignored
            rather than queued, so a rapid click-through cannot stack requests. */
@@ -184,6 +196,10 @@
         var _checkCode = '';
         var _checkTitle = '';
         var _columns = [];
+
+        /* Whether the open check declares a Screen column of its own. When it does not,
+           the document cell carries the screen name as its second line instead. */
+        var _hasScreenColumn = false;
         var _page = 1;
         var _detailSeq = 0;
         var _bodyH = 0;
@@ -403,6 +419,11 @@
                             $root[0].style.setProperty('--widget-inline-size', width + 'px');
                         }
                     }
+
+                    /* A resize changes both the row height (the card's font scale is
+                       driven off its width) and the space available, so the page size
+                       is re-measured on every one. */
+                    syncCardPageSize();
                 });
                 ro.observe($root[0]);
             } catch (e) { }
@@ -518,11 +539,11 @@
             var items = (_data && _data.Items) ? _data.Items : [];
             if (items.length === 0) { renderState(label('VAS_192_CouldntLoad', "Couldn't load"), true); return; }
 
-            var totalPages = Math.max(1, Math.ceil(items.length / CARD_PAGE_SIZE));
+            var totalPages = Math.max(1, Math.ceil(items.length / _cardPageSize));
             if (_cardPage > totalPages) { _cardPage = totalPages; }
 
-            var from = (_cardPage - 1) * CARD_PAGE_SIZE;
-            var to = Math.min(from + CARD_PAGE_SIZE, items.length);
+            var from = (_cardPage - 1) * _cardPageSize;
+            var to = Math.min(from + _cardPageSize, items.length);
 
             var html = '';
             for (var i = from; i < to; i++) {
@@ -531,6 +552,58 @@
 
             $list.html(html);
             paintFooter(items.length, from, to, totalPages);
+
+            /* Measure only after the browser has laid the page out - offsetHeight on a
+               row this statement has just written is not yet meaningful. */
+            if (!_sizingPage) { window.setTimeout(syncCardPageSize, 0); }
+        }
+
+        /* How many rows actually fit the list area at its current size.
+           The TALLEST painted row is the unit, not the first: a check with a summary
+           line under its title is taller than one without, and sizing to the shorter
+           kind would clip the taller ones. */
+        function measureCardPageSize() {
+            if (!$list || !$list[0]) { return _cardPageSize; }
+
+            var rows = $list[0].querySelectorAll('.vas-195-row');
+            if (!rows.length) { return _cardPageSize; }
+
+            var rowH = 0;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].offsetHeight > rowH) { rowH = rows[i].offsetHeight; }
+            }
+            if (rowH <= 0) { return _cardPageSize; }
+
+            var available = $list[0].clientHeight;
+            if (available <= 0) { return _cardPageSize; }
+
+            var fits = Math.floor(available / rowH);
+            if (!isFinite(fits) || fits < 1) { fits = 1; }
+            if (fits > CARD_PAGE_MAX) { fits = CARD_PAGE_MAX; }
+
+            return fits;
+        }
+
+        /* Adopts a new page size and repaints, keeping the reader where they were:
+           the item that led the old page leads the new one, so growing the widget
+           reveals more rows around what you were looking at instead of throwing you
+           back to page 1. */
+        function syncCardPageSize() {
+            if (_sizingPage || !_data) { return; }
+
+            var next = measureCardPageSize();
+            if (next === _cardPageSize) { return; }
+
+            var firstIndex = (_cardPage - 1) * _cardPageSize;
+
+            _sizingPage = true;
+            try {
+                _cardPageSize = next;
+                _cardPage = Math.floor(firstIndex / _cardPageSize) + 1;
+                paintList();
+            } finally {
+                _sizingPage = false;
+            }
         }
 
         function buildRow(item) {
@@ -915,6 +988,11 @@
                     if (data.Schema) { _schema = data.Schema; }
 
                     _columns = data.Columns || [];
+                    _hasScreenColumn = false;
+                    for (var i = 0; i < _columns.length; i++) {
+                        if (_columns[i].Type === 'SCREEN') { _hasScreenColumn = true; break; }
+                    }
+
                     _page = data.PageNo || 1;
                     renderModalRows(data);
                 },
@@ -1042,15 +1120,30 @@
            the row is navigable at all (an active window the role may open, a real
            record, and a key column to position by); without that it stays plain text
            rather than offering a dead link. Where the check supplied its own value in
-           the cell (a recurring name, a period name) that wins over the resolver's. */
+           the cell (a recurring name, a period name) that wins over the resolver's.
+
+           When the check declares NO Screen column - checks 01 and 02, whose rows are
+           already grouped by screen - the screen name goes UNDER the document number
+           instead. It is the same fact either way; a second line inside a cell that is
+           already there costs no column width, and a reader landing mid-list still
+           knows which screen a document belongs to without scrolling back to find the
+           head of its group. */
         function docCell(row, raw) {
             var text = raw != null && String(raw) !== ''
                 ? String(raw)
                 : (row.DocumentDisplayValue || '');
 
+            var screen = (!_hasScreenColumn && row.ScreenDisplayName) ? row.ScreenDisplayName : '';
+            var sub = screen
+                ? '<span class="vas-195-docsub" title="' + escapeHtml(screen) + '">' +
+                      escapeHtml(screen) + '</span>'
+                : '';
+
             if (!row.CanNavigate) {
-                return '<span class="vas-195-dcell vas-195-dcell-b" title="' + escapeHtml(text) + '">' +
-                    escapeHtml(text) + '</span>';
+                return '<span class="vas-195-dcell vas-195-dcell-doc">' +
+                    '<span class="vas-195-docmain vas-195-dcell-b" title="' + escapeHtml(text) + '">' +
+                        escapeHtml(text) + '</span>' + sub +
+                '</span>';
             }
 
             return '<span class="vas-195-dcell vas-195-dcell-doc">' +
@@ -1059,6 +1152,7 @@
                     ' data-record="' + (row.Record_ID || 0) + '"' +
                     ' data-window="' + (row.AD_Window_ID || 0) + '"' +
                     ' title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</button>' +
+                sub +
             '</span>';
         }
 
