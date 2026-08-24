@@ -50,10 +50,16 @@ namespace VASLogic.Models
     ///               with the TABLE name, every generated statement aliases the source
     ///               table to its own name rather than to something short.
     ///
-    ///               Where those clauses cannot separate the windows - a clause with
-    ///               @context@ variables this widget cannot resolve, or none at all -
-    ///               the table collapses back to ONE row covering all its records. One
-    ///               honest row beats several rows each listing the same documents.
+    ///               A clause carrying @variables@ is RESOLVED against the session
+    ///               context first (Env.ParseContext, window 0), so the global ones -
+    ///               @#AD_Client_ID@ and its kind - work normally. Only a window-level
+    ///               variable, which needs a current record this widget does not have,
+    ///               is refused.
+    ///
+    ///               Where the clauses still cannot separate the windows - an
+    ///               unresolvable variable, or no clause at all - the table collapses
+    ///               back to ONE row covering all its records, and says so in the log.
+    ///               One honest row beats several rows each listing the same documents.
     ///
     ///               Dynamic SQL, safely: a bind parameter cannot be a table or column
     ///               identifier, so the physical statement is composed server-side -
@@ -98,7 +104,10 @@ namespace VASLogic.Models
     ///               AddAccessSQL so the FROM-clause parser is not confused by a
     ///               trailing clause. Compatible with PostgreSQL and Oracle.
     /// Chronological development:
-    ///   VAI154      2026-08-21 Created
+    ///   VAI145      2026-08-21 Created
+    ///   VAI145      2026-08-24 Tab WhereClause resolved against the session context
+    ///                          instead of being discarded whenever it carried an '@';
+    ///                          window name falls back to AD_Window.Name
     /// </summary>
     public class VAS_197_UnProcessedDocumentsModel
     {
@@ -866,7 +875,10 @@ namespace VASLogic.Models
                        COALESCE(tab.WhereClause,N'') AS Tab_Where_Clause,
                        w.AD_Window_ID AS AD_Window_ID,
                        COALESCE(wtrl.Name,w.DisplayName,N'') AS Window_Name
-                FROM AD_Tab tab
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (c.AD_Table_ID=t.AD_Table_ID)
+                INNER JOIN AD_Field f ON (f.AD_Column_ID=c.AD_Column_ID)
+                INNER JOIN AD_Tab tab ON (tab.AD_Tab_ID=f.AD_Tab_ID)
                 INNER JOIN AD_Window w ON (w.AD_Window_ID=tab.AD_Window_ID)
                 INNER JOIN AD_Menu m ON (m.AD_Window_ID=w.AD_Window_ID)
                 LEFT OUTER JOIN AD_Window_Trl wtrl ON (wtrl.AD_Window_ID=w.AD_Window_ID AND wtrl.AD_Language=@AD_Language AND wtrl.IsActive='Y')
@@ -874,6 +886,7 @@ namespace VASLogic.Models
                 WHERE tab.IsActive='Y'
                   AND m.IsActive = 'Y'
                   AND tab.IsDisplayed='Y'
+                  AND c.ColumnName='" + COLUMN_DOCSTATUS+ @"'
                   AND w.IsActive='Y'";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "tab", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -903,7 +916,7 @@ namespace VASLogic.Models
                 screen.AD_Tab_ID = Util.GetValueOfInt(dr["AD_Tab_ID"]);
                 screen.WindowName = Util.GetValueOfString(dr["Window_Name"]);
                 screen.TabName = Util.GetValueOfString(dr["Tab_Name"]);
-                screen.WhereClause = Util.GetValueOfString(dr["Tab_Where_Clause"]);
+                screen.WhereClause = ResolveWhereClause(ctx, Util.GetValueOfString(dr["Tab_Where_Clause"]));
 
                 if (screen.AD_Window_ID <= 0) { continue; }
 
@@ -1009,17 +1022,70 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Whether a tab's WhereClause may be pasted into this widget's SQL.
+        /// Resolves a tab's WhereClause against the SESSION context and returns the
+        /// usable text, or "" when it cannot be used here.
         ///
-        /// The text is the framework's own filter for that window rather than anything
-        /// a user typed, and it is executed verbatim every time the window opens - but
-        /// it IS dictionary data, and dictionary data can be edited, so it is checked
-        /// before it is concatenated. Rejected: an @context@ variable (this widget has
-        /// no window context to resolve one against, and a half-resolved predicate
-        /// silently returns the wrong rows), a statement terminator, and either
-        /// comment form, any of which could hide what follows.
+        /// Most dictionary WhereClauses that carry an @variable@ carry a GLOBAL one -
+        /// @#AD_Client_ID@ and friends - which the session context can supply perfectly
+        /// well. Rejecting every clause containing an '@' therefore threw away filters
+        /// that were entirely resolvable, and with them the screens those filters exist
+        /// to tell apart: a window whose clause was discarded stops being separable, and
+        /// once fewer than two remain, every window over that table collapses into one
+        /// row. That is what made Blanket Sales Order and Sales Quotation disappear.
+        ///
+        /// So the clause is PARSED first, with window number 0 - this widget has no
+        /// window and no current record, so only global context resolves, which is the
+        /// point. What Env.ParseContext cannot fill in it reports by returning empty,
+        /// and anything that still carries an '@' afterwards was a window-level
+        /// variable this widget genuinely cannot answer for. Those are still refused:
+        /// a half-resolved predicate does not fail loudly, it silently returns the
+        /// wrong rows, which on a close checklist is the worse outcome.
+        ///
+        /// The safety check runs on the RESOLVED text, not the raw text, so a context
+        /// value cannot smuggle in a terminator or a comment.
         /// </summary>
+        /// <param name="ctx">Session context (supplies the global variables).</param>
         /// <param name="clause">AD_Tab.WhereClause, possibly empty.</param>
+        /// <returns>The resolved, checked clause, or "" when unusable.</returns>
+        private string ResolveWhereClause(Ctx ctx, string clause)
+        {
+            if (clause == null) { return ""; }
+
+            string text = clause.Trim();
+            if (text.Length == 0) { return ""; }
+
+            if (text.IndexOf('@') >= 0)
+            {
+                try
+                {
+                    text = Env.ParseContext(ctx, 0, text, false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Log(Level.WARNING, "VAS_197: a tab WhereClause could not be resolved "
+                        + "against the session context and is ignored", ex);
+                    return "";
+                }
+
+                if (string.IsNullOrEmpty(text)) { return ""; }
+                text = text.Trim();
+            }
+
+            return IsUsableWhereClause(text) ? text : "";
+        }
+
+        /// <summary>
+        /// Whether an ALREADY RESOLVED WhereClause may be pasted into this widget's SQL.
+        ///
+        /// The text is the framework's own filter for that window rather than anything a
+        /// user typed, and it is executed verbatim every time the window opens - but it
+        /// IS dictionary data, and dictionary data can be edited, so it is checked
+        /// before it is concatenated. Rejected: a surviving @variable@ (see
+        /// <see cref="ResolveWhereClause"/> - by this point it is one the session
+        /// context could not answer for), a statement terminator, and either comment
+        /// form, any of which could hide what follows.
+        /// </summary>
+        /// <param name="clause">Resolved WhereClause, possibly empty.</param>
         /// <returns>true when the clause is safe and self-contained.</returns>
         private bool IsUsableWhereClause(string clause)
         {

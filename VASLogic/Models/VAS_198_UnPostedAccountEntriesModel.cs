@@ -892,10 +892,13 @@ namespace VASLogic.Models
         {
             Dictionary<int, List<ScreenItem>> byTable = new Dictionary<int, List<ScreenItem>>();
 
-            /* AD_Window carries no DisplayName column in this schema, so the screen
-               name is AD_Window.Name, preferring its translation for the session
-               language where one is seeded. The tab name is translated the same way -
-               it is what disambiguates two sources on one window. */
+            /* Screen name: the session language's translation, then the window's
+               DisplayName, then its Name. AD_Window.Name is the last resort but it must
+               be there - DisplayName is optional and often null, and without this
+               fallback such a window resolves to an empty name, falls back to its tab's
+               (generic) name and sorts ahead of its siblings. The tab name is
+               translated the same way - it is what disambiguates two sources on one
+               window. */
             string sql = @"
                 SELECT DISTINCT t.AD_Table_ID AS AD_Table_ID,
                        tab.AD_Tab_ID AS AD_Tab_ID,
@@ -903,7 +906,7 @@ namespace VASLogic.Models
                        tab.SeqNo AS Tab_Seq_No,
                        COALESCE(tab.WhereClause,N'') AS Tab_Where_Clause,
                        w.AD_Window_ID AS AD_Window_ID,
-                       COALESCE(wtrl.Name,w.DisplayName,N'') AS Window_Name
+                       COALESCE(wtrl.Name,w.DisplayName,w.Name,N'') AS Window_Name
                 FROM AD_Table t
                 INNER JOIN AD_Column c ON (c.AD_Table_ID=t.AD_Table_ID)
                 INNER JOIN AD_Field f ON (f.AD_Column_ID=c.AD_Column_ID)
