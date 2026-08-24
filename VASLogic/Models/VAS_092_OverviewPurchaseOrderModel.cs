@@ -326,6 +326,26 @@
 ///                        The body (TextMsg, flattened) travels with the row so
 ///                        the panel reveals it on click. Read in one query for
 ///                        the whole feed through VAS_ActivitySourcesModel.
+///   VAI163   2026-08-24  - VendorEmail: the address the panel's Send Invoice
+///                          button seeds the share/e-mail form's recipient with,
+///                          beside the vendor's name. The order's own contact
+///                          address is preferred; any active contact of the
+///                          vendor (MIN over AD_User, so the scalar sub-select
+///                          cannot return two rows and raise on Oracle) stands in
+///                          when the order names none. A blank one is not a
+///                          failure — VAS_SentEmailDocModel resolves the
+///                          recipient from AD_Table_ID + RecordID on the server.
+///                        - IsEmailSent (C_Order.VAS_IsEmailSent) so the Order
+///                          Progress "With Vendor" stage can report "Email Sent"
+///                          or "Pending" rather than repeating the completion
+///                          date the stage above it already carries. Read in its
+///                          OWN statement (LoadEmailSent) and ATTEMPTED rather
+///                          than gated on ColumnExists: it is a module column, so
+///                          selecting it alongside the header would fail the
+///                          WHOLE overview on a deployment that has not taken it,
+///                          and the dictionary guard has its own failure modes
+///                          (see LoadBlanketOrigin). A missing column throws once
+///                          and the stage reads "Pending".
 /// </summary>
 
 using System;
@@ -384,6 +404,17 @@ namespace VASLogic.Models
                               bpc.Name            AS ContactName,
                               bpc.Phone           AS ContactPhone,
                               bpc.EMail           AS ContactEmail,
+                              -- The VENDOR's own e-mail address, used to seed the
+                              -- Send Invoice recipient when the order names no
+                              -- contact of its own. MIN, not a bare column: a
+                              -- vendor can carry several contacts and a scalar
+                              -- sub-select that returns more than one row raises
+                              -- on Oracle instead of answering.
+                              (SELECT MIN(bpu.EMail)
+                                 FROM AD_User bpu
+                                WHERE bpu.C_BPartner_ID = o.C_BPartner_ID
+                                  AND bpu.IsActive      = 'Y'
+                                  AND bpu.EMail IS NOT NULL)                    AS VendorEMail,
                               sr.Name             AS BuyerName,
                               cu.Name             AS CreatedByName,
                               pt.Name             AS PaymentTermName,
@@ -497,6 +528,13 @@ namespace VASLogic.Models
             result.ContactName   = Util.GetValueOfString(r["ContactName"]);
             result.ContactPhone  = Util.GetValueOfString(r["ContactPhone"]);
             result.ContactEmail  = Util.GetValueOfString(r["ContactEmail"]);
+            // Recipient seed for the Send Invoice / share-document flow. The
+            // order's own contact address is preferred — it is the person this
+            // purchase order was actually placed with — and any active contact of
+            // the vendor stands in when the order names none.
+            result.VendorEmail   = result.ContactEmail.Trim().Length > 0
+                                   ? result.ContactEmail
+                                   : Util.GetValueOfString(r["VendorEMail"]);
             result.BuyerName     = Util.GetValueOfString(r["BuyerName"]);
             result.CreatedByName = Util.GetValueOfString(r["CreatedByName"]);
             result.PaymentTermName = Util.GetValueOfString(r["PaymentTermName"]);
@@ -587,6 +625,9 @@ namespace VASLogic.Models
             result.IsInvoiceRaised    = invoiced;
             result.IsPaymentDone      = paid;
             result.CurrentStage       = ComputeCurrentStage(result);
+
+            // ----- With Vendor: has the order been e-mailed out? -----
+            LoadEmailSent(C_Order_ID, result);
 
             // ----- Per-stage action dates (for the progress stepper) -----
             result.OrderCompletedDate = GetOrderCompletedDate(C_Order_ID);
@@ -2295,6 +2336,55 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// Remembers whether C_Order.VAS_IsEmailSent is readable against this
+        /// schema, so a deployment without the column reports it once rather than
+        /// on every order the panel opens.
+        /// </summary>
+        private static bool? _emailSentLookupUsable;
+
+        /// <summary>
+        /// Whether the purchase order has been e-mailed to the vendor
+        /// (C_Order.VAS_IsEmailSent = 'Y'), which is what the Order Progress
+        /// "With Vendor" stage reports — "Email Sent" against a true flag,
+        /// "Pending" otherwise.
+        ///
+        /// Read in its OWN statement rather than as a column of the main SELECT,
+        /// and ATTEMPTED rather than gated on ColumnExists — the same reasoning as
+        /// <see cref="LoadBlanketOrigin"/>. VAS_IsEmailSent is a module column: a
+        /// deployment that has not taken it would fail the whole overview if it
+        /// were selected alongside the header, and the dictionary guard has its own
+        /// failure modes (a missing AD_Column row, or an AD_Table carrying more
+        /// than one row named C_Order, which makes the guard's scalar sub-select
+        /// raise instead of answer). A genuinely missing column throws once here
+        /// and the stage simply reads "Pending".
+        /// </summary>
+        /// <param name="C_Order_ID">Selected purchase order id.</param>
+        /// <param name="d">Overview being populated.</param>
+        private void LoadEmailSent(int C_Order_ID, PurchaseOrderOverviewData d)
+        {
+            if (_emailSentLookupUsable == false) return;
+
+            try
+            {
+                // COALESCE, not NVL: this statement has to read the same on Oracle
+                // and PostgreSQL.
+                string sql = @"SELECT COALESCE(o.VAS_IsEmailSent, 'N') AS IsEmailSent
+                                 FROM C_Order o
+                                WHERE o.C_Order_ID = @C_Order_ID";
+                object v = DB.ExecuteScalar(sql, OrderParam(C_Order_ID), null);
+                _emailSentLookupUsable = true;
+                d.IsEmailSent = Util.GetValueOfString(v) == "Y";
+            }
+            catch (Exception ex)
+            {
+                // Almost certainly "no such column" on a schema without the
+                // module column. Recorded so the next order skips the attempt.
+                _emailSentLookupUsable = false;
+                _log.Severe("LoadEmailSent (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Returns the moment the order was completed: the Created stamp of its
         /// workflow DocComplete activity (AD_WF_Process -> AD_WF_Activity ->
         /// AD_WF_Node), or null when the order has no completed workflow node.
@@ -3232,6 +3322,10 @@ namespace VASLogic.Models
             public string    ContactName     { get; set; }
             public string    ContactPhone    { get; set; }
             public string    ContactEmail    { get; set; }
+            /// <summary>Vendor e-mail address that seeds the Send Invoice
+            /// recipient: the order's own contact address, falling back to any
+            /// active contact of the vendor.</summary>
+            public string    VendorEmail     { get; set; }
 
             // Meta
             public string    BuyerName       { get; set; }
@@ -3313,6 +3407,10 @@ namespace VASLogic.Models
             public bool      IsInvoiceRaised    { get; set; }
             public bool      IsPaymentDone      { get; set; }
             public int       CurrentStage       { get; set; }    // 1..7
+            /// <summary>C_Order.VAS_IsEmailSent = 'Y' — the order was e-mailed to
+            /// the vendor. Reported by the "With Vendor" stage as "Email Sent"
+            /// against a true flag and "Pending" otherwise.</summary>
+            public bool      IsEmailSent        { get; set; }
 
             // Per-stage action dates (progress stepper sub-line)
             public DateTime? OrderCompletedDate { get; set; }    // DocComplete workflow node

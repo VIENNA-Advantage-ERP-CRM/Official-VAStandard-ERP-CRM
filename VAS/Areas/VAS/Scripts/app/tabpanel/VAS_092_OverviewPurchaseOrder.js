@@ -341,6 +341,23 @@
  *                        each one - who it went to, its subject, when it went
  *                        and who sent it, then the message itself. The body is
  *                        shown ONLY once the row is opened.
+ *   VAI163   2026-08-24  - A Send Invoice button in the header strip
+ *                          (.vas_092-actions) opens the Preview and Share
+ *                          Document form on this order through the shared
+ *                          VAS_SentEmailDoc form, with the recipient seeded from
+ *                          the VENDOR - its name and e-mail address. It runs off
+ *                          the tab's own print process, so it is disabled (not
+ *                          hidden) on a window that carries none; a blank address
+ *                          is not a failure, VAS_SentEmailDoc resolves the
+ *                          recipient on the server from AD_Table_ID + RecordID.
+ *                          Follows VAS_189_ARInvoiceDetailPanel.
+ *                        - Order Progress: the "With Vendor" stage reads
+ *                          "Email Sent" or "Pending" (C_Order.VAS_IsEmailSent)
+ *                          instead of repeating the completion date the Completed
+ *                          stage above it already carries - a date that said the
+ *                          order was finished, never that it had reached the
+ *                          vendor. A stage may now carry its own sub-line (meta),
+ *                          which holds in every state.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -386,6 +403,7 @@
         this.record_ID = 0;
         this.table_ID = 0;
         this.windowNo = 0;
+        this.AD_Window_ID = 0;
         this.curTab = null;
         this.selectedRow = null;
         this.panelWidth;
@@ -459,6 +477,9 @@
             VAS_092_FullyReceived: "Received",
             VAS_092_WithVendor: "With Vendor",
             VAS_092_Drafted: "Drafted",
+            // Header action bar
+            VAS_092_SendInvoice: "Send Invoice",
+            VAS_092_ActionFailed: "The action could not be completed.",
             // Generated From
             VAS_092_GeneratedFrom: "Generated From",
             VAS_092_Manual: "Manual",
@@ -491,6 +512,7 @@
             VAS_092_Stage: "Stage",
             VAS_092_InProgress: "In progress",
             VAS_092_Pending: "Pending",
+            VAS_092_EmailSent: "Email Sent",
             VAS_092_Required: "Required",
             // Line items
             VAS_092_Items: "items",
@@ -949,6 +971,7 @@
             $top.append($pills);
 
             $strip.append($top);
+            renderActions($strip);
             $body.append($strip);
 
             // --- Details card: vendor identity (left) + terms fields (right) ---
@@ -999,6 +1022,73 @@
             if ($right.children().length) $card.append($right);
 
             $body.append($card);
+        }
+
+        // ---------- Header action bar ---------- //
+
+        // Send Invoice runs off the TAB's print process (the same one the
+        // framework's own print button uses), so the control is disabled — not
+        // hidden — when the window carries none: an absent button reads as a
+        // missing feature, a disabled one as a document that cannot be printed.
+        function renderActions($parent) {
+            var hasPrintProcess = $self.curTab
+                && typeof $self.curTab.getAD_Process_ID === "function"
+                && +$self.curTab.getAD_Process_ID() > 0;
+
+            var $a = $('<div class="vas_092-actions"></div>');
+            var $send = $('<button type="button" class="vas_092-btn"></button>');
+            $send.append(svgIcon("send"));
+            $send.append($('<span></span>').text(getMsg("VAS_092_SendInvoice")));
+            $send.prop("disabled", !hasPrintProcess);
+            $send.on("click", function () { if (hasPrintProcess) sendInvoiceEmail(); });
+            $a.append($send);
+            $parent.append($a);
+        }
+
+        // AD_Process_ID / AD_Table_ID / AD_Window_ID for the share flow, read off
+        // the current grid tab — the same values the framework's print button
+        // works from. Mirrors VAS_189_ARInvoiceDetailPanel.
+        function printContext() {
+            var tab = $self.curTab;
+            return {
+                AD_Process_ID: (tab && typeof tab.getAD_Process_ID === "function") ? tab.getAD_Process_ID() : 0,
+                AD_Table_ID: (tab && typeof tab.getAD_Table_ID === "function") ? tab.getAD_Table_ID() : ($self.table_ID || 0),
+                AD_Window_ID: (tab && typeof tab.getAD_Window_ID === "function") ? tab.getAD_Window_ID() : ($self.AD_Window_ID || 0),
+                RecordID: $self.record_ID,
+                ToName: (data && data.VendorName) ? data.VendorName : "",
+                ToEmail: (data && data.VendorEmail) ? data.VendorEmail : ""
+            };
+        }
+
+        // Open the Preview and Share Document form (the shared VA112 share/e-mail
+        // panel) on this purchase order, with the recipient seeded from the
+        // VENDOR — its name and e-mail address. When the address is blank
+        // VAS_SentEmailDoc resolves it on the server from AD_Table_ID + RecordID,
+        // so a vendor with no address on the order still reaches its contact.
+        function sendInvoiceEmail() {
+            if (!$self.record_ID || !$self.curTab) return;
+            if (!VAS.VAS_SentEmailDoc || typeof VAS.VAS_SentEmailDoc.sendEmail !== "function") {
+                toast(getMsg("VAS_092_ActionFailed"), true);
+                return;
+            }
+
+            var ctxRes = printContext();
+            if (!ctxRes.AD_Process_ID || !ctxRes.AD_Table_ID || !ctxRes.AD_Window_ID) {
+                toast(getMsg("VAS_092_ActionFailed"), true);
+                return;
+            }
+
+            // Called as a plain static, not with `new`: it returns nothing and
+            // instantiates the form itself.
+            VAS.VAS_SentEmailDoc.sendEmail({
+                windowNo: $self.windowNo,
+                AD_Process_ID: ctxRes.AD_Process_ID,
+                AD_Table_ID: ctxRes.AD_Table_ID,
+                RecordID: ctxRes.RecordID,
+                AD_Window_ID: ctxRes.AD_Window_ID,
+                Name: ctxRes.ToName,
+                EMailID: ctxRes.ToEmail
+            });
         }
 
         function headerPill(label, tone, icon, withDot) {
@@ -1256,6 +1346,13 @@
             var paymentLabel = data.IsPaymentDone
                 ? getMsg("VAS_092_PaymentCompleted")
                 : getMsg("VAS_092_PendingAmount");
+            // With Vendor reports whether the order has actually gone OUT to the
+            // vendor (C_Order.VAS_IsEmailSent) — "Email Sent" or "Pending". It
+            // used to repeat the completion date the Completed stage above it
+            // already carries, which said nothing about the vendor having it.
+            var withVendorMeta = data.IsEmailSent
+                ? getMsg("VAS_092_EmailSent")
+                : getMsg("VAS_092_Pending");
             return [
                 // stamp: true marks a date that is a stored TIMESTAMP (UTC, no
                 // zone designator) rather than a document date field, so it is
@@ -1263,7 +1360,7 @@
                 // late in the local evening reports the following UTC day.
                 { key: "VAS_092_Drafted",          done: true,                     active: data.CurrentStage === 1, date: data.Created || data.DateOrdered, stamp: true },
                 { key: "VAS_092_Completed",        done: data.IsCompleted,         active: data.CurrentStage === 2, date: data.OrderCompletedDate || data.DateOrdered },
-                { key: "VAS_092_WithVendor",       done: data.IsWithVendor,        active: data.CurrentStage === 3, date: data.OrderCompletedDate || data.DateOrdered },
+                { key: "VAS_092_WithVendor",       done: data.IsWithVendor,        active: data.CurrentStage === 3, date: data.OrderCompletedDate || data.DateOrdered, meta: withVendorMeta },
                 { key: "VAS_092_ExpectedDelivery", done: data.IsExpectedDelivery,  active: data.CurrentStage === 4, date: data.DatePromised, required: true },
                 // The receipt stage dates from when the GRN was CREATED (model
                 // side), which is a stamp — not the movement date it used to
@@ -1308,6 +1405,9 @@
                         ? getMsg("VAS_092_Required") + " " + dateText
                         : dateText;
                 }
+                // A stage that states its own sub-line (With Vendor) keeps it in
+                // every state — the sentence is the point, not the date.
+                if (s.meta) metaText = s.meta;
 
                 $tl.append(stepEntry(i + 1, s.label || getMsg(s.key), metaText, s.done, stateCls));
             }
@@ -2825,6 +2925,7 @@
             chevLeft: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
             chevRight: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
             alert: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+            send:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4Z"/></svg>',
             history: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>'
         };
 
@@ -2961,6 +3062,11 @@
         this.curTab = curTab;
         if (curTab && typeof curTab.getAD_Table_ID === "function") {
             this.table_ID = curTab.getAD_Table_ID();
+        }
+        // Cached for the share flow's fallback, so printContext() still resolves
+        // the window on a build whose tab does not expose the getter.
+        if (curTab && typeof curTab.getAD_Window_ID === "function") {
+            this.AD_Window_ID = curTab.getAD_Window_ID();
         }
         this.init();
         // Watch the tab itself so New Record (which never calls refreshPanelData)

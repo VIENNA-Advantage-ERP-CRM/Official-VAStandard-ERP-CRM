@@ -944,9 +944,9 @@
    drawer is a grid inside the line table, and a grid item placed at the end of
    its track sits right whatever a competing rule does to text-align. */
 .vas_100-qpMini .vas_100-qpMiniRow > span.vas_100-ta-r {
-    justify-self: end;
+   /* justify-self: end;*/
     max-width: 100%;
-    text-align: right;
+    text-align: left;
     font-variant-numeric: tabular-nums;
 }
 .vas_100-qpMini .vas_100-qpMiniRow > span.vas_100-ta-c {

@@ -163,6 +163,11 @@
  *                        track in the panel now has a floor of 0 rather than its
  *                        own content. Consistency pass — this panel's cells
  *                        already clipped, so nothing here was overlapping.
+ *   VAI163   2026-08-24  Added the header action bar (.vas_092-actions /
+ *                        .vas_092-btn) carrying the Send Invoice control — an
+ *                        outlined action pill in the panel's action colour,
+ *                        wrapping on a narrow panel, with a muted disabled
+ *                        state for a window that carries no print process.
  ***********************************************************/
 
 .vas_092-root {
@@ -365,6 +370,53 @@
     background: currentColor;
     flex: none;
 }
+
+/* ----------------------------------------------------------- */
+/*  Header — action bar                                         */
+/* ----------------------------------------------------------- */
+/* Pill row under the title / status pills. Wraps rather than clipping, and
+   the row collapses to nothing when it holds no enabled control. */
+.vas_092-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5em;
+    margin-top: 0.875em;
+}
+
+.vas_092-btn {
+    font-family: inherit;
+    font-size: 0.8125em;
+    font-weight: 400;
+    line-height: 1.2;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.5em 0.875em;
+    border-radius: 999px;
+    border: 1px solid var(--vaspo-action);
+    background: #fff;
+    color: var(--vaspo-action);
+    transition: background .15s, border-color .15s, color .15s;
+}
+
+.vas_092-btn:hover:not(:disabled) {
+    background: var(--vaspo-info-bg);
+    border-color: var(--vaspo-action-dk);
+    color: var(--vaspo-action-dk);
+}
+
+/* Disabled, not hidden: the window carries no print process, so there is
+   nothing to share — an absent button would read as a missing feature. */
+.vas_092-btn:disabled {
+    border-color: var(--vaspo-card-bd);
+    color: var(--vaspo-muted);
+    background: #fff;
+    cursor: not-allowed;
+}
+
+.vas_092-btn .vas_092-ic { color: currentColor; display: inline-flex; flex: none; }
 
 /* ----------------------------------------------------------- */
 /*  Header — details card (vendor | terms)                      */

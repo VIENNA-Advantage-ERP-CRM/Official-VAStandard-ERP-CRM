@@ -386,6 +386,19 @@
  *                        each one - who it went to, its subject, when it went
  *                        and who sent it, then the message itself. The body is
  *                        shown ONLY once the row is opened.
+ *   VAI163   2026-08-24  The Reference strip's BLANKET ORDER chip takes its window
+ *                        from the payload (data.BlanketOrderWindowId) rather than
+ *                        resolving the name for itself. The name is still sent and
+ *                        still tried, but only second: the client's own lookup
+ *                        falls through to the TABLE's zoom target when it comes
+ *                        back empty, and C_Order's zoom target is the ordinary
+ *                        order screen — so a blanket SALES order opened the Sales
+ *                        Order window filtered to a record that window does not
+ *                        carry, instead of VAS_BlanketSalesOrder. A window the
+ *                        server could not resolve now leaves the chip as plain
+ *                        text, still naming the document, rather than opening the
+ *                        wrong screen. Same treatment the VA075 / VAMFG chips
+ *                        already had.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -955,17 +968,28 @@
             // behind the request, reached from the same reference either directly or
             // through the release it points at (model side).
             //
-            // It names its own window rather than letting the table choose one: a
-            // blanket order is a C_Order like any other, so nothing about the record
-            // itself says it opens the blanket screen instead of the ordinary order
-            // screen — and a blanket SALES order opens a different one again.
+            // Its window comes from the PAYLOAD, resolved on the server by name and
+            // against the role. A blanket order is a C_Order like any other, so
+            // nothing about the record itself says it opens the blanket screen
+            // rather than the ordinary order one — and a blanket SALES order opens a
+            // different one again.
+            //
+            // The name travels too, but only as the second attempt: it is the
+            // server-resolved id that matters here, because the client's own name
+            // lookup falls through to the TABLE's zoom target when it comes back
+            // empty, and C_Order's zoom target is the ordinary order screen. That
+            // fall-through is what stopped a blanket sales order opening — the click
+            // started the Sales Order window filtered to a record it does not carry.
+            // A window the server could not resolve now leaves the chip as plain
+            // text, still naming the document, rather than opening the wrong screen.
             if (data.BlanketOrderNo) {
                 var $blanket = originChip("doc",
                     data.BlanketOrderIsSOTrx
                         ? msg("BlanketSalesOrder", "Blanket Sales Order")
                         : msg("BlanketOrder", "Blanket Purchase Order"),
                     countedValue(data.BlanketOrderNo, data.BlanketOrderCount),
-                    "success", "C_Order", data.BlanketOrderId, "", undefined,
+                    "success", "C_Order", data.BlanketOrderId, "",
+                    data.BlanketOrderWindowId,
                     data.BlanketOrderIsSOTrx ? "VAS_BlanketSalesOrder"
                                              : "VAS_BlanketPurchaseOrder");
                 if (data.BlanketOrderIsSOTrx) $blanket.attr("data-open-sotrx", "Y");

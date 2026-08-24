@@ -172,6 +172,11 @@
  *                        inside their word (overflow-wrap) so a shrunken step
  *                        cannot paint over its neighbour, and the narrow-panel
  *                        header grids took the minmax floor.
+ *   VAI163   2026-08-24  Added the header action bar (.vas_106-actions /
+ *                        .vas_106-btn) carrying the Send Invoice control — an
+ *                        outlined action pill in the panel's action colour,
+ *                        wrapping on a narrow panel, with a muted disabled state
+ *                        for a window that carries no print process.
  ***********************************************************/
 
 .vas_106-root {
@@ -294,6 +299,34 @@
 .vas_106-hdrPill.vas_106-tone-neutral { background: var(--vaso-neutral-bg); color: var(--vaso-neutral-tx); }
 .vas_106-hdrPill .vas_106-ic { color: currentColor; }
 .vas_106-hdrDot { width: 0.5em; height: 0.5em; border-radius: 50%; background: currentColor; flex: none; }
+
+/* ----------------------------------------------------------- */
+/*  Header — action bar                                         */
+/* ----------------------------------------------------------- */
+/* Pill row under the title / status pills. Wraps rather than clipping. */
+.vas_106-actions {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: 0.5em; margin-top: 0.875em;
+}
+
+.vas_106-btn {
+    font-family: inherit; font-size: 0.8125em; font-weight: 400; line-height: 1.2;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 0.5em;
+    padding: 0.5em 0.875em; border-radius: 999px;
+    border: 1px solid var(--vaso-action); background: #fff; color: var(--vaso-action);
+    transition: background .15s, border-color .15s, color .15s;
+}
+.vas_106-btn:hover:not(:disabled) {
+    background: var(--vaso-faint-blue);
+    border-color: var(--vaso-action-dk); color: var(--vaso-action-dk);
+}
+/* Disabled, not hidden: the window carries no print process, so there is nothing
+   to share — an absent button would read as a missing feature. */
+.vas_106-btn:disabled {
+    border-color: var(--vaso-card-bd); color: var(--vaso-muted);
+    background: #fff; cursor: not-allowed;
+}
+.vas_106-btn .vas_106-ic { color: currentColor; display: inline-flex; flex: none; }
 
 /* ----------------------------------------------------------- */
 /*  Customer identity card                                      */

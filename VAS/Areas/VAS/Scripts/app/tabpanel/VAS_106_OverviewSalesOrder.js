@@ -385,6 +385,35 @@
  *                        each one - who it went to, its subject, when it went
  *                        and who sent it, then the message itself. The body is
  *                        shown ONLY once the row is opened.
+ *   VAI163   2026-08-24  - A Send Invoice button in the header strip
+ *                          (.vas_106-actions) opens the Preview and Share Document
+ *                          form on this order through the shared VAS_SentEmailDoc
+ *                          form, with the recipient seeded from the CUSTOMER - its
+ *                          name and e-mail address. It runs off the tab's own print
+ *                          process, so it is disabled (not hidden) on a window that
+ *                          carries none; a blank address is not a failure,
+ *                          VAS_SentEmailDoc resolves the recipient on the server
+ *                          from AD_Table_ID + RecordID. Follows
+ *                          VAS_189_ARInvoiceDetailPanel.
+ *                        - An "Email Sent" badge (C_Order.VAS_IsEmailSent) sits
+ *                          beside Posted in the header, drawn only when the flag is
+ *                          set - the same milestone rule Posted follows. There is
+ *                          no "Not Sent" counterpart.
+ *                        - Order Progress: SHIPPED is driven by the delivery
+ *                          order's own lifecycle and nothing else (shippedStage).
+ *                          Done once a delivery order against this sales order is
+ *                          COMPLETED, dated by that delivery order's creation
+ *                          stamp - the EARLIEST completed one, since Shipped is
+ *                          when the order first went out where Delivered reports
+ *                          the latest movement. "In progress" ONLY while a delivery
+ *                          order exists and is still drafted. Completing the SALES
+ *                          order no longer drags the stage into "in progress":
+ *                          the stepper marks the first not-done stage active, so a
+ *                          completed order with nothing raised against it claimed a
+ *                          delivery that did not exist. A stage can now decline
+ *                          that marker (canBeActive), which is what holds Shipped
+ *                          at Pending. Partial Delivered, Delivered, Invoiced and
+ *                          Paid are untouched.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -424,6 +453,7 @@
         this.record_ID = 0;
         this.table_ID = 0;
         this.windowNo = 0;
+        this.AD_Window_ID = 0;
         this.curTab = null;
         this.selectedRow = null;
         this.panelWidth;
@@ -807,10 +837,86 @@
             // badge follows.
             if (data.Posted === "Y")
                 $pills.append(headerPill(getMsg("VAS_106_Posted", "Posted"), "success", null, true));
+            // "Email Sent" (C_Order.VAS_IsEmailSent) sits beside Posted and follows
+            // the same rule: a milestone badge, drawn once the milestone is reached
+            // and absent before it. There is no "Not Sent" counterpart — that is not
+            // news about an order nobody has sent yet.
+            if (data.IsEmailSent)
+                $pills.append(headerPill(getMsg("VAS_106_EmailSent", "Email Sent"), "info", "mail", false));
             $top.append($pills);
 
             $strip.append($top);
+            renderActions($strip);
             $body.append($strip);
+        }
+
+        // ----------------------------------------------------------------- //
+        //  Header action bar                                                 //
+        // ----------------------------------------------------------------- //
+
+        // Send Invoice runs off the TAB's print process (the same one the framework's
+        // own print button uses), so the control is disabled — not hidden — when the
+        // window carries none: an absent button reads as a missing feature, a
+        // disabled one as a document that cannot be printed.
+        function renderActions($parent) {
+            var hasPrintProcess = $self.curTab
+                && typeof $self.curTab.getAD_Process_ID === "function"
+                && +$self.curTab.getAD_Process_ID() > 0;
+
+            var $a = $('<div class="vas_106-actions"></div>');
+            var $send = $('<button type="button" class="vas_106-btn"></button>');
+            $send.append(svgIcon("send"));
+            $send.append($('<span></span>').text(getMsg("VAS_106_SendInvoice", "Send Invoice")));
+            $send.prop("disabled", !hasPrintProcess);
+            $send.on("click", function () { if (hasPrintProcess) sendInvoiceEmail(); });
+            $a.append($send);
+            $parent.append($a);
+        }
+
+        // AD_Process_ID / AD_Table_ID / AD_Window_ID for the share flow, read off the
+        // current grid tab — the same values the framework's print button works from.
+        // Mirrors VAS_189_ARInvoiceDetailPanel.
+        function printContext() {
+            var tab = $self.curTab;
+            return {
+                AD_Process_ID: (tab && typeof tab.getAD_Process_ID === "function") ? tab.getAD_Process_ID() : 0,
+                AD_Table_ID: (tab && typeof tab.getAD_Table_ID === "function") ? tab.getAD_Table_ID() : ($self.table_ID || 0),
+                AD_Window_ID: (tab && typeof tab.getAD_Window_ID === "function") ? tab.getAD_Window_ID() : ($self.AD_Window_ID || 0),
+                RecordID: $self.record_ID,
+                ToName: (data && data.CustomerName) ? data.CustomerName : "",
+                ToEmail: (data && data.CustomerEmail) ? data.CustomerEmail : ""
+            };
+        }
+
+        // Open the Preview and Share Document form (the shared VA112 share/e-mail
+        // panel) on this sales order, with the recipient seeded from the CUSTOMER —
+        // its name and e-mail address. When the address is blank VAS_SentEmailDoc
+        // resolves it on the server from AD_Table_ID + RecordID, so a customer with
+        // no address on the order still reaches its contact.
+        function sendInvoiceEmail() {
+            if (!$self.record_ID || !$self.curTab) return;
+            if (!VAS.VAS_SentEmailDoc || typeof VAS.VAS_SentEmailDoc.sendEmail !== "function") {
+                toast(getMsg("VAS_106_ActionFailed", "The action could not be completed."), true);
+                return;
+            }
+
+            var ctxRes = printContext();
+            if (!ctxRes.AD_Process_ID || !ctxRes.AD_Table_ID || !ctxRes.AD_Window_ID) {
+                toast(getMsg("VAS_106_ActionFailed", "The action could not be completed."), true);
+                return;
+            }
+
+            // Called as a plain static, not with `new`: it returns nothing and
+            // instantiates the form itself.
+            VAS.VAS_SentEmailDoc.sendEmail({
+                windowNo: $self.windowNo,
+                AD_Process_ID: ctxRes.AD_Process_ID,
+                AD_Table_ID: ctxRes.AD_Table_ID,
+                RecordID: ctxRes.RecordID,
+                AD_Window_ID: ctxRes.AD_Window_ID,
+                Name: ctxRes.ToName,
+                EMailID: ctxRes.ToEmail
+            });
         }
 
         function headerPill(label, tone, icon, withDot) {
@@ -1140,10 +1246,51 @@
             return best;
         }
 
+        // The Shipped stage, resolved from the DELIVERY ORDERS raised against this
+        // sales order and from nothing else:
+        //
+        //   done       — a delivery order has been COMPLETED (or closed). Dated by
+        //                that delivery order's own creation stamp (M_InOut.Created,
+        //                model side), not by MovementDate, which a user can
+        //                back-date. The EARLIEST completed one is used: Shipped is
+        //                the moment the order first went out, where Delivered and
+        //                Partial Delivered below report the latest movement.
+        //   inProgress — nothing completed yet, but a delivery order EXISTS and is
+        //                still drafted. This is the only state that shows the stage
+        //                as active.
+        //   neither    — no delivery order at all, so the stage is Pending.
+        //
+        // Completing the sales order does not touch any of this. It used to: the
+        // stepper marks the first not-done stage "In progress", so a completed order
+        // with nothing shipped showed Shipped as in progress — claiming a delivery
+        // that had not been raised. canBeActive:false on the stage is what holds it
+        // at Pending instead.
+        function shippedStage() {
+            var dv = data.Deliveries || [];
+            var doneDate = null, drafted = false;
+            for (var i = 0; i < dv.length; i++) {
+                var st = dv[i].DocStatus;
+                if (st === "CO" || st === "CL") {
+                    var d = parseDbDate(dv[i].Created, true) || parseDbDate(dv[i].MovementDate, false);
+                    if (d && (!doneDate || d < doneDate)) doneDate = d;
+                } else if (st === "DR") {
+                    drafted = true;
+                }
+            }
+            return {
+                done: !!doneDate,
+                date: doneDate,
+                inProgress: !doneDate && drafted
+            };
+        }
+
         function progressStages() {
             var f = fulfilment(), iv = invoiced(), inv = data.Invoices || [], dv = data.Deliveries || [];
             var completed = isCompleted();
             var shipped = dv.length > 0;
+            // Shipped is driven by the DELIVERY ORDER's own lifecycle, never by the
+            // sales order reaching Completed — see shippedStage().
+            var ship = shippedStage();
             var delivered = f.total > 0 ? (f.full >= f.total) : shipped;
             // Partial Delivered is a stage the order PASSES THROUGH, not a state it
             // is either in or out of: an order that is delivered in full reached
@@ -1163,7 +1310,15 @@
                 // back-date.
                 { key: "VAS_106_Completed", label: "Completed", done: completed,
                   date: completed ? (data.CompletedDate || data.DateOrdered) : null },
-                { key: "VAS_106_Shipped",   label: "Shipped",   done: shipped,   date: lastDelivery },
+                // Shipped answers for the DELIVERY ORDER, not for the sales order.
+                // It is done once a delivery order against this sales order has been
+                // completed, dated by that delivery order's creation stamp; it is
+                // "In progress" only while one exists and is still drafted. Anything
+                // else — no delivery order at all — leaves it Pending, INCLUDING a
+                // completed sales order, which used to drag the stage into "In
+                // progress" purely by being the first stage not yet done.
+                { key: "VAS_106_Shipped",   label: "Shipped",   done: ship.done,
+                  date: ship.date, canBeActive: ship.inProgress },
                 // Delivery in progress: some of the order has gone out, the rest has
                 // not. Counted in LINES, like Delivered beside it — the lines
                 // anything has shipped against, out of the stock lines there are.
@@ -1216,7 +1371,14 @@
             for (var i = 0; i < stages.length; i++) {
                 var s = stages[i];
                 var stateCls, metaText;
-                if (i === active && !s.done) { stateCls = "vas_106-is-active"; metaText = getMsg("VAS_106_InProgress", "In progress"); }
+                // A stage may refuse the automatic "in progress" marker: being the
+                // first stage not yet done is not, on its own, evidence that anything
+                // is under way. Shipped sets canBeActive from the delivery order's
+                // own status, so a completed sales order with nothing raised against
+                // it stays Pending there. Every other stage leaves it undefined and
+                // keeps the original behaviour.
+                var mayBeActive = (s.canBeActive !== false);
+                if (i === active && !s.done && mayBeActive) { stateCls = "vas_106-is-active"; metaText = getMsg("VAS_106_InProgress", "In progress"); }
                 else if (s.done) { stateCls = "vas_106-is-done"; metaText = formatDate(s.date) || s.meta || getMsg("VAS_106_Done", "Done"); }
                 else { stateCls = "is-pending"; metaText = s.meta || getMsg("VAS_106_Pending", "Pending"); }
                 $tl.append(stepEntry(i + 1, getMsg(s.key, s.label), metaText, s.done, stateCls));
@@ -2522,7 +2684,8 @@
             chevLeft: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
             chevRight:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
             plus:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
-            arrowUpRight: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>'
+            arrowUpRight: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>',
+            send:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4Z"/></svg>'
         };
 
         function svgIcon(name) {
@@ -2610,6 +2773,11 @@
         this.curTab = curTab;
         if (curTab && typeof curTab.getAD_Table_ID === "function") {
             this.table_ID = curTab.getAD_Table_ID();
+        }
+        // Cached for the share flow's fallback, so printContext() still resolves the
+        // window on a build whose tab does not expose the getter.
+        if (curTab && typeof curTab.getAD_Window_ID === "function") {
+            this.AD_Window_ID = curTab.getAD_Window_ID();
         }
         this.init();
         // Watch the tab itself so New Record / Copy Record (neither of which
