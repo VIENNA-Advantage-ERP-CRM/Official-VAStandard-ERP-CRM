@@ -189,6 +189,11 @@
  *                          beside the ordered one is gone — the chip already says
  *                          the order is short, and two quantities on one line
  *                          invited being read as the same figure.
+ *   VAI163   2026-08-21  Activity: a Task or Appointment row now says how many
+ *                        e-mails were sent against it, and opens on click onto
+ *                        each one - who it went to, its subject, when it went
+ *                        and who sent it, then the message itself. The body is
+ *                        shown ONLY once the row is opened.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -374,11 +379,19 @@
         // The message body is the row's own next sibling, the way VAS_092 folds
         // it: the row states the state, the panel beneath it holds the mail.
         function toggleMail($row) {
+            // Two kinds of row open: a mail onto its own message, a task or
+            // appointment onto the e-mails sent against it. The row says which,
+            // so the hint names the right thing.
+            var isAppt = ($row.attr("data-openkind") === "appt");
             var nowOpen = !$row.hasClass("vas_190-is-open");
+            var hint = nowOpen
+                ? (isAppt ? msg("VAS_190_HideMails", "Hide e-mails")
+                          : msg("VAS_190_HideMail", "Hide full mail"))
+                : (isAppt ? msg("VAS_190_ShowMails", "Show e-mails")
+                          : msg("VAS_190_ShowMail", "Show full mail"));
             $row.toggleClass("vas_190-is-open", nowOpen)
                 .attr("aria-expanded", nowOpen ? "true" : "false")
-                .attr("title", nowOpen ? msg("VAS_190_HideMail", "Hide full mail")
-                                       : msg("VAS_190_ShowMail", "Show full mail"));
+                .attr("title", hint);
             $row.next(".vas_190-actBody").toggle(nowOpen);
         }
 
@@ -1979,6 +1992,7 @@
                     .attr("role", "button")
                     .attr("tabindex", "0")
                     .attr("aria-expanded", "false")
+                    .attr("data-openkind", "mail")
                     .attr("title", msg("VAS_190_ShowMail", "Show full mail"));
                 $row.append($('<span class="vas_190-actCaret"></span>').append(svgIcon("chevRight")));
                 $item.append($row);
@@ -1986,8 +2000,37 @@
                 return $item;
             }
 
+            // A task or appointment opens onto the e-mails sent against IT — the
+            // ones filed on AppointmentsInfo rather than on the product. The row
+            // states how many; the drawer holds each one's recipient, subject,
+            // moment, sender and message.
+            if ((a.Type === "task" || a.Type === "appointment") && activityMails(a).length) {
+                $row.addClass("vas_190-is-openable")
+                    .attr("role", "button")
+                    .attr("tabindex", "0")
+                    .attr("aria-expanded", "false")
+                    .attr("data-openkind", "appt")
+                    .attr("title", msg("VAS_190_ShowMails", "Show e-mails"));
+                $row.append($('<span class="vas_190-actCaret"></span>').append(svgIcon("chevRight")));
+                $item.append($row);
+                $item.append(buildApptMailBlock(a));
+                return $item;
+            }
+
             $item.append($row);
             return $item;
+        }
+
+        // The e-mails sent against a task or appointment (MailAttachment1 keyed on
+        // AppointmentsInfo). Always an array, so callers can count and loop
+        // without guarding.
+        function activityMails(a) {
+            return (a && a.Mails && a.Mails.length) ? a.Mails : [];
+        }
+
+        function mailCountLabel(n) {
+            return n + " " + (n === 1 ? msg("VAS_190_Email", "email")
+                                      : msg("VAS_190_Emails", "emails"));
         }
 
         // "was X → now Y" under the field's name. A value the log recorded as
@@ -2054,9 +2097,11 @@
             } else if (a.Type === "task") {
                 bits.push(a.IsClosed ? msg("VAS_190_TaskCompleted", "Completed")
                                      : msg("VAS_190_TaskOpen", "Open"));
+                appendMailCountBit(bits, a);
             } else if (a.Type === "appointment") {
                 if (a.IsCancelled) bits.push(msg("VAS_190_Cancelled", "Cancelled"));
                 if (a.Location) bits.push(a.Location);
+                appendMailCountBit(bits, a);
             } else if (a.Type === "workflow") {
                 // The dictionary label, resolved server-side in the reader's own
                 // language. The stored code is only the last resort — a list
@@ -2099,6 +2144,44 @@
             $row.append($('<span class="vas_190-mailK"></span>').text(label));
             $row.append($('<span class="vas_190-mailV"></span>').text(text));
             $meta.append($row);
+        }
+
+        // How many e-mails were sent about this task or appointment. The count
+        // only — the addresses, subjects and bodies are in the drawer, and a
+        // meeting that generated several notices would otherwise fill the row.
+        function appendMailCountBit(bits, a) {
+            var n = activityMails(a).length;
+            if (n) bits.push(mailCountLabel(n));
+        }
+
+        // The e-mails sent against a task or appointment, folded under its row —
+        // each with who it went to, what it was about, when it went and who sent
+        // it, then the message. Every value goes in through .text(): a stored
+        // message is untrusted text and is never handed to the browser as markup.
+        function buildApptMailBlock(a) {
+            var $block = $('<div class="vas_190-actBody" style="display:none;"></div>');
+            var mails = activityMails(a);
+
+            for (var i = 0; i < mails.length; i++) {
+                var m = mails[i];
+                var $one = $('<div class="vas_190-actMailItem"></div>');
+                // Ruled off from the one before it, so several notices about the
+                // same meeting do not read as one long message.
+                if (i > 0) $one.addClass("vas_190-actMailSplit");
+
+                $one.append($('<div class="vas_190-mailSub"></div>')
+                    .text((m.Subject || "").trim() || msg("VAS_190_NoSubject", "(no subject)")));
+
+                var $meta = $('<div class="vas_190-mailMeta"></div>');
+                appendMailRow($meta, msg("VAS_190_To", "To"), m.MailTo);
+                appendMailRow($meta, msg("VAS_190_Date", "Date"), formatDateTime(m.SentOn));
+                appendMailRow($meta, msg("VAS_190_SentBy", "Sent by"), m.SentBy);
+                $one.append($meta);
+
+                $one.append($('<div class="vas_190-mailBody"></div>').text(m.Body || ""));
+                $block.append($one);
+            }
+            return $block;
         }
 
         // ----------------------------------------------------------------- //

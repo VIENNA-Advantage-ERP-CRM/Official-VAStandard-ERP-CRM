@@ -60,6 +60,21 @@
  *                        `flex: 1 0 auto` (grows with its content, still fills the
  *                        panel when short) and the scrollbar styling followed the
  *                        scroll to .vas_167-root.
+ *   VAI163   2026-08-21  Nothing overlaps anything at any zoom level. The cost
+ *                        element row's action column was an `auto` track, and
+ *                        every row here is its own grid container — so it was
+ *                        sized from whatever that ONE row held: nothing in the
+ *                        header, two icon buttons in a draft row, a Lines toggle
+ *                        in a completed one. Three action widths meant three
+ *                        amount columns, so the Amount heading sat over the
+ *                        buttons and the figures under it did not line up down
+ *                        the table. The action track is a fixed 72px now, the two
+ *                        data tracks minmax(0, Nfr), and the actions cell clips to
+ *                        it (the Lines label truncating in a long locale rather
+ *                        than reaching over the amount). Generated-line rows took
+ *                        the same minmax tracks, cells carry min-width:0 with
+ *                        overflow:hidden, and the focus rings moved inside the
+ *                        buttons so the clip cannot cut them.
  ***********************************************************/
 
 .vas_167-root {
@@ -207,7 +222,7 @@
    left behind a divider, labelled order fields two-across on the right. */
 .vas_167-hdrCard {
     display: grid;
-    grid-template-columns: 40% 1fr;
+    grid-template-columns: 40% minmax(0, 1fr);
     gap: 14px 26px;
     border: 1px solid var(--vaselc-card-bd);
     border-radius: var(--vaselc-card-radius);
@@ -277,7 +292,7 @@
 
 /* Narrow panels: stack the two columns and drop the pills below the title. */
 @container (max-width: 460px) {
-    .vas_167-hdrCard { grid-template-columns: 1fr; }
+    .vas_167-hdrCard { grid-template-columns: minmax(0, 1fr); }
     .vas_167-hdrColL {
         border-right: none;
         padding-right: 0;
@@ -285,7 +300,7 @@
         padding-bottom: 11px;
     }
     /* Two field columns are too cramped this narrow — back to a single stack. */
-    .vas_167-hdrColR { grid-template-columns: 1fr; }
+    .vas_167-hdrColR { grid-template-columns: minmax(0, 1fr); }
     .vas_167-head { flex-direction: column; }
     .vas_167-headPills { justify-content: flex-start; }
 }
@@ -383,17 +398,32 @@
 }
 
 /* Three visual columns: identity | amount | actions. The panel is too narrow
-   for the five stored attributes as separate columns. */
+   for the five stored attributes as separate columns.
+
+   The action track is a FIXED width, not `auto`. Every row here is its own grid
+   container — the header, a draft row and a completed row are three separate
+   grids — so an `auto` track was sized from whatever that one row happened to
+   hold: nothing in the header (an empty cell, so 0), two 32px icon buttons in a
+   draft row, a Lines toggle in a completed one. Three different action widths
+   meant three different amount columns, so the Amount heading sat over the
+   buttons and the figures under it did not line up with each other down the
+   table. 72px holds the widest of them (32 + 4 + 32) and is the same number in
+   every row, at every panel width and zoom level.
+
+   The two data tracks are minmax(0, Nfr) so they give way to it rather than
+   pushing the row past the card. */
 .vas_167-row {
     display: grid;
-    grid-template-columns: 1.6fr 1fr auto;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 72px;
     align-items: center;
     gap: 9px;
     padding: 10px 13px;
     min-width: 0;
 }
 
-.vas_167-row > span { min-width: 0; }
+/* min-width:0 lets a cell shrink below its content; overflow:hidden is what stops
+   the text painting outside the box it shrank to, over the column beside it. */
+.vas_167-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 .vas_167-rowHead {
     background: var(--vaselc-faint);
@@ -489,11 +519,17 @@
 
 /* ---------------- Row actions ---------------- */
 
+/* Sits inside the fixed 72px action track and never reaches past it — an action
+   cell that outgrew its track would run leftwards over the amount beside it. */
 .vas_167-acts {
     justify-self: end;
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 /* Icon hit target stays at least 32px tall for pointer accessibility while the
@@ -516,15 +552,23 @@
 
 .vas_167-icBtn.vas_167-is-edit:hover { background: var(--vaselc-info-bg); color: var(--vaselc-link); }
 .vas_167-icBtn.vas_167-is-rm:hover   { background: var(--vaselc-risk-bg); color: var(--vaselc-risk-tx); }
-.vas_167-icBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 1px; }
+/* Inset focus ring: the action cell clips to its fixed track, so a ring drawn
+   outside the button would be the part that gets cut off. */
+.vas_167-icBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: -2px; }
 
+/* Shrinks to the fixed action track rather than overflowing it: in a locale whose
+   word for "Lines" is longer than the English one the label truncates and the
+   chevron stays, instead of the button reaching over the amount column. The
+   button's title / aria-label carries the action in full either way. */
 .vas_167-linesBtn {
     display: inline-flex;
     align-items: center;
     gap: 4px;
     height: 26px;
     padding: 0 9px;
-    flex: none;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
     border: none;
     border-radius: 999px;
     background: var(--vaselc-info-bg);
@@ -535,9 +579,14 @@
     white-space: nowrap;
     cursor: pointer;
 }
+.vas_167-linesBtn > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 .vas_167-linesBtn:hover { background: #CDE9FF; }
-.vas_167-linesBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 1px; }
+.vas_167-linesBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: -2px; }
 .vas_167-linesBtn .vas_167-ic { transition: transform 0.2s ease; }
 .vas_167-linesBtn.vas_167-is-open .vas_167-ic { transform: rotate(180deg); }
 
@@ -581,16 +630,19 @@
     overflow: hidden;
 }
 
+/* Every track is minmax(0, Nfr): the head and each body row are separate grid
+   containers, so a bare Nfr track was sized from that one row's own content and
+   the columns drifted apart from each other. */
 .vas_167-lRow {
     display: grid;
-    grid-template-columns: 1.9fr 1.1fr 0.55fr 1fr;
+    grid-template-columns: minmax(0, 1.9fr) minmax(0, 1.1fr) minmax(0, 0.55fr) minmax(0, 1fr);
     align-items: center;
     gap: 8px;
     padding: 7px 11px;
     min-width: 0;
 }
 
-.vas_167-lRow > span { min-width: 0; }
+.vas_167-lRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 .vas_167-lHead {
     background: #F5F8FB;

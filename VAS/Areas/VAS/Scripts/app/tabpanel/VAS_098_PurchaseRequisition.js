@@ -381,6 +381,24 @@
  *                          resort for a screen that cannot be named, and the
  *                          production order's can. The two VA075 documents still
  *                          fall through to it, since theirs genuinely cannot.
+ *   VAI163   2026-08-21  Activity: a Task or Appointment row now says how many
+ *                        e-mails were sent against it, and opens on click onto
+ *                        each one - who it went to, its subject, when it went
+ *                        and who sent it, then the message itself. The body is
+ *                        shown ONLY once the row is opened.
+ *   VAI163   2026-08-24  The Reference strip's BLANKET ORDER chip takes its window
+ *                        from the payload (data.BlanketOrderWindowId) rather than
+ *                        resolving the name for itself. The name is still sent and
+ *                        still tried, but only second: the client's own lookup
+ *                        falls through to the TABLE's zoom target when it comes
+ *                        back empty, and C_Order's zoom target is the ordinary
+ *                        order screen — so a blanket SALES order opened the Sales
+ *                        Order window filtered to a record that window does not
+ *                        carry, instead of VAS_BlanketSalesOrder. A window the
+ *                        server could not resolve now leaves the chip as plain
+ *                        text, still naming the document, rather than opening the
+ *                        wrong screen. Same treatment the VA075 / VAMFG chips
+ *                        already had.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -950,17 +968,28 @@
             // behind the request, reached from the same reference either directly or
             // through the release it points at (model side).
             //
-            // It names its own window rather than letting the table choose one: a
-            // blanket order is a C_Order like any other, so nothing about the record
-            // itself says it opens the blanket screen instead of the ordinary order
-            // screen — and a blanket SALES order opens a different one again.
+            // Its window comes from the PAYLOAD, resolved on the server by name and
+            // against the role. A blanket order is a C_Order like any other, so
+            // nothing about the record itself says it opens the blanket screen
+            // rather than the ordinary order one — and a blanket SALES order opens a
+            // different one again.
+            //
+            // The name travels too, but only as the second attempt: it is the
+            // server-resolved id that matters here, because the client's own name
+            // lookup falls through to the TABLE's zoom target when it comes back
+            // empty, and C_Order's zoom target is the ordinary order screen. That
+            // fall-through is what stopped a blanket sales order opening — the click
+            // started the Sales Order window filtered to a record it does not carry.
+            // A window the server could not resolve now leaves the chip as plain
+            // text, still naming the document, rather than opening the wrong screen.
             if (data.BlanketOrderNo) {
                 var $blanket = originChip("doc",
                     data.BlanketOrderIsSOTrx
                         ? msg("BlanketSalesOrder", "Blanket Sales Order")
                         : msg("BlanketOrder", "Blanket Purchase Order"),
                     countedValue(data.BlanketOrderNo, data.BlanketOrderCount),
-                    "success", "C_Order", data.BlanketOrderId, "", undefined,
+                    "success", "C_Order", data.BlanketOrderId, "",
+                    data.BlanketOrderWindowId,
                     data.BlanketOrderIsSOTrx ? "VAS_BlanketSalesOrder"
                                              : "VAS_BlanketPurchaseOrder");
                 if (data.BlanketOrderIsSOTrx) $blanket.attr("data-open-sotrx", "Y");
@@ -2028,6 +2057,12 @@
                 if (a.Location) bits.push(a.Location);
                 if (a.IsCancelled) bits.push(msg("ActCancelled", "Cancelled"));
                 else if (a.IsClosed) bits.push(msg("ActCompleted", "Completed"));
+                // What was e-mailed about this meeting or task. The count only —
+                // the addresses, subjects and bodies are in the drawer, and a
+                // meeting that generated several notices would otherwise push
+                // everything else off the sub-line.
+                var apptMails = activityMails(a);
+                if (apptMails.length) bits.push(mailCountLabel(apptMails.length));
                 if (bits.length) {
                     var sub = bits.join(" · ");
                     $main.append($('<div class="vas_098-actsub"></div>')
@@ -2050,15 +2085,23 @@
 
             // Rows carrying a body are clickable; the caret shows the state.
             if (hasActivityBody(a)) {
-                $row.addClass("vas_098-openable")
-                    .attr("title", msg("ShowMailBody", "Click to read the message"));
+                // A meeting or task opens onto the e-mails sent about it; every
+                // other openable row onto its own message.
+                var isAppt = (a.Type === "appointment" || a.Type === "task");
+                var showHint = isAppt
+                    ? msg("ShowMails", "Click to read the e-mails")
+                    : msg("ShowMailBody", "Click to read the message");
+                var hideHint = isAppt
+                    ? msg("HideMails", "Click to hide the e-mails")
+                    : msg("HideMailBody", "Click to hide the message");
+
+                $row.addClass("vas_098-openable").attr("title", showHint);
                 $row.on("click", function () {
                     var $panel = $row.next(".vas_098-actbody");
                     if (!$panel.length) return;
                     var nowOpen = !$row.hasClass("vas_098-open");
                     $row.toggleClass("vas_098-open", nowOpen)
-                        .attr("title", nowOpen ? msg("HideMailBody", "Click to hide the message")
-                                               : msg("ShowMailBody", "Click to read the message"));
+                        .attr("title", nowOpen ? hideHint : showHint);
                     $panel.toggle(nowOpen);
                 });
             }
@@ -2070,9 +2113,27 @@
         // stays a plain, non-clickable row.
         // A letter opens like a mail: it is the same record in the same table,
         // with the same body and the same addresses on it.
+        // A meeting or task opens onto the e-mails sent against it instead.
         function hasActivityBody(a) {
-            return !!(a && (a.Type === "email" || a.Type === "letter") &&
-                      a.Body && String(a.Body).trim());
+            if (!a) return false;
+            if (a.Type === "email" || a.Type === "letter") {
+                return !!(a.Body && String(a.Body).trim());
+            }
+            if (a.Type === "appointment" || a.Type === "task") {
+                return activityMails(a).length > 0;
+            }
+            return false;
+        }
+
+        // The e-mails sent against an appointment or task (MailAttachment1 keyed
+        // on AppointmentsInfo). Always an array, so callers can count and loop
+        // without guarding.
+        function activityMails(a) {
+            return (a && a.Mails && a.Mails.length) ? a.Mails : [];
+        }
+
+        function mailCountLabel(n) {
+            return n + " " + (n === 1 ? msg("Email", "email") : msg("Emails", "emails"));
         }
 
         // The e-mail body, collapsed beneath its activity row. The full recipient
@@ -2082,12 +2143,53 @@
             if (!hasActivityBody(a)) return null;
 
             var $panel = $('<div class="vas_098-actbody" style="display:none;"></div>');
+
+            // An appointment or task opens onto the e-mails sent about it, each
+            // with its own recipient, subject, moment and sender. They are listed
+            // newest first (model order).
+            if (a.Type === "appointment" || a.Type === "task") {
+                var mails = activityMails(a);
+                for (var i = 0; i < mails.length; i++) {
+                    $panel.append(activityMailEntry(mails[i], i > 0));
+                }
+                return $panel;
+            }
+
             appendMailMeta($panel, "MailFrom", "From:", a.MailFrom);
             appendMailMeta($panel, "MailTo",   "To:",   a.MailTo);
             appendMailMeta($panel, "MailCc",   "Cc:",   a.MailCc);
             appendMailMeta($panel, "MailBcc",  "Bcc:",  a.MailBcc);
             $panel.append($('<p></p>').text(String(a.Body).trim()));
             return $panel;
+        }
+
+        // One e-mail inside an appointment's or task's drawer: who it went to and
+        // what it was about, then when and by whom, then the message. Separated
+        // from the one before it so several notices do not read as one.
+        function activityMailEntry(m, separated) {
+            var $wrap = $('<div class="vas_098-actmailitem"></div>');
+            if (separated) $wrap.addClass("vas_098-actmailsplit");
+
+            appendMailMeta($wrap, "MailTo", "To:", m.MailTo);
+            appendMailMeta($wrap, "MailSubject", "Subject:",
+                (m.Subject && String(m.Subject).trim())
+                    ? m.Subject : msg("NoSubject", "(no subject)"));
+
+            // "when · by whom", the same two parts in the same order as the row
+            // above it.
+            var when = formatDateTime(m.SentOn);
+            if (m.SentBy) {
+                when = when ? when + " · " + msg("By", "by") + " " + m.SentBy
+                            : msg("By", "by") + " " + m.SentBy;
+            }
+            if (when) $wrap.append($('<div class="vas_098-actmeta"></div>').text(when));
+
+            // The body is the thing the click was for; a mail filed without one
+            // still shows its envelope rather than an empty gap.
+            if (m.Body && String(m.Body).trim()) {
+                $wrap.append($('<p></p>').text(String(m.Body).trim()));
+            }
+            return $wrap;
         }
 
         function appendMailMeta($panel, key, fallback, value) {

@@ -117,6 +117,16 @@
  *                        read. min-content is the width of the longest
  *                        unbreakable word in the column, so the heading fits in
  *                        any language and the track still flexes above it.
+ *   VAI163   2026-08-21  Nothing overlaps anything at any zoom level. The delivery
+ *                        table had minmax(0, Nfr) tracks but no cell rule, which
+ *                        is only half the fix: a grid ITEM keeps min-width:auto —
+ *                        its own content-based minimum — so a cell stayed as wide
+ *                        as its text and printed over the column beside it even
+ *                        though the track underneath had compressed. Cells now
+ *                        carry min-width:0 with overflow:hidden. Stage labels
+ *                        break inside their word (overflow-wrap) so a shrunken
+ *                        step cannot paint over its neighbour, and the header /
+ *                        customer grids took the minmax floor.
  ***********************************************************/
 
 .vas_100-root {
@@ -274,7 +284,7 @@
    leaves the identity half empty. */
 .vas_100-hdrCard {
     display: grid;
-    grid-template-columns: 40% 1fr;
+    grid-template-columns: 40% minmax(0, 1fr);
     gap: 0.875em 1.75em;
     border: 1px solid var(--do-card-bd);
     border-radius: var(--do-card-radius);
@@ -314,10 +324,10 @@
 .vas_100-fVal.vas_100-is-link { color: var(--do-link); }
 
 @container (max-width: 460px) {
-    .vas_100-hdrCard { grid-template-columns: 1fr; }
+    .vas_100-hdrCard { grid-template-columns: minmax(0, 1fr); }
     .vas_100-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--do-row-div); padding-bottom: 0.75em; }
     /* Two field columns are too cramped this narrow — back to a single stack. */
-    .vas_100-hdrColR { grid-template-columns: 1fr; }
+    .vas_100-hdrColR { grid-template-columns: minmax(0, 1fr); }
     .vas_100-hdrTop  { flex-direction: column; }
     .vas_100-hdrPills { justify-content: flex-start; }
 }
@@ -391,7 +401,7 @@
 }
 
 @container (max-width: 620px) {
-    .vas_100-custFields { grid-template-columns: 1fr; }
+    .vas_100-custFields { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ----------------------------------------------------------- */
@@ -658,16 +668,23 @@
     min-width: 0;
 }
 
+/* A stage name is a single unbreakable word ("Completed", "In Transit"). The
+   step is allowed to shrink (min-width:0), so without a break inside the word
+   the label paints over the stage beside it; without the shrink it would set the
+   stepper's floor and push the panel sideways instead. Breaking inside the word
+   keeps every stage on one rail at any panel width or zoom level. */
 .vas_100-stepTitle {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--do-text);
+    overflow-wrap: anywhere;
 }
 
 .vas_100-stepMeta {
     font-size: 0.6875em;
     color: var(--do-muted);
     margin-top: 0.25em;
+    overflow-wrap: anywhere;
 }
 .vas_100-step.vas_100-is-active .vas_100-stepMeta { color: #E08A1E; font-weight: 600; }
 
@@ -709,6 +726,21 @@
         minmax(0, 2.2fr) minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 1.1fr)
         minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(min-content, 0.7fr);
 }
+
+/* Cells clip inside their own track rather than spilling out of it. The tracks
+   above are minmax(0, Nfr), so a track compresses freely — but a grid ITEM keeps
+   min-width:auto, which is its own content-based minimum, so the cell stayed as
+   wide as its text and printed straight over the column beside it. min-width:0
+   plus overflow:hidden is what confines a cell to the track it was given; the
+   item cell's children carry their own ellipsis and the Received cell is a flex
+   column, so neither is harmed by the clip. Header and body are separate grid
+   containers, so this also keeps a body column under the heading that names it.
+   Numeric and header cells never wrap — a wrapped figure would sit off the
+   shared baseline. */
+.vas_100-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vas_100-tHead > span,
+.vas_100-tRow > span.vas_100-ta-r,
+.vas_100-tRow > span.vas_100-ta-c { white-space: nowrap; }
 
 .vas_100-tHead {
     background: #F5F8FB;
@@ -912,9 +944,9 @@
    drawer is a grid inside the line table, and a grid item placed at the end of
    its track sits right whatever a competing rule does to text-align. */
 .vas_100-qpMini .vas_100-qpMiniRow > span.vas_100-ta-r {
-    justify-self: end;
+   /* justify-self: end;*/
     max-width: 100%;
-    text-align: right;
+    text-align: left;
     font-variant-numeric: tabular-nums;
 }
 .vas_100-qpMini .vas_100-qpMiniRow > span.vas_100-ta-c {
@@ -1235,4 +1267,13 @@
 .vas_100-cvNew {
     color: var(--do-text); font-weight: 700;
     overflow-wrap: break-word; word-break: break-word;
+}
+
+/* Each e-mail sent against an appointment or task, inside that row's drawer.
+   The second and later ones are ruled off, so several notices about the same
+   meeting do not read as one long message. */
+.vas_100-actMailSplit {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--do-card-bd);
 }

@@ -321,6 +321,93 @@
 ///                          cannot see raises when the framework starts it, and the
 ///                          point of resolving up front is that a chip is drawn as
 ///                          plain text instead.
+///   VAI163   2026-08-21  Activity: an appointment or task now carries the
+///                        e-mails sent against IT - MailAttachment1 keyed on
+///                        AppointmentsInfo rather than on this panel's own
+///                        table - with the recipient (MailAddress), subject
+///                        (Title), when (Created) and who sent it (CreatedBy).
+///                        The body (TextMsg, flattened) travels with the row so
+///                        the panel reveals it on click. Read in one query for
+///                        the whole feed through VAS_ActivitySourcesModel.
+///   VAI163   2026-08-24  LoadReceivedQty's goods-receipt side now reaches every
+///                        order line the requisition line was ordered on, not one:
+///                        - It matches the order line BOTH ways —
+///                          C_OrderLine.M_RequisitionLine_ID as well as
+///                          M_RequisitionLine.C_OrderLine_ID. The forward link is
+///                          what the platform itself reads (MOrder's completion
+///                          hook, MRequisition.UpdateRequisitionStatus) and is the
+///                          only ONE-TO-MANY one: the requisition line holds a
+///                          single C_OrderLine_ID, so a line split across two
+///                          purchase orders — two vendors, or a top-up after a
+///                          short delivery — counted only one order's receipts and
+///                          read as permanently short however much had arrived.
+///                        - A PO raised from an RFQ is reached at all. RfQCreatePO
+///                          builds its order lines from the winning response and
+///                          stamps NO requisition reference on them, so a
+///                          requisition tendered through an RFQ reported 0 received
+///                          forever. The surviving link is the one the RFQ was
+///                          built with (C_RfQLine.M_RequisitionLine_ID), so the
+///                          chain runs requisition line -> RFQ line -> response
+///                          line -> C_RfQResponse.C_Order_ID -> that order's lines,
+///                          matched on product because nothing finer exists.
+///                          Dictionary-guarded, and it skips a requisition line
+///                          whose product sits on more than one line of the same
+///                          RFQ: product is the whole match there, so two such
+///                          lines would each claim BOTH order lines' receipts.
+///                        Both branches sum over a SELECT DISTINCT keyed on
+///                        M_InOutLine_ID, so a receipt line reachable by more than
+///                        one route is counted once — summing the join directly
+///                        would multiply it by the number of routes.
+///   VAI163   2026-08-24  Documents: an INVENTORY USE row shows the issue's whole
+///                        value again. BuildInventoryRateExpr valued each line at
+///                        COALESCE(CurrentCostPrice, VA024_UnitPrice, 0) — both
+///                        optional module columns that a great many issues never
+///                        carry — so a completed issue whose value lives in
+///                        M_CostDetail reported 0, and one where only some lines
+///                        carried a price column reported PART of the total, which
+///                        is worse because a partial figure does not look wrong.
+///                        It now resolves the rate the way VAS_102's own panel
+///                        does: the cost booked against the line (newest
+///                        M_CostDetail row, Amt / Qty), else the product's latest
+///                        cost at the issue's warehouse, else those two columns.
+///                        Each cost lookup is NULLIF(..., 0) so a zero-valued row
+///                        falls through instead of pinning the rate at zero, which
+///                        is the same test VAS_102 makes in C#. The old comment
+///                        called itself "VAS_102's arithmetic, column for column" —
+///                        true when written, and untrue from the day VAS_102 moved
+///                        to M_CostDetail.
+///                        The MATERIAL TRANSFER rate is deliberately untouched:
+///                        VAS_103 still prices from CurrentCostPrice /
+///                        VA024_UnitPrice, so BuildMovementRateExpr already agrees
+///                        with the screen it mirrors.
+///   VAI163   2026-08-24  Reference strip — two chips that opened the wrong screen
+///                        or none:
+///                        - BLANKET ORDER. Its window is now resolved on the SERVER
+///                          (BlanketOrderWindowId), by name and against the role,
+///                          and deliberately WITHOUT the table fallback every other
+///                          chip keeps behind it. The client resolved the name for
+///                          itself and, when that came back empty, fell through to
+///                          C_Order's zoom target — the ordinary order screen, or
+///                          for a sales-side record the Sales Order screen. The
+///                          click therefore opened a real window filtered to a
+///                          record that window does not carry, which is why a
+///                          blanket SALES order never reached VAS_BlanketSalesOrder.
+///                          A wrong screen is worse than no link, so an unresolved
+///                          name leaves the id at 0 and the chip is drawn as plain
+///                          text.
+///                        - FIELD SERVICE REQUEST. Its screen is NAMED now
+///                          (VA075_FieldService) with the dictionary lookup left
+///                          behind it, instead of going straight to the table:
+///                          AD_Table.AD_Window_ID for VA075_FieldServiceReq
+///                          resolves to a window that does not maintain the record,
+///                          so the click reported an error rather than showing it.
+///                        - Both VA075 origins are now gated on the MODULE
+///                          (Env.IsModuleInstalled("VA075_")), not on their columns
+///                          alone. A column guard proves a dictionary row exists; it
+///                          does not prove the module is installed and its windows
+///                          deployed, and a client carrying the rows without the
+///                          module passed every ColumnExists and then had no screen
+///                          to open.
 /// </summary>
 
 using System;
@@ -979,19 +1066,44 @@ namespace VASLogic.Models
         /// has actually been delivered against it, across every kind of document
         /// that can deliver it.
         ///
-        ///   Goods receipt   — through M_RequisitionLine.C_OrderLine_ID, the order
-        ///                     line the PO conversion writes back, and from there
-        ///                     the receipt lines raised against that order line
-        ///                     (M_InOutLine.MovementQty).
+        ///   Goods receipt   — the order lines raised for the requisition line, and
+        ///                     from them the receipt lines booked against those order
+        ///                     lines (M_InOutLine.MovementQty).
+        ///
+        ///                     An order line is matched BOTH WAYS: forward through
+        ///                     C_OrderLine.M_RequisitionLine_ID and back through
+        ///                     M_RequisitionLine.C_OrderLine_ID. The forward link is
+        ///                     the one the platform itself reads (MOrder's completion
+        ///                     hook and MRequisition.UpdateRequisitionStatus both walk
+        ///                     C_OrderLine.M_RequisitionLine_ID), and it is the only
+        ///                     one that is ONE-TO-MANY: the requisition line holds a
+        ///                     single C_OrderLine_ID, so a line ordered across several
+        ///                     purchase orders — split between vendors, or topped up
+        ///                     after a short delivery — reported only the receipts of
+        ///                     whichever order line happened to be stamped on it and
+        ///                     read as permanently short. The reverse link is kept as
+        ///                     well so a line carrying only that one is still counted.
+        ///
+        ///   RFQ -> PO       — an RFQ delivers nothing itself, but the purchase order
+        ///                     raised from a winning response carries NO requisition
+        ///                     reference at all: RfQCreatePO builds its order lines
+        ///                     from the response quantities and never stamps
+        ///                     M_RequisitionLine_ID (nor writes C_OrderLine_ID back).
+        ///                     The link that does survive is the one the RFQ was built
+        ///                     with — C_RfQLine.M_RequisitionLine_ID — so the chain is
+        ///                     requisition line -> RFQ line -> response line ->
+        ///                     C_RfQResponse.C_Order_ID -> that order's lines. Without
+        ///                     this branch every requisition tendered through an RFQ
+        ///                     read 0 received however much had arrived.
         ///   Material transfer — M_MovementLine.M_RequisitionLine_ID
         ///                     (MovementQty): stock moved in from another warehouse
         ///                     satisfies the request exactly as a purchase does.
         ///   Inventory Use   — M_InventoryLine.M_RequisitionLine_ID
         ///                     (QtyInternalUse): issued straight out of stock.
         ///
-        /// An RFQ delivers nothing — it asks for prices — so it contributes no
-        /// quantity, and neither does a purchase order on its own: ordering is not
-        /// receiving.
+        /// A purchase order contributes nothing on its own: ordering is not
+        /// receiving. Only what its RECEIPTS booked counts, which is why both order
+        /// branches end at M_InOutLine rather than at the order line.
         ///
         /// Only documents that reached Completed or Closed count. A drafted one has
         /// moved no stock, and reporting its quantity as received would claim goods
@@ -1008,22 +1120,95 @@ namespace VASLogic.Models
         {
             Dictionary<int, decimal> byId = new Dictionary<int, decimal>();
 
-            // ----- Goods receipts, through the order line the PO conversion wrote -----
+            // ----- Goods receipts against the order lines raised for the line -----
+            //  The order line is matched both ways (see the summary above), which
+            //  means one receipt line can be reached TWICE — once forward and once
+            //  back. The inner SELECT DISTINCT keys on M_InOutLine_ID, so a receipt
+            //  reachable by both routes lands in the sum exactly once; summing the
+            //  join directly would double it.
             AddReceivedQty(M_Requisition_ID, byId, "M_InOut", "",  "",
-                @"SELECT rl.M_RequisitionLine_ID,
-                         COALESCE(SUM(iol.MovementQty), 0) AS ReceivedQty
-                    FROM M_RequisitionLine rl
-                   INNER JOIN M_InOutLine iol
-                           ON (iol.C_OrderLine_ID = rl.C_OrderLine_ID)
-                   INNER JOIN M_InOut io
-                           ON (io.M_InOut_ID = iol.M_InOut_ID)
-                   WHERE rl.M_Requisition_ID = @M_Requisition_ID
-                     AND rl.IsActive  = 'Y'
-                     AND iol.IsActive = 'Y'
-                     AND io.IsActive  = 'Y'
-                     AND io.IsSOTrx   = 'N'
-                     AND io.DocStatus IN ('CO', 'CL')
-                   GROUP BY rl.M_RequisitionLine_ID");
+                @"SELECT t.M_RequisitionLine_ID,
+                         COALESCE(SUM(t.MovementQty), 0) AS ReceivedQty
+                    FROM (SELECT DISTINCT rl.M_RequisitionLine_ID,
+                                          iol.M_InOutLine_ID,
+                                          iol.MovementQty
+                            FROM M_RequisitionLine rl
+                           INNER JOIN C_OrderLine ol
+                                   ON (ol.M_RequisitionLine_ID = rl.M_RequisitionLine_ID
+                                    OR ol.C_OrderLine_ID       = rl.C_OrderLine_ID)
+                           INNER JOIN M_InOutLine iol
+                                   ON (iol.C_OrderLine_ID = ol.C_OrderLine_ID)
+                           INNER JOIN M_InOut io
+                                   ON (io.M_InOut_ID = iol.M_InOut_ID)
+                           WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                             AND rl.IsActive  = 'Y'
+                             AND ol.IsActive  = 'Y'
+                             AND iol.IsActive = 'Y'
+                             AND io.IsActive  = 'Y'
+                             AND io.IsSOTrx   = 'N'
+                             AND io.DocStatus IN ('CO', 'CL')) t
+                   GROUP BY t.M_RequisitionLine_ID");
+
+            // ----- Goods receipts against a PO raised from an RFQ -----
+            //  Guarded on C_RfQLine.M_RequisitionLine_ID: without that column the
+            //  chain has no starting point and only this contribution is skipped.
+            //
+            //  The order line carries no requisition reference on this path, so it
+            //  is reached through the RESPONSE's order and matched on product. Two
+            //  conditions keep that match honest:
+            //    * an order line that DOES carry a requisition reference (or that
+            //      the requisition line itself names) is excluded — the branch above
+            //      already counted its receipts;
+            //    * a requisition line whose product sits on more than one line of
+            //      the same RFQ is skipped entirely (the NOT EXISTS). Product is all
+            //      there is to match on here, so two lines of the same product would
+            //      each claim BOTH order lines' receipts and report roughly double
+            //      what arrived. Counting nothing understates a ratio that is still
+            //      bounded by the requested quantity; counting twice overstates it
+            //      past what was asked for, which reads as a completed line.
+            AddReceivedQty(M_Requisition_ID, byId, "C_RfQ",
+                "C_RfQLine", "M_RequisitionLine_ID",
+                @"SELECT t.M_RequisitionLine_ID,
+                         COALESCE(SUM(t.MovementQty), 0) AS ReceivedQty
+                    FROM (SELECT DISTINCT rl.M_RequisitionLine_ID,
+                                          iol.M_InOutLine_ID,
+                                          iol.MovementQty
+                            FROM M_RequisitionLine rl
+                           INNER JOIN C_RfQLine ql
+                                   ON (ql.M_RequisitionLine_ID = rl.M_RequisitionLine_ID)
+                           INNER JOIN C_RfQResponseLine rspl
+                                   ON (rspl.C_RfQLine_ID = ql.C_RfQLine_ID)
+                           INNER JOIN C_RfQResponse rsp
+                                   ON (rsp.C_RfQResponse_ID = rspl.C_RfQResponse_ID)
+                           INNER JOIN C_OrderLine ol
+                                   ON (ol.C_Order_ID   = rsp.C_Order_ID
+                                   AND ol.M_Product_ID = rl.M_Product_ID)
+                           INNER JOIN M_InOutLine iol
+                                   ON (iol.C_OrderLine_ID = ol.C_OrderLine_ID)
+                           INNER JOIN M_InOut io
+                                   ON (io.M_InOut_ID = iol.M_InOut_ID)
+                           WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                             AND rl.IsActive   = 'Y'
+                             AND rl.M_Product_ID > 0
+                             AND ql.IsActive   = 'Y'
+                             AND rspl.IsActive = 'Y'
+                             AND rsp.IsActive  = 'Y'
+                             AND ol.IsActive   = 'Y'
+                             AND iol.IsActive  = 'Y'
+                             AND io.IsActive   = 'Y'
+                             AND io.IsSOTrx    = 'N'
+                             AND io.DocStatus IN ('CO', 'CL')
+                             AND COALESCE(ol.M_RequisitionLine_ID, 0) = 0
+                             AND COALESCE(rl.C_OrderLine_ID, 0) <> ol.C_OrderLine_ID
+                             AND NOT EXISTS (SELECT 1
+                                               FROM C_RfQLine ql2
+                                              INNER JOIN M_RequisitionLine rl2
+                                                      ON (rl2.M_RequisitionLine_ID = ql2.M_RequisitionLine_ID)
+                                              WHERE ql2.C_RfQ_ID     = ql.C_RfQ_ID
+                                                AND ql2.C_RfQLine_ID <> ql.C_RfQLine_ID
+                                                AND ql2.IsActive      = 'Y'
+                                                AND rl2.M_Product_ID  = rl.M_Product_ID)) t
+                   GROUP BY t.M_RequisitionLine_ID");
 
             // ----- Material transfers raised against the line -----
             AddReceivedQty(M_Requisition_ID, byId, "M_Movement",
@@ -2096,6 +2281,8 @@ namespace VASLogic.Models
                     MailBcc    = s.MailBcc,
                     MailFrom   = s.MailFrom,
                     IsMailSent = s.IsMailSent,
+                    // An appointment or task brings the mails sent against it.
+                    Mails      = s.Mails,
                     UserName   = s.ActorName,
                     Created    = s.EventTime
                 });
@@ -2520,8 +2707,16 @@ namespace VASLogic.Models
         {
             if (d.VA075_WorkOrder_ID > 0)
                 d.WorkOrderWindowId = ResolveChipWindow(ctx, "", "VA075_WorkOrder");
+            // The field service request's screen HAS a name — VA075_FieldService —
+            // so it is asked for by name first and the dictionary's table lookup is
+            // left behind it. Going straight to the table was what made this chip
+            // fail: AD_Table.AD_Window_ID for VA075_FieldServiceReq resolves to a
+            // window that does not maintain the record (or to none the role may
+            // open), so the click started a screen the record could not be found
+            // in and reported an error instead of showing it.
             if (d.VA075_FieldServiceReq_ID > 0)
-                d.FieldServiceReqWindowId = ResolveChipWindow(ctx, "", "VA075_FieldServiceReq");
+                d.FieldServiceReqWindowId =
+                    ResolveChipWindow(ctx, "VA075_FieldService", "VA075_FieldServiceReq");
             // The production order's screen HAS a name — VAS_102 opens it by that
             // name — so it is asked for first, the way VAS_092 resolves every window
             // it opens. The two VA075 screens have none that can be hard-coded, and
@@ -2529,6 +2724,25 @@ namespace VASLogic.Models
             if (d.VAMFG_M_WorkOrder_ID > 0)
                 d.ProductionOrderWindowId =
                     ResolveChipWindow(ctx, "VAMFG_ProductionOrder", "VAMFG_M_WorkOrder");
+
+            // The blanket order, resolved BY NAME ONLY — deliberately without the
+            // table fallback every other chip keeps behind it.
+            //
+            // C_Order's dictionary window is the ordinary order screen, and a
+            // blanket order is not in it: the client used to resolve this name for
+            // itself and, when the lookup came back empty, fell through to the
+            // table's zoom target — which for a sales-side C_Order is the Sales
+            // Order window. The click then opened a real screen filtered to a
+            // record that screen does not carry, which is why it did not land on
+            // the blanket sales order. A wrong screen is worse than no link, so
+            // there is nothing behind the name here: a name that does not resolve
+            // leaves the id at 0 and the panel draws the chip as plain text.
+            if (d.BlanketOrderId > 0)
+            {
+                d.BlanketOrderWindowId = GetWindowId(ctx,
+                    d.BlanketOrderIsSOTrx ? "VAS_BlanketSalesOrder"
+                                          : "VAS_BlanketPurchaseOrder");
+            }
         }
 
         /// <summary>
@@ -2751,6 +2965,14 @@ namespace VASLogic.Models
             recordId = 0;
             documentNo = "";
             count = 0;
+
+            // The module itself is asked for FIRST. A column guard proves a column
+            // is in the dictionary; it does not prove the module that owns it is
+            // installed and its windows deployed — a client that once had VA075, or
+            // that took its dictionary rows without the module, answers "yes" to
+            // every ColumnExists below and then has no screen to open the record in.
+            // That is the state the field service request chip failed from.
+            if (!Env.IsModuleInstalled("VA075_")) return;
 
             // The table's own key column is the proof the table is there at all.
             if (!ColumnExists(tableName, idColumn)) return;
@@ -3277,11 +3499,13 @@ namespace VASLogic.Models
                 // names what that document is worth.
                 //
                 // It is VAS_102's own arithmetic: the issued quantity
-                // (QtyInternalUse) at the line's cost price, falling back to the
-                // VA024 unit price. The row used to report NOTHING, on the argument
-                // that an issue's value is a costing question the document does not
-                // answer — but its own screen answers it, and a dash here against a
-                // figure there is just the two screens disagreeing.
+                // (QtyInternalUse) at the rate that panel resolves for the line —
+                // the cost BOOKED against it, else the product's cost at the
+                // issue's warehouse, else its price columns (BuildInventoryRateExpr).
+                // The row used to report NOTHING, on the argument that an issue's
+                // value is a costing question the document does not answer — but its
+                // own screen answers it, and a dash here against a figure there is
+                // just the two screens disagreeing.
                 //
                 // Read outside the aggregate, over a derived table: Oracle rejects a
                 // subquery expression in GROUP BY (ORA-22818).
@@ -3294,6 +3518,8 @@ namespace VASLogic.Models
                                       x.LineCount,
                                       (SELECT NVL(SUM(NVL(il2.QtyInternalUse, 0) * " + rateExpr + @"), 0)
                                          FROM M_InventoryLine il2
+                                        INNER JOIN M_Inventory inv2
+                                                ON (inv2.M_Inventory_ID = il2.M_Inventory_ID)
                                         WHERE il2.M_Inventory_ID = x.M_Inventory_ID
                                           AND il2.IsActive       = 'Y') AS IssueValue
                                  FROM (SELECT inv.M_Inventory_ID,
@@ -3340,13 +3566,71 @@ namespace VASLogic.Models
 
         /// <summary>
         /// The unit-rate expression an inventory-use line is valued at, over an
-        /// M_InventoryLine aliased "il2": the line's own cost price, else the VA024
-        /// unit price, else 0. VAS_102's BuildRateExpr, column for column, so the
-        /// value reported here is the one that document's own screen shows.
+        /// M_InventoryLine aliased "il2" whose document is aliased "inv2". Four
+        /// sources, in the order VAS_102's own panel resolves them:
+        ///
+        ///   1. the cost BOOKED against the line — Amt / Qty of the newest
+        ///      M_CostDetail row written for it;
+        ///   2. else the product's latest cost at the issue's warehouse;
+        ///   3. else the line's own CurrentCostPrice;
+        ///   4. else the VA024 unit price; else 0.
+        ///
+        /// Steps 1 and 2 are what this expression was missing, and they are the
+        /// only two that answer for a COMPLETED issue. CurrentCostPrice and
+        /// VA024_UnitPrice are optional module columns that a great many issues
+        /// never carry, so a completed inventory-use document whose value lives
+        /// entirely in M_CostDetail reported 0 here while its own screen showed the
+        /// full figure — and an issue where only some lines carried a price column
+        /// reported part of it, which is worse, because a partial total does not
+        /// look wrong. The comment this replaces claimed to be "VAS_102's
+        /// arithmetic, column for column"; that was true when it was written, and
+        /// stopped being true when VAS_102 moved to M_CostDetail.
+        ///
+        /// Each cost lookup is wrapped in NULLIF(..., 0) so a zero-valued cost row
+        /// falls through to the next source rather than pinning the rate at zero —
+        /// VAS_102 makes the same test in C# (costRate != 0).
+        ///
+        /// Every branch is dictionary-guarded, so a schema missing any of these
+        /// columns simply resolves further down the list.
         /// </summary>
         private string BuildInventoryRateExpr()
         {
             List<string> cols = new List<string>();
+
+            // 1. The cost actually booked against this issue line.
+            if (ColumnExists("M_CostDetail", "M_InventoryLine_ID"))
+            {
+                // The newest cost detail for the line, not a SUM: costs are written
+                // per accounting schema and cost element, so summing them would
+                // multiply the rate by however many of each the client keeps.
+                cols.Add(@"NULLIF((SELECT ABS(cd.Amt / cd.Qty)
+                                     FROM M_CostDetail cd
+                                    WHERE cd.M_CostDetail_ID =
+                                          (SELECT MAX(cd2.M_CostDetail_ID)
+                                             FROM M_CostDetail cd2
+                                            WHERE cd2.M_InventoryLine_ID = il2.M_InventoryLine_ID
+                                              AND cd2.IsActive           = 'Y'
+                                              AND COALESCE(cd2.Qty, 0)  <> 0)), 0)");
+
+                // 2. Else the product's latest cost at the issue's own warehouse.
+                //    This is what values a DRAFT issue, which has booked no cost of
+                //    its own yet. Skipped where the schema keeps no warehouse on
+                //    M_CostDetail (a costing level below warehouse).
+                if (ColumnExists("M_CostDetail", "M_Warehouse_ID"))
+                {
+                    cols.Add(@"NULLIF((SELECT ABS(cd3.Amt / cd3.Qty)
+                                         FROM M_CostDetail cd3
+                                        WHERE cd3.M_CostDetail_ID =
+                                              (SELECT MAX(cd4.M_CostDetail_ID)
+                                                 FROM M_CostDetail cd4
+                                                WHERE cd4.M_Product_ID    = il2.M_Product_ID
+                                                  AND cd4.M_Warehouse_ID  = inv2.M_Warehouse_ID
+                                                  AND cd4.IsActive        = 'Y'
+                                                  AND COALESCE(cd4.Qty, 0) <> 0)), 0)");
+                }
+            }
+
+            // 3 / 4. The line's own price columns, the last resort.
             if (ColumnExists("M_InventoryLine", "CurrentCostPrice")) cols.Add("il2.CurrentCostPrice");
             if (ColumnExists("M_InventoryLine", "VA024_UnitPrice"))  cols.Add("il2.VA024_UnitPrice");
             if (cols.Count == 0) return "0";
@@ -3653,6 +3937,14 @@ namespace VASLogic.Models
             public string    MailBcc    { get; set; }
             public string    MailFrom   { get; set; }
             public bool      IsMailSent { get; set; }
+
+            /// <summary>The e-mails sent against an APPOINTMENT or TASK itself
+            /// (MailAttachment1 anchored on AppointmentsInfo): recipient, subject,
+            /// body, when and by whom. Distinct from the mail fields above, which
+            /// are correspondence about the REQUISITION. Empty on every other
+            /// type; the bodies travel with the row so the panel reveals them on
+            /// click without a second round trip.</summary>
+            public List<VAS_ActivityMailRow> Mails { get; set; }
         }
 
         public class RequisitionOverviewData
@@ -3748,6 +4040,12 @@ namespace VASLogic.Models
             public string    BlanketOrderNo      { get; set; }
             public bool      BlanketOrderIsSOTrx { get; set; }
             public int       BlanketOrderCount   { get; set; }
+            /// <summary>The window the blanket order opens in — the blanket SALES
+            /// or blanket PURCHASE screen as its side requires. Resolved by name
+            /// only (no table fallback): C_Order's own window is the ordinary order
+            /// screen, which does not carry a blanket. 0 means the chip is drawn as
+            /// plain text rather than opening the wrong screen.</summary>
+            public int       BlanketOrderWindowId { get; set; }
             public int       VA075_WorkOrder_ID { get; set; }
             public string    WorkOrderNo     { get; set; }  // VA075 maintenance work order
             public int       WorkOrderCount  { get; set; }
