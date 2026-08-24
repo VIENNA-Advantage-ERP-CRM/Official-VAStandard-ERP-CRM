@@ -237,6 +237,30 @@
 ///                            alone found nothing on either.
 ///                        Every predicate is COALESCE rather than NVL, so the
 ///                        statements read the same on Oracle and PostgreSQL.
+///   VAI163   2026-08-21  Activity: an appointment or task now carries the
+///                        e-mails sent against IT - MailAttachment1 keyed on
+///                        AppointmentsInfo rather than on this panel's own
+///                        table - with the recipient (MailAddress), subject
+///                        (Title), when (Created) and who sent it (CreatedBy).
+///                        The body (TextMsg, flattened) travels with the row so
+///                        the panel reveals it on click. Read in one query for
+///                        the whole feed through VAS_ActivitySourcesModel.
+///   VAI163   2026-08-24  - CustomerEmail: the address the panel's Send Invoice
+///                          button seeds the share/e-mail form's recipient with,
+///                          beside the customer's name. The order's own contact
+///                          address is preferred; any active contact of the
+///                          customer (MIN over AD_User, so the scalar sub-select
+///                          cannot return two rows and raise on Oracle) stands in
+///                          when the order names none. A blank one is not a
+///                          failure — VAS_SentEmailDocModel resolves the recipient
+///                          from AD_Table_ID + RecordID on the server.
+///                        - IsEmailSent (C_Order.VAS_IsEmailSent) for the header's
+///                          "Email Sent" badge, drawn only when the flag is set —
+///                          the milestone rule the Posted badge beside it follows.
+///                          Read in its OWN statement (LoadEmailSent) and ATTEMPTED
+///                          rather than dictionary-guarded: it is a module column,
+///                          so selecting it alongside the header would fail the
+///                          WHOLE overview on a deployment that has not taken it.
 /// </summary>
 
 using System;
@@ -299,6 +323,17 @@ namespace VASLogic.Models
                               contact.Name               AS ContactName,
                               contact.Phone              AS ContactPhone,
                               contact.EMail              AS ContactEmail,
+                              -- The CUSTOMER's own e-mail address, used to seed the
+                              -- Send Invoice recipient when the order names no
+                              -- contact of its own. MIN, not a bare column: a
+                              -- customer can carry several contacts and a scalar
+                              -- sub-select that returns more than one row raises on
+                              -- Oracle instead of answering.
+                              (SELECT MIN(bpu.EMail)
+                                 FROM AD_User bpu
+                                WHERE bpu.C_BPartner_ID = o.C_BPartner_ID
+                                  AND bpu.IsActive      = 'Y'
+                                  AND bpu.EMail IS NOT NULL) AS CustomerEMail,
                               sr.Name                    AS SalesRepName,
                               pt.Name                    AS PaymentTermName,
                               pl.Name                    AS PriceListName,
@@ -353,6 +388,13 @@ namespace VASLogic.Models
             result.ContactName    = Util.GetValueOfString(r["ContactName"]);
             result.ContactPhone   = Util.GetValueOfString(r["ContactPhone"]);
             result.ContactEmail   = Util.GetValueOfString(r["ContactEmail"]);
+            // Recipient seed for the Send Invoice / share-document flow. The order's
+            // own contact address is preferred — that is the person this sales order
+            // was placed with — and any active contact of the customer stands in
+            // when the order names none.
+            result.CustomerEmail  = result.ContactEmail.Trim().Length > 0
+                                    ? result.ContactEmail
+                                    : Util.GetValueOfString(r["CustomerEMail"]);
             result.SalesRepName   = Util.GetValueOfString(r["SalesRepName"]);
             result.PaymentTermName = Util.GetValueOfString(r["PaymentTermName"]);
             result.PriceListName  = Util.GetValueOfString(r["PriceListName"]);
@@ -370,6 +412,10 @@ namespace VASLogic.Models
             // When the order was actually completed, for the progress line's
             // Completed stage.
             result.CompletedDate = GetOrderCompletedDate(C_Order_ID);
+
+            // Has the order been e-mailed to the customer? Drives the header's
+            // "Email Sent" badge.
+            LoadEmailSent(C_Order_ID, result);
 
             // ----- Child data -----
             LoadAddresses(shipLocId, billLocId, result);
@@ -2603,6 +2649,8 @@ namespace VASLogic.Models
                     MailBcc     = s.MailBcc,
                     MailFrom    = s.MailFrom,
                     IsMailSent  = s.IsMailSent,
+                    // An appointment or task brings the mails sent against it.
+                    Mails       = s.Mails,
                     ActorName   = s.ActorName,
                     EventTime   = s.EventTime
                 });
@@ -2612,6 +2660,51 @@ namespace VASLogic.Models
         private SqlParameter[] OrderParam(int C_Order_ID)
         {
             return new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) };
+        }
+
+        /// <summary>
+        /// Remembers whether C_Order.VAS_IsEmailSent is readable against this
+        /// schema, so a deployment without the column reports it once rather than
+        /// on every order the panel opens.
+        /// </summary>
+        private static bool? _emailSentLookupUsable;
+
+        /// <summary>
+        /// Whether the sales order has been e-mailed to the customer
+        /// (C_Order.VAS_IsEmailSent = 'Y'), which the header reports as an "Email
+        /// Sent" badge — shown only when the flag is set, the same milestone rule
+        /// the Posted badge beside it follows.
+        ///
+        /// Read in its OWN statement rather than as a column of the header SELECT,
+        /// and ATTEMPTED rather than gated on a dictionary guard: VAS_IsEmailSent is
+        /// a module column, so selecting it alongside the header would fail the
+        /// WHOLE overview on a deployment that has not taken it. A genuinely missing
+        /// column throws once here, is remembered, and the badge simply never shows.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected sales order id.</param>
+        /// <param name="d">Overview being populated.</param>
+        private void LoadEmailSent(int C_Order_ID, SalesOrderOverviewData d)
+        {
+            if (_emailSentLookupUsable == false) return;
+
+            try
+            {
+                // COALESCE, not NVL: this statement has to read the same on Oracle
+                // and PostgreSQL.
+                string sql = @"SELECT COALESCE(o.VAS_IsEmailSent, 'N') AS IsEmailSent
+                                 FROM C_Order o
+                                WHERE o.C_Order_ID = @C_Order_ID";
+                object v = DB.ExecuteScalar(sql, OrderParam(C_Order_ID), null);
+                _emailSentLookupUsable = true;
+                d.IsEmailSent = Util.GetValueOfString(v) == "Y";
+            }
+            catch (Exception ex)
+            {
+                // Almost certainly "no such column" on a schema without the module
+                // column. Recorded so the next order skips the attempt.
+                _emailSentLookupUsable = false;
+                _log.Severe("LoadEmailSent (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
         }
 
         /// <summary>
@@ -2832,6 +2925,14 @@ namespace VASLogic.Models
             public string   Location    { get; set; }
             public bool     IsClosed    { get; set; }
             public bool     IsCancelled { get; set; }
+
+            /// <summary>The e-mails sent against an APPOINTMENT or TASK itself
+            /// (MailAttachment1 anchored on AppointmentsInfo): recipient, subject,
+            /// body, when and by whom. Distinct from the mail fields above, which
+            /// are correspondence about the ORDER. Empty on every other event
+            /// type; the bodies travel with the row so the panel reveals them on
+            /// click without a second round trip.</summary>
+            public List<VAS_ActivityMailRow> Mails { get; set; }
         }
 
         public class NoteData
@@ -2889,6 +2990,14 @@ namespace VASLogic.Models
             public string    ContactName    { get; set; }
             public string    ContactPhone   { get; set; }
             public string    ContactEmail   { get; set; }
+            /// <summary>Customer e-mail address that seeds the Send Invoice
+            /// recipient: the order's own contact address, falling back to any
+            /// active contact of the customer.</summary>
+            public string    CustomerEmail  { get; set; }
+            /// <summary>C_Order.VAS_IsEmailSent = 'Y' — the order was e-mailed to
+            /// the customer. Drives the header's "Email Sent" badge, which is drawn
+            /// only when the flag is set.</summary>
+            public bool      IsEmailSent    { get; set; }
             public string    SalesRepName   { get; set; }
             public string    PaymentTermName { get; set; }
             public string    PriceListName  { get; set; }
