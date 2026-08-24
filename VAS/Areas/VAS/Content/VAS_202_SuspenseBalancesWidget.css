@@ -1,0 +1,1047 @@
+/* VAS_202_SuspenseBalancesWidget.css
+   Suspense Balances (Period Control dashboard, 3x2).
+   Design source: design.md -> dashboard-widgets.md (Widget Header, Glass Widget,
+   Grid Data Widget, Row And Header Separators, No Inner Scrollbars, Widget Footer
+   Pager). All internal sizing is em-driven off the widget root anchor; borders,
+   radii and shadows stay in px because they are physical edges ("Not Scaled With
+   em"). No native tag selector is styled - every rule is scoped to a vas-202- class. */
+
+.vas-202-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container (mirrors the sibling Period Control widgets) so a narrow
+       or zoomed-in cell can step the card base font below its 16px clamp floor, and
+       so the card's breakpoints query ITS width, not the viewport. */
+    container: vas-202 / inline-size;
+}
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Everything inside is em against this. */
+.vas-202-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: .875em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    box-sizing: border-box;
+    /* No inner scrollbars: the card holds exactly three account rows. */
+    overflow: hidden;
+}
+
+/* ---- Header: icon well + title / subtitle + period chip ----
+   Well and glyph are driven off the same --dash-inline-size lever as the title (2x
+   and ~1.1x the title clamp) so the header stays balanced at every width. */
+.vas-202-header {
+    display: flex;
+    align-items: center;
+    gap: .625em;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: .625em;
+}
+
+.vas-202-icon {
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * .022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * .022750), 40px);
+    flex: 0 0 auto;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+.vas-202-icon svg {
+    width: clamp(18px, calc(var(--dash-inline-size, 100vw) * .012500), 22px);
+    height: clamp(18px, calc(var(--dash-inline-size, 100vw) * .012500), 22px);
+}
+
+.vas-202-head-text {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-202-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    /* Fixed 2px pairs the two lines at every width (Widget Header rule). */
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Period chip: names the period every figure belongs to, opens the picker ---- */
+.vas-202-periodchip {
+    flex: 0 0 auto;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: .3em;
+    max-width: 40%;
+    font-family: inherit;
+    font-size: .625em;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #0083DA;
+    background: rgba(0, 131, 218, .08);
+    border: 1px solid #BFE4FF;
+    border-radius: 999px;
+    padding: .32em .6em;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.vas-202-periodchip:hover {
+    background: rgba(0, 131, 218, .14);
+}
+
+.vas-202-periodchip svg {
+    width: 1em;
+    height: 1em;
+    flex: 0 0 auto;
+}
+
+.vas-202-periodchip-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-periodchip:focus-visible {
+    outline: 2px solid #BFE4FF;
+    outline-offset: 1px;
+}
+
+/* ---- Body: column header + three account rows + footer total ---- */
+.vas-202-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ONE shared column template for the header and every row (Column Sizing And
+   Truncation): minmax(0, Nfr) only, so the entry and balance columns line up down
+   the card and no cell can blow the row out of the cell. */
+.vas-202-thead,
+.vas-202-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, .45fr) minmax(0, .95fr) 1em;
+    gap: .5em;
+    align-items: center;
+}
+
+/* Header separator is darker than the body row separator - it is a section boundary,
+   not another row divider. */
+.vas-202-thead {
+    flex: 0 0 auto;
+    padding: .35em .35em .4em;
+    border-bottom: 1px solid #C5D2DD;
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+}
+
+.vas-202-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    overflow: hidden;
+}
+
+/* One control account. Row cells sit one step below the widget title (List / Grid
+   Hierarchy Rule); the separator carries the scan-down rhythm and is never optional -
+   only the last row drops it. */
+.vas-202-row {
+    padding: .4em .35em;
+    border-bottom: 1px solid #E2EAF1;
+    border-radius: 6px;
+}
+
+.vas-202-row:last-child {
+    border-bottom: 0;
+}
+
+/* Only a row with something behind it advertises itself as clickable. */
+.vas-202-row-open {
+    cursor: pointer;
+}
+
+.vas-202-row-open:hover {
+    background: rgba(0, 131, 218, .06);
+}
+
+.vas-202-row-open:focus-visible {
+    outline: 2px solid #BFE4FF;
+    outline-offset: -2px;
+}
+
+/* Every cell truncates and carries its raw value in `title`. */
+.vas-202-cell {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The name cell stacks two lines: the account as an accountant reads it, and under
+   it the SETTING that points at it - two different facts, and the row needs both. */
+.vas-202-cell-name {
+    display: flex;
+    flex-direction: column;
+    gap: .1em;
+    overflow: hidden;
+}
+
+.vas-202-row-main {
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-row-sub {
+    font-size: .625em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Numeric columns right-aligned so the figures line up across the three rows.
+   The end padding is not cosmetic: a cell clips its own overflow, and a glyph's INK
+   can reach past the advance width its box is measured from - an italic tail (the "d"
+   of "Not configured") or a currency symbol otherwise loses a sliver at the cell
+   edge. Applied to the header caption too, so the captions stay aligned with the
+   figures under them rather than sitting .25em further right. */
+.vas-202-cell-num {
+    text-align: right;
+    padding-inline-end: .25em;
+}
+
+.vas-202-row .vas-202-cell-num {
+    font-size: .75em;
+    font-weight: 400;
+    color: #102C3F;
+}
+
+/* An unconfigured control account: muted, and never a figure - a "0" here would read
+   as "nothing to clear" when the truth is "nobody has said where to look". */
+.vas-202-row .vas-202-cell-off {
+    font-size: .6875em;
+    font-style: italic;
+    color: #9F9F9F;
+}
+
+/* Tone carries the operational reading of the balance: anything left on a suspense
+   account is work, zero is the target state. */
+.vas-202-row .vas-202-cell-value {
+    font-weight: 700;
+}
+
+.vas-202-row .vas-202-tone-fail {
+    color: #D14545;
+}
+
+.vas-202-row .vas-202-tone-ok {
+    color: #20A464;
+    font-weight: 400;
+}
+
+.vas-202-cell-chev {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    color: #9DB2C2;
+}
+
+.vas-202-cell-chev svg {
+    width: 1em;
+    height: 1em;
+}
+
+/* Load error / configuration / no-open-period state takes over the list area. */
+.vas-202-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: .5em;
+    font-size: .75em;
+    color: #748494;
+    line-height: 1.4;
+}
+
+.vas-202-state-error {
+    color: #D14545;
+}
+
+/* ---- Footer: the money still to clear, plus a setup warning when there is one ---- */
+.vas-202-foot {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    padding-top: .5em;
+    border-top: 1px solid #D9E2EB;
+    margin-top: .5em;
+}
+
+.vas-202-foot:empty {
+    display: none;
+}
+
+.vas-202-foot-info {
+    min-width: 0;
+    font-size: .75em;
+    color: #748494;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A setup problem, not a balance problem - amber, and it never crowds out the total. */
+.vas-202-foot-warn {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: .625em;
+    font-weight: 500;
+    color: #9A6500;
+    background: #FBF1DF;
+    border-radius: 999px;
+    padding: .18em .6em;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Busy overlay ---- */
+.vas-202-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .45);
+    border-radius: 14px;
+    z-index: 2;
+}
+
+.vas-202-hidden {
+    display: none !important;
+}
+
+/* ==========================================================
+   Period picker — anchored under the chip, appended to <body>
+   A menu, not a dialog: it closes on an outside click, on Escape and on any layout
+   change. It is a document-baseline surface, not part of the widget's em scale, so it
+   declares its own anchor.
+   ========================================================== */
+.vas-202-pp {
+    position: fixed;
+    /* Same narrow band the sibling Period Control popovers use: above the glass
+       cards, below every framework layer (jQuery UI .ui-front = 100, dialogs 101+). */
+    z-index: 95;
+    box-sizing: border-box;
+    min-width: 190px;
+    max-width: calc(100vw - 16px);
+    max-height: 60vh;
+    overflow: auto;
+    padding: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(8, 24, 38, .22);
+    color: #102C3F;
+}
+
+.vas-202-pp-h {
+    font-size: .6875rem;
+    font-weight: 700;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 8px 10px 4px;
+}
+
+.vas-202-pp-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .875rem;
+    color: #102C3F;
+    padding: 9px 10px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+.vas-202-pp-opt:hover {
+    background: #EAF8FF;
+}
+
+.vas-202-pp-opt[aria-selected="true"] {
+    background: #EAF8FF;
+    font-weight: 700;
+    color: #0083DA;
+}
+
+.vas-202-pp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-pp-meta {
+    flex: 0 0 auto;
+    font-size: .75rem;
+    font-weight: 400;
+    color: #748494;
+}
+
+.vas-202-pp-tick {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+    color: #0083DA;
+    opacity: 0;
+}
+
+.vas-202-pp-opt[aria-selected="true"] .vas-202-pp-tick {
+    opacity: 1;
+}
+
+.vas-202-pp-tick svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ==========================================================
+   Detail modal — the postings behind one suspense account
+   A real dialog: modal scrim, Escape / scrim / close button dismiss. Server-side
+   paged, and its body height is pinned to one page so the panel never resizes between
+   pages, accounts or states.
+   ========================================================== */
+.vas-202-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 96;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(8, 24, 38, .45);
+}
+
+.vas-202-modal {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(980px, 100%);
+    max-height: 82vh;
+    overflow: hidden;
+    background: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(8, 24, 38, .3);
+    color: #102C3F;
+}
+
+/* Busy layer over the whole panel - shown from the moment the dialog opens and on
+   every page turn, so the user never faces an empty box. */
+.vas-202-modal-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .6);
+    border-radius: 16px;
+    z-index: 1;
+}
+
+.vas-202-modal-head {
+    flex: 0 0 auto;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    border-bottom: 1px solid #E4EDF4;
+}
+
+/* The card's header glyph carried into the dialog. Fixed px rather than the card's
+   --dash-inline-size clamp: the dialog is a document-baseline surface. */
+.vas-202-modal-ico {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+.vas-202-modal-ico svg {
+    width: 18px;
+    height: 18px;
+}
+
+.vas-202-modal-heads {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-202-modal-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-modal-sub {
+    font-size: .8125rem;
+    font-weight: 400;
+    color: #5F7283;
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-modal-close {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    color: #141414;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+.vas-202-modal-close:hover {
+    background: #F0F4F8;
+}
+
+.vas-202-modal-close svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* The body is pinned to one page's worth of rows by an inline height the widget sets
+   from the page size. min-height:0 stays so the flex item can still shrink under the
+   dialog's 82vh cap on a short viewport. scrollbar-gutter reserves the scrollbar's
+   width whether or not it is showing - without it a page that scrolls and a page that
+   does not would render the columns at two different widths. */
+.vas-202-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+    padding: 6px 20px 16px;
+}
+
+.vas-202-modal-state {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: .875rem;
+    color: #748494;
+}
+
+.vas-202-modal-state-error {
+    color: #D14545;
+}
+
+/* ---- Detail grid: ONE shared column template ----
+   Unlike the sibling three-way-match dialog, every row of this list has the same
+   shape, so the header and the rows share a single template and there is exactly one
+   place to tune. Six columns: screen · document · document date · account date ·
+   Dr/Cr · amount. The screen and the document number take the slack - a window name
+   ("Invoice (Vendor)", "Material Receipt") is the longest thing in the row, while the
+   two dates, the badge and the amount are all fixed-width content. */
+.vas-202-dhead,
+.vas-202-drow {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1.5fr) minmax(0, 1.25fr) minmax(0, .95fr)
+        minmax(0, .95fr) minmax(0, .7fr) minmax(0, 1.1fr);
+    gap: 12px;
+    align-items: center;
+}
+
+/* Header separator is darker than the body row separator. */
+.vas-202-dhead {
+    position: sticky;
+    top: 0;
+    background: #FFFFFF;
+    padding: 11px 0;
+    border-bottom: 1px solid #C5D2DD;
+    font-size: .8125rem;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+}
+
+.vas-202-drow {
+    padding: 12px 0;
+    border-bottom: 1px solid #E2EAF1;
+    font-size: .875rem;
+}
+
+.vas-202-drow:last-child {
+    border-bottom: 0;
+}
+
+/* Every cell truncates and carries its raw value in `title` - clipping is acceptable,
+   loss of information is not. */
+.vas-202-dcell {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #5F7283;
+}
+
+.vas-202-dcell-b {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+/* Numeric columns right-aligned so values line up across rows - header included,
+   otherwise the caption floats away from its own column. */
+.vas-202-dcell-num {
+    text-align: right;
+}
+
+.vas-202-drow .vas-202-dcell-amt {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+/* Dr / Cr badge: which side of the account the posting sits on. Both tones are
+   readable rather than alarming - a suspense posting is not "bad" for being a credit,
+   and the colour is only there to let the eye sort the column at a glance. */
+.vas-202-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .35em;
+    font-size: .75rem;
+    font-weight: 500;
+    line-height: 1.4;
+    padding: .18em .6em;
+    border-radius: 999px;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-202-badge::before {
+    content: "";
+    flex: 0 0 auto;
+    width: .45em;
+    height: .45em;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: .9;
+}
+
+.vas-202-badge-dr {
+    color: #106AB0;
+    background: #E3F2FC;
+}
+
+.vas-202-badge-cr {
+    color: #9A6500;
+    background: #FBF1DF;
+}
+
+/* Document number = the zoom affordance. Styled as a link, built as a button: it
+   opens a window rather than following a URL. Only rendered as a link when the server
+   confirmed the row really is navigable. */
+.vas-202-dcell-doc {
+    display: block;
+}
+
+.vas-202-doclink {
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    line-height: inherit;
+    color: #106AB0;
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-doclink:hover {
+    text-decoration: underline;
+    color: #0083DA;
+}
+
+.vas-202-doclink:focus-visible {
+    outline: 2px solid #BFE4FF;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* ---- Modal footer: the canonical widget pager, in the dialog ----
+   Always present, even on the empty and error states (with both arrows disabled) - a
+   footer that came and went would change the dialog's height. */
+.vas-202-modal-foot {
+    flex: 0 0 auto;
+    min-height: 49px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+    border-top: 1px solid #D9E2EB;
+}
+
+.vas-202-pager-info {
+    font-size: .8125rem;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-202-pager-nav {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vas-202-pager-label {
+    font-size: .8125rem;
+    font-weight: 500;
+    color: #102C3F;
+    min-width: 3.5em;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.vas-202-pgbtn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, .7);
+    color: #0083DA;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-202-pgbtn:hover:not(:disabled) {
+    background: #EAF8FF;
+}
+
+.vas-202-pgbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+}
+
+.vas-202-pgbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ==========================================================
+   RTL
+   Only the things that are genuinely directional are flipped. The AMOUNT column is
+   NOT: a figure column is read against its own edge in both directions, and
+   text-align:right on a numeric cell in an RTL row would put it on the wrong side of
+   the grid track. `text-align: end` resolves per direction and does both at once, so
+   the numeric rule is stated once here rather than duplicated per direction.
+   ========================================================== */
+.vas-202-cell-num,
+.vas-202-dcell-num {
+    text-align: end;
+}
+
+[dir="rtl"] .vas-202-pp-opt,
+[dir="rtl"] .vas-202-doclink {
+    text-align: right;
+}
+
+[dir="rtl"] .vas-202-cell-chev {
+    justify-content: flex-start;
+}
+
+/* The row chevron points the way the reader travels. */
+[dir="rtl"] .vas-202-cell-chev svg {
+    transform: scaleX(-1);
+}
+
+/* ==========================================================
+   Responsive
+   Two different mechanisms, deliberately:
+
+   • The CARD uses CONTAINER queries against its own named container (`vas-202`,
+     declared on .vas-202-root). What matters to the card is how wide ITS CELL is - a
+     3-span cell is ~394px on a 1208px dashboard but far narrower once a sidebar and a
+     right panel are both open, at the very same viewport width. A media query cannot
+     see that; a container query can.
+
+   • The MODAL and the PERIOD PICKER use MEDIA queries. Both are appended to <body>,
+     outside the widget's container, so they have no container to resolve against -
+     the viewport is genuinely what bounds them.
+
+   Both only ever REMOVE ornament or tighten spacing, or - in the modal - drop the
+   least load-bearing column. No breakpoint hides an entry count, a document number,
+   an amount or the "Not configured" state.
+   ========================================================== */
+
+/* ---- Card: narrow cell ---- */
+@container vas-202 (max-width: 360px) {
+
+    .vas-202-header {
+        gap: .5em;
+    }
+
+    .vas-202-periodchip {
+        max-width: 34%;
+        padding: .3em .5em;
+    }
+
+    .vas-202-thead,
+    .vas-202-row {
+        gap: .35em;
+        padding-left: .25em;
+        padding-right: .25em;
+    }
+
+    .vas-202-row {
+        padding-top: .35em;
+        padding-bottom: .35em;
+    }
+}
+
+/* ---- Card: very narrow cell ---- */
+@container vas-202 (max-width: 300px) {
+
+    /* The title alone identifies the card at this width. */
+    .vas-202-subtitle {
+        display: none;
+    }
+
+    /* The calendar glyph goes; the chevron still says "this opens". */
+    .vas-202-periodchip svg:first-child {
+        display: none;
+    }
+
+    /* The setting name under the account goes before any figure does - the row's
+       aria-label still carries it for a screen reader. */
+    .vas-202-row-sub {
+        display: none;
+    }
+
+    /* The row chevron goes next - the rows still respond to a click, and the count
+       and the balance are the content. */
+    .vas-202-thead,
+    .vas-202-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, .5fr) minmax(0, 1fr);
+    }
+
+    .vas-202-cell-chev {
+        display: none;
+    }
+
+    /* The warning pill is the first thing to go from a crowded footer: it duplicates
+       what the affected row already says in place. */
+    .vas-202-foot-warn {
+        display: none;
+    }
+}
+
+/* ==========================================================
+   Modal / picker — viewport-driven
+   The posting grid drops columns as the viewport narrows, least-informative first,
+   and what it sheds is DATES - in that order:
+
+     <= 800px   the DOCUMENT date goes. The account date is the one the ledger is
+                keyed on, so of the two it is the one worth keeping.
+     <= 560px   the ACCOUNT date goes too. Every row in the dialog already belongs to
+                the single accounting period named in its header, so a narrow view
+                loses no scoping information by dropping both dates.
+
+   The screen, the document number, the Dr/Cr side and the amount survive every
+   width - they are what identifies the posting and what the reader came for.
+   Hiding a cell with display:none removes it from the grid flow, so the remaining
+   cells fill the shorter template in order.
+   ========================================================== */
+
+@media (max-width: 980px) {
+
+    .vas-202-overlay {
+        padding: 16px;
+    }
+
+    .vas-202-modal-body {
+        padding: 6px 14px 14px;
+    }
+
+    .vas-202-modal-head,
+    .vas-202-modal-foot {
+        padding: 10px 14px;
+    }
+
+    .vas-202-dhead,
+    .vas-202-drow {
+        gap: 8px;
+    }
+}
+
+@media (max-width: 800px) {
+
+    .vas-202-overlay {
+        padding: 10px;
+    }
+
+    .vas-202-modal {
+        max-height: 90vh;
+        border-radius: 12px;
+    }
+
+    .vas-202-dhead,
+    .vas-202-drow {
+        font-size: .8125rem;
+    }
+
+    /* Document date goes; the account date stays. */
+    .vas-202-dhead > :nth-child(3),
+    .vas-202-drow > :nth-child(3) {
+        display: none;
+    }
+
+    .vas-202-dhead,
+    .vas-202-drow {
+        grid-template-columns:
+            minmax(0, 1.5fr) minmax(0, 1.3fr) minmax(0, 1fr)
+            minmax(0, .75fr) minmax(0, 1.15fr);
+    }
+
+    .vas-202-modal-ico {
+        display: none;
+    }
+}
+
+@media (max-width: 560px) {
+
+    /* The account date goes too - the dialog header already names the one period
+       every row belongs to. The screen and the document number still say what the
+       posting is, and the amount is what is being chased. */
+    .vas-202-dhead > :nth-child(4),
+    .vas-202-drow > :nth-child(4) {
+        display: none;
+    }
+
+    .vas-202-dhead,
+    .vas-202-drow {
+        grid-template-columns:
+            minmax(0, 1.4fr) minmax(0, 1.3fr) minmax(0, .8fr) minmax(0, 1.2fr);
+    }
+
+    .vas-202-modal-foot .vas-202-pager-info {
+        display: none;
+    }
+
+    .vas-202-modal-foot {
+        justify-content: flex-end;
+    }
+
+    .vas-202-pp {
+        min-width: 150px;
+        max-width: calc(100vw - 20px);
+    }
+}
+
+/* The pop animation the reference design uses on the panel, honoured only where the
+   viewer has not asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+
+    .vas-202-modal {
+        animation: vas-202-pop .14s ease-out;
+    }
+}
+
+@keyframes vas-202-pop {
+    from {
+        transform: translateY(8px) scale(.99);
+        opacity: 0;
+    }
+
+    to {
+        transform: none;
+        opacity: 1;
+    }
+}
