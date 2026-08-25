@@ -742,8 +742,12 @@
     padding-inline-end: .25em;
 }
 
+/* Darker than the muted cells around it, but NOT bold. Weight is emphasis, and
+   emphasis only works on a minority: the account-balance checks carry five amount
+   columns in a row, and bolding all of them made the whole line shout while telling
+   the reader nothing about which figure mattered. The darker ink still separates a
+   value from its labels, and right alignment already does the column's real work. */
 .vas-195-drow .vas-195-dcell-amt {
-    font-weight: 700;
     color: #102C3F;
 }
 

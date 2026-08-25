@@ -95,6 +95,16 @@ namespace VASLogic.Models
     ///   VAI145      2026-08-25 Check 19 rewritten to the simplified rule: foreign-currency
     ///                          invoice count, then FRPT_RevaluationDate journal count.
     ///                          Reclassified WARNING, reports PASS / FAIL, no drill-down
+    ///   VAI145      2026-08-25 Check 04 leads with the document number, adds Document Type
+    ///                          and splits Bank from Bank Account; the Source badge goes,
+    ///                          the screen name under the number already says as much
+    ///   VAI145      2026-08-25 Check 05 names the VA009 payment method instead of the
+    ///                          TenderType letter, reads both statuses as reference names,
+    ///                          excludes reversals, and puts the amount last
+    ///   VAI145      2026-08-25 Check 10 reads its account as "1110 - Petty Cash" in one
+    ///                          column, and detail amounts are no longer bold
+    ///   VAI145      2026-08-25 Check 10's accounts scoped to the primary schema's own
+    ///                          chart via C_AcctSchema_Element (ElementType 'AC')
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -120,6 +130,11 @@ namespace VASLogic.Models
            because each appears in a CASE the WHERE never binds against. */
         private const string DRCR_DEBIT = "Debit";
         private const string DRCR_CREDIT = "Credit";
+
+        /* C_AcctSchema_Element.ElementType for the natural ACCOUNT element - the one whose
+           C_Element carries the chart of accounts a schema posts against. Bound as a
+           value, never inlined: it is data, not an identifier. */
+        private const string ELEMENTTYPE_Account = "AC";
 
         /* The date column a discovered document is bounded by, in preference order.
            DateAcct first because the period filter must mean the same thing for every
@@ -1227,6 +1242,22 @@ namespace VASLogic.Models
         /// already pointing at a payment is the SAME reconciliation item as that payment
         /// and would otherwise be counted twice - once here and once in the payment
         /// branch - inflating the number finance is asked to review.
+        ///
+        /// THE DOCUMENT LEADS. The row is an item to go and look at, so its number is the
+        /// first thing read and everything else qualifies it. The screen name rides under
+        /// the number, as it does on every other document check, and that is also what
+        /// replaced the old Source badge: "AP Payment" and "Bank Statement" under the
+        /// number say which branch a row came from more precisely than PAYMENT and
+        /// STATEMENT did, and they cost no column of their own.
+        ///
+        /// BANK AND ACCOUNT ARE TWO FACTS. The bank account name used to fall back to the
+        /// bank's name when the account had none, which quietly showed a bank where a
+        /// reader expected an account and gave no way to tell the two cases apart. They
+        /// are separate columns now, each empty when it is genuinely unknown.
+        ///
+        /// Both branches select the same columns in the same ORDER - a UNION lines its
+        /// branches up by position, not by name - and each optional column is emitted as
+        /// a typed literal where its table cannot supply it.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <returns>Populated <see cref="DetailSpec"/>.</returns>
@@ -1235,23 +1266,32 @@ namespace VASLogic.Models
             List<SqlParameter> parameters = Binds();
             StringBuilder sql = new StringBuilder();
 
+            /* Target type first - see DocTypeKeyExpr. A payment carries both. */
+            string payDocTypeKey = DocTypeKeyExpr("p",
+                ColumnExists("C_Payment", "C_DocType_ID"),
+                ColumnExists("C_Payment", "C_DocTypeTarget_ID"));
+
             string payments = @"
                 SELECT " + TableId("C_Payment") + " AS " + TECH_TABLE + @",
                        p.C_Payment_ID AS " + TECH_RECORD + @",
                        0 AS " + TECH_WINDOW + @",
-                       COALESCE(ba.Name,bank.Name,N'') AS Bank_Account,
-                       'PAYMENT' AS Source_Type,
                        COALESCE(p.DocumentNo,N'') AS Doc_Number,
+                       " + (string.IsNullOrEmpty(payDocTypeKey) ? "N''" : "COALESCE(dt.Name,N'')") + @" AS Doc_Type,
+                       bank.Name AS Bank_Name,
+                       ba.AccountNo AS Bank_Account,
                        p.DateTrx AS Trx_Date,
                        p.DateAcct AS Doc_Date,
                        COALESCE(bp.Name,N'') AS Partner_Name,
                        COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
                        COALESCE(p.PayAmt,0) AS Doc_Amount
                 FROM C_Payment p
-                LEFT OUTER JOIN C_BankAccount ba ON (ba.C_BankAccount_ID=p.C_BankAccount_ID)
-                LEFT OUTER JOIN C_Bank bank ON (bank.C_Bank_ID=ba.C_Bank_ID)
+                INNER JOIN C_BankAccount ba ON (ba.C_BankAccount_ID=p.C_BankAccount_ID)
+                INNER JOIN C_Bank bank ON (bank.C_Bank_ID=ba.C_Bank_ID)
+                " + (string.IsNullOrEmpty(payDocTypeKey)
+                        ? ""
+                        : "INNER JOIN C_DocType dt ON (dt.C_DocType_ID=" + payDocTypeKey + ")") + @"
                 LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=p.C_BPartner_ID)
-                LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=p.C_Currency_ID)
+                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=p.C_Currency_ID)
                 WHERE p.IsActive='Y'
                   AND p.DocStatus IN (" + DOCSTATUS_FinalList + @")
                   AND COALESCE(p.IsReversal,'N')='N'
@@ -1266,13 +1306,21 @@ namespace VASLogic.Models
             {
                 bool hasInvoice = ColumnExists("C_BankStatementLine", "C_Invoice_ID");
 
+                /* A bank statement carries no target type, and in some schemas no document
+                   type at all - probed rather than assumed, so the branch degrades to an
+                   empty Document Type instead of failing the whole statement. */
+                string stmtDocTypeKey = DocTypeKeyExpr("bs",
+                    ColumnExists("C_BankStatement", "C_DocType_ID"),
+                    ColumnExists("C_BankStatement", "C_DocTypeTarget_ID"));
+
                 string lines = @"
                 SELECT " + TableId("C_BankStatementLine") + " AS " + TECH_TABLE + @",
                        bsl.C_BankStatementLine_ID AS " + TECH_RECORD + @",
                        0 AS " + TECH_WINDOW + @",
-                       COALESCE(ba.Name,N'') AS Bank_Account,
-                       'STATEMENT' AS Source_Type,
                        COALESCE(bs.DocumentNo,N'') AS Doc_Number,
+                       " + (string.IsNullOrEmpty(stmtDocTypeKey) ? "N''" : "COALESCE(dt.Name,N'')") + @" AS Doc_Type,
+                       COALESCE(bank.Name,N'') AS Bank_Name,
+                       COALESCE(ba.Name,N'') AS Bank_Account,
                        bsl.StatementLineDate AS Trx_Date,
                        bsl.DateAcct AS Doc_Date,
                        COALESCE(bp.Name,N'') AS Partner_Name,
@@ -1281,6 +1329,10 @@ namespace VASLogic.Models
                 FROM C_BankStatementLine bsl
                 INNER JOIN C_BankStatement bs ON (bs.C_BankStatement_ID=bsl.C_BankStatement_ID)
                 LEFT OUTER JOIN C_BankAccount ba ON (ba.C_BankAccount_ID=bs.C_BankAccount_ID)
+                LEFT OUTER JOIN C_Bank bank ON (bank.C_Bank_ID=ba.C_Bank_ID)
+                " + (string.IsNullOrEmpty(stmtDocTypeKey)
+                        ? ""
+                        : "LEFT OUTER JOIN C_DocType dt ON (dt.C_DocType_ID=" + stmtDocTypeKey + ")") + @"
                 LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=bsl.C_BPartner_ID)
                 LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=bsl.C_Currency_ID)
                 WHERE bsl.IsActive='Y'
@@ -1293,9 +1345,10 @@ namespace VASLogic.Models
             }
 
             List<ColumnDef> columns = new List<ColumnDef>();
+            columns.Add(Col("Doc_Number", "DocumentNo", "Document No", COLTYPE_DOC, 1.4m));
+            columns.Add(Col("Doc_Type", "VAS_195_DocumentType", "Document Type", COLTYPE_TEXT, 1.1m));
+            columns.Add(Col("Bank_Name", "VAS_195_Bank", "Bank", COLTYPE_TEXT, 1.2m));
             columns.Add(Col("Bank_Account", "VAS_195_BankAccount", "Bank Account", COLTYPE_TEXT, 1.2m));
-            columns.Add(Col("Source_Type", "VAS_195_SourceType", "Source", COLTYPE_BADGE, 0.8m));
-            columns.Add(Col("Doc_Number", "DocumentNo", "Document No", COLTYPE_DOC, 1.1m));
             columns.Add(Col("Trx_Date", "VAS_195_TransactionDate", "Transaction Date", COLTYPE_DATE, 0.9m));
             columns.Add(Col("Doc_Date", "VAS_195_AccountDate", "Account Date", COLTYPE_DATE, 0.9m));
             columns.Add(Col("Partner_Name", "VAS_195_BusinessPartner", "Business Partner", COLTYPE_TEXT, 1.2m));
@@ -1328,6 +1381,28 @@ namespace VASLogic.Models
         /// VA009 execution status of In-Progress, Bounced or Rejected. The execution
         /// column only exists where the VA009 module is installed, so it is probed and
         /// the predicate degrades to the DocStatus test alone.
+        ///
+        /// HOW IT WAS PAID reads the VA009 payment method rather than TenderType.
+        /// TenderType is the platform's coarse classification - a letter meaning "check"
+        /// or "direct deposit" - while the payment method is the actual instrument
+        /// finance set up and recognises by name, which is what a reader chasing a stuck
+        /// payment needs. Its name column differs between installations, so it is probed
+        /// in the same VA009_Name / Name / Value order the VAS_033 widget uses. Where the
+        /// module is absent the column falls back to TenderType, resolved to its
+        /// reference NAME rather than left as a letter.
+        ///
+        /// BOTH STATUSES ARE NAMES, NOT CODES. DocStatus and VA009_ExecutionStatus are
+        /// AD_Reference list columns; showing 'IP' and 'B' put the reader in front of two
+        /// columns of stored values. Each is resolved through AD_Ref_List for the session
+        /// language by <see cref="ListNameJoin"/>, whose reference id comes from AD_Column
+        /// rather than a literal, and each falls back through translation, reference name,
+        /// then the raw code - so a missing translation degrades one step at a time.
+        ///
+        /// REVERSALS ARE EXCLUDED. A reversal is the correction of a payment, not a
+        /// payment stuck mid-execution; listing it asks finance to chase something that
+        /// has already been dealt with. The same exclusion checks 04 and 21 apply.
+        ///
+        /// The amount goes last, after the currency that qualifies it.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <returns>Populated <see cref="DetailSpec"/>.</returns>
@@ -1336,10 +1411,42 @@ namespace VASLogic.Models
             List<SqlParameter> parameters = Binds();
             bool hasExec = ColumnExists("C_Payment", COLUMN_EXECUTION_STATUS);
 
-            string execExpr = hasExec ? "COALESCE(p." + COLUMN_EXECUTION_STATUS + ",N'')" : "N''";
+            /* Joins and their binds are appended together, in text order: a bind whose
+               occurrence is not emitted would be filled into the next one's slot under
+               positional binding. */
+            StringBuilder joins = new StringBuilder();
+            joins.Append(" LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=p.C_BPartner_ID)");
+            joins.Append(" LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=p.C_Currency_ID)");
+
+            string methodExpr = AppendPaymentMethod(c, joins, parameters);
+
+            string statusExpr = "COALESCE(p.DocStatus,N'')";
+            string statusJoin = ListNameJoin("ds", "dstrl", "p.DocStatus", "C_Payment", "DocStatus", "@AD_LanguageD");
+            if (statusJoin.Length > 0)
+            {
+                joins.Append(statusJoin);
+                parameters.Add(new SqlParameter("@AD_LanguageD", ctxLanguage(c)));
+                statusExpr = "COALESCE(dstrl.Name,ds.Name,p.DocStatus,N'')";
+            }
+
+            string execExpr = "N''";
+            if (hasExec)
+            {
+                execExpr = "COALESCE(p." + COLUMN_EXECUTION_STATUS + ",N'')";
+
+                string execJoin = ListNameJoin("es", "estrl", "p." + COLUMN_EXECUTION_STATUS,
+                    "C_Payment", COLUMN_EXECUTION_STATUS, "@AD_LanguageE");
+                if (execJoin.Length > 0)
+                {
+                    joins.Append(execJoin);
+                    parameters.Add(new SqlParameter("@AD_LanguageE", ctxLanguage(c)));
+                    execExpr = "COALESCE(estrl.Name,es.Name,p." + COLUMN_EXECUTION_STATUS + ",N'')";
+                }
+            }
+
             string exception = hasExec
-                ? "(p.DocStatus IN ('DR','IP','WP','WC') OR p." + COLUMN_EXECUTION_STATUS + " IN ('I','B','C'))"
-                : "p.DocStatus IN ('DR','IP','WP','WC')";
+                ? "(p.DocStatus IN ('DR', 'IP') OR (p.DocStatus NOT IN ('VO' , 'RE') AND p." + COLUMN_EXECUTION_STATUS + " IN ('B','C')))"
+                : "p.DocStatus IN ('DR', 'IP')";
 
             string sql = @"
                 SELECT " + TableId("C_Payment") + " AS " + TECH_TABLE + @",
@@ -1348,29 +1455,74 @@ namespace VASLogic.Models
                        COALESCE(p.DocumentNo,N'') AS Doc_Number,
                        p.DateAcct AS Doc_Date,
                        COALESCE(bp.Name,N'') AS Partner_Name,
-                       COALESCE(p.TenderType,N'') AS Tender_Type,
+                       " + methodExpr + @" AS Payment_Method,
+                       " + statusExpr + @" AS Doc_Status,
+                       " + execExpr + @" AS Exec_Status,
                        COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
-                       COALESCE(p.PayAmt,0) AS Doc_Amount,
-                       p.DocStatus AS Doc_Status,
-                       " + execExpr + @" AS Exec_Status
-                FROM C_Payment p
-                LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=p.C_BPartner_ID)
-                LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=p.C_Currency_ID)
+                       COALESCE(p.PayAmt,0) AS Doc_Amount
+                FROM C_Payment p" + joins.ToString() + @"
                 WHERE p.IsActive='Y'
+                  AND COALESCE(p.IsReversal,'N')='N'
                   AND " + exception + @"
                   AND " + PeriodWhere(c, "p", "DateAcct", "P", parameters);
 
             List<ColumnDef> columns = new List<ColumnDef>();
-            columns.Add(Col("Doc_Number", "VAS_195_PaymentNo", "Payment No", COLTYPE_DOC, 1.1m));
+            columns.Add(Col("Doc_Number", "VAS_195_PaymentNo", "Payment No", COLTYPE_DOC, 1.2m));
             columns.Add(Col("Doc_Date", "VAS_195_AccountDate", "Account Date", COLTYPE_DATE, 0.9m));
-            columns.Add(Col("Partner_Name", "VAS_195_BusinessPartner", "Business Partner", COLTYPE_TEXT, 1.3m));
-            columns.Add(Col("Tender_Type", "VAS_195_TenderType", "Tender Type", COLTYPE_TEXT, 0.8m));
+            columns.Add(Col("Partner_Name", "VAS_195_BusinessPartner", "Business Partner", COLTYPE_TEXT, 1.4m));
+            columns.Add(Col("Payment_Method", "VAS_195_PaymentMethod", "Payment Method", COLTYPE_TEXT, 1.2m));
+            columns.Add(Col("Doc_Status", "VAS_195_DocStatus", "Status", COLTYPE_BADGE, 1.0m));
+            columns.Add(Col("Exec_Status", "VAS_195_ExecStatus", "Execution", COLTYPE_BADGE, 1.0m));
             columns.Add(Col("Currency_Iso", "VAS_195_Currency", "Currency", COLTYPE_TEXT, 0.5m));
-            columns.Add(Col("Doc_Amount", "VAS_195_Amount", "Amount", COLTYPE_DOCAMOUNT, 1.0m));
-            columns.Add(Col("Doc_Status", "VAS_195_DocStatus", "Status", COLTYPE_BADGE, 0.8m));
-            columns.Add(Col("Exec_Status", "VAS_195_ExecStatus", "Execution", COLTYPE_BADGE, 0.8m));
+            columns.Add(Col("Doc_Amount", "VAS_195_Amount", "Amount", COLTYPE_DOCAMOUNT, 1.1m));
 
             return Spec(sql, "p", "p.DateAcct DESC,p.C_Payment_ID DESC", parameters, columns);
+        }
+
+        /// <summary>
+        /// Appends whatever join is needed to name a payment's instrument, and returns the
+        /// SELECT expression that reads it.
+        ///
+        /// Preferred: the VA009 payment method, joined by id. Its display column is not
+        /// the same everywhere - VA009_Name, then Name, then Value - which is the order
+        /// the VAS_033 Payment Methods widget probes, reused here rather than guessed at
+        /// again.
+        ///
+        /// Fallback where the module is absent: TenderType, resolved to its reference name
+        /// so the column still reads "Check" rather than 'K'. Only one of the two joins is
+        /// ever emitted, which keeps the statement's join count bounded.
+        /// </summary>
+        /// <param name="c">Shared evaluation context.</param>
+        /// <param name="joins">Join clause being built, appended to in text order.</param>
+        /// <param name="parameters">Bind list being built, in appearance order.</param>
+        /// <returns>Scalar expression naming the instrument.</returns>
+        private string AppendPaymentMethod(CheckContext c, StringBuilder joins, List<SqlParameter> parameters)
+        {
+            if (ColumnExists("C_Payment", "VA009_PaymentMethod_ID") && TableExists("VA009_PaymentMethod"))
+            {
+                string nameColumn = "";
+                if (ColumnExists("VA009_PaymentMethod", "VA009_Name")) { nameColumn = "pm.VA009_Name"; }
+                else if (ColumnExists("VA009_PaymentMethod", "Name")) { nameColumn = "pm.Name"; }
+                else if (ColumnExists("VA009_PaymentMethod", "Value")) { nameColumn = "pm.Value"; }
+
+                if (nameColumn.Length > 0)
+                {
+                    joins.Append(" LEFT OUTER JOIN VA009_PaymentMethod pm")
+                         .Append(" ON (pm.VA009_PaymentMethod_ID=p.VA009_PaymentMethod_ID)");
+
+                    return "COALESCE(" + nameColumn + ",N'')";
+                }
+            }
+
+            string tenderJoin = ListNameJoin("tt", "tttrl", "p.TenderType", "C_Payment", "TenderType", "@AD_LanguageT");
+            if (tenderJoin.Length > 0)
+            {
+                joins.Append(tenderJoin);
+                parameters.Add(new SqlParameter("@AD_LanguageT", ctxLanguage(c)));
+                return "COALESCE(tttrl.Name,tt.Name,p.TenderType,N'')";
+            }
+
+            return "COALESCE(p.TenderType,N'')";
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -1880,8 +2032,12 @@ namespace VASLogic.Models
                 SELECT fa.Account_ID AS " + TECH_RECORD + @",
                        0 AS " + TECH_TABLE + @",
                        0 AS " + TECH_WINDOW + @",
+                       /* Selected but NOT declared - it is the sort key only. The reader
+                          sees the combined name; ordering by the bare value is what keeps
+                          the list in account-code order rather than alphabetical. */
                        COALESCE(ev.Value,N'') AS Account_Value,
-                       COALESCE(ev.Name,N'') AS Account_Name,
+                       CASE WHEN COALESCE(ev.Name,N'')=N'' THEN COALESCE(ev.Value,N'')
+                            ELSE COALESCE(ev.Value,N'') || N' - ' || COALESCE(ev.Name,N'') END AS Account_Name,
                        SUM(CASE WHEN fa.DateAcct<@OpeningBefore THEN COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0) ELSE 0 END) AS Opening_Balance,
                        SUM(CASE WHEN " + string.Format(periodCase, "A") + @" THEN COALESCE(fa.AmtAcctDr,0) ELSE 0 END) AS Period_Debit,
                        SUM(CASE WHEN " + string.Format(periodCase, "B") + @" THEN COALESCE(fa.AmtAcctCr,0) ELSE 0 END) AS Period_Credit,
@@ -1924,9 +2080,12 @@ namespace VASLogic.Models
             spec.OrderBy = "Account_Value";
             spec.Params = parameters;
 
+            /* ONE account column, not two. The code and the name are one identity to a
+               reader - "1110 - Petty Cash" - and splitting them cost a column to repeat
+               half of what the next one said. The CASE guards the separator so an account
+               with no name renders as its code alone rather than trailing a dangling dash. */
             List<ColumnDef> columns = new List<ColumnDef>();
-            columns.Add(Col("Account_Value", labelKey, labelText, COLTYPE_TEXT, 0.8m));
-            columns.Add(Col("Account_Name", "VAS_195_AccountName", "Account Name", COLTYPE_TEXT, 1.6m));
+            columns.Add(Col("Account_Name", labelKey, labelText, COLTYPE_TEXT, 2.2m));
             columns.Add(Col("Opening_Balance", "VAS_195_OpeningBalance", "Opening", COLTYPE_AMOUNT, 1.0m));
             columns.Add(Col("Period_Debit", "VAS_195_PeriodDebit", "Debit", COLTYPE_AMOUNT, 1.0m));
             columns.Add(Col("Period_Credit", "VAS_195_PeriodCredit", "Credit", COLTYPE_AMOUNT, 1.0m));
@@ -2126,10 +2285,12 @@ namespace VASLogic.Models
         ///
         /// There is no reliable universal rule for identifying a clearing account, and
         /// this installation carries no close-check account mapping, so the check uses
-        /// C_ElementValue.IsAllocationRelated as the documented SETUP AID and says so.
-        /// When nothing is marked, the answer is NOT_APPLICABLE with a setup message -
-        /// never a PASS, because "we found no clearing accounts to look at" is not the
-        /// same as "the clearing accounts are clean".
+        /// C_ElementValue.IsAllocationRelated as the documented SETUP AID and says so,
+        /// within the primary accounting schema's own chart - see
+        /// <see cref="ClearingAccounts"/>. When nothing is marked, the answer is
+        /// NOT_APPLICABLE with a setup message - never a PASS, because "we found no
+        /// clearing accounts to look at" is not the same as "the clearing accounts are
+        /// clean".
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <param name="def">Registry entry.</param>
@@ -2178,6 +2339,21 @@ namespace VASLogic.Models
         /// <summary>
         /// The natural accounts treated as clearing accounts. Setup aid only - see the
         /// note on Eval10.
+        ///
+        /// SCOPED TO THE PRIMARY SCHEMA'S CHART. An element value belongs to a
+        /// C_Element, and a tenant can carry several - a second chart of accounts, a
+        /// user-defined dimension - so selecting on the flag alone reached across every
+        /// element the client owns. The accounts now come from the ONE element the
+        /// primary accounting schema declares as its natural account: the
+        /// C_AcctSchema_Element row of that schema with ElementType 'AC', active.
+        ///
+        /// That is the same element Fact_Acct.Account_ID points into, which is what makes
+        /// the balances this check reports mean anything. An id from another chart could
+        /// only ever match no posting - or, worse, match a different account's postings by
+        /// numeric coincidence.
+        ///
+        /// IsAllocationRelated is still what DESIGNATES a clearing account; the element
+        /// join says which chart to look in, not which accounts qualify.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <returns>Distinct account ids (never null).</returns>
@@ -2189,13 +2365,19 @@ namespace VASLogic.Models
             string sql = @"
                 SELECT ev.C_ElementValue_ID AS Account_ID
                 FROM C_ElementValue ev
+                INNER JOIN C_AcctSchema_Element ase ON (ase.C_Element_ID=ev.C_Element_ID)
                 WHERE ev.AD_Client_ID=@AD_Client_ID
                   AND ev.IsActive='Y'
+                  AND ase.C_AcctSchema_ID=@C_AcctSchema_ID
+                  AND ase.ElementType=@ElementType
+                  AND ase.IsActive='Y'
                   AND COALESCE(ev.IsAllocationRelated,'N')='Y'";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
-                new SqlParameter("@AD_Client_ID", c.Ctx.GetAD_Client_ID())
+                new SqlParameter("@AD_Client_ID", c.Ctx.GetAD_Client_ID()),
+                new SqlParameter("@C_AcctSchema_ID", c.Acct.C_AcctSchema_ID),
+                new SqlParameter("@ElementType", ELEMENTTYPE_Account)
             };
 
             DataSet ds = DB.ExecuteDataset(sql, parameters, null);
@@ -2278,9 +2460,10 @@ namespace VASLogic.Models
                 FROM C_PaymentAllocate pa
                 INNER JOIN C_Payment p ON (p.C_Payment_ID=pa.C_Payment_ID)
                 LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=p.C_BPartner_ID)
-                LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=p.C_Currency_ID)
+                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=p.C_Currency_ID)
                 WHERE pa.IsActive='Y'
                   AND p.IsActive='Y'
+                  AND p.DocStatus NOT IN (" + DOCSTATUS_DeadList + @")
                   AND pa.C_AllocationLine_ID IS NULL
                   AND " + PeriodWhere(c, "p", "DateAcct", "PA", parameters) + @"
                   AND ABS(COALESCE(pa.Amount,0))>@ToleranceP";
