@@ -86,6 +86,12 @@ namespace VASLogic.Models
     ///   VAI145      2026-08-25 Check 12 keyed on DateNextRun alone - the run test it was
     ///                          ANDed with could only hide live exceptions - and its type
     ///                          and frequency read as names rather than stored codes
+    ///   VAI145      2026-08-25 Check 15 groups by screen with the screen name under the
+    ///                          document number, and drops the Currency column its three
+    ///                          tables can never populate
+    ///   VAI145      2026-08-25 Check 03 reads C_Payment.IsAllocated and excludes
+    ///                          advances, instead of re-deriving allocation from
+    ///                          C_AllocationLine - it now agrees with the VAS_199 widget
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -881,7 +887,7 @@ namespace VASLogic.Models
                selected column of every branch, which is what lets a UNION's ORDER BY
                reach it. */
             return Spec(sql.ToString(), "", "Screen_Sort,Doc_Date DESC,Doc_Number DESC",
-                parameters, DocColumns(false));
+                parameters, DocColumns(false, true));
         }
 
         /// <summary>
@@ -970,15 +976,26 @@ namespace VASLogic.Models
         /// <summary>
         /// The shared column set of the document checks.
         ///
-        /// Checks 01 and 02 leave the Screen column OUT while still sorting by it: the
+        /// NO check declares the Screen column any more, and all three sort by it: the
         /// rows arrive grouped screen by screen, and a column repeating the same value
-        /// down each group earns less than the width it costs - the document number and
-        /// its type already say what the record is. Check 15 keeps the column, because
-        /// its three inventory documents interleave by date rather than group.
+        /// down each group earns less than the width it costs. The screen name goes on a
+        /// second line inside the document cell instead - see the client's docCell -
+        /// which costs no column width at all and still tells a reader landing mid-list
+        /// which screen a record belongs to.
+        ///
+        /// CURRENCY is optional because it is not merely narrow on the inventory check,
+        /// it is EMPTY: M_InOut, M_Inventory and M_Movement carry no C_Currency_ID, so
+        /// the branch builder emits a literal for every one of their rows and the column
+        /// renders blank down its whole length. A column that can never have a value on
+        /// the check that declares it is not a thin column, it is a wrong one.
         /// </summary>
-        /// <param name="withScreen">Whether to declare the Screen column.</param>
+        /// <param name="withScreen">Whether to declare the Screen column. Every caller
+        /// passes false today; the parameter stays because the client still renders
+        /// COLTYPE_SCREEN, so restoring the column on one check is a one-word change
+        /// rather than a rendering change.</param>
+        /// <param name="withCurrency">Whether the check's tables can carry a currency.</param>
         /// <returns>Declared columns.</returns>
-        private List<ColumnDef> DocColumns(bool withScreen)
+        private List<ColumnDef> DocColumns(bool withScreen, bool withCurrency)
         {
             List<ColumnDef> columns = new List<ColumnDef>();
             if (withScreen) { columns.Add(Col("Screen", "VAS_195_Screen", "Screen", COLTYPE_SCREEN, 1.2m)); }
@@ -993,7 +1010,7 @@ namespace VASLogic.Models
             columns.Add(Col("Doc_Status", "VAS_195_DocStatus", "Status", COLTYPE_BADGE, 0.8m));
             columns.Add(Col("Org_Name", "VAS_195_Organization", "Organization", COLTYPE_TEXT, 1.0m));
             columns.Add(Col("Partner_Name", "VAS_195_BusinessPartner", "Business Partner", COLTYPE_TEXT, 1.3m));
-            columns.Add(Col("Currency_Iso", "VAS_195_Currency", "Currency", COLTYPE_TEXT, 0.5m));
+            if (withCurrency) { columns.Add(Col("Currency_Iso", "VAS_195_Currency", "Currency", COLTYPE_TEXT, 0.5m)); }
             columns.Add(Col("Doc_Amount", "VAS_195_Amount", "Amount", COLTYPE_DOCAMOUNT, 1.0m));
             return columns;
         }
@@ -1065,7 +1082,7 @@ namespace VASLogic.Models
                selected column of every branch, which is what lets a UNION's ORDER BY
                reach it. */
             return Spec(sql.ToString(), "", "Screen_Sort,Doc_Date DESC,Doc_Number DESC",
-                parameters, DocColumns(false));
+                parameters, DocColumns(false, true));
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -1088,39 +1105,61 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Completed payments in the period whose allocated total falls short of the
-        /// payment by more than the currency tolerance.
+        /// Completed SETTLEMENT payments in the period that are not allocated - the same
+        /// population the VAS_199 widget reports under "Settlement, not allocated", read
+        /// the same way.
         ///
-        /// Allocation is summed from active lines of completed allocation headers, in
-        /// the ALLOCATION's own currency conversion back to the payment currency where
-        /// the two differ - comparing raw amounts across currencies would mark a fully
-        /// allocated foreign payment as outstanding.
+        /// IsAllocated IS THE ANSWER. This check used to re-derive allocation by summing
+        /// C_AllocationLine.Amount and comparing it against PayAmt, and that is what made
+        /// it disagree with VAS_199. An allocation line carries more than Amount -
+        /// DiscountAmt, WriteOffAmt and OverUnderAmt are settlement too - so an invoice
+        /// paid short by an agreed discount allocates in full, sets IsAllocated='Y', and
+        /// still sums to less than PayAmt. The sum-and-compare test flagged exactly those
+        /// payments as outstanding when nothing was outstanding at all. C_Payment's own
+        /// completeness flag is maintained by the allocation process itself and is the
+        /// authoritative answer; VAS_199 says so in its own header, and this check now
+        /// follows it rather than second-guessing it.
+        ///
+        /// ADVANCES ARE NOT SETTLEMENT. A prepayment, and a payment against a charge
+        /// flagged IsAdvanceCharge, are unallocated by their nature and forever - they
+        /// are money received before there is anything to allocate against. VAS_199 gives
+        /// them their own bucket and keeps them out of the settlement figure. This check
+        /// never excluded them, so every advance on the books inflated it. Its own summary
+        /// line has always said "settlement payments", and the doc note below has always
+        /// said advances are why it warns rather than blocks - the predicate simply never
+        /// matched the words.
+        ///
+        /// Two further filters were dropped to match: a currency tolerance, which has no
+        /// meaning once the test is a flag rather than a subtraction, and a
+        /// COALESCE(IsReversal,'N')='N' exclusion that VAS_199 does not apply.
+        ///
+        /// The period bounds stay in <see cref="PeriodWhere"/>'s half-open form rather
+        /// than VAS_199's TRUNC/CAST form. They select the same rows - both cover the
+        /// whole of the last day - and the half-open form leaves an index on DateAcct
+        /// usable, which a function on the column does not.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <returns>Populated <see cref="DetailSpec"/>.</returns>
         private DetailSpec Spec03(CheckContext c)
         {
             List<SqlParameter> parameters = Binds();
+
             bool hasPrepayment = ColumnExists("C_Payment", "IsPrepayment");
+            bool hasCharge = ColumnExists("C_Payment", "C_Charge_ID");
+            bool hasAdvanceCharge = hasCharge && ColumnExists("C_Charge", "IsAdvanceCharge");
 
             /* Target type first - see DocTypeKeyExpr. A payment carries both. */
             string docTypeKey = DocTypeKeyExpr("p",
                 ColumnExists("C_Payment", "C_DocType_ID"),
                 ColumnExists("C_Payment", "C_DocTypeTarget_ID"));
 
-            /* Allocated, in the payment's currency. currencyConvert is a no-op when the
-               two currencies already match, so the CASE keeps the common path cheap. */
-            string allocated = @"COALESCE((SELECT SUM(CASE WHEN ah.C_Currency_ID=p.C_Currency_ID THEN al.Amount
-                        ELSE COALESCE(currencyConvert(al.Amount,ah.C_Currency_ID,p.C_Currency_ID,ah.DateAcct,ah.C_ConversionType_ID,ah.AD_Client_ID,ah.AD_Org_ID),0) END)
-                    FROM C_AllocationLine al
-                    INNER JOIN C_AllocationHdr ah ON (ah.C_AllocationHdr_ID=al.C_AllocationHdr_ID)
-                    WHERE al.C_Payment_ID=p.C_Payment_ID
-                      AND al.IsActive='Y'
-                      AND ah.IsActive='Y'
-                      AND ah.DocStatus IN (" + DOCSTATUS_FinalList + ")),0)";
-
-            string category = "CASE WHEN COALESCE(p.IsAllocated,'N')<>'Y' AND " + allocated + @"=0 THEN 'NOTALLOCATED'
-                    WHEN " + allocated + "<ABS(COALESCE(p.PayAmt,0)) THEN 'PARTIAL' ELSE 'ONACCOUNT' END";
+            /* The two advance forms, each applied only where its column exists. A schema
+               without them cannot separate advances from settlements, and the check then
+               reports the wider population rather than failing - the same degradation
+               every optional-column probe in this file makes. */
+            string notAdvance = "";
+            if (hasPrepayment) { notAdvance += " AND COALESCE(p.IsPrepayment,'N')<>'Y'"; }
+            if (hasAdvanceCharge) { notAdvance += " AND COALESCE(ch.IsAdvanceCharge,'N')<>'Y'"; }
 
             string sql = @"
                 SELECT " + TableId("C_Payment") + " AS " + TECH_TABLE + @",
@@ -1130,36 +1169,29 @@ namespace VASLogic.Models
                        p.DateAcct AS Doc_Date,
                        " + (string.IsNullOrEmpty(docTypeKey) ? "N''" : "COALESCE(dt.Name,N'')") + @" AS Doc_Type,
                        COALESCE(bp.Name,N'') AS Partner_Name,
+                       " + (hasCharge ? "COALESCE(ch.Name,N'')" : "N''") + @" AS Charge_Name,
                        COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
-                       COALESCE(p.PayAmt,0) AS Pay_Amount,
-                       " + allocated + @" AS Allocated_Amount,
-                       (ABS(COALESCE(p.PayAmt,0))-" + allocated + @") AS Unallocated_Amount,
-                       " + category + @" AS Alloc_Category,
-                       " + (hasPrepayment ? "COALESCE(p.IsPrepayment,'N')" : "'N'") + @" AS Is_Prepayment
+                       COALESCE(p.PayAmt,0) AS Pay_Amount
                 FROM C_Payment p
                 " + (string.IsNullOrEmpty(docTypeKey)
                         ? ""
                         : "LEFT OUTER JOIN C_DocType dt ON (dt.C_DocType_ID=" + docTypeKey + ")") + @"
+                " + (hasCharge ? "LEFT OUTER JOIN C_Charge ch ON (ch.C_Charge_ID=p.C_Charge_ID)" : "") + @"
                 LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=p.C_BPartner_ID)
                 LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=p.C_Currency_ID)
                 WHERE p.IsActive='Y'
                   AND p.DocStatus IN (" + DOCSTATUS_FinalList + @")
-                  AND COALESCE(p.IsReversal,'N')='N'
                   AND " + PeriodWhere(c, "p", "DateAcct", "P", parameters) + @"
-                  AND (ABS(COALESCE(p.PayAmt,0))-" + allocated + ")>@Tolerance";
-
-            parameters.Add(new SqlParameter("@Tolerance", c.Tolerance));
+                  AND COALESCE(p.IsAllocated,'N')<>'Y'" + notAdvance;
 
             List<ColumnDef> columns = new List<ColumnDef>();
-            columns.Add(Col("Doc_Number", "VAS_195_PaymentNo", "Payment No", COLTYPE_DOC, 1.1m));
+            columns.Add(Col("Doc_Number", "VAS_195_PaymentNo", "Payment No", COLTYPE_DOC, 1.2m));
             columns.Add(Col("Doc_Date", "VAS_195_AccountDate", "Account Date", COLTYPE_DATE, 0.9m));
-            columns.Add(Col("Doc_Type", "VAS_195_PaymentType", "Payment Type", COLTYPE_TEXT, 1.1m));
-            columns.Add(Col("Partner_Name", "VAS_195_BusinessPartner", "Business Partner", COLTYPE_TEXT, 1.3m));
+            columns.Add(Col("Doc_Type", "VAS_195_PaymentType", "Payment Type", COLTYPE_TEXT, 1.2m));
+            columns.Add(Col("Partner_Name", "VAS_195_BusinessPartner", "Business Partner", COLTYPE_TEXT, 1.4m));
+            columns.Add(Col("Charge_Name", "VAS_195_Charge", "Charge", COLTYPE_TEXT, 1.1m));
             columns.Add(Col("Currency_Iso", "VAS_195_Currency", "Currency", COLTYPE_TEXT, 0.5m));
-            columns.Add(Col("Pay_Amount", "VAS_195_PaymentAmount", "Payment Amount", COLTYPE_DOCAMOUNT, 1.0m));
-            columns.Add(Col("Allocated_Amount", "VAS_195_AllocatedAmount", "Allocated", COLTYPE_DOCAMOUNT, 1.0m));
-            columns.Add(Col("Unallocated_Amount", "VAS_195_UnallocatedAmount", "Unallocated", COLTYPE_DOCAMOUNT, 1.0m));
-            columns.Add(Col("Alloc_Category", "VAS_195_AllocCategory", "Category", COLTYPE_BADGE, 0.9m));
+            columns.Add(Col("Pay_Amount", "VAS_195_PaymentAmount", "Payment Amount", COLTYPE_DOCAMOUNT, 1.1m));
 
             return Spec(sql, "p", "p.DateAcct DESC,p.C_Payment_ID DESC", parameters, columns);
         }
@@ -2543,12 +2575,17 @@ namespace VASLogic.Models
                 sql.Append(SecureBranch(c, branch, a));
             }
 
-            /* Straight date order, and the Screen column stays. Unlike checks 01 and 02
-               this list spans only three inventory documents, which interleave by date
-               rather than group - grouping three screens would just hide the
-               chronology without saving any width. */
-            return Spec(sql.ToString(), "", "Doc_Date DESC,Doc_Number DESC",
-                parameters, DocColumns(true));
+            /* Grouped by screen exactly as checks 01 and 02 are, and for the same reason:
+               a reader working this list works one document type at a time - every
+               material receipt, then every physical inventory - rather than following
+               three of them interleaved by date. Screen_Sort is a selected column of
+               every branch, which is what lets a UNION's ORDER BY reach it, and the
+               screen name itself rides under each document number.
+
+               No Currency column: none of these three tables has a C_Currency_ID, so it
+               could only ever render blank. */
+            return Spec(sql.ToString(), "", "Screen_Sort,Doc_Date DESC,Doc_Number DESC",
+                parameters, DocColumns(false, false));
         }
 
         // ─────────────────────────────────────────────────────────────────────

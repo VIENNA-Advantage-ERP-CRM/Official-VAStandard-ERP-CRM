@@ -679,10 +679,16 @@
     width: max-content;
 }
 
+/* The gutter is deliberately tighter than the sibling dialogs' 12px. This grid is the
+   only one composed per check, so it routinely carries eight or nine columns where they
+   carry six, and at that count the gutter is what pushes a check into a horizontal
+   scroll. Cells already truncate with an ellipsis and every column is separated by
+   alignment and weight rather than by whitespace, so the narrower gutter buys real width
+   back without the columns reading as one run of text. */
 .vas-195-dhead,
 .vas-195-drow {
     display: grid;
-    gap: 12px;
+    gap: 8px;
     align-items: center;
     min-width: 100%;
 }
@@ -1013,7 +1019,7 @@
 
     .vas-195-dhead,
     .vas-195-drow {
-        gap: 8px;
+        gap: 6px;
     }
 }
 
