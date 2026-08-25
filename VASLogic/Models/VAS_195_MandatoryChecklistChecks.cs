@@ -138,6 +138,8 @@ namespace VASLogic.Models
     ///   VAI145      2026-08-25 Check 22 names both its codes and drops the Code column;
     ///                          the base type's reference now comes from C_DocType
     ///   VAI145      2026-08-25 Check 06's UOM column reads the unit's name, not its symbol
+    ///   VAI145      2026-08-25 Check 13 evaluates GL_Journal.GL_ReversalDate instead of
+    ///                          reporting NOT_APPLICABLE; PASS / FAIL, no drill-down
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -847,8 +849,9 @@ namespace VASLogic.Models
                 case "MPC_CLOSE_23": return Spec23(c);
             }
 
-            /* 13 is configuration-driven and has no records until finance maintains its
-               expectations - there is nothing to page. */
+            /* 13 deliberately absent, like 19: it answers PASS or FAIL from one count and
+               exposes no records, so there is nothing to page and this endpoint must have
+               nothing to answer with even when asked directly. */
             return null;
         }
 
@@ -2786,21 +2789,99 @@ namespace VASLogic.Models
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Period-end accruals and provisions finance expects but has not booked.
+        /// Whether the period carries an accrual entry at all.
         ///
-        /// This check is configuration-driven by design and there is no close-requirement
-        /// entity in this installation, so it reports NOT_APPLICABLE with a setup
-        /// message. The alternative - inferring an accrual from journal description text
-        /// - is explicitly ruled out: it would produce confident answers with no basis,
-        /// which on a close checklist is worse than no answer.
+        /// THE REVERSAL DATE IS THE EVIDENCE. An accrual is a journal booked in one period
+        /// and reversed out in the next, so the journal that carries a GL_ReversalDate is
+        /// by construction an accrual - the field exists for nothing else. One such
+        /// journal in the period means accruals were passed and the row PASSES; none means
+        /// they were not, and it FAILS.
+        ///
+        /// This replaces a NOT_APPLICABLE that was honest but useless. The check used to
+        /// look for a close-requirement entity this installation does not have, and its
+        /// own comment ruled out inferring an accrual from journal description text - as
+        /// it should have, that being guesswork. GL_ReversalDate is not a guess; it is the
+        /// field the accrual process sets.
+        ///
+        /// FAIL, NOT WARNING, and non-blocking with it - the same shape as check 19. The
+        /// registry classifies this row WARNING so it never gates the close, while the
+        /// STATUS it reports is the pass/fail its rule is stated as.
+        ///
+        /// NO DRILL-DOWN. DetailAvailable stays false and BuildDetail has no case for
+        /// MPC_CLOSE_13, so the row is not clickable and the detail endpoint has nothing
+        /// to answer with even if it is asked directly.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <param name="def">Registry entry.</param>
         /// <returns>Populated <see cref="CheckResult"/>.</returns>
         private CheckResult Eval13(CheckContext c, CheckDef def)
         {
-            return NotApplicable(def, "VAS_195_Na13",
-                "No accrual or provision expectations are configured - setup required to evaluate");
+            /* Without the column the question cannot be asked - which is the one case that
+               is genuinely not-applicable rather than a failure. */
+            if (!TableExists("GL_Journal") || !ColumnExists("GL_Journal", "GL_ReversalDate"))
+            {
+                return NotApplicable(def, "VAS_195_Na13",
+                    "Accrual reversal dates are not recorded in this installation");
+            }
+
+            int accruals = AccrualJournalCount(c);
+
+            CheckResult result = NewResult(def);
+            result.RecordCount = accruals;
+            result.IsBlocking = false;
+            result.DetailAvailable = false;
+
+            if (accruals > 0)
+            {
+                result.Status = STATUS_PASS;
+                result.SummaryKey = "VAS_195_Clr13";
+                result.SummaryText = "Accrual entries were passed for this period";
+            }
+            else
+            {
+                result.Status = STATUS_FAIL;
+                result.SummaryKey = "VAS_195_Sum13";
+                result.SummaryText = "No accrual entry was found for this period";
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Journals of the primary accounting schema, accounted inside the period, that
+        /// carry a reversal date - the accrual entries.
+        ///
+        /// Bounded by the journal's OWN accounting date rather than by the reversal date:
+        /// an accrual belongs to the period it was booked in, and its reversal is dated in
+        /// the NEXT one. Testing the reversal date against this period's bounds would look
+        /// for the accrual in the period it unwinds in and find nothing.
+        ///
+        /// Deliberately no Posted or DocStatus test. The question is whether accruals were
+        /// passed; whether their journals have reached the ledger is check 02's business.
+        /// </summary>
+        /// <param name="c">Shared evaluation context.</param>
+        /// <returns>Journal count, 0 when the period carries no accrual.</returns>
+        private int AccrualJournalCount(CheckContext c)
+        {
+            List<SqlParameter> parameters = Binds();
+
+            string sql = @"
+                SELECT COUNT(1) AS Journal_Count
+                FROM GL_Journal j
+                WHERE j.IsActive='Y'
+                  AND j.C_AcctSchema_ID=@C_AcctSchema_ID
+                  AND j.GL_ReversalDate IS NOT NULL
+                  AND ";
+
+            parameters.Add(new SqlParameter("@C_AcctSchema_ID", c.Acct.C_AcctSchema_ID));
+            sql += PeriodWhere(c, "j", "DateAcct", "AC", parameters);
+
+            sql = MRole.GetDefault(c.Ctx).AddAccessSQL(sql, "j", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters.ToArray(), null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { return 0; }
+
+            return Util.GetValueOfInt(ds.Tables[0].Rows[0]["Journal_Count"]);
         }
 
         // ─────────────────────────────────────────────────────────────────────

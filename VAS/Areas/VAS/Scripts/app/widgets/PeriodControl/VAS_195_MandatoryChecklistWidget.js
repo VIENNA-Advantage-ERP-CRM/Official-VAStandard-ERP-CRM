@@ -861,8 +861,12 @@
             _bodyH = (MODAL_ROW_H * 12) + MODAL_HEAD_H + MODAL_BODY_SLACK;
             $modalBody.css('height', _bodyH + 'px');
 
+            /* The close button, and Escape - deliberately NOT a click on the backdrop.
+               This dialog is a work list a reader pages through and scrolls sideways in,
+               so a stray click that lands off the panel is far more likely to be a missed
+               target than a decision to leave. Losing the page and the scroll position to
+               it is a real cost, and there is nothing to undo it with. */
             $overlay.find('.vas-195-modal-close').on('click', closeModal);
-            $overlay.on('click', function (e) { if (e.target === $overlay[0]) { closeModal(); } });
 
             $modalPager.on('click', '.vas-195-pgbtn', function () {
                 var $btn = $(this);
