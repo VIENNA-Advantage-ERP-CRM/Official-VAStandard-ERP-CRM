@@ -76,6 +76,12 @@
  * 27 | of                                 | VAS_026_Of              (reuse)
  * 28 | Previous                           | VAS_026_Prev            (reuse)
  * 29 | Next                               | VAS_026_Next            (reuse)
+ * 30 | Debit                              | VAS_195_Debit
+ * 31 | Credit                             | VAS_195_Credit
+ *
+ * 30 and 31 are the one exception to "captions come from the server": the ledger
+ * side arrives as a stored token so that it CAN be translated here, which a string
+ * composed in SQL could not be. Both fall back to the token, which reads as English.
  */
 ; VAS = window.VAS || {};
 
@@ -1100,8 +1106,10 @@
             if (type === 'NUMBER') { return textCell(formatNumber(raw), 'vas-195-dcell-num'); }
 
             if (type === 'BADGE') {
-                var text = raw == null ? '' : String(raw);
-                if (!text) { return textCell(''); }
+                var code = raw == null ? '' : String(raw);
+                if (!code) { return textCell(''); }
+
+                var text = badgeText(code);
                 return '<span class="vas-195-dcell">' +
                     '<span class="vas-195-dbadge" title="' + escapeHtml(text) + '">' +
                         escapeHtml(text) + '</span></span>';
@@ -1113,6 +1121,19 @@
         function textCell(text, extraClass) {
             return '<span class="vas-195-dcell' + (extraClass ? ' ' + extraClass : '') +
                 '" title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</span>';
+        }
+
+        /* A badge carries a STORED code, and most of them have no translation to offer -
+           a DocStatus reads 'CO' on every installation and is shown as it is stored, the
+           way the rest of the product shows it. The ledger side is the exception: the
+           server emits 'Debit' / 'Credit' as stable tokens precisely so this can put them
+           through the message table, which a string composed in SQL could never be. An
+           unseeded key falls back to the token, which is already readable English. */
+        var BADGE_MESSAGE_KEYS = { 'Debit': 'VAS_195_Debit', 'Credit': 'VAS_195_Credit' };
+
+        function badgeText(code) {
+            var key = BADGE_MESSAGE_KEYS[code];
+            return key ? label(key, code) : code;
         }
 
         /* A document number rendered as a link. A button, not an anchor: there is no

@@ -78,6 +78,11 @@ namespace VASLogic.Models
     ///   VAI145      2026-08-24 Created
     ///   VAI145      2026-08-25 Discovery admits Posted-only tables so check 02 agrees
     ///                          with the VAS_198 widget
+    ///   VAI145      2026-08-25 Check 09 drills into the suspense POSTINGS - ledger,
+    ///                          document, dates, side, amount - instead of an account
+    ///                          summary; check 10 keeps the summary
+    ///   VAI145      2026-08-25 Check 09's posting list bounded by the selected period,
+    ///                          like every other check on the card
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -95,6 +100,14 @@ namespace VASLogic.Models
         /* Payment execution states that mean "not settled": In-Progress, Bounced,
            Rejected. VA009 module column; probed before use. */
         private const string COLUMN_EXECUTION_STATUS = "VA009_ExecutionStatus";
+
+        /* Which side of the ledger one Fact_Acct row sits on. Emitted as a stable TOKEN
+           rather than as display text: the client badge translates it through
+           VAS_195_Debit / VAS_195_Credit, which a string composed in SQL could never be.
+           Inlined into the statement because they are compile-time policy constants, and
+           because each appears in a CASE the WHERE never binds against. */
+        private const string DRCR_DEBIT = "Debit";
+        private const string DRCR_CREDIT = "Credit";
 
         /* The date column a discovered document is bounded by, in preference order.
            DateAcct first because the period filter must mean the same thing for every
@@ -1675,8 +1688,19 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Account-level summary of every configured suspense account: opening balance,
-        /// period debit and credit, movement and closing balance.
+        /// Every posting that makes up the suspense accounts' closing balance, newest
+        /// first - the entries themselves, not a summary of them.
+        ///
+        /// An account-level summary is what this used to open, and it answered the wrong
+        /// question. The check BLOCKS the close because a suspense balance is not zero,
+        /// and the only useful next step is finding out which documents put it there;
+        /// a row reading "opening 4,000, movement 900, closing 4,900" tells the reader
+        /// what they already saw on the card. The posting list names the documents and
+        /// zooms straight to them.
+        ///
+        /// The clearing-account check still opens the summary - see
+        /// <see cref="AccountBalanceSpec"/>, which is unchanged and now serves check 10
+        /// alone.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <returns>Populated <see cref="DetailSpec"/>, or null when none are configured.</returns>
@@ -1691,13 +1715,105 @@ namespace VASLogic.Models
                 if (!ids.Contains(accounts[i].Account_ID)) { ids.Add(accounts[i].Account_ID); }
             }
 
-            return AccountBalanceSpec(c, ids, "VAS_195_SuspenseAccount", "Suspense Account");
+            return SuspensePostingSpec(c, ids);
         }
 
         /// <summary>
-        /// The shared account-balance statement used by both the suspense check and the
-        /// clearing check: one row per natural account, with the balance split into what
-        /// was carried in, what moved, and what remains.
+        /// One row per Fact_Acct entry on the configured suspense accounts, WITHIN the
+        /// selected period.
+        ///
+        /// Bounded at both ends by <see cref="PeriodWhere"/>, like every other check on
+        /// this card: the period chip at the top of the widget is the one filter the
+        /// whole checklist is read through, and a list that quietly ignored it would be
+        /// the odd one out. Newest first, so the entries most likely to be the cause are
+        /// on the first page.
+        ///
+        /// One consequence, and it is intended rather than overlooked: the card's
+        /// headline for this check is the CLOSING balance - every posting ever made to
+        /// the account through period end - so this list will not sum to it whenever the
+        /// account carried a balance into the period. The list answers "what hit suspense
+        /// in this period", which is the question the period filter asks; the opening
+        /// balance behind the difference is the previous periods' business.
+        ///
+        /// The LEDGER column carries "&lt;Value&gt; - &lt;Name&gt;" ("79200 - Suspense
+        /// balancing") because the check spans every configured suspense account at
+        /// once - balancing, error and the optional rounding account - and a posting row
+        /// is meaningless without saying which of them it landed on. The CASE guards the
+        /// separator: an account with no name renders as its value alone rather than as
+        /// a value trailing a dangling dash.
+        ///
+        /// No Screen column is declared, which is what puts the screen name UNDER the
+        /// document number - see the client's docCell. The document number itself is not
+        /// selected at all: Fact_Acct stores AD_Table_ID / Record_ID rather than a
+        /// number, and the shared resolver fills the display value, the screen label and
+        /// the navigability from those three technical aliases.
+        /// </summary>
+        /// <param name="c">Shared evaluation context.</param>
+        /// <param name="accountIds">Validated natural account ids.</param>
+        /// <returns>Populated <see cref="DetailSpec"/>.</returns>
+        private DetailSpec SuspensePostingSpec(CheckContext c, List<int> accountIds)
+        {
+            List<SqlParameter> parameters = Binds();
+
+            string sql = @"
+                SELECT fa.AD_Table_ID AS " + TECH_TABLE + @",
+                       COALESCE(fa.Record_ID,0) AS " + TECH_RECORD + @",
+                       COALESCE(fa.AD_Window_ID,0) AS " + TECH_WINDOW + @",
+                       CASE WHEN COALESCE(ev.Name,N'')=N'' THEN COALESCE(ev.Value,N'')
+                            ELSE COALESCE(ev.Value,N'') || N' - ' || COALESCE(ev.Name,N'') END AS Ledger_Name,
+                       fa.DateTrx AS Doc_Date,
+                       fa.DateAcct AS Acct_Date,
+                       CASE WHEN COALESCE(fa.AmtAcctDr,0)<>0 THEN N'" + DRCR_DEBIT + @"' ELSE N'" + DRCR_CREDIT + @"' END AS Dr_Cr,
+                       CASE WHEN COALESCE(fa.AmtAcctDr,0)<>0 THEN COALESCE(fa.AmtAcctDr,0) ELSE COALESCE(fa.AmtAcctCr,0) END AS Posting_Amount
+                FROM Fact_Acct fa
+                LEFT OUTER JOIN C_ElementValue ev ON (ev.C_ElementValue_ID=fa.Account_ID)
+                WHERE fa.AD_Client_ID=@AD_Client_ID
+                  AND fa.C_AcctSchema_ID=@C_AcctSchema_ID
+                  AND fa.PostingType=@PostingType
+                  AND fa.IsActive='Y'
+                  AND ";
+
+            /* Appearance order - the adapters bind positionally, so each fragment's binds
+               are added at the point its text is appended, never up front. */
+            parameters.Add(new SqlParameter("@AD_Client_ID", c.Ctx.GetAD_Client_ID()));
+            parameters.Add(new SqlParameter("@C_AcctSchema_ID", c.Acct.C_AcctSchema_ID));
+            parameters.Add(new SqlParameter("@PostingType", POSTINGTYPE_Actual));
+
+            /* The period chip's own bounds, through the shared helper every other check
+               uses - inclusive start, exclusive end, so a posting stamped with a time on
+               the period's last day still falls inside its own period on both backends. */
+            sql += PeriodWhere(c, "fa", "DateAcct", "S", parameters);
+
+            sql += " AND fa.Account_ID IN (";
+            sql += BuildIdInList(accountIds, "@Account_ID", parameters) + ")";
+
+            /* Doc_Number is DECLARED but never selected: Fact_Acct has no document
+               number to give, and the shared resolver fills the display value from the
+               technical aliases above. A declared column its statement does not select
+               yields an empty cell, which is exactly the hook the DOC renderer falls
+               back through. */
+            List<ColumnDef> columns = new List<ColumnDef>();
+            columns.Add(Col("Ledger_Name", "VAS_195_Ledger", "Ledger", COLTYPE_TEXT, 1.6m));
+            columns.Add(Col("Doc_Number", "DocumentNo", "Document No", COLTYPE_DOC, 1.5m));
+            columns.Add(Col("Doc_Date", "VAS_195_DocumentDate", "Document Date", COLTYPE_DATE, 0.95m));
+            columns.Add(Col("Acct_Date", "VAS_195_AccountDate", "Account Date", COLTYPE_DATE, 0.95m));
+            columns.Add(Col("Dr_Cr", "VAS_195_DrCr", "Dr / Cr", COLTYPE_BADGE, 0.7m));
+            columns.Add(Col("Posting_Amount", "VAS_195_Amount", "Amount", COLTYPE_AMOUNT, 1.1m));
+
+            /* Physical columns in the sort rather than the select aliases: there is no
+               GROUP BY or DISTINCT here, so both back ends can reach them, and
+               Fact_Acct_ID breaks the date tie so paging stays stable between requests. */
+            return Spec(sql, "fa", "fa.DateAcct DESC,fa.Fact_Acct_ID DESC", parameters, columns);
+        }
+
+        /// <summary>
+        /// The account-balance statement behind the CLEARING check: one row per natural
+        /// account, with the balance split into what was carried in, what moved, and what
+        /// remains.
+        ///
+        /// The suspense check used to share it and no longer does - see
+        /// <see cref="SuspensePostingSpec"/> for why. The signature keeps its caption
+        /// parameters, so a second summary-style check can still reuse it.
         ///
         /// Opening and closing are bounded by @PeriodEnd only, so they include every
         /// prior posting; the period figures are bounded at both ends. Amounts are
@@ -1801,7 +1917,10 @@ namespace VASLogic.Models
             List<string> settings = new List<string>();
             settings.Add("SuspenseBalancing_Acct");
             settings.Add("SuspenseError_Acct");
-            if (ColumnExists("C_AcctSchema_GL", "FRPT_RoundingOff_Acct")) { settings.Add("FRPT_RoundingOff_Acct"); }
+            if (ColumnExists("C_AcctSchema_GL", "FRPT_RoundingOff_Acct")) 
+            {
+                settings.Add("FRPT_RoundingOff_Acct"); 
+            }
 
             StringBuilder select = new StringBuilder("SELECT ");
             for (int i = 0; i < settings.Count; i++)
