@@ -757,9 +757,11 @@
             _bodyH = (MODAL_ROW_H * MODAL_PAGE_SIZE) + MODAL_HEAD_H + MODAL_BODY_SLACK;
             $modalBody.css('height', _bodyH + 'px');
 
+            /* The close button, and Escape - deliberately NOT a click on the scrim. This
+               dialog is a work list a reader pages through, so a stray click landing off
+               the panel is far more likely to be a missed target than a decision to leave,
+               and losing the page to it has nothing to undo it with. */
             $overlay.find('.vas-198-modal-close').on('click', closeModal);
-            /* Scrim click closes; a click inside the panel must not. */
-            $overlay.on('click', function (e) { if (e.target === $overlay[0]) { closeModal(); } });
 
             $modalPager.on('click', '.vas-198-pgbtn', function () {
                 var $btn = $(this);
