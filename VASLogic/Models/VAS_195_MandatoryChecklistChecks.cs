@@ -67,7 +67,7 @@ namespace VASLogic.Models
     ///               Posted) and the branch builder emits a typed literal for whichever
     ///               of the two a given table does not have.
     ///
-    ///               UNION CHECKS. Checks 01, 02, 04, 11 and 15 span several physical
+    ///               UNION CHECKS. Checks 01, 02, 04 and 15 span several physical
     ///               tables. Each branch is built and secured on its OWN main alias and
     ///               only then combined with UNION ALL; the combined statement is never
     ///               re-secured, and the framework's count runner wraps it as a derived
@@ -105,6 +105,13 @@ namespace VASLogic.Models
     ///                          column, and detail amounts are no longer bold
     ///   VAI145      2026-08-25 Check 10's accounts scoped to the primary schema's own
     ///                          chart via C_AcctSchema_Element (ElementType 'AC')
+    ///   VAI145      2026-08-25 Check 17's Status reads the DocStatus reference name
+    ///   VAI145      2026-08-25 Check 11 reads C_AllocationHdr only; the C_PaymentAllocate
+    ///                          branch is gone - check 03 already owns that money
+    ///   VAI145      2026-08-25 Check 11 drops the Amount column and reads its Status as
+    ///                          the DocStatus reference name
+    ///   VAI145      2026-08-25 Check 23's Period column no longer prints "Period" under
+    ///                          every value - see ColumnDef.HideScreenName
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -2285,7 +2292,7 @@ namespace VASLogic.Models
         ///
         /// There is no reliable universal rule for identifying a clearing account, and
         /// this installation carries no close-check account mapping, so the check uses
-        /// C_ElementValue.IsAllocationRelated as the documented SETUP AID and says so,
+        /// C_ElementValue.IsInterMediateCode as the documented SETUP AID and says so,
         /// within the primary accounting schema's own chart - see
         /// <see cref="ClearingAccounts"/>. When nothing is marked, the answer is
         /// NOT_APPLICABLE with a setup message - never a PASS, because "we found no
@@ -2352,7 +2359,7 @@ namespace VASLogic.Models
         /// only ever match no posting - or, worse, match a different account's postings by
         /// numeric coincidence.
         ///
-        /// IsAllocationRelated is still what DESIGNATES a clearing account; the element
+        /// IsInterMediateCode is still what DESIGNATES a clearing account; the element
         /// join says which chart to look in, not which accounts qualify.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
@@ -2360,7 +2367,7 @@ namespace VASLogic.Models
         private List<int> ClearingAccounts(CheckContext c)
         {
             List<int> accountIds = new List<int>();
-            if (!ColumnExists("C_ElementValue", "IsAllocationRelated")) { return accountIds; }
+            if (!ColumnExists("C_ElementValue", "IsInterMediateCode")) { return accountIds; }
 
             string sql = @"
                 SELECT ev.C_ElementValue_ID AS Account_ID
@@ -2371,7 +2378,7 @@ namespace VASLogic.Models
                   AND ase.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND ase.ElementType=@ElementType
                   AND ase.IsActive='Y'
-                  AND COALESCE(ev.IsAllocationRelated,'N')='Y'";
+                  AND COALESCE(ev.IsInterMediateCode,'N')='Y'";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
@@ -2413,79 +2420,67 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Two secured branches: allocation headers in the period that never reached a
-        /// final status, and payment-allocate rows that were prepared but never became
-        /// an allocation line.
+        /// Allocation headers in the period that never reached a final status.
+        ///
+        /// ONE SOURCE, C_AllocationHdr. A second branch used to read C_PaymentAllocate -
+        /// rows prepared on a payment that never became an allocation line - and it is
+        /// gone. Those rows are not settlement DOCUMENTS; they are working state inside a
+        /// payment, and a payment whose settlement never completed is already reported by
+        /// check 03. Listing them here asked finance to chase the same money twice, under
+        /// two different owners, which is exactly the confusion this check's own summary
+        /// warns against.
+        ///
+        /// One branch means no UNION, which in turn means the framework can secure the
+        /// statement on its own main alias rather than each branch being secured
+        /// separately and combined - the spec names "ah" and MRole is applied once, where
+        /// the physical table actually is.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <returns>Populated <see cref="DetailSpec"/>.</returns>
         private DetailSpec Spec11(CheckContext c)
         {
             List<SqlParameter> parameters = Binds();
-            StringBuilder sql = new StringBuilder();
 
-            string headers = @"
+            /* DocStatus is an AD_Reference list column: it stores 'DR' and the reader
+               needs "Drafted". The bind is added HERE, before the statement is built,
+               because its occurrence is in the FROM clause and the period binds that
+               follow are in the WHERE - these adapters bind positionally. */
+            string statusExpr = "COALESCE(ah.DocStatus,N'')";
+            string statusJoin = ListNameJoin("ds", "dstrl", "ah.DocStatus",
+                "C_AllocationHdr", "DocStatus", "@AD_LanguageD");
+            if (statusJoin.Length > 0)
+            {
+                parameters.Add(new SqlParameter("@AD_LanguageD", ctxLanguage(c)));
+                statusExpr = "COALESCE(dstrl.Name,ds.Name,ah.DocStatus,N'')";
+            }
+
+            string sql = @"
                 SELECT " + TableId("C_AllocationHdr") + " AS " + TECH_TABLE + @",
                        ah.C_AllocationHdr_ID AS " + TECH_RECORD + @",
                        0 AS " + TECH_WINDOW + @",
-                       'ALLOCATION' AS Source_Type,
                        COALESCE(ah.DocumentNo,N'') AS Doc_Number,
                        ah.DateAcct AS Doc_Date,
-                       N'' AS Partner_Name,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
-                       COALESCE(ah.ApprovalAmt,0) AS Doc_Amount,
-                       ah.DocStatus AS Doc_Status
+                       " + statusExpr + @" AS Doc_Status,
+                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso
                 FROM C_AllocationHdr ah
-                LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=ah.C_Currency_ID)
+                LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=ah.C_Currency_ID)" + statusJoin + @"
                 WHERE ah.IsActive='Y'
                   AND ah.DocStatus NOT IN (" + DOCSTATUS_FinalList + @")
                   AND ah.DocStatus NOT IN (" + DOCSTATUS_DeadList + @")
                   AND " + PeriodWhere(c, "ah", "DateAcct", "A", parameters);
 
-            sql.Append(SecureBranch(c, headers, "ah"));
-
-            if (TableExists("C_PaymentAllocate") && ColumnExists("C_PaymentAllocate", "C_AllocationLine_ID"))
-            {
-                string prepared = @"
-                SELECT " + TableId("C_Payment") + " AS " + TECH_TABLE + @",
-                       pa.C_Payment_ID AS " + TECH_RECORD + @",
-                       0 AS " + TECH_WINDOW + @",
-                       'PREPARED' AS Source_Type,
-                       COALESCE(p.DocumentNo,N'') AS Doc_Number,
-                       p.DateAcct AS Doc_Date,
-                       COALESCE(bp.Name,N'') AS Partner_Name,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
-                       COALESCE(pa.Amount,0) AS Doc_Amount,
-                       p.DocStatus AS Doc_Status
-                FROM C_PaymentAllocate pa
-                INNER JOIN C_Payment p ON (p.C_Payment_ID=pa.C_Payment_ID)
-                LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=p.C_BPartner_ID)
-                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=p.C_Currency_ID)
-                WHERE pa.IsActive='Y'
-                  AND p.IsActive='Y'
-                  AND p.DocStatus NOT IN (" + DOCSTATUS_DeadList + @")
-                  AND pa.C_AllocationLine_ID IS NULL
-                  AND " + PeriodWhere(c, "p", "DateAcct", "PA", parameters) + @"
-                  AND ABS(COALESCE(pa.Amount,0))>@ToleranceP";
-
-                /* Tolerance predicate sits AFTER the period one in the text, so its bind
-                   is added after the period binds - order is what positional binding
-                   goes by, not the name. */
-                parameters.Add(new SqlParameter("@ToleranceP", c.Tolerance));
-
-                sql.Append(" UNION ALL ").Append(SecureBranch(c, prepared, "pa"));
-            }
-
+            /* No Source column: with one source a badge repeating "ALLOCATION" down every
+               row says nothing. No Business Partner either - C_AllocationHdr carries none,
+               only its lines do. No Amount: ApprovalAmt is an approval limit rather than
+               the value allocated, and the value allocated lives on the lines, so the
+               column was answering a different question than its caption asked. */
             List<ColumnDef> columns = new List<ColumnDef>();
-            columns.Add(Col("Source_Type", "VAS_195_SettlementSource", "Source", COLTYPE_BADGE, 0.9m));
-            columns.Add(Col("Doc_Number", "DocumentNo", "Document No", COLTYPE_DOC, 1.2m));
-            columns.Add(Col("Doc_Date", "VAS_195_AccountDate", "Account Date", COLTYPE_DATE, 0.9m));
-            columns.Add(Col("Partner_Name", "VAS_195_BusinessPartner", "Business Partner", COLTYPE_TEXT, 1.3m));
-            columns.Add(Col("Currency_Iso", "VAS_195_Currency", "Currency", COLTYPE_TEXT, 0.5m));
-            columns.Add(Col("Doc_Amount", "VAS_195_Amount", "Amount", COLTYPE_DOCAMOUNT, 1.0m));
-            columns.Add(Col("Doc_Status", "VAS_195_DocStatus", "Status", COLTYPE_BADGE, 0.8m));
+            columns.Add(Col("Doc_Number", "DocumentNo", "Document No", COLTYPE_DOC, 1.8m));
+            columns.Add(Col("Doc_Date", "VAS_195_AccountDate", "Account Date", COLTYPE_DATE, 1.0m));
+            columns.Add(Col("Doc_Status", "VAS_195_DocStatus", "Status", COLTYPE_BADGE, 1.1m));
+            columns.Add(Col("Currency_Iso", "VAS_195_Currency", "Currency", COLTYPE_TEXT, 0.6m));
 
-            return Spec(sql.ToString(), "", "Doc_Date DESC,Doc_Number DESC", parameters, columns);
+            return Spec(sql, "ah", "ah.DateAcct DESC,ah.DocumentNo DESC", parameters, columns);
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -2895,14 +2890,27 @@ namespace VASLogic.Models
         {
             if (!TableExists("M_Inventory") || !TableExists("M_InventoryLine")) { return null; }
 
-            bool hasDifference = ColumnExists("M_InventoryLine", "DifferenceQty");
             List<SqlParameter> parameters = Binds();
 
-            /* Prefer the stored difference; fall back to the two quantities it is
-               derived from where the column is not present. */
-            string difference = hasDifference
-                ? "COALESCE(il.DifferenceQty,0)"
-                : "(COALESCE(il.QtyCount,0)-COALESCE(il.QtyBook,0))";
+            /* The adjustment's signed quantity. A DIFFERENCE-type line already carries the
+               figure and carries it the other way round, so it is negated; every other
+               type is counted less booked. */
+            string difference = "CASE WHEN il.AdjustmentType = 'D' THEN COALESCE(-1* il.DifferenceQty,0) ELSE (COALESCE(il.QtyCount,0)-COALESCE(il.QtyBook,0)) END";
+
+            /* DocStatus is an AD_Reference list column: it stores 'DR' and the reader
+               needs "Drafted". Resolved through AD_Ref_List for the session language,
+               falling back to the reference name and then to the stored code, so a
+               missing translation degrades one step at a time. The bind is added HERE,
+               before the statement is built, because its occurrence is in the FROM clause
+               and the period binds that follow it are in the WHERE - these adapters bind
+               positionally, so the two have to be added in that order. */
+            string statusExpr = "COALESCE(i.DocStatus,N'')";
+            string statusJoin = ListNameJoin("ds", "dstrl", "i.DocStatus", "M_Inventory", "DocStatus", "@AD_LanguageD");
+            if (statusJoin.Length > 0)
+            {
+                parameters.Add(new SqlParameter("@AD_LanguageD", ctxLanguage(c)));
+                statusExpr = "COALESCE(dstrl.Name,ds.Name,i.DocStatus,N'')";
+            }
 
             string sql = @"
                 SELECT " + TableId("M_Inventory") + " AS " + TECH_TABLE + @",
@@ -2916,13 +2924,14 @@ namespace VASLogic.Models
                        COALESCE(il.QtyBook,0) AS Book_Qty,
                        COALESCE(il.QtyCount,0) AS Count_Qty,
                        " + difference + @" AS Difference_Qty,
-                       i.DocStatus AS Doc_Status
+                       " + statusExpr + @" AS Doc_Status
                 FROM M_InventoryLine il
                 INNER JOIN M_Inventory i ON (i.M_Inventory_ID=il.M_Inventory_ID)
-                LEFT OUTER JOIN M_Locator loc ON (loc.M_Locator_ID=il.M_Locator_ID)
-                LEFT OUTER JOIN M_Warehouse wh ON (wh.M_Warehouse_ID=loc.M_Warehouse_ID)
-                LEFT OUTER JOIN M_Product prod ON (prod.M_Product_ID=il.M_Product_ID)
+                INNER JOIN M_Locator loc ON (loc.M_Locator_ID=il.M_Locator_ID)
+                INNER JOIN M_Warehouse wh ON (wh.M_Warehouse_ID=loc.M_Warehouse_ID)
+                LEFT OUTER JOIN M_Product prod ON (prod.M_Product_ID=il.M_Product_ID)" + statusJoin + @"
                 WHERE il.IsActive='Y'
+                  AND i.IsInternalUse = 'N' 
                   AND i.IsActive='Y'
                   AND i.DocStatus NOT IN (" + DOCSTATUS_FinalList + @")
                   AND i.DocStatus NOT IN (" + DOCSTATUS_DeadList + @")
@@ -2935,10 +2944,14 @@ namespace VASLogic.Models
             columns.Add(Col("Warehouse_Name", "VAS_195_Warehouse", "Warehouse", COLTYPE_TEXT, 1.1m));
             columns.Add(Col("Locator_Name", "VAS_195_Locator", "Locator", COLTYPE_TEXT, 0.9m));
             columns.Add(Col("Product_Name", "VAS_195_Product", "Product", COLTYPE_TEXT, 1.5m));
+
+            /* Status closes the "what is this line" half of the row, before the three
+               quantities open the "by how much" half. Trailing the quantities it split
+               them from the difference they explain. */
+            columns.Add(Col("Doc_Status", "VAS_195_DocStatus", "Status", COLTYPE_BADGE, 1.0m));
             columns.Add(Col("Book_Qty", "VAS_195_BookQty", "Book", COLTYPE_QTY, 0.7m));
             columns.Add(Col("Count_Qty", "VAS_195_CountQty", "Count", COLTYPE_QTY, 0.7m));
             columns.Add(Col("Difference_Qty", "VAS_195_DifferenceQty", "Difference", COLTYPE_QTY, 0.8m));
-            columns.Add(Col("Doc_Status", "VAS_195_DocStatus", "Status", COLTYPE_BADGE, 0.8m));
 
             return Spec(sql, "il", "i.MovementDate DESC,i.DocumentNo DESC,il.M_InventoryLine_ID DESC",
                 parameters, columns);
@@ -3578,7 +3591,9 @@ namespace VASLogic.Models
 
             List<ColumnDef> columns = new List<ColumnDef>();
             columns.Add(Col("Fiscal_Year", "VAS_195_FiscalYear", "Fiscal Year", COLTYPE_TEXT, 0.9m));
-            columns.Add(Col("Period_Name", "VAS_195_PeriodName", "Period", COLTYPE_DOC, 1.4m));
+            /* Every row of this check IS a period, so the screen name under the value
+               would read "Period" on all of them. */
+            columns.Add(DocColNoScreen("Period_Name", "VAS_195_PeriodName", "Period", 1.4m));
             columns.Add(Col("Start_Date", "VAS_195_StartDate", "Start Date", COLTYPE_DATE, 1.0m));
             columns.Add(Col("End_Date", "VAS_195_EndDate", "End Date", COLTYPE_DATE, 1.0m));
             columns.Add(Col("Open_Controls", "VAS_195_OpenControls", "Open Controls", COLTYPE_NUMBER, 0.9m));

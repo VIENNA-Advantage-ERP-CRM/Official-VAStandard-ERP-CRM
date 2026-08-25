@@ -1096,7 +1096,7 @@
             }
 
             if (type === 'DOC') {
-                return docCell(row, raw);
+                return docCell(row, raw, column);
             }
 
             if (type === 'DATE') { return textCell(formatDate(raw)); }
@@ -1148,13 +1148,17 @@
            instead. It is the same fact either way; a second line inside a cell that is
            already there costs no column width, and a reader landing mid-list still
            knows which screen a document belongs to without scrolling back to find the
-           head of its group. */
-        function docCell(row, raw) {
+           head of its group.
+
+           A check reading ONE table opts out with HideScreenName: there the line would
+           repeat the same word on every row, which is noise rather than orientation. */
+        function docCell(row, raw, column) {
             var text = raw != null && String(raw) !== ''
                 ? String(raw)
                 : (row.DocumentDisplayValue || '');
 
-            var screen = (!_hasScreenColumn && row.ScreenDisplayName) ? row.ScreenDisplayName : '';
+            var wantScreen = !_hasScreenColumn && !(column && column.HideScreenName);
+            var screen = (wantScreen && row.ScreenDisplayName) ? row.ScreenDisplayName : '';
             var sub = screen
                 ? '<span class="vas-195-docsub" title="' + escapeHtml(screen) + '">' +
                       escapeHtml(screen) + '</span>'

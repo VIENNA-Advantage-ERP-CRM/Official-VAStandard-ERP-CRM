@@ -1855,6 +1855,23 @@ namespace VASLogic.Models
             return column;
         }
 
+        /// <summary>
+        /// A COLTYPE_DOC column that does NOT print the screen name under its value - for
+        /// a check whose rows all come from one screen, where that line would repeat the
+        /// same word on every row. See <see cref="ColumnDef.HideScreenName"/>.
+        /// </summary>
+        /// <param name="key">SELECT alias the cell value is read from.</param>
+        /// <param name="labelKey">AD_Message key for the caption.</param>
+        /// <param name="labelText">English fallback caption.</param>
+        /// <param name="weight">Relative grid width.</param>
+        /// <returns>Populated <see cref="ColumnDef"/>.</returns>
+        protected ColumnDef DocColNoScreen(string key, string labelKey, string labelText, decimal weight)
+        {
+            ColumnDef column = Col(key, labelKey, labelText, COLTYPE_DOC, weight);
+            column.HideScreenName = true;
+            return column;
+        }
+
         // ─────────────────────────────────────────────────────────────────────
         // §10 Contracts
         // ─────────────────────────────────────────────────────────────────────
@@ -2005,6 +2022,18 @@ namespace VASLogic.Models
 
             /// <summary>Relative grid width.</summary>
             public decimal Weight { get; set; }
+
+            /// <summary>
+            /// COLTYPE_DOC only: suppresses the screen name the client otherwise prints
+            /// under the document number.
+            ///
+            /// That second line earns its place on a check whose rows span SEVERAL
+            /// screens - it is what tells a reader landing mid-list whether they are
+            /// looking at a receipt or an inventory count. On a check reading one table,
+            /// every row repeats the same word down the whole column and says nothing.
+            /// Default false, so a check has to opt out deliberately.
+            /// </summary>
+            public bool HideScreenName { get; set; }
         }
 
         /// <summary>One detail row: declared cells plus the technical navigation fields.</summary>
