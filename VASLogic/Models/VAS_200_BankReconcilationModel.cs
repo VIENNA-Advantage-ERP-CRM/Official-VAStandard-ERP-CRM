@@ -808,10 +808,10 @@ namespace VASLogic.Models
             {
                 if (!HasExecutionStatusColumn())
                 {
-                    return "p.DocStatus='IP'";
+                    return "p.DocStatus IN ('DR', 'IP')";
                 }
 
-                return "(p.DocStatus='IP' OR (p." + COLUMNNAME_ExecutionStatus + " IN ('"
+                return "(p.DocStatus IN ('DR','IP') OR (p." + COLUMNNAME_ExecutionStatus + " IN ('"
                     + X_C_Payment.VA009_EXECUTIONSTATUS_Bounced + "','"
                     + X_C_Payment.VA009_EXECUTIONSTATUS_Rejected
                     + "') AND p.DocStatus NOT IN ('VO','RE')))";
