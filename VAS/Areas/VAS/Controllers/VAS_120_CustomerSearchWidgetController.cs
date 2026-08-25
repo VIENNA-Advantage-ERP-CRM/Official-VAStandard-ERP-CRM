@@ -41,6 +41,20 @@ namespace VAS.Controllers
     ///   VAI052      2026-07-20 Created
     ///   VAI052      2026-08-07 Added SaveAppointment / SaveTask for the search-row
     ///                          quick-action popups.
+    ///   VAI052      2026-08-25 ORA-01008 on Oracle: the search returned nothing at all
+    ///                          because both the suggest and the count statement failed
+    ///                          before a row was read. The shared CTE repeats its
+    ///                          placeholders (@Client_ID 2x, @Search_Exact 2x,
+    ///                          @Search_Prefix 2x, @Search_Like 6x) while the parameter
+    ///                          list carried ONE entry each, and it also carried an
+    ///                          @Org_ID that the SQL never used. The app's Oracle layer
+    ///                          never sets BindByName, so ODP.NET binds BY POSITION and
+    ///                          any name occurring more often than its parameter raises
+    ///                          ORA-01008 ("not all variables bound") - the same defect
+    ///                          already fixed in VAS_128 / VAS_140 / VAS_099. Every
+    ///                          occurrence now has its own uniquely named parameter,
+    ///                          supplied in the order the placeholders appear in the
+    ///                          assembled statement, and the unused @Org_ID is gone.
     /// </summary>
     public class VAS_120_CustomerSearchWidgetController : Controller
     {
@@ -400,7 +414,6 @@ namespace VAS.Controllers
             if (maxRows <= 0 || maxRows > MaxSuggestRows) { maxRows = MaxSuggestRows; }
 
             int clientId = ctx.GetAD_Client_ID();
-            int orgId = ctx.GetAD_Org_ID();
             string upperText = searchText.ToUpperInvariant();
             string likeValue = "%" + upperText + "%";
             string prefixValue = upperText + "%";
@@ -438,7 +451,7 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                dr = DB.ExecuteReader(suggestSql, BuildSearchParameters(clientId, orgId, likeValue, upperText, prefixValue, language, maxRows));
+                dr = DB.ExecuteReader(suggestSql, BuildSearchParameters(clientId, likeValue, upperText, prefixValue, language, maxRows));
                 while (dr != null && dr.Read())
                 {
                     string tierCode = Util.GetValueOfString(dr["Tier_Code"]);
@@ -474,7 +487,7 @@ namespace VAS.Controllers
             {
                 // The count query does not reference @Max_Rows, so it is bound with
                 // the shared predicate parameters only (no unused bind).
-                countReader = DB.ExecuteReader(countSql, BuildSearchParameters(clientId, orgId, likeValue, upperText, prefixValue, language, null));
+                countReader = DB.ExecuteReader(countSql, BuildSearchParameters(clientId, likeValue, upperText, prefixValue, language, null));
                 if (countReader != null && countReader.Read())
                 {
                     result.Total = Util.GetValueOfInt(countReader["Total_Count"]);
@@ -522,7 +535,7 @@ namespace VAS.Controllers
                        ) AS RN
                 FROM AD_User Contact
                 WHERE Contact.IsActive = 'Y'
-                  AND Contact.AD_Client_ID = @Client_ID";
+                  AND Contact.AD_Client_ID = @Contact_Client_ID";
 
             // Main physical table body. bp is the primary data source; grp / c /
             // owner are secondary joins used only to resolve display + search text.
@@ -540,10 +553,10 @@ namespace VAS.Controllers
                        bp.Rating AS Tier_Code,
                        COALESCE(RatingTrl.Name, RatingList.Name, N'') AS Tier_Name,
                        CASE
-                           WHEN UPPER(COALESCE(bp.Name, N'')) = @Search_Exact THEN 0
-                           WHEN UPPER(COALESCE(bp.Value, N'')) = @Search_Exact THEN 1
-                           WHEN UPPER(COALESCE(bp.Name, N'')) LIKE @Search_Prefix THEN 2
-                           WHEN UPPER(COALESCE(c.Contact_Name, bp.Name, N'')) LIKE @Search_Prefix THEN 3
+                           WHEN UPPER(COALESCE(bp.Name, N'')) = @Search_Exact_Name THEN 0
+                           WHEN UPPER(COALESCE(bp.Value, N'')) = @Search_Exact_Value THEN 1
+                           WHEN UPPER(COALESCE(bp.Name, N'')) LIKE @Search_Prefix_Name THEN 2
+                           WHEN UPPER(COALESCE(c.Contact_Name, bp.Name, N'')) LIKE @Search_Prefix_Contact THEN 3
                            ELSE 4
                        END AS Relevance_Rank
                 FROM C_BPartner bp
@@ -556,14 +569,14 @@ namespace VAS.Controllers
                 LEFT OUTER JOIN AD_Ref_List_Trl RatingTrl ON (RatingTrl.AD_Ref_List_ID = RatingList.AD_Ref_List_ID AND RatingTrl.AD_Language = @AD_Language)
                 WHERE bp.IsActive = 'Y'
                   AND bp.IsCustomer = 'Y'
-                  AND bp.AD_Client_ID = @Client_ID
+                  AND bp.AD_Client_ID = @Customer_Client_ID
                   AND (
-                      UPPER(COALESCE(bp.Name, N'')) LIKE @Search_Like
-                      OR UPPER(COALESCE(bp.Value, N'')) LIKE @Search_Like
-                      OR UPPER(COALESCE(c.Contact_Name, bp.Name, N'')) LIKE @Search_Like
-                      OR UPPER(COALESCE(c.Contact_EMail, bp.EMail, N'')) LIKE @Search_Like
-                      OR UPPER(COALESCE(grp.Name, N'')) LIKE @Search_Like
-                      OR UPPER(COALESCE(owner.Name, N'')) LIKE @Search_Like
+                      UPPER(COALESCE(bp.Name, N'')) LIKE @Search_Like_Name
+                      OR UPPER(COALESCE(bp.Value, N'')) LIKE @Search_Like_Value
+                      OR UPPER(COALESCE(c.Contact_Name, bp.Name, N'')) LIKE @Search_Like_Contact
+                      OR UPPER(COALESCE(c.Contact_EMail, bp.EMail, N'')) LIKE @Search_Like_Email
+                      OR UPPER(COALESCE(grp.Name, N'')) LIKE @Search_Like_Segment
+                      OR UPPER(COALESCE(owner.Name, N'')) LIKE @Search_Like_Rep
                   )";
 
             // MRole tenant + record access on the main physical table alias only.
@@ -586,21 +599,44 @@ namespace VAS.Controllers
         /// Fresh parameter array for one command execution (a SqlParameter cannot be
         /// shared across two commands, so each query builds its own).
         /// </summary>
-        private SqlParameter[] BuildSearchParameters(int clientId, int orgId, string likeValue, string exactValue, string prefixValue, string language, int? maxRows)
+        /// The app's Oracle layer never sets BindByName, so ODP.NET binds BY POSITION:
+        /// every placeholder OCCURRENCE needs its own parameter, listed in the order the
+        /// occurrences appear in the assembled statement, and no parameter may be
+        /// supplied that the statement does not use. That is why the repeated search
+        /// values are bound under one name per occurrence (_Name / _Value / _Contact /
+        /// _Email / _Segment / _Rep suffixes) rather than a single shared @Search_Like -
+        /// re-using one name raised ORA-01008 and killed the whole search (2026-08-25).
+        /// <param name="clientId">Tenant id, bound once per occurrence.</param>
+        /// <param name="likeValue">"%TEXT%" for the six contains-branches.</param>
+        /// <param name="exactValue">Upper-cased raw text for the two equality ranks.</param>
+        /// <param name="prefixValue">"TEXT%" for the two starts-with ranks.</param>
+        /// <param name="language">Session language for the tier-label translation.</param>
+        /// <param name="maxRows">Row cap for the suggest fetch; null for the count.</param>
+        private SqlParameter[] BuildSearchParameters(int clientId, string likeValue, string exactValue, string prefixValue, string language, int? maxRows)
         {
             List<SqlParameter> parameters = new List<SqlParameter>
             {
-                new SqlParameter("@Client_ID", clientId),
-                new SqlParameter("@Org_ID", orgId),
-                new SqlParameter("@Search_Like", SqlDbType.NVarChar) { Value = likeValue },
-                new SqlParameter("@Search_Exact", SqlDbType.NVarChar) { Value = exactValue },
-                new SqlParameter("@Search_Prefix", SqlDbType.NVarChar) { Value = prefixValue },
-                // Bound by both queries: the CTE (shared by suggest + count) joins
-                // AD_Ref_List_Trl on it to translate the tier label.
-                new SqlParameter("@AD_Language", SqlDbType.NVarChar) { Value = language }
+                // 1 - RankedContacts CTE.
+                new SqlParameter("@Contact_Client_ID", clientId),
+                // 2-5 - Relevance_Rank CASE in the CustomerSearch select list.
+                new SqlParameter("@Search_Exact_Name", SqlDbType.NVarChar) { Value = exactValue },
+                new SqlParameter("@Search_Exact_Value", SqlDbType.NVarChar) { Value = exactValue },
+                new SqlParameter("@Search_Prefix_Name", SqlDbType.NVarChar) { Value = prefixValue },
+                new SqlParameter("@Search_Prefix_Contact", SqlDbType.NVarChar) { Value = prefixValue },
+                // 6 - AD_Ref_List_Trl join (tier label translation).
+                new SqlParameter("@AD_Language", SqlDbType.NVarChar) { Value = language },
+                // 7-13 - CustomerSearch WHERE clause.
+                new SqlParameter("@Customer_Client_ID", clientId),
+                new SqlParameter("@Search_Like_Name", SqlDbType.NVarChar) { Value = likeValue },
+                new SqlParameter("@Search_Like_Value", SqlDbType.NVarChar) { Value = likeValue },
+                new SqlParameter("@Search_Like_Contact", SqlDbType.NVarChar) { Value = likeValue },
+                new SqlParameter("@Search_Like_Email", SqlDbType.NVarChar) { Value = likeValue },
+                new SqlParameter("@Search_Like_Segment", SqlDbType.NVarChar) { Value = likeValue },
+                new SqlParameter("@Search_Like_Rep", SqlDbType.NVarChar) { Value = likeValue }
             };
 
-            // @Max_Rows only for the suggest fetch; the count query omits it.
+            // 14 - @Max_Rows closes the suggest fetch; the count query omits it (an
+            // unused parameter would break positional binding just as a missing one does).
             if (maxRows.HasValue)
             {
                 parameters.Add(new SqlParameter("@Max_Rows", maxRows.Value));
