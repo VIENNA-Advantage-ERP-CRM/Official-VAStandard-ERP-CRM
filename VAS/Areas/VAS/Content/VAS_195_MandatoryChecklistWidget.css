@@ -637,9 +637,11 @@
    on a short viewport. scrollbar-gutter reserves the scrollbar's width whether or
    not it is showing - without it a page that scrolls and a page that does not would
    render the columns at two different widths.
-   overflow-x is auto here, unlike the sibling dialogs: a check may declare eleven
-   columns, and a wide grid must scroll inside its own box rather than force the
-   whole page sideways.
+   overflow-x is HIDDEN. The grid is pinned to this box's width and its cells ellipsis
+   (see .vas-195-dgrid), so nothing should ever overflow sideways - and if a future
+   change makes something do so, clipping it is the lesser fault. A scrollbar that
+   appears on one page of a check and not the next moves every column under the reader,
+   which is the failure this replaced.
 
    NO padding-top, deliberately. A sticky header pins to the top of its scroll
    container's PADDING box, not its content box - any padding-top here would leave a
@@ -650,7 +652,7 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
-    overflow-x: auto;
+    overflow-x: hidden;
     scrollbar-gutter: stable;
     padding: 0 20px 16px;
 }
@@ -672,11 +674,21 @@
 /* ---- Detail grid ----
    NO grid-template-columns here, deliberately: the widget composes one per check
    from the column weights the server declares, and writes it inline on the header
-   and every row. A wide check keeps its columns readable by setting a min-width, so
-   the body scrolls rather than crushing eleven columns into 400px. */
+   and every row.
+
+   width:100%, NOT max-content. Under max-content the fr tracks were sized from what
+   the page actually held, so the grid's width was a function of the DATA: a page whose
+   longest business partner was "BrightTech Innovations" fitted the dialog, and turning
+   to a page holding "Mahavir Auto Components Pvt Ltd" grew the grid past it and raised
+   a horizontal scrollbar. Same check, same columns, different width - the columns
+   shifted under the reader between pages, which is worse than any single layout.
+
+   Pinned to the container the fr tracks divide a fixed width instead, so every page of
+   a check lines up with every other. The weights the server declares decide the
+   proportions and the cells ellipsis whatever will not fit, which is what they were
+   already written to do. */
 .vas-195-dgrid {
-    min-width: 100%;
-    width: max-content;
+    width: 100%;
 }
 
 /* The gutter is deliberately tighter than the sibling dialogs' 12px. This grid is the

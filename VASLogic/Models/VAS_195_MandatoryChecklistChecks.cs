@@ -112,6 +112,15 @@ namespace VASLogic.Models
     ///                          the DocStatus reference name
     ///   VAI145      2026-08-25 Check 23's Period column no longer prints "Period" under
     ///                          every value - see ColumnDef.HideScreenName
+    ///   VAI145      2026-08-25 Check 18 drops its Status column, leads the money columns
+    ///                          with Currency, and captions Tax Base as Taxable Amount
+    ///   VAI145      2026-08-25 Check 16 tests M_Transaction.M_CostElement_ID directly and
+    ///                          no longer consults M_CostDetail at all
+    ///   VAI145      2026-08-25 Check 16 excludes movements whose source document was
+    ///                          voided or reversed - inventory, production, and the
+    ///                          VAMFG / VA143 / VAFAM module documents
+    ///   VAI145      2026-08-25 Check 16 shows the source document number and reads
+    ///                          MovementType as its reference name
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -142,6 +151,61 @@ namespace VASLogic.Models
            C_Element carries the chart of accounts a schema posts against. Bound as a
            value, never inlined: it is data, not an identifier. */
         private const string ELEMENTTYPE_Account = "AC";
+
+        /// <summary>
+        /// One kind of document that produces inventory movements: the column
+        /// M_Transaction references it by, and the path from there to the document header.
+        /// </summary>
+        private class MovementSource
+        {
+            /// <summary>The reference column on M_Transaction.</summary>
+            public string LinkColumn { get; set; }
+
+            /// <summary>Line table the reference points at, or "" when it names the header.</summary>
+            public string LineTable { get; set; }
+
+            /// <summary>The document header.</summary>
+            public string HeaderTable { get; set; }
+
+            /// <summary>Key joining line to header; unused when there is no line table.</summary>
+            public string HeaderKey { get; set; }
+
+            /// <summary>Short unique stem the generated aliases are built from.</summary>
+            public string Alias { get; set; }
+        }
+
+        /// <summary>
+        /// Every document check 16 knows how to trace a movement back to - the inventory
+        /// documents check 15 examines, plus production and the three module documents
+        /// that also move stock: work-order execution (VAMFG), job work (VA143) and asset
+        /// disposal (VAFAM).
+        ///
+        /// Fixed rather than discovered, for the same reason check 15's list is: "does
+        /// this document move stock" is not a question the dictionary answers. Nothing
+        /// here is trusted at run time - every table and column is probed before it
+        /// reaches SQL, so an installation without a module simply contributes nothing for
+        /// it.
+        ///
+        /// Asset disposal carries no line table: a transaction names the disposal itself,
+        /// so its LineTable is empty and the reference IS the header's key.
+        /// </summary>
+        private static readonly List<MovementSource> MovementSources = new List<MovementSource>
+        {
+            new MovementSource { LinkColumn = "M_InOutLine_ID", LineTable = "M_InOutLine",
+                HeaderTable = "M_InOut", HeaderKey = "M_InOut_ID", Alias = "Iol" },
+            new MovementSource { LinkColumn = "M_InventoryLine_ID", LineTable = "M_InventoryLine",
+                HeaderTable = "M_Inventory", HeaderKey = "M_Inventory_ID", Alias = "Inv" },
+            new MovementSource { LinkColumn = "M_MovementLine_ID", LineTable = "M_MovementLine",
+                HeaderTable = "M_Movement", HeaderKey = "M_Movement_ID", Alias = "Mov" },
+            new MovementSource { LinkColumn = "M_ProductionLine_ID", LineTable = "M_ProductionLine",
+                HeaderTable = "M_Production", HeaderKey = "M_Production_ID", Alias = "Prd" },
+            new MovementSource { LinkColumn = "VAMFG_M_WrkOdrTrnsctionLine_ID", LineTable = "VAMFG_M_WrkOdrTrnsctionLine",
+                HeaderTable = "VAMFG_M_WrkOdrTransaction", HeaderKey = "VAMFG_M_WrkOdrTransaction_ID", Alias = "Wo" },
+            new MovementSource { LinkColumn = "VA143_JobWorkInOutLine_ID", LineTable = "VA143_JobWorkInOutLine",
+                HeaderTable = "VA143_JobWorkInOut", HeaderKey = "VA143_JobWorkInOut_ID", Alias = "Jw" },
+            new MovementSource { LinkColumn = "VAFAM_AssetDisposal_ID", LineTable = "",
+                HeaderTable = "VAFAM_AssetDisposal", HeaderKey = "", Alias = "Ad" }
+        };
 
         /* The date column a discovered document is bounded by, in preference order.
            DateAcct first because the period filter must mean the same thing for every
@@ -2784,7 +2848,7 @@ namespace VASLogic.Models
         /// <returns>Populated <see cref="CheckResult"/>.</returns>
         private CheckResult Eval16(CheckContext c, CheckDef def)
         {
-            if (!TableExists("M_Transaction") || !TableExists("M_CostDetail"))
+            if (!TableExists("M_Transaction") || !ColumnExists("M_Transaction", "M_CostElement_ID"))
             {
                 return NotApplicable(def, "VAS_195_Na16", "No inventory costing data in this installation");
             }
@@ -2795,64 +2859,289 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Period transactions with no processed cost detail in the primary accounting
-        /// schema.
+        /// Period transactions the costing process has not costed - those whose
+        /// M_CostElement_ID was never set.
         ///
-        /// Deliberately transaction-level. A cost-closing header being processed says
-        /// the RUN finished, not that every transaction in the period was costed by it -
-        /// so the test is per movement, against M_CostDetail for the primary schema.
+        /// THE TRANSACTION ANSWERS FOR ITSELF. This used to ask M_CostDetail instead:
+        /// "is there a processed cost row for this movement in the primary schema". That
+        /// is a reconstruction of the same fact from a second table, and it depended on
+        /// three columns of M_CostDetail being present and meaning what it assumed. The
+        /// cost element on the movement IS the record of having been costed - unset means
+        /// the process never reached it - so nothing on M_CostDetail is consulted any
+        /// more.
+        ///
+        /// COALESCE, not IS NULL. An unset foreign key is stored as 0 rather than NULL on
+        /// several tables in this schema, and a bare IS NULL against a column that holds
+        /// zeros finds nothing at all - which on a blocker would read as a clean PASS over
+        /// a period that was never costed. Testing both forms costs nothing and cannot be
+        /// wrong either way; no real M_CostElement_ID is 0.
+        ///
+        /// One consequence of dropping M_CostDetail: the check is no longer scoped to the
+        /// primary accounting schema. It cannot be - a movement is physical and carries no
+        /// schema, and it was M_CostDetail that made the old test per-schema. A tenant
+        /// running several accounting schemas now gets one answer covering all of them.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <returns>Populated <see cref="DetailSpec"/>, or null when costing data is absent.</returns>
         private DetailSpec Spec16(CheckContext c)
         {
-            if (!TableExists("M_Transaction") || !TableExists("M_CostDetail")) { return null; }
-
-            bool costByTransaction = ColumnExists("M_CostDetail", "M_Transaction_ID");
-            bool hasSchema = ColumnExists("M_CostDetail", "C_AcctSchema_ID");
-            bool hasProcessed = ColumnExists("M_CostDetail", "Processed");
-
-            /* Without a transaction reference on M_CostDetail there is no reliable way
-               to tie a cost row to a movement, and guessing would report every
-               transaction as uncosted. */
-            if (!costByTransaction) { return null; }
+            if (!TableExists("M_Transaction") || !ColumnExists("M_Transaction", "M_CostElement_ID")) { return null; }
 
             List<SqlParameter> parameters = Binds();
 
-            StringBuilder costWhere = new StringBuilder();
-            costWhere.Append("cd.M_Transaction_ID=mt.M_Transaction_ID AND cd.IsActive='Y'");
-            if (hasProcessed) { costWhere.Append(" AND COALESCE(cd.Processed,'N')='Y'"); }
-            if (hasSchema) { costWhere.Append(" AND cd.C_AcctSchema_ID=@C_AcctSchema_ID"); }
+            /* MovementType is an AD_Reference list column: it stores 'V+' and the reader
+               needs "Vendor Receipt". The bind goes in before the statement is built - its
+               occurrence is in the FROM clause, ahead of the period binds in the WHERE. */
+            string typeExpr = "COALESCE(mt.MovementType,N'')";
+            string typeJoin = ListNameJoin("mtl", "mtltrl", "mt.MovementType",
+                "M_Transaction", "MovementType", "@AD_LanguageM");
+            if (typeJoin.Length > 0)
+            {
+                parameters.Add(new SqlParameter("@AD_LanguageM", ctxLanguage(c)));
+                typeExpr = "COALESCE(mtltrl.Name,mtl.Name,mt.MovementType,N'')";
+            }
+
+            /* The number of whichever document produced the movement. Empty when this
+               installation has none of the sources, in which case the column is not
+               declared at all rather than shown blank on every row. */
+            string docNoExpr = SourceDocumentNoExpr();
+            bool hasDocNo = docNoExpr.Length > 0;
 
             string sql = @"
                 SELECT " + TableId("M_Transaction") + " AS " + TECH_TABLE + @",
                        mt.M_Transaction_ID AS " + TECH_RECORD + @",
                        0 AS " + TECH_WINDOW + @",
+                       " + (hasDocNo ? docNoExpr : "N''") + @" AS Doc_Number,
                        mt.MovementDate AS Doc_Date,
-                       COALESCE(mt.MovementType,N'') AS Movement_Type,
+                       " + typeExpr + @" AS Movement_Type,
                        COALESCE(prod.Name,N'') AS Product_Name,
                        COALESCE(loc.Value,N'') AS Locator_Name,
                        COALESCE(wh.Name,N'') AS Warehouse_Name,
                        COALESCE(mt.MovementQty,0) AS Movement_Qty
                 FROM M_Transaction mt
-                LEFT OUTER JOIN M_Product prod ON (prod.M_Product_ID=mt.M_Product_ID)
-                LEFT OUTER JOIN M_Locator loc ON (loc.M_Locator_ID=mt.M_Locator_ID)
-                LEFT OUTER JOIN M_Warehouse wh ON (wh.M_Warehouse_ID=loc.M_Warehouse_ID)
+                INNER JOIN M_Product prod ON (prod.M_Product_ID=mt.M_Product_ID)
+                INNER JOIN M_Locator loc ON (loc.M_Locator_ID=mt.M_Locator_ID)
+                INNER JOIN M_Warehouse wh ON (wh.M_Warehouse_ID=loc.M_Warehouse_ID)" + typeJoin + @"
                 WHERE mt.IsActive='Y'
-                  AND " + PeriodWhere(c, "mt", "MovementDate", "T", parameters) + @"
-                  AND NOT EXISTS(SELECT 1 FROM M_CostDetail cd WHERE " + costWhere + ")";
+                  AND COALESCE(mt.M_CostElement_ID,0)=0
+                  AND " + PeriodWhere(c, "mt", "MovementDate", "T", parameters)
+                  + ExcludeReversedSources();
 
-            if (hasSchema) { parameters.Add(new SqlParameter("@C_AcctSchema_ID", c.Acct.C_AcctSchema_ID)); }
-
+            /* TEXT, not DOC: the number belongs to the source document while the row's
+               technical ids point at the movement, so a link here would open something
+               other than what it names. */
             List<ColumnDef> columns = new List<ColumnDef>();
+            if (hasDocNo) { columns.Add(Col("Doc_Number", "DocumentNo", "Document No", COLTYPE_TEXT, 1.2m)); }
             columns.Add(Col("Doc_Date", "VAS_195_TransactionDate", "Transaction Date", COLTYPE_DATE, 1.0m));
-            columns.Add(Col("Movement_Type", "VAS_195_MovementType", "Movement", COLTYPE_BADGE, 0.9m));
+            columns.Add(Col("Movement_Type", "VAS_195_MovementType", "Movement", COLTYPE_BADGE, 1.2m));
             columns.Add(Col("Product_Name", "VAS_195_Product", "Product", COLTYPE_TEXT, 1.8m));
             columns.Add(Col("Warehouse_Name", "VAS_195_Warehouse", "Warehouse", COLTYPE_TEXT, 1.2m));
             columns.Add(Col("Locator_Name", "VAS_195_Locator", "Locator", COLTYPE_TEXT, 1.0m));
             columns.Add(Col("Movement_Qty", "VAS_195_Quantity", "Quantity", COLTYPE_QTY, 0.8m));
 
             return Spec(sql, "mt", "mt.MovementDate DESC,mt.M_Transaction_ID DESC", parameters, columns);
+        }
+
+        /// <summary>
+        /// The predicate that keeps VOIDED and REVERSED movements out of check 16.
+        ///
+        /// M_Transaction carries no document status of its own - it is a physical
+        /// movement, and whether that movement still counts is a fact about the DOCUMENT
+        /// that produced it. So the test reaches back through whichever line reference the
+        /// transaction holds to that document's header and asks its DocStatus.
+        ///
+        /// The sources are the inventory documents check 15 examines, plus production and
+        /// the three MODULE documents that also move stock - work-order execution
+        /// (VAMFG), job work (VA143) and asset disposal (VAFAM). The list is fixed rather
+        /// than discovered for the same reason as check 15's: "does this document move
+        /// stock" is not a question the dictionary answers. Every table and column is
+        /// probed before it is named, so an installation without a module contributes no
+        /// predicate for it - one fewer exclusion, never a broken statement.
+        ///
+        /// MOST have a line table between the movement and the document; asset disposal
+        /// does not - a transaction names the disposal itself - which is why there are two
+        /// shapes here rather than one.
+        ///
+        /// WHICH MARKER means "dead" differs by document, so it is discovered rather than
+        /// assumed. A shipment, an inventory count and a movement say so through
+        /// DocStatus; a production says so through IsReversed and may carry no DocStatus
+        /// at all. <see cref="DeadDocumentTest"/> probes for both and ORs whichever the
+        /// header actually has, so no source needs a rule written twice.
+        ///
+        /// NOT EXISTS rather than a join: a transaction holds ONE of these references and
+        /// leaves the others null, so joining would multiply rows out or drop them
+        /// depending on the join type. A correlated existence test against a null
+        /// reference matches nothing, which leaves the row in the list - correct, since a
+        /// movement from a source this predicate cannot judge has not been shown to be
+        /// reversed.
+        /// </summary>
+        /// <returns>WHERE fragment, or "" when no reference can be checked.</returns>
+        private string ExcludeReversedSources()
+        {
+            StringBuilder sb = new StringBuilder();
+
+            for (int i = 0; i < MovementSources.Count; i++)
+            {
+                MovementSource s = MovementSources[i];
+
+                if (s.LineTable.Length == 0)
+                {
+                    AppendNotReversedDirect(sb, s.LinkColumn, s.HeaderTable, "rev" + s.Alias);
+                }
+                else
+                {
+                    AppendNotReversed(sb, s.LinkColumn, s.LineTable, "revL" + s.Alias,
+                        s.HeaderTable, "rev" + s.Alias, s.HeaderKey);
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// The document number of whichever source produced a movement, as a single
+        /// SELECT expression - "" when none of them can supply one.
+        ///
+        /// A transaction holds ONE source reference and leaves the rest null, so the
+        /// number is a COALESCE over one correlated look-up per source: the first that
+        /// resolves wins, and a movement whose source this list does not cover reads
+        /// empty rather than wrong.
+        ///
+        /// MAX rather than a bare column because a scalar sub-select must yield one row.
+        /// The key equality already guarantees at most one, so MAX changes no value - it
+        /// only removes the chance of a "more than one row" error if a schema ever lets
+        /// the join fan out. A source whose header has no DocumentNo at all is skipped.
+        /// </summary>
+        /// <returns>Scalar expression over alias mt, or "".</returns>
+        private string SourceDocumentNoExpr()
+        {
+            StringBuilder sb = new StringBuilder();
+
+            for (int i = 0; i < MovementSources.Count; i++)
+            {
+                MovementSource s = MovementSources[i];
+
+                if (!ColumnExists("M_Transaction", s.LinkColumn)) { continue; }
+                if (!TableExists(s.HeaderTable) || !ColumnExists(s.HeaderTable, "DocumentNo")) { continue; }
+
+                string headerAlias = "no" + s.Alias;
+
+                if (s.LineTable.Length == 0)
+                {
+                    if (!ColumnExists(s.HeaderTable, s.LinkColumn)) { continue; }
+
+                    sb.Append(sb.Length > 0 ? "," : "")
+                      .Append("(SELECT MAX(").Append(headerAlias).Append(".DocumentNo)")
+                      .Append(" FROM ").Append(s.HeaderTable).Append(" ").Append(headerAlias)
+                      .Append(" WHERE ").Append(headerAlias).Append(".").Append(s.LinkColumn)
+                      .Append("=mt.").Append(s.LinkColumn).Append(")");
+                    continue;
+                }
+
+                if (!TableExists(s.LineTable) || !ColumnExists(s.LineTable, s.HeaderKey)) { continue; }
+
+                string lineAlias = "noL" + s.Alias;
+
+                sb.Append(sb.Length > 0 ? "," : "")
+                  .Append("(SELECT MAX(").Append(headerAlias).Append(".DocumentNo)")
+                  .Append(" FROM ").Append(s.LineTable).Append(" ").Append(lineAlias)
+                  .Append(" INNER JOIN ").Append(s.HeaderTable).Append(" ").Append(headerAlias)
+                  .Append(" ON (").Append(headerAlias).Append(".").Append(s.HeaderKey)
+                  .Append("=").Append(lineAlias).Append(".").Append(s.HeaderKey).Append(")")
+                  .Append(" WHERE ").Append(lineAlias).Append(".").Append(s.LinkColumn)
+                  .Append("=mt.").Append(s.LinkColumn).Append(")");
+            }
+
+            if (sb.Length == 0) { return ""; }
+
+            return "COALESCE(" + sb.ToString() + ",N'')";
+        }
+
+        /// <summary>
+        /// How one document header says it no longer counts, built from the columns it
+        /// actually has: DocStatus in the voided / reversed pair, IsReversed set, or both
+        /// ORed where a table carries both.
+        ///
+        /// Returns "" when the header offers neither. The caller then contributes no
+        /// predicate at all rather than an always-false one - a document that cannot
+        /// answer the question must not be treated as having answered it.
+        ///
+        /// COALESCE on IsReversed because the flag is NULL rather than 'N' on rows written
+        /// before the column existed.
+        /// </summary>
+        /// <param name="headerTable">Document header table.</param>
+        /// <param name="headerAlias">Alias it carries in the generated statement.</param>
+        /// <returns>Predicate over that alias, or "".</returns>
+        private string DeadDocumentTest(string headerTable, string headerAlias)
+        {
+            string deadTest = "";
+
+            if (ColumnExists(headerTable, "DocStatus"))
+            {
+                deadTest = headerAlias + ".DocStatus IN (" + DOCSTATUS_DeadList + ")";
+            }
+
+            if (ColumnExists(headerTable, "IsReversed"))
+            {
+                string reversed = "COALESCE(" + headerAlias + ".IsReversed,'N')='Y'";
+                deadTest = deadTest.Length > 0 ? "(" + deadTest + " OR " + reversed + ")" : reversed;
+            }
+
+            return deadTest;
+        }
+
+        /// <summary>
+        /// Adds the exclusion for a source the transaction references DIRECTLY - no line
+        /// table in between, so the link column is the header's own key.
+        /// </summary>
+        /// <param name="sb">WHERE fragment being built.</param>
+        /// <param name="linkColumn">M_Transaction's reference, and the header's key.</param>
+        /// <param name="headerTable">The document header.</param>
+        /// <param name="headerAlias">Alias for that header.</param>
+        private void AppendNotReversedDirect(StringBuilder sb, string linkColumn,
+            string headerTable, string headerAlias)
+        {
+            if (!ColumnExists("M_Transaction", linkColumn)) { return; }
+            if (!TableExists(headerTable) || !ColumnExists(headerTable, linkColumn)) { return; }
+
+            string deadTest = DeadDocumentTest(headerTable, headerAlias);
+            if (deadTest.Length == 0) { return; }
+
+            sb.Append(" AND NOT EXISTS(SELECT 1 FROM ").Append(headerTable).Append(" ").Append(headerAlias)
+              .Append(" WHERE ").Append(headerAlias).Append(".").Append(linkColumn)
+              .Append("=mt.").Append(linkColumn)
+              .Append(" AND ").Append(deadTest).Append(")");
+        }
+
+        /// <summary>
+        /// Adds one source's exclusion, when this installation carries every table and
+        /// column it names AND the header offers some way to say it is dead - see
+        /// <see cref="DeadDocumentTest"/>.
+        /// </summary>
+        /// <param name="sb">WHERE fragment being built.</param>
+        /// <param name="linkColumn">M_Transaction's reference to the line.</param>
+        /// <param name="lineTable">The line table it points at.</param>
+        /// <param name="lineAlias">Alias for that line table.</param>
+        /// <param name="headerTable">The line's document header.</param>
+        /// <param name="headerAlias">Alias for that header.</param>
+        /// <param name="headerKey">Key joining line to header.</param>
+        private void AppendNotReversed(StringBuilder sb, string linkColumn, string lineTable,
+            string lineAlias, string headerTable, string headerAlias, string headerKey)
+        {
+            if (!ColumnExists("M_Transaction", linkColumn)) { return; }
+            if (!TableExists(lineTable) || !TableExists(headerTable)) { return; }
+            if (!ColumnExists(lineTable, headerKey)) { return; }
+
+            string deadTest = DeadDocumentTest(headerTable, headerAlias);
+            if (deadTest.Length == 0) { return; }
+
+            sb.Append(" AND NOT EXISTS(SELECT 1 FROM ").Append(lineTable).Append(" ").Append(lineAlias)
+              .Append(" INNER JOIN ").Append(headerTable).Append(" ").Append(headerAlias)
+              .Append(" ON (").Append(headerAlias).Append(".").Append(headerKey)
+              .Append("=").Append(lineAlias).Append(".").Append(headerKey).Append(")")
+              .Append(" WHERE ").Append(lineAlias).Append(".").Append(linkColumn)
+              .Append("=mt.").Append(linkColumn)
+              .Append(" AND ").Append(deadTest).Append(")");
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -3004,13 +3293,12 @@ namespace VASLogic.Models
                        COALESCE(tax.Rate,0) AS Tax_Rate,
                        " + (hasTaxBase ? "COALESCE(it.TaxBaseAmt,0)" : "0") + @" AS Tax_Base,
                        COALESCE(it.TaxAmt,0) AS Tax_Amount,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
-                       i.DocStatus AS Doc_Status
+                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso
                 FROM C_InvoiceTax it
                 INNER JOIN C_Invoice i ON (i.C_Invoice_ID=it.C_Invoice_ID)
-                LEFT OUTER JOIN C_Tax tax ON (tax.C_Tax_ID=it.C_Tax_ID)
-                LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=i.C_BPartner_ID)
-                LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=i.C_Currency_ID)
+                INNER JOIN C_Tax tax ON (tax.C_Tax_ID=it.C_Tax_ID)
+                INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=i.C_BPartner_ID)
+                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=i.C_Currency_ID)
                 WHERE it.IsActive='Y'
                   AND i.IsActive='Y'
                   AND i.DocStatus IN (" + DOCSTATUS_FinalList + @")
@@ -3027,10 +3315,13 @@ namespace VASLogic.Models
             columns.Add(Col("Partner_Name", "VAS_195_BusinessPartner", "Business Partner", COLTYPE_TEXT, 1.3m));
             columns.Add(Col("Tax_Name", "VAS_195_TaxName", "Tax", COLTYPE_TEXT, 1.2m));
             columns.Add(Col("Tax_Rate", "VAS_195_TaxRate", "Rate", COLTYPE_NUMBER, 0.6m));
-            columns.Add(Col("Tax_Base", "VAS_195_TaxBase", "Tax Base", COLTYPE_DOCAMOUNT, 1.0m));
-            columns.Add(Col("Tax_Amount", "VAS_195_TaxAmount", "Tax Amount", COLTYPE_DOCAMOUNT, 1.0m));
+
+            /* Currency leads the two money columns it qualifies. No Status column: the
+               WHERE already restricts the list to completed and closed invoices, so the
+               badge could only ever read one of two near-identical values on every row. */
             columns.Add(Col("Currency_Iso", "VAS_195_Currency", "Currency", COLTYPE_TEXT, 0.5m));
-            columns.Add(Col("Doc_Status", "VAS_195_DocStatus", "Status", COLTYPE_BADGE, 0.8m));
+            columns.Add(Col("Tax_Base", "VAS_195_TaxableAmount", "Taxable Amount", COLTYPE_DOCAMOUNT, 1.1m));
+            columns.Add(Col("Tax_Amount", "VAS_195_TaxAmount", "Tax Amount", COLTYPE_DOCAMOUNT, 1.1m));
 
             return Spec(sql, "it", "i.DateAcct DESC,i.DocumentNo DESC", parameters, columns);
         }
@@ -3408,16 +3699,16 @@ namespace VASLogic.Models
                 SELECT 0 AS " + TECH_TABLE + @",
                        0 AS " + TECH_RECORD + @",
                        0 AS " + TECH_WINDOW + @",
-                       COALESCE(bank.Name,N'') AS Bank_Name,
-                       COALESCE(ba.Name,N'') AS Bank_Account,
+                       bank.Name AS Bank_Name,
+                       ba.AccountNo AS Bank_Account,
                        COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
                        COUNT(1) AS Total_Items,
                        SUM(CASE WHEN COALESCE(p.IsReconciled,'N')='Y' THEN 1 ELSE 0 END) AS Reconciled_Items,
                        SUM(CASE WHEN COALESCE(p.IsReconciled,'N')<>'Y' THEN 1 ELSE 0 END) AS Unreconciled_Items
                 FROM C_Payment p
                 INNER JOIN C_BankAccount ba ON (ba.C_BankAccount_ID=p.C_BankAccount_ID)
-                LEFT OUTER JOIN C_Bank bank ON (bank.C_Bank_ID=ba.C_Bank_ID)
-                LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=ba.C_Currency_ID)
+                INNER JOIN C_Bank bank ON (bank.C_Bank_ID=ba.C_Bank_ID)
+                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=ba.C_Currency_ID)
                 WHERE p.IsActive='Y'
                   AND ba.IsActive='Y'
                   AND p.DocStatus IN (" + DOCSTATUS_FinalList + @")
@@ -3427,7 +3718,7 @@ namespace VASLogic.Models
             DetailSpec spec = new DetailSpec();
             spec.Sql = sql;
             spec.MainAlias = "p";
-            spec.GroupBy = "COALESCE(bank.Name,N''),COALESCE(ba.Name,N''),COALESCE(cur.ISO_Code,N'')";
+            spec.GroupBy = "bank.Name,ba.AccountNo,COALESCE(cur.ISO_Code,N'')";
             spec.OrderBy = "Bank_Name,Bank_Account";
             spec.Params = parameters;
 
