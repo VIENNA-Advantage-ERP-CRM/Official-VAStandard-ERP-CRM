@@ -126,6 +126,18 @@ namespace VASLogic.Models
     ///                          accounts, in both its measurement and its drill-down
     ///   VAI145      2026-08-25 Check 20 reads its account as "12120 - A/R Non Sufficient
     ///                          Funds Returned Checks" in one column
+    ///   VAI145      2026-08-25 The document checks (01, 02, 15) read DocStatus as its
+    ///                          reference name, carry the currency as a symbol beside the
+    ///                          amount instead of a column, and narrow Document No; the
+    ///                          dialog subtitle drops the accounting schema
+    ///   VAI145      2026-08-25 Check 15 drops the Amount column its tables cannot fill;
+    ///                          a negative amount now signs before the symbol
+    ///   VAI145      2026-08-25 Check 07's Match Req. column hides itself when empty
+    ///                          across the whole result; check 17's quantity captions
+    ///                          spelled out
+    ///   VAI145      2026-08-25 Check 22 names both its codes and drops the Code column;
+    ///                          the base type's reference now comes from C_DocType
+    ///   VAI145      2026-08-25 Check 06's UOM column reads the unit's name, not its symbol
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -1014,12 +1026,17 @@ namespace VASLogic.Models
                     ? "(" + a + ".DocStatus IN (" + DOCSTATUS_OpenList + ") OR COALESCE(" + a + ".Processed,'N')='N')"
                     : a + ".DocStatus IN (" + DOCSTATUS_OpenList + ")";
 
+                /* SELECT before WHERE, and not only for reading order: the branch's
+                   SELECT carries a join whose bind precedes the period binds in the
+                   finished text, and these adapters bind by position. */
+                string select = DocBranchSelect(c, d, suffix, parameters);
+
                 string where = a + ".IsActive='Y' AND " + a + ".DocStatus NOT IN (" + DOCSTATUS_DeadList + ")"
                     + " AND " + pending
                     + " AND " + PeriodWhere(c, a, d.DateColumn, suffix, parameters)
                     + ScreenFilter(d);
 
-                string branch = DocBranchSelect(d, suffix, parameters) + " WHERE " + where;
+                string branch = select + " WHERE " + where;
 
                 if (i > 0) { sql.Append(" UNION ALL "); }
                 sql.Append(SecureBranch(c, branch, a));
@@ -1037,13 +1054,36 @@ namespace VASLogic.Models
         /// branches of a UNION really do line up column for column. Columns a given
         /// table does not carry are emitted as typed literals rather than omitted.
         /// </summary>
+        /// <param name="c">Shared evaluation context.</param>
         /// <param name="d">Discovered screen for this branch.</param>
         /// <param name="suffix">Unique bind suffix for this branch.</param>
         /// <param name="parameters">Bind list being built, in appearance order.</param>
         /// <returns>SELECT ... FROM fragment aliased to the table's own name.</returns>
-        private string DocBranchSelect(DocDef d, string suffix, List<SqlParameter> parameters)
+        private string DocBranchSelect(CheckContext c, DocDef d, string suffix, List<SqlParameter> parameters)
         {
             string a = Alias(d);
+
+            /* DocStatus as its reference NAME rather than the stored 'CO'. Resolved per
+               branch, because the reference comes from THIS branch's own table, and with
+               its own bind name, because a UNION's branches all land in one statement and
+               these adapters bind by position.
+               The bind is added here, ahead of the caller's period binds - the join sits
+               in the FROM clause and those sit in the WHERE. */
+            string statusExpr = d.HasDocStatus ? a + ".DocStatus" : "N''";
+            string statusJoin = "";
+
+            if (d.HasDocStatus)
+            {
+                statusJoin = ListNameJoin("ds", "dstrl", a + ".DocStatus",
+                    d.TableName, "DocStatus", "@DocLang" + suffix);
+
+                if (statusJoin.Length > 0)
+                {
+                    parameters.Add(new SqlParameter("@DocLang" + suffix, ctxLanguage(c)));
+                    statusExpr = "COALESCE(dstrl.Name,ds.Name," + a + ".DocStatus,N'')";
+                }
+            }
+
             StringBuilder sql = new StringBuilder();
 
             sql.Append("SELECT ").Append(d.AD_Table_ID).Append(" AS ").Append(TECH_TABLE)
@@ -1059,11 +1099,14 @@ namespace VASLogic.Models
                /* A Posted-only table has no workflow state to report; the branch still
                   has to line up column for column with its siblings, so it contributes
                   the same typed literal the other optional columns use. */
-               .Append(",").Append(d.HasDocStatus ? a + ".DocStatus" : "N''").Append(" AS Doc_Status")
+               .Append(",").Append(statusExpr).Append(" AS Doc_Status")
                .Append(",").Append(string.IsNullOrEmpty(d.DocTypeKey) ? "N''" : "COALESCE(dt.Name,N'')").Append(" AS Doc_Type")
                .Append(",COALESCE(org.Name,N'') AS Org_Name")
                .Append(",").Append(d.HasBPartner ? "COALESCE(bp.Name,N'')" : "N''").Append(" AS Partner_Name")
-               .Append(",").Append(d.HasCurrency ? "COALESCE(cur.ISO_Code,N'')" : "N''").Append(" AS Currency_Iso")
+               /* The SYMBOL, not the ISO code: it rides beside the amount instead of
+                  taking a column of its own. Symbol first, code as the fallback for a
+                  currency that defines none. */
+               .Append(",").Append(d.HasCurrency ? "COALESCE(cur.CurSymbol,cur.ISO_Code,N'')" : "N''").Append(" AS Currency_Symbol")
                .Append(",").Append(d.HasAmount ? "COALESCE(" + a + "." + d.AmountColumn + ",0)" : "0").Append(" AS Doc_Amount")
                .Append(" FROM ").Append(d.TableName).Append(" ").Append(a)
                .Append(" LEFT OUTER JOIN AD_Org org ON (org.AD_Org_ID=").Append(a).Append(".AD_Org_ID)");
@@ -1080,6 +1123,8 @@ namespace VASLogic.Models
             {
                 sql.Append(" LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=").Append(a).Append(".C_Currency_ID)");
             }
+
+            sql.Append(statusJoin);
 
             return sql.ToString();
         }
@@ -1125,35 +1170,47 @@ namespace VASLogic.Models
         /// which costs no column width at all and still tells a reader landing mid-list
         /// which screen a record belongs to.
         ///
-        /// CURRENCY is optional because it is not merely narrow on the inventory check,
-        /// it is EMPTY: M_InOut, M_Inventory and M_Movement carry no C_Currency_ID, so
-        /// the branch builder emits a literal for every one of their rows and the column
-        /// renders blank down its whole length. A column that can never have a value on
-        /// the check that declares it is not a thin column, it is a wrong one.
+        /// NO CURRENCY COLUMN. The document's currency rides beside its amount as a
+        /// symbol instead - see <see cref="ColumnDef.SymbolKey"/>. An ISO code repeated
+        /// down a column of its own cost width to say what one character in front of the
+        /// figure says better, and on the inventory check it said nothing at all:
+        /// M_InOut, M_Inventory and M_Movement carry no C_Currency_ID, so every row of it
+        /// was blank. A table with no currency now contributes an empty symbol, which
+        /// prefixes nothing.
+        /// </summary>
+        /// AMOUNT is optional for the same reason currency stopped being a column: on the
+        /// inventory check it is not merely small, it is ZERO on every row. None of
+        /// M_InOut, M_Inventory or M_Movement carries any of the amount columns the branch
+        /// builder recognises, so it emits a literal 0 for all of them - a column of
+        /// nothing, taking width from the quantities and dates that do carry the answer.
         /// </summary>
         /// <param name="withScreen">Whether to declare the Screen column. Every caller
         /// passes false today; the parameter stays because the client still renders
         /// COLTYPE_SCREEN, so restoring the column on one check is a one-word change
         /// rather than a rendering change.</param>
-        /// <param name="withCurrency">Whether the check's tables can carry a currency.</param>
+        /// <param name="withAmount">Whether the check's tables can carry a document value.</param>
         /// <returns>Declared columns.</returns>
-        private List<ColumnDef> DocColumns(bool withScreen, bool withCurrency)
+        private List<ColumnDef> DocColumns(bool withScreen, bool withAmount)
         {
             List<ColumnDef> columns = new List<ColumnDef>();
             if (withScreen) { columns.Add(Col("Screen", "VAS_195_Screen", "Screen", COLTYPE_SCREEN, 1.2m)); }
 
-            /* Wider without a Screen column of its own: the document cell then carries
-               the screen name on a second line, and a window name is routinely longer
-               than the document number above it. */
-            columns.Add(Col("Doc_Number", "DocumentNo", "Document No", COLTYPE_DOC,
-                withScreen ? 1.2m : 1.7m));
+            columns.Add(Col("Doc_Number", "DocumentNo", "Document No", COLTYPE_DOC, 1.2m));
             columns.Add(Col("Doc_Date", "VAS_195_AccountDate", "Account Date", COLTYPE_DATE, 0.9m));
             columns.Add(Col("Doc_Type", "VAS_195_DocumentType", "Document Type", COLTYPE_TEXT, 1.1m));
-            columns.Add(Col("Doc_Status", "VAS_195_DocStatus", "Status", COLTYPE_BADGE, 0.8m));
+
+            /* Wider than it was: it carries a word now rather than a two-letter code. */
+            columns.Add(Col("Doc_Status", "VAS_195_DocStatus", "Status", COLTYPE_BADGE, 1.0m));
             columns.Add(Col("Org_Name", "VAS_195_Organization", "Organization", COLTYPE_TEXT, 1.0m));
             columns.Add(Col("Partner_Name", "VAS_195_BusinessPartner", "Business Partner", COLTYPE_TEXT, 1.3m));
-            if (withCurrency) { columns.Add(Col("Currency_Iso", "VAS_195_Currency", "Currency", COLTYPE_TEXT, 0.5m)); }
-            columns.Add(Col("Doc_Amount", "VAS_195_Amount", "Amount", COLTYPE_DOCAMOUNT, 1.0m));
+
+            if (withAmount)
+            {
+                ColumnDef amount = Col("Doc_Amount", "VAS_195_Amount", "Amount", COLTYPE_DOCAMOUNT, 1.1m);
+                amount.SymbolKey = "Currency_Symbol";
+                columns.Add(amount);
+            }
+
             return columns;
         }
 
@@ -1209,12 +1266,15 @@ namespace VASLogic.Models
                     ? a + ".DocStatus IN (" + DOCSTATUS_FinalList + ") AND "
                     : "";
 
+                /* SELECT before WHERE - see the note in Spec01. */
+                string select = DocBranchSelect(c, d, suffix, parameters);
+
                 string where = a + ".IsActive='Y' AND " + completed
                     + "COALESCE(" + a + ".Posted,'N')<>'Y'"
                     + " AND " + PeriodWhere(c, a, d.DateColumn, suffix, parameters)
                     + ScreenFilter(d);
 
-                string branch = DocBranchSelect(d, suffix, parameters) + " WHERE " + where;
+                string branch = select + " WHERE " + where;
 
                 if (i > 0) { sql.Append(" UNION ALL "); }
                 sql.Append(SecureBranch(c, branch, a));
@@ -1701,7 +1761,7 @@ namespace VASLogic.Models
                        io.DateAcct AS Doc_Date,
                        COALESCE(bp.Name,N'') AS Partner_Name,
                        COALESCE(prod.Name,N'') AS Product_Name,
-                       COALESCE(uom.UOMSymbol,N'') AS Uom_Symbol,
+                       COALESCE(uom.Name,uom.UOMSymbol,N'') AS Uom_Name,
                        ABS(COALESCE(iol.MovementQty,0)) AS Received_Qty
                 FROM M_InOutLine iol
                 INNER JOIN M_InOut io ON (io.M_InOut_ID=iol.M_InOut_ID)
@@ -1727,7 +1787,7 @@ namespace VASLogic.Models
             columns.Add(Col("Doc_Date", "VAS_195_AccountDate", "Account Date", COLTYPE_DATE, 0.9m));
             columns.Add(Col("Partner_Name", "VAS_195_BusinessPartner", "Business Partner", COLTYPE_TEXT, 1.4m));
             columns.Add(Col("Product_Name", "VAS_195_Product", "Product", COLTYPE_TEXT, 1.5m));
-            columns.Add(Col("Uom_Symbol", "VAS_195_Uom", "UOM", COLTYPE_TEXT, 0.5m));
+            columns.Add(Col("Uom_Name", "VAS_195_Uom", "UOM", COLTYPE_TEXT, 0.9m));
             columns.Add(Col("Received_Qty", "VAS_195_ReceivedQty", "Received", COLTYPE_QTY, 0.8m));
 
             return Spec(sql, "iol", "io.DateAcct DESC,io.DocumentNo DESC,iol.M_InOutLine_ID DESC",
@@ -1831,7 +1891,7 @@ namespace VASLogic.Models
                   AND " + unmatched + ">" + QTY_TOLERANCE;
 
             List<ColumnDef> columns = new List<ColumnDef>();
-            columns.Add(Col("Doc_Number", "VAS_195_InvoiceNo", "Invoice No", COLTYPE_DOC, 1.1m));
+            columns.Add(Col("Doc_Number", "VAS_195_InvoiceNo", "Invoice No", COLTYPE_DOC, 0.9m));
             columns.Add(Col("Trx_Date", "DateInvoiced", "Invoice Date", COLTYPE_DATE, 0.9m));
             columns.Add(Col("Doc_Date", "VAS_195_AccountDate", "Account Date", COLTYPE_DATE, 0.9m));
             columns.Add(Col("Partner_Name", "VAS_195_BusinessPartner", "Business Partner", COLTYPE_TEXT, 1.2m));
@@ -1839,7 +1899,13 @@ namespace VASLogic.Models
             columns.Add(Col("Invoiced_Qty", "VAS_195_InvoicedQty", "Invoiced", COLTYPE_QTY, 0.8m));
             columns.Add(Col("Matched_Qty", "VAS_195_MatchedQty", "Matched", COLTYPE_QTY, 0.8m));
             columns.Add(Col("Unmatched_Qty", "VAS_195_UnmatchedQty", "Unmatched", COLTYPE_QTY, 0.8m));
-            columns.Add(Col("Match_Requirement", "VAS_195_MatchRequirement", "Match Req.", COLTYPE_BADGE, 0.8m));
+            /* Optional by nature: MatchRequirementI is left unset by tenants that do not
+               drive matching from the invoice, and a badge column of blanks is worse than
+               no column. Hidden only when it is empty across the WHOLE result, never just
+               the page - see DropEmptyColumns. */
+            ColumnDef matchReq = Col("Match_Requirement", "VAS_195_MatchRequirement", "Match Req.", COLTYPE_BADGE, 0.8m);
+            matchReq.HideWhenEmpty = true;
+            columns.Add(matchReq);
             columns.Add(Col("Doc_Amount", "VAS_195_LineAmount", "Line Amount", COLTYPE_DOCAMOUNT, 1.0m));
 
             return Spec(sql, "il", "i.DateAcct DESC,i.DocumentNo DESC,il.C_InvoiceLine_ID DESC",
@@ -2861,12 +2927,15 @@ namespace VASLogic.Models
                     ? "(" + a + ".DocStatus IN (" + DOCSTATUS_OpenList + ") OR COALESCE(" + a + ".Processed,'N')='N')"
                     : a + ".DocStatus IN (" + DOCSTATUS_OpenList + ")";
 
+                /* SELECT before WHERE - see the note in Spec01. */
+                string select = DocBranchSelect(c, d, suffix, parameters);
+
                 string where = a + ".IsActive='Y' AND " + a + ".DocStatus NOT IN (" + DOCSTATUS_DeadList + ")"
                     + " AND " + pending
                     + " AND " + PeriodWhere(c, a, d.DateColumn, suffix, parameters)
                     + ScreenFilter(d);
 
-                string branch = DocBranchSelect(d, suffix, parameters) + " WHERE " + where;
+                string branch = select + " WHERE " + where;
 
                 if (i > 0) { sql.Append(" UNION ALL "); }
                 sql.Append(SecureBranch(c, branch, a));
@@ -2879,8 +2948,10 @@ namespace VASLogic.Models
                every branch, which is what lets a UNION's ORDER BY reach it, and the
                screen name itself rides under each document number.
 
-               No Currency column: none of these three tables has a C_Currency_ID, so it
-               could only ever render blank. */
+               No Amount column: none of these three tables carries a value the branch
+               builder recognises, so it would read 0.00 on every row - and with no amount
+               there is no currency to name either. The quantities under check 17 are
+               where an inventory document's numbers actually live. */
             return Spec(sql.ToString(), "", "Screen_Sort,Doc_Date DESC,Doc_Number DESC",
                 parameters, DocColumns(false, false));
         }
@@ -3288,8 +3359,8 @@ namespace VASLogic.Models
                quantities open the "by how much" half. Trailing the quantities it split
                them from the difference they explain. */
             columns.Add(Col("Doc_Status", "VAS_195_DocStatus", "Status", COLTYPE_BADGE, 1.0m));
-            columns.Add(Col("Book_Qty", "VAS_195_BookQty", "Book", COLTYPE_QTY, 0.7m));
-            columns.Add(Col("Count_Qty", "VAS_195_CountQty", "Count", COLTYPE_QTY, 0.7m));
+            columns.Add(Col("Book_Qty", "VAS_195_QuantityBook", "Quantity Book", COLTYPE_QTY, 1.0m));
+            columns.Add(Col("Count_Qty", "VAS_195_QuantityCount", "Quantity Count", COLTYPE_QTY, 1.0m));
             columns.Add(Col("Difference_Qty", "VAS_195_DifferenceQty", "Difference", COLTYPE_QTY, 0.8m));
 
             return Spec(sql, "il", "i.MovementDate DESC,i.DocumentNo DESC,il.M_InventoryLine_ID DESC",
@@ -3854,16 +3925,44 @@ namespace VASLogic.Models
         /// its translated display name.
         ///
         /// No required/ignored base-type policy exists in this installation, so ALL open
-        /// base types are shown - the documented default. The label comes from
-        /// AD_Ref_List for the session language, never from a hard-coded map: DocBaseType
-        /// stores a two-letter code that means nothing to a reader.
+        /// base types are shown - the documented default. Both the base type and the
+        /// period status come from AD_Ref_List for the session language, never from a
+        /// hard-coded map: each stores a code of one or two letters that means nothing to
+        /// a reader.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <returns>Populated <see cref="DetailSpec"/>.</returns>
         private DetailSpec Spec22(CheckContext c)
         {
             List<SqlParameter> parameters = Binds();
-            parameters.Add(new SqlParameter("@AD_Language", ctxLanguage(c)));
+
+            /* Both list columns go through the shared resolver now. The base type's
+               reference is taken from C_DocType.DocBaseType rather than from
+               C_PeriodControl's own column: the control table MIRRORS the code, and where
+               its column carries no AD_Reference_Value_ID the lookup matched nothing and
+               the "name" quietly fell back to the very code it was meant to replace.
+               C_DocType is where that list is actually defined.
+
+               Both binds are added before the statement is built - the joins are in the
+               FROM clause, ahead of everything the WHERE binds. */
+            string typeExpr = "COALESCE(pc.DocBaseType,N'')";
+            string typeJoin = ListNameJoin("bt", "bttrl", "pc.DocBaseType",
+                "C_DocType", "DocBaseType", "@AD_LanguageB");
+            if (typeJoin.Length > 0)
+            {
+                parameters.Add(new SqlParameter("@AD_LanguageB", ctxLanguage(c)));
+                typeExpr = "COALESCE(bttrl.Name,bt.Name,pc.DocBaseType,N'')";
+            }
+
+            string statusExpr = "COALESCE(pc.PeriodStatus,N'')";
+            string statusJoin = ListNameJoin("ps", "pstrl", "pc.PeriodStatus",
+                "C_PeriodControl", "PeriodStatus", "@AD_LanguageP");
+            if (statusJoin.Length > 0)
+            {
+                parameters.Add(new SqlParameter("@AD_LanguageP", ctxLanguage(c)));
+                statusExpr = "COALESCE(pstrl.Name,ps.Name,pc.PeriodStatus,N'')";
+            }
+
             parameters.Add(new SqlParameter("@C_Period_ID", c.Period.C_Period_ID));
             parameters.Add(new SqlParameter("@PeriodStatus", PERIODSTATUS_Open));
 
@@ -3871,23 +3970,22 @@ namespace VASLogic.Models
                 SELECT 0 AS " + TECH_TABLE + @",
                        0 AS " + TECH_RECORD + @",
                        0 AS " + TECH_WINDOW + @",
-                       pc.DocBaseType AS Base_Type,
-                       COALESCE(rlt.Name,rl.Name,pc.DocBaseType) AS Base_Type_Name,
-                       pc.PeriodStatus AS Period_Status,
+                       " + typeExpr + @" AS Base_Type_Name,
+                       " + statusExpr + @" AS Period_Status,
                        pc.Updated AS Updated_On,
                        COALESCE(u.Name,N'') AS Updated_By
                 FROM C_PeriodControl pc
-                LEFT OUTER JOIN AD_Ref_List rl ON (rl.Value=pc.DocBaseType AND rl.IsActive='Y' AND rl.AD_Reference_ID=(SELECT c2.AD_Reference_Value_ID FROM AD_Column c2 INNER JOIN AD_Table t2 ON (t2.AD_Table_ID=c2.AD_Table_ID) WHERE t2.TableName='C_PeriodControl' AND c2.ColumnName='DocBaseType' AND c2.IsActive='Y'))
-                LEFT OUTER JOIN AD_Ref_List_Trl rlt ON (rlt.AD_Ref_List_ID=rl.AD_Ref_List_ID AND rlt.AD_Language=@AD_Language AND rlt.IsActive='Y')
-                LEFT OUTER JOIN AD_User u ON (u.AD_User_ID=pc.UpdatedBy)
+                LEFT OUTER JOIN AD_User u ON (u.AD_User_ID=pc.UpdatedBy)" + typeJoin + statusJoin + @"
                 WHERE pc.IsActive='Y'
                   AND pc.C_Period_ID=@C_Period_ID
                   AND pc.PeriodStatus=@PeriodStatus";
 
+            /* No Code column. It existed to show what the name could not, and now that the
+               name resolves there is nothing left for it to add - every row of this check
+               is one base type, named. */
             List<ColumnDef> columns = new List<ColumnDef>();
-            columns.Add(Col("Base_Type", "VAS_195_BaseTypeCode", "Code", COLTYPE_TEXT, 0.5m));
             columns.Add(Col("Base_Type_Name", "VAS_195_BaseTypeName", "Document Base Type", COLTYPE_TEXT, 2.0m));
-            columns.Add(Col("Period_Status", "VAS_195_PeriodStatus", "Status", COLTYPE_BADGE, 0.8m));
+            columns.Add(Col("Period_Status", "VAS_195_PeriodStatus", "Status", COLTYPE_BADGE, 1.0m));
             columns.Add(Col("Updated_On", "VAS_195_LastUpdated", "Last Updated", COLTYPE_DATE, 1.0m));
             columns.Add(Col("Updated_By", "VAS_195_UpdatedBy", "Updated By", COLTYPE_TEXT, 1.2m));
 

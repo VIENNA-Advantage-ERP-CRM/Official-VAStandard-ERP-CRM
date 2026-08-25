@@ -758,10 +758,18 @@ namespace VASLogic.Models
                 return result;
             }
 
-            result.Columns = spec.Columns;
-
             result.Total = CountOf(ctx, spec);
-            if (result.Total == 0) { return result; }
+            if (result.Total == 0)
+            {
+                /* Nothing to measure emptiness against, so the declared set stands. */
+                result.Columns = spec.Columns;
+                return result;
+            }
+
+            /* Prunes the spec's list, so the columns the client is told about and the
+               cells PageOf goes on to materialise are the same set. */
+            DropEmptyColumns(ctx, spec);
+            result.Columns = spec.Columns;
 
             int totalPages = (result.Total + pageSize - 1) / pageSize;
             if (pageNo > totalPages) { pageNo = totalPages; }
@@ -830,6 +838,75 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// Drops every column a check marked <see cref="ColumnDef.HideWhenEmpty"/> that
+        /// turns out to carry no value anywhere in the result.
+        ///
+        /// DECIDED OVER THE WHOLE SET, not the page, and that is the point. Testing the
+        /// page would let a column appear on page 2 and vanish on page 3, moving every
+        /// other column sideways under the reader - the same instability the grid's fixed
+        /// width exists to prevent. One answer per request, or none.
+        ///
+        /// It costs ONE query, and only for a check that asks: the flags are aggregated in
+        /// a single pass over the same derived table the row count already scans, rather
+        /// than one probe per column. A check with no such column runs nothing extra.
+        ///
+        /// TEXT COLUMNS ONLY. The emptiness test compares against N'', which is a type
+        /// error on a numeric or date column - a column of zeros or of nulls is a
+        /// different question, and one no check has asked yet.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="spec">Detail specification, whose column list is pruned in place.</param>
+        private void DropEmptyColumns(Ctx ctx, DetailSpec spec)
+        {
+            List<ColumnDef> candidates = new List<ColumnDef>();
+            for (int i = 0; i < spec.Columns.Count; i++)
+            {
+                ColumnDef column = spec.Columns[i];
+                if (column.HideWhenEmpty && IsSafeIdentifier(column.Key)) { candidates.Add(column); }
+            }
+
+            if (candidates.Count == 0) { return; }
+
+            StringBuilder select = new StringBuilder();
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                if (select.Length > 0) { select.Append(","); }
+
+                select.Append("SUM(CASE WHEN COALESCE(CheckRows.").Append(candidates[i].Key)
+                      .Append(",N'')<>N'' THEN 1 ELSE 0 END) AS Filled_")
+                      .Append(i.ToString(CultureInfo.InvariantCulture));
+            }
+
+            string sql = "SELECT " + select.ToString()
+                       + " FROM (" + Secure(ctx, spec) + ") CheckRows";
+
+            DataSet ds;
+            try
+            {
+                ds = DB.ExecuteDataset(sql, spec.Params.ToArray(), null);
+            }
+            catch (Exception ex)
+            {
+                /* A column that cannot be tested is KEPT. Hiding it on the strength of a
+                   failed query would remove data on no evidence at all. */
+                Log.Log(Level.WARNING, "VAS_195: emptiness probe failed; every column is kept", ex);
+                return;
+            }
+
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { return; }
+
+            DataRow row = ds.Tables[0].Rows[0];
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                string alias = "Filled_" + i.ToString(CultureInfo.InvariantCulture);
+                if (!row.Table.Columns.Contains(alias)) { continue; }
+
+                if (Util.GetValueOfInt(row[alias]) == 0) { spec.Columns.Remove(candidates[i]); }
+            }
+        }
+
+        /// <summary>
         /// One page of a check's rows, materialised into the generic cell contract.
         ///
         /// Every declared column is read BY NAME from the result, so a spec that
@@ -865,6 +942,21 @@ namespace VASLogic.Models
                     ColumnDef column = spec.Columns[c];
                     if (!dt.Columns.Contains(column.Key)) { continue; }
                     row.Cells[column.Key] = NormalizeCell(dr[column.Key]);
+                }
+
+                /* A column may need a SIBLING value it does not itself display - an
+                   amount's currency symbol. Those cells are carried too, or the renderer
+                   would reach for a value the page never sent. Kept in a second pass so a
+                   companion named by an early column is still picked up when the column
+                   supplying it is declared later, or not declared at all. */
+                for (int c = 0; c < spec.Columns.Count; c++)
+                {
+                    string companion = spec.Columns[c].SymbolKey;
+                    if (string.IsNullOrEmpty(companion)) { continue; }
+                    if (row.Cells.ContainsKey(companion)) { continue; }
+                    if (!dt.Columns.Contains(companion)) { continue; }
+
+                    row.Cells[companion] = NormalizeCell(dr[companion]);
                 }
 
                 /* Reserved technical aliases - present only on document-backed rows. */
@@ -2034,6 +2126,35 @@ namespace VASLogic.Models
             /// Default false, so a check has to opt out deliberately.
             /// </summary>
             public bool HideScreenName { get; set; }
+
+            /// <summary>
+            /// Amount columns only: the key of a SIBLING cell holding this row's currency
+            /// symbol, which the client prefixes to the formatted figure.
+            ///
+            /// A document amount is in the DOCUMENT's currency, not the ledger's, so the
+            /// symbol belongs to the row rather than to the dialog - which is why it is a
+            /// cell reference and not a fixed string. Naming it here lets a check retire
+            /// its separate Currency column: a bare ISO code repeated down its own column
+            /// costs width to say what one character beside the figure says better.
+            ///
+            /// Empty means no prefix, which is right for a column already in the
+            /// accounting schema's own currency.
+            /// </summary>
+            public string SymbolKey { get; set; }
+
+            /// <summary>
+            /// Drops this column entirely when it carries no value anywhere in the result
+            /// - not merely on the page being viewed. See
+            /// <see cref="DropEmptyColumns"/>.
+            ///
+            /// For an OPTIONAL fact: a column whose source exists in the dictionary but is
+            /// left unset by this tenant's process would otherwise take width to show a
+            /// blank cell on every row. A column that is sometimes empty must NOT set
+            /// this - the blank is then information, and the column has to hold its place.
+            ///
+            /// Text columns only.
+            /// </summary>
+            public bool HideWhenEmpty { get; set; }
         }
 
         /// <summary>One detail row: declared cells plus the technical navigation fields.</summary>

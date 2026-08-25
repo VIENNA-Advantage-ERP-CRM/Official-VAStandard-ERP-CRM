@@ -281,16 +281,25 @@
         }
 
         /* An accounting-schema-currency amount, at the schema's own precision. */
-        function formatAmount(value, withSymbol) {
+        /* The SIGN leads, then the symbol, then the digits: "-$18,536.000", never
+           "$-18,536.000". A minus wedged between a currency and its number reads as a
+           typo, and it is the one part of an amount a reader must not have to look for.
+
+           symbolText overrides the dialog's own currency for a row carrying its own -
+           pass '' for none. Left undefined it falls back to withSymbol, so the two older
+           call shapes are unchanged. */
+        function formatAmount(value, withSymbol, symbolText) {
             var n = Number(value || 0);
             if (!isFinite(n)) { n = 0; }
             var p = precision();
 
             var sign = n < 0 ? '-' : '';
+            var sym = symbolText != null ? String(symbolText) : (withSymbol ? symbol() : '');
+
             var text = Math.abs(n).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: p, maximumFractionDigits: p
             });
-            return sign + (withSymbol ? symbol() : '') + text;
+            return sign + sym + text;
         }
 
         /* Quantities carry their own decimals, not a currency precision. */
@@ -918,17 +927,17 @@
             loadModalPage();
         }
 
-        /* "<Period> · <Accounting schema> (<ISO>)" - the three things that scope every
-           figure in the dialog. */
+        /* The period, and nothing else.
+
+           The accounting schema and its currency used to follow it. They were dropped for
+           two reasons: there is only ever ONE primary schema, so naming it on every
+           dialog told the reader nothing they could act on - and where a schema was itself
+           named after its currency the line read "... US Dollar (USD) (USD)", which is
+           the kind of detail that makes a header look unmaintained. Rows that need a
+           currency now carry it beside their own amount, where it differs per document
+           and therefore means something. */
         function modalSubtitle() {
-            var parts = [];
-            if (_periodName) { parts.push(_periodName); }
-
-            if (_schema && _schema.Name) {
-                parts.push(_schema.Name + (_schema.Iso ? ' (' + _schema.Iso + ')' : ''));
-            }
-
-            return parts.join(' · ');
+            return _periodName || '';
         }
 
         function closeModal() {
@@ -1101,7 +1110,15 @@
 
             if (type === 'DATE') { return textCell(formatDate(raw)); }
             if (type === 'AMOUNT') { return textCell(formatAmount(raw, true), 'vas-195-dcell-num vas-195-dcell-amt'); }
-            if (type === 'DOCAMOUNT') { return textCell(formatAmount(raw, false), 'vas-195-dcell-num vas-195-dcell-amt'); }
+
+            /* A document amount is in the DOCUMENT's currency, so its symbol comes from a
+               sibling cell the column names rather than from the dialog's own base
+               currency. A check that declares no SymbolKey renders the bare figure. */
+            if (type === 'DOCAMOUNT') {
+                var rowSymbol = column.SymbolKey ? (cells[column.SymbolKey] || '') : '';
+                return textCell(formatAmount(raw, false, rowSymbol),
+                    'vas-195-dcell-num vas-195-dcell-amt');
+            }
             if (type === 'QTY') { return textCell(formatQty(raw), 'vas-195-dcell-num'); }
             if (type === 'NUMBER') { return textCell(formatNumber(raw), 'vas-195-dcell-num'); }
 
