@@ -10,7 +10,7 @@
 
 
 4.	For the database, we assumed you already setup the database and hosting files if not then please refer to the below link:
-  [Hosting files and database 5.x](https://sourceforge.net/projects/erp-crm-advant/files/VIENNA%20Advantage%20HTML5%20Version/VIENNA%20Advantage%20ERP/)
+  [Hosting files and database { 6.x or 5.x } ](https://onfinity.io/installation-packages.php)
 
 
 5.	After download the code, Open the application in Visual Studio 2019 or latest version and go to the ViennaAdvantageWeb folder in the project shown as below.
@@ -30,13 +30,13 @@
       Password: =XM#@VuNM2
 
 
-7.	Go to the path /Required Files for Partner-kit Setup/5.x and copy all DLLs from “CommonDlls” folder and paste them into the “DLL” folder within ViennaAdvantageWeb. As shown in below pic.
+7.	Go to the path /Required Files for Partner-kit Setup/{ 6.x or 5.x } and copy all DLLs from “CommonDlls” folder and paste them into the “DLL” folder within ViennaAdvantageWeb. As shown in below pic.
 
  ![image](https://github.com/user-attachments/assets/afb00e13-422c-49ed-97e5-0380631bab0d)
 
 
 
-7.	Navigate to /Required Files for Partner-kit Setup/5.x/ViennaBase in FTP and select the version that matches the Vienna Advantage Base Files module version in database that you setup in step 3.  
+7.	Navigate to /Required Files for Partner-kit Setup/{6.x or 5.x}/ViennaBase in FTP and select the version that matches the Vienna Advantage Base Files module version in database that you setup in step 3.  
 
     To find the module version, search the Module Management screen from Menu after login with Role: “System Administration”. As shown in below pic.
     ![image](https://github.com/user-attachments/assets/4bdc75e2-a667-43f2-9b20-3d65c370395f)
@@ -46,7 +46,7 @@
   	
     ![image](https://github.com/user-attachments/assets/66781d89-b423-4dcf-a564-d25aaedb07b5)
 
-9.	Now, go to path /Required Files for Partner-kit Setup/5.x/ViennaBase.
+9.	Now, go to path /Required Files for Partner-kit Setup/{6.x or 5.x}/ViennaBase.
     Under a particular version it will show two folder Htmlbin and Area as show in below screen. Copy the DLLs from the Htmlbin folder and paste them into the DLL folder in ViennaAdvantageWeb. Similarly, copy the folders from the Areas folder and paste them into the Areas folder in ViennaAdvantageWeb. As shown in below pics.
 
 •	Copy dll from Htmlbin folder
@@ -58,7 +58,7 @@
 
 
 
-9.	Navigate to folder “/Required Files for Partner-kit Setup/5.x/VIS” in FTP, and select the version based on the Vienna Advantage Framework module version in your database.
+9.	Navigate to folder “/Required Files for Partner-kit Setup/{6.x or 5.x}/VIS” in FTP, and select the version based on the Vienna Advantage Framework module version in your database.
     
     To find the module version, follow Step - 7.
 
