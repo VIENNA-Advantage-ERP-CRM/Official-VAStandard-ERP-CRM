@@ -45,16 +45,27 @@ namespace VASLogic.Models
     ///
     ///               DOCUMENT DISCOVERY. Checks 01 and 02 do NOT work from a list of
     ///               tables kept in this file. They ask the Application Dictionary which
-    ///               tables behave like documents - a DocStatus column, a key, a usable
-    ///               date, and at least one active menu-reachable window - which is the
-    ///               same definition VAS_197 and VAS_198 use, so the checklist covers
-    ///               exactly what those widgets cover. A hand-kept list was the earlier
-    ///               design and it was wrong in the way hand-kept lists always are:
-    ///               whatever nobody remembered to add simply never appeared, and
-    ///               nothing said so. The menu requirement is what keeps staging and
-    ///               workflow tables out; they carry a DocStatus but no user opens one.
-    ///               Check 15 keeps a fixed list, because "does this document move
-    ///               stock" is not a question the dictionary answers.
+    ///               tables behave like documents - a key, a usable date, at least one
+    ///               active menu-reachable window, and EITHER a DocStatus column OR a
+    ///               Posted column - which is the union of what VAS_197 and VAS_198
+    ///               recognise, so the checklist covers everything those widgets cover.
+    ///               A hand-kept list was the earlier design and it was wrong in the way
+    ///               hand-kept lists always are: whatever nobody remembered to add simply
+    ///               never appeared, and nothing said so. The menu requirement is what
+    ///               keeps staging and workflow tables out; they carry a DocStatus but no
+    ///               user opens one. Check 15 keeps a fixed list, because "does this
+    ///               document move stock" is not a question the dictionary answers.
+    ///
+    ///               DocStatus is deliberately NOT the entry ticket. Requiring it was
+    ///               what made check 02 disagree with the VAS_198 widget: the accounting
+    ///               tables that post without ever running a document workflow -
+    ///               M_MatchInv and M_MatchPO are the obvious ones - carry a Posted
+    ///               column and a Posted button on their window but no DocStatus at all,
+    ///               so discovery dropped them in silence and the checklist reported
+    ///               fewer unposted entries than the widget beside it. Each check now
+    ///               states which column it needs (01 and 15 need DocStatus, 02 needs
+    ///               Posted) and the branch builder emits a typed literal for whichever
+    ///               of the two a given table does not have.
     ///
     ///               UNION CHECKS. Checks 01, 02, 04, 11 and 15 span several physical
     ///               tables. Each branch is built and secured on its OWN main alias and
@@ -64,7 +75,9 @@ namespace VASLogic.Models
     ///               play checks 01 and 02 can reach a few dozen branches, which is the
     ///               cost of covering everything rather than a chosen few.
     /// Chronological development:
-    ///   VAI154      2026-08-24 Created
+    ///   VAI145      2026-08-24 Created
+    ///   VAI145      2026-08-25 Discovery admits Posted-only tables so check 02 agrees
+    ///                          with the VAS_198 widget
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -115,13 +128,23 @@ namespace VASLogic.Models
         /// Every table in this installation that behaves like a document, discovered
         /// from the Application Dictionary rather than from a list maintained here.
         ///
-        /// A table qualifies when it has a DocStatus column, a key column, a usable date
-        /// column, and at least one active, menu-reachable window over it - the same
-        /// definition of "a document with a screen" that VAS_197 and VAS_198 use, so the
-        /// checklist covers exactly what those widgets cover rather than a hand-kept
-        /// subset that silently omits whatever nobody remembered to add. The menu
-        /// requirement is what keeps staging and workflow tables out: they carry a
-        /// DocStatus but no user ever opens one.
+        /// A table qualifies when it has a key column, a usable date column, at least one
+        /// active menu-reachable window over it, and EITHER a DocStatus column OR a
+        /// Posted column. That is the UNION of what VAS_197 and VAS_198 recognise, so the
+        /// checklist covers everything those widgets cover rather than a hand-kept subset
+        /// that silently omits whatever nobody remembered to add. The menu requirement is
+        /// what keeps staging and workflow tables out: they carry a DocStatus but no user
+        /// ever opens one.
+        ///
+        /// The OR is the whole point of this revision. DocStatus alone used to be the
+        /// entry ticket, and it quietly excluded every table that posts to the ledger
+        /// without running a document workflow - M_MatchInv and M_MatchPO carry a Posted
+        /// column and a Posted button on their window but have no DocStatus whatsoever.
+        /// Check 02 therefore reported fewer unposted entries than the VAS_198 widget
+        /// sitting on the same dashboard, which is exactly the kind of disagreement a
+        /// close checklist cannot afford. Discovery now admits them; the checks
+        /// themselves say which of the two columns they require, and the branch builder
+        /// emits a typed literal wherever a table lacks one.
         ///
         /// Still server-controlled, and still nothing the browser can influence - the
         /// browser sends a check code, and every table name reaching SQL comes from
@@ -145,6 +168,7 @@ namespace VASLogic.Models
                costs one query for the whole card; probing them per table would cost one
                per table per check. */
             AppendProbe(select, "DocumentNo");
+            AppendProbe(select, "DocStatus");
             AppendProbe(select, "Posted");
             AppendProbe(select, "Processed");
             AppendProbe(select, "C_BPartner_ID");
@@ -164,7 +188,8 @@ namespace VASLogic.Models
                      silently discovers nothing at all. VAS_197 and VAS_198 guard it the
                      same way. */
                   AND COALESCE(t.IsView,'N')='N'
-                  AND EXISTS(SELECT 1 FROM AD_Column dc WHERE dc.AD_Table_ID=t.AD_Table_ID AND dc.ColumnName='DocStatus' AND dc.IsActive='Y')
+                  AND (EXISTS(SELECT 1 FROM AD_Column dc WHERE dc.AD_Table_ID=t.AD_Table_ID AND dc.ColumnName='DocStatus' AND dc.IsActive='Y')
+                       OR EXISTS(SELECT 1 FROM AD_Column ac WHERE ac.AD_Table_ID=t.AD_Table_ID AND ac.ColumnName='Posted' AND ac.IsActive='Y'))
                   AND EXISTS(SELECT 1 FROM AD_Tab tab INNER JOIN AD_Window w ON (w.AD_Window_ID=tab.AD_Window_ID) INNER JOIN AD_Menu m ON (m.AD_Window_ID=w.AD_Window_ID) WHERE tab.AD_Table_ID=t.AD_Table_ID AND tab.IsActive='Y' AND w.IsActive='Y' AND m.IsActive='Y')
                 GROUP BY t.AD_Table_ID,t.TableName
                 ORDER BY t.TableName");
@@ -221,9 +246,8 @@ namespace VASLogic.Models
         /// is gone until its behaviour against this installation's actual AD_Tab data
         /// has been confirmed rather than assumed.
         ///
-        /// The PRIMARY screen is the one whose tab carries no filter of its own - the
-        /// window that shows the whole table - falling back to the first screen found.
-        /// That is the right window to open a record on and the right name to group by.
+        /// The PRIMARY screen is chosen by <see cref="PickPrimaryScreen"/>: it is the
+        /// right window to open a record on and the right name to group by.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="tables">Discovered tables, labelled in place.</param>
@@ -244,11 +268,7 @@ namespace VASLogic.Models
                     continue;
                 }
 
-                ScreenDef primary = screens[0];
-                for (int s = 0; s < screens.Count; s++)
-                {
-                    if (string.IsNullOrEmpty(screens[s].WhereClause)) { primary = screens[s]; break; }
-                }
+                ScreenDef primary = PickPrimaryScreen(screens);
 
                 table.AD_Window_ID = primary.AD_Window_ID;
                 table.ScreenLabel = primary.WindowName;
@@ -258,6 +278,45 @@ namespace VASLogic.Models
             }
 
             return tables;
+        }
+
+        /// <summary>
+        /// Which of a table's screens speaks for it.
+        ///
+        /// Two properties matter, in this order. First, does the tab actually carry the
+        /// POSTED BUTTON: a reader following up an unposted-entry row is going there to
+        /// post something, so a window that cannot post is the wrong place to send them -
+        /// and it is the same window VAS_198 names for the same record, which is what
+        /// makes the checklist row and the widget row agree by sight and not only by
+        /// count. Second, and only among equals on the first, does the tab carry NO
+        /// filter of its own - that is the window showing the whole table rather than one
+        /// slice of it.
+        ///
+        /// The list arrives ordered by window name, so where neither property separates
+        /// the candidates the first one wins and the choice stays stable between requests.
+        /// </summary>
+        /// <param name="screens">A table's screens, in the query's stable order.</param>
+        /// <returns>The screen to label, group and zoom by (never null).</returns>
+        private ScreenDef PickPrimaryScreen(List<ScreenDef> screens)
+        {
+            ScreenDef posted = null;
+            ScreenDef unfiltered = null;
+
+            for (int s = 0; s < screens.Count; s++)
+            {
+                ScreenDef screen = screens[s];
+                bool noFilter = string.IsNullOrEmpty(screen.WhereClause);
+
+                if (screen.HasPostedField)
+                {
+                    if (noFilter) { return screen; }
+                    if (posted == null) { posted = screen; }
+                }
+                else if (noFilter && unfiltered == null) { unfiltered = screen; }
+            }
+
+            if (posted != null) { return posted; }
+            return unfiltered != null ? unfiltered : screens[0];
         }
 
         /// <summary>
@@ -291,7 +350,14 @@ namespace VASLogic.Models
                        tab.SeqNo AS Tab_Seq_No,
                        COALESCE(tab.WhereClause,N'') AS Tab_Where_Clause,
                        w.AD_Window_ID AS AD_Window_ID,
-                       COALESCE(wtrl.Name,w.DisplayName,w.Name,N'') AS Window_Name
+                       COALESCE(wtrl.Name,w.DisplayName,w.Name,N'') AS Window_Name,
+                       (SELECT COUNT(1)
+                          FROM AD_Field pf
+                          INNER JOIN AD_Column pc ON (pc.AD_Column_ID=pf.AD_Column_ID)
+                         WHERE pf.AD_Tab_ID=tab.AD_Tab_ID
+                           AND pf.IsActive='Y'
+                           AND pc.IsActive='Y'
+                           AND pc.ColumnName='Posted') AS Posted_Field_Count
                 FROM AD_Tab tab
                 INNER JOIN AD_Window w ON (w.AD_Window_ID=tab.AD_Window_ID)
                 INNER JOIN AD_Menu m ON (m.AD_Window_ID=w.AD_Window_ID)
@@ -330,6 +396,7 @@ namespace VASLogic.Models
                 screen.AD_Window_ID = windowId;
                 screen.WindowName = Util.GetValueOfString(dr["Window_Name"]);
                 screen.WhereClause = ResolveWhereClause(ctx, Util.GetValueOfString(dr["Tab_Where_Clause"]));
+                screen.HasPostedField = Util.GetValueOfInt(dr["Posted_Field_Count"]) > 0;
 
                 screens.Add(screen);
             }
@@ -451,6 +518,7 @@ namespace VASLogic.Models
             def.AmountColumn = FirstProbed(row, AmountColumnPreference);
             def.HasAmount = IsSafeIdentifier(def.AmountColumn);
 
+            def.HasDocStatus = Probed(row, "DocStatus");
             def.HasPosted = Probed(row, "Posted");
             def.HasProcessed = Probed(row, "Processed");
             def.HasDocumentNo = Probed(row, "DocumentNo");
@@ -531,17 +599,22 @@ namespace VASLogic.Models
         /// <summary>
         /// The discovered documents one check should examine.
         ///
-        /// Check 01 takes everything - anything with a DocStatus can be left unfinished.
+        /// Check 01 takes everything with a DocStatus - "unprocessed" is a statement
+        /// about a document workflow, and a table without one has no workflow to be
+        /// unfinished in. A Posted-only table is not a draft, it is a posting artefact.
         /// Check 02 takes only what carries a Posted column: a table without one cannot
         /// be judged unposted, and treating its absence as "not posted" would
-        /// manufacture failures out of documents that never post at all.
-        /// Check 15 takes the inventory movement documents.
+        /// manufacture failures out of documents that never post at all. It does NOT
+        /// require a DocStatus - that requirement is what used to hide M_MatchInv and
+        /// M_MatchPO from it while the VAS_198 widget listed them.
+        /// Check 15 takes the inventory movement documents, all of which have both.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="inventoryOnly">Restrict to inventory movement documents.</param>
         /// <param name="postedOnly">Restrict to documents carrying a Posted column.</param>
+        /// <param name="docStatusOnly">Restrict to documents carrying a DocStatus column.</param>
         /// <returns>Usable documents (never null).</returns>
-        private List<DocDef> UsableDocuments(Ctx ctx, bool inventoryOnly, bool postedOnly)
+        private List<DocDef> UsableDocuments(Ctx ctx, bool inventoryOnly, bool postedOnly, bool docStatusOnly)
         {
             List<DocDef> usable = new List<DocDef>();
             List<DocDef> all = DiscoverDocuments(ctx);
@@ -552,6 +625,7 @@ namespace VASLogic.Models
 
                 if (inventoryOnly && !def.IsInventory) { continue; }
                 if (postedOnly && !def.HasPosted) { continue; }
+                if (docStatusOnly && !def.HasDocStatus) { continue; }
 
                 usable.Add(def);
             }
@@ -759,7 +833,7 @@ namespace VASLogic.Models
         /// <returns>Populated <see cref="DetailSpec"/>, or null when no table qualifies.</returns>
         private DetailSpec Spec01(CheckContext c)
         {
-            List<DocDef> docs = UsableDocuments(c.Ctx, false, false);
+            List<DocDef> docs = UsableDocuments(c.Ctx, false, false, true);
             if (docs.Count == 0) { return null; }
 
             List<SqlParameter> parameters = Binds();
@@ -818,7 +892,10 @@ namespace VASLogic.Models
                .Append(",").Append(d.ScreenRank).Append(" AS Screen_Sort")
                .Append(",").Append(d.HasDocumentNo ? "COALESCE(" + a + ".DocumentNo,N'')" : "N''").Append(" AS Doc_Number")
                .Append(",").Append(a).Append(".").Append(d.DateColumn).Append(" AS Doc_Date")
-               .Append(",").Append(a).Append(".DocStatus AS Doc_Status")
+               /* A Posted-only table has no workflow state to report; the branch still
+                  has to line up column for column with its siblings, so it contributes
+                  the same typed literal the other optional columns use. */
+               .Append(",").Append(d.HasDocStatus ? a + ".DocStatus" : "N''").Append(" AS Doc_Status")
                .Append(",").Append(string.IsNullOrEmpty(d.DocTypeKey) ? "N''" : "COALESCE(dt.Name,N'')").Append(" AS Doc_Type")
                .Append(",COALESCE(org.Name,N'') AS Org_Name")
                .Append(",").Append(d.HasBPartner ? "COALESCE(bp.Name,N'')" : "N''").Append(" AS Partner_Name")
@@ -924,15 +1001,23 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// One secured branch per posting table that both expects accounting AND carries
-        /// a Posted column - a table without one cannot be judged unposted, and guessing
-        /// would manufacture failures.
+        /// One secured branch per posting table that carries a Posted column - a table
+        /// without one cannot be judged unposted, and guessing would manufacture
+        /// failures.
+        ///
+        /// A DocStatus is NOT required, and the completed-state test is applied only to
+        /// the tables that have one. This is what makes the check agree with the VAS_198
+        /// widget, which reads the same way: M_MatchInv and M_MatchPO post to the ledger
+        /// and carry a Posted button, but they have no document workflow at all, so
+        /// demanding DocStatus IN ('CO','CL') of them excluded every one of their
+        /// unposted rows from a checklist whose whole job is to find them. For a table
+        /// with no workflow, "exists and is not posted" IS the actionable condition.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <returns>Populated <see cref="DetailSpec"/>, or null when no table qualifies.</returns>
         private DetailSpec Spec02(CheckContext c)
         {
-            List<DocDef> docs = UsableDocuments(c.Ctx, false, true);
+            List<DocDef> docs = UsableDocuments(c.Ctx, false, true, false);
             if (docs.Count == 0) { return null; }
 
             List<SqlParameter> parameters = Binds();
@@ -945,8 +1030,12 @@ namespace VASLogic.Models
 
                 string a = Alias(d);
 
-                string where = a + ".IsActive='Y' AND " + a + ".DocStatus IN (" + DOCSTATUS_FinalList + ")"
-                    + " AND COALESCE(" + a + ".Posted,'N')<>'Y'"
+                string completed = d.HasDocStatus
+                    ? a + ".DocStatus IN (" + DOCSTATUS_FinalList + ") AND "
+                    : "";
+
+                string where = a + ".IsActive='Y' AND " + completed
+                    + "COALESCE(" + a + ".Posted,'N')<>'Y'"
                     + " AND " + PeriodWhere(c, a, d.DateColumn, suffix, parameters)
                     + ScreenFilter(d);
 
@@ -2274,7 +2363,7 @@ namespace VASLogic.Models
         /// <returns>Populated <see cref="DetailSpec"/>, or null when no table qualifies.</returns>
         private DetailSpec Spec15(CheckContext c)
         {
-            List<DocDef> docs = UsableDocuments(c.Ctx, true, false);
+            List<DocDef> docs = UsableDocuments(c.Ctx, true, false, true);
             if (docs.Count == 0) { return null; }
 
             List<SqlParameter> parameters = Binds();
@@ -3130,6 +3219,14 @@ namespace VASLogic.Models
             public int ScreenRank { get; set; }
 
             public int AD_Table_ID { get; set; }
+
+            /// <summary>
+            /// Whether the table runs a document workflow. False for the posting
+            /// artefacts - M_MatchInv, M_MatchPO - which have a Posted column and a
+            /// Posted button but no DocStatus, and which check 02 must still list.
+            /// </summary>
+            public bool HasDocStatus { get; set; }
+
             public bool HasPosted { get; set; }
             public bool HasProcessed { get; set; }
             public bool HasDocumentNo { get; set; }
@@ -3155,6 +3252,13 @@ namespace VASLogic.Models
 
             /// <summary>Resolved and checked; "" when the tab carries no usable filter.</summary>
             public string WhereClause { get; set; }
+
+            /// <summary>
+            /// Whether the tab displays the Posted button. The window a reader would go
+            /// to in order to POST something is the right one to name and to zoom to,
+            /// and it is the same window VAS_198 names for the same record.
+            /// </summary>
+            public bool HasPostedField { get; set; }
         }
 
         /// <summary>One configured control account and its closing balance.</summary>
