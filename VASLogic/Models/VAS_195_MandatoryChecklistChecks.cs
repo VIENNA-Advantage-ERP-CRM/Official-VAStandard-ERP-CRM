@@ -121,6 +121,11 @@ namespace VASLogic.Models
     ///                          VAMFG / VA143 / VAFAM module documents
     ///   VAI145      2026-08-25 Check 16 shows the source document number and reads
     ///                          MovementType as its reference name
+    ///   VAI145      2026-08-25 Check 20 excludes memo accounts (AccountType 'M') and
+    ///                          confines itself to the primary schema's own chart of
+    ///                          accounts, in both its measurement and its drill-down
+    ///   VAI145      2026-08-25 Check 20 reads its account as "12120 - A/R Non Sufficient
+    ///                          Funds Returned Checks" in one column
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -151,6 +156,12 @@ namespace VASLogic.Models
            C_Element carries the chart of accounts a schema posts against. Bound as a
            value, never inlined: it is data, not an identifier. */
         private const string ELEMENTTYPE_Account = "AC";
+
+        /* C_ElementValue.AccountType for a MEMO account - statistical postings that carry
+           no financial value and are deliberately not part of a trial balance. Summing
+           them would manufacture the very imbalance check 20 exists to detect. Bound as a
+           value, never inlined: it is data, not an identifier. */
+        private const string ACCOUNTTYPE_Memo = "M";
 
         /// <summary>
         /// One kind of document that produces inventory movements: the column
@@ -893,6 +904,46 @@ namespace VASLogic.Models
         private List<SqlParameter> Binds()
         {
             return new List<SqlParameter>();
+        }
+
+        /// <summary>
+        /// The predicate confining an element value to the PRIMARY accounting schema's own
+        /// chart of accounts - the C_Element that schema declares through its
+        /// C_AcctSchema_Element row of ElementType 'AC'.
+        ///
+        /// A tenant can carry several elements - a second chart, a user-defined dimension -
+        /// so an element value alone does not say which chart it belongs to. Without this
+        /// a figure could be assembled from more than one chart at once, and on a trial
+        /// balance that is precisely how a difference appears out of nowhere.
+        ///
+        /// EXISTS rather than a join, deliberately. A join through C_AcctSchema_Element
+        /// would fan out and DOUBLE every summed amount if a schema ever carried two
+        /// active 'AC' rows - a misconfiguration this check would then report as an
+        /// imbalance it had itself created. An existence test cannot multiply a row.
+        ///
+        /// Both binds carry the caller's suffix: a statement that already binds its
+        /// accounting schema for Fact_Acct needs a SECOND, differently named occurrence
+        /// here, because these adapters bind by position and a reused name is filled from
+        /// the wrong slot.
+        /// </summary>
+        /// <param name="c">Shared evaluation context.</param>
+        /// <param name="elementValueAlias">Alias of the C_ElementValue row being confined.</param>
+        /// <param name="suffix">Unique bind and alias suffix for this occurrence.</param>
+        /// <param name="parameters">Bind list being built, in appearance order.</param>
+        /// <returns>Predicate fragment.</returns>
+        private string ChartOfAccountsWhere(CheckContext c, string elementValueAlias, string suffix,
+            List<SqlParameter> parameters)
+        {
+            parameters.Add(new SqlParameter("@CoaAcctSchema" + suffix, c.Acct.C_AcctSchema_ID));
+            parameters.Add(new SqlParameter("@CoaElementType" + suffix, ELEMENTTYPE_Account));
+
+            string alias = "coaAse" + suffix;
+
+            return "EXISTS(SELECT 1 FROM C_AcctSchema_Element " + alias
+                 + " WHERE " + alias + ".C_Element_ID=" + elementValueAlias + ".C_Element_ID"
+                 + " AND " + alias + ".C_AcctSchema_ID=@CoaAcctSchema" + suffix
+                 + " AND " + alias + ".ElementType=@CoaElementType" + suffix
+                 + " AND " + alias + ".IsActive='Y')";
         }
 
         /// <summary>Assembles a DetailSpec.</summary>
@@ -2740,8 +2791,7 @@ namespace VASLogic.Models
                         WHERE adl.VAFAM_AssetSchedule_ID=sch.VAFAM_AssetSchedule_ID
                           AND adl.IsActive='Y'
                           AND ad.IsActive='Y'
-                          AND ad.DocStatus IN (" + DOCSTATUS_FinalList + @")
-                          AND COALESCE(ad.Posted,'N')='Y')"
+                          AND ad.DocStatus IN (" + DOCSTATUS_FinalList + @"))"
                 : "";
 
             string sql = @"
@@ -3532,16 +3582,23 @@ namespace VASLogic.Models
             parameters.Add(new SqlParameter("@AD_Client_ID", c.Ctx.GetAD_Client_ID()));
             parameters.Add(new SqlParameter("@C_AcctSchema_ID", c.Acct.C_AcctSchema_ID));
             parameters.Add(new SqlParameter("@PostingType", POSTINGTYPE_Actual));
+            parameters.Add(new SqlParameter("@AccountType", ACCOUNTTYPE_Memo));
 
+            /* INNER: the balance is measured over the primary schema's own chart of
+               accounts, so a posting whose Account_ID resolves to no element value of that
+               chart is outside the population by definition rather than a row to keep. */
             string sql = @"
                 SELECT SUM(COALESCE(fa.AmtAcctDr,0)) AS Total_Debit,
                        SUM(COALESCE(fa.AmtAcctCr,0)) AS Total_Credit,
                        SUM(COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0)) AS Difference
                 FROM Fact_Acct fa
+                INNER JOIN C_ElementValue ev ON (ev.C_ElementValue_ID=fa.Account_ID)
                 WHERE fa.AD_Client_ID=@AD_Client_ID
                   AND fa.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND fa.PostingType=@PostingType
                   AND fa.IsActive='Y'
+                  AND COALESCE(ev.AccountType,N'')<>@AccountType
+                  AND " + ChartOfAccountsWhere(c, "ev", "E", parameters) + @"
                   AND " + PeriodWhere(c, "fa", "DateAcct", "F", parameters);
 
             /* Secured on Fact_Acct before anything wraps it, exactly as the paged
@@ -3584,6 +3641,11 @@ namespace VASLogic.Models
         /// <summary>
         /// Organisation and account level movement for the period, so an imbalance can be
         /// traced to where it came from.
+        ///
+        /// Memo accounts and the chart-of-accounts scope are applied here on exactly the
+        /// same predicates Eval20 uses. Both have to filter identically: a headline that
+        /// measures one population and a drill-down that lists another is a check that
+        /// reports a difference nobody can find in its own list.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <returns>Populated <see cref="DetailSpec"/>.</returns>
@@ -3593,24 +3655,30 @@ namespace VASLogic.Models
             parameters.Add(new SqlParameter("@AD_Client_ID", c.Ctx.GetAD_Client_ID()));
             parameters.Add(new SqlParameter("@C_AcctSchema_ID", c.Acct.C_AcctSchema_ID));
             parameters.Add(new SqlParameter("@PostingType", POSTINGTYPE_Actual));
+            parameters.Add(new SqlParameter("@AccountType", ACCOUNTTYPE_Memo));
 
             string sql = @"
                 SELECT 0 AS " + TECH_TABLE + @",
                        0 AS " + TECH_RECORD + @",
                        0 AS " + TECH_WINDOW + @",
                        COALESCE(org.Name,N'') AS Org_Name,
+                       /* Selected but NOT declared - the sort key only, so the list runs
+                          in account-code order rather than alphabetically by name. */
                        COALESCE(ev.Value,N'') AS Account_Value,
-                       COALESCE(ev.Name,N'') AS Account_Name,
+                       CASE WHEN COALESCE(ev.Name,N'')=N'' THEN COALESCE(ev.Value,N'')
+                            ELSE COALESCE(ev.Value,N'') || N' - ' || COALESCE(ev.Name,N'') END AS Account_Name,
                        SUM(COALESCE(fa.AmtAcctDr,0)) AS Period_Debit,
                        SUM(COALESCE(fa.AmtAcctCr,0)) AS Period_Credit,
                        SUM(COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0)) AS Difference
                 FROM Fact_Acct fa
                 LEFT OUTER JOIN AD_Org org ON (org.AD_Org_ID=fa.AD_Org_ID)
-                LEFT OUTER JOIN C_ElementValue ev ON (ev.C_ElementValue_ID=fa.Account_ID)
+                INNER JOIN C_ElementValue ev ON (ev.C_ElementValue_ID=fa.Account_ID)
                 WHERE fa.AD_Client_ID=@AD_Client_ID
                   AND fa.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND fa.PostingType=@PostingType
                   AND fa.IsActive='Y'
+                  AND COALESCE(ev.AccountType,N'')<>@AccountType
+                  AND " + ChartOfAccountsWhere(c, "ev", "S", parameters) + @"
                   AND " + PeriodWhere(c, "fa", "DateAcct", "F", parameters);
 
             DetailSpec spec = new DetailSpec();
@@ -3621,9 +3689,13 @@ namespace VASLogic.Models
             spec.Params = parameters;
 
             List<ColumnDef> columns = new List<ColumnDef>();
+            /* ONE account column, not two. The code and the name are one identity to a
+               reader - "12120 - A/R Non Sufficient Funds Returned Checks" - and splitting
+               them cost a column to repeat half of what the next one said. The CASE guards
+               the separator so an account with no name renders as its code alone rather
+               than trailing a dangling dash. */
             columns.Add(Col("Org_Name", "VAS_195_Organization", "Organization", COLTYPE_TEXT, 1.1m));
-            columns.Add(Col("Account_Value", "VAS_195_Account", "Account", COLTYPE_TEXT, 0.8m));
-            columns.Add(Col("Account_Name", "VAS_195_AccountName", "Account Name", COLTYPE_TEXT, 1.8m));
+            columns.Add(Col("Account_Name", "VAS_195_AccountName", "Account Name", COLTYPE_TEXT, 2.6m));
             columns.Add(Col("Period_Debit", "VAS_195_PeriodDebit", "Debit", COLTYPE_AMOUNT, 1.0m));
             columns.Add(Col("Period_Credit", "VAS_195_PeriodCredit", "Credit", COLTYPE_AMOUNT, 1.0m));
             columns.Add(Col("Difference", "VAS_195_Difference", "Difference", COLTYPE_AMOUNT, 1.0m));
