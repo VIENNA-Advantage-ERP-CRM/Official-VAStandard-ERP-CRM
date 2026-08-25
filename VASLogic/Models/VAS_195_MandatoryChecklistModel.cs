@@ -1553,6 +1553,49 @@ namespace VASLogic.Models
             return Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Table_ID"]);
         }
 
+        /// <summary>
+        /// The LEFT JOIN pair that resolves ONE list column to its translated name, in
+        /// the form <see cref="VAS_195_MandatoryChecklistModel"/>'s checks already use.
+        ///
+        /// A list column stores a short code ('M', 'I', 'CO') and the readable text lives
+        /// in AD_Ref_List, translated through AD_Ref_List_Trl. A check that shows the
+        /// stored code is showing an internal value, not a name.
+        ///
+        /// The reference id is resolved INSIDE the statement, from AD_Column, rather than
+        /// passed in as a literal: reference ids are surrogate keys and differ between
+        /// installations, so a constant would be right on one and silently wrong on the
+        /// next. Both joins are OUTER, so a code with no reference row at all still shows
+        /// as the raw code rather than dropping the row.
+        ///
+        /// Aliases are supplied by the caller because one statement may resolve several
+        /// list columns and each pair needs its own.
+        /// </summary>
+        /// <param name="listAlias">Alias for the AD_Ref_List row.</param>
+        /// <param name="trlAlias">Alias for its translation row.</param>
+        /// <param name="valueExpr">Qualified column holding the stored code.</param>
+        /// <param name="tableName">Physical table the column belongs to.</param>
+        /// <param name="columnName">The list column's name.</param>
+        /// <param name="languageBind">Bind holding the session language, unique to this occurrence.</param>
+        /// <returns>Two LEFT OUTER JOIN clauses, or "" when the names are unsafe.</returns>
+        protected string ListNameJoin(string listAlias, string trlAlias, string valueExpr,
+            string tableName, string columnName, string languageBind)
+        {
+            if (!IsSafeIdentifier(tableName) || !IsSafeIdentifier(columnName)) { return ""; }
+            if (!IsSafeIdentifier(listAlias) || !IsSafeIdentifier(trlAlias)) { return ""; }
+
+            return " LEFT OUTER JOIN AD_Ref_List " + listAlias
+                 + " ON (" + listAlias + ".Value=" + valueExpr
+                 + " AND " + listAlias + ".IsActive='Y'"
+                 + " AND " + listAlias + ".AD_Reference_ID=(SELECT c2.AD_Reference_Value_ID FROM AD_Column c2"
+                 + " INNER JOIN AD_Table t2 ON (t2.AD_Table_ID=c2.AD_Table_ID)"
+                 + " WHERE t2.TableName='" + tableName + "' AND c2.ColumnName='" + columnName + "'"
+                 + " AND c2.IsActive='Y'))"
+                 + " LEFT OUTER JOIN AD_Ref_List_Trl " + trlAlias
+                 + " ON (" + trlAlias + ".AD_Ref_List_ID=" + listAlias + ".AD_Ref_List_ID"
+                 + " AND " + trlAlias + ".AD_Language=" + languageBind
+                 + " AND " + trlAlias + ".IsActive='Y')";
+        }
+
         // ─────────────────────────────────────────────────────────────────────
         // §8  Shared helpers
         // ─────────────────────────────────────────────────────────────────────

@@ -83,6 +83,9 @@ namespace VASLogic.Models
     ///                          summary; check 10 keeps the summary
     ///   VAI145      2026-08-25 Check 09's posting list bounded by the selected period,
     ///                          like every other check on the card
+    ///   VAI145      2026-08-25 Check 12 keyed on DateNextRun alone - the run test it was
+    ///                          ANDed with could only hide live exceptions - and its type
+    ///                          and frequency read as names rather than stored codes
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -2289,14 +2292,33 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Active recurring setups whose next run fell due on or before period end and
-        /// which have no run recorded inside the period.
+        /// Active recurring setups whose NEXT RUN falls before the end of the selected
+        /// period - that is the whole test, and it is sufficient on its own.
         ///
-        /// The due date comes from C_Recurring's own DateNextRun - the same field the
-        /// recurring process advances - rather than from month arithmetic over
-        /// FrequencyType. For a HISTORICAL period DateNextRun may already have moved
-        /// past the period, which is exactly why the exception test is "no run landed in
-        /// this period" rather than "DateNextRun is old".
+        /// The due date comes from C_Recurring's own DateNextRun, the same field the
+        /// recurring process advances when it generates a document, rather than from
+        /// month arithmetic over FrequencyType. Because the process moves that field
+        /// forward on every generation, "DateNextRun still sits inside this period" IS
+        /// "a run is due and has not happened". Nothing further needs asking.
+        ///
+        /// A second condition used to be ANDed on: no C_Recurring_Run row dated inside
+        /// the period. It has been removed, for two reasons. It could only ever REMOVE
+        /// rows, so the historical-period case its comment claimed to handle was never
+        /// reachable - a DateNextRun that had advanced past the period already failed the
+        /// first test, and no second test can bring a row back. And it wrongly hid live
+        /// exceptions: a weekly setup that ran on the 1st and the 8th but still owes the
+        /// 15th has both a run inside the period and a due date inside it, and the
+        /// NOT EXISTS dropped it from a check whose entire job is to report it.
+        ///
+        /// Bounded by PeriodEndExclusive, so a setup due ON the period's last day counts
+        /// as due for that period - which it is.
+        ///
+        /// TYPE and FREQUENCY are list columns: they store a one-letter code and the
+        /// reader needs the word. Both are now resolved through AD_Ref_List for the
+        /// session language, exactly as check 22 resolves DocBaseType, so the columns
+        /// read "Invoice" and "Monthly" rather than 'I' and 'M'. The raw codes are no
+        /// longer shown - they are internal values, and the name is what the same field
+        /// shows on the recurring document's own window.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <returns>Populated <see cref="DetailSpec"/>, or null when the feature is absent.</returns>
@@ -2305,46 +2327,57 @@ namespace VASLogic.Models
             if (!TableExists("C_Recurring")) { return null; }
 
             List<SqlParameter> parameters = Binds();
-            bool hasRuns = TableExists("C_Recurring_Run");
             bool hasRunsRemaining = ColumnExists("C_Recurring", "RunsRemaining");
             bool hasRecurringType = ColumnExists("C_Recurring", "RecurringType");
             bool hasDateLastRun = ColumnExists("C_Recurring", "DateLastRun");
 
-            parameters.Add(new SqlParameter("@PeriodEndR", c.PeriodEndExclusive));
-
-            string noRun = hasRuns
-                ? @" AND NOT EXISTS(SELECT 1 FROM C_Recurring_Run rr
-                        WHERE rr.C_Recurring_ID=r.C_Recurring_ID
-                          AND rr.IsActive='Y'
-                          AND rr.DateDoc>=@PeriodStartR AND rr.DateDoc<@PeriodEndR2)"
+            /* The joins are built BEFORE any of their binds are added, because whether a
+               join exists decides whether its bind exists at all: a bind with no
+               occurrence in the finished text is not ignored under positional binding -
+               it is filled into the NEXT occurrence's slot, and every bind after it
+               shifts by one. Each occurrence therefore carries its own name, and each
+               name is added only where its text really is. */
+            string typeJoin = hasRecurringType
+                ? ListNameJoin("rt", "rttrl", "r.RecurringType", "C_Recurring", "RecurringType", "@AD_LanguageT")
                 : "";
+            if (typeJoin.Length > 0) { parameters.Add(new SqlParameter("@AD_LanguageT", ctxLanguage(c))); }
 
-            if (hasRuns)
-            {
-                parameters.Add(new SqlParameter("@PeriodStartR", c.PeriodStart));
-                parameters.Add(new SqlParameter("@PeriodEndR2", c.PeriodEndExclusive));
-            }
+            string freqJoin = ListNameJoin("fr", "frtrl", "r.FrequencyType", "C_Recurring", "FrequencyType", "@AD_LanguageF");
+            if (freqJoin.Length > 0) { parameters.Add(new SqlParameter("@AD_LanguageF", ctxLanguage(c))); }
+
+            /* A join that could not be built contributes no alias, so the name expression
+               that would have read it falls back to the stored code - a readable 'M'
+               beats an empty column. */
+            string typeName = typeJoin.Length > 0
+                ? "COALESCE(rttrl.Name,rt.Name,r.RecurringType,N'')"
+                : (hasRecurringType ? "COALESCE(r.RecurringType,N'')" : "N''");
+
+            string freqName = freqJoin.Length > 0
+                ? "COALESCE(frtrl.Name,fr.Name,r.FrequencyType,N'')"
+                : "COALESCE(r.FrequencyType,N'')";
 
             string sql = @"
                 SELECT " + TableId("C_Recurring") + " AS " + TECH_TABLE + @",
                        r.C_Recurring_ID AS " + TECH_RECORD + @",
                        0 AS " + TECH_WINDOW + @",
                        COALESCE(r.Name,N'') AS Recurring_Name,
-                       " + (hasRecurringType ? "COALESCE(r.RecurringType,N'')" : "N''") + @" AS Recurring_Type,
-                       COALESCE(r.FrequencyType,N'') AS Frequency_Type,
+                       " + typeName + @" AS Recurring_Type_Name,
+                       " + freqName + @" AS Frequency_Name,
                        COALESCE(r.Frequency,0) AS Frequency,
                        " + (hasDateLastRun ? "r.DateLastRun" : "CAST(NULL AS DATE)") + @" AS Last_Run,
                        r.DateNextRun AS Next_Run,
                        " + (hasRunsRemaining ? "COALESCE(r.RunsRemaining,0)" : "0") + @" AS Runs_Remaining
-                FROM C_Recurring r
+                FROM C_Recurring r" + typeJoin + freqJoin + @"
                 WHERE r.IsActive='Y'
                   AND r.DateNextRun IS NOT NULL
-                  AND r.DateNextRun<@PeriodEndR" + noRun;
+                  AND r.DateNextRun<@PeriodEndR";
+
+            parameters.Add(new SqlParameter("@PeriodEndR", c.PeriodEndExclusive));
 
             List<ColumnDef> columns = new List<ColumnDef>();
             columns.Add(Col("Recurring_Name", "VAS_195_RecurringName", "Recurring", COLTYPE_DOC, 1.6m));
-            columns.Add(Col("Recurring_Type", "VAS_195_RecurringType", "Type", COLTYPE_BADGE, 0.9m));
-            columns.Add(Col("Frequency_Type", "VAS_195_Frequency", "Frequency", COLTYPE_TEXT, 0.9m));
+            columns.Add(Col("Recurring_Type_Name", "VAS_195_RecurringType", "Type", COLTYPE_TEXT, 1.1m));
+            columns.Add(Col("Frequency_Name", "VAS_195_Frequency", "Frequency", COLTYPE_TEXT, 1.1m));
             columns.Add(Col("Last_Run", "VAS_195_LastRun", "Last Run", COLTYPE_DATE, 0.9m));
             columns.Add(Col("Next_Run", "VAS_195_NextRun", "Next Run", COLTYPE_DATE, 0.9m));
             columns.Add(Col("Runs_Remaining", "VAS_195_RunsRemaining", "Remaining", COLTYPE_NUMBER, 0.7m));
