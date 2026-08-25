@@ -92,6 +92,9 @@ namespace VASLogic.Models
     ///   VAI145      2026-08-25 Check 03 reads C_Payment.IsAllocated and excludes
     ///                          advances, instead of re-deriving allocation from
     ///                          C_AllocationLine - it now agrees with the VAS_199 widget
+    ///   VAI145      2026-08-25 Check 19 rewritten to the simplified rule: foreign-currency
+    ///                          invoice count, then FRPT_RevaluationDate journal count.
+    ///                          Reclassified WARNING, reports PASS / FAIL, no drill-down
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -726,7 +729,9 @@ namespace VASLogic.Models
                 case "MPC_CLOSE_16": return Spec16(c);
                 case "MPC_CLOSE_17": return Spec17(c);
                 case "MPC_CLOSE_18": return Spec18(c);
-                case "MPC_CLOSE_19": return Spec19(c);
+                /* 19 deliberately absent - see Eval19. The row reports two counts and
+                   exposes no records, so there is nothing to page and the endpoint must
+                   have nothing to answer with even when asked directly. */
                 case "MPC_CLOSE_20": return Spec20(c);
                 case "MPC_CLOSE_21": return Spec21(c);
                 case "MPC_CLOSE_22": return Spec22(c);
@@ -1175,10 +1180,10 @@ namespace VASLogic.Models
                 FROM C_Payment p
                 " + (string.IsNullOrEmpty(docTypeKey)
                         ? ""
-                        : "LEFT OUTER JOIN C_DocType dt ON (dt.C_DocType_ID=" + docTypeKey + ")") + @"
+                        : "INNER JOIN C_DocType dt ON (dt.C_DocType_ID=" + docTypeKey + ")") + @"
                 " + (hasCharge ? "LEFT OUTER JOIN C_Charge ch ON (ch.C_Charge_ID=p.C_Charge_ID)" : "") + @"
                 LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=p.C_BPartner_ID)
-                LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=p.C_Currency_ID)
+                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=p.C_Currency_ID)
                 WHERE p.IsActive='Y'
                   AND p.DocStatus IN (" + DOCSTATUS_FinalList + @")
                   AND " + PeriodWhere(c, "p", "DateAcct", "P", parameters) + @"
@@ -2835,140 +2840,189 @@ namespace VASLogic.Models
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // 19  Foreign currency revaluation not run                     BLOCKER
+        // 19  Foreign currency revaluation not run                     WARNING
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Whether period-end foreign-currency revaluation has been run and posted.
+        /// Whether the period's foreign-currency exposure has been revalued.
         ///
-        /// Applicability first: the check only bites when an account is actually flagged
-        /// for revaluation. Failing a tenant that has no foreign-currency exposure would
-        /// block a close for a process it never needed to run.
+        /// TWO COUNTS, SHORT-CIRCUITED. Is there anything to revalue - a completed or
+        /// closed invoice in the period whose transaction currency is not the primary
+        /// schema's? If not, there is nothing to ask about and the row PASSES; the second
+        /// query never runs. If there is, does a revaluation journal exist for this period
+        /// in the primary schema? That answer is the row's outcome.
+        ///
+        /// PASS when there is nothing to revalue is deliberate, and it is NOT the same as
+        /// NOT_APPLICABLE. Not-applicable means the question could not be asked - a module
+        /// absent, a column missing. Here the question was asked and answered: the period
+        /// holds no foreign-currency invoice, so nothing is outstanding. That is evidence,
+        /// and the row says so.
+        ///
+        /// FAIL, NOT WARNING, and non-blocking with it. The registry classifies this row
+        /// WARNING so it never gates the close, but its rule is stated as a pass/fail
+        /// test, so the STATUS it reports is PASS or FAIL rather than the WARNING status
+        /// <see cref="Counted"/> would give a warning-class row. Classification and status
+        /// are separate fields precisely so a row can be one thing and report the other;
+        /// IsBlocking is left false, which is what keeps the close available.
+        ///
+        /// NO DRILL-DOWN. DetailAvailable stays false and no MPC_CLOSE_19 case exists in
+        /// BuildDetail, so the row is not clickable AND the detail endpoint has nothing to
+        /// answer with even if it is asked. The summary carries the two counts; no
+        /// record-level data leaves the server.
+        ///
+        /// The evidence is the EXISTENCE of an active journal carrying a
+        /// FRPT_RevaluationDate inside the period. Deliberately not Posted='Y' and not a
+        /// DocStatus test - the requirement is that the revaluation was run for this
+        /// period, and whether its journal has reached the ledger yet is check 02's
+        /// question, not this one.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <param name="def">Registry entry.</param>
         /// <returns>Populated <see cref="CheckResult"/>.</returns>
         private CheckResult Eval19(CheckContext c, CheckDef def)
         {
-            if (!ColumnExists("C_ElementValue", "FRPT_IsForexRevaluation"))
+            /* The stamp column is what this check reads its evidence from. Without it the
+               question genuinely cannot be asked, which is the one case that IS
+               not-applicable rather than a pass. */
+            if (!TableExists("GL_Journal") || !ColumnExists("GL_Journal", "FRPT_RevaluationDate"))
             {
                 return NotApplicable(def, "VAS_195_Na19", "Foreign currency revaluation is not configured");
             }
 
-            int enabled = RevaluationAccountCount(c);
-            if (enabled == 0)
+            int foreignInvoices = ForeignCurrencyInvoiceCount(c);
+
+            if (foreignInvoices == 0)
             {
-                return NotApplicable(def, "VAS_195_Na19b", "No revaluation-enabled account carries a balance");
+                return RevaluationResult(def, STATUS_PASS, 0, 0,
+                    "VAS_195_Rev19None", "No foreign-currency invoices were found for the selected period");
             }
 
-            /* Evidence: a completed, posted journal that the revaluation stamped for this
-               period. Staging output alone is not evidence - it says the calculation ran,
-               not that the ledger received it. */
-            if (RevaluationJournalPosted(c))
+            int journals = RevaluationJournalCount(c);
+
+            if (journals > 0)
             {
-                CheckResult passed = NewResult(def);
-                passed.Status = STATUS_PASS;
-                passed.SummaryKey = "VAS_195_Clr19";
-                passed.SummaryText = "Foreign currency revaluation is completed and posted";
-                passed.DetailAvailable = true;
-                passed.DocumentCount = enabled;
-                return passed;
+                return RevaluationResult(def, STATUS_PASS, foreignInvoices, journals,
+                    "VAS_195_Rev19Found", "A foreign-currency revaluation journal was found for the selected period");
             }
 
-            CheckResult result = Counted(def, enabled,
-                "VAS_195_Sum19", "revaluation-enabled accounts have no posted revaluation for this period",
-                "VAS_195_Clr19", "Foreign currency revaluation is completed and posted");
-            result.DetailAvailable = true;
-            return result;
-        }
-
-        /// <summary>The revaluation-enabled accounts and their period-end balances.</summary>
-        /// <param name="c">Shared evaluation context.</param>
-        /// <returns>Populated <see cref="DetailSpec"/>, or null when not configured.</returns>
-        private DetailSpec Spec19(CheckContext c)
-        {
-            if (!ColumnExists("C_ElementValue", "FRPT_IsForexRevaluation")) { return null; }
-
-            List<SqlParameter> parameters = Binds();
-            parameters.Add(new SqlParameter("@AD_Client_ID", c.Ctx.GetAD_Client_ID()));
-            parameters.Add(new SqlParameter("@C_AcctSchema_ID", c.Acct.C_AcctSchema_ID));
-            parameters.Add(new SqlParameter("@PostingType", POSTINGTYPE_Actual));
-            parameters.Add(new SqlParameter("@PeriodEndF", c.PeriodEndExclusive));
-
-            string sql = @"
-                SELECT 0 AS " + TECH_TABLE + @",
-                       fa.Account_ID AS " + TECH_RECORD + @",
-                       0 AS " + TECH_WINDOW + @",
-                       COALESCE(ev.Value,N'') AS Account_Value,
-                       COALESCE(ev.Name,N'') AS Account_Name,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
-                       SUM(COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0)) AS Closing_Balance
-                FROM Fact_Acct fa
-                INNER JOIN C_ElementValue ev ON (ev.C_ElementValue_ID=fa.Account_ID AND ev.IsActive='Y' AND COALESCE(ev.FRPT_IsForexRevaluation,'N')='Y')
-                LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=fa.C_Currency_ID)
-                WHERE fa.AD_Client_ID=@AD_Client_ID
-                  AND fa.C_AcctSchema_ID=@C_AcctSchema_ID
-                  AND fa.PostingType=@PostingType
-                  AND fa.IsActive='Y'
-                  AND fa.DateAcct<@PeriodEndF";
-
-            DetailSpec spec = new DetailSpec();
-            spec.Sql = sql;
-            spec.MainAlias = "fa";
-            spec.GroupBy = "fa.Account_ID,COALESCE(ev.Value,N''),COALESCE(ev.Name,N''),COALESCE(cur.ISO_Code,N'')";
-            spec.OrderBy = "Account_Value";
-            spec.Params = parameters;
-
-            List<ColumnDef> columns = new List<ColumnDef>();
-            columns.Add(Col("Account_Value", "VAS_195_Account", "Account", COLTYPE_TEXT, 0.9m));
-            columns.Add(Col("Account_Name", "VAS_195_AccountName", "Account Name", COLTYPE_TEXT, 2.0m));
-            columns.Add(Col("Currency_Iso", "VAS_195_Currency", "Currency", COLTYPE_TEXT, 0.6m));
-            columns.Add(Col("Closing_Balance", "VAS_195_ClosingBalance", "Closing Balance", COLTYPE_AMOUNT, 1.2m));
-            spec.Columns = columns;
-
-            return spec;
-        }
-
-        /// <summary>How many revaluation-enabled accounts carry a period-end balance.</summary>
-        /// <param name="c">Shared evaluation context.</param>
-        /// <returns>Account count.</returns>
-        private int RevaluationAccountCount(CheckContext c)
-        {
-            DetailSpec spec = Spec19(c);
-            return spec == null ? 0 : CountOf(c.Ctx, spec);
+            /* Lower-cased on purpose: the client leads a non-passing summary with its
+               RecordCount, so this reads "3 foreign-currency invoices exist, but ...".
+               The two PASS messages above are never prefixed and stay full sentences. */
+            return RevaluationResult(def, STATUS_FAIL, foreignInvoices, 0,
+                "VAS_195_Rev19Missing",
+                "foreign-currency invoices exist, but no revaluation journal was found for the selected period");
         }
 
         /// <summary>
-        /// Whether a completed, posted revaluation journal exists for the period.
-        /// Falls back to the journal's accounting date when the FRPT stamp column is not
-        /// present in this installation.
+        /// Assembles check 19's one and only outcome: a status, a summary, the two counts
+        /// it was decided from, and no drill-down.
+        /// </summary>
+        /// <param name="def">Registry entry.</param>
+        /// <param name="status">STATUS_PASS or STATUS_FAIL.</param>
+        /// <param name="foreignInvoices">Foreign-currency invoices found in the period.</param>
+        /// <param name="journals">Revaluation journals found for the period.</param>
+        /// <param name="summaryKey">AD_Message key for the summary line.</param>
+        /// <param name="summaryText">English fallback for the summary line.</param>
+        /// <returns>Populated <see cref="CheckResult"/>.</returns>
+        private CheckResult RevaluationResult(CheckDef def, string status,
+            int foreignInvoices, int journals, string summaryKey, string summaryText)
+        {
+            CheckResult result = NewResult(def);
+
+            result.Status = status;
+            result.SummaryKey = summaryKey;
+            result.SummaryText = summaryText;
+
+            /* The count the row stands for is the exposure it found. A passing row that
+               found nothing reports zero, which is the honest figure. */
+            result.RecordCount = foreignInvoices;
+            result.DocumentCount = journals;
+
+            /* Non-blocking whatever the status, and never openable. */
+            result.IsBlocking = false;
+            result.DetailAvailable = false;
+
+            return result;
+        }
+
+        /// <summary>
+        /// Completed or closed invoices in the period whose transaction currency is not
+        /// the primary accounting schema's - the exposure that would need revaluing.
+        ///
+        /// Draft and in-progress invoices are deliberately out of scope: they are check
+        /// 01's business, and counting them here would raise a revaluation warning about
+        /// documents that may never be completed at all. Both sales and purchase invoices
+        /// qualify, and so do credit notes - IsSOTrx is not tested, because exposure is
+        /// exposure whichever direction it points.
+        ///
+        /// MRole is applied to C_Invoice on its own, as the only physical table in the
+        /// statement, which is what makes the organization scope the ROLE's rather than
+        /// the whole database's.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
-        /// <returns>true when posted evidence exists.</returns>
-        private bool RevaluationJournalPosted(CheckContext c)
+        /// <returns>Invoice count, 0 when there is no exposure.</returns>
+        private int ForeignCurrencyInvoiceCount(CheckContext c)
         {
-            if (!TableExists("GL_Journal")) { return false; }
+            if (c.Acct.C_Currency_ID <= 0) { return 0; }
 
-            bool hasStamp = ColumnExists("GL_Journal", "FRPT_RevaluationDate");
-            string dateColumn = hasStamp ? "FRPT_RevaluationDate" : "DateAcct";
+            List<SqlParameter> parameters = Binds();
 
+            string sql = @"
+                SELECT COUNT(1) AS Invoice_Count
+                FROM C_Invoice i
+                WHERE i.IsActive='Y'
+                  AND i.DocStatus IN (" + DOCSTATUS_FinalList + @")
+                  AND i.C_Currency_ID<>@BaseCurrency_ID
+                  AND ";
+
+            parameters.Add(new SqlParameter("@BaseCurrency_ID", c.Acct.C_Currency_ID));
+            sql += PeriodWhere(c, "i", "DateAcct", "FX", parameters);
+
+            sql = MRole.GetDefault(c.Ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters.ToArray(), null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { return 0; }
+
+            return Util.GetValueOfInt(ds.Tables[0].Rows[0]["Invoice_Count"]);
+        }
+
+        /// <summary>
+        /// Active journals of the primary accounting schema carrying a
+        /// FRPT_RevaluationDate inside the period - the evidence that revaluation ran.
+        ///
+        /// The date tested is the revaluation stamp, never the journal's own DateAcct: a
+        /// journal booked in one period can revalue another, and it is the period it
+        /// revalued that this check is about. A journal in a different accounting schema
+        /// is not evidence for this one, which is why the schema is part of the predicate
+        /// rather than assumed.
+        ///
+        /// MRole is applied to GL_Journal on its own, independently of the invoice count's
+        /// filter - two physical tables, two access filters, never one over a combined
+        /// result.
+        /// </summary>
+        /// <param name="c">Shared evaluation context.</param>
+        /// <returns>Journal count, 0 when no revaluation is recorded for the period.</returns>
+        private int RevaluationJournalCount(CheckContext c)
+        {
             List<SqlParameter> parameters = Binds();
 
             string sql = @"
                 SELECT COUNT(1) AS Journal_Count
                 FROM GL_Journal j
                 WHERE j.IsActive='Y'
-                  AND j.DocStatus IN (" + DOCSTATUS_FinalList + @")
-                  AND COALESCE(j.Posted,'N')='Y'"
-                  + (hasStamp ? " AND j.FRPT_RevaluationDate IS NOT NULL" : "")
-                  + " AND " + PeriodWhere(c, "j", dateColumn, "J", parameters);
+                  AND j.C_AcctSchema_ID=@C_AcctSchema_ID
+                  AND j.FRPT_RevaluationDate IS NOT NULL
+                  AND ";
+
+            parameters.Add(new SqlParameter("@C_AcctSchema_ID", c.Acct.C_AcctSchema_ID));
+            sql += PeriodWhere(c, "j", "FRPT_RevaluationDate", "RV", parameters);
 
             sql = MRole.GetDefault(c.Ctx).AddAccessSQL(sql, "j", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             DataSet ds = DB.ExecuteDataset(sql, parameters.ToArray(), null);
-            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { return false; }
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { return 0; }
 
-            return Util.GetValueOfInt(ds.Tables[0].Rows[0]["Journal_Count"]) > 0;
+            return Util.GetValueOfInt(ds.Tables[0].Rows[0]["Journal_Count"]);
         }
 
         // ─────────────────────────────────────────────────────────────────────

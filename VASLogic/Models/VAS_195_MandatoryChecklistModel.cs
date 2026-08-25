@@ -466,7 +466,10 @@ namespace VASLogic.Models
             registry.Add(NewCheck("MPC_CLOSE_16", 16, CLASS_BLOCKER, "VAS_195_Chk16", "Inventory costing not completed"));
             registry.Add(NewCheck("MPC_CLOSE_17", 17, CLASS_WARNING, "VAS_195_Chk17", "Physical inventory adjustments pending"));
             registry.Add(NewCheck("MPC_CLOSE_18", 18, CLASS_WARNING, "VAS_195_Chk18", "Tax transactions pending posting"));
-            registry.Add(NewCheck("MPC_CLOSE_19", 19, CLASS_BLOCKER, "VAS_195_Chk19", "Foreign currency revaluation not run"));
+            /* WARNING, not BLOCKER: revaluation is a finance judgement, and a period that
+               has not been revalued is still a period that can be closed. Its handler
+               reports PASS / FAIL rather than the usual WARNING status - see Eval19. */
+            registry.Add(NewCheck("MPC_CLOSE_19", 19, CLASS_WARNING, "VAS_195_Chk19", "Foreign currency revaluation not run"));
             registry.Add(NewCheck("MPC_CLOSE_20", 20, CLASS_BLOCKER, "VAS_195_Chk20", "Trial Balance debit <> credit"));
             registry.Add(NewCheck("MPC_CLOSE_21", 21, CLASS_CHECK, "VAS_195_Chk21", "Bank accounts fully reconciled"));
             registry.Add(NewCheck("MPC_CLOSE_22", 22, CLASS_WARNING, "VAS_195_Chk22", "Required document base types still open"));
@@ -613,7 +616,15 @@ namespace VASLogic.Models
                 CheckResult item = data.Items[i];
 
                 if (item.IsBlocking) { data.BlockerFailCount++; }
-                else if (STATUS_WARNING.Equals(item.Status)) { data.WarningCount++; }
+                /* A non-blocking FAIL counts as a warning too. Check 19 reports its
+                   outcome as PASS / FAIL while staying classified WARNING, and the footer
+                   would otherwise show a row nobody was told about. IsBlocking is checked
+                   first, so a failing BLOCKER can never be double counted here. */
+                else if (STATUS_WARNING.Equals(item.Status)
+                    || (CLASS_WARNING.Equals(item.Classification) && STATUS_FAIL.Equals(item.Status)))
+                {
+                    data.WarningCount++;
+                }
                 else if (STATUS_COMPLETE.Equals(item.Status)) { data.CheckCompleteCount++; }
             }
 
@@ -648,7 +659,12 @@ namespace VASLogic.Models
             bool warning = CLASS_WARNING.Equals(item.Classification);
 
             if (blocker && (STATUS_FAIL.Equals(item.Status) || STATUS_CONFIGURATION_ERROR.Equals(item.Status))) { return 1; }
-            if (warning && STATUS_WARNING.Equals(item.Status)) { return 2; }
+
+            /* A warning that reports FAIL rather than WARNING belongs in the same band as
+               one that reports WARNING - it needs the same decision from the same reader.
+               Only check 19 answers this way today, because its rule is stated as a
+               pass/fail test that must not block the close. */
+            if (warning && (STATUS_WARNING.Equals(item.Status) || STATUS_FAIL.Equals(item.Status))) { return 2; }
             if (STATUS_INCOMPLETE.Equals(item.Status)) { return 3; }
             if (blocker && STATUS_PASS.Equals(item.Status)) { return 4; }
             if (warning && STATUS_PASS.Equals(item.Status)) { return 5; }
