@@ -339,7 +339,7 @@
             });
         };
 
-        this.clear = function () {
+        this.clear = function (isNewRecord) {
             // Bump fetchSeq so any in-flight GetPanelData response is discarded — the panel
             // is being cleared (e.g. user navigated away) and rendering stale data would
             // overwrite the blank state that clear() just set.
@@ -347,7 +347,15 @@
             // Also tear down any open dialog so a fixed backdrop isn't orphaned over the page.
             closeDialogs();
             try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
-            parent = null; lines = []; render();
+            parent = null; lines = [];
+            if (isNewRecord) {
+                // New unsaved record — show a blank panel (no message).
+                if ($body)       $body.hide();
+                if ($emptyState) $emptyState.hide();
+            } else {
+                if ($emptyState) $emptyState.text(lbl("VAS_107_NoOrder", "Select an order to add lines"));
+                render();
+            }
         };
 
         function fromServerRow(r) {
@@ -1009,7 +1017,7 @@
             var canUndoEdits = line.status === "saved" && line.dirty && line._saved;
             var canDiscardNew = line.status === "new";
             if (editable && !line._saving && (canUndoEdits || canDiscardNew)) {
-                var undoTitle = canDiscardNew ? lbl("VAS_107_UndoNewLine", "Undo (remove line)") : lbl("VAS_107_UndoChanges", "Undo changes");
+                var undoTitle = (canDiscardNew ? lbl("VAS_107_UndoNewLine", "Undo (remove line)") : lbl("VAS_107_UndoChanges", "Undo changes")) + " (Ctrl+Alt+Z)";
                 var $undo = $('<button type="button" class="vas-obl-undo-btn" title="' + esc(undoTitle) + '">' + icon("rotate-ccw", "↺") + "</button>");
                 var undoAct = canDiscardNew ? discardNewLine : undoLine;
                 // Act on mousedown + preventDefault (like Save): a single click while a
@@ -2144,13 +2152,23 @@
            column that appears in the Additional Info modal (module-guarded + applicable).
            Used to visually highlight the "..." button so the user can see at a glance
            that the modal contains data without opening it.
+           Uses dynFieldKind to classify each field — critical for YesNo columns whose
+           value is "N" (No): +("N") === NaN, and NaN !== 0 is true, so the naive
+           +val !== 0 check would wrongly highlight the button for an unset checkbox.
            Pass a pre-computed cols array to avoid calling additionalInfoColumns twice. */
         function hasAdditionalValues(line, cols) {
             if (!cols) cols = additionalInfoColumns(line);
             for (var i = 0; i < cols.length; i++) {
-                var val = line.values[cols[i].ColumnName];
-                // FK IDs are 0 when unset; amounts are 0 when unset; treat null/""/"0"/0 as empty.
-                if (val !== null && val !== undefined && val !== "" && +val !== 0) return true;
+                var m = cols[i], v = lineVal(line, m.ColumnName);
+                if (v == null) continue;
+                var s = String(v).trim();
+                if (!s) continue;
+                switch (dynFieldKind(m)) {
+                    case "fk": case "int": if (parseInt(s, 10) > 0) return true; break;
+                    case "number": if (parseFloat(s) !== 0) return true; break;
+                    case "yesno": if (s === "Y" || s === "true" || s === "1") return true; break;
+                    default: return true;   // string / memo / date / list with any text
+                }
             }
             return false;
         }
@@ -3802,7 +3820,12 @@
     };
 
     VAS.VAS_107_CreateOrderBottomPanel.prototype.refreshPanelData = function (recordID, selectedRow) {
-        if (selectedRow == undefined || recordID <= 0) { this.clear(); return; }
+        if (selectedRow == undefined || recordID <= 0) {
+            // Pass true when a row exists in the grid but the order has no DB ID yet
+            // (new unsaved record), so the panel can show a more helpful message.
+            this.clear(selectedRow !== undefined && recordID <= 0);
+            return;
+        }
         this.record_ID = recordID;
         this.selectedRow = selectedRow;
         this.fetchData(recordID);

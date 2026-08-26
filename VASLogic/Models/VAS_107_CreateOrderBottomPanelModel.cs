@@ -862,7 +862,10 @@ namespace VASLogic.Models
                 OrderLineRow row = new OrderLineRow();
                 foreach (DataColumn dc in dt.Columns)
                 {
-                    if (dc.ColumnName.StartsWith("VASOLDISP_")) continue;
+                    // OrdinalIgnoreCase: PostgreSQL lowercases aliases (vasoldisp_*),
+                    // Oracle uppercases them (VASOLDISP_*) — both must be excluded from
+                    // the generic Values bag so only real C_OrderLine columns are sent.
+                    if (dc.ColumnName.StartsWith("VASOLDISP_", StringComparison.OrdinalIgnoreCase)) continue;
                     row.Values[dc.ColumnName] = (r[dc] == DBNull.Value) ? null : r[dc];
                 }
                 row.C_OrderLine_ID = Util.GetValueOfInt(r["C_OrderLine_ID"]);
@@ -885,7 +888,14 @@ namespace VASLogic.Models
                 row.LineTotalAmt = Util.GetValueOfDecimal(r["LineTotalAmt"]);
                 row.M_AttributeSetInstance_ID = Util.GetValueOfInt(r["M_AttributeSetInstance_ID"]);
                 row.AttrName = Util.GetValueOfString(r["VASOLDISP_AttrName"]);
-                row.HasAttributeSet = Util.GetValueOfInt(r["VASOLDISP_HasAttrSet"]) > 0;
+                int hasAttrSetRaw = Util.GetValueOfInt(r["VASOLDISP_HasAttrSet"]);
+                row.HasAttributeSet = hasAttrSetRaw > 0;
+                // Store under a canonical mixed-case key so the JS productHasAttributeSet()
+                // can read it via lineVal() on both PostgreSQL and Oracle without falling back
+                // to the display flag (which conflates AttrName with the actual attribute-set
+                // presence and would wrongly enable the attribute link when the product's
+                // attribute set was removed after the line was saved).
+                row.Values["VASOLDISP_HasAttrSet"] = hasAttrSetRaw;
                 row.ProductType = Util.GetValueOfString(r["VASOLDISP_ProductType"]);
                 rows.Add(row);
             }
