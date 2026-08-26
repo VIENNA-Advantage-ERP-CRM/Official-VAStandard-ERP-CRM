@@ -1193,7 +1193,11 @@ namespace VASLogic.Models
                 FROM AD_Table t
                 INNER JOIN AD_Column c ON (c.AD_Table_ID=t.AD_Table_ID AND c.IsActive='Y')
                 WHERE t.IsActive='Y'
-                  AND t.IsView='N'
+                  /* COALESCE, not a bare comparison: AD_Table.IsView is NULLable and
+                     unset on most tables, so 't.IsView=''N''' is NULL rather than true
+                     and no source table would resolve at all - every document number in
+                     the modal would fall back to #Record_ID. */
+                  AND COALESCE(t.IsView,'N')='N'
                   AND t.AD_Table_ID IN (" + inList + @")
                 GROUP BY t.AD_Table_ID,t.TableName";
 

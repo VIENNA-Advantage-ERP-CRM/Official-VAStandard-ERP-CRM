@@ -35,9 +35,18 @@ namespace VASLogic.Models
     ///                 AD_Table -> AD_Column(Posted) -> AD_Field -> AD_Tab -> AD_Window
     ///
     ///               A table qualifies when it is an active, non-view physical table
-    ///               carrying an active Posted column that is actually DISPLAYED on an
-    ///               active tab of an active window. That last condition keeps purely
-    ///               technical tables with a Posted column out of a user-facing card.
+    ///               carrying an active Posted column and reachable through the MENU -
+    ///               it has an active window whose header tab is over it. The menu
+    ///               requirement is what keeps purely technical tables with a Posted
+    ///               column out of a user-facing card, and it is the same test VAS_195
+    ///               applies, so the two agree on what counts as a document.
+    ///
+    ///               A tab DISPLAYING the Posted field is preferred but is no longer
+    ///               required. It used to be, and it was too strict: a table whose
+    ///               windows declare no field over Posted returned no screen, and the
+    ///               table was dropped from the card in silence - all of its unposted
+    ///               documents with it, while VAS_195 listed every one. Such a table now
+    ///               falls back to its primary window and contributes one unsplit row.
     ///
     ///               A row of the card is a SCREEN, not a table: one table displayed
     ///               on several windows is several rows, so C_Invoice appears as AP
@@ -56,9 +65,23 @@ namespace VASLogic.Models
     ///               the source table to its own name rather than to something short.
     ///
     ///               Where those clauses cannot separate the windows - a clause with
-    ///               @context@ variables this widget cannot resolve, or none at all -
-    ///               the table collapses back to ONE row covering all its records.
-    ///               One honest row beats several rows each listing the same documents.
+    ///               @context@ variables this widget cannot resolve, a clause reaching
+    ///               for a table this statement does not join, or none at all - the
+    ///               table collapses back to ONE row covering all its records. One
+    ///               honest row beats several rows each listing the same documents.
+    ///
+    ///               THE SPLIT IS EXHAUSTIVE. Whatever the screens claim, every record
+    ///               of the table lands in exactly one row of the card, because the
+    ///               filtered screens are always accompanied by a row carrying their
+    ///               complement. Three separate ways a record used to escape that
+    ///               guarantee are now closed: a table all of whose screens are filtered
+    ///               had no window to hang the complement on and so had no complement
+    ///               row at all; the complement was written as NOT(a) AND NOT(b), which
+    ///               is NULL - and therefore not true - wherever a sibling clause tests
+    ///               a NULLable column; and a clause naming a table outside the FROM
+    ///               made the whole query throw, whereupon that screen was logged and
+    ///               skipped. Each one silently under-reported unposted documents that
+    ///               VAS_195, which applies no tab filter at all, went on listing.
     ///
     ///               Zoom therefore needs no rule at all: a row IS a screen, so it
     ///               opens that screen.
@@ -110,7 +133,12 @@ namespace VASLogic.Models
     ///               parser is not confused by a trailing clause. Compatible with
     ///               PostgreSQL and Oracle.
     /// Chronological development:
-    ///   VAI154      2026-08-21 Created
+    ///   VAI145      2026-08-21 Created
+    ///   VAI145      2026-08-25 Period end bound made exclusive so a time-stamped
+    ///                          document on the period's last day is not dropped
+    ///   VAI145      2026-08-25 Screen split made exhaustive, and a table with no
+    ///                          Posted-bearing tab falls back to its primary window
+    ///                          instead of vanishing - both to agree with VAS_195
     /// </summary>
     public class VAS_198_UnPostedAccountEntriesModel
     {
@@ -145,6 +173,13 @@ namespace VASLogic.Models
         /* Longest tab filter this widget will paste into its own SQL. Real ones are a
            predicate or two; anything past this is not a tab filter. */
         private const int WHERECLAUSE_MAX = 500;
+
+        /* The same bound for a filter this class COMPOSED rather than read: a complement
+           row carries one negated sibling clause per filtered screen, so it is legitimately
+           several times the length a single tab filter may be. Still bounded - a table with
+           an implausible number of screens collapses to one row instead of growing the
+           statement without limit. */
+        private const int WHERECLAUSE_COMPOSED_MAX = 8000;
 
         /// <summary>
         /// The trusted amount strategy: which column carries the accounting value of
@@ -228,6 +263,11 @@ namespace VASLogic.Models
         private const string COLUMN_DOCUMENTNO = "DocumentNo";
         private const string COLUMN_DATEACCT = "DateAcct";
         private const string COLUMN_MOVEMENTDATE = "MovementDate";
+
+        /* The accounting date of a bank statement. C_BankStatement has no DateAcct on
+           its header - only its lines do - so without this the table resolves to no
+           usable date column and never reaches the card. */
+        private const string COLUMN_STATEMENTDATE = "StatementDate";
         private const string COLUMN_DOCSTATUS = "DocStatus";
         private const string COLUMN_DOCTYPE = "C_DocType_ID";
         private const string COLUMN_CURRENCY = "C_Currency_ID";
@@ -426,6 +466,7 @@ namespace VASLogic.Models
             ApplyLineStrategies(ctx, byTable);
 
             Dictionary<int, List<ScreenItem>> screensByTable = ReadSourceScreens(ctx);
+            Dictionary<int, ScreenItem> primaryByTable = ReadPrimaryScreens(ctx);
 
             foreach (SourceItem item in byTable.Values)
             {
@@ -438,12 +479,35 @@ namespace VASLogic.Models
                 if (!IsSafeIdentifier(item.KeyColumn)) { continue; }
                 if (!IsSafeIdentifier(item.DateColumn)) { continue; }
 
+                ScreenItem primary;
+                if (!primaryByTable.TryGetValue(item.AD_Table_ID, out primary)) { primary = null; }
+
                 List<ScreenItem> screens;
-                if (!screensByTable.TryGetValue(item.AD_Table_ID, out screens)) { continue; }
+                if (!screensByTable.TryGetValue(item.AD_Table_ID, out screens) || screens.Count == 0)
+                {
+                    /* No tab DISPLAYS the Posted field - the column is there, the
+                       posting is real, but no window declares a field over it, or the
+                       only ones that do sit on tabs marked not displayed.
+
+                       Dropping the table here is what used to happen, and it cost the
+                       card every record of that table while the VAS_195 checklist -
+                       which asks only for a menu-reachable window over the TABLE -
+                       listed all of them. A screen is how this card LABELS a row, not
+                       what makes a document unposted, so a table with no Posted-bearing
+                       screen falls back to its primary window and contributes one
+                       unsplit row rather than nothing at all. */
+                    if (primary == null) { continue; }
+
+                    Log.Log(Level.INFO, "VAS_198: " + item.TableName + " has a Posted column but no tab"
+                        + " displaying it; falling back to its primary window as a single unsplit row");
+
+                    screens = new List<ScreenItem>();
+                    screens.Add(primary);
+                }
 
                 /* One row per SCREEN, which is what the user recognises - Purchase
                    Order and Sales Order are two screens over one C_Order table. */
-                List<SourceItem> perScreen = SplitByScreen(item, screens);
+                List<SourceItem> perScreen = SplitByScreen(item, screens, primary);
                 for (int i = 0; i < perScreen.Count; i++)
                 {
                     perScreen[i].DisplayName = ResolveDisplayName(perScreen[i]);
@@ -485,6 +549,7 @@ namespace VASLogic.Models
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_DOCUMENTNO + @"' THEN c.ColumnName END) AS Document_No_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_DATEACCT + @"' THEN c.ColumnName END) AS Date_Acct_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_MOVEMENTDATE + @"' THEN c.ColumnName END) AS Movement_Date_Column,
+                       MAX(CASE WHEN c.ColumnName='" + COLUMN_STATEMENTDATE + @"' THEN c.ColumnName END) AS Statement_Date_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_DOCSTATUS + @"' THEN c.ColumnName END) AS Doc_Status_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_DOCTYPE + @"' THEN c.ColumnName END) AS Doc_Type_Column,
                        MAX(CASE WHEN c.ColumnName='" + COLUMN_CURRENCY + @"' THEN c.ColumnName END) AS Currency_Column,
@@ -532,6 +597,7 @@ namespace VASLogic.Models
                 item.DocumentNoColumn = Util.GetValueOfString(dr["Document_No_Column"]);
                 item.DateAcctColumn = Util.GetValueOfString(dr["Date_Acct_Column"]);
                 item.MovementDateColumn = Util.GetValueOfString(dr["Movement_Date_Column"]);
+                item.StatementDateColumn = Util.GetValueOfString(dr["Statement_Date_Column"]);
                 item.DateColumn = ResolveDateColumn(item);
                 item.DocStatusColumn = Util.GetValueOfString(dr["Doc_Status_Column"]);
                 item.DocTypeColumn = Util.GetValueOfString(dr["Doc_Type_Column"]);
@@ -831,22 +897,34 @@ namespace VASLogic.Models
 
         /// <summary>
         /// The column the period bounds are applied to: DateAcct where the table has
-        /// one, otherwise MovementDate.
+        /// one, else MovementDate, else StatementDate.
         ///
-        /// This is a SHORT, EXPLICIT fallback list, not a scan for anything that
-        /// looks like a date. §19 rules out guessing between DateTrx / MovementDate /
+        /// This is a SHORT, EXPLICIT fallback list, not a scan for anything that looks
+        /// like a date. §19 rules out guessing between DateTrx / DateOrdered /
         /// DateInvoiced precisely because those three mean different things - but it
-        /// permits a trusted mapping, and MovementDate is the accounting date of the
-        /// inventory documents that have no DateAcct at all (movements, physical
-        /// inventories): for those the movement IS the accounting event. Nothing else
-        /// is accepted; a table with neither column is still excluded.
+        /// permits a trusted mapping, and the other two ARE the accounting date of
+        /// their own documents, which is how the platform itself treats them:
+        ///
+        ///   MovementDate    the inventory documents (movements, physical inventories)
+        ///                   have no DateAcct at all - for those the movement IS the
+        ///                   accounting event.
+        ///   StatementDate   C_BankStatement likewise carries no DateAcct on its header,
+        ///                   only on its lines, and MBankStatement tests the period with
+        ///                   MPeriod.IsOpen(ctx, GetStatementDate(), ...). Without this
+        ///                   third fallback the table resolved to no date column and was
+        ///                   dropped from discovery in silence.
+        ///
+        /// Nothing else is accepted; a table with none of the three is still excluded.
+        /// Chronological development:
+        ///   VAI154      2026-08-24 StatementDate admitted (C_BankStatement)
         /// </summary>
-        /// <param name="item">Discovered source carrying both probe results.</param>
-        /// <returns>The date column to bound by, or "" when the table has neither.</returns>
+        /// <param name="item">Discovered source carrying the probe results.</param>
+        /// <returns>The date column to bound by, or "" when the table has none.</returns>
         private string ResolveDateColumn(SourceItem item)
         {
             if (IsSafeIdentifier(item.DateAcctColumn)) { return item.DateAcctColumn; }
             if (IsSafeIdentifier(item.MovementDateColumn)) { return item.MovementDateColumn; }
+            if (IsSafeIdentifier(item.StatementDateColumn)) { return item.StatementDateColumn; }
             return "";
         }
 
@@ -892,10 +970,13 @@ namespace VASLogic.Models
         {
             Dictionary<int, List<ScreenItem>> byTable = new Dictionary<int, List<ScreenItem>>();
 
-            /* AD_Window carries no DisplayName column in this schema, so the screen
-               name is AD_Window.Name, preferring its translation for the session
-               language where one is seeded. The tab name is translated the same way -
-               it is what disambiguates two sources on one window. */
+            /* Screen name: the session language's translation, then the window's
+               DisplayName, then its Name. AD_Window.Name is the last resort but it must
+               be there - DisplayName is optional and often null, and without this
+               fallback such a window resolves to an empty name, falls back to its tab's
+               (generic) name and sorts ahead of its siblings. The tab name is
+               translated the same way - it is what disambiguates two sources on one
+               window. */
             string sql = @"
                 SELECT DISTINCT t.AD_Table_ID AS AD_Table_ID,
                        tab.AD_Tab_ID AS AD_Tab_ID,
@@ -903,7 +984,7 @@ namespace VASLogic.Models
                        tab.SeqNo AS Tab_Seq_No,
                        COALESCE(tab.WhereClause,N'') AS Tab_Where_Clause,
                        w.AD_Window_ID AS AD_Window_ID,
-                       COALESCE(wtrl.Name,w.DisplayName,N'') AS Window_Name
+                       COALESCE(wtrl.Name,w.DisplayName,w.Name,N'') AS Window_Name
                 FROM AD_Table t
                 INNER JOIN AD_Column c ON (c.AD_Table_ID=t.AD_Table_ID)
                 INNER JOIN AD_Field f ON (f.AD_Column_ID=c.AD_Column_ID)
@@ -918,7 +999,7 @@ namespace VASLogic.Models
                   AND c.ColumnName='" + COLUMN_POSTED + @"'
                   AND f.IsActive='Y'
                   /*AND f.IsDisplayed='Y'*/
-                  AND t.IsView = 'N' 
+                  AND COALESCE(t.IsView,'N')='N'
                   AND tab.IsActive='Y'
                   AND tab.IsDisplayed='Y'
                   AND w.IsActive='Y'";
@@ -951,7 +1032,7 @@ namespace VASLogic.Models
                 screen.AD_Tab_ID = Util.GetValueOfInt(dr["AD_Tab_ID"]);
                 screen.WindowName = Util.GetValueOfString(dr["Window_Name"]);
                 screen.TabName = Util.GetValueOfString(dr["Tab_Name"]);
-                screen.WhereClause = Util.GetValueOfString(dr["Tab_Where_Clause"]);
+                screen.WhereClause = ResolveWhereClause(ctx, Util.GetValueOfString(dr["Tab_Where_Clause"]));
 
                 if (screen.AD_Window_ID <= 0) { continue; }
 
@@ -972,6 +1053,99 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// The ONE window a reader would open each Posted-carrying table on, regardless
+        /// of whether any tab declares a field over its Posted column.
+        ///
+        /// This is the safety net under the whole screen mechanism, and it serves two
+        /// rows that would otherwise not exist:
+        ///
+        ///   the fallback row  a table whose Posted column has no AD_Field on a
+        ///                     displayed tab returns no screen at all from
+        ///                     <see cref="ReadSourceScreens"/>, and used to be dropped
+        ///                     from the card in silence - every one of its unposted
+        ///                     documents with it.
+        ///   the complement    a table whose screens ALL carry a filter has no window
+        ///                     to hang "everything the other screens did not claim" on,
+        ///                     and the records matching none of those filters appeared
+        ///                     nowhere. They hang on this window instead.
+        ///
+        /// The primary window is the one whose HEADER tab (TabLevel 0) is over the
+        /// table - the window that opens the record itself rather than showing it as
+        /// somebody else's child tab - lowest tab sequence first, then lowest window id
+        /// so the same installation always resolves the same screen. Menu-reachable and
+        /// active, exactly as VAS_195 resolves the same thing.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <returns>One primary screen per table, keyed by AD_Table_ID (never null).</returns>
+        private Dictionary<int, ScreenItem> ReadPrimaryScreens(Ctx ctx)
+        {
+            Dictionary<int, ScreenItem> byTable = new Dictionary<int, ScreenItem>();
+
+            /* No WhereClause is read: this screen stands for the whole table by
+               definition, and giving it a filter would defeat the point of having it. */
+            string sql = @"
+                SELECT t.AD_Table_ID AS AD_Table_ID,
+                       tab.AD_Tab_ID AS AD_Tab_ID,
+                       tab.SeqNo AS Tab_Seq_No,
+                       COALESCE(tabtrl.Name,tab.Name,N'') AS Tab_Name,
+                       w.AD_Window_ID AS AD_Window_ID,
+                       COALESCE(wtrl.Name,w.DisplayName,w.Name,N'') AS Window_Name
+                FROM AD_Table t
+                INNER JOIN AD_Tab tab ON (tab.AD_Table_ID=t.AD_Table_ID)
+                INNER JOIN AD_Window w ON (w.AD_Window_ID=tab.AD_Window_ID)
+                INNER JOIN AD_Menu m ON (m.AD_Window_ID=w.AD_Window_ID)
+                LEFT OUTER JOIN AD_Window_Trl wtrl ON (wtrl.AD_Window_ID=w.AD_Window_ID AND wtrl.AD_Language=@AD_Language AND wtrl.IsActive='Y')
+                LEFT OUTER JOIN AD_Tab_Trl tabtrl ON (tabtrl.AD_Tab_ID=tab.AD_Tab_ID AND tabtrl.AD_Language=@AD_Language AND tabtrl.IsActive='Y')
+                WHERE t.IsActive='Y'
+                  AND COALESCE(t.IsView,'N')='N'
+                  AND EXISTS(SELECT 1 FROM AD_Column pc WHERE pc.AD_Table_ID=t.AD_Table_ID AND pc.ColumnName='" + COLUMN_POSTED + @"' AND pc.IsActive='Y')
+                  AND tab.IsActive='Y'
+                  /* Header tabs only. COALESCE because TabLevel is NULLable, and a bare
+                     comparison would be NULL - never true - on every row that leaves it
+                     unset, which is most of them. */
+                  AND COALESCE(tab.TabLevel,0)=0
+                  AND w.IsActive='Y'
+                  AND m.IsActive='Y'";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "t", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            /* A total order, so the first row of each table is a stable choice. */
+            sql += " ORDER BY t.AD_Table_ID,tab.SeqNo,w.AD_Window_ID,tab.AD_Tab_ID";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@AD_Language", ctx.GetAD_Language())
+            };
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
+            if (ds == null || ds.Tables.Count == 0) { return byTable; }
+
+            DataTable dt = ds.Tables[0];
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                DataRow dr = dt.Rows[i];
+
+                int tableId = Util.GetValueOfInt(dr["AD_Table_ID"]);
+                int windowId = Util.GetValueOfInt(dr["AD_Window_ID"]);
+                if (tableId <= 0 || windowId <= 0) { continue; }
+
+                /* First row wins - the ORDER BY above already decided which. */
+                if (byTable.ContainsKey(tableId)) { continue; }
+
+                ScreenItem screen = new ScreenItem();
+                screen.AD_Window_ID = windowId;
+                screen.AD_Tab_ID = Util.GetValueOfInt(dr["AD_Tab_ID"]);
+                screen.WindowName = Util.GetValueOfString(dr["Window_Name"]);
+                screen.TabName = Util.GetValueOfString(dr["Tab_Name"]);
+                screen.WhereClause = "";
+
+                byTable[tableId] = screen;
+            }
+
+            return byTable;
+        }
+
+        /// <summary>
         /// Turns one discovered table into the card rows it deserves: one per SCREEN
         /// its Posted field appears on.
         ///
@@ -982,31 +1156,48 @@ namespace VASLogic.Models
         /// Sales Order, GRN beside Delivery Order, all over one physical table.
         ///
         /// Where it is not - a clause carrying @context@ variables this widget cannot
-        /// resolve, or no clause at all - the windows cannot be separated, and the
-        /// table collapses back to ONE row covering all of its records. That is the
-        /// deliberate choice: one honest row beats several rows each listing the same
-        /// documents.
+        /// resolve, a clause reaching for a table this statement does not join, or no
+        /// clause at all - the windows cannot be separated, and the table collapses back
+        /// to ONE row covering all of its records. That is the deliberate choice: one
+        /// honest row beats several rows each listing the same documents.
+        ///
+        /// Whatever the split, it is EXHAUSTIVE. Every record of the table lands in
+        /// exactly one row of the card, because the filtered screens are always
+        /// accompanied by a row carrying their complement - see
+        /// <see cref="ComplementClause"/>. Without that guarantee a document simply
+        /// disappears from the card while remaining unposted, which is the one failure
+        /// this widget cannot have.
         /// </summary>
         /// <param name="item">Discovered table.</param>
         /// <param name="screens">Every screen its Posted field is displayed on.</param>
+        /// <param name="primary">The table's primary window, to carry the complement
+        /// row when no screen of its own can; may be null.</param>
         /// <returns>One or more sources (never null; empty when there is no screen).</returns>
-        private List<SourceItem> SplitByScreen(SourceItem item, List<ScreenItem> screens)
+        private List<SourceItem> SplitByScreen(SourceItem item, List<ScreenItem> screens, ScreenItem primary)
         {
             List<SourceItem> result = new List<SourceItem>();
             if (screens == null || screens.Count == 0) { return result; }
 
             List<ScreenItem> separable = new List<ScreenItem>();
+            List<ScreenItem> unfiltered = new List<ScreenItem>();
+
             for (int i = 0; i < screens.Count; i++)
             {
-                if (IsUsableWhereClause(screens[i].WhereClause)
-                    && screens[i].WhereClause.Trim().Length > 0)
+                string clause = screens[i].WhereClause;
+
+                if (clause != null && clause.Trim().Length > 0
+                    && IsUsableWhereClause(clause) && ReferencesOnlyTable(clause, item.TableName))
                 {
                     separable.Add(screens[i]);
                 }
+                else
+                {
+                    unfiltered.Add(screens[i]);
+                }
             }
 
-            /* Fewer than two separable screens means there is nothing to separate. */
-            if (separable.Count < 2)
+            /* Nothing separable: one row covering every record of the table. */
+            if (separable.Count == 0)
             {
                 SourceItem single = CloneForScreen(item, screens[0]);
                 single.WhereClause = "";
@@ -1019,7 +1210,213 @@ namespace VASLogic.Models
                 result.Add(CloneForScreen(item, separable[i]));
             }
 
+            /* Whatever the filtered screens did not claim still has to appear somewhere,
+               and this is the row that carries it.
+
+               Dropping it - which is what happened before - loses documents outright:
+               C_Order's Sales Order tab carries no WhereClause while Purchase Order,
+               Quotation and Blanket Order all carry one, so an ordinary sales order
+               matched none of the surviving rows and appeared nowhere on the card. Its
+               row is therefore the COMPLEMENT of its filtered siblings: everything the
+               other screens did not claim. That keeps the split exhaustive without
+               double counting, which a plain unfiltered row would not.
+
+               A window with no filter of its own is the natural place to hang it, and
+               those are unique by window. When EVERY screen of the table carries a filter
+               there is no such window - and that case used to produce no complement row
+               at all, so every record matching none of the tab filters was invisible on
+               this card while the VAS_195 checklist, which applies no tab filter, counted
+               all of them. The table's primary window stands in.
+
+               That stand-in comes from a different query, though, and may well BE one of
+               the filtered screens. Two card rows sharing a window id cannot be told
+               apart by a drill-down request, which identifies a row by table and window
+               alone, so a colliding carrier is refused and the table collapses to one row
+               below. */
+            ScreenItem carrier = unfiltered.Count > 0 ? unfiltered[0] : primary;
+            if (carrier != null && unfiltered.Count == 0 && ClaimsWindow(separable, carrier.AD_Window_ID))
+            {
+                carrier = null;
+            }
+
+            string complement = carrier != null ? ComplementClause(item, separable) : "";
+
+            /* Two ways the complement can fail to exist: no window to hang it on, or a
+               composition too long to be one. Either way the split is no longer known to
+               be exhaustive, and a split that might lose a record is worse than no split
+               at all - so the table collapses to one honest row over all of it. Coarser
+               than intended, never short of documents. */
+            if (carrier == null || complement.Length == 0
+                || complement.Length > WHERECLAUSE_COMPOSED_MAX)
+            {
+                Log.Log(Level.WARNING, "VAS_198: " + item.TableName + " has " + separable.Count
+                    + " filtered screens whose complement cannot be expressed"
+                    + (carrier == null ? " (no window to carry it)" : " (composed filter too long)")
+                    + "; reporting the whole table as one row");
+
+                SourceItem whole = CloneForScreen(item, carrier != null ? carrier : screens[0]);
+                whole.WhereClause = "";
+
+                result.Clear();
+                result.Add(whole);
+                return result;
+            }
+
+            SourceItem rest = CloneForScreen(item, carrier);
+            rest.WhereClause = complement;
+
+            /* Server-composed, not dictionary text: it is longer than a tab filter is
+               allowed to be and it qualifies its own inner alias, so the raw-clause
+               guards must not be applied to it a second time. */
+            rest.IsComposedWhereClause = true;
+            result.Add(rest);
+
+            if (unfiltered.Count > 1)
+            {
+                Log.Log(Level.WARNING, "VAS_198: " + item.TableName + " has "
+                    + unfiltered.Count + " screens with no usable filter; '"
+                    + unfiltered[0].WindowName + "' represents them all as the catch-all row");
+            }
+
             return result;
+        }
+
+        /// <summary>Whether any of these screens already occupies a given window.</summary>
+        /// <param name="screens">Screens already holding a row of the card.</param>
+        /// <param name="windowId">Window a further row would want to use.</param>
+        /// <returns>true when the window is taken.</returns>
+        private bool ClaimsWindow(List<ScreenItem> screens, int windowId)
+        {
+            for (int i = 0; i < screens.Count; i++)
+            {
+                if (screens[i].AD_Window_ID == windowId) { return true; }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// The complement of a set of screen filters: every record none of them claims.
+        ///
+        /// Written as a NOT EXISTS keyed on the table's own primary key rather than as
+        /// "NOT (a) AND NOT (b)", and that is the whole point of the method.
+        ///
+        /// SQL predicates are three-valued. If a sibling clause tests a column that is
+        /// NULL on some row, that clause is NULL there - so the row fails the sibling's
+        /// own branch (NULL is not true) AND fails NOT(clause) in the complement (NOT
+        /// NULL is still NULL). It lands in no row of the card at all and quietly stops
+        /// being reported, which on an unposted-entries card is the worst possible way
+        /// to be wrong. The earlier code documented this as a caveat it could not fix
+        /// portably, because the obvious repair is a boolean COALESCE that Oracle has no
+        /// form of.
+        ///
+        /// EXISTS is two-valued, which is the way out. The correlated sub-select returns
+        /// a row only when the outer record genuinely satisfies one of the clauses; when
+        /// a clause evaluates to NULL it returns nothing, so NOT EXISTS is TRUE and the
+        /// record falls into the complement - exactly where an unclaimed record belongs.
+        /// The key equality makes it at most a single primary-key probe per row.
+        ///
+        /// The clauses inside deliberately still reference the OUTER alias: a tab
+        /// WhereClause qualifies its columns with the table name, the outer alias IS the
+        /// table name (see <see cref="SourceAlias"/>), and the inner copy is aliased to
+        /// something else precisely so those references keep resolving outward.
+        /// </summary>
+        /// <param name="item">Discovered table, supplying the table and key names.</param>
+        /// <param name="screens">Screens carrying resolved, usable clauses.</param>
+        /// <returns>Predicate fragment, or "" when there is nothing to complement.</returns>
+        private string ComplementClause(SourceItem item, List<ScreenItem> screens)
+        {
+            if (screens == null || screens.Count == 0) { return ""; }
+
+            StringBuilder claimed = new StringBuilder();
+
+            for (int i = 0; i < screens.Count; i++)
+            {
+                if (claimed.Length > 0) { claimed.Append(" OR "); }
+                claimed.Append("(").Append(screens[i].WhereClause).Append(")");
+            }
+
+            /* Both names came from the dictionary and were validated by the caller, but
+               they are being concatenated into SQL, so they are checked once more here -
+               the same belt-and-braces rule every other generated identifier follows. */
+            if (!IsSafeIdentifier(item.TableName) || !IsSafeIdentifier(item.KeyColumn)) { return ""; }
+
+            return "NOT EXISTS(SELECT 1 FROM " + item.TableName + " VAS198Claimed"
+                 + " WHERE VAS198Claimed." + item.KeyColumn + "=" + SourceAlias(item) + "." + item.KeyColumn
+                 + " AND (" + claimed.ToString() + "))";
+        }
+
+        /// <summary>
+        /// Whether a resolved WhereClause reads ONLY the source table's own columns.
+        ///
+        /// A tab filter is executed by the framework against a statement that joins
+        /// whatever that window joins, so a perfectly valid clause can say
+        /// "C_DocType.DocBaseType='ARC'" - and this widget's statement selects from the
+        /// transaction table alone. Pasting such a clause in does not return the wrong
+        /// rows, it throws; ReadSourceTotal then logs the failure and returns null, and
+        /// GetPeriodData skips that source entirely. The result is a screen's worth of
+        /// unposted documents missing from the card with nothing on screen to say so,
+        /// while VAS_195 - which applies no tab filter - reports every one of them.
+        ///
+        /// So a clause reaching for another table is refused here instead, and the
+        /// screen degrades to an unfiltered one. That is a coarser split, never a lost
+        /// record: an unfiltered screen either becomes the complement row or collapses
+        /// the table to a single row, both of which still cover everything.
+        ///
+        /// The scan is deliberately literal-aware - a quoted string may contain a dot
+        /// and means nothing here - and ignores a dot that is part of a number. A
+        /// qualifier is accepted when it names the source table itself; a subquery that
+        /// brings its own FROM and qualifies nothing is accepted too, since it resolves
+        /// on its own.
+        /// </summary>
+        /// <param name="clause">Resolved WhereClause.</param>
+        /// <param name="tableName">The only table this statement can resolve.</param>
+        /// <returns>true when every qualified reference names the source table.</returns>
+        private bool ReferencesOnlyTable(string clause, string tableName)
+        {
+            if (string.IsNullOrEmpty(clause)) { return false; }
+            if (string.IsNullOrEmpty(tableName)) { return false; }
+
+            bool inLiteral = false;
+
+            for (int i = 0; i < clause.Length; i++)
+            {
+                char ch = clause[i];
+
+                if (ch == '\'') { inLiteral = !inLiteral; continue; }
+                if (inLiteral || ch != '.') { continue; }
+
+                /* A dot only qualifies something when a column name follows it;
+                   "1.5" and a trailing dot qualify nothing. */
+                if (i + 1 >= clause.Length) { continue; }
+                char next = clause[i + 1];
+                if (!((next >= 'A' && next <= 'Z') || (next >= 'a' && next <= 'z') || next == '_')) { continue; }
+
+                int end = i;
+                int start = i;
+                while (start > 0 && IsIdentifierChar(clause[start - 1])) { start--; }
+
+                if (start == end) { continue; }
+
+                string qualifier = clause.Substring(start, end - start);
+
+                /* A numeric prefix is a literal, not a table. */
+                char first = qualifier[0];
+                if (!((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z') || first == '_')) { continue; }
+
+                if (!qualifier.Equals(tableName, StringComparison.OrdinalIgnoreCase)) { return false; }
+            }
+
+            return true;
+        }
+
+        /// <summary>Whether a character may appear inside an unquoted SQL identifier.</summary>
+        /// <param name="ch">Character under test.</param>
+        /// <returns>true for a letter, a digit or an underscore.</returns>
+        private bool IsIdentifierChar(char ch)
+        {
+            return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')
+                || (ch >= '0' && ch <= '9') || ch == '_';
         }
 
         /// <summary>
@@ -1040,6 +1437,7 @@ namespace VASLogic.Models
             copy.DocumentNoColumn = item.DocumentNoColumn;
             copy.DateAcctColumn = item.DateAcctColumn;
             copy.MovementDateColumn = item.MovementDateColumn;
+            copy.StatementDateColumn = item.StatementDateColumn;
             copy.DateColumn = item.DateColumn;
             copy.DocStatusColumn = item.DocStatusColumn;
             copy.DocTypeColumn = item.DocTypeColumn;
@@ -1059,22 +1457,90 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Whether a tab's WhereClause may be pasted into this widget's SQL.
+        /// Resolves a tab's WhereClause against the SESSION context and returns the
+        /// usable text, or "" when it cannot be used here.
+        ///
+        /// Most dictionary WhereClauses that carry an @variable@ carry a GLOBAL one -
+        /// @#AD_Client_ID@ and friends - which the session context can supply perfectly
+        /// well. Rejecting every clause containing an '@' therefore threw away filters
+        /// that were entirely resolvable, and with them the screens those filters exist
+        /// to tell apart.
+        ///
+        /// So the clause is PARSED first, with window number 0 - this widget has no
+        /// window and no current record, so only global context resolves, which is the
+        /// point. What Env.ParseContext cannot fill in it reports by returning empty,
+        /// and anything that still carries an '@' afterwards was a window-level
+        /// variable this widget genuinely cannot answer for. Those are still refused:
+        /// a half-resolved predicate does not fail loudly, it silently returns the
+        /// wrong rows.
+        ///
+        /// The safety check runs on the RESOLVED text, not the raw text, so a context
+        /// value cannot smuggle in a terminator or a comment.
+        /// </summary>
+        /// <param name="ctx">Session context (supplies the global variables).</param>
+        /// <param name="clause">AD_Tab.WhereClause, possibly empty.</param>
+        /// <returns>The resolved, checked clause, or "" when unusable.</returns>
+        private string ResolveWhereClause(Ctx ctx, string clause)
+        {
+            if (clause == null) { return ""; }
+
+            string text = clause.Trim();
+            if (text.Length == 0) { return ""; }
+
+            if (text.IndexOf('@') >= 0)
+            {
+                try
+                {
+                    text = Env.ParseContext(ctx, 0, text, false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Log(Level.WARNING, "VAS_198: a tab WhereClause could not be resolved "
+                        + "against the session context and is ignored", ex);
+                    return "";
+                }
+
+                if (string.IsNullOrEmpty(text)) { return ""; }
+                text = text.Trim();
+            }
+
+            return IsUsableWhereClause(text) ? text : "";
+        }
+
+        /// <summary>
+        /// Whether an ALREADY RESOLVED WhereClause may be pasted into this widget's SQL.
         ///
         /// The text is the framework's own filter for that window rather than anything
         /// a user typed, and it is executed verbatim every time the window opens - but
         /// it IS dictionary data, and dictionary data can be edited, so it is checked
-        /// before it is concatenated. Rejected: an @context@ variable (this widget has
-        /// no window context to resolve one against, and a half-resolved predicate
-        /// silently returns the wrong rows), a statement terminator, and either
-        /// comment form, any of which could hide what follows.
+        /// before it is concatenated. Rejected: a surviving @variable@ (see
+        /// <see cref="ResolveWhereClause"/> - by this point one the session context
+        /// could not answer for), a statement terminator, and either comment form, any
+        /// of which could hide what follows.
         /// </summary>
-        /// <param name="clause">AD_Tab.WhereClause, possibly empty.</param>
+        /// <param name="clause">Resolved WhereClause, possibly empty.</param>
         /// <returns>true when the clause is safe and self-contained.</returns>
         private bool IsUsableWhereClause(string clause)
         {
             if (clause == null) { return false; }
             if (clause.Length > WHERECLAUSE_MAX) { return false; }
+
+            return IsSafeClauseText(clause);
+        }
+
+        /// <summary>
+        /// The character-level half of the clause guard, without the length bound: no
+        /// surviving @variable@, no statement terminator, neither comment form.
+        ///
+        /// Split out because a COMPOSED clause - a complement row's negation of its
+        /// siblings - is legitimately longer than any tab filter is allowed to be, while
+        /// still having to satisfy every one of these.
+        /// </summary>
+        /// <param name="clause">Clause text, raw or composed.</param>
+        /// <returns>true when the text hides nothing.</returns>
+        private bool IsSafeClauseText(string clause)
+        {
+            if (clause == null) { return false; }
 
             if (clause.IndexOf('@') >= 0) { return false; }
             if (clause.IndexOf(';') >= 0) { return false; }
@@ -1082,6 +1548,33 @@ namespace VASLogic.Models
             if (clause.IndexOf("/*", StringComparison.Ordinal) >= 0) { return false; }
 
             return true;
+        }
+
+        /// <summary>
+        /// Whether one source's filter may be pasted into its statement, applying the
+        /// guard that matches where the filter came from.
+        ///
+        /// A clause read from AD_Tab is dictionary data: bounded in length, and allowed
+        /// to qualify columns with the source table's name and nothing else. A clause
+        /// this class composed is neither - it is longer by design and it names its own
+        /// inner alias - so re-running the raw-text guards over it would reject it and,
+        /// worse, drop it SILENTLY, turning a complement row into a row over the whole
+        /// table that double counts every one of its filtered siblings.
+        /// </summary>
+        /// <param name="source">Discovered source carrying the filter.</param>
+        /// <returns>true when the filter is safe to concatenate.</returns>
+        private bool IsUsableClauseFor(SourceItem source)
+        {
+            if (source == null || string.IsNullOrEmpty(source.WhereClause)) { return false; }
+
+            if (source.IsComposedWhereClause)
+            {
+                return source.WhereClause.Length <= WHERECLAUSE_COMPOSED_MAX
+                    && IsSafeClauseText(source.WhereClause);
+            }
+
+            return IsUsableWhereClause(source.WhereClause)
+                && ReferencesOnlyTable(source.WhereClause, source.TableName);
         }
 
         /// <summary>
@@ -1617,12 +2110,18 @@ namespace VASLogic.Models
                   .Append(" IN (").Append(DOCSTATUS_ACTIONABLE).Append(")");
             }
 
+            /* Inclusive start, EXCLUSIVE end - the end bind is the day after the period,
+               so a document stamped with a time on the period's last day still lands
+               inside its own period on both backends, without a TRUNC or a cast. It used
+               to be an inclusive bound against midnight, which silently dropped every
+               such document and was one of the two reasons this card disagreed with the
+               VAS_195 close checklist, which has always bounded periods this way. */
             sb.Append(" AND ").Append(alias).Append(".").Append(source.DateColumn).Append(">=@StartDate");
-            sb.Append(" AND ").Append(alias).Append(".").Append(source.DateColumn).Append("<=@EndDate");
+            sb.Append(" AND ").Append(alias).Append(".").Append(source.DateColumn).Append("<@EndDate");
 
             /* The screen's own filter, last and parenthesised so an OR inside it
                cannot reach past its own brackets and widen everything above. */
-            if (!string.IsNullOrEmpty(source.WhereClause) && IsUsableWhereClause(source.WhereClause))
+            if (IsUsableClauseFor(source))
             {
                 sb.Append(" AND (").Append(source.WhereClause).Append(")");
             }
@@ -1656,7 +2155,11 @@ namespace VASLogic.Models
         private SqlParameter[] SourceWhereParameters(Ctx ctx, PeriodItem period)
         {
             DateTime from = period.StartDate.HasValue ? period.StartDate.Value.Date : DateTime.MinValue;
-            DateTime to = period.EndDate.HasValue ? period.EndDate.Value.Date : DateTime.MaxValue.Date;
+
+            /* The day AFTER the period's last day - @EndDate is compared with '<'. */
+            DateTime to = period.EndDate.HasValue
+                ? period.EndDate.Value.Date.AddDays(1)
+                : DateTime.MaxValue.Date;
 
             return new SqlParameter[]
             {
@@ -1823,7 +2326,10 @@ namespace VASLogic.Models
             /// <summary>Inclusive lower bound applied to the document's DateAcct.</summary>
             public DateTime? StartDate { get; set; }
 
-            /// <summary>Inclusive upper bound applied to the document's DateAcct.</summary>
+            /// <summary>
+            /// The period's own last day. The bound the queries apply is the day AFTER
+            /// this one, compared exclusively - see <see cref="SourceWhereParameters"/>.
+            /// </summary>
             public DateTime? EndDate { get; set; }
 
             public int C_Year_ID { get; set; }
@@ -1854,6 +2360,9 @@ namespace VASLogic.Models
             public string DocumentNoColumn { get; set; }
             public string DateAcctColumn { get; set; }
             public string MovementDateColumn { get; set; }
+
+            /// <summary>StatementDate probe - the bank statement's accounting date.</summary>
+            public string StatementDateColumn { get; set; }
             public string DocStatusColumn { get; set; }
             public string DocTypeColumn { get; set; }
             public string CurrencyColumn { get; set; }
@@ -1897,6 +2406,14 @@ namespace VASLogic.Models
             /// whole table.
             /// </summary>
             public string WhereClause { get; set; }
+
+            /// <summary>
+            /// Whether <see cref="WhereClause"/> was COMPOSED here rather than read from
+            /// AD_Tab - true only on a complement row. It decides which guard
+            /// <see cref="IsUsableClauseFor"/> applies, because a composed filter is
+            /// longer than a tab filter may be and names an alias of its own.
+            /// </summary>
+            public bool IsComposedWhereClause { get; set; }
         }
 
         /// <summary>

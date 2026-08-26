@@ -183,6 +183,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_198_UnPostedAccountEntriesWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_199_PaymentAllocationStatusWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_200_BankReconcilationWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_195_MandatoryChecklistWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_201_UnMatchedGRNInvoiceWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_202_SuspenseBalancesWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_178_NewMaterialIssueQuickActionController.cs" />
@@ -1015,6 +1016,8 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\PeriodControl\VAS_201_UnMatchedGRNInvoiceWidget.js" />
     <Content Include="Areas\VAS\Content\VAS_202_SuspenseBalancesWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\PeriodControl\VAS_202_SuspenseBalancesWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_195_MandatoryChecklistWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\PeriodControl\VAS_195_MandatoryChecklistWidget.js" />
     <Content Include="Areas\VAS\Content\VAS_181_ProductionIssuesWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_181_ProductionIssuesWidget.js" />
     <Content Include="Areas\VAS\Content\VAS_182_SparesConsumablesIssuesWidget.css" />

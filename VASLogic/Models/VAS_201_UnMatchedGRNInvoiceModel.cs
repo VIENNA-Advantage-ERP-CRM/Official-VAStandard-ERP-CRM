@@ -29,7 +29,12 @@ namespace VASLogic.Models
     ///                 GRNs not invoiced      a completed receipt no purchase
     ///                                        invoice line points at yet
     ///                 Invoices without GRN   a completed purchase invoice none of
-    ///                                        whose lines points at a receipt line
+    ///                                        whose MATCHABLE lines points at a receipt
+    ///                                        line. Charge lines are not matchable - a
+    ///                                        freight or duty charge is never received
+    ///                                        into stock - so they are excluded, and an
+    ///                                        invoice made up only of charges is not an
+    ///                                        exception at all
     ///                 Qty / price mismatches receipt and invoice ARE matched, but
     ///                                        the quantities or the prices differ
     ///
@@ -71,7 +76,8 @@ namespace VASLogic.Models
     ///               AddAccessSQL so the FROM-clause parser is not confused by a
     ///               trailing clause. Compatible with PostgreSQL and Oracle.
     /// Chronological development:
-    ///   VAI154      2026-08-20 Created
+    ///   VAI145      2026-08-20 Created
+    ///   VAI145      2026-08-24 Invoice-without-GRN check excludes charge lines
     /// </summary>
     public class VAS_201_UnMatchedGRNInvoiceModel
     {
@@ -349,6 +355,7 @@ namespace VASLogic.Models
                 SELECT COUNT(1) AS Record_Count,
                        SUM(" + InvoiceValueExpr(baseCurrency, 1) + @") AS Base_Value
                 FROM C_Invoice i
+                INNER JOIN C_Invoiceline il ON (i.C_Invoice_ID=il.C_Invoice_ID)
                 WHERE " + InvoiceNoGrnWhere();
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -548,6 +555,7 @@ namespace VASLogic.Models
                        COALESCE(i.GrandTotal,0) AS Document_Value,
                        " + InvoiceValueExpr(baseCurrency, 1) + @" AS Base_Value
                 FROM C_Invoice i
+                INNER JOIN C_Invoiceline il ON (i.C_Invoice_ID=il.C_Invoice_ID)
                 INNER JOIN C_Currency cur ON (cur.C_Currency_ID=i.C_Currency_ID)
                 LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=i.C_BPartner_ID)
                 WHERE " + InvoiceNoGrnWhere();
@@ -695,14 +703,34 @@ namespace VASLogic.Models
         /// <summary>
         /// WHERE clause shared by the invoice-without-GRN count and list: a completed
         /// purchase invoice, inside the period by DateAcct, none of whose active
-        /// lines carries a receipt-line reference.
+        /// MATCHABLE lines carries a receipt-line reference.
+        ///
+        /// CHARGE LINES ARE NOT MATCHABLE and are excluded from both halves of the test.
+        /// A charge - freight, duty, a handling fee - is never received into stock, so
+        /// it can never carry an M_InOutLine_ID and its absence proves nothing.
+        ///
+        /// Both halves matter, and the EXISTS is not optional: excluding charges from
+        /// the NOT EXISTS alone would make an invoice consisting ENTIRELY of charge
+        /// lines look worse, not better - it has no non-charge line pointing at a
+        /// receipt, so it would satisfy the test and be reported as an unmatched
+        /// invoice. The EXISTS is what says "this invoice has something that could have
+        /// been received in the first place".
+        ///
+        /// COALESCE rather than IS NULL because an unset FK is stored as 0 here.
+        /// Chronological development:
+        ///   VAI154      2026-08-24 Charge lines excluded
         /// </summary>
         /// <returns>WHERE fragment binding @StartDate and @EndDate.</returns>
         private string InvoiceNoGrnWhere()
         {
             return PurchaseInvoiceScope("i") + @"
                   AND " + DateWhere("i") + @"
-                  AND NOT EXISTS(SELECT 1 FROM C_InvoiceLine il WHERE il.C_Invoice_ID=i.C_Invoice_ID AND il.IsActive='Y' AND il.M_InOutLine_ID IS NOT NULL)";
+                  AND il.M_Product_ID IS NOT NULL 
+                  AND EXISTS(SELECT 1 FROM C_InvoiceLine ilm WHERE ilm.C_Invoice_ID=i.C_Invoice_ID AND ilm.IsActive='Y' AND COALESCE(ilm.C_Charge_ID,0)=0)
+                  AND (ABS(COALESCE(il.QtyInvoiced,0))-COALESCE((SELECT SUM(ABS(COALESCE(mi.Qty,0))) FROM M_MatchInv mi
+                    WHERE mi.C_InvoiceLine_ID=il.C_InvoiceLine_ID
+                      AND mi.IsActive='Y' AND COALESCE(mi.Processed,'Y')='Y'),0))>0
+                  /*AND NOT EXISTS(SELECT 1 FROM C_InvoiceLine il WHERE il.C_Invoice_ID=i.C_Invoice_ID AND il.IsActive='Y' AND COALESCE(il.C_Charge_ID,0)=0 AND il.M_InOutLine_ID IS NOT NULL)*/";
         }
 
         /// <summary>
