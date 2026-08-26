@@ -685,7 +685,7 @@ namespace VASLogic.Models
                                   COALESCE(il.QtyEntered, 0)                AS QtyEntered,
                                   p.Name                          AS ProductName,
                                   p.ProductType                   AS ProductType,
-                                  COALESCE(u.UOMSymbol, u.Name)   AS UomName,
+                                  COALESCE(u.Name, u.UOMSymbol)   AS UomName,
                                   asi.Description                 AS AttrName
                            FROM C_InvoiceLine il
                            LEFT JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
@@ -1000,7 +1000,7 @@ namespace VASLogic.Models
             string sql = "SELECT " + cols.ToString() +
                 @"COALESCE(p.Name, N'') AS VASCILDISP_ProductName,
                   COALESCE(ch.Name, N'') AS VASCILDISP_ChargeName,
-                  COALESCE(uom.UOMSymbol, uom.Name, N'') AS VASCILDISP_UOMName,
+                  COALESCE(uom.Name,uom.UOMSymbol, N'') AS VASCILDISP_UOMName,
                   COALESCE(t.Name, N'') AS VASCILDISP_TaxName,
                   COALESCE(asi.Description, N'') AS VASCILDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASCILDISP_HasAttrSet,
@@ -2011,7 +2011,7 @@ namespace VASLogic.Models
         {
             if (C_UOM_ID <= 0) return "";
             object o = DB.ExecuteScalar(
-                "SELECT COALESCE(UOMSymbol, Name) FROM C_UOM WHERE C_UOM_ID=@id",
+                "SELECT COALESCE(Name, UOMSymbol) FROM C_UOM WHERE C_UOM_ID=@id",
                 new SqlParameter[] { new SqlParameter("@id", C_UOM_ID) }, null);
             return Util.GetValueOfString(o);
         }
