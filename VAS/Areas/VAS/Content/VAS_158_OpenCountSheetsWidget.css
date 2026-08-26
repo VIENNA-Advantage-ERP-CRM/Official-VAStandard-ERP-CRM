@@ -20,7 +20,12 @@
     padding: 0.85em;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    /* Was justify-content: center, which vertically centred the label/value/meta stack in the card
+       while every other Inventory Count KPI card (VAS_156, 157, 159, 160) leaves the default
+       flex-start and renders its content from the top-left. That single declaration was the whole
+       visible inconsistency. The source prompt lists no justify-content for this widget either. */
+    justify-content: flex-start;
+    align-items: flex-start;
     gap: 0.25em;
     cursor: pointer;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -81,7 +86,10 @@
 
 .vas-opencountsheets-modal-dialog {
     width: clamp(340px, 85vw, 1400px);
-    height: clamp(420px, 85vh, 900px);
+    /* Content-sized: header + exactly --vas-rows lines + footer. The fixed clamp height forced a
+       ~900px popup regardless of how few rows existed, leaving a large empty band under the lines. */
+    height: auto;
+    max-height: clamp(420px, 85vh, 900px);
     font-size: clamp(14px, 1.2vw, 22px);
     background-color: #FFFFFF;
     border-radius: 16px;
@@ -134,7 +142,9 @@
 
 /* Modal Body Anchor */
 .vas-opencountsheets-modal-body {
-    padding: 1.125em 0.875em;
+    /* Vertical padding trimmed with the row padding so the tighter rows are not left floating in
+       a disproportionately tall body. */
+    padding: 0.75em 0.875em;
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
@@ -172,9 +182,12 @@
     text-align: right;
 }
 
-/* Data Rows */
+/* Data Rows
+   Row padding reduced 0.625em -> 0.375em (2026-08-16, user request: "reduce padding between lines
+   of modal"). Still relative to the modal's font anchor, so it scales; the status chip's own
+   0.3125em vertical padding keeps the row from collapsing below a comfortable touch height. */
 .vas-opencountsheets-data-row {
-    padding: 0.625em 0;
+    padding: 0.375em 0;
     border-bottom: 1px solid #E2EAF1;
     cursor: pointer;
     transition: background-color 0.15s ease;
@@ -235,7 +248,26 @@
     background-color: #EEF6FF;
     color: #0F69AC;
     text-align: center;
+    white-space: nowrap;
 }
+
+    /* The modal now returns three statuses instead of only Draft, so the chip carries a tone per
+       status from the standard chip palette. Without this a "Waiting Confirmation" row would wear
+       the same colour the user reads as "Draft". */
+    .vas-opencountsheets-status-chip.status-dr {
+        background-color: #F1F4F8;
+        color: #41576A;
+    }
+
+    .vas-opencountsheets-status-chip.status-ip {
+        background-color: #EAF8FF;
+        color: #0083DA;
+    }
+
+    .vas-opencountsheets-status-chip.status-wc {
+        background-color: #FFF6E2;
+        color: #9A6500;
+    }
 
 /* Modal Footer & Pager */
 .vas-opencountsheets-modal-footer {
@@ -308,3 +340,36 @@
     font-size: 0.8125em;
     color: #5F7283;
 }
+
+
+
+/* ============================================================================
+   POPUP — DETERMINISTIC HEIGHT (2026-08-18) — see VAS_156 for the rationale.
+   ============================================================================ */
+.vas-opencountsheets-modal-dialog {
+    --vas-rows: 7;
+    --vas-row-h: 2.6em;
+}
+
+.vas-opencountsheets-rows-container {
+    flex: 0 0 auto;
+    height: calc(var(--vas-rows) * var(--vas-row-h));
+    display: block;
+    overflow: hidden;
+}
+
+    .vas-opencountsheets-rows-container > .vas-opencountsheets-data-row {
+        height: var(--vas-row-h);
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+.vas-opencountsheets-filler {
+    pointer-events: none;
+    background: transparent !important;
+    cursor: default;
+}
+
+    .vas-opencountsheets-filler:hover {
+        background: transparent !important;
+    }

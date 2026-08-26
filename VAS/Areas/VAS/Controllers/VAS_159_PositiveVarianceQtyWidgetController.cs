@@ -42,20 +42,32 @@ namespace VIS.Controllers
             DateTime monthStart = new DateTime(now.Year, now.Month, 1);
             DateTime nextMonthStart = monthStart.AddMonths(1);
 
+            // Variance is COMPUTED as QtyCount - QtyBook, not read from the stored DifferenceQty.
+            //
+            // The source prompt asserts "DifferenceQty is the approved stored difference and
+            // represents QtyCount - QtyBook". Measured on DB 2 that is false: of 368 completed
+            // count lines, 348 hold the exact NEGATION (QtyBook - QtyCount), 20 hold NULL, and only
+            // the 3 zero-difference lines agree. Filtering on DifferenceQty > 0 therefore selected
+            // the lines that had counted SHORT, so this widget was reporting the negative population
+            // (and VAS_160 the positive one), with both totals wrong.
+            //
+            // Lines where QtyCount = QtyBook are ignored: the comparison also drops rows where
+            // either quantity is NULL, which is the wanted behaviour - an uncounted line is not a
+            // variance.
             string sql = @"
                 SELECT
-                    COALESCE(SUM(il.DifferenceQty), 0) AS variance_qty,
+                    COALESCE(SUM(il.QtyCount - il.QtyBook), 0) AS variance_qty,
                     COUNT(*) AS total_lines
                 FROM M_Inventory i
                 JOIN M_InventoryLine il
                     ON il.M_Inventory_ID = i.M_Inventory_ID
                 WHERE i.IsActive = 'Y'
                   AND il.IsActive = 'Y'
-                  AND i.IsInternalUse = 'N'
-                  AND i.DocStatus IN ('CO', 'CL')
+                  AND COALESCE(i.IsInternalUse, 'N') = 'N'
+                  AND i.DocStatus = 'CO'
                   AND i.MovementDate >= @MonthStart
                   AND i.MovementDate < @NextMonthStart
-                  AND il.DifferenceQty > 0";
+                  AND il.QtyCount > il.QtyBook";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql,
@@ -147,7 +159,10 @@ namespace VIS.Controllers
                     w.Value AS Warehouse,
                     l.Value AS Locator,
                     il.QtyCount,
-                    il.DifferenceQty,
+                    -- Computed, for the same reason as the summary query: the stored DifferenceQty
+                    -- column is sign-inverted on this data. Keeping the alias means the JSON
+                    -- contract and the JS are unchanged.
+                    (il.QtyCount - il.QtyBook) AS DifferenceQty,
                     i.MovementDate,
                     il.Line AS LineNo
                 FROM M_Inventory i
@@ -161,11 +176,11 @@ namespace VIS.Controllers
                     ON l.M_Locator_ID = il.M_Locator_ID
                 WHERE i.IsActive = 'Y'
                   AND il.IsActive = 'Y'
-                  AND i.IsInternalUse = 'N'
-                  AND i.DocStatus IN ('CO', 'CL')
+                  AND COALESCE(i.IsInternalUse, 'N') = 'N'
+                  AND i.DocStatus = 'CO'
                   AND i.MovementDate >= @MonthStart
                   AND i.MovementDate < @NextMonthStart
-                  AND il.DifferenceQty > 0";
+                  AND il.QtyCount > il.QtyBook";
 
             baseSql = MRole.GetDefault(ctx).AddAccessSQL(
                 baseSql,
@@ -264,3 +279,4 @@ namespace VIS.Controllers
         }
     }
 }
+

@@ -43,6 +43,11 @@
         write();
     }
 
+    // Window name/search key for the Inventory Count screen, per the source prompt's
+    // "Inventory Count navigation" section. Used as the fallback when the widget is not hosted
+    // inside that window itself.
+    var COUNT_WINDOW_NAME = "VAS_PhysicalInventory";
+
     VAS.VAS_158_OpenCountSheetsWidget = function () {
 
         this.frame;
@@ -56,7 +61,9 @@
         var draftCount = 0;
         var draftList = [];
         var currentPage = 1;
-        var pageSize = 8;
+        /* Lines the popup holds before paging. MUST stay in step with --vas-rows in
+       VAS_158_OpenCountSheetsWidget.css, which sizes the dialog to exactly this many rows. */
+        var pageSize = 7;
         var $modalOverlay = null;
         var widgetObserver = null;
 
@@ -206,7 +213,7 @@
             );
             $body.append($headerRow);
 
-            var $rowsContainer = $('<div class="vas-opencountsheets-rows-container" style="flex: 1; display: flex; flex-direction: column;"></div>');
+            var $rowsContainer = $('<div class="vas-opencountsheets-rows-container"></div>');
             $body.append($rowsContainer);
 
             var $footer = $(
@@ -226,6 +233,22 @@
 
         function updatePageRender($rowsContainer, $footer) {
             $rowsContainer.empty();
+
+            /* Invisible spacers so a short page occupies the same height as a full one. */
+            var appendFillerRows = function (count) {
+                for (var f = 0; f < count; f++) {
+                    $rowsContainer.append(
+                        '<div class="vas-opencountsheets-grid-row vas-opencountsheets-data-row vas-opencountsheets-filler" aria-hidden="true">' +
+                        '<div class="vas-opencountsheets-cell">&nbsp;</div>' +
+                        '<div class="vas-opencountsheets-cell">&nbsp;</div>' +
+                        '<div class="vas-opencountsheets-cell">&nbsp;</div>' +
+                        '<div class="vas-opencountsheets-cell">&nbsp;</div>' +
+                        '<div class="vas-opencountsheets-cell">&nbsp;</div>' +
+                        '<div class="vas-opencountsheets-cell">&nbsp;</div>' +
+                        '</div>'
+                    );
+                }
+            };
 
             var totalItems = draftList.length;
             var totalPages = Math.ceil(totalItems / pageSize) || 1;
@@ -250,7 +273,7 @@
                     '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-text" title="' + item.Locator + '">' + item.Locator + '</div>' +
                     '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-lines" title="' + item.Lines + '">' + item.Lines + '</div>' +
                     '<div class="vas-opencountsheets-cell vas-opencountsheets-cell-date" title="' + item.Started + '">' + item.Started + '</div>' +
-                    '<div class="vas-opencountsheets-cell"><span class="vas-opencountsheets-status-chip">' + item.Status + '</span></div>' +
+                    '<div class="vas-opencountsheets-cell"><span class="vas-opencountsheets-status-chip status-' + String(item.DocStatus || '').toLowerCase() + '">' + item.Status + '</span></div>' +
                     '</div>'
                 );
 
@@ -262,6 +285,9 @@
 
                 $rowsContainer.append($row);
             }
+
+            // Hold the popup at pageSize lines regardless of what this page holds.
+            appendFillerRows(Math.max(0, pageSize - pageItems.length));
 
             var $footerText = $footer.find('.vas-opencountsheets-footer-text');
             var $pagerInfo = $footer.find('.vas-opencountsheets-pager-info');
@@ -299,20 +325,46 @@
             }
         }
 
+        // The framework navigates IN-PLACE only when the payload's ActionName equals the name of the
+        // window currently HOSTING this widget; otherwise VIS.dynamicWidget resolves ActionName
+        // through UserPreference/GetWindowID and opens that window. Resolve the host name from the
+        // listener chain. Established pattern - VAS_091_MaterialReceiptSearchWidget.js zoomTo().
+        function hostWindowName() {
+            try {
+                var l = $self.listener;
+                for (var i = 0; i < 6 && l; i++) {
+                    if (l.apanel && l.apanel.gridWindow && l.apanel.gridWindow.getName) {
+                        return l.apanel.gridWindow.getName();
+                    }
+                    if (l.gridWindow && l.gridWindow.getName) {
+                        return l.gridWindow.getName();
+                    }
+                    l = l.listener;
+                }
+            } catch (e) { }
+            return '';
+        }
+
+        /* Navigate to the Physical Inventory screen at the clicked count sheet.
+           Source prompt, "Inventory Count navigation": window name/search key VAS_PhysicalInventory,
+           header table M_Inventory - and "Do not hardcode a new URL when the application already has
+           a window/router navigation helper."
+
+           The previous implementation hardcoded AD_Window_ID 168 and only replaced it via
+           VIS.context.getWindowId("M_Inventory"), which is not a framework API - so it always fell
+           through to 168. On this installation the Physical Inventory window is VAS_PhysicalInventory
+           (AD_Window_ID 1000212 on DB 1), and window IDs differ per instance, so 168 landed on the
+           wrong screen. Resolving by NAME through the widget channel is instance-independent. */
         function openInventoryWindow(inventoryId) {
-            if (!inventoryId) return;
+            if (!inventoryId) { return; }
 
-            var windowId = 168;
-            if (VIS.context && VIS.context.getWindowId) {
-                windowId = VIS.context.getWindowId("M_Inventory") || 168;
-            }
-
-            var query = new VIS.Query();
-            query.addRestriction("M_Inventory_ID", VIS.Query.prototype.EQUAL, inventoryId);
-
-            if (VIS.viewManager) {
-                VIS.viewManager.startWindow(windowId, query);
-            }
+            $self.widgetFirevalueChanged({
+                "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                "TabLayout": "Y",
+                "TabIndex": "0",
+                "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
+                "ActionType": "W"
+            });
         }
 
         this.getRoot = function () {
@@ -334,6 +386,16 @@
             }
             $wrapper.remove();
         };
+    };
+
+    // Listener plumbing was missing entirely on this widget, so nothing it fired could reach the
+    // host. Both are required for the navigation channel to work.
+    VAS.VAS_158_OpenCountSheetsWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) { this.listener.widgetFirevalueChanged(value); }
+    };
+
+    VAS.VAS_158_OpenCountSheetsWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
     };
 
     VAS.VAS_158_OpenCountSheetsWidget.prototype.init = function (windowNo, frame) {
@@ -358,3 +420,4 @@
     };
 
 })(VAS, jQuery);
+

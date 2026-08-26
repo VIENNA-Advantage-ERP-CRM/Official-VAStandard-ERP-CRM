@@ -81,6 +81,14 @@
 ///                        is not an edit, and the platform logs plenty of those.
 ///                        The trail said WHICH field moved but never what it moved
 ///                        from or to. Follows VAS_101 / VAS_104.
+///   VAI163   2026-08-21  Activity: an appointment or task now carries the
+///                        e-mails sent against IT - MailAttachment1 keyed on
+///                        AppointmentsInfo rather than on this panel's own
+///                        table - with the recipient (MailAddress), subject
+///                        (Title), when (Created) and who sent it (CreatedBy).
+///                        The body (TextMsg, flattened) travels with the row so
+///                        the panel reveals it on click. Read in one query for
+///                        the whole feed through VAS_ActivitySourcesModel.
 /// </summary>
 
 using System;
@@ -733,6 +741,11 @@ namespace VASLogic.Models
             // the nearest thing to an edit trail was one row carrying the LAST
             // save's timestamp and nothing about what it touched.
             LoadChangeActivity(M_Movement_ID, activity);
+            // Appointments, tasks, calls, letters AND mails filed against the
+            // transfer. Mails come from here too: this panel has no mail loader of
+            // its own, so without them the correspondence trail would carry the
+            // letters and silently drop the e-mails beside them.
+            LoadSharedSourceActivity(M_Movement_ID, activity);
 
             activity.Sort((a, b) =>
                 b.EventTime.GetValueOrDefault(DateTime.MinValue)
@@ -815,7 +828,9 @@ namespace VASLogic.Models
                                       cl.NewValue     AS NewValue,
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
-                                      col.ColumnName  AS FieldColumn
+                                      col.ColumnName  AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId
                                  FROM AD_ChangeLog cl
                                 INNER JOIN AD_Table adt
                                         ON (adt.AD_Table_ID = cl.AD_Table_ID)
@@ -852,6 +867,8 @@ namespace VASLogic.Models
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
                                       col.ColumnName  AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId,
                                       l.Line          AS LineNo,
                                       p.Name          AS ProductName
                                  FROM AD_ChangeLog cl
@@ -911,20 +928,80 @@ namespace VASLogic.Models
 
             // The move itself. A save that rewrites a field with the value it
             // already had is not an edit, and the platform logs plenty of those.
+            // Compared on the RAW values, before either is resolved: two records
+            // can share a name, and dropping such a row would hide a real edit.
             string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
             string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
             if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) return;
+
+            // ... and then reported as the field SHOWS them, not as the log stored
+            // them: a reference reads as the referenced record's identifier, a list
+            // value as its label, a date as the date alone.
+            string column  = Util.GetValueOfString(r["FieldColumn"]);
+            int refType    = Util.GetValueOfInt(r["RefType"]);
+            int refValueId = Util.GetValueOfInt(r["RefValueId"]);
 
             list.Add(new ActivityData
             {
                 EventType   = "Updated",
                 FieldName   = field,
-                OldValue    = oldValue,
-                NewValue    = newValue,
+                OldValue    = _changeValues.Display(oldValue, column, refType, refValueId),
+                NewValue    = _changeValues.Display(newValue, column, refType, refValueId),
                 ChangeScope = scope,
                 ActorName   = Util.GetValueOfString(r["UserName"]),
                 EventTime   = at
             });
+        }
+
+        /// <summary>
+        /// Resolves a change-log value into the text the field shows — a reference
+        /// into the referenced record's identifier, a list code into its label, a
+        /// timestamp into the date alone. Shared with the other overview panels
+        /// (VAS_ChangeLogValueModel). One per request, so its caches last exactly
+        /// as long as the feed being built.
+        /// </summary>
+        private readonly VAS_ChangeLogValueModel _changeValues = new VAS_ChangeLogValueModel();
+
+        /// <summary>Reads the appointment / task / call / letter / mail sources
+        /// every overview panel shares (VAS_ActivitySourcesModel).</summary>
+        private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
+
+        /// <summary>
+        /// The correspondence and engagement sources shared with every other
+        /// overview panel: appointments and tasks (AppointmentsInfo, split on
+        /// IsTask), calls (VA048_CallDetails), and the letters and mails
+        /// MailAttachment1 holds, split on AttachmentType. Each is pinned to the
+        /// transfer by AD_Table_ID + Record_ID.
+        ///
+        /// Mails are read HERE rather than by a loader of this panel's own — it
+        /// never had one, so its trail reported no correspondence at all.
+        /// </summary>
+        private void LoadSharedSourceActivity(int M_Movement_ID, List<ActivityData> list)
+        {
+            List<VAS_ActivitySourceRow> rows =
+                _activitySources.Load("M_Movement", M_Movement_ID, true);
+            foreach (VAS_ActivitySourceRow s in rows)
+            {
+                list.Add(new ActivityData
+                {
+                    // appointment | task | call | letter | email
+                    EventType   = s.Kind,
+                    Title       = s.Title,
+                    Body        = s.Body,
+                    Location    = s.Location,
+                    IsClosed    = s.IsClosed,
+                    IsCancelled = s.IsCancelled,
+                    MailTo      = s.MailTo,
+                    MailCc      = s.MailCc,
+                    MailBcc     = s.MailBcc,
+                    MailFrom    = s.MailFrom,
+                    IsMailSent  = s.IsMailSent,
+                    // An appointment or task brings the mails sent against it.
+                    Mails       = s.Mails,
+                    ActorName   = s.ActorName,
+                    EventTime   = s.EventTime
+                });
+            }
         }
 
         /// <summary>
@@ -1308,6 +1385,33 @@ namespace VASLogic.Models
             // for the first time.
             public string    OldValue    { get; set; }
             public string    NewValue    { get; set; }
+
+            // The shared correspondence / engagement sources
+            // (VAS_ActivitySourcesModel). Empty on every other event type.
+            /// <summary>Appointment / task: where the meeting is.</summary>
+            public string    Location    { get; set; }
+            public bool      IsClosed    { get; set; }
+            public bool      IsCancelled { get; set; }
+            /// <summary>Who it reached: a mail's or letter's recipient, a call's
+            /// number.</summary>
+            public string    MailTo      { get; set; }
+            // The rest of a mail's / letter's envelope, and its body — carried
+            // with the row so the panel can reveal the message on click without a
+            // second round trip. The body arrives already flattened to text
+            // (VAS_ActivitySourcesModel), since a mail sent as HTML stores markup.
+            public string    MailCc      { get; set; }
+            public string    MailBcc     { get; set; }
+            public string    MailFrom    { get; set; }
+            public bool      IsMailSent  { get; set; }
+            public string    Body        { get; set; }
+
+            /// <summary>The e-mails sent against an APPOINTMENT or TASK itself
+            /// (MailAttachment1 anchored on AppointmentsInfo): recipient, subject,
+            /// body, when and by whom. Distinct from the mail fields above, which
+            /// are correspondence about the TRANSFER. Empty on every other event
+            /// type; the bodies travel with the row so the panel reveals them on
+            /// click without a second round trip.</summary>
+            public List<VAS_ActivityMailRow> Mails { get; set; }
         }
 
         public class MaterialTransferOverviewData

@@ -96,6 +96,18 @@
 ///                        is not an edit, and the platform logs plenty of those.
 ///                        The trail said WHICH field moved but never what it moved
 ///                        from or to. Follows VAS_101 / VAS_104.
+///   VAI163   2026-08-20  Added PostedDate (GetPostedDate: the earliest Fact_Acct
+///                        row written for the delivery), which dates the timeline's
+///                        new Posted stage. M_InOut.Posted says WHETHER it posted;
+///                        this says when. Ported from VAS_098.
+///   VAI163   2026-08-21  Activity: an appointment or task now carries the
+///                        e-mails sent against IT - MailAttachment1 keyed on
+///                        AppointmentsInfo rather than on this panel's own
+///                        table - with the recipient (MailAddress), subject
+///                        (Title), when (Created) and who sent it (CreatedBy).
+///                        The body (TextMsg, flattened) travels with the row so
+///                        the panel reveals it on click. Read in one query for
+///                        the whole feed through VAS_ActivitySourcesModel.
 /// </summary>
 
 using System;
@@ -406,6 +418,9 @@ namespace VASLogic.Models
             // (planned-vs-recorded fallback, checking bands, display-column
             // probing) duplicated and kept in step by hand.
             LoadQualityParams(M_InOut_ID, result);
+
+            // When posting actually ran, for the timeline's Posted stage.
+            result.PostedDate = GetPostedDate(M_InOut_ID);
 
             // ----- Documents raised against this delivery -----
             result.Documents = LoadDocuments(M_InOut_ID);
@@ -754,10 +769,94 @@ namespace VASLogic.Models
             return string.Join(", ", parts);
         }
 
+        /// <summary>
+        /// Resolves a change-log value into the text the field shows — a reference
+        /// into the referenced record's identifier, a list code into its label, a
+        /// timestamp into the date alone. Shared with the other overview panels
+        /// (VAS_ChangeLogValueModel). One per request, so its caches last exactly
+        /// as long as the feed being built.
+        /// </summary>
+        private readonly VAS_ChangeLogValueModel _changeValues = new VAS_ChangeLogValueModel();
+
+        /// <summary>Reads the appointment / task / call / letter sources every
+        /// overview panel shares (VAS_ActivitySourcesModel).</summary>
+        private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
+
+        /// <summary>
+        /// The correspondence and engagement sources shared with every other
+        /// overview panel: appointments and tasks (AppointmentsInfo, split on
+        /// IsTask), calls (VA048_CallDetails) and letters (MailAttachment1,
+        /// AttachmentType 'I'), each pinned to the delivery by AD_Table_ID +
+        /// Record_ID.
+        ///
+        /// Mails stay with LoadEmailActivity, which carries the recipient and body
+        /// detail the mail drawer needs and now excludes letters so the two kinds
+        /// cannot both claim the same row.
+        /// </summary>
+        private void LoadSharedSourceActivity(int M_InOut_ID, List<DOActivityData> list)
+        {
+            List<VAS_ActivitySourceRow> rows =
+                _activitySources.Load("M_InOut", M_InOut_ID, false);
+            foreach (VAS_ActivitySourceRow s in rows)
+            {
+                list.Add(new DOActivityData
+                {
+                    Type        = s.Kind,      // appointment | task | call | letter
+                    Text        = s.Title,
+                    Body        = s.Body,
+                    Location    = s.Location,
+                    IsClosed    = s.IsClosed,
+                    IsCancelled = s.IsCancelled,
+                    MailTo      = s.MailTo,
+                    MailCc      = s.MailCc,
+                    MailBcc     = s.MailBcc,
+                    MailFrom    = s.MailFrom,
+                    IsMailSent  = s.IsMailSent,
+                    // An appointment or task brings the mails sent against it.
+                    Mails       = s.Mails,
+                    UserName    = s.ActorName,
+                    Created     = s.EventTime
+                });
+            }
+        }
+
         /// <summary>Single-parameter helper for the shipment-scoped queries.</summary>
         private SqlParameter[] InOutParam(int M_InOut_ID)
         {
             return new SqlParameter[] { new SqlParameter("@M_InOut_ID", M_InOut_ID) };
+        }
+
+        /// <summary>
+        /// The moment the delivery was actually posted — the earliest Created stamp
+        /// across the Fact_Acct rows written for it — or null when it has never
+        /// been posted.
+        ///
+        /// M_InOut.Posted answers WHETHER it posted; this answers WHEN, which is
+        /// what the timeline's Posted stage is captioned with. Its own statement
+        /// rather than a join on the header query: a schema whose Fact_Acct differs
+        /// then costs this one figure instead of the whole overview. Ported from
+        /// VAS_098.
+        /// </summary>
+        /// <param name="M_InOut_ID">Selected delivery id.</param>
+        private DateTime? GetPostedDate(int M_InOut_ID)
+        {
+            try
+            {
+                string sql = @"SELECT MIN(fa.Created) AS PostedDate
+                                 FROM Fact_Acct fa
+                                INNER JOIN AD_Table adt ON (adt.AD_Table_ID = fa.AD_Table_ID)
+                                WHERE fa.Record_ID  = @M_InOut_ID
+                                  AND adt.TableName = 'M_InOut'";
+                DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return null;
+                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["PostedDate"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetPostedDate (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
+                return null;
+            }
         }
 
         // ----------------------------------------------------------------- //
@@ -1053,6 +1152,8 @@ namespace VASLogic.Models
             LoadChangeActivity(M_InOut_ID, activity);
             LoadNoteActivity(M_InOut_ID, activity);
             LoadEmailActivity(M_InOut_ID, activity);
+            // Appointments, tasks, calls and letters filed against the delivery.
+            LoadSharedSourceActivity(M_InOut_ID, activity);
 
             // Newest first; entries with no timestamp sink to the bottom.
             activity.Sort(delegate (DOActivityData a, DOActivityData b)
@@ -1205,7 +1306,9 @@ namespace VASLogic.Models
                                       cl.NewValue     AS NewValue,
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
-                                      col.ColumnName  AS FieldColumn
+                                      col.ColumnName  AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId
                                  FROM AD_ChangeLog cl
                                 INNER JOIN AD_Table adt
                                         ON (adt.AD_Table_ID = cl.AD_Table_ID)
@@ -1242,6 +1345,8 @@ namespace VASLogic.Models
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
                                       col.ColumnName  AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId,
                                       l.Line          AS LineNo,
                                       p.Name          AS ProductName
                                  FROM AD_ChangeLog cl
@@ -1297,16 +1402,25 @@ namespace VASLogic.Models
 
             // The move itself. A save that rewrites a field with the value it
             // already had is not an edit, and the platform logs plenty of those.
+            // Compared on the RAW values, before either is resolved: two records
+            // can share a name, and dropping such a row would hide a real edit.
             string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
             string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
             if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) return;
+
+            // ... and then reported as the field SHOWS them, not as the log stored
+            // them: a reference reads as the referenced record's identifier, a list
+            // value as its label, a date as the date alone.
+            string column  = Util.GetValueOfString(r["FieldColumn"]);
+            int refType    = Util.GetValueOfInt(r["RefType"]);
+            int refValueId = Util.GetValueOfInt(r["RefValueId"]);
 
             list.Add(new DOActivityData
             {
                 Type        = "updated",
                 FieldName   = field,
-                OldValue    = oldValue,
-                NewValue    = newValue,
+                OldValue    = _changeValues.Display(oldValue, column, refType, refValueId),
+                NewValue    = _changeValues.Display(newValue, column, refType, refValueId),
                 ChangeScope = scope,
                 UserName    = Util.GetValueOfString(r["UserName"]),
                 Created     = at
@@ -1400,6 +1514,12 @@ namespace VASLogic.Models
                                         WHERE UPPER(t.TableName) = 'M_INOUT')
                                   AND ma.Record_ID          = @M_InOut_ID
                                   AND NVL(ma.IsActive, 'Y') = 'Y'
+                                  -- Letters ('I') and only letters are filtered
+                                  -- out: they are a kind of their own now and
+                                  -- LoadSharedSourceActivity reads them, so leaving
+                                  -- them here would report each one twice. Every
+                                  -- other AttachmentType still counts as a mail.
+                                  AND COALESCE(ma.AttachmentType, 'M') <> 'I'
                                   AND (NVL(TRIM(ma.MailAddress), ' ')    <> ' '
                                     OR NVL(TRIM(ma.MailAddressCc), ' ')  <> ' '
                                     OR NVL(TRIM(ma.MailAddressBcc), ' ') <> ' ')
@@ -1556,6 +1676,10 @@ namespace VASLogic.Models
             public string    StatusCode     { get; set; }   // DocStatus code
             public bool      Processed      { get; set; }
             public bool      Posted         { get; set; }
+            /// <summary>When posting actually ran — the earliest Fact_Acct row
+            /// written for the delivery. Posted says WHETHER, this says WHEN, and
+            /// the timeline's Posted stage is captioned with it.</summary>
+            public DateTime? PostedDate     { get; set; }
             public DateTime? Created        { get; set; }   // record creation stamp
             public DateTime? MovementDate   { get; set; }
             public string    PriorityCode   { get; set; }   // PriorityRule code
@@ -1716,13 +1840,28 @@ namespace VASLogic.Models
             public string    OldValue    { get; set; }
             public string    NewValue    { get; set; }
 
-            // E-mail (MailAttachment1) — the body is revealed on click.
+            // Appointment / task rows (AppointmentsInfo): where the meeting is and
+            // whether it has been dealt with. Empty on every other type.
+            public string    Location    { get; set; }
+            public bool      IsClosed    { get; set; }
+            public bool      IsCancelled { get; set; }
+
+            // E-mail (MailAttachment1) — the body is revealed on click. A LETTER is
+            // the same record filed under AttachmentType 'I'.
             public string    Body       { get; set; }   // TextMsg (flattened to text)
             public string    MailTo     { get; set; }   // MailAddress
             public string    MailCc     { get; set; }   // MailAddressCc
             public string    MailBcc    { get; set; }   // MailAddressBcc
             public string    MailFrom   { get; set; }   // MailAddressFrom
             public bool      IsMailSent { get; set; }
+
+            /// <summary>The e-mails sent against an APPOINTMENT or TASK itself
+            /// (MailAttachment1 anchored on AppointmentsInfo): recipient, subject,
+            /// body, when and by whom. Distinct from the mail fields above, which
+            /// are correspondence about the DELIVERY. Empty on every other type;
+            /// the bodies travel with the row so the panel reveals them on click
+            /// without a second round trip.</summary>
+            public List<VAS_ActivityMailRow> Mails { get; set; }
         }
     }
 }

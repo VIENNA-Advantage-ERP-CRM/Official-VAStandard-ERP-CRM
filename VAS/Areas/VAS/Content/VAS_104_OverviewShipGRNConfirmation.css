@@ -56,6 +56,20 @@
  *                          out — it has to be found and dragged before it says
  *                          anything is there — where a compressed column is
  *                          visibly present and keeps its ellipsis and tooltip.
+ *   VAI163   2026-08-21  Nothing overlaps anything at any zoom level. The
+ *                        confirmation table's eight tracks were bare Nfr and its
+ *                        cells never clipped: a one-word heading like
+ *                        "Difference" set its column's floor, eight such floors
+ *                        together were wider than the panel, and because the
+ *                        header row and every body row are SEPARATE grid
+ *                        containers each sized its columns from its own content —
+ *                        so the headings and the figures under them drifted apart
+ *                        and ran into each other. Tracks (line table and quality
+ *                        drawer alike) are now minmax(0, Nfr) and cells carry
+ *                        min-width:0 with overflow:hidden; a status / QC tag
+ *                        truncates inside its cell rather than being clipped
+ *                        mid-word. The snapshot and header grids took the same
+ *                        minmax floor.
  ***********************************************************/
 
 .vas_104-root {
@@ -224,7 +238,7 @@
    leaves the identity half empty. */
 .vas_104-hdrCard {
     display: grid;
-    grid-template-columns: 40% 1fr;
+    grid-template-columns: 40% minmax(0, 1fr);
     gap: 0.875em 1.75em;
     border: 1px solid var(--gc-card-bd);
     border-radius: var(--gc-card-radius);
@@ -267,10 +281,10 @@
 .vas_104-fVal.vas_104-is-link:hover { text-decoration: underline; }
 
 @container (max-width: 460px) {
-    .vas_104-hdrCard { grid-template-columns: 1fr; }
+    .vas_104-hdrCard { grid-template-columns: minmax(0, 1fr); }
     .vas_104-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--gc-row-div); padding-bottom: 0.75em; }
     /* Two field columns are too cramped this narrow — back to a single stack. */
-    .vas_104-hdrColR { grid-template-columns: 1fr; }
+    .vas_104-hdrColR { grid-template-columns: minmax(0, 1fr); }
     .vas_104-hdrTop  { flex-direction: column; }
     .vas_104-hdrPills { justify-content: flex-start; }
 }
@@ -301,10 +315,10 @@
 /* ----------------------------------------------------------- */
 .vas_104-snap {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0.75em;
 }
-.vas_104-root.vas_104-no-quality .vas_104-snap { grid-template-columns: repeat(5, 1fr); }
+.vas_104-root.vas_104-no-quality .vas_104-snap { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
 .vas_104-metric {
     min-width: 0;
@@ -373,15 +387,15 @@
 
 @container (max-width: 720px) {
     .vas_104-snap,
-    .vas_104-root.vas_104-no-quality .vas_104-snap { grid-template-columns: repeat(3, 1fr); }
+    .vas_104-root.vas_104-no-quality .vas_104-snap { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @container (max-width: 460px) {
     .vas_104-snap,
-    .vas_104-root.vas_104-no-quality .vas_104-snap { grid-template-columns: repeat(2, 1fr); }
+    .vas_104-root.vas_104-no-quality .vas_104-snap { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container (max-width: 300px) {
     .vas_104-snap,
-    .vas_104-root.vas_104-no-quality .vas_104-snap { grid-template-columns: 1fr; }
+    .vas_104-root.vas_104-no-quality .vas_104-snap { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ----------------------------------------------------------- */
@@ -396,17 +410,52 @@
 
 /* Quality mode: 8 columns (QC mark column present). The Locator column is gone
    — it moved under the Scrapped figure, where it only appears when something was
-   actually scrapped. */
+   actually scrapped.
+
+   Every track is minmax(0, Nfr). A bare Nfr track cannot shrink below its own
+   content, so a long product name — or simply a one-word heading like
+   "Difference" — set its column's floor, and eight such floors together were
+   wider than the panel. Worse, the header and each body row are SEPARATE grid
+   containers: each sized its tracks from its own content, so the headings and the
+   figures under them drifted apart and ran into each other. Proportional tracks
+   with a floor of 0 resolve to the same widths in every row at every panel width
+   and zoom level. */
 .vas_104-tRow {
     display: grid;
     align-items: center;
     gap: 0.625em;
     padding: 0.625em 0.875em;
-    grid-template-columns: 2.6fr 0.6fr 0.85fr 0.9fr 0.9fr 1fr 0.8fr 0.95fr;
+    grid-template-columns:
+        minmax(0, 2.6fr) minmax(0, 0.6fr) minmax(0, 0.85fr) minmax(0, 0.9fr)
+        minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.95fr);
 }
 /* No-quality mode: 7 columns (QC mark column hidden). */
 .vas_104-root.vas_104-no-quality .vas_104-tRow {
-    grid-template-columns: 2.6fr 0.6fr 0.9fr 0.95fr 0.95fr 1.05fr 1fr;
+    grid-template-columns:
+        minmax(0, 2.6fr) minmax(0, 0.6fr) minmax(0, 0.9fr) minmax(0, 0.95fr)
+        minmax(0, 0.95fr) minmax(0, 1.05fr) minmax(0, 1fr);
+}
+
+/* The other half of the same fix: a grid ITEM keeps min-width:auto, its own
+   content-based minimum, so a cell stayed as wide as its text and printed
+   straight over the column beside it even once the track could compress.
+   min-width:0 plus overflow:hidden confines a cell to the track it was given;
+   the item cell's children and the scrap cell carry their own ellipsis, so
+   neither is harmed by the clip. Numeric and header cells never wrap — a wrapped
+   figure would sit off the shared baseline. */
+.vas_104-tRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vas_104-tHead > span,
+.vas_104-tRow > span.vas_104-ta-r,
+.vas_104-tRow > span.vas_104-ta-c { white-space: nowrap; }
+
+/* A status / QC tag still hugs its own text, but truncates inside its cell
+   instead of being clipped mid-word; the row's tooltip carries the full label. */
+.vas_104-tRow > span > .vas_104-tag {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
 }
 
 .vas_104-tHead {
@@ -537,7 +586,9 @@
     align-items: center;
     gap: 0.5em;
     padding: 0.3125em 0;
-    grid-template-columns: 0.9fr 1.3fr 1.1fr 1.1fr 0.6fr 0.8fr;
+    grid-template-columns:
+        minmax(0, 0.9fr) minmax(0, 1.3fr) minmax(0, 1.1fr) minmax(0, 1.1fr)
+        minmax(0, 0.6fr) minmax(0, 0.8fr);
 }
 .vas_104-qcHead {
     font-size: 0.6875em;
@@ -738,6 +789,59 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+/* The line a shared-source row carries under its headline: a mail's or letter's
+   recipients, a call's number, a meeting's location and state. flex-basis 100%
+   gives it a row of its own so the "when · by whom" stays up on the headline's
+   line, where every other activity row carries it. */
+.vas_104-actSub {
+    order: 4;
+    flex: 0 0 100%;
+    min-width: 0;
+    font-size: 0.6875em;
+    color: var(--gc-muted);
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* A row carrying a message body (a mail or a letter) opens it on click. */
+.vas_104-actRow.vas_104-openable { cursor: pointer; }
+.vas_104-actRow.vas_104-openable:hover { background: var(--gc-info-bg); }
+
+/* The message body, revealed under its row. A SIBLING of the row, not a child,
+   so it spans the card's full width instead of being trapped beside the badge. */
+.vas_104-actBody {
+    padding: 0.625em 0.75em 0.75em;
+    margin: 0 0 0.5em;
+    border-radius: 9px;
+    background: var(--gc-info-bg);
+    border: 1px solid var(--gc-card-bd);
+}
+.vas_104-actMeta {
+    font-size: 0.6875em;
+    color: var(--gc-muted);
+    word-break: break-word;
+}
+.vas_104-actMeta + .vas_104-actMeta { margin-top: 0.125em; }
+/* Each e-mail sent against an appointment or task, inside that row's drawer.
+   The second and later ones are ruled off, so several notices about the same
+   meeting do not read as one long message. */
+.vas_104-actMailSplit {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--gc-card-bd);
+}
+/* The message itself keeps the sender's own line breaks. */
+.vas_104-actBody p {
+    margin: 0.5em 0 0;
+    font-size: 0.8125em;
+    color: var(--gc-text);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .vas_104-actWhen {
     flex: none;
     margin-left: auto;

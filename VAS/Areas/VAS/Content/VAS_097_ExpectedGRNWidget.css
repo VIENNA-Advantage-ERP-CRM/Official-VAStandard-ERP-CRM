@@ -14,7 +14,13 @@
 
 .vas-egrn-card {
     font-family: Roboto, Arial, sans-serif;
+    /* Anchored to the widget's OWN width via container queries, per the global standard for
+       dashboard widgets. The previous anchor used --dash-inline-size (the whole dashboard), so the
+       card's text did not respond to the widget being resized - only to the browser window.
+       cqi keeps every em-based child in proportion at 1080p, 2K and 4K.
+       The --dash-inline-size form is retained as the fallback for any browser without cqi. */
     font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .014), 24px);
+    font-size: clamp(13px, 3.6cqi, 26px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -100,9 +106,11 @@
 }
 
 .vas-egrn-row {
-    flex: 0 0 auto;
-    /* Paged like the Material Receipt Register: compact rows so 4 records
-       fit on the standard 2x3 card. */
+    /* The card always renders exactly CARD_ROWS (4) rows, so each row takes an equal share of the
+       list height. That makes the 4 lines fill the card at any size instead of clustering at the
+       top, and every child inside the row is sized in em off the card anchor, so the whole line -
+       text, chips, numbers, padding - shrinks and grows together with the widget. */
+    flex: 1 1 0;
     min-height: 2.6em;
     display: flex;
     align-items: center;
@@ -238,18 +246,24 @@
 }
 
 /* ---- Footer pager ---- */
+/* Footer + pager restyled 2026-08-18 to match the Consumption widget (VAS_183), which is the
+   agreed better design. Differences adopted: a top divider separating the pager band from the
+   rows, the same .75em text scale for both the helper and the pager, and the 1.6em button with an
+   inset-ring hover instead of a flat tint. Shared by VAS_093 (Pending GRN), which reuses these
+   vas-egrn-* classes. */
 .vas-egrn-foot {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: .5em;
-    padding-top: .28em;
-    margin-top: .18em;
+    border-top: 1px solid #EDF2F6;
+    padding-top: .45em;
+    margin-top: .35em;
 }
 
 .vas-egrn-foot-info {
-    font-size: 0.8125em;
+    font-size: .75em;
     color: #748494;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -260,14 +274,15 @@
 .vas-egrn-pager {
     display: flex;
     align-items: center;
-    gap: .5em;
+    gap: .4em;
+    font-size: .75em;
+    color: #102C3F;
+    font-weight: 500;
     flex: 0 0 auto;
 }
 
 .vas-egrn-pgtext {
-    font-size: 0.875em;
-    font-weight: 400;
-    color: #102C3F;
+    /* Inherits .75em / 500 / #102C3F from .vas-egrn-pager, as in the Consumption widget. */
     min-width: 3.2em;
     text-align: center;
     white-space: nowrap;
@@ -275,21 +290,25 @@
 }
 
 .vas-egrn-pgbtn {
-    width: 1.5em;
-    height: 1.5em;
+    width: 1.6em;
+    height: 1.6em;
     border: 1px solid #E4EDF4;
-    border-radius: 7px;
-    background: #fff;
+    border-radius: .4em;
+    background: rgba(255, 255, 255, 0.9);
     color: #0083DA;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 0;
+    line-height: 1;
 }
 
     .vas-egrn-pgbtn:hover:not(:disabled) {
-        background: #E7F4FF;
+        background: #EEF6FF;
+        color: #0083DA;
+        box-shadow: inset 0 0 0 1px #0083DA;
+        outline: none;
     }
 
     .vas-egrn-pgbtn:disabled {

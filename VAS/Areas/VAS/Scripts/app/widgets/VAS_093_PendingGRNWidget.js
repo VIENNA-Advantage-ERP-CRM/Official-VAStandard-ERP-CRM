@@ -71,7 +71,9 @@
         this.currentPage = 1;
         this.totalPages = 0;
         var widgetID = 0;
-        var pageSize = 4;
+        /* Lines shown on the card before paging. */
+        var CARD_ROWS = 4;
+        var pageSize = CARD_ROWS;
         var isLoading = false;
         var rowResizeObserver = null;
         var rowsByPoId = {}; // poId -> list row (feeds the drill-down modal)
@@ -263,19 +265,13 @@
         };
 
         function measurePageSize() {
-            var $list = $root.find('#VAS_DeliveryBox_' + widgetID);
-            if (!$list.length || !$list.is(':visible')) { return pageSize; }
-
-            var listHeight = Math.floor($list.innerHeight());
-            if (listHeight <= 0) { return pageSize; }
-
-            var $sample = $list.find('.vas-egrn-row:first');
-            var rowHeight = $sample.length ? Math.ceil($sample.outerHeight(true)) : 58;
-            if (rowHeight <= 0) { rowHeight = 58; }
-
-            /* Paged like the Material Receipt Register: at least 4 records on
-               the standard card; the count still grows with taller screens. */
-            return Math.max(4, Math.floor(listHeight / rowHeight));
+            /* The card ALWAYS shows CARD_ROWS lines; anything beyond that pages.
+               The count is fixed rather than measured so the layout is predictable at every
+               resolution - the rows themselves flex to share the list height (see the CSS
+               .vas-egrn-rows > .vas-egrn-row rule), so 4 rows fill the card exactly whether it is
+               rendered on a 1080p or a 4K screen. Because the count is a constant there is no
+               measure-then-resize feedback loop. */
+            return CARD_ROWS;
         }
 
         function syncPageSize() {

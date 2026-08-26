@@ -2,8 +2,8 @@
  * Transfers by Warehouse Widget (Material Transfer Dashboard)
  * Purpose - 3x2 bar-list widget showing total stock moved per warehouse for a
  *           selected month/year. Each row is clickable and opens a modal with
- *           per-transfer detail. A period-picker popover lets the user navigate
- *           to any past month.
+ *           per-transfer detail. Month / Year selects choose the period,
+ *           matching VAS_165_LocationWiseInventoryCountWidget.
  * Prefix  - VAS_173_
  */
 ; VAS = window.VAS || {};
@@ -45,6 +45,40 @@
         return d.getDate() + ' ' + monthNames()[d.getMonth()] + ' ' + d.getFullYear();
     }
 
+// ===== NEW CODE START — currency format (agent C07, 2026-08-19) =====
+    function formatCurrency(val, currencyObj) {
+        var num = parseFloat(val);
+        if (isNaN(num) || num === null || num === undefined) { num = 0; }
+        var iso = (currencyObj && currencyObj.iso) ? currencyObj.iso.toUpperCase() : '';
+        var symbol = (currencyObj && currencyObj.symbol) ? currencyObj.symbol : (iso || '$');
+
+        var isIndian = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'].indexOf(iso) !== -1;
+        var formattedNum = '';
+
+        var absVal = Math.abs(num);
+        if (isIndian) {
+            if (absVal >= 10000000) {
+                formattedNum = (num / 10000000).toFixed(2) + ' Cr';
+            } else if (absVal >= 100000) {
+                formattedNum = (num / 100000).toFixed(2) + ' L';
+            } else {
+                formattedNum = num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+        } else {
+            if (absVal >= 1000000000) {
+                formattedNum = (num / 1000000000).toFixed(2) + ' B';
+            } else if (absVal >= 1000000) {
+                formattedNum = (num / 1000000).toFixed(2) + ' M';
+            } else {
+                formattedNum = num.toLocaleString(window.navigator.language || 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+        }
+
+        return symbol + ' ' + formattedNum;
+    }
+// ===== NEW CODE END — currency format =====
+
+
     var PALETTE = ['#9ECBF5', '#A7E3C9', '#F6CBA0', '#CBBDF0', '#F5B8C9'];
 
     VAS.VAS_173_TransfersByWarehouseWidget = function () {
@@ -55,6 +89,7 @@
         var $self = this;
         var $wrapper = $('<div class="vas-173-container">');
         var $root = $('<div class="vas-173-root">');
+        var widgetObserver = null;
 
         var now = new Date();
         var selMonth = now.getMonth() + 1;
@@ -69,8 +104,7 @@
         var modalPage = 1;
         var MODAL_PAGE_SIZE = 8;
 
-        var popoverOpen = false;
-        var popoverYear = selYear;
+        var YEAR_MIN = 2024;
 
         function buildWidget() {
             var monthLabel = monthNames()[selMonth - 1] + ' ' + selYear;
@@ -88,101 +122,69 @@
                             '<div class="vas-173-subtitle" id="vas173-sub">' + escapeHtml(lbl('VAS_173_StockMoved', 'Stock moved') + ' · ' + monthLabel + ' (qty)') + '</div>' +
                         '</div>' +
                     '</div>' +
-                    '<button type="button" class="vas-173-period-btn" id="vas173-period-btn">' +
-                        '<span id="vas173-period-lbl">' + escapeHtml(monthLabel) + '</span>' +
-                    '</button>' +
+                    '<div class="vas-173-filter-cluster">' +
+                        '<select class="vas-173-select" id="vas173-m-sel" aria-label="' + escapeHtml(lbl('VAS_173_Month', 'Month')) + '">' + monthOptions() + '</select>' +
+                        '<select class="vas-173-select" id="vas173-y-sel" aria-label="' + escapeHtml(lbl('VAS_173_Year', 'Year')) + '">' + yearOptions() + '</select>' +
+                    '</div>' +
                 '</div>' +
                 '<div class="vas-173-body"></div>' +
                 '<div class="vas-173-footer"></div>'
             );
 
-            $root.find('#vas173-period-btn').on('click', function (e) {
-                e.stopPropagation();
-                togglePopover();
+            $root.find('#vas173-m-sel').on('change', function () {
+                selMonth = parseInt($(this).val(), 10);
+                currentPage = 1;
+                updatePeriodLabel();
+                loadData();
             });
 
-            $(document).on('click.vas173', function () {
-                if (popoverOpen) { closePopover(); }
+            $root.find('#vas173-y-sel').on('change', function () {
+                selYear = parseInt($(this).val(), 10);
+                currentPage = 1;
+                updatePeriodLabel();
+                loadData();
             });
 
             $wrapper.append($root);
-        }
 
-        function togglePopover() {
-            if (popoverOpen) { closePopover(); } else { openPopover(); }
-        }
-
-        function openPopover() {
-            popoverOpen = true;
-            popoverYear = selYear;
-            renderPopover();
-        }
-
-        function closePopover() {
-            popoverOpen = false;
-            $root.find('.vas-173-popover').remove();
-        }
-
-        function renderPopover() {
-            $root.find('.vas-173-popover').remove();
-
-            var currentRealYear = now.getFullYear();
-            var currentRealMonth = now.getMonth() + 1;
-            var months = monthNames();
-
-            var gridHtml = '';
-            for (var m = 1; m <= 12; m++) {
-                var isSelected = (popoverYear === selYear && m === selMonth);
-                var isCurrent  = (popoverYear === currentRealYear && m === currentRealMonth);
-                var isDisabled = (popoverYear > currentRealYear || (popoverYear === currentRealYear && m > currentRealMonth));
-
-                var cls = 'vas-173-month-btn';
-                if (isSelected) { cls += ' vas-173-month-btn--selected'; }
-                if (isCurrent)  { cls += ' vas-173-month-btn--current'; }
-                if (isDisabled) { cls += ' vas-173-month-btn--disabled'; }
-
-                gridHtml += '<button type="button" class="' + cls + '" data-m="' + m + '"' + (isDisabled ? ' disabled' : '') + '>' + escapeHtml(months[m - 1]) + '</button>';
+            // Self-Sizing Observer — feeds --widget-inline-size, which the root
+            // font-size clamp reads. Without it the CSS falls back to 380px and
+            // the whole widget renders smaller than VAS_165 / VAS_161.
+            if (window.ResizeObserver && $wrapper[0]) {
+                widgetObserver = new ResizeObserver(function (entries) {
+                    for (var i = 0; i < entries.length; i++) {
+                        var width = entries[i].contentRect.width;
+                        if (width > 0 && $root[0]) {
+                            $root[0].style.setProperty('--widget-inline-size', width + 'px');
+                        }
+                    }
+                });
+                widgetObserver.observe($wrapper[0]);
             }
 
-            var popoverHtml =
-                '<div class="vas-173-popover" onclick="event.stopPropagation()">' +
-                    '<div class="vas-173-popover-head">' +
-                        '<button type="button" class="vas-173-year-btn" id="vas173-yr-prev"' + (popoverYear <= 2024 ? ' disabled' : '') + '>&#8249;</button>' +
-                        '<span class="vas-173-year-label">' + popoverYear + '</span>' +
-                        '<button type="button" class="vas-173-year-btn" id="vas173-yr-next"' + (popoverYear >= currentRealYear ? ' disabled' : '') + '>&#8250;</button>' +
-                    '</div>' +
-                    '<div class="vas-173-month-grid">' + gridHtml + '</div>' +
-                    '<div class="vas-173-popover-foot">' +
-                        '<button type="button" class="vas-173-cur-month-btn" id="vas173-cur-month">' + escapeHtml(lbl('VAS_173_CurrentMonth', 'Current month')) + '</button>' +
-                        '<span class="vas-173-popover-hint">' + escapeHtml(lbl('VAS_173_PickAMonth', 'Pick a month')) + '</span>' +
-                    '</div>' +
-                '</div>';
+        }
 
-            var $pop = $(popoverHtml);
-            $root.append($pop);
+        /* Option builders for the Month / Year selects (VAS_165 pattern). */
+        function monthOptions() {
+            var months = monthNames();
+            var html = '';
+            for (var m = 1; m <= 12; m++) {
+                html += '<option value="' + m + '"' + (m === selMonth ? ' selected' : '') + '>' +
+                        escapeHtml(months[m - 1]) + '</option>';
+            }
+            return html;
+        }
 
-            $pop.find('#vas173-yr-prev').on('click', function () { popoverYear--; renderPopover(); });
-            $pop.find('#vas173-yr-next').on('click', function () { popoverYear++; renderPopover(); });
-            $pop.find('.vas-173-month-btn:not(:disabled)').on('click', function () {
-                var m = parseInt($(this).attr('data-m'), 10);
-                selMonth = m;
-                selYear = popoverYear;
-                closePopover();
-                updatePeriodLabel();
-                loadData();
-            });
-            $pop.find('#vas173-cur-month').on('click', function () {
-                selMonth = currentRealMonth;
-                selYear = currentRealYear;
-                closePopover();
-                updatePeriodLabel();
-                loadData();
-            });
+        function yearOptions() {
+            var html = '';
+            for (var y = now.getFullYear(); y >= YEAR_MIN; y--) {
+                html += '<option value="' + y + '"' + (y === selYear ? ' selected' : '') + '>' + y + '</option>';
+            }
+            return html;
         }
 
         function updatePeriodLabel() {
             var text = monthNames()[selMonth - 1] + ' ' + selYear;
-            $root.find('#vas173-period-lbl').text(text);
             $root.find('#vas173-sub').text(lbl('VAS_173_StockMoved', 'Stock moved') + ' · ' + text + ' (qty)');
         }
 
@@ -246,6 +248,8 @@
             $footer.find('#vas173-next').on('click', function () { if (currentPage < totalPages) { currentPage++; renderList(); } });
         }
 
+        var orgCurrency = null;
+
         function loadData() {
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_173_TransfersByWarehouseWidget/GetWarehouseTransfers',
@@ -255,6 +259,7 @@
                 success: function (res) {
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
                     if (data && typeof data === 'string') { data = JSON.parse(data); }
+                    if (data && data.currency) { orgCurrency = data.currency; }
                     var raw = (data && !data.error && Array.isArray(data.warehouses)) ? data.warehouses : [];
                     
                     for (var i = 0; i < raw.length; i++) {
@@ -399,9 +404,11 @@
         this.getRoot = function () { return $wrapper; };
 
         this.disposeComponent = function () {
+            if (widgetObserver) {
+                widgetObserver.disconnect();
+                widgetObserver = null;
+            }
             closeModal();
-            closePopover();
-            $(document).off('click.vas173');
             $root.off();
             $root.remove();
             $wrapper.remove();

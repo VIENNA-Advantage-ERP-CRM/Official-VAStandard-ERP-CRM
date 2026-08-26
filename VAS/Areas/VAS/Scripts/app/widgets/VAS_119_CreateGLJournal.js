@@ -17,7 +17,7 @@
  *                  Internal type/spacing in em; borders/radii/shadows in px.
  *
  * Chronological development:
- *   VAI_XXX        Created  Date 2026-07-20
+ *   VAI_145        Created  Date 2026-07-20
  ***********************************************************/
 ; VAS = window.VAS || {};
 
@@ -116,18 +116,30 @@
             e.preventDefault();
             e.stopPropagation();
             try {
-                if ($self.windowNo >= 0) {
-                    var windowParam = {
-                        "IsTabInNewMode": "true",
-                        "TabIndex": "0"
-                    };
-                    $self.widgetFirevalueChanged(windowParam);
+                if (window.VA028) {
+                    datedraft = Globalize.format(new Date(), "yyyy-MM-dd");
+                    var c = new VIS.CFrame();
+                    var journal = new VA028.GLJournalNew(0, 0, datedraft);
+                    c.setName(VIS.Msg.getMsg("VA028_JournalsEntry"));
+                    c.setTitle(VIS.Msg.getMsg("VA028_JournalsEntry"));
+                    c.setContent(journal);
+                    c.show();
+                    journal.initialize();
                 }
                 else {
-                    VAS.ZoomUtil.zoomToRecord("GL_Journal_ID", 0, windowId, ZOOM_WINDOW_NAME_NEW, "")
-                        .done(function (id) {
-                            if (id > 0) { windowId = id; }
-                        });
+                    if ($self.windowNo >= 0) {
+                        var windowParam = {
+                            "IsTabInNewMode": "true",
+                            "TabIndex": "0"
+                        };
+                        $self.widgetFirevalueChanged(windowParam);
+                    }
+                    else {
+                        VAS.ZoomUtil.zoomToRecord("GL_Journal_ID", 0, windowId, ZOOM_WINDOW_NAME_NEW, "")
+                            .done(function (id) {
+                                if (id > 0) { windowId = id; }
+                            });
+                    }
                 }
             }
             catch (err) {

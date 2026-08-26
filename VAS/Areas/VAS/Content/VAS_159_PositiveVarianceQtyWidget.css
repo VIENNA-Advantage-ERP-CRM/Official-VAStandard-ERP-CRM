@@ -138,7 +138,10 @@
 .vas-pos-var-dialog {
     position: relative;
     width: clamp(340px, 85vw, 1400px);
-    height: clamp(420px, 85vh, 900px);
+    /* Content-sized: header + exactly --vas-rows lines + footer. The fixed clamp height forced a
+       ~900px popup regardless of how few rows existed, leaving a large empty band under the lines. */
+    height: auto;
+    max-height: clamp(420px, 85vh, 900px);
     display: flex;
     flex-direction: column;
     background: #FFFFFF;
@@ -380,3 +383,37 @@
     cursor: pointer;
     text-decoration: underline;
 }
+
+
+/* ============================================================================
+   POPUP — DETERMINISTIC HEIGHT (2026-08-18) — see VAS_156 for the rationale.
+   Row height replaces the old JS assumption of a 36px row: it is em-based, so
+   it scales with the dialog's own font anchor instead of being fixed in px.
+   ============================================================================ */
+.vas-pos-var-dialog {
+    --vas-rows: 7;
+    --vas-row-h: 2.6em;
+}
+
+.vas-pos-var-modal-body {
+    flex: 0 0 auto;
+    height: calc(var(--vas-rows) * var(--vas-row-h));
+    display: block;
+    overflow: hidden;
+}
+
+    .vas-pos-var-modal-body > .vas-pos-var-row {
+        height: var(--vas-row-h);
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+.vas-pos-var-filler {
+    pointer-events: none;
+    background: transparent !important;
+    cursor: default;
+}
+
+    .vas-pos-var-filler:hover {
+        background: transparent !important;
+    }

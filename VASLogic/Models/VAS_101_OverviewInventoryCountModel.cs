@@ -116,6 +116,14 @@
 ///                        VAS_092 uses, so both panels tag and headline the row the
 ///                        same way; ChangeScope and the old / new values ride along
 ///                        as extra sub-lines the client drops when empty.
+///   VAI163   2026-08-21  Activity: an appointment or task now carries the
+///                        e-mails sent against IT - MailAttachment1 keyed on
+///                        AppointmentsInfo rather than on this panel's own
+///                        table - with the recipient (MailAddress), subject
+///                        (Title), when (Created) and who sent it (CreatedBy).
+///                        The body (TextMsg, flattened) travels with the row so
+///                        the panel reveals it on click. Read in one query for
+///                        the whole feed through VAS_ActivitySourcesModel.
 /// </summary>
 
 using System;
@@ -560,6 +568,8 @@ namespace VASLogic.Models
             LoadPostingActivity(M_Inventory_ID, activity);
             LoadNoteActivity(M_Inventory_ID, activity);
             LoadEmailActivity(M_Inventory_ID, activity);
+            // Appointments, tasks, calls and letters filed against the count.
+            LoadSharedSourceActivity(M_Inventory_ID, activity);
 
             // Newest first; entries with no timestamp sink to the bottom.
             activity.Sort(delegate (ActivityData a, ActivityData b)
@@ -762,6 +772,9 @@ namespace VASLogic.Models
                                       cl.OldValue,
                                       cl.NewValue,
                                       COALESCE(c.Name, c.ColumnName) AS FieldName,
+                                      c.ColumnName               AS FieldColumn,
+                                      c.AD_Reference_ID          AS RefType,
+                                      c.AD_Reference_Value_ID    AS RefValueId,
                                       u.Name AS UserName
                                  FROM AD_ChangeLog cl
                                 INNER JOIN AD_Table adt ON (adt.AD_Table_ID = cl.AD_Table_ID)
@@ -789,6 +802,9 @@ namespace VASLogic.Models
                                       cl.OldValue,
                                       cl.NewValue,
                                       COALESCE(c.Name, c.ColumnName) AS FieldName,
+                                      c.ColumnName               AS FieldColumn,
+                                      c.AD_Reference_ID          AS RefType,
+                                      c.AD_Reference_Value_ID    AS RefValueId,
                                       u.Name  AS UserName,
                                       l.Line  AS LineNo,
                                       p.Name  AS ProductName
@@ -821,6 +837,57 @@ namespace VASLogic.Models
             }
         }
 
+        /// <summary>
+        /// Resolves a change-log value into the text the field shows — a reference
+        /// into the referenced record's identifier, a list code into its label, a
+        /// timestamp into the date alone. Shared with the other overview panels
+        /// (VAS_ChangeLogValueModel). One per request, so its caches last exactly
+        /// as long as the feed being built.
+        /// </summary>
+        private readonly VAS_ChangeLogValueModel _changeValues = new VAS_ChangeLogValueModel();
+
+        /// <summary>Reads the appointment / task / call / letter sources every
+        /// overview panel shares (VAS_ActivitySourcesModel).</summary>
+        private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
+
+        /// <summary>
+        /// The correspondence and engagement sources shared with every other
+        /// overview panel: appointments and tasks (AppointmentsInfo, split on
+        /// IsTask), calls (VA048_CallDetails) and letters (MailAttachment1,
+        /// AttachmentType 'I'), each pinned to the count by AD_Table_ID +
+        /// Record_ID.
+        ///
+        /// Mails stay with LoadEmailActivity, which carries the recipient and body
+        /// detail the mail drawer needs and now excludes letters so the two kinds
+        /// cannot both claim the same row.
+        /// </summary>
+        private void LoadSharedSourceActivity(int M_Inventory_ID, List<ActivityData> list)
+        {
+            List<VAS_ActivitySourceRow> rows =
+                _activitySources.Load("M_Inventory", M_Inventory_ID, false);
+            foreach (VAS_ActivitySourceRow s in rows)
+            {
+                list.Add(new ActivityData
+                {
+                    Type        = s.Kind,      // appointment | task | call | letter
+                    Text        = s.Title,
+                    Body        = s.Body,
+                    Location    = s.Location,
+                    IsClosed    = s.IsClosed,
+                    IsCancelled = s.IsCancelled,
+                    MailTo      = s.MailTo,
+                    MailCc      = s.MailCc,
+                    MailBcc     = s.MailBcc,
+                    MailFrom    = s.MailFrom,
+                    IsMailSent  = s.IsMailSent,
+                    // An appointment or task brings the mails sent against it.
+                    Mails       = s.Mails,
+                    UserName    = s.ActorName,
+                    Created     = s.EventTime
+                });
+            }
+        }
+
         /// <summary>Adds every row of a change-log result under one scope label.</summary>
         private void AddChangeRows(DataSet ds, string scope, List<ActivityData> list)
         {
@@ -839,6 +906,13 @@ namespace VASLogic.Models
             string field = Util.GetValueOfString(r["FieldName"]);
             if (string.IsNullOrEmpty(field)) return;
 
+            // Reported as the field SHOWS them, not as the log stored them: a
+            // reference reads as the referenced record's identifier, a list value
+            // as its label, a date as the date alone.
+            string column  = Util.GetValueOfString(r["FieldColumn"]);
+            int refType    = Util.GetValueOfInt(r["RefType"]);
+            int refValueId = Util.GetValueOfInt(r["RefValueId"]);
+
             list.Add(new ActivityData
             {
                 // "updated", not "changed": the same type VAS_092 emits for a
@@ -846,8 +920,12 @@ namespace VASLogic.Models
                 // identically ("Updated <field>").
                 Type        = "updated",
                 FieldName   = field,
-                OldValue    = ChangeValue(Util.GetValueOfString(r["OldValue"])),
-                NewValue    = ChangeValue(Util.GetValueOfString(r["NewValue"])),
+                OldValue    = _changeValues.Display(
+                                  ChangeValue(Util.GetValueOfString(r["OldValue"])),
+                                  column, refType, refValueId),
+                NewValue    = _changeValues.Display(
+                                  ChangeValue(Util.GetValueOfString(r["NewValue"])),
+                                  column, refType, refValueId),
                 ChangeScope = scope,
                 UserName    = Util.GetValueOfString(r["UserName"]),
                 Created     = Util.GetValueOfDateTime(r["Created"])
@@ -1025,6 +1103,12 @@ namespace VASLogic.Models
                                         WHERE UPPER(t.TableName) = 'M_INVENTORY')
                                   AND ma.Record_ID          = @M_Inventory_ID
                                   AND NVL(ma.IsActive, 'Y') = 'Y'
+                                  -- Letters ('I') and only letters are filtered
+                                  -- out: they are a kind of their own now and
+                                  -- LoadSharedSourceActivity reads them, so leaving
+                                  -- them here would report each one twice. Every
+                                  -- other AttachmentType still counts as a mail.
+                                  AND COALESCE(ma.AttachmentType, 'M') <> 'I'
                                   AND (NVL(TRIM(ma.MailAddress), ' ')    <> ' '
                                     OR NVL(TRIM(ma.MailAddressCc), ' ')  <> ' '
                                     OR NVL(TRIM(ma.MailAddressBcc), ' ') <> ' ')
@@ -1433,13 +1517,28 @@ namespace VASLogic.Models
             /// counted quantities, and those live on the lines.</summary>
             public string    ChangeScope { get; set; }
 
-            // E-mail (MailAttachment1) — the body is revealed on click.
+            // Appointment / task rows (AppointmentsInfo): where the meeting is and
+            // whether it has been dealt with. Empty on every other type.
+            public string    Location    { get; set; }
+            public bool      IsClosed    { get; set; }
+            public bool      IsCancelled { get; set; }
+
+            // E-mail (MailAttachment1) — the body is revealed on click. A LETTER is
+            // the same record filed under AttachmentType 'I'.
             public string    Body       { get; set; }   // TextMsg (flattened to text)
             public string    MailTo     { get; set; }   // MailAddress
             public string    MailCc     { get; set; }   // MailAddressCc
             public string    MailBcc    { get; set; }   // MailAddressBcc
             public string    MailFrom   { get; set; }   // MailAddressFrom
             public bool      IsMailSent { get; set; }
+
+            /// <summary>The e-mails sent against an APPOINTMENT or TASK itself
+            /// (MailAttachment1 anchored on AppointmentsInfo): recipient, subject,
+            /// body, when and by whom. Distinct from the mail fields above, which
+            /// are correspondence about the COUNT. Empty on every other type; the
+            /// bodies travel with the row so the panel reveals them on click
+            /// without a second round trip.</summary>
+            public List<VAS_ActivityMailRow> Mails { get; set; }
         }
 
         public class InventoryCountLineData

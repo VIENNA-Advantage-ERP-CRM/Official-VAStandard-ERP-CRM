@@ -445,8 +445,10 @@
 
 .vas-rag-form {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 1.5em;
+    /* Three fields per row (was two) - user request 2026-08-18. With Qty received removed and
+       Warehouse added the header holds six fields, so this lays out as a clean 3 x 2. */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 1.25em;
 }
 
 .vas-rag-field {
@@ -518,9 +520,14 @@
 }
 
 .vas-rag-l-num {
-    width: 9em;
+    /* Narrower than before: the unit moved out of this cell into .vas-rag-l-uom. */
+    width: 6em;
     text-align: right !important;
     font-variant-numeric: tabular-nums;
+}
+
+.vas-rag-l-uom {
+    width: 5em;
 }
 
 .vas-rag-l-location {
@@ -552,12 +559,19 @@
     display: none !important;
 }
 
+@media (max-width: 64em) and (min-width: 40.01em) {
+    .vas-rag-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 40em) {
     .vas-rag-form {
         grid-template-columns: 1fr;
     }
 
     .vas-rag-l-num,
+    .vas-rag-l-uom,
     .vas-rag-l-location,
     .vas-rag-l-status {
         width: auto;

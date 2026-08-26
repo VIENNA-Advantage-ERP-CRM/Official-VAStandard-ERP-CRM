@@ -12,6 +12,7 @@ using System.IO;
 using System.Data;
 using VAdvantage.Print;
 using System.ServiceModel;
+using ViennaAdvantage.Model;
 
 namespace VAdvantage.Model
 {
@@ -436,7 +437,7 @@ namespace VAdvantage.Model
         //createClient
         private void CreateDefaultRoles(int adminUserID)
         {
-            string sql = @"select * from ad_role where ad_client_id=0 and ad_org_id=0 and name!='Sys Admin' and name!='System Administrator' AND IsForNewTenant='Y'";
+            string sql = @"SELECT * FROM AD_Role WHERE AD_Client_ID=0 AND AD_Org_ID=0 AND Name != 'Sys Admin' AND Name!='System Administrator' AND IsForNewTenant='Y' AND IsActive = 'Y'";
             DataSet ds = DB.ExecuteDataset(sql);
             if (ds != null)
             {
@@ -449,6 +450,7 @@ namespace VAdvantage.Model
                 X_AD_Form_Access formAcess = null;
                 X_AD_Workflow_Access workAccess = null;
                 X_AD_Task_Access taskAcess = null;
+                X_AD_Widget_Access widgetAcess = null;
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
                     role = new MRole(m_ctx, 0, m_trx);
@@ -466,7 +468,15 @@ namespace VAdvantage.Model
                     }
                     if (ds.Tables[0].Rows[i]["UserLevel"] != null && ds.Tables[0].Rows[i]["UserLevel"] != DBNull.Value)
                     {
-                        role.SetUserLevel(ds.Tables[0].Rows[i]["UserLevel"].ToString());
+                        // change done to handle the user level
+                        // as this role is getting created in tenant so 
+                        // the role doesn't have any relevance if the UserLevel is set to System
+                        if (ds.Tables[0].Rows[i]["UserLevel"].ToString().Trim().Equals("S"))
+                        {
+                            role.SetUserLevel(MRole.USERLEVEL_ClientPlusOrganization);
+                        }
+                        else
+                            role.SetUserLevel(ds.Tables[0].Rows[i]["UserLevel"].ToString());
                     }
                     if (ds.Tables[0].Rows[i]["IsManual"] != null && ds.Tables[0].Rows[i]["IsManual"] != DBNull.Value)
                     {
@@ -575,7 +585,7 @@ namespace VAdvantage.Model
                     else
                     {
                         /////////Save OrgAccess
-                        dsComm = DB.ExecuteDataset("Select * From AD_Role_OrgAccess WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Role_OrgAccess WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
                         {
                             for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
@@ -611,7 +621,7 @@ namespace VAdvantage.Model
                             log.Info(role.GetName() + " UserAccessNotSaved");
                         }
                         /////////////Window Access
-                        dsComm = DB.ExecuteDataset("Select * From AD_Window_Access WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Window_Access WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
                         {
                             for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
@@ -640,7 +650,7 @@ namespace VAdvantage.Model
                             }
                         }
                         ////////Save PRocess Acceess
-                        dsComm = DB.ExecuteDataset("Select * From AD_Process_Access WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Process_Access WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
                         {
                             for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
@@ -664,13 +674,13 @@ namespace VAdvantage.Model
                                 }
                                 if (!processAcess.Save(m_trx))
                                 {
-                                    log.Info(" WindowAcessNotSaved");
+                                    log.Info(" ProcessAcessNotSaved");
                                 }
                             }
                         }
 
                         ////////Save FormAccess 
-                        dsComm = DB.ExecuteDataset("Select * From AD_Form_Access WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Form_Access WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
                         {
                             for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
@@ -694,12 +704,12 @@ namespace VAdvantage.Model
                                 }
                                 if (!formAcess.Save(m_trx))
                                 {
-                                    log.Info(" WindowAcessNotSaved");
+                                    log.Info(" FormAcessNotSaved");
                                 }
                             }
                         }
                         /////////////Save WorkFlow Access
-                        dsComm = DB.ExecuteDataset("Select * From AD_Workflow_Access WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Workflow_Access WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
                         {
                             for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
@@ -723,12 +733,12 @@ namespace VAdvantage.Model
                                 }
                                 if (!workAccess.Save(m_trx))
                                 {
-                                    log.Info(" WindowAcessNotSaved");
+                                    log.Info(" WorkflowAcessNotSaved");
                                 }
                             }
                         }
                         /////////Save TaskAcess
-                        dsComm = DB.ExecuteDataset("Select * From AD_Task_Access WHERE AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Task_Access WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
                         if (dsComm != null)
                         {
                             for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
@@ -752,7 +762,29 @@ namespace VAdvantage.Model
                                 }
                                 if (!taskAcess.Save(m_trx))
                                 {
-                                    log.Info(" WindowAcessNotSaved");
+                                    log.Info(" TaskAcessNotSaved");
+                                }
+                            }
+                        }
+
+                        /////////Save WidgetAcess
+                        dsComm = DB.ExecuteDataset("SELECT * FROM AD_Widget_Access WHERE IsActive = 'Y' AND AD_Role_ID=" + ds.Tables[0].Rows[i]["AD_Role_ID"]);
+                        if (dsComm != null)
+                        {
+                            for (int j = 0; j < dsComm.Tables[0].Rows.Count; j++)
+                            {
+                                widgetAcess = new X_AD_Widget_Access(m_ctx, 0, m_trx);
+                                widgetAcess.SetAD_Client_ID(m_client.GetAD_Client_ID());
+                                widgetAcess.SetIsActive(true);
+                                widgetAcess.SetAD_Org_ID(0);
+                                widgetAcess.SetAD_Role_ID(role.GetAD_Role_ID());
+                                if (dsComm.Tables[0].Rows[j]["AD_Widget_ID"] != null && dsComm.Tables[0].Rows[j]["AD_Widget_ID"] != DBNull.Value)
+                                {
+                                    widgetAcess.SetAD_Widget_ID(Util.GetValueOfInt(dsComm.Tables[0].Rows[j]["AD_Widget_ID"]));
+                                }
+                                if (!widgetAcess.Save(m_trx))
+                                {
+                                    log.Info(" WidgetAcessNotSaved");
                                 }
                             }
                         }
@@ -3181,30 +3213,30 @@ namespace VAdvantage.Model
 
                 #region Lakhwinder 29Jan2020
                 //Adding new DocBaseType
-                int docBasetypeID = Util.GetValueOfInt(DB.ExecuteScalar("Select C_DocBaseType_ID from C_DocBaseType WHERE docbasetype='MMC'", null,m_trx));
+                int docBasetypeID = Util.GetValueOfInt(DB.ExecuteScalar("Select C_DocBaseType_ID from C_DocBaseType WHERE docbasetype='MMC'", null, m_trx));
                 if (docBasetypeID < 1)//INSERT DocBaseType
                 {
-                   
+
                     DB.ExecuteQuery(@"INSERT INTO C_DocBaseType (AD_Client_ID,AD_Org_ID,C_DocBaseType_ID,Created,CreatedBy,Description,DocBaseType,EntityType,IsActive,Name,Updated,UpdatedBy) VALUES (
                                             0,
                                             0,
                                             (SELECT MAX(C_DOCBASETYPE_ID) + 1 FROM C_DocBaseType),
-                                           "+ GlobalVariable.TO_DATE(DateTime.Now, false) + @",
+                                           " + GlobalVariable.TO_DATE(DateTime.Now, false) + @",
                                              " + m_ctx.GetAD_User_ID() + @",
                                             '*** System Maintained ***',
-                                            '" + MDocBaseType.DOCBASETYPE_MoveConfirmation+ @"',
+                                            '" + MDocBaseType.DOCBASETYPE_MoveConfirmation + @"',
                                             'D',
                                             'Y',
                                             'Move Confirmation',
                                              " + GlobalVariable.TO_DATE(DateTime.Now, false) + @",
                                             " + m_ctx.GetAD_User_ID() + @",
-                                        ) ", null,m_trx);
-                    
-                
+                                        ) ", null, m_trx);
+
+
                 }
                 CreateDocType("Move Confirmation", "Move Confirmation",
                     MDocBaseType.DOCBASETYPE_MoveConfirmation, null, 0, 0,
-                    0, GL_MM,String.Empty);
+                    0, GL_MM, String.Empty);
 
                 docBasetypeID = Util.GetValueOfInt(DB.ExecuteScalar("Select C_DocBaseType_ID from C_DocBaseType WHERE docbasetype='SRC'", null, m_trx));
                 if (docBasetypeID < 1)//INSERT DocBaseType
@@ -3215,7 +3247,7 @@ namespace VAdvantage.Model
                                             0,
                                             (SELECT MAX(C_DOCBASETYPE_ID) + 1 FROM C_DocBaseType),
                                              " + GlobalVariable.TO_DATE(DateTime.Now, false) + @",
-                                            "+m_ctx.GetAD_User_ID()+@",
+                                            " + m_ctx.GetAD_User_ID() + @",
                                             '*** System Maintained ***',
                                             '" + MDocBaseType.DOCBASETYPE_ShipReceiptConfirmation + @"',
                                             'D',
@@ -3223,7 +3255,7 @@ namespace VAdvantage.Model
                                             'Ship/Receipt Confirmation',
                                              " + GlobalVariable.TO_DATE(DateTime.Now, false) + @",
                                             100
-                                        ) ", null, m_trx);                 
+                                        ) ", null, m_trx);
 
                 }
                 CreateDocType("Ship/Receipt Confirmation", "Ship/Receipt Confirmation",
@@ -3374,7 +3406,7 @@ namespace VAdvantage.Model
             if (DocSubTypeSO != null)
                 dt.SetDocSubTypeSO(DocSubTypeSO);
 
-            
+
             // For Blanket Order Set Document Type of Release
             if (C_DocTypeShipment_ID != 0)
             {
