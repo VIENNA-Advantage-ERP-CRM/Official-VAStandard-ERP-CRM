@@ -28,8 +28,10 @@ namespace VAS.Controllers
     ///               are re-validated server-side before any document is read: the
     ///               period against the primary calendar's open periods, the type
     ///               against what Application Dictionary discovery actually returned.
-    ///               The client only ever SENDS an AD_Table_ID and an AD_Window_ID -
-    ///               a card row is a screen, so the pair is its whole identity. It
+    ///               The client only ever SENDS an AD_Table_ID, an AD_Window_ID and a
+    ///               catch-all flag - a card row is a screen, so that is its whole
+    ///               identity, the flag being what tells a table's leftover row from the
+    ///               filtered screen it may share a window with. It
     ///               receives the key column name of the screen it opened, because the
     ///               framework's Zoom needs it to build the query - but nothing the
     ///               client sends is ever used as a table name, a column name or a
@@ -40,6 +42,8 @@ namespace VAS.Controllers
     ///               Records are never fetched with the figures.
     /// Chronological development:
     ///   VAI154      2026-08-21 Created
+    ///   VAI154      2026-08-26 GetRecords carries the catch-all flag, the third part of
+    ///                          a card row's identity
     /// </summary>
     public class VAS_198_UnPostedAccountEntriesWidgetController : Controller
     {
@@ -115,12 +119,18 @@ namespace VAS.Controllers
         /// <param name="tableId">AD_Table_ID of the transaction type opened.</param>
         /// <param name="windowId">AD_Window_ID of the row opened - a card row is a
         /// SCREEN, so the table alone does not identify it.</param>
+        /// <param name="isComplement">Whether the row opened is the table's catch-all -
+        /// the records none of its filtered screens claim. Optional, and false when it
+        /// is not sent, which is what an ordinary screen row is. A catch-all can share a
+        /// window with a filtered screen, so without this the two would answer for each
+        /// other.</param>
         /// <param name="pageNo">1-based page number.</param>
         /// <param name="pageSize">Requested rows per page.</param>
         /// <returns>JSON-serialized RecordPage, or { error }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetRecords(int periodId, int tableId, int windowId, int pageNo, int pageSize)
+        public JsonResult GetRecords(int periodId, int tableId, int windowId, int pageNo, int pageSize,
+            bool isComplement = false)
         {
             string retJSON = "";
 
@@ -131,7 +141,7 @@ namespace VAS.Controllers
                 {
                     VAS_198_UnPostedAccountEntriesModel model = new VAS_198_UnPostedAccountEntriesModel();
                     retJSON = JsonConvert.SerializeObject(
-                        model.GetRecords(ctx, periodId, tableId, windowId, pageNo, pageSize));
+                        model.GetRecords(ctx, periodId, tableId, windowId, isComplement, pageNo, pageSize));
                 }
                 catch (Exception ex)
                 {

@@ -51,6 +51,9 @@ namespace VASLogic.Models
     ///               PostgreSQL and Oracle.
     /// Chronological development:
     ///   VAI145      2026-08-19 Created
+    ///   VAI154      2026-08-26 The DocBaseType fallback is cast to the name's character
+    ///                          type on Oracle - see DocBaseTypeCode - and the ORDER BY
+    ///                          reads the SELECT aliases rather than repeating it
     /// </summary>
     public class VAS_196_PeriodControlMatrixModel
     {
@@ -258,7 +261,7 @@ namespace VASLogic.Models
                        COALESCE(org.Name,N'') AS Org_Name,
                        pc.DocBaseType AS Doc_Base_Type,
                        dbt.C_DocBaseType_ID AS C_DocBaseType_ID,
-                       COALESCE(dbt.Name,pc.DocBaseType) AS Doc_Base_Type_Name,
+                       COALESCE(dbt.Name," + DocBaseTypeCode("pc") + @") AS Doc_Base_Type_Name,
                        pc.PeriodStatus AS Period_Status,
                        pc.PeriodAction AS Period_Action
                 FROM C_PeriodControl pc
@@ -273,8 +276,12 @@ namespace VASLogic.Models
 
             /* Tenant-wide controls (AD_Org_ID=0) first, then the org-specific ones
                grouped by org name, and by document base type inside each group -
-               so the matrix reads as one block per organization when several exist. */
-            sql += " ORDER BY pc.AD_Org_ID,COALESCE(org.Name,N''),COALESCE(dbt.Name,pc.DocBaseType)";
+               so the matrix reads as one block per organization when several exist.
+
+               By SELECT ALIAS, not by the expressions repeated: both back ends resolve
+               an alias in ORDER BY, and writing the COALESCE out a second time meant the
+               character-set cast below had to be got right in two places instead of one. */
+            sql += " ORDER BY AD_Org_ID,Org_Name,Doc_Base_Type_Name";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
@@ -307,6 +314,34 @@ namespace VASLogic.Models
             }
 
             return rows;
+        }
+
+        /// <summary>
+        /// The stored DocBaseType CODE, in the character type C_DocBaseType.Name is held
+        /// in, so a COALESCE can fall back from the name to the code.
+        ///
+        /// On ORACLE that cast is not optional. COALESCE requires every later argument to
+        /// be implicitly convertible to the FIRST one's type, and the two are not the same
+        /// kind of string: C_DocBaseType.Name is NVARCHAR2 (national character set) while
+        /// C_PeriodControl.DocBaseType is a plain CHAR/VARCHAR2 in the database character
+        /// set. Oracle refuses to mix them and raises ORA-12704 "character set mismatch" -
+        /// the whole statement fails, so the matrix came back empty rather than merely
+        /// unsorted. PostgreSQL has one text type and needs no cast, and NVARCHAR2 is not
+        /// a type it knows, so the cast is emitted for Oracle only.
+        ///
+        /// 100 characters, comfortably above the three the column actually stores; the
+        /// length only has to be long enough not to truncate.
+        /// Chronological development:
+        ///   VAI154      2026-08-26 Created - COALESCE(dbt.Name,pc.DocBaseType) threw
+        ///                          ORA-12704 on Oracle
+        /// </summary>
+        /// <param name="alias">Alias of C_PeriodControl in the statement.</param>
+        /// <returns>Expression yielding the code, castable beside the name.</returns>
+        private string DocBaseTypeCode(string alias)
+        {
+            string column = alias + ".DocBaseType";
+
+            return DB.IsOracle() ? "CAST(" + column + " AS NVARCHAR2(100))" : column;
         }
 
         // ─────────────────────────────────────────────────────────────────────
