@@ -15,20 +15,22 @@
  * opens that record in its own standard window.
  *
  * The transaction types are NOT hard-coded. The server discovers them from the
- * Application Dictionary - every active physical table with a Posted column that
- * is actually displayed on an active window - and a row is one of those SCREENS,
+ * Application Dictionary - every active physical table with a Posted column, on
+ * every menu-reachable window that opens it - and a row is one of those SCREENS,
  * not one of those tables. So C_Invoice arrives as AP Invoice / AR Invoice /
  * Expense Invoice, M_InOut as GRN / Delivery Order / the return flavours, and so
  * on, named as the tenant named its windows. A module that adds a posted document
  * screen appears here without a code change.
  *
- * A row is therefore a table AND a window, and that pair is the whole of what this
- * widget holds and the whole of what it sends back. What separates two screens
- * over one table is that screen's own record filter, which lives on the server and
- * is never sent here. The key column name used to build a Zoom query arrives with
- * the records and is never echoed back - so nothing here can name a table the
- * dictionary did not publish. Zoom needs no rule of its own: a row IS a screen, so
- * it opens that screen.
+ * A row is therefore a table, a window, and a flag saying whether it is that
+ * table's catch-all - the records none of its screens claim, which can sit on the
+ * same window as one of them. Those three are the whole of what this widget holds
+ * and the whole of what it sends back. What separates two screens over one table
+ * is that screen's own record filter, which lives on the server and is never sent
+ * here. The key column name used to build a Zoom query arrives with the records
+ * and is never echoed back - so nothing here can name a table the dictionary did
+ * not publish. Zoom needs no rule of its own: a row IS a screen, so it opens that
+ * screen.
  *
  * A type is valued either from a header total in its own currency (an invoice's
  * GrandTotal, a payment's PayAmt) or, where it has no header total, from the
@@ -87,6 +89,11 @@
  * 22 | of                                       | VAS_026_Of                (reuse)
  * 23 | Previous                                 | VAS_026_Prev              (reuse)
  * 24 | Next                                     | VAS_026_Next              (reuse)
+ * 25 | Other                                    | VAS_198_OtherRecords      (server)
+ *
+ * (server) is resolved in VAS_198_UnPostedAccountEntriesModel, not here: it
+ * qualifies a table's catch-all row when that row would otherwise repeat the name
+ * of the screen it shares a window with. Unseeded it renders as "Other".
  */
 ; VAS = window.VAS || {};
 
@@ -171,6 +178,11 @@
            already navigated away from (or of a period they have already changed). */
         var _tableId = 0;
         var _windowId = 0;
+
+        /* The third part of a row's identity: a table's catch-all row - the records
+           none of its screens claim - can sit on the same window as one of those
+           screens, and without this the server cannot tell the two apart. */
+        var _isComplement = false;
         var _typeName = '';
         var _page = 1;
         var _detailSeq = 0;
@@ -349,6 +361,7 @@
                 var $row = $(this);
                 openModal(parseInt($row.attr('data-table'), 10) || 0,
                     parseInt($row.attr('data-window'), 10) || 0,
+                    $row.attr('data-complement') === '1',
                     $row.attr('data-name') || '');
             });
             $list.on('keydown', '.vas-198-row', function (e) {
@@ -520,6 +533,7 @@
                    opened. One table can be several rows. */
                 html += '<div class="vas-198-row" role="button" tabindex="0" data-table="' + src.AD_Table_ID +
                         '" data-window="' + (src.AD_Window_ID || 0) +
+                        '" data-complement="' + (src.IsComplement ? '1' : '0') +
                         '" data-name="' + escapeHtml(name) + '" aria-label="' + escapeHtml(name) + '">' +
                     '<span class="vas-198-cell vas-198-cell-name" title="' + escapeHtml(name) + '">' +
                         escapeHtml(name) + '</span>' +
@@ -781,12 +795,13 @@
             });
         }
 
-        function openModal(tableId, windowId, typeName) {
+        function openModal(tableId, windowId, isComplement, typeName) {
             if (!(tableId > 0) || _periodId <= 0) { return; }
             if (!$overlay) { buildModal(); }
 
             _tableId = tableId;
             _windowId = windowId || 0;
+            _isComplement = !!isComplement;
             _typeName = typeName || '';
             _page = 1;
 
@@ -842,6 +857,7 @@
                     periodId: periodId,
                     tableId: _tableId,
                     windowId: _windowId,
+                    isComplement: _isComplement,
                     pageNo: _page,
                     pageSize: MODAL_PAGE_SIZE
                 },
