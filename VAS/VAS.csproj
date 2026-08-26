@@ -189,6 +189,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_188_TopUsedProductsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_074_CreateInvoiceLinePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_107_CreateOrderBottomPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_218_CreateOppLinesController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_105_AccountRightPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_106_OverviewSalesOrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_120_CustomerSearchWidgetController.cs" />
@@ -431,6 +432,7 @@
     <Content Include="Areas\VAS\Content\VAS_106_OverviewSalesOrder.css" />
     <Content Include="Areas\VAS\Content\VAS_120_CustomerSearchWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_121_NewCustomerWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_218_CreateOppLines.css" />
     <Content Include="Areas\VAS\Content\VAS_KpiDrillThrough.css" />
     <Content Include="Areas\VAS\Content\VAS_122_TotalCustomersWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_124_DelayedPaymentsWidget.css" />
@@ -450,6 +452,8 @@
     <Content Include="Areas\VAS\Content\VAS_172_PendingTransferConfirmationWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_173_TransfersByWarehouseWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_174_TransferQueueWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_218_CreateOppLines.js" />
+    <Content Include="Areas\VAS\Scripts\app\util\VAS_PanelShortcuts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_167_NewTransferQuickActionWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_168_OpenTransfersWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_169_UnderConfirmationWidget.js" />
