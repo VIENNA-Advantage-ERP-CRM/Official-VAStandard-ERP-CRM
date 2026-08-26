@@ -243,7 +243,7 @@ namespace VASLogic.Models
                        acs.Name AS Acct_Schema_Name,
                        acs.C_Currency_ID AS C_Currency_ID,
                        cur.ISO_Code AS Currency_Iso,
-                       COALESCE(cur.CurSymbol,cur.ISO_Code) AS Currency_Symbol,
+                       COALESCE(cur.CurSymbol," + CodeAsText("cur.ISO_Code") + @") AS Currency_Symbol,
                        cur.StdPrecision AS Std_Precision
                 FROM AD_ClientInfo ci
                 INNER JOIN C_AcctSchema acs ON (acs.C_AcctSchema_ID=ci.C_AcctSchema1_ID)
@@ -1588,9 +1588,6 @@ namespace VASLogic.Models
                 FROM AD_Table t
                 INNER JOIN AD_Column c ON (c.AD_Table_ID=t.AD_Table_ID AND c.IsActive='Y')
                 WHERE t.IsActive='Y'
-                  /* COALESCE, not a bare comparison: AD_Table.IsView is NULLable and
-                     unset on most tables, so 't.IsView=''N''' is NULL rather than true
-                     and would resolve no source table at all. */
                   AND COALESCE(t.IsView,'N')='N'
                   AND t.AD_Table_ID IN (" + inList + @")
                 GROUP BY t.AD_Table_ID,t.TableName";
@@ -2029,6 +2026,54 @@ namespace VASLogic.Models
                  + " ON (" + trlAlias + ".AD_Ref_List_ID=" + listAlias + ".AD_Ref_List_ID"
                  + " AND " + trlAlias + ".AD_Language=" + languageBind
                  + " AND " + trlAlias + ".IsActive='Y')";
+        }
+
+        /// <summary>
+        /// What to SELECT beside a <see cref="ListNameJoin"/>: the translated list name,
+        /// then the untranslated one, then the stored code as it stands.
+        ///
+        /// One place for the shape, because the code has to be CAST - see
+        /// <see cref="CodeAsText"/> - and getting that wrong throws rather than merely
+        /// looking odd.
+        /// </summary>
+        /// <param name="trlAlias">Alias of the translation row.</param>
+        /// <param name="listAlias">Alias of the AD_Ref_List row.</param>
+        /// <param name="codeExpr">Qualified column holding the stored code.</param>
+        /// <returns>Scalar expression yielding the readable name.</returns>
+        protected string ListNameExpr(string trlAlias, string listAlias, string codeExpr)
+        {
+            return "COALESCE(" + trlAlias + ".Name," + listAlias + ".Name,"
+                 + CodeAsText(codeExpr) + ",N'')";
+        }
+
+        /// <summary>
+        /// A stored CODE, in the character type the NAME columns beside it are held in.
+        ///
+        /// On ORACLE this cast is not optional. A dictionary NAME is NVARCHAR2, in the
+        /// national character set; a code column - DocStatus, DocBaseType, TenderType,
+        /// MovementType, PeriodStatus - is a plain VARCHAR2 in the database character
+        /// set. COALESCE requires its later arguments to be convertible to the FIRST
+        /// one's type, and Oracle refuses to mix the two character sets: it raises
+        /// ORA-12704 "character set mismatch" and the whole statement fails, so a check
+        /// reports an error rather than a coarser label. The same applies ACROSS a UNION,
+        /// which is why a branch with no list join casts its bare code column too - one
+        /// branch yielding NVARCHAR2 and its sibling VARCHAR2 will not unite.
+        ///
+        /// PostgreSQL has one text type and needs no cast, and NVARCHAR2 is not a type it
+        /// knows, so the cast is emitted for Oracle only. 100 characters is comfortably
+        /// above anything a reference code stores; the length only has to avoid
+        /// truncating.
+        /// Chronological development:
+        ///   VAI154      2026-08-26 Created - the same mismatch confirmed on VAS_196's
+        ///                          COALESCE(dbt.Name,pc.DocBaseType)
+        /// </summary>
+        /// <param name="codeExpr">Qualified column holding the stored code.</param>
+        /// <returns>The expression, cast where the backend requires it.</returns>
+        protected string CodeAsText(string codeExpr)
+        {
+            if (string.IsNullOrEmpty(codeExpr)) { return "N''"; }
+
+            return DB.IsOracle() ? "CAST(" + codeExpr + " AS NVARCHAR2(100))" : codeExpr;
         }
 
         // ─────────────────────────────────────────────────────────────────────

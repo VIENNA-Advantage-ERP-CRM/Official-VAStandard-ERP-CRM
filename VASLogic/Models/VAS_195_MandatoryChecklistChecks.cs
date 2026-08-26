@@ -1110,7 +1110,9 @@ namespace VASLogic.Models
                these adapters bind by position.
                The bind is added here, ahead of the caller's period binds - the join sits
                in the FROM clause and those sit in the WHERE. */
-            string statusExpr = d.HasDocStatus ? a + ".DocStatus" : "N''";
+            /* CodeAsText even on the bare fallback: a UNION will not unite one branch
+               yielding a national string with a sibling yielding a plain one. */
+            string statusExpr = d.HasDocStatus ? CodeAsText(a + ".DocStatus") : "N''";
             string statusJoin = "";
 
             if (d.HasDocStatus)
@@ -1121,7 +1123,7 @@ namespace VASLogic.Models
                 if (statusJoin.Length > 0)
                 {
                     parameters.Add(new SqlParameter("@DocLang" + suffix, ctxLanguage(c)));
-                    statusExpr = "COALESCE(dstrl.Name,ds.Name," + a + ".DocStatus,N'')";
+                    statusExpr = ListNameExpr("dstrl", "ds", a + ".DocStatus");
                 }
             }
 
@@ -1153,7 +1155,7 @@ namespace VASLogic.Models
                /* The SYMBOL, not the ISO code: it rides beside the amount instead of
                   taking a column of its own. Symbol first, code as the fallback for a
                   currency that defines none. */
-               .Append(",").Append(d.HasCurrency ? "COALESCE(cur.CurSymbol,cur.ISO_Code,N'')" : "N''").Append(" AS Currency_Symbol")
+               .Append(",").Append(d.HasCurrency ? "COALESCE(cur.CurSymbol," + CodeAsText("cur.ISO_Code") + ",N'')" : "N''").Append(" AS Currency_Symbol")
                .Append(",").Append(d.HasAmount ? "COALESCE(" + a + "." + d.AmountColumn + ",0)" : "0").Append(" AS Doc_Amount")
                .Append(" FROM ").Append(d.TableName).Append(" ").Append(a)
                .Append(" LEFT OUTER JOIN AD_Org org ON (org.AD_Org_ID=").Append(a).Append(".AD_Org_ID)");
@@ -1419,7 +1421,7 @@ namespace VASLogic.Models
                        " + (string.IsNullOrEmpty(docTypeKey) ? "N''" : "COALESCE(dt.Name,N'')") + @" AS Doc_Type,
                        COALESCE(bp.Name,N'') AS Partner_Name,
                        " + (hasCharge ? "COALESCE(ch.Name,N'')" : "N''") + @" AS Charge_Name,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso,
                        COALESCE(p.PayAmt,0) AS Pay_Amount
                 FROM C_Payment p
                 " + (string.IsNullOrEmpty(docTypeKey)
@@ -1511,7 +1513,7 @@ namespace VASLogic.Models
                        p.DateTrx AS Trx_Date,
                        p.DateAcct AS Doc_Date,
                        COALESCE(bp.Name,N'') AS Partner_Name,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso,
                        COALESCE(p.PayAmt,0) AS Doc_Amount
                 FROM C_Payment p
                 INNER JOIN C_BankAccount ba ON (ba.C_BankAccount_ID=p.C_BankAccount_ID)
@@ -1553,7 +1555,7 @@ namespace VASLogic.Models
                        bsl.StatementLineDate AS Trx_Date,
                        bsl.DateAcct AS Doc_Date,
                        COALESCE(bp.Name,N'') AS Partner_Name,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso,
                        COALESCE(bsl.StmtAmt,0) AS Doc_Amount
                 FROM C_BankStatementLine bsl
                 INNER JOIN C_BankStatement bs ON (bs.C_BankStatement_ID=bsl.C_BankStatement_ID)
@@ -1649,19 +1651,19 @@ namespace VASLogic.Models
 
             string methodExpr = AppendPaymentMethod(c, joins, parameters);
 
-            string statusExpr = "COALESCE(p.DocStatus,N'')";
+            string statusExpr = "COALESCE(" + CodeAsText("p.DocStatus") + ",N'')";
             string statusJoin = ListNameJoin("ds", "dstrl", "p.DocStatus", "C_Payment", "DocStatus", "@AD_LanguageD");
             if (statusJoin.Length > 0)
             {
                 joins.Append(statusJoin);
                 parameters.Add(new SqlParameter("@AD_LanguageD", ctxLanguage(c)));
-                statusExpr = "COALESCE(dstrl.Name,ds.Name,p.DocStatus,N'')";
+                statusExpr = ListNameExpr("dstrl", "ds", "p.DocStatus");
             }
 
             string execExpr = "N''";
             if (hasExec)
             {
-                execExpr = "COALESCE(p." + COLUMN_EXECUTION_STATUS + ",N'')";
+                execExpr = "COALESCE(" + CodeAsText("p." + COLUMN_EXECUTION_STATUS) + ",N'')";
 
                 string execJoin = ListNameJoin("es", "estrl", "p." + COLUMN_EXECUTION_STATUS,
                     "C_Payment", COLUMN_EXECUTION_STATUS, "@AD_LanguageE");
@@ -1669,7 +1671,7 @@ namespace VASLogic.Models
                 {
                     joins.Append(execJoin);
                     parameters.Add(new SqlParameter("@AD_LanguageE", ctxLanguage(c)));
-                    execExpr = "COALESCE(estrl.Name,es.Name,p." + COLUMN_EXECUTION_STATUS + ",N'')";
+                    execExpr = ListNameExpr("estrl", "es", "p." + COLUMN_EXECUTION_STATUS);
                 }
             }
 
@@ -1687,7 +1689,7 @@ namespace VASLogic.Models
                        " + methodExpr + @" AS Payment_Method,
                        " + statusExpr + @" AS Doc_Status,
                        " + execExpr + @" AS Exec_Status,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso,
                        COALESCE(p.PayAmt,0) AS Doc_Amount
                 FROM C_Payment p" + joins.ToString() + @"
                 WHERE p.IsActive='Y'
@@ -1748,10 +1750,10 @@ namespace VASLogic.Models
             {
                 joins.Append(tenderJoin);
                 parameters.Add(new SqlParameter("@AD_LanguageT", ctxLanguage(c)));
-                return "COALESCE(tttrl.Name,tt.Name,p.TenderType,N'')";
+                return ListNameExpr("tttrl", "tt", "p.TenderType");
             }
 
-            return "COALESCE(p.TenderType,N'')";
+            return "COALESCE(" + CodeAsText("p.TenderType") + ",N'')";
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -1919,8 +1921,8 @@ namespace VASLogic.Models
                        ABS(COALESCE(il.QtyInvoiced,0)) AS Invoiced_Qty,
                        " + matched + @" AS Matched_Qty,
                        " + unmatched + @" AS Unmatched_Qty,
-                       " + (hasMatchReq ? "COALESCE(i.MatchRequirementI,N'')" : "N''") + @" AS Match_Requirement,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
+                       " + (hasMatchReq ? "COALESCE(" + CodeAsText("i.MatchRequirementI") + ",N'')" : "N''") + @" AS Match_Requirement,
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso,
                        COALESCE(il.LineNetAmt,0) AS Doc_Amount
                 FROM C_InvoiceLine il
                 INNER JOIN C_Invoice i ON (i.C_Invoice_ID=il.C_Invoice_ID)
@@ -2028,7 +2030,7 @@ namespace VASLogic.Models
                        " + matchedQty + @" AS Invoiced_Qty,
                        " + orderPrice + @" AS Order_Price,
                        " + invoicePrice + @" AS Invoice_Price,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso
                 FROM M_MatchInv mi
                 INNER JOIN C_InvoiceLine il ON (il.C_InvoiceLine_ID=mi.C_InvoiceLine_ID)
                 INNER JOIN C_Invoice i ON (i.C_Invoice_ID=il.C_Invoice_ID)
@@ -2673,13 +2675,13 @@ namespace VASLogic.Models
                needs "Drafted". The bind is added HERE, before the statement is built,
                because its occurrence is in the FROM clause and the period binds that
                follow are in the WHERE - these adapters bind positionally. */
-            string statusExpr = "COALESCE(ah.DocStatus,N'')";
+            string statusExpr = "COALESCE(" + CodeAsText("ah.DocStatus") + ",N'')";
             string statusJoin = ListNameJoin("ds", "dstrl", "ah.DocStatus",
                 "C_AllocationHdr", "DocStatus", "@AD_LanguageD");
             if (statusJoin.Length > 0)
             {
                 parameters.Add(new SqlParameter("@AD_LanguageD", ctxLanguage(c)));
-                statusExpr = "COALESCE(dstrl.Name,ds.Name,ah.DocStatus,N'')";
+                statusExpr = ListNameExpr("dstrl", "ds", "ah.DocStatus");
             }
 
             string sql = @"
@@ -2689,7 +2691,7 @@ namespace VASLogic.Models
                        COALESCE(ah.DocumentNo,N'') AS Doc_Number,
                        ah.DateAcct AS Doc_Date,
                        " + statusExpr + @" AS Doc_Status,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso
                 FROM C_AllocationHdr ah
                 LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=ah.C_Currency_ID)" + statusJoin + @"
                 WHERE ah.IsActive='Y'
@@ -2792,12 +2794,12 @@ namespace VASLogic.Models
                that would have read it falls back to the stored code - a readable 'M'
                beats an empty column. */
             string typeName = typeJoin.Length > 0
-                ? "COALESCE(rttrl.Name,rt.Name,r.RecurringType,N'')"
-                : (hasRecurringType ? "COALESCE(r.RecurringType,N'')" : "N''");
+                ? ListNameExpr("rttrl", "rt", "r.RecurringType")
+                : (hasRecurringType ? "COALESCE(" + CodeAsText("r.RecurringType") + ",N'')" : "N''");
 
             string freqName = freqJoin.Length > 0
-                ? "COALESCE(frtrl.Name,fr.Name,r.FrequencyType,N'')"
-                : "COALESCE(r.FrequencyType,N'')";
+                ? ListNameExpr("frtrl", "fr", "r.FrequencyType")
+                : "COALESCE(" + CodeAsText("r.FrequencyType") + ",N'')";
 
             string sql = @"
                 SELECT " + TableId("C_Recurring") + " AS " + TECH_TABLE + @",
@@ -3138,13 +3140,13 @@ namespace VASLogic.Models
             /* MovementType is an AD_Reference list column: it stores 'V+' and the reader
                needs "Vendor Receipt". The bind goes in before the statement is built - its
                occurrence is in the FROM clause, ahead of the period binds in the WHERE. */
-            string typeExpr = "COALESCE(mt.MovementType,N'')";
+            string typeExpr = "COALESCE(" + CodeAsText("mt.MovementType") + ",N'')";
             string typeJoin = ListNameJoin("mtl", "mtltrl", "mt.MovementType",
                 "M_Transaction", "MovementType", "@AD_LanguageM");
             if (typeJoin.Length > 0)
             {
                 parameters.Add(new SqlParameter("@AD_LanguageM", ctxLanguage(c)));
-                typeExpr = "COALESCE(mtltrl.Name,mtl.Name,mt.MovementType,N'')";
+                typeExpr = ListNameExpr("mtltrl", "mtl", "mt.MovementType");
             }
 
             /* The number of whichever document produced the movement. Empty when this
@@ -3439,12 +3441,12 @@ namespace VASLogic.Models
                before the statement is built, because its occurrence is in the FROM clause
                and the period binds that follow it are in the WHERE - these adapters bind
                positionally, so the two have to be added in that order. */
-            string statusExpr = "COALESCE(i.DocStatus,N'')";
+            string statusExpr = "COALESCE(" + CodeAsText("i.DocStatus") + ",N'')";
             string statusJoin = ListNameJoin("ds", "dstrl", "i.DocStatus", "M_Inventory", "DocStatus", "@AD_LanguageD");
             if (statusJoin.Length > 0)
             {
                 parameters.Add(new SqlParameter("@AD_LanguageD", ctxLanguage(c)));
-                statusExpr = "COALESCE(dstrl.Name,ds.Name,i.DocStatus,N'')";
+                statusExpr = ListNameExpr("dstrl", "ds", "i.DocStatus");
             }
 
             string sql = @"
@@ -3539,7 +3541,7 @@ namespace VASLogic.Models
                        COALESCE(tax.Rate,0) AS Tax_Rate,
                        " + (hasTaxBase ? "COALESCE(it.TaxBaseAmt,0)" : "0") + @" AS Tax_Base,
                        COALESCE(it.TaxAmt,0) AS Tax_Amount,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso
                 FROM C_InvoiceTax it
                 INNER JOIN C_Invoice i ON (i.C_Invoice_ID=it.C_Invoice_ID)
                 INNER JOIN C_Tax tax ON (tax.C_Tax_ID=it.C_Tax_ID)
@@ -3969,7 +3971,7 @@ namespace VASLogic.Models
                        0 AS " + TECH_WINDOW + @",
                        bank.Name AS Bank_Name,
                        ba.AccountNo AS Bank_Account,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso,
                        COUNT(1) AS Total_Items,
                        SUM(CASE WHEN COALESCE(p.IsReconciled,'N')='Y' THEN 1 ELSE 0 END) AS Reconciled_Items,
                        SUM(CASE WHEN COALESCE(p.IsReconciled,'N')<>'Y' THEN 1 ELSE 0 END) AS Unreconciled_Items
@@ -3986,7 +3988,7 @@ namespace VASLogic.Models
             DetailSpec spec = new DetailSpec();
             spec.Sql = sql;
             spec.MainAlias = "p";
-            spec.GroupBy = "bank.Name,ba.AccountNo,COALESCE(cur.ISO_Code,N'')";
+            spec.GroupBy = "bank.Name,ba.AccountNo,COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'')";
             spec.OrderBy = "Bank_Name,Bank_Account";
             spec.Params = parameters;
 
@@ -4070,22 +4072,22 @@ namespace VASLogic.Models
 
                Both binds are added before the statement is built - the joins are in the
                FROM clause, ahead of everything the WHERE binds. */
-            string typeExpr = "COALESCE(pc.DocBaseType,N'')";
+            string typeExpr = "COALESCE(" + CodeAsText("pc.DocBaseType") + ",N'')";
             string typeJoin = ListNameJoin("bt", "bttrl", "pc.DocBaseType",
                 "C_DocType", "DocBaseType", "@AD_LanguageB");
             if (typeJoin.Length > 0)
             {
                 parameters.Add(new SqlParameter("@AD_LanguageB", ctxLanguage(c)));
-                typeExpr = "COALESCE(bttrl.Name,bt.Name,pc.DocBaseType,N'')";
+                typeExpr = ListNameExpr("bttrl", "bt", "pc.DocBaseType");
             }
 
-            string statusExpr = "COALESCE(pc.PeriodStatus,N'')";
+            string statusExpr = "COALESCE(" + CodeAsText("pc.PeriodStatus") + ",N'')";
             string statusJoin = ListNameJoin("ps", "pstrl", "pc.PeriodStatus",
                 "C_PeriodControl", "PeriodStatus", "@AD_LanguageP");
             if (statusJoin.Length > 0)
             {
                 parameters.Add(new SqlParameter("@AD_LanguageP", ctxLanguage(c)));
-                statusExpr = "COALESCE(pstrl.Name,ps.Name,pc.PeriodStatus,N'')";
+                statusExpr = ListNameExpr("pstrl", "ps", "pc.PeriodStatus");
             }
 
             parameters.Add(new SqlParameter("@C_Period_ID", c.Period.C_Period_ID));

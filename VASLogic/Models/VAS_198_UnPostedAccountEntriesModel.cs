@@ -939,6 +939,33 @@ namespace VASLogic.Models
             return sb.ToString();
         }
 
+        /// <summary>
+        /// A stored CODE, in the character type the NAME columns beside it are held in.
+        ///
+        /// On ORACLE this cast is not optional. A dictionary NAME or symbol is NVARCHAR2,
+        /// in the national character set; a code column - ISO_Code, DocBaseType,
+        /// DocStatus - is a plain CHAR / VARCHAR2 in the database character set. COALESCE
+        /// and CASE both require their arms to be convertible to the first one's type, and
+        /// Oracle refuses to mix the two character sets: it raises ORA-12704 "character
+        /// set mismatch" and the whole statement fails, so the widget shows a load error
+        /// rather than a coarser label.
+        ///
+        /// PostgreSQL has one text type and needs no cast, and NVARCHAR2 is not a type it
+        /// knows, so the cast is emitted for Oracle only. 100 characters is comfortably
+        /// above anything a code column stores; the length only has to avoid truncating.
+        /// Chronological development:
+        ///   VAI154      2026-08-26 Created - the same mismatch confirmed on VAS_196's
+        ///                          COALESCE(dbt.Name,pc.DocBaseType)
+        /// </summary>
+        /// <param name="codeExpr">Qualified column holding the stored code.</param>
+        /// <returns>The expression, cast where the backend requires it.</returns>
+        private string CodeAsText(string codeExpr)
+        {
+            if (string.IsNullOrEmpty(codeExpr)) { return "N''"; }
+
+            return DB.IsOracle() ? "CAST(" + codeExpr + " AS NVARCHAR2(100))" : codeExpr;
+        }
+
         /// <summary>Case-insensitive membership test over a confirmed column list.</summary>
         /// <param name="columns">Column names the dictionary reported.</param>
         /// <param name="name">Column the strategy needs.</param>
@@ -2426,8 +2453,11 @@ namespace VASLogic.Models
 
             /* The document's own currency, and its own value in it. Without a
                currency column there is nothing to label a document amount with. */
-            sb.Append(",").Append(hasCurrency ? "COALESCE(cur.ISO_Code,N'')" : "N''").Append(" AS Currency_Iso");
-            sb.Append(",").Append(hasCurrency ? "COALESCE(cur.CurSymbol,cur.ISO_Code,N'')" : "N''")
+            /* ISO_Code is a plain CHAR column while CurSymbol is national text, so it is
+               cast before it stands beside one - see CodeAsText. */
+            sb.Append(",").Append(hasCurrency ? "COALESCE(" + CodeAsText("cur.ISO_Code") + ",N'')" : "N''")
+              .Append(" AS Currency_Iso");
+            sb.Append(",").Append(hasCurrency ? "COALESCE(cur.CurSymbol," + CodeAsText("cur.ISO_Code") + ",N'')" : "N''")
               .Append(" AS Currency_Symbol");
             sb.Append(",").Append(hasCurrency ? "COALESCE(cur.StdPrecision,2)" : "2").Append(" AS Currency_Precision");
 
@@ -2747,10 +2777,12 @@ namespace VASLogic.Models
             BaseCurrency result = new BaseCurrency();
             result.Precision = 2;
 
+            /* The CASE arms are cast to one character type: CurSymbol is national text and
+               ISO_Code is not, and Oracle will not decide between them - see CodeAsText. */
             string sql = @"
                 SELECT AcctSchema.C_Currency_ID AS Acct_Currency_ID,
                        Currency.StdPrecision AS Std_Precision,
-                       CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Currency_Symbol,
+                       CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE " + CodeAsText("Currency.ISO_Code") + @" END AS Currency_Symbol,
                        Currency.ISO_Code AS Currency_Iso
                 FROM AD_ClientInfo ClientInfo
                 INNER JOIN C_AcctSchema AcctSchema ON (AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID)
