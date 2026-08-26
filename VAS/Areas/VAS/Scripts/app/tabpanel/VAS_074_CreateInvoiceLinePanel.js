@@ -515,7 +515,11 @@
                 "<span>" + esc(lbl("VAS_074_AddLine", "Add line")) + "</span></button>");
             // Icon + label span built ONCE here; renderHeaderButtons only updates the label
             // span's TEXT (never rebuilds innerHTML) so the label can't momentarily blank out.
-            $saveBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--primary vas-cil-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_074_SaveRow", "Save row")) + ' (Ctrl+Alt+S)">' + icon("hard-drive", "💾") + '<span class="vas-cil-save-lbl"></span></button>');
+            // Save carries the FRAMEWORK save glyph (`vis vis-save`) rather than the panel's
+            // own icon() placeholder, so it reads as the same Save the rest of the product
+            // shows. A bare <i> is the framework's own markup and needs no wrapper here - the
+            // button is inline-flex with a gap, so it spaces itself like the other icons.
+            $saveBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--primary vas-cil-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_074_SaveRow", "Save row")) + ' (Ctrl+Alt+S)"><i class="vis vis-save"></i><span class="vas-cil-save-lbl"></span></button>');
             $deleteBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--danger vas-cil-is-disabled" data-action="delete-selected" title="' + esc(lbl("Delete", "Delete")) + ' (Ctrl+Alt+D)" disabled>' +
                 icon("trash", "🗑") + "<span>" + esc(lbl("Delete", "Delete")) + ' <span class="vas-cil-sel-count"></span></span></button>');
             // Refresh re-loads the current invoice's panel data (current page) from the server.
@@ -621,7 +625,15 @@
             // detach() keeps the node's handlers, input value and open popover; we re-insert it
             // in place and restore focus + caret (detach blurs the input).
             var keepId = null, $keep = null, refocusEl = null, caretPos = null;
-            if (editing && catalog.$pop && catalog.$pop.closest("body").length && lineById(editing.rowId)) {
+            // ONLY while the primary (product / charge) cell is the one being edited. The
+            // dropdown belongs to that cell, and preserving the row means NOT re-rendering
+            // it - so if `editing` has already moved on to another field, keeping the row
+            // freezes it on the primary AND the refocus below drags the caret back there.
+            // That is precisely what made Tab off a product cell do nothing: advanceField
+            // set editing to "description", render() saw a live popover, re-attached the
+            // untouched row and put focus straight back in the product input.
+            var editingPrimary = !!(editing && (editing.field === "product" || editing.field === "charge"));
+            if (editingPrimary && catalog.$pop && catalog.$pop.closest("body").length && lineById(editing.rowId)) {
                 var $existing = $linesBody.find('[data-rowid="' + editing.rowId + '"]').first();
                 if ($existing.length) {
                     var ae = document.activeElement;
@@ -1151,8 +1163,12 @@
             var canUndoEdits = line.status === "saved" && line.dirty && line._saved;
             var canDiscardNew = line.status === "new";
             if (editable && !line._saving && (canUndoEdits || canDiscardNew)) {
+                // Tooltip names the keyboard shortcut, exactly as the toolbar's Add / Save /
+                // Delete / Refresh buttons do - Ctrl+Alt+Z is the same Undo, reached from the
+                // keyboard (it acts on the ACTIVE row: the one being edited, else the first
+                // selected / first unsaved one - see undoActive).
                 var undoTitle = canDiscardNew ? lbl("VAS_074_UndoNewLine", "Undo (remove line)") : lbl("VAS_074_UndoChanges", "Undo changes");
-                var $undo = $('<button type="button" class="vas-cil-undo-btn" title="' + esc(undoTitle) + '">' + icon("rotate-ccw", "↺") + "</button>");
+                var $undo = $('<button type="button" class="vas-cil-undo-btn" title="' + esc(undoTitle) + ' (Ctrl+Alt+Z)">' + icon("rotate-ccw", "↺") + "</button>");
                 var undoAct = canDiscardNew ? discardNewLine : undoLine;
                 // Act on mousedown + preventDefault (like Save): a single click while a
                 // cell editor is focused would otherwise blur->commit->re-render and
@@ -1744,6 +1760,10 @@
             // (Tab / blur) discards it and keeps the cell on the committed record (or empty
             // on a new line). Previously the free text was kept as the display name, leaving
             // a name that no M_Product_ID / C_Charge_ID matched.
+            // Leaving the cell for good, so the dropdown goes with it - a popover left live
+            // in the DOM keeps render()'s preserve block believing the primary is still
+            // being edited (see render), which is how Tab off this cell used to be swallowed.
+            closeCatalog();
             if (fromTab) { editing = null; return; }   // advanceField owns the next field + render
             // Blur: only act while still editing THIS row's primary. If a catalog pick has
             // already advanced focus (e.g. to Description), leave that state untouched.
@@ -2438,15 +2458,15 @@
             { col: "C_Project_ID" },
             { col: "C_Campaign_ID" },
             { col: "C_Activity_ID" },
+            { col: "VAFAM_IsAssetRelated", when: "vafam" },
+            { col: "A_Asset_ID", when: "vafam" },
+            { col: "VAFAM_CapitalExpense", when: "vafam" },
             { col: "C_Withholding_ID" },
             { col: "WithholdingAmt" },
-            { col: "C_RevenueRecognition_ID", when: "svcExpenseOrCharge" },
-            { col: "RevenueStartDate", when: "svcExpenseOrCharge" },
-            { col: "VAFAM_IsAssetRelated", when: "vafam" },
-            { col: "VAFAM_CapitalExpense", when: "vafam" },
-            { col: "A_Asset_ID", when: "vafam" },
             { col: "VA106_TaxCollectedAtSource_ID", when: "va106_" },
             { col: "VA106_TCSAmount", when: "va106_" },
+            { col: "C_RevenueRecognition_ID", when: "svcExpenseOrCharge" },
+            { col: "RevenueStartDate", when: "svcExpenseOrCharge" },
             // "Treat as Discount Reference" group - only when the invoice header's
             // TreatAsDiscount flag is set (AP credit-memo treated as a discount). Picking
             // Ref_InvoiceLineOrg_ID copies the referenced line's product / ASI / UOM / qty
@@ -2582,7 +2602,7 @@
            title (AD_Message key + English fallback), `collapsed` = initial state. */
         var MORE_FIELD_GROUPS = [
             { anchor: "AD_OrgTrx_ID", key: "VAS_074_GrpDimension", def: "Dimension", collapsed: false },
-            { anchor: "C_Withholding_ID", key: "VAS_074_GrpReferences", def: "References", collapsed: false },
+            { anchor: "VAFAM_IsAssetRelated", key: "VAS_074_GrpReferences", def: "References", collapsed: false },
             { anchor: "Ref_InvoiceOrg_ID", key: "VAS_074_GrpTreatAsDiscount", def: "Treat as Discount Reference", collapsed: false }
         ];
         // Per-anchor collapsed state; persists across refreshMoreDialog and re-opens so a
