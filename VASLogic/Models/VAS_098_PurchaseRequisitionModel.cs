@@ -408,6 +408,32 @@
 ///                          deployed, and a client carrying the rows without the
 ///                          module passed every ColumnExists and then had no screen
 ///                          to open.
+///   VAI163   2026-08-26  A requisition referencing a BLANKET order was reported as
+///                        an ordinary Sales Order in Generated From. Two causes,
+///                        both fixed:
+///                        - LoadBlanketOrderOrigin gated its three routes on
+///                          ColumnExists and merged them into ONE union. That guard
+///                          answers "absent" for a column the schema really has
+///                          whenever AD_Column lacks the row, and its scalar
+///                          sub-select RAISES where AD_Table carries more than one
+///                          row named C_Order — the catch turns that into the same
+///                          "absent". A single union also meant one bad column took
+///                          down the two routes beside it. Each route is now
+///                          ATTEMPTED in its own statement and remembers its
+///                          usability in a static flag; the first to answer wins,
+///                          so a direct reference to the commitment outranks one
+///                          inferred through a release.
+///                        - RefOrderIsBlanket: the referenced order's own
+///                          C_Order.IsBlanketTrx now travels with it
+///                          (LoadSalesOrderOrigin, attempted the same way), so the
+///                          origin is named Blanket Sales / Purchase Order even
+///                          where none of the routes above can run, and
+///                          RefOrderWindowId points that chip at the blanket screen
+///                          rather than at C_Order's ordinary one. A blanket
+///                          reference is also named FIRST where several orders feed
+///                          the requisition — the strip names one and counts the
+///                          rest, and the standing commitment is the stronger of
+///                          the two origins.
 /// </summary>
 
 using System;
@@ -2743,6 +2769,19 @@ namespace VASLogic.Models
                     d.BlanketOrderIsSOTrx ? "VAS_BlanketSalesOrder"
                                           : "VAS_BlanketPurchaseOrder");
             }
+
+            // The referenced order gets the same treatment, but ONLY when it is
+            // itself a blanket. It normally is not, and an ordinary order opens
+            // perfectly well through the client's own lookup — so the id is left at
+            // 0 for one and the blanket screen named for the other. This is the
+            // fallback path: where the blanket loader answered, it has already
+            // claimed the record and cleared this chip.
+            if (d.RefOrderId > 0 && d.RefOrderIsBlanket)
+            {
+                d.RefOrderWindowId = GetWindowId(ctx,
+                    d.RefOrderIsSOTrx ? "VAS_BlanketSalesOrder"
+                                      : "VAS_BlanketPurchaseOrder");
+            }
         }
 
         /// <summary>
@@ -2790,35 +2829,97 @@ namespace VASLogic.Models
         /// opens it in the matching window. Calling a purchase order a sales order
         /// because of where the link happens to point would be worse than saying
         /// nothing.
+        ///
+        /// IsBlanketTrx travels with it too. A requisition raised straight against
+        /// a BLANKET order reaches it through this same reference, and the
+        /// referenced document is then a standing commitment, not an ordinary
+        /// order — so the chip has to say Blanket Sales Order rather than Sales
+        /// Order. <see cref="LoadBlanketOrderOrigin"/> normally claims that record
+        /// for its own chip and clears this one, but it is reached through three
+        /// optional columns and any of them can be absent from a given schema;
+        /// carrying the flag here means the origin is named correctly even when
+        /// none of those routes answers.
         /// </summary>
         private void LoadSalesOrderOrigin(int M_Requisition_ID, RequisitionOverviewData d)
         {
             if (!ColumnExists("M_RequisitionLine", "Ref_OrderLine_ID")) return;
 
+            // The blanket flag is ATTEMPTED, not gated on ColumnExists: that guard
+            // reports "absent" for a column the schema really has whenever the
+            // dictionary lacks the AD_Column row, and its scalar sub-select RAISES
+            // where AD_Table carries more than one row named C_Order — which the
+            // catch turns into the same "absent". Both leave a blanket order
+            // labelled as a plain sales order. A schema that genuinely has no such
+            // column falls back to the flagless read, once, and remembers.
+            if (_orderBlanketFlagUsable != false)
+            {
+                try
+                {
+                    ReadRefOrderOrigin(M_Requisition_ID, d, true);
+                    _orderBlanketFlagUsable = true;
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    _orderBlanketFlagUsable = false;
+                    _log.Severe("LoadSalesOrderOrigin/blanketflag (M_Requisition_ID="
+                                + M_Requisition_ID + "): " + ex.Message);
+                }
+            }
+
             try
             {
-                string sql = @"SELECT DISTINCT o.C_Order_ID, o.DocumentNo, o.IsSOTrx
-                                 FROM M_RequisitionLine rl
-                                INNER JOIN C_OrderLine ol
-                                        ON (ol.C_OrderLine_ID = rl.Ref_OrderLine_ID)
-                                INNER JOIN C_Order o
-                                        ON (o.C_Order_ID = ol.C_Order_ID)
-                                WHERE rl.M_Requisition_ID = @M_Requisition_ID
-                                  AND rl.IsActive = 'Y'
-                                ORDER BY o.DocumentNo";
-                DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
-                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
-
-                DataRow r = ds.Tables[0].Rows[0];
-                d.RefOrderId    = Util.GetValueOfInt(r["C_Order_ID"]);
-                d.RefOrderNo    = Util.GetValueOfString(r["DocumentNo"]);
-                d.RefOrderIsSOTrx = Util.GetValueOfString(r["IsSOTrx"]) == "Y";
-                d.RefOrderCount = ds.Tables[0].Rows.Count;
+                ReadRefOrderOrigin(M_Requisition_ID, d, false);
             }
             catch (Exception ex)
             {
                 _log.Severe("LoadSalesOrderOrigin (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// Remembers whether C_Order.IsBlanketTrx can be selected against this
+        /// schema, so a database that genuinely lacks it reports the failure once
+        /// rather than on every requisition the panel opens.
+        /// </summary>
+        private static bool? _orderBlanketFlagUsable;
+
+        /// <summary>
+        /// Reads the referenced order itself. Throws rather than swallowing, so the
+        /// caller can tell a missing IsBlanketTrx from an empty result.
+        /// </summary>
+        /// <param name="withBlanketFlag">Select C_Order.IsBlanketTrx; false reads a
+        /// constant 'N' instead, for a schema without the column.</param>
+        private void ReadRefOrderOrigin(int M_Requisition_ID, RequisitionOverviewData d,
+                                        bool withBlanketFlag)
+        {
+            string blanketSel = withBlanketFlag ? "COALESCE(o.IsBlanketTrx, 'N')" : "'N'";
+
+            // Blanket references are named FIRST where several orders feed the
+            // requisition: the strip names the first document and counts the rest,
+            // and a standing commitment is the stronger origin of the two.
+            // The ORDER BY runs on the SELECT alias, not on the expression — under
+            // DISTINCT the sort must come from the select list, and an unqualified
+            // IsBlanketTrx there would read ambiguously against the column itself.
+            string sql = @"SELECT DISTINCT o.C_Order_ID, o.DocumentNo, o.IsSOTrx,
+                                  " + blanketSel + @" AS IS_BLANKET
+                             FROM M_RequisitionLine rl
+                            INNER JOIN C_OrderLine ol
+                                    ON (ol.C_OrderLine_ID = rl.Ref_OrderLine_ID)
+                            INNER JOIN C_Order o
+                                    ON (o.C_Order_ID = ol.C_Order_ID)
+                            WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                              AND rl.IsActive = 'Y'
+                            ORDER BY IS_BLANKET DESC, o.DocumentNo";
+            DataSet ds = DB.ExecuteDataset(sql, ReqParam(M_Requisition_ID), null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+            DataRow r = ds.Tables[0].Rows[0];
+            d.RefOrderId       = Util.GetValueOfInt(r["C_Order_ID"]);
+            d.RefOrderNo       = Util.GetValueOfString(r["DocumentNo"]);
+            d.RefOrderIsSOTrx  = Util.GetValueOfString(r["IsSOTrx"]) == "Y";
+            d.RefOrderIsBlanket = Util.GetValueOfString(r["IS_BLANKET"]) == "Y";
+            d.RefOrderCount    = ds.Tables[0].Rows.Count;
         }
 
         /// <summary>
@@ -2844,9 +2945,24 @@ namespace VASLogic.Models
         /// purchase order. Reporting the wrong one would send the reader to a window
         /// that cannot show the record.
         ///
-        /// Every column it rests on is optional and dictionary-guarded — the flag,
-        /// the header link and the line link each enable their own route — so a
-        /// schema carrying none of them simply draws no chip.
+        /// Every column the three routes rest on is optional, and each is ATTEMPTED
+        /// in a statement of its own rather than gated on ColumnExists and merged
+        /// into one UNION. Two faults came out of doing it the other way:
+        ///
+        ///   - The dictionary guard was itself what failed. ColumnExists answers
+        ///     "absent" for a column the schema really has whenever AD_Column lacks
+        ///     the row, and its scalar sub-select RAISES where AD_Table carries more
+        ///     than one row named C_Order, which the catch turns into the same
+        ///     "absent". A requisition raised directly against a blanket then lost
+        ///     route 1 and was labelled a plain sales order.
+        ///   - One UNION meant one failure. A column the dictionary claims but the
+        ///     schema does not have took down the two routes beside it as well, so a
+        ///     blanket reachable by either was reported as no blanket at all.
+        ///
+        /// Each route now remembers its own usability in a static flag, so a schema
+        /// that genuinely lacks a column reports it once rather than per record, and
+        /// the first route to answer wins: a direct reference to the commitment
+        /// outranks one inferred through a release.
         /// </summary>
         /// <param name="M_Requisition_ID">Selected requisition id.</param>
         /// <param name="d">Overview payload being populated.</param>
@@ -2854,74 +2970,105 @@ namespace VASLogic.Models
         {
             if (!ColumnExists("M_RequisitionLine", "Ref_OrderLine_ID")) return;
 
-            bool hasFlag       = ColumnExists("C_Order", "IsBlanketTrx");
-            bool hasHeaderLink = ColumnExists("C_Order", "C_Order_Blanket");
-            bool hasLineLink   = ColumnExists("C_OrderLine", "C_OrderLine_Blanket_ID");
-            if (!hasFlag && !hasHeaderLink && !hasLineLink) return;
+            // The id is inlined rather than bound: the id source is nested inside
+            // the outer statement, and positional binding gives a repeated bind name
+            // a second, unfilled placeholder. It is an int, so nothing can be
+            // injected.
+            string reqId = M_Requisition_ID.ToString();
+            const string REF_JOIN =
+                @"FROM M_RequisitionLine rl
+                 INNER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = rl.Ref_OrderLine_ID)";
+            string where = @"WHERE rl.M_Requisition_ID = " + reqId + @"
+                               AND rl.IsActive = 'Y'";
 
+            // 1. The referenced order IS the blanket.
+            bool found = TryBlanketRoute(M_Requisition_ID, d, "flag",
+                @"SELECT o.C_Order_ID AS BLANKET_ID " + REF_JOIN + @"
+                   INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                   " + where + @" AND COALESCE(o.IsBlanketTrx, 'N') = 'Y'",
+                ref _blanketFlagRouteUsable);
+
+            // 2. It is a RELEASE of one, per its header.
+            if (!found)
+                found = TryBlanketRoute(M_Requisition_ID, d, "header",
+                    @"SELECT o.C_Order_Blanket AS BLANKET_ID " + REF_JOIN + @"
+                       INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                       " + where + @" AND COALESCE(o.C_Order_Blanket, 0) > 0",
+                    ref _blanketHeaderRouteUsable);
+
+            // 3. Its LINE is a release of one — the route the header misses.
+            if (!found)
+                found = TryBlanketRoute(M_Requisition_ID, d, "line",
+                    @"SELECT bol.C_Order_ID AS BLANKET_ID " + REF_JOIN + @"
+                       INNER JOIN C_OrderLine bol
+                               ON (bol.C_OrderLine_ID = ol.C_OrderLine_Blanket_ID)
+                       " + where + @" AND COALESCE(ol.C_OrderLine_Blanket_ID, 0) > 0",
+                    ref _blanketLineRouteUsable);
+
+            if (!found) return;
+
+            // The plain Order chip stands down when it found this same record —
+            // a requisition raised straight against a blanket reaches it through
+            // Ref_OrderLine_ID, so both loaders land on it and the strip would
+            // carry one document twice, under two different names.
+            if (d.RefOrderId > 0 && d.RefOrderId == d.BlanketOrderId)
+            {
+                d.RefOrderId    = 0;
+                d.RefOrderNo    = "";
+                d.RefOrderCount = 0;
+                d.RefOrderIsBlanket = false;
+            }
+        }
+
+        /// <summary>
+        /// Whether each blanket route can be run against this schema. Null until
+        /// tried, false once its own statement has failed — see
+        /// <see cref="LoadBlanketOrderOrigin"/> for why these are remembered rather
+        /// than asked of the dictionary.
+        /// </summary>
+        private static bool? _blanketFlagRouteUsable;
+        private static bool? _blanketHeaderRouteUsable;
+        private static bool? _blanketLineRouteUsable;
+
+        /// <summary>
+        /// Runs one blanket route and, where it answers, fills the blanket chip's
+        /// fields from the first order it names.
+        /// </summary>
+        /// <param name="routeName">Route label, for the log line only.</param>
+        /// <param name="idSource">SELECT yielding candidate blanket order ids. It
+        /// carries the requisition id as a literal and binds nothing.</param>
+        /// <param name="usable">The route's remembered usability flag.</param>
+        /// <returns>True when this route named a blanket order.</returns>
+        private bool TryBlanketRoute(int M_Requisition_ID, RequisitionOverviewData d,
+                                     string routeName, string idSource, ref bool? usable)
+        {
+            if (usable == false) return false;
             try
             {
-                // The id is inlined rather than bound: each UNION branch below would
-                // otherwise carry the same bind name again, and positional binding
-                // gives a repeated name a second, unfilled placeholder. It is an
-                // int, so nothing can be injected.
-                string reqId = M_Requisition_ID.ToString();
-                const string REF_JOIN =
-                    @"FROM M_RequisitionLine rl
-                     INNER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = rl.Ref_OrderLine_ID)";
-                string where = @"WHERE rl.M_Requisition_ID = " + reqId + @"
-                                   AND rl.IsActive = 'Y'";
-
-                List<string> sources = new List<string>();
-                if (hasFlag)
-                {
-                    sources.Add(@"SELECT o.C_Order_ID AS BLANKET_ID " + REF_JOIN + @"
-                                   INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
-                                   " + where + @" AND COALESCE(o.IsBlanketTrx, 'N') = 'Y'");
-                }
-                if (hasHeaderLink)
-                {
-                    sources.Add(@"SELECT o.C_Order_Blanket AS BLANKET_ID " + REF_JOIN + @"
-                                   INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
-                                   " + where + @" AND COALESCE(o.C_Order_Blanket, 0) > 0");
-                }
-                if (hasLineLink)
-                {
-                    sources.Add(@"SELECT bol.C_Order_ID AS BLANKET_ID " + REF_JOIN + @"
-                                   INNER JOIN C_OrderLine bol
-                                           ON (bol.C_OrderLine_ID = ol.C_OrderLine_Blanket_ID)
-                                   " + where + @" AND COALESCE(ol.C_OrderLine_Blanket_ID, 0) > 0");
-                }
-
                 string sql = @"SELECT bo.C_Order_ID, bo.DocumentNo, bo.IsSOTrx
                                  FROM C_Order bo
                                 WHERE bo.IsActive = 'Y'
-                                  AND bo.C_Order_ID IN ("
-                                 + string.Join(" UNION ", sources.ToArray()) + @")
+                                  AND bo.C_Order_ID IN (" + idSource + @")
                                 ORDER BY bo.DocumentNo";
                 DataSet ds = DB.ExecuteDataset(sql, null, null);
-                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+                usable = true;
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return false;
 
                 DataRow r = ds.Tables[0].Rows[0];
                 d.BlanketOrderId      = Util.GetValueOfInt(r["C_Order_ID"]);
                 d.BlanketOrderNo      = Util.GetValueOfString(r["DocumentNo"]);
                 d.BlanketOrderIsSOTrx = Util.GetValueOfString(r["IsSOTrx"]) == "Y";
                 d.BlanketOrderCount   = ds.Tables[0].Rows.Count;
-
-                // The plain Order chip stands down when it found this same record —
-                // a requisition raised straight against a blanket reaches it through
-                // Ref_OrderLine_ID, so both loaders land on it and the strip would
-                // carry one document twice, under two different names.
-                if (d.RefOrderId > 0 && d.RefOrderId == d.BlanketOrderId)
-                {
-                    d.RefOrderId    = 0;
-                    d.RefOrderNo    = "";
-                    d.RefOrderCount = 0;
-                }
+                return true;
             }
             catch (Exception ex)
             {
-                _log.Severe("LoadBlanketOrderOrigin (M_Requisition_ID=" + M_Requisition_ID + "): " + ex.Message);
+                // A schema without this route's column simply has no such route.
+                usable = false;
+                _log.Severe("LoadBlanketOrderOrigin/" + routeName + " (M_Requisition_ID="
+                            + M_Requisition_ID + "): " + ex.Message);
+                return false;
             }
         }
 
@@ -4031,6 +4178,18 @@ namespace VASLogic.Models
             public string    RefOrderNo      { get; set; }
             public bool      RefOrderIsSOTrx { get; set; }
             public int       RefOrderCount   { get; set; }
+            /// <summary>That referenced order is itself a BLANKET
+            /// (C_Order.IsBlanketTrx) — the chip then names it Blanket Sales /
+            /// Purchase Order rather than calling a standing commitment an ordinary
+            /// order. Normally the blanket loader claims the record and clears this
+            /// chip entirely; the flag is what keeps the naming right on a schema
+            /// where none of its three routes can run.</summary>
+            public bool      RefOrderIsBlanket { get; set; }
+            /// <summary>The window that referenced order opens in, resolved by name
+            /// only, and ONLY when it is a blanket: a blanket does not open in
+            /// C_Order's own window. 0 leaves the client to its normal lookup, which
+            /// is correct for an ordinary order.</summary>
+            public int       RefOrderWindowId  { get; set; }
             // The BLANKET order behind that reference — the standing commitment the
             // requisition draws on, reached either directly or through the release
             // it points at (LoadBlanketOrderOrigin). Its own chip, and its own

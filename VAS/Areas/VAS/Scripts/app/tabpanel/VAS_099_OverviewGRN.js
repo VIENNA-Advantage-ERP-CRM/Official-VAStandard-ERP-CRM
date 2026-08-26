@@ -328,6 +328,29 @@
  *                        each one - who it went to, its subject, when it went
  *                        and who sent it, then the message itself. The body is
  *                        shown ONLY once the row is opened.
+ *   VAI163   2026-08-26  Receipt Timeline reworked to follow the receipt through
+ *                        its DOCUMENTS: Drafted -> Completed -> [Confirmed] ->
+ *                        Invoiced.
+ *                        - In Progress is gone. It restated the Completed stage's
+ *                          own "not yet" as a stage of its own, and captioned it
+ *                          with the last-updated stamp, which says nothing about
+ *                          where the document stands.
+ *                        - Posted is gone. It reports the accounting act rather
+ *                          than the receipt's progress, and the header already
+ *                          carries a Posted pill for it.
+ *                        - Completed reads Pending while the receipt is drafted,
+ *                          In Process once it has moved but has not completed, and
+ *                          the workflow completion date once it has.
+ *                        - Confirmed is new, and is drawn ONLY for a receipt whose
+ *                          TARGET document type asks for a confirmation
+ *                          (IsShipConfirmTarget). It reads In Process until the
+ *                          receipt confirmation completes — including when none has
+ *                          been raised — then captions with the moment it did.
+ *                        - Invoiced now waits for the AP invoice to COMPLETE: a
+ *                          drafted invoice leaves the stage Pending, where the
+ *                          stage previously went green on an invoice merely
+ *                          existing. With several invoices it captions with the
+ *                          latest completed one (model side).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1149,44 +1172,84 @@
 
         // ---------- Receipt timeline (horizontal stepper) ---------- //
 
-        // The receipt's document lifecycle: Drafted -> In Progress -> Completed ->
-        // Posted -> Invoiced. Each stage is driven by document state, not by the
-        // presence of a date; the date is only the caption underneath.
-        //   Drafted     — the record exists, so always done (captioned with Created).
-        //   In Progress — the document has moved past draft (any of IP/AP/WC/WP)
-        //                 or reached a terminal state (CO/CL/VO/RE). Invalid (IN)
-        //                 and Not Approved (NA) do not count as progressed.
-        //   Completed   — DocStatus CO or CL, captioned with the movement date.
-        //   Posted      — M_InOut.Posted, captioned with the date posting actually
-        //                 ran (PostedDate, from the receipt's Fact_Acct rows). The
-        //                 accounting date is only a fallback: it is the date the
-        //                 posting was booked to and normally equals the movement
-        //                 date, which is not what this stage is reporting.
-        //   Invoiced    — an AP invoice exists for the receipt's purchase order.
-        var PROGRESSED_STATUS = ["IP", "AP", "WC", "WP", "CO", "CL", "VO", "RE"];
-
+        // The receipt's document lifecycle: Drafted -> Completed -> [Confirmed] ->
+        // Invoiced. Each stage is driven by document state, not by the presence of
+        // a date; the date is only the caption underneath, and a stage that has not
+        // been reached says where it stands instead.
+        //   Drafted   — the record exists, so always done, captioned with the date
+        //               it was created on.
+        //   Completed — Pending while the receipt is still drafted, In Process once
+        //               it has moved but has not completed, and the workflow's own
+        //               DocComplete stamp once it has. NOT the movement date: that
+        //               is when the goods moved, typed on the receipt, and a receipt
+        //               entered for last month but completed today captioned this
+        //               stage with last month. The movement date remains the
+        //               fallback for a receipt completed outside the workflow.
+        //   Confirmed — drawn ONLY for a receipt whose TARGET document type asks
+        //               for a receipt confirmation (IsShipConfirm on
+        //               C_DocTypeTarget_ID). Until the confirmation
+        //               (M_InOutConfirm) completes — including when none has been
+        //               raised yet — it reads In Process; once it completes it
+        //               captions with the moment it did.
+        //   Invoiced  — Pending until an AP invoice for the receipt COMPLETES; a
+        //               drafted invoice is not an invoiced receipt. With several
+        //               invoices it captions with the latest completed one.
+        //
+        // In Progress and Posted are gone. In Progress restated the Completed
+        // stage's own "not yet" in a stage of its own, and Posted reports the
+        // accounting act rather than the receipt's progress through its documents —
+        // the header's Posted pill already carries it.
         function timelineStages() {
             var st = data.StatusCode;
-            var progressed = PROGRESSED_STATUS.indexOf(st) >= 0;
-            var completed  = (st === "CO" || st === "CL");
+            var completed = (st === "CO" || st === "CL");
+            // Drafted is the one state that has not been worked on at all. Anything
+            // else short of completion is under way — in the workflow (IP/WC/WP),
+            // waiting on approval (AP), or handed back to the user (IN/NA). A
+            // voided or reversed receipt lands here too; the header's status pill
+            // is what reports that, not the timeline.
+            var drafted = !st || st === "DR";
 
             // `stamp` marks a caption fed by a real timestamp rather than a
             // date-only field: those are stored in UTC and have to be converted
             // before the day is read off them.
-            return [
-                { key: "VAS_099_Drafted",    fallback: "Drafted",     date: data.Created,             done: true,       stamp: true },
-                { key: "VAS_099_InProgress", fallback: "In Progress", date: progressed ? data.Updated : null, done: progressed, stamp: true },
-                // The date the record was completed on — the workflow's own stamp.
-                // NOT the movement date: that is when the goods moved, typed on the
-                // receipt, and a receipt entered for last month but completed today
-                // captioned this stage with last month.
-                { key: "VAS_099_Completed",  fallback: "Completed",   date: completed ? (data.CompletedDate || data.MovementDate) : null, done: completed, stamp: !!data.CompletedDate },
-                { key: "VAS_099_Posted",     fallback: "Posted",      date: data.Posted ? (data.PostedDate || data.PostingDate) : null, done: !!data.Posted, stamp: !!data.PostedDate },
-                // When the invoice was RAISED against this receipt, not the date
-                // typed on it: DateInvoiced says which period the invoice books
-                // to, and can be any date the enterer chose.
-                { key: "VAS_099_Invoiced",   fallback: "Invoiced",    date: data.ReferenceInvoiceCreated || data.ReferenceInvoiceDate, done: !!data.ReferenceInvoice, stamp: !!data.ReferenceInvoiceCreated }
+            var stages = [
+                {
+                    key: "VAS_099_Drafted", fallback: "Drafted",
+                    date: data.Created, done: true, stamp: true
+                },
+                {
+                    key: "VAS_099_Completed", fallback: "Completed",
+                    date: completed ? (data.CompletedDate || data.MovementDate) : null,
+                    done: completed, stamp: !!data.CompletedDate,
+                    pending: drafted ? null : inProcessText()
+                }
             ];
+
+            // Only a receipt that is going to be confirmed carries the stage. On
+            // any other document type there is no confirmation to wait for, and a
+            // permanently In Process stage would read as an omission.
+            if (data.IsShipConfirmTarget) {
+                stages.push({
+                    key: "VAS_099_Confirmed", fallback: "Confirmed",
+                    date: data.ConfirmCompletedDate,
+                    done: !!data.ConfirmCompletedDate, stamp: true,
+                    // Not raised yet, still drafted, or raised and not completed —
+                    // all of them are the confirmation being worked through.
+                    pending: inProcessText()
+                });
+            }
+
+            stages.push({
+                key: "VAS_099_Invoiced", fallback: "Invoiced",
+                date: data.InvoiceCompletedDate,
+                done: !!data.InvoiceCompletedDate, stamp: true
+            });
+
+            return stages;
+        }
+
+        function inProcessText() {
+            return msg("VAS_099_InProcess", "In Process");
         }
 
         function renderTimeline() {
@@ -1208,13 +1271,15 @@
                 var stateCls, metaText;
                 if (i === activeIdx) {
                     stateCls = "vas_099-is-active";
-                    metaText = stageDate || VIS.Msg.getMsg("VAS_099_Done");
+                    metaText = stageDate || msg("VAS_099_Done", "Done");
                 } else if (s.done) {
                     stateCls = "vas_099-is-done";
-                    metaText = stageDate || VIS.Msg.getMsg("VAS_099_Done");
+                    metaText = stageDate || msg("VAS_099_Done", "Done");
                 } else {
                     stateCls = "vas_099-is-pending";
-                    metaText = VIS.Msg.getMsg("VAS_099_Pending");
+                    // A stage that is under way says so; one that has not started
+                    // falls back to Pending.
+                    metaText = s.pending || msg("VAS_099_Pending", "Pending");
                 }
 
                 $tl.append(stepEntry(i + 1, msg(s.key, s.fallback), metaText, s.done, stateCls));

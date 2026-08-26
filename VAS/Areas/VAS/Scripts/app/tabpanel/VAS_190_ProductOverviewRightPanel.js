@@ -194,6 +194,44 @@
  *                        each one - who it went to, its subject, when it went
  *                        and who sent it, then the message itself. The body is
  *                        shown ONLY once the row is opened.
+ *   VAI163   2026-08-26  A LETTER reads as a letter throughout the feed, not as a
+ *                        mail wearing a different word. The model had already
+ *                        split the two kinds; the panel had not followed it all
+ *                        the way:
+ *                        - The chip carries the DOCUMENT icon instead of the
+ *                          envelope. At a glance down a feed the icon is what the
+ *                          eye sorts on, so a letter still read as a mail however
+ *                          the chip was worded.
+ *                        - Its sub-line says "Letter sent" / "Letter received".
+ *                          It had no branch of its own and carried nothing there.
+ *                        - Its headline falls back to "(no subject)" as a mail's
+ *                          does; it used to drop through to the generic branch and
+ *                          a letter with no subject read "Event".
+ *                        - Opening it is offered as "Show full letter". The row
+ *                          carries its own open-kind (data-openkind="letter") so
+ *                          the hint names the kind of correspondence being opened.
+ *   VAI163   2026-08-26  - Recent transactions drops the UNIT COST column and runs
+ *                          three columns (stylesheet: four tracks, the freed width
+ *                          going to Document rather than being shared out). A
+ *                          movement is a quantity leaving or arriving; what it was
+ *                          valued at is an accounting question, and the Accounting
+ *                          details section states the costing method it is valued
+ *                          under. The column also read empty on every movement with
+ *                          no cost detail recorded, which is most of them where
+ *                          costing has not been run.
+ *                        - The Document cell states the document TYPE in front of
+ *                          the number on EVERY row. Where the document carries no
+ *                          type - a production or job-work document whose table has
+ *                          no C_DocType_ID - the movement's own name stands in, so
+ *                          the column never prints a bare number with nothing
+ *                          saying what it is.
+ *                        - The Accounting section is drawn whenever the server
+ *                          could name a schema, not only when the product sets an
+ *                          account. A product with none says so, under the schema
+ *                          and costing method it is still valued by, and notes that
+ *                          postings fall back to the product category. Every
+ *                          SERVICE product had no such section at all, with nothing
+ *                          saying whether that was an absence or a failure.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -382,13 +420,24 @@
             // Two kinds of row open: a mail onto its own message, a task or
             // appointment onto the e-mails sent against it. The row says which,
             // so the hint names the right thing.
-            var isAppt = ($row.attr("data-openkind") === "appt");
+            var kind = $row.attr("data-openkind");
+            var isAppt = (kind === "appt");
+            // A LETTER opens onto its own text and says so. It used to be offered
+            // as "Show full mail", which named the wrong kind of correspondence on
+            // the one control the reader has to act on.
+            var isLetter = (kind === "letter");
             var nowOpen = !$row.hasClass("vas_190-is-open");
-            var hint = nowOpen
-                ? (isAppt ? msg("VAS_190_HideMails", "Hide e-mails")
-                          : msg("VAS_190_HideMail", "Hide full mail"))
-                : (isAppt ? msg("VAS_190_ShowMails", "Show e-mails")
-                          : msg("VAS_190_ShowMail", "Show full mail"));
+            var hint;
+            if (isAppt) {
+                hint = nowOpen ? msg("VAS_190_HideMails", "Hide e-mails")
+                               : msg("VAS_190_ShowMails", "Show e-mails");
+            } else if (isLetter) {
+                hint = nowOpen ? msg("VAS_190_HideLetter", "Hide full letter")
+                               : msg("VAS_190_ShowLetter", "Show full letter");
+            } else {
+                hint = nowOpen ? msg("VAS_190_HideMail", "Hide full mail")
+                               : msg("VAS_190_ShowMail", "Show full mail");
+            }
             $row.toggleClass("vas_190-is-open", nowOpen)
                 .attr("aria-expanded", nowOpen ? "true" : "false")
                 .attr("title", hint);
@@ -615,7 +664,12 @@
             { key: "so",          condition: function () { return any(data.SalesOrders); }, render: renderSalesOrders },
             { key: "po",          condition: function () { return any(data.PurchaseOrders); }, render: renderPurchaseOrders },
             { key: "tx",          condition: function () { return isItem() && any(data.Transactions); }, render: renderTransactions },
-            { key: "accounting",  condition: function () { return !!(data.Accounting && any(data.Accounting.Rows)); }, render: renderAccounting },
+            // Drawn whenever the server could name an accounting schema, whether or
+            // not the product sets an account of its own. It used to need at least
+            // one account row, so a product with none — and every SERVICE product,
+            // which the reader refused outright — had no Accounting section at all,
+            // with nothing saying whether that was an absence or a failure.
+            { key: "accounting",  condition: function () { return !!data.Accounting; }, render: renderAccounting },
             // Activity is the one section that renders empty — it reports the
             // absence of events rather than hiding the fact that there are none.
             { key: "activity",    condition: function () { return true; },                  render: renderActivity }
@@ -1738,13 +1792,17 @@
             if (total > rows.length) summary += " " + msg("VAS_190_Of", "of") + " " + total;
             var $sec = section(msg("VAS_190_RecentTransactions", "Recent transactions"), summary);
 
+            // Three columns. The money one is gone: a movement is a quantity
+            // leaving or arriving, and what it was VALUED at is an accounting
+            // question this section is not the place to answer — the Accounting
+            // details section below states the costing method the product is
+            // valued under. The column also read empty on every movement with no
+            // cost detail recorded against its line, which is most of them on a
+            // tenant that has not run costing.
             var $grid = dataGrid("colsTx", [
                 { label: msg("VAS_190_Document", "Document") },
                 { label: msg("VAS_190_Date", "Date") },
-                { label: msg("VAS_190_Qty", "Qty"), align: "r" },
-                // The money column is the COST the movement was booked at, not a
-                // price agreed on a document.
-                { label: msg("VAS_190_UnitCost", "Unit cost"), align: "r" }
+                { label: msg("VAS_190_Qty", "Qty"), align: "r" }
             ]);
             $sec.append($grid);
 
@@ -1754,7 +1812,6 @@
                 var mv = MOVEMENT[t.MovementType] ||
                          { icon: "move", tone: "warn", key: "VAS_190_MvOther", text: "Stock movement" };
                 var mvName = msg(mv.key, mv.text);
-                var sym = t.CurSymbol || t.ISO_Code || "";
 
                 var $row = $('<div class="vas_190-gRow"></div>');
 
@@ -1785,22 +1842,17 @@
                     .attr("title", mvName)
                     .append(svgIcon(mv.icon)));
 
-                // Document type name in front of the number — the number alone
-                // does not say what the movement was. The tenant's own C_DocType
-                // name is used, so a renamed document type reads as it does
-                // everywhere else in the application.
+                // Document TYPE in front of the number, on every row. The
+                // tenant's own C_DocType name is used, so a renamed document type
+                // reads as it does everywhere else in the application.
                 //
-                // A movement the panel cannot name a document for — an assembly
-                // or production issue, whose document this section does not read
-                // — is still a movement of this product, and the section carries
-                // every one of them. It reads under its movement type rather
-                // than as a bare dash.
-                var docText;
-                if (t.DocumentNo) {
-                    docText = t.DocTypeName ? t.DocTypeName + " · " + t.DocumentNo : t.DocumentNo;
-                } else {
-                    docText = t.DocTypeName || mvName;
-                }
+                // Where the document carries no type at all — a production or
+                // job-work document whose table has no C_DocType_ID — the
+                // MOVEMENT's own name stands in as the type. The column used to
+                // print a bare number in that case, which said what the document
+                // was called but not what it was.
+                var docType = t.DocTypeName || mvName;
+                var docText = t.DocumentNo ? docType + " · " + t.DocumentNo : docType;
 
                 // WHERE the movement happened, under the document it was posted
                 // by. One document posts a row per line, so without this two
@@ -1829,12 +1881,6 @@
 
                 $row.append(gridCell(formatDate(t.MovementDate) || "—"));
                 $row.append(gridCell(qtyText(t.MovementQty, prec, uom), "r"));
-                // The cost the movement was booked at. A movement with none
-                // recorded shows a dash — nothing is computed to fill the column,
-                // and a document price is not stood in for a cost.
-                $row.append(gridCell(
-                    (t.UnitCost === null || t.UnitCost === undefined)
-                        ? "—" : formatAmount(t.UnitCost, sym, t.CurPrecision), "r"));
                 return $row;
             }, $grid);
         }
@@ -1876,8 +1922,24 @@
             var $list = $('<div class="vas_190-clist"></div>');
             $sec.append($list);
 
-            for (var i = 0; i < acct.Rows.length; i++) {
-                var a = acct.Rows[i];
+            var rows = acct.Rows || [];
+
+            // A product that sets no account of its own says so, under the schema
+            // and costing method it is still valued by. The section used not to be
+            // drawn at all in that case, which reads as the panel having failed
+            // rather than as there being nothing set.
+            if (!rows.length) {
+                $list.append(listRow({
+                    primary: msg("VAS_190_NoAccountsSet", "No accounts set on this product"),
+                    meta: msg("VAS_190_AccountsFromCategory",
+                              "Postings fall back to the product category's accounts"),
+                    value: ""
+                }));
+                return;
+            }
+
+            for (var i = 0; i < rows.length; i++) {
+                var a = rows[i];
                 var role = ACCOUNT_ROLE[a.AccountRole];
                 // Every row here is an account set on the PRODUCT's own accounting
                 // tab. Nothing is inherited from the product category any more, so
@@ -1911,7 +1973,12 @@
             // An inbound LETTER is a MailAttachment1 record like a mail, filed
             // under AttachmentType 'I' — the model splits the two now, where both
             // used to arrive typed "mail" and a letter was reported as an e-mail.
-            "letter":      { tone: "purple",  icon: "mail",     key: "VAS_190_TagLetter",      text: "Letter" },
+            //
+            // It carries the DOCUMENT icon, not the envelope. The chip read
+            // "Letter" while wearing the same envelope the mail rows wear, and at
+            // a glance down a feed the icon is what the eye sorts on — so a letter
+            // still read as a mail however the chip was worded.
+            "letter":      { tone: "purple",  icon: "doc",      key: "VAS_190_TagLetter",      text: "Letter" },
             // Calls (VA048_CallDetails), the one shared source this panel was
             // missing.
             "call":        { tone: "ok",      icon: "chat",     key: "VAS_190_TagCall",        text: "Call" }
@@ -1986,14 +2053,19 @@
             if (a.Actor) when += (when ? " · " : "") + a.Actor;
             if (when) $row.append($('<span class="vas_190-actWhen"></span>').text(when));
 
-            // A mail with a body opens on click; the caret shows the state.
+            // A mail or letter with a body opens on click; the caret shows the
+            // state. The open-kind travels with the row so the hint names the
+            // kind of correspondence the reader is actually opening.
             if (isMail && a.Body && String(a.Body).trim()) {
+                var isLetterRow = (a.Type === "letter");
                 $row.addClass("vas_190-is-openable")
                     .attr("role", "button")
                     .attr("tabindex", "0")
                     .attr("aria-expanded", "false")
-                    .attr("data-openkind", "mail")
-                    .attr("title", msg("VAS_190_ShowMail", "Show full mail"));
+                    .attr("data-openkind", isLetterRow ? "letter" : "mail")
+                    .attr("title", isLetterRow
+                        ? msg("VAS_190_ShowLetter", "Show full letter")
+                        : msg("VAS_190_ShowMail", "Show full mail"));
                 $row.append($('<span class="vas_190-actCaret"></span>').append(svgIcon("chevRight")));
                 $item.append($row);
                 $item.append(buildMailBlock(a));
@@ -2072,7 +2144,10 @@
                 // from the next.
                 return (a.Title || msg("VAS_190_FieldChanged", "Field changed"));
             }
-            if (a.Type === "mail") {
+            // A letter is headlined by its subject exactly as a mail is, and falls
+            // back the same way. It used to drop through to the generic branch
+            // below and a letter with no subject read "Event".
+            if (a.Type === "mail" || a.Type === "letter") {
                 return (a.Title || "").trim() || msg("VAS_190_NoSubject", "(no subject)");
             }
             if (a.Type === "chat") {
@@ -2094,6 +2169,12 @@
                 // one states only the direction.
                 bits.push(a.IsSent ? msg("VAS_190_MailSent", "Mail sent")
                                    : msg("VAS_190_MailReceived", "Mail received"));
+            } else if (a.Type === "letter") {
+                // A letter says so in its own words. It had no branch of its own,
+                // so it either carried nothing here or, worse, borrowed the mail
+                // wording and told the reader an e-mail had been sent.
+                bits.push(a.IsSent ? msg("VAS_190_LetterSent", "Letter sent")
+                                   : msg("VAS_190_LetterReceived", "Letter received"));
             } else if (a.Type === "task") {
                 bits.push(a.IsClosed ? msg("VAS_190_TaskCompleted", "Completed")
                                      : msg("VAS_190_TaskOpen", "Open"));

@@ -20,12 +20,13 @@
  *  #  | Current Text  | Message Key                | MsgText
  * ----+---------------+----------------------------+---------------
  *  1  | Movement Date | VAS_100_MovementDate       | Movement Date
- *  2  | In Progress   | VAS_100_StageInProgress    | In Progress
- *  3  | Posted        | VAS_100_StagePosted        | Posted
- *  4  | Invoiced      | VAS_100_StageInvoiced      | Invoiced
+ *  2  | Invoiced      | VAS_100_StageInvoiced      | Invoiced
+ *  3  | Confirmed     | VAS_100_StageConfirmed     | Confirmed
+ *  4  | In Process    | VAS_100_InProcess          | In Process
  *
- *  VAS_100_StagePickedPacked, VAS_100_StageInTransit, VAS_100_NotLinked and
- *  VAS_100_CustomerLocation are no longer used by any string on the panel.
+ *  VAS_100_StagePickedPacked, VAS_100_StageInTransit, VAS_100_NotLinked,
+ *  VAS_100_CustomerLocation, VAS_100_StageInProgress, VAS_100_StagePosted and
+ *  VAS_100_Current are no longer used by any string on the panel.
  *
  * Chronological development:
  *   VAI163   2026-07-06  Created
@@ -218,6 +219,40 @@
  *                        each one - who it went to, its subject, when it went
  *                        and who sent it, then the message itself. The body is
  *                        shown ONLY once the row is opened.
+ *   VAI163   2026-08-26  Delivery Order Timeline reworked to follow the delivery
+ *                        through its DOCUMENTS: Drafted -> Completed ->
+ *                        [Confirmed] -> Invoiced.
+ *                        - IN PROGRESS is gone. It restated the Completed stage's
+ *                          own "not yet" as a stage of its own and carried no date
+ *                          at all, so it told the reader nothing that stage did
+ *                          not.
+ *                        - POSTED is gone. It reports the accounting act rather
+ *                          than the delivery's progress, and the header already
+ *                          carries a Posted pill for it.
+ *                        - COMPLETED reads Pending while the delivery is drafted,
+ *                          In Process once it has moved but has not completed, and
+ *                          the WORKFLOW completion date once it has - not the
+ *                          movement date, which is the day the goods moved and is
+ *                          typed on the document.
+ *                        - CONFIRMED is new, and is drawn ONLY for a delivery whose
+ *                          TARGET document type asks for a confirmation
+ *                          (data.IsShipConfirmTarget). It reads In Process until
+ *                          the shipment confirmation completes - including when
+ *                          none has been raised - then captions with the moment it
+ *                          did.
+ *                        - INVOICED now waits for the AR invoice to COMPLETE: a
+ *                          drafted invoice leaves the stage Pending, where the
+ *                          stage previously went green on an invoice merely
+ *                          existing and captioned itself with DateInvoiced, a
+ *                          field a user can back-date. With several invoices it
+ *                          captions with the latest completed one (model side).
+ *                        - Each stage states its own case, so LIFECYCLE_CHAIN and
+ *                          the monotonic back-fill it drove are gone, along with
+ *                          isInvoiced / lastInvoiceDate.
+ *                        - Timeline captions fed by a TIMESTAMP read through the
+ *                          new formatStampDate, so the day lands in the viewer's
+ *                          zone rather than on the stored UTC clock. Drafted was
+ *                          already showing the raw stamp's day.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -954,122 +989,98 @@
 
         // ---------- Fulfilment lifecycle (horizontal stepper) ---------- //
 
-        // When the delivery was last invoiced — the latest customer invoice raised
-        // against its lines (Documents, type "invoice"; model side reads them with
-        // IsSOTrx = 'Y' through C_InvoiceLine.M_InOutLine_ID, so only invoices that
-        // actually billed THIS shipment count). Null when none has been.
-        // DateInvoiced is a date-only field, so it is parsed as it stands — the
-        // same rule formatDate follows — rather than tagged UTC like a timestamp,
-        // which could roll its calendar day over.
-        function lastInvoiceDate() {
-            var docs = (data && data.Documents) || [], best = null;
-            for (var i = 0; i < docs.length; i++) {
-                if (docs[i].Type !== "invoice" || !docs[i].DocDate) continue;
-                var d = new Date(docs[i].DocDate);
-                if (isNaN(d.getTime())) continue;
-                if (!best || d > best) best = d;
-            }
-            return best;
-        }
-
-        // True once a customer invoice has been raised against the delivery.
-        function isInvoiced() {
-            var docs = (data && data.Documents) || [];
-            for (var i = 0; i < docs.length; i++) {
-                if (docs[i].Type === "invoice") return true;
-            }
-            return false;
-        }
-
-        // The five stages a delivery order passes through, each with the moment it
-        // happened:
+        // The delivery's document lifecycle: Drafted -> Completed -> [Confirmed] ->
+        // Invoiced. Every stage past the first answers for a DOCUMENT and reports
+        // that document's own state — a date once it is reached, and where it has
+        // got to until then, which each stage states for itself.
         //
-        //   Drafted     — the record exists (M_InOut.Created).
-        //   In Progress — it has left draft and is being worked: any of the
-        //                 in-progress / waiting states, or Processed.
-        //   Completed   — DocStatus CO / CL, dated by the movement date.
-        //   Posted      — written to the ledger (M_InOut.Posted), dated by the
-        //                 earliest Fact_Acct row (PostedDate, model side).
-        //   Invoiced    — a customer invoice has been raised against its lines.
+        //   Drafted   — the record exists, so always done, captioned with the day it
+        //               was created on.
+        //   Completed — Pending while the delivery is still drafted, In Process once
+        //               it has moved but has not completed, and the workflow's own
+        //               DocComplete stamp once it has. NOT the movement date: that is
+        //               the day the goods moved, typed on the document, so a delivery
+        //               entered for last month and completed today captioned this
+        //               stage with last month.
+        //   Confirmed — drawn ONLY for a delivery whose TARGET document type asks for
+        //               a shipment confirmation (IsShipConfirm on C_DocTypeTarget_ID).
+        //               Until the confirmation (M_InOutConfirm) completes — including
+        //               when none has been raised yet — it reads In Process; once it
+        //               completes it captions with the moment it did.
+        //   Invoiced  — Pending until an AR invoice against this delivery's lines
+        //               COMPLETES; a drafted invoice is not an invoiced delivery. With
+        //               several invoices it captions with the latest completed one.
         //
-        // It replaces Drafted / Picked & Packed / In Transit / Completed. Those
-        // middle two were not states this document records: nothing in M_InOut
-        // says a delivery has been picked or is in transit, so both were inferred
-        // from the same DocStatus values and lit up together — two stages
-        // reporting one fact, and neither of them the fact the reader is after.
-        // What follows completion — posting and invoicing — is what actually
-        // happens next to a delivery, and the line said nothing about either.
-        //
-        // Posted and Invoiced are NOT a monotonic chain with the three before them
-        // (a delivery can be invoiced before it is posted, or posted and never
-        // invoiced), so each is marked from its own flag rather than back-filling
-        // the ones before it.
-        var LIFECYCLE_CHAIN = 3;   // Drafted, In Progress, Completed
-
+        // In Progress and Posted are gone. In Progress restated the Completed stage's
+        // own "not yet" as a stage of its own, and carried no date at all; Posted
+        // reports the accounting act rather than the delivery's progress through its
+        // documents, and the header's Posted pill already carries it. LIFECYCLE_CHAIN
+        // and the monotonic reach it drove go with them — with each stage stating its
+        // own case there is nothing left for a back-fill rule to decide.
         function lifecycleStages() {
             var s = data.StatusCode;
             var completed = s === "CO" || s === "CL";
-            // Voided / Reversed / Invalid make no forward progress — the document
-            // stopped, and reporting it as "in progress" would say it is moving.
-            var dead = s === "VO" || s === "RE" || s === "IN" || s === "NA";
-            var inProgress = completed ||
-                (!dead && (!!data.Processed || s === "IP" || s === "AP" ||
-                           s === "WC" || s === "WP"));
+            // Drafted is the one state nothing has been done to. Anything else short
+            // of completion is under way — in the workflow (IP/WC/WP), waiting on
+            // approval (AP), or handed back to the user (IN/NA). Voided and reversed
+            // land here too; the header's status pill reports that, not the timeline.
+            var drafted = !s || s === "DR";
+            var inProcess = msg("VAS_100_InProcess", "In Process");
 
-            return [
-                { key: "VAS_100_StageDrafted",    fallback: "Drafted",
-                  done: true,             date: formatDate(data.Created) },
-                { key: "VAS_100_StageInProgress", fallback: "In Progress",
-                  done: inProgress,       date: "" },
-                { key: "VAS_100_StageCompleted",  fallback: "Completed",
-                  done: completed,        date: completed ? formatDate(data.MovementDate) : "" },
-                { key: "VAS_100_StagePosted",     fallback: "Posted",
-                  done: !!data.Posted,    date: formatDate(data.PostedDate) },
-                { key: "VAS_100_StageInvoiced",   fallback: "Invoiced",
-                  done: isInvoiced(),     date: formatDate(lastInvoiceDate()) }
+            var stages = [
+                { key: "VAS_100_StageDrafted", fallback: "Drafted",
+                  done: true, date: formatStampDate(data.Created) },
+                // The completion stamp is a timestamp and reads through
+                // formatStampDate; MovementDate, its fallback, is a date-only field
+                // and must be parsed as it stands or its calendar day can roll over.
+                { key: "VAS_100_StageCompleted", fallback: "Completed",
+                  done: completed,
+                  date: completed ? (formatStampDate(data.CompletedDate) ||
+                                     formatDate(data.MovementDate)) : "",
+                  pending: drafted ? null : inProcess, active: !drafted }
             ];
+
+            // Only a delivery that is going to be confirmed carries the stage. On any
+            // other document type there is no confirmation to wait for, and a
+            // permanently In Process stage would read as an omission.
+            if (data.IsShipConfirmTarget) {
+                stages.push({
+                    key: "VAS_100_StageConfirmed", fallback: "Confirmed",
+                    done: !!data.ConfirmCompletedDate,
+                    date: formatStampDate(data.ConfirmCompletedDate),
+                    // Not raised yet, still drafted, or raised and not completed —
+                    // all of them are the confirmation being worked through.
+                    pending: inProcess, active: true
+                });
+            }
+
+            stages.push({
+                key: "VAS_100_StageInvoiced", fallback: "Invoiced",
+                done: !!data.InvoiceCompletedDate,
+                date: formatStampDate(data.InvoiceCompletedDate)
+            });
+
+            return stages;
         }
 
         function renderLifecycle() {
             var stages = lifecycleStages();
 
-            // Monotonic reach across the CHAIN only: a stage counts as reached when
-            // it or any later chain stage is done.
-            var reached = [];
-            for (var i = 0; i < LIFECYCLE_CHAIN; i++) {
-                var any = false;
-                for (var j = i; j < LIFECYCLE_CHAIN; j++) { if (stages[j].done) { any = true; break; } }
-                reached.push(any);
-            }
-            var current = 0;                                  // first unreached
-            while (current < reached.length && reached[current]) current++;
-
             var $sec = section(msg("VAS_100_Timeline", "Delivery Order Timeline"), null);
 
             var $tl = $('<div class="vas_100-stepper"></div>');
             for (var k = 0; k < stages.length; k++) {
-                var stg = stages[k], stateCls, metaText, done;
-                if (k >= LIFECYCLE_CHAIN) {
-                    // Posted / Invoiced: done or not, on their own flag. Neither is
-                    // ever the "active" stage — nobody works towards them, the
-                    // posting engine and the billing run either have gone or have
-                    // not.
-                    done = stg.done;
-                    stateCls = done ? "vas_100-is-done" : "is-pending";
-                    metaText = done ? (stg.date || VIS.Msg.getMsg("VAS_100_Done"))
-                                    : VIS.Msg.getMsg("VAS_100_Pending");
-                } else if (reached[k]) {
-                    // A stage that has been reached is done, and reports WHEN.
-                    done = true; stateCls = "vas_100-is-done";
-                    metaText = stg.date || VIS.Msg.getMsg("VAS_100_Done");
-                } else if (k === current) {
-                    done = false; stateCls = "vas_100-is-active";
-                    metaText = VIS.Msg.getMsg("VAS_100_Current");
+                var stg = stages[k], stateCls, metaText;
+                if (stg.done) {
+                    stateCls = "vas_100-is-done";
+                    metaText = stg.date || msg("VAS_100_Done", "Done");
                 } else {
-                    done = false; stateCls = "is-pending";
-                    metaText = VIS.Msg.getMsg("VAS_100_Pending");
+                    // A stage that is under way says so; one that has not started
+                    // falls back to Pending.
+                    stateCls = stg.active ? "vas_100-is-active" : "is-pending";
+                    metaText = stg.pending || msg("VAS_100_Pending", "Pending");
                 }
-                $tl.append(stepEntry(k + 1, msg(stg.key, stg.fallback), metaText, done, stateCls));
+                $tl.append(stepEntry(k + 1, msg(stg.key, stg.fallback), metaText, stg.done, stateCls));
             }
             $sec.append($tl);
         }
@@ -2255,6 +2266,15 @@
             }
             var d = new Date(s);
             return isNaN(d.getTime()) ? null : d;
+        }
+
+        // The DAY of a genuine timestamp, in the viewer's own zone — for the
+        // timeline, whose stages are captioned with moments (created, completed,
+        // confirmed, invoiced) rather than with document date fields. formatDate on
+        // its own reads a UTC stamp as local and can report the day before or after
+        // the one the reader would call it.
+        function formatStampDate(value) {
+            return formatDate(parseStamp(value));
         }
 
         function formatDateTime(value) {

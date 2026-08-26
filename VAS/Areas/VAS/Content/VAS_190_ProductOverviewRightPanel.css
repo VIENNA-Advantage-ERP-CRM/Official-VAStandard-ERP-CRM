@@ -54,6 +54,12 @@
  *                        entity lists the right-hand value still holds its width
  *                        (the label gives way first) but clips rather than running
  *                        back over the label when even that is not enough.
+ *   VAI163   2026-08-26  .vas_190-colsTx runs FOUR tracks, not five: the Unit cost
+ *                        column is gone from Recent transactions. The width it
+ *                        gave up goes to the Document cell (2fr -> 2.9fr) rather
+ *                        than being shared out — that cell carries the document
+ *                        TYPE in front of the number on every row now, so it is
+ *                        the one that wanted the room.
  ***********************************************************/
 
 .vas_190-root {
@@ -460,11 +466,13 @@
 .vas_190-colsStock .vas_190-gRow {
     grid-template-columns: 1.75em minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.7fr);
 }
-/* The Document cell carries the document TYPE name in front of the number, so
-   it needs more of the row than the other three columns put together. */
+/* Icon, Document, Date, Qty — four tracks since the Unit cost column went. The
+   Document cell carries the document TYPE name in front of the number, so it
+   keeps more of the row than the other two put together, and the width the
+   money column gave up goes to it rather than being shared out. */
 .vas_190-colsTx .vas_190-gHead,
 .vas_190-colsTx .vas_190-gRow {
-    grid-template-columns: 1.75em minmax(0, 2fr) minmax(0, 0.9fr) minmax(0, 0.6fr) minmax(0, 0.9fr);
+    grid-template-columns: 1.75em minmax(0, 2.9fr) minmax(0, 0.9fr) minmax(0, 0.6fr);
 }
 
 .vas_190-gHead { padding: 0 0 0.375em; border-bottom: 1px solid var(--p190-card-bd); }

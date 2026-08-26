@@ -177,6 +177,14 @@
  *                        outlined action pill in the panel's action colour,
  *                        wrapping on a narrow panel, with a muted disabled state
  *                        for a window that carries no print process.
+ *   VAI163   2026-08-26  .vas_106-hasTip drops its HELP cursor (now inherit). It
+ *                        was the only hint that the unit price carries the line's
+ *                        list price on its hover, but the pointer it draws is an
+ *                        arrow with a QUESTION MARK on it, and over a figure that
+ *                        reads as a query about the amount rather than as an offer
+ *                        of more detail. The tooltip is unchanged and the class is
+ *                        kept, so the markup and the stylesheet still name the
+ *                        same cell.
  ***********************************************************/
 
 .vas_106-root {
@@ -737,10 +745,15 @@
 .vas_106-naDash { color: var(--vaso-muted); }
 
 /* A cell whose hover carries more than it prints — the unit price, which holds
-   the line's list price on its tooltip. The help cursor is the only hint: a
-   figure that changes appearance to advertise a tooltip stops reading as a
-   figure. */
-.vas_106-hasTip { cursor: help; }
+   the line's list price on its tooltip.
+
+   No help cursor. It was the only hint the tooltip was there, but the pointer it
+   draws is an arrow with a QUESTION MARK hanging off it, and over a figure that
+   reads as a query about the figure — as though the amount itself were in doubt.
+   The tooltip stays; it is simply found by resting on the cell, as every other
+   tooltip in this panel is. The class is kept as the cell's hook rather than
+   removed, so the markup and the stylesheet still name the same thing. */
+.vas_106-hasTip { cursor: inherit; }
 
 /* Delivered progress cell.
    The status line sits ON TOP of the delivered / ordered ratio rather than

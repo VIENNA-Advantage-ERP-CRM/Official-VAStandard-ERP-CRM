@@ -193,6 +193,55 @@
 ///                        The body (TextMsg, flattened) travels with the row so
 ///                        the panel reveals it on click. Read in one query for
 ///                        the whole feed through VAS_ActivitySourcesModel.
+///   VAI163   2026-08-26  Recent transactions reach EVERY document that can post a
+///                        movement, not only the three core ones. A movement
+///                        posted by an assembly, a production order, an asset
+///                        disposal, a job-work despatch or a vendor invoice
+///                        arrived with no document number, no type and nothing to
+///                        click through to — it read as a bare movement type.
+///                        M_Transaction carries a link column for each of them
+///                        (the set is authoritative: ReCostingCalculationTransaction
+///                        reads exactly these), so they are read from the same row
+///                        rather than inferred:
+///                          M_ProductionLine_ID            -> M_Production
+///                          VAMFG_M_WrkOdrTransaction_ID   -> VAMFG_M_WrkOdrTransaction
+///                          VAFAM_AssetDisposal_ID         -> VAFAM_AssetDisposal
+///                          VA143_JobWorkInOutLine_ID      -> VA143_JobWorkInOut
+///                          C_InvoiceLine_ID               -> C_Invoice
+///                        All but production belong to modules, so each source is
+///                        gated on BOTH its link column and its target table and
+///                        contributes nothing at all where either is absent — one
+///                        flag drives that source's select expression, its join and
+///                        its table-name branch together, so a source is never half
+///                        present in the statement.
+///                        TransactionWindowName names the screen for each. Job work
+///                        takes its direction from the movement's own sign (one
+///                        table, two screens) and an invoice-driven movement from
+///                        the invoice's IsSOTrx. A name that a tenant has no window
+///                        for still costs nothing: the panel falls back to the
+///                        table's zoom target, as it already did.
+///   VAI163   2026-08-26  - The transaction UNIT COST is no longer read. The column
+///                          is gone from the section, and the correlated
+///                          M_CostDetail sub-select that fed it goes with it — it
+///                          ran once per movement over the product's whole history,
+///                          which was the most expensive thing that statement did.
+///                          BuildTransactionCostExpr is kept: it is the one place
+///                          that knows how a movement's material cost is reached.
+///                        - Document TYPE is read for the sources added above as
+///                          well, wherever their own table carries a C_DocType_ID
+///                          (work order, asset disposal, job work, invoice), so a
+///                          row states what kind of document it is and not only its
+///                          number. Each lookup is dictionary-guarded on its own.
+///                        - Accounting details are returned for EVERY product type,
+///                          service included, and for a product that sets no account
+///                          of its own — the schema, costing method and currency
+///                          come back with an empty row list. Returning null made
+///                          the whole section vanish, which reads as the panel
+///                          having failed rather than as there being nothing set;
+///                          a service product had no accounting section at all.
+///                          The category fallback stays removed: what the section
+///                          lists is still exactly what the product's own
+///                          Accounting tab holds.
 /// </summary>
 
 using System;
@@ -337,7 +386,9 @@ namespace VASLogic.Models
             }
 
             // ----- Accounting: only what the product's own tab actually sets -----
-            result.Accounting = LoadAccounting(ctx, M_Product_ID, type);
+            // Every product type, service included — the accounting section reports
+            // what the product is valued under whether or not it sets accounts.
+            result.Accounting = LoadAccounting(ctx, M_Product_ID);
 
             // ----- Activity: merged from its sources, newest first -----
             result.Activity = LoadActivity(ctx, M_Product_ID);
@@ -2265,34 +2316,159 @@ namespace VASLogic.Models
             string ioReturnExpr      = ioHasReturn ? "COALESCE(io.IsReturnTrx, 'N')" : "'N'";
             string invInternalExpr   = invHasInternalUse ? "COALESCE(inv.IsInternalUse, 'N')" : "'N'";
 
-            // The cost the movement was booked at, read against the very line the
-            // transaction came from. A correlated SUM rather than a join: a line
-            // can carry several cost-detail rows, and joining them would repeat
-            // the transaction once per row.
-            string unitCostExpr = BuildTransactionCostExpr(ctx);
+            // The unit-cost column is gone from the section, and the correlated
+            // M_CostDetail sub-select that fed it goes with it: it ran once per
+            // movement over the product's whole history, which is the most
+            // expensive thing this statement did, and nothing reads the figure any
+            // more. BuildTransactionCostExpr is kept — it is the one place that
+            // knows how a movement's material cost is reached, and the column is
+            // the sort of thing that comes back.
 
-            // COALESCE across the three, in the order a transaction can carry
-            // them. A movement with no document type at all falls through to
-            // NULL and the panel shows the number on its own.
+            // COALESCE across every source that names a document type, in the
+            // order a transaction can carry them. The sources added below extend
+            // this list where their own table carries a C_DocType_ID; a movement
+            // whose document has no type at all still falls through to NULL, and
+            // the panel then puts the MOVEMENT's own name in front of the number
+            // rather than printing the number bare.
             StringBuilder docTypeName = new StringBuilder("COALESCE(iodt.Name");
             if (invHasDocType) docTypeName.Append(", invdt.Name");
             if (mvHasDocType)  docTypeName.Append(", mvdt.Name");
-            docTypeName.Append(")");
+            StringBuilder extraTypeName = new StringBuilder();
+
+            // ---- The other documents a movement can be posted by ----
+            //
+            // A shipment, a count and a transfer are the three this reader used to
+            // know about, and every other movement — an assembly, a production
+            // order's issue or receipt, an asset disposal, a job-work despatch, an
+            // invoice-driven cost movement — reached the panel with no document
+            // number, no type and nowhere to click through to. M_Transaction
+            // carries a link column for each of them (the set is authoritative:
+            // ReCostingCalculationTransaction reads exactly these), so they are
+            // read from the same row rather than inferred from MovementType.
+            //
+            // All but production belong to modules, so every source is gated on
+            // BOTH its link column and its target table and contributes nothing
+            // at all where either is absent — one flag drives that source's select
+            // expression, its join and its table-name branch together, so a source
+            // is never half-present in the statement.
+            bool hasProduction = ColumnExists("M_Transaction", "M_ProductionLine_ID")
+                              && TableExists("M_ProductionLine") && TableExists("M_Production");
+            bool hasWorkOrder  = ColumnExists("M_Transaction", "VAMFG_M_WrkOdrTransaction_ID")
+                              && TableExists("VAMFG_M_WrkOdrTransaction");
+            bool hasDisposal   = ColumnExists("M_Transaction", "VAFAM_AssetDisposal_ID")
+                              && TableExists("VAFAM_AssetDisposal");
+            bool hasJobWork    = ColumnExists("M_Transaction", "VA143_JobWorkInOutLine_ID")
+                              && TableExists("VA143_JobWorkInOutLine") && TableExists("VA143_JobWorkInOut");
+            bool hasInvoiceTrx = ColumnExists("M_Transaction", "C_InvoiceLine_ID");
+
+            // Document numbers, in the order the CASE below tests the sources.
+            StringBuilder extraDocNo   = new StringBuilder();
+            StringBuilder extraTable   = new StringBuilder();
+            StringBuilder extraRecord  = new StringBuilder();
+            StringBuilder extraJoins   = new StringBuilder();
+
+            if (hasProduction)
+            {
+                // M_Production carries both a Name and a DocumentNo; the number is
+                // what every other row here is identified by, with the name behind
+                // it for a plan that was never numbered.
+                extraDocNo.Append(", prod.DocumentNo, prod.Name");
+                extraTable.Append(" WHEN prod.M_Production_ID IS NOT NULL THEN 'M_Production'");
+                extraRecord.Append(", prod.M_Production_ID");
+                extraJoins.Append(@" LEFT OUTER JOIN M_ProductionLine prodl
+                                            ON (prodl.M_ProductionLine_ID=mt.M_ProductionLine_ID)
+                                     LEFT OUTER JOIN M_Production prod
+                                            ON (prod.M_Production_ID=prodl.M_Production_ID)");
+            }
+            if (hasWorkOrder)
+            {
+                extraDocNo.Append(", wot.DocumentNo");
+                extraTable.Append(" WHEN wot.VAMFG_M_WrkOdrTransaction_ID IS NOT NULL THEN 'VAMFG_M_WrkOdrTransaction'");
+                extraRecord.Append(", wot.VAMFG_M_WrkOdrTransaction_ID");
+                extraJoins.Append(@" LEFT OUTER JOIN VAMFG_M_WrkOdrTransaction wot
+                                            ON (wot.VAMFG_M_WrkOdrTransaction_ID=mt.VAMFG_M_WrkOdrTransaction_ID)");
+                // Its own document type, where the table carries one, so the row
+                // reads under the tenant's own name for it rather than under the
+                // movement type standing in.
+                if (ColumnExists("VAMFG_M_WrkOdrTransaction", "C_DocType_ID"))
+                {
+                    extraJoins.Append(@" LEFT OUTER JOIN C_DocType wotdt
+                                                ON (wotdt.C_DocType_ID=wot.C_DocType_ID)");
+                    extraTypeName.Append(", wotdt.Name");
+                }
+            }
+            if (hasDisposal)
+            {
+                extraDocNo.Append(", disp.DocumentNo");
+                extraTable.Append(" WHEN disp.VAFAM_AssetDisposal_ID IS NOT NULL THEN 'VAFAM_AssetDisposal'");
+                extraRecord.Append(", disp.VAFAM_AssetDisposal_ID");
+                extraJoins.Append(@" LEFT OUTER JOIN VAFAM_AssetDisposal disp
+                                            ON (disp.VAFAM_AssetDisposal_ID=mt.VAFAM_AssetDisposal_ID)");
+                if (ColumnExists("VAFAM_AssetDisposal", "C_DocType_ID"))
+                {
+                    extraJoins.Append(@" LEFT OUTER JOIN C_DocType dispdt
+                                                ON (dispdt.C_DocType_ID=disp.C_DocType_ID)");
+                    extraTypeName.Append(", dispdt.Name");
+                }
+            }
+            if (hasJobWork)
+            {
+                extraDocNo.Append(", jwio.DocumentNo");
+                extraTable.Append(" WHEN jwio.VA143_JobWorkInOut_ID IS NOT NULL THEN 'VA143_JobWorkInOut'");
+                extraRecord.Append(", jwio.VA143_JobWorkInOut_ID");
+                extraJoins.Append(@" LEFT OUTER JOIN VA143_JobWorkInOutLine jwiol
+                                            ON (jwiol.VA143_JobWorkInOutLine_ID=mt.VA143_JobWorkInOutLine_ID)
+                                     LEFT OUTER JOIN VA143_JobWorkInOut jwio
+                                            ON (jwio.VA143_JobWorkInOut_ID=jwiol.VA143_JobWorkInOut_ID)");
+                if (ColumnExists("VA143_JobWorkInOut", "C_DocType_ID"))
+                {
+                    extraJoins.Append(@" LEFT OUTER JOIN C_DocType jwdt
+                                                ON (jwdt.C_DocType_ID=jwio.C_DocType_ID)");
+                    extraTypeName.Append(", jwdt.Name");
+                }
+            }
+            if (hasInvoiceTrx)
+            {
+                // An invoice-driven movement — the cost correction a vendor invoice
+                // posts against stock. Its side decides which invoice screen it
+                // opens, so IsSOTrx travels with it.
+                extraDocNo.Append(", cinv.DocumentNo");
+                extraTable.Append(" WHEN cinv.C_Invoice_ID IS NOT NULL THEN 'C_Invoice'");
+                extraRecord.Append(", cinv.C_Invoice_ID");
+                extraJoins.Append(@" LEFT OUTER JOIN C_InvoiceLine cinvl
+                                            ON (cinvl.C_InvoiceLine_ID=mt.C_InvoiceLine_ID)
+                                     LEFT OUTER JOIN C_Invoice cinv
+                                            ON (cinv.C_Invoice_ID=cinvl.C_Invoice_ID)
+                                     LEFT OUTER JOIN C_DocType cinvdt
+                                            ON (cinvdt.C_DocType_ID=cinv.C_DocType_ID)");
+                extraTypeName.Append(", cinvdt.Name");
+            }
+
+            // The added sources' type names close the COALESCE opened above.
+            docTypeName.Append(extraTypeName).Append(")");
+
+            // Whether the invoice behind an invoice-driven movement is a SALES one,
+            // for the window the row opens. 'N' where there is no such source.
+            string invoiceSoTrxExpr = hasInvoiceTrx ? "COALESCE(cinv.IsSOTrx, 'N')" : "'N'";
 
             string inner = @"SELECT mt.M_Transaction_ID,
                                     mt.MovementType,
                                     mt.MovementDate,
                                     COALESCE(mt.MovementQty, 0) AS MovementQty,
-                                    COALESCE(io.DocumentNo, inv.DocumentNo, mv.DocumentNo) AS DocumentNo,
+                                    COALESCE(io.DocumentNo, inv.DocumentNo, mv.DocumentNo"
+                                    + extraDocNo + @") AS DocumentNo,
                                     " + docTypeName + @" AS DocTypeName,
                                     /* Where the row navigates to: the document
                                        the movement was posted by. */
                                     CASE WHEN io.M_InOut_ID IS NOT NULL THEN 'M_InOut'
                                          WHEN inv.M_Inventory_ID IS NOT NULL THEN 'M_Inventory'
-                                         WHEN mv.M_Movement_ID IS NOT NULL THEN 'M_Movement'
+                                         WHEN mv.M_Movement_ID IS NOT NULL THEN 'M_Movement'"
+                                         + extraTable + @"
                                     END AS DocTableName,
-                                    COALESCE(io.M_InOut_ID, inv.M_Inventory_ID, mv.M_Movement_ID) AS DocRecordId,
+                                    COALESCE(io.M_InOut_ID, inv.M_Inventory_ID, mv.M_Movement_ID"
+                                    + extraRecord + @") AS DocRecordId,
                                     COALESCE(io.IsSOTrx, 'N') AS DocIsSOTrx,
+                                    " + invoiceSoTrxExpr + @" AS InvoiceIsSOTrx,
                                     " + ioReturnExpr + @" AS DocIsReturn,
                                     " + invInternalExpr + @" AS DocIsInternalUse,
                                     wh.Name AS WarehouseName,
@@ -2300,8 +2476,7 @@ namespace VASLogic.Models
                                     asi.Description AS AsiDescription,
                                     asi.Lot,
                                     asi.SerNo,
-                                    asi.GuaranteeDate,
-                                    " + unitCostExpr + @" AS UnitCost
+                                    asi.GuaranteeDate
                              FROM M_Transaction mt
                              LEFT OUTER JOIN M_Locator loc ON (loc.M_Locator_ID=mt.M_Locator_ID)
                              LEFT OUTER JOIN M_Warehouse wh ON (wh.M_Warehouse_ID=loc.M_Warehouse_ID)
@@ -2316,6 +2491,7 @@ namespace VASLogic.Models
                              LEFT OUTER JOIN M_MovementLine mvl ON (mvl.M_MovementLine_ID=mt.M_MovementLine_ID)
                              LEFT OUTER JOIN M_Movement mv ON (mv.M_Movement_ID=mvl.M_Movement_ID)
                              " + mvDocTypeJoin + @"
+                             " + extraJoins + @"
                              WHERE mt.M_Product_ID=@M_Product_ID";
             inner = MRole.GetDefault(ctx).AddAccessSQL(
                 inner, "mt", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -2335,10 +2511,6 @@ namespace VASLogic.Models
             DataSet ds = Query(sql, ProductParam(M_Product_ID), "LoadTransactions");
             if (ds == null || ds.Tables.Count == 0) return rows;
 
-            // The cost is booked in the accounting schema's currency, not in a
-            // document's — one currency for the whole column.
-            AcctSchemaInfo schema = PrimaryAcctSchema(ctx);
-
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 string docTable = Util.GetValueOfString(r["DocTableName"]);
@@ -2357,18 +2529,16 @@ namespace VASLogic.Models
                         docTable,
                         Util.GetValueOfString(r["DocIsSOTrx"]) == "Y",
                         Util.GetValueOfString(r["DocIsReturn"]) == "Y",
-                        Util.GetValueOfString(r["DocIsInternalUse"]) == "Y"),
+                        Util.GetValueOfString(r["DocIsInternalUse"]) == "Y",
+                        Util.GetValueOfString(r["MovementType"]),
+                        Util.GetValueOfString(r["InvoiceIsSOTrx"]) == "Y"),
                     WarehouseName    = Util.GetValueOfString(r["WarehouseName"]),
                     LocatorName      = Util.GetValueOfString(r["LocatorName"]),
                     Attributes       = BuildAsiText(
                         Util.GetValueOfString(r["AsiDescription"]),
                         Util.GetValueOfString(r["Lot"]),
                         Util.GetValueOfString(r["SerNo"]),
-                        Util.GetValueOfDateTime(r["GuaranteeDate"])),
-                    UnitCost         = NullableDecimal(r["UnitCost"]),
-                    CurSymbol        = schema == null ? "" : schema.CurSymbol,
-                    ISO_Code         = schema == null ? "" : schema.CurrencyISO,
-                    CurPrecision     = schema == null ? 2  : schema.StdPrecision
+                        Util.GetValueOfDateTime(r["GuaranteeDate"]))
                 });
             }
             return rows;
@@ -2405,8 +2575,19 @@ namespace VASLogic.Models
         /// and falls back to the table's zoom target when the tenant has not got
         /// a window under that name, so an unknown name costs nothing.
         /// </summary>
+        /// <param name="docTable">The document's physical table.</param>
+        /// <param name="isSOTrx">The shipment document is a sales one.</param>
+        /// <param name="isReturn">The shipment document is a return.</param>
+        /// <param name="isInternalUse">The inventory document is an internal use.</param>
+        /// <param name="movementType">M_Transaction.MovementType, which is what
+        /// gives a job-work document its direction: the document table is one for
+        /// both, and the sign on the movement is what says whether the goods went
+        /// out to the job worker or came back.</param>
+        /// <param name="invoiceIsSOTrx">The invoice behind an invoice-driven
+        /// movement is a sales one — a customer invoice rather than a vendor's.</param>
         private static string TransactionWindowName(string docTable, bool isSOTrx,
-                                                    bool isReturn, bool isInternalUse)
+                                                    bool isReturn, bool isInternalUse,
+                                                    string movementType, bool invoiceIsSOTrx)
         {
             if (docTable == "M_InOut")
             {
@@ -2418,6 +2599,26 @@ namespace VASLogic.Models
                 return isInternalUse ? "VAS_InternalUseInventory" : "VAS_PhysicalInventory";
             }
             if (docTable == "M_Movement") return "VAS_MaterialTransfer";
+            // An assembly / disassembly. Both directions are the one document and
+            // the one screen — which of them a row is, its movement type says.
+            if (docTable == "M_Production") return "VAS_Assembly";
+            // A production order's own issue or receipt. The name is the one
+            // VAS_098 and VAS_102 already open that screen by.
+            if (docTable == "VAMFG_M_WrkOdrTransaction") return "VAMFG_ProductionOrder";
+            if (docTable == "VAFAM_AssetDisposal") return "VAFAM_AssetDisposal";
+            if (docTable == "VA143_JobWorkInOut")
+            {
+                // Goods leaving for the job worker and goods coming back are the
+                // same table under two screens, told apart by the sign on the
+                // movement: '+' is stock arriving, '-' is stock leaving.
+                string mt = (movementType ?? "").Trim();
+                bool inbound = mt.EndsWith("+");
+                return inbound ? "VA143_JobWorkIn" : "VA143_JobWorkOut";
+            }
+            if (docTable == "C_Invoice")
+            {
+                return invoiceIsSOTrx ? "VAS_ARInvoice" : "VAS_APInvoice";
+            }
             return "";
         }
 
@@ -2513,13 +2714,21 @@ namespace VASLogic.Models
         ///     the accounts above that the product sets is reported, so an account
         ///     configured on the tab can no longer go missing from the panel.
         ///
-        /// Service products are still excluded outright: no account of any kind
-        /// is queried or shown for them.
+        /// Two things it no longer does either, both of which took the section off
+        /// the panel altogether rather than reporting what it found:
+        ///   - Service products are no longer excluded. A service posts revenue,
+        ///     expense and COGS like anything else, and its Accounting tab holds
+        ///     those accounts; refusing to query them meant the section simply did
+        ///     not exist on a service product, with nothing saying why.
+        ///   - A product with no account set still comes back with its accounting
+        ///     CONTEXT — the schema that answered, its costing method and its
+        ///     currency — and an empty row list. That is an answer ("this product
+        ///     sets no accounts of its own, and here is what it is valued under");
+        ///     returning null made the whole section vanish, which reads as the
+        ///     panel having failed rather than as the product having nothing set.
         /// </summary>
-        private AccountingData LoadAccounting(Ctx ctx, int M_Product_ID, string productType)
+        private AccountingData LoadAccounting(Ctx ctx, int M_Product_ID)
         {
-            if (productType == TYPE_SERVICE) return null;
-
             List<string> wanted = new List<string>(PRODUCT_ACCT_COLUMNS);
 
             // The client's schemas, primary first. A tenant posting under a
@@ -2570,7 +2779,23 @@ namespace VASLogic.Models
                 }
                 if (acct.Rows.Count > 0) return acct;
             }
-            return null;   // nothing set on the product - no section
+
+            // No schema carried an account for this product. The section still
+            // reports the accounting context it is valued under, with no rows —
+            // see the remarks above for why that is preferred to no section.
+            if (schemas.Count > 0)
+            {
+                AcctSchemaInfo primary = schemas[0];
+                return new AccountingData
+                {
+                    SchemaName    = primary.Name,
+                    CostingMethod = primary.CostingMethod,
+                    CurrencyISO   = primary.CurrencyISO,
+                    CurSymbol     = primary.CurSymbol,
+                    Rows          = new List<AccountRowData>()
+                };
+            }
+            return null;   // the client has no accounting schema at all
         }
 
         /// <summary>
