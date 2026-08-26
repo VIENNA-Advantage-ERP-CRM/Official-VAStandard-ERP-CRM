@@ -140,6 +140,10 @@ namespace VASLogic.Models
     ///   VAI145      2026-08-25 Check 06's UOM column reads the unit's name, not its symbol
     ///   VAI145      2026-08-25 Check 13 evaluates GL_Journal.GL_ReversalDate instead of
     ///                          reporting NOT_APPLICABLE; PASS / FAIL, no drill-down
+    ///   VAI154      2026-08-26 A document branch declares NO window, so every row's
+    ///                          screen is resolved per record from the tab WhereClause
+    ///                          and the document type; screens are header tabs only and
+    ///                          are ordered by the dictionary's sequence, not by name
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -382,8 +386,11 @@ namespace VASLogic.Models
         /// is gone until its behaviour against this installation's actual AD_Tab data
         /// has been confirmed rather than assumed.
         ///
-        /// The PRIMARY screen is chosen by <see cref="PickPrimaryScreen"/>: it is the
-        /// right window to open a record on and the right name to group by.
+        /// The PRIMARY screen is chosen by <see cref="PickPrimaryScreen"/>. It is the
+        /// right name to GROUP by, and it is no longer what a row zooms to: which screen
+        /// holds a given record is a property of the record, not of its table, so the
+        /// branch emits no window at all and the shared resolver answers per record -
+        /// falling back to this same screen when no window's filter claims one.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="tables">Discovered tables, labelled in place.</param>
@@ -428,8 +435,9 @@ namespace VASLogic.Models
         /// filter of its own - that is the window showing the whole table rather than one
         /// slice of it.
         ///
-        /// The list arrives ordered by window name, so where neither property separates
-        /// the candidates the first one wins and the choice stays stable between requests.
+        /// The list arrives in the dictionary's own tab / window sequence, so where
+        /// neither property separates the candidates the table's lowest-sequenced window
+        /// wins - its main screen - and the choice stays stable between requests.
         /// </summary>
         /// <param name="screens">A table's screens, in the query's stable order.</param>
         /// <returns>The screen to label, group and zoom by (never null).</returns>
@@ -459,22 +467,48 @@ namespace VASLogic.Models
         /// Every active, menu-reachable screen each discovered table is shown on, with
         /// its tab filter already resolved against the session context.
         ///
-        /// One window can show a table on more than one tab; the first (lowest SeqNo)
-        /// speaks for the window.
+        /// Overload for the discovery pass, which holds tables rather than ids.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="tables">Discovered tables.</param>
         /// <returns>Screens grouped by AD_Table_ID (never null).</returns>
         private Dictionary<int, List<ScreenDef>> ReadScreens(Ctx ctx, List<DocDef> tables)
         {
-            Dictionary<int, List<ScreenDef>> byTable = new Dictionary<int, List<ScreenDef>>();
-
             List<int> tableIds = new List<int>();
             for (int i = 0; i < tables.Count; i++)
             {
                 if (tables[i].AD_Table_ID > 0) { tableIds.Add(tables[i].AD_Table_ID); }
             }
-            if (tableIds.Count == 0) { return byTable; }
+
+            return ReadScreens(ctx, tableIds);
+        }
+
+        /// <summary>
+        /// Every active, menu-reachable screen each table is shown on, with its tab
+        /// filter already resolved against the session context.
+        ///
+        /// HEADER tabs only (TabLevel 0) - the window that OPENS the record, not one that
+        /// shows it as somebody else's child. A child tab is not a screen a reader can be
+        /// sent to with a record id, so admitting one only ever produced a zoom target
+        /// that could not position on the record.
+        ///
+        /// One window can show a table on more than one tab; the first (lowest SeqNo)
+        /// speaks for the window. Ordered by the dictionary's own sequence rather than by
+        /// window NAME: the first screen of a table is the one a reader would call its
+        /// main window, and ordering by name made that an alphabetical accident - which is
+        /// how a table's default screen came to be "Blanket Sales Order" merely because B
+        /// sorts before S.
+        /// Chronological development:
+        ///   VAI154      2026-08-26 Header tabs only; ordered by tab / window sequence
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="tableIds">AD_Table_IDs wanted.</param>
+        /// <returns>Screens grouped by AD_Table_ID (never null).</returns>
+        private Dictionary<int, List<ScreenDef>> ReadScreens(Ctx ctx, List<int> tableIds)
+        {
+            Dictionary<int, List<ScreenDef>> byTable = new Dictionary<int, List<ScreenDef>>();
+
+            if (tableIds == null || tableIds.Count == 0) { return byTable; }
 
             List<SqlParameter> parameters = Binds();
             parameters.Add(new SqlParameter("@AD_Language", ctxLanguage(ctx)));
@@ -500,10 +534,14 @@ namespace VASLogic.Models
                 LEFT OUTER JOIN AD_Window_Trl wtrl ON (wtrl.AD_Window_ID=w.AD_Window_ID AND wtrl.AD_Language=@AD_Language AND wtrl.IsActive='Y')
                 WHERE tab.IsActive='Y'
                   AND tab.IsDisplayed='Y'
+                  /* Header tabs only. COALESCE because TabLevel is NULLable, and a bare
+                     comparison would be NULL - never true - on every row that leaves it
+                     unset, which is most of them. */
+                  AND COALESCE(tab.TabLevel,0)=0
                   AND w.IsActive='Y'
                   AND m.IsActive='Y'
                   AND tab.AD_Table_ID IN (" + inList + @")
-                ORDER BY tab.AD_Table_ID,Window_Name,tab.SeqNo,w.AD_Window_ID,tab.AD_Tab_ID";
+                ORDER BY tab.AD_Table_ID,tab.SeqNo,w.AD_Window_ID,tab.AD_Tab_ID";
 
             DataSet ds = DB.ExecuteDataset(sql, parameters.ToArray(), null);
             if (ds == null || ds.Tables.Count == 0) { return byTable; }
@@ -1091,9 +1129,15 @@ namespace VASLogic.Models
 
             sql.Append("SELECT ").Append(d.AD_Table_ID).Append(" AS ").Append(TECH_TABLE)
                .Append(",").Append(a).Append(".").Append(d.KeyColumn).Append(" AS ").Append(TECH_RECORD)
-               /* The screen's OWN window, so the drill-down opens the record on the
-                  screen the row came from rather than on the table's default one. */
-               .Append(",").Append(d.AD_Window_ID).Append(" AS ").Append(TECH_WINDOW)
+               /* Deliberately 0, which hands the choice to the shared resolver.
+                  A branch is one TABLE, and a table is opened on several screens - the
+                  branch's own window is only the first of them. Emitting it here declared
+                  the same screen for every record of the table, so an internal-use
+                  inventory announced itself as an Inventory Count and then zoomed there,
+                  onto a window whose filter excludes it. The resolver decides per RECORD,
+                  from the tab WhereClause and the document type, and falls back to this
+                  very window when no screen claims the record. */
+               .Append(",0 AS ").Append(TECH_WINDOW)
                /* Sort key only - never declared as a column, so the page materialiser
                   ignores it and the reader never sees it. */
                .Append(",").Append(d.ScreenRank).Append(" AS Screen_Sort")
