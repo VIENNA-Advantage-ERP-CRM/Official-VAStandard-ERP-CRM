@@ -140,6 +140,10 @@ namespace VASLogic.Models
     ///   VAI145      2026-08-25 Check 06's UOM column reads the unit's name, not its symbol
     ///   VAI145      2026-08-25 Check 13 evaluates GL_Journal.GL_ReversalDate instead of
     ///                          reporting NOT_APPLICABLE; PASS / FAIL, no drill-down
+    ///   VAI154      2026-08-26 A document branch declares NO window, so every row's
+    ///                          screen is resolved per record from the tab WhereClause
+    ///                          and the document type; screens are header tabs only and
+    ///                          are ordered by the dictionary's sequence, not by name
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -382,8 +386,11 @@ namespace VASLogic.Models
         /// is gone until its behaviour against this installation's actual AD_Tab data
         /// has been confirmed rather than assumed.
         ///
-        /// The PRIMARY screen is chosen by <see cref="PickPrimaryScreen"/>: it is the
-        /// right window to open a record on and the right name to group by.
+        /// The PRIMARY screen is chosen by <see cref="PickPrimaryScreen"/>. It is the
+        /// right name to GROUP by, and it is no longer what a row zooms to: which screen
+        /// holds a given record is a property of the record, not of its table, so the
+        /// branch emits no window at all and the shared resolver answers per record -
+        /// falling back to this same screen when no window's filter claims one.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="tables">Discovered tables, labelled in place.</param>
@@ -428,8 +435,9 @@ namespace VASLogic.Models
         /// filter of its own - that is the window showing the whole table rather than one
         /// slice of it.
         ///
-        /// The list arrives ordered by window name, so where neither property separates
-        /// the candidates the first one wins and the choice stays stable between requests.
+        /// The list arrives in the dictionary's own tab / window sequence, so where
+        /// neither property separates the candidates the table's lowest-sequenced window
+        /// wins - its main screen - and the choice stays stable between requests.
         /// </summary>
         /// <param name="screens">A table's screens, in the query's stable order.</param>
         /// <returns>The screen to label, group and zoom by (never null).</returns>
@@ -459,22 +467,48 @@ namespace VASLogic.Models
         /// Every active, menu-reachable screen each discovered table is shown on, with
         /// its tab filter already resolved against the session context.
         ///
-        /// One window can show a table on more than one tab; the first (lowest SeqNo)
-        /// speaks for the window.
+        /// Overload for the discovery pass, which holds tables rather than ids.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="tables">Discovered tables.</param>
         /// <returns>Screens grouped by AD_Table_ID (never null).</returns>
         private Dictionary<int, List<ScreenDef>> ReadScreens(Ctx ctx, List<DocDef> tables)
         {
-            Dictionary<int, List<ScreenDef>> byTable = new Dictionary<int, List<ScreenDef>>();
-
             List<int> tableIds = new List<int>();
             for (int i = 0; i < tables.Count; i++)
             {
                 if (tables[i].AD_Table_ID > 0) { tableIds.Add(tables[i].AD_Table_ID); }
             }
-            if (tableIds.Count == 0) { return byTable; }
+
+            return ReadScreens(ctx, tableIds);
+        }
+
+        /// <summary>
+        /// Every active, menu-reachable screen each table is shown on, with its tab
+        /// filter already resolved against the session context.
+        ///
+        /// HEADER tabs only (TabLevel 0) - the window that OPENS the record, not one that
+        /// shows it as somebody else's child. A child tab is not a screen a reader can be
+        /// sent to with a record id, so admitting one only ever produced a zoom target
+        /// that could not position on the record.
+        ///
+        /// One window can show a table on more than one tab; the first (lowest SeqNo)
+        /// speaks for the window. Ordered by the dictionary's own sequence rather than by
+        /// window NAME: the first screen of a table is the one a reader would call its
+        /// main window, and ordering by name made that an alphabetical accident - which is
+        /// how a table's default screen came to be "Blanket Sales Order" merely because B
+        /// sorts before S.
+        /// Chronological development:
+        ///   VAI154      2026-08-26 Header tabs only; ordered by tab / window sequence
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="tableIds">AD_Table_IDs wanted.</param>
+        /// <returns>Screens grouped by AD_Table_ID (never null).</returns>
+        private Dictionary<int, List<ScreenDef>> ReadScreens(Ctx ctx, List<int> tableIds)
+        {
+            Dictionary<int, List<ScreenDef>> byTable = new Dictionary<int, List<ScreenDef>>();
+
+            if (tableIds == null || tableIds.Count == 0) { return byTable; }
 
             List<SqlParameter> parameters = Binds();
             parameters.Add(new SqlParameter("@AD_Language", ctxLanguage(ctx)));
@@ -500,10 +534,14 @@ namespace VASLogic.Models
                 LEFT OUTER JOIN AD_Window_Trl wtrl ON (wtrl.AD_Window_ID=w.AD_Window_ID AND wtrl.AD_Language=@AD_Language AND wtrl.IsActive='Y')
                 WHERE tab.IsActive='Y'
                   AND tab.IsDisplayed='Y'
+                  /* Header tabs only. COALESCE because TabLevel is NULLable, and a bare
+                     comparison would be NULL - never true - on every row that leaves it
+                     unset, which is most of them. */
+                  AND COALESCE(tab.TabLevel,0)=0
                   AND w.IsActive='Y'
                   AND m.IsActive='Y'
                   AND tab.AD_Table_ID IN (" + inList + @")
-                ORDER BY tab.AD_Table_ID,Window_Name,tab.SeqNo,w.AD_Window_ID,tab.AD_Tab_ID";
+                ORDER BY tab.AD_Table_ID,tab.SeqNo,w.AD_Window_ID,tab.AD_Tab_ID";
 
             DataSet ds = DB.ExecuteDataset(sql, parameters.ToArray(), null);
             if (ds == null || ds.Tables.Count == 0) { return byTable; }
@@ -1072,7 +1110,9 @@ namespace VASLogic.Models
                these adapters bind by position.
                The bind is added here, ahead of the caller's period binds - the join sits
                in the FROM clause and those sit in the WHERE. */
-            string statusExpr = d.HasDocStatus ? a + ".DocStatus" : "N''";
+            /* CodeAsText even on the bare fallback: a UNION will not unite one branch
+               yielding a national string with a sibling yielding a plain one. */
+            string statusExpr = d.HasDocStatus ? CodeAsText(a + ".DocStatus") : "N''";
             string statusJoin = "";
 
             if (d.HasDocStatus)
@@ -1083,7 +1123,7 @@ namespace VASLogic.Models
                 if (statusJoin.Length > 0)
                 {
                     parameters.Add(new SqlParameter("@DocLang" + suffix, ctxLanguage(c)));
-                    statusExpr = "COALESCE(dstrl.Name,ds.Name," + a + ".DocStatus,N'')";
+                    statusExpr = ListNameExpr("dstrl", "ds", a + ".DocStatus");
                 }
             }
 
@@ -1091,9 +1131,15 @@ namespace VASLogic.Models
 
             sql.Append("SELECT ").Append(d.AD_Table_ID).Append(" AS ").Append(TECH_TABLE)
                .Append(",").Append(a).Append(".").Append(d.KeyColumn).Append(" AS ").Append(TECH_RECORD)
-               /* The screen's OWN window, so the drill-down opens the record on the
-                  screen the row came from rather than on the table's default one. */
-               .Append(",").Append(d.AD_Window_ID).Append(" AS ").Append(TECH_WINDOW)
+               /* Deliberately 0, which hands the choice to the shared resolver.
+                  A branch is one TABLE, and a table is opened on several screens - the
+                  branch's own window is only the first of them. Emitting it here declared
+                  the same screen for every record of the table, so an internal-use
+                  inventory announced itself as an Inventory Count and then zoomed there,
+                  onto a window whose filter excludes it. The resolver decides per RECORD,
+                  from the tab WhereClause and the document type, and falls back to this
+                  very window when no screen claims the record. */
+               .Append(",0 AS ").Append(TECH_WINDOW)
                /* Sort key only - never declared as a column, so the page materialiser
                   ignores it and the reader never sees it. */
                .Append(",").Append(d.ScreenRank).Append(" AS Screen_Sort")
@@ -1109,7 +1155,7 @@ namespace VASLogic.Models
                /* The SYMBOL, not the ISO code: it rides beside the amount instead of
                   taking a column of its own. Symbol first, code as the fallback for a
                   currency that defines none. */
-               .Append(",").Append(d.HasCurrency ? "COALESCE(cur.CurSymbol,cur.ISO_Code,N'')" : "N''").Append(" AS Currency_Symbol")
+               .Append(",").Append(d.HasCurrency ? "COALESCE(cur.CurSymbol," + CodeAsText("cur.ISO_Code") + ",N'')" : "N''").Append(" AS Currency_Symbol")
                .Append(",").Append(d.HasAmount ? "COALESCE(" + a + "." + d.AmountColumn + ",0)" : "0").Append(" AS Doc_Amount")
                .Append(" FROM ").Append(d.TableName).Append(" ").Append(a)
                .Append(" LEFT OUTER JOIN AD_Org org ON (org.AD_Org_ID=").Append(a).Append(".AD_Org_ID)");
@@ -1375,7 +1421,7 @@ namespace VASLogic.Models
                        " + (string.IsNullOrEmpty(docTypeKey) ? "N''" : "COALESCE(dt.Name,N'')") + @" AS Doc_Type,
                        COALESCE(bp.Name,N'') AS Partner_Name,
                        " + (hasCharge ? "COALESCE(ch.Name,N'')" : "N''") + @" AS Charge_Name,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso,
                        COALESCE(p.PayAmt,0) AS Pay_Amount
                 FROM C_Payment p
                 " + (string.IsNullOrEmpty(docTypeKey)
@@ -1467,7 +1513,7 @@ namespace VASLogic.Models
                        p.DateTrx AS Trx_Date,
                        p.DateAcct AS Doc_Date,
                        COALESCE(bp.Name,N'') AS Partner_Name,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso,
                        COALESCE(p.PayAmt,0) AS Doc_Amount
                 FROM C_Payment p
                 INNER JOIN C_BankAccount ba ON (ba.C_BankAccount_ID=p.C_BankAccount_ID)
@@ -1509,7 +1555,7 @@ namespace VASLogic.Models
                        bsl.StatementLineDate AS Trx_Date,
                        bsl.DateAcct AS Doc_Date,
                        COALESCE(bp.Name,N'') AS Partner_Name,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso,
                        COALESCE(bsl.StmtAmt,0) AS Doc_Amount
                 FROM C_BankStatementLine bsl
                 INNER JOIN C_BankStatement bs ON (bs.C_BankStatement_ID=bsl.C_BankStatement_ID)
@@ -1605,19 +1651,19 @@ namespace VASLogic.Models
 
             string methodExpr = AppendPaymentMethod(c, joins, parameters);
 
-            string statusExpr = "COALESCE(p.DocStatus,N'')";
+            string statusExpr = "COALESCE(" + CodeAsText("p.DocStatus") + ",N'')";
             string statusJoin = ListNameJoin("ds", "dstrl", "p.DocStatus", "C_Payment", "DocStatus", "@AD_LanguageD");
             if (statusJoin.Length > 0)
             {
                 joins.Append(statusJoin);
                 parameters.Add(new SqlParameter("@AD_LanguageD", ctxLanguage(c)));
-                statusExpr = "COALESCE(dstrl.Name,ds.Name,p.DocStatus,N'')";
+                statusExpr = ListNameExpr("dstrl", "ds", "p.DocStatus");
             }
 
             string execExpr = "N''";
             if (hasExec)
             {
-                execExpr = "COALESCE(p." + COLUMN_EXECUTION_STATUS + ",N'')";
+                execExpr = "COALESCE(" + CodeAsText("p." + COLUMN_EXECUTION_STATUS) + ",N'')";
 
                 string execJoin = ListNameJoin("es", "estrl", "p." + COLUMN_EXECUTION_STATUS,
                     "C_Payment", COLUMN_EXECUTION_STATUS, "@AD_LanguageE");
@@ -1625,7 +1671,7 @@ namespace VASLogic.Models
                 {
                     joins.Append(execJoin);
                     parameters.Add(new SqlParameter("@AD_LanguageE", ctxLanguage(c)));
-                    execExpr = "COALESCE(estrl.Name,es.Name,p." + COLUMN_EXECUTION_STATUS + ",N'')";
+                    execExpr = ListNameExpr("estrl", "es", "p." + COLUMN_EXECUTION_STATUS);
                 }
             }
 
@@ -1643,7 +1689,7 @@ namespace VASLogic.Models
                        " + methodExpr + @" AS Payment_Method,
                        " + statusExpr + @" AS Doc_Status,
                        " + execExpr + @" AS Exec_Status,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso,
                        COALESCE(p.PayAmt,0) AS Doc_Amount
                 FROM C_Payment p" + joins.ToString() + @"
                 WHERE p.IsActive='Y'
@@ -1704,10 +1750,10 @@ namespace VASLogic.Models
             {
                 joins.Append(tenderJoin);
                 parameters.Add(new SqlParameter("@AD_LanguageT", ctxLanguage(c)));
-                return "COALESCE(tttrl.Name,tt.Name,p.TenderType,N'')";
+                return ListNameExpr("tttrl", "tt", "p.TenderType");
             }
 
-            return "COALESCE(p.TenderType,N'')";
+            return "COALESCE(" + CodeAsText("p.TenderType") + ",N'')";
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -1875,8 +1921,8 @@ namespace VASLogic.Models
                        ABS(COALESCE(il.QtyInvoiced,0)) AS Invoiced_Qty,
                        " + matched + @" AS Matched_Qty,
                        " + unmatched + @" AS Unmatched_Qty,
-                       " + (hasMatchReq ? "COALESCE(i.MatchRequirementI,N'')" : "N''") + @" AS Match_Requirement,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
+                       " + (hasMatchReq ? "COALESCE(" + CodeAsText("i.MatchRequirementI") + ",N'')" : "N''") + @" AS Match_Requirement,
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso,
                        COALESCE(il.LineNetAmt,0) AS Doc_Amount
                 FROM C_InvoiceLine il
                 INNER JOIN C_Invoice i ON (i.C_Invoice_ID=il.C_Invoice_ID)
@@ -1984,7 +2030,7 @@ namespace VASLogic.Models
                        " + matchedQty + @" AS Invoiced_Qty,
                        " + orderPrice + @" AS Order_Price,
                        " + invoicePrice + @" AS Invoice_Price,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso
                 FROM M_MatchInv mi
                 INNER JOIN C_InvoiceLine il ON (il.C_InvoiceLine_ID=mi.C_InvoiceLine_ID)
                 INNER JOIN C_Invoice i ON (i.C_Invoice_ID=il.C_Invoice_ID)
@@ -2629,13 +2675,13 @@ namespace VASLogic.Models
                needs "Drafted". The bind is added HERE, before the statement is built,
                because its occurrence is in the FROM clause and the period binds that
                follow are in the WHERE - these adapters bind positionally. */
-            string statusExpr = "COALESCE(ah.DocStatus,N'')";
+            string statusExpr = "COALESCE(" + CodeAsText("ah.DocStatus") + ",N'')";
             string statusJoin = ListNameJoin("ds", "dstrl", "ah.DocStatus",
                 "C_AllocationHdr", "DocStatus", "@AD_LanguageD");
             if (statusJoin.Length > 0)
             {
                 parameters.Add(new SqlParameter("@AD_LanguageD", ctxLanguage(c)));
-                statusExpr = "COALESCE(dstrl.Name,ds.Name,ah.DocStatus,N'')";
+                statusExpr = ListNameExpr("dstrl", "ds", "ah.DocStatus");
             }
 
             string sql = @"
@@ -2645,7 +2691,7 @@ namespace VASLogic.Models
                        COALESCE(ah.DocumentNo,N'') AS Doc_Number,
                        ah.DateAcct AS Doc_Date,
                        " + statusExpr + @" AS Doc_Status,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso
                 FROM C_AllocationHdr ah
                 LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=ah.C_Currency_ID)" + statusJoin + @"
                 WHERE ah.IsActive='Y'
@@ -2748,12 +2794,12 @@ namespace VASLogic.Models
                that would have read it falls back to the stored code - a readable 'M'
                beats an empty column. */
             string typeName = typeJoin.Length > 0
-                ? "COALESCE(rttrl.Name,rt.Name,r.RecurringType,N'')"
-                : (hasRecurringType ? "COALESCE(r.RecurringType,N'')" : "N''");
+                ? ListNameExpr("rttrl", "rt", "r.RecurringType")
+                : (hasRecurringType ? "COALESCE(" + CodeAsText("r.RecurringType") + ",N'')" : "N''");
 
             string freqName = freqJoin.Length > 0
-                ? "COALESCE(frtrl.Name,fr.Name,r.FrequencyType,N'')"
-                : "COALESCE(r.FrequencyType,N'')";
+                ? ListNameExpr("frtrl", "fr", "r.FrequencyType")
+                : "COALESCE(" + CodeAsText("r.FrequencyType") + ",N'')";
 
             string sql = @"
                 SELECT " + TableId("C_Recurring") + " AS " + TECH_TABLE + @",
@@ -3094,13 +3140,13 @@ namespace VASLogic.Models
             /* MovementType is an AD_Reference list column: it stores 'V+' and the reader
                needs "Vendor Receipt". The bind goes in before the statement is built - its
                occurrence is in the FROM clause, ahead of the period binds in the WHERE. */
-            string typeExpr = "COALESCE(mt.MovementType,N'')";
+            string typeExpr = "COALESCE(" + CodeAsText("mt.MovementType") + ",N'')";
             string typeJoin = ListNameJoin("mtl", "mtltrl", "mt.MovementType",
                 "M_Transaction", "MovementType", "@AD_LanguageM");
             if (typeJoin.Length > 0)
             {
                 parameters.Add(new SqlParameter("@AD_LanguageM", ctxLanguage(c)));
-                typeExpr = "COALESCE(mtltrl.Name,mtl.Name,mt.MovementType,N'')";
+                typeExpr = ListNameExpr("mtltrl", "mtl", "mt.MovementType");
             }
 
             /* The number of whichever document produced the movement. Empty when this
@@ -3395,12 +3441,12 @@ namespace VASLogic.Models
                before the statement is built, because its occurrence is in the FROM clause
                and the period binds that follow it are in the WHERE - these adapters bind
                positionally, so the two have to be added in that order. */
-            string statusExpr = "COALESCE(i.DocStatus,N'')";
+            string statusExpr = "COALESCE(" + CodeAsText("i.DocStatus") + ",N'')";
             string statusJoin = ListNameJoin("ds", "dstrl", "i.DocStatus", "M_Inventory", "DocStatus", "@AD_LanguageD");
             if (statusJoin.Length > 0)
             {
                 parameters.Add(new SqlParameter("@AD_LanguageD", ctxLanguage(c)));
-                statusExpr = "COALESCE(dstrl.Name,ds.Name,i.DocStatus,N'')";
+                statusExpr = ListNameExpr("dstrl", "ds", "i.DocStatus");
             }
 
             string sql = @"
@@ -3495,7 +3541,7 @@ namespace VASLogic.Models
                        COALESCE(tax.Rate,0) AS Tax_Rate,
                        " + (hasTaxBase ? "COALESCE(it.TaxBaseAmt,0)" : "0") + @" AS Tax_Base,
                        COALESCE(it.TaxAmt,0) AS Tax_Amount,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso
                 FROM C_InvoiceTax it
                 INNER JOIN C_Invoice i ON (i.C_Invoice_ID=it.C_Invoice_ID)
                 INNER JOIN C_Tax tax ON (tax.C_Tax_ID=it.C_Tax_ID)
@@ -3749,7 +3795,7 @@ namespace VASLogic.Models
                   AND fa.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND fa.PostingType=@PostingType
                   AND fa.IsActive='Y'
-                  AND COALESCE(ev.AccountType,N'')<>@AccountType
+                  AND COALESCE(ev.AccountType,'')<>@AccountType
                   AND " + ChartOfAccountsWhere(c, "ev", "E", parameters) + @"
                   AND " + PeriodWhere(c, "fa", "DateAcct", "F", parameters);
 
@@ -3829,7 +3875,7 @@ namespace VASLogic.Models
                   AND fa.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND fa.PostingType=@PostingType
                   AND fa.IsActive='Y'
-                  AND COALESCE(ev.AccountType,N'')<>@AccountType
+                  AND COALESCE(ev.AccountType,'')<>@AccountType
                   AND " + ChartOfAccountsWhere(c, "ev", "S", parameters) + @"
                   AND " + PeriodWhere(c, "fa", "DateAcct", "F", parameters);
 
@@ -3925,7 +3971,7 @@ namespace VASLogic.Models
                        0 AS " + TECH_WINDOW + @",
                        bank.Name AS Bank_Name,
                        ba.AccountNo AS Bank_Account,
-                       COALESCE(cur.ISO_Code,N'') AS Currency_Iso,
+                       COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'') AS Currency_Iso,
                        COUNT(1) AS Total_Items,
                        SUM(CASE WHEN COALESCE(p.IsReconciled,'N')='Y' THEN 1 ELSE 0 END) AS Reconciled_Items,
                        SUM(CASE WHEN COALESCE(p.IsReconciled,'N')<>'Y' THEN 1 ELSE 0 END) AS Unreconciled_Items
@@ -3942,7 +3988,7 @@ namespace VASLogic.Models
             DetailSpec spec = new DetailSpec();
             spec.Sql = sql;
             spec.MainAlias = "p";
-            spec.GroupBy = "bank.Name,ba.AccountNo,COALESCE(cur.ISO_Code,N'')";
+            spec.GroupBy = "bank.Name,ba.AccountNo,COALESCE(" + CodeAsText("cur.ISO_Code") + @",N'')";
             spec.OrderBy = "Bank_Name,Bank_Account";
             spec.Params = parameters;
 
@@ -4026,22 +4072,22 @@ namespace VASLogic.Models
 
                Both binds are added before the statement is built - the joins are in the
                FROM clause, ahead of everything the WHERE binds. */
-            string typeExpr = "COALESCE(pc.DocBaseType,N'')";
+            string typeExpr = "COALESCE(" + CodeAsText("pc.DocBaseType") + ",N'')";
             string typeJoin = ListNameJoin("bt", "bttrl", "pc.DocBaseType",
                 "C_DocType", "DocBaseType", "@AD_LanguageB");
             if (typeJoin.Length > 0)
             {
                 parameters.Add(new SqlParameter("@AD_LanguageB", ctxLanguage(c)));
-                typeExpr = "COALESCE(bttrl.Name,bt.Name,pc.DocBaseType,N'')";
+                typeExpr = ListNameExpr("bttrl", "bt", "pc.DocBaseType");
             }
 
-            string statusExpr = "COALESCE(pc.PeriodStatus,N'')";
+            string statusExpr = "COALESCE(" + CodeAsText("pc.PeriodStatus") + ",N'')";
             string statusJoin = ListNameJoin("ps", "pstrl", "pc.PeriodStatus",
                 "C_PeriodControl", "PeriodStatus", "@AD_LanguageP");
             if (statusJoin.Length > 0)
             {
                 parameters.Add(new SqlParameter("@AD_LanguageP", ctxLanguage(c)));
-                statusExpr = "COALESCE(pstrl.Name,ps.Name,pc.PeriodStatus,N'')";
+                statusExpr = ListNameExpr("pstrl", "ps", "pc.PeriodStatus");
             }
 
             parameters.Add(new SqlParameter("@C_Period_ID", c.Period.C_Period_ID));

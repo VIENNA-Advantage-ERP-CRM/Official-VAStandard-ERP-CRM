@@ -70,6 +70,10 @@ namespace VASLogic.Models
     ///               Compatible with PostgreSQL and Oracle.
     /// Chronological development:
     ///   VAI154      2026-08-24 Created
+    ///   VAI154      2026-08-26 A row's screen - the name under its document number and
+    ///                          the window its Zoom opens - is resolved per RECORD from
+    ///                          the tab WhereClause and the document type, not per table
+    ///                          from its lowest window id
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -113,6 +117,23 @@ namespace VASLogic.Models
         public const string TECH_TABLE = "Tech_AD_Table_ID";
         public const string TECH_RECORD = "Tech_Record_ID";
         public const string TECH_WINDOW = "Tech_AD_Window_ID";
+
+        /* The ONE table beyond the source itself that a screen filter may reach for,
+           because the window resolver joins it: which of a table's windows holds a
+           record is decided by the document TYPE far more often than by anything else -
+           Delivery Order against Material Receipt, Blanket Sales Order against Sales
+           Order - and those tab filters name C_DocType directly. Joined under its own
+           name, since a tab clause qualifies with the TABLE name. */
+        private const string TABLE_DOCTYPE = "C_DocType";
+
+        /* Words that can follow a table name in a FROM / JOIN without being its alias -
+           the stop list CollectClauseSources reads a clause's own sources with. */
+        private static readonly List<string> SCREEN_CLAUSE_KEYWORDS = new List<string>
+        {
+            "WHERE", "ON", "AND", "OR", "NOT", "JOIN", "INNER", "LEFT", "RIGHT", "FULL",
+            "OUTER", "CROSS", "GROUP", "ORDER", "HAVING", "UNION", "SELECT", "AS", "FROM",
+            "IN", "EXISTS", "LIMIT", "FETCH", "OFFSET", "START", "CONNECT"
+        };
 
         /* Stored codes. */
         private const string PERIODSTATUS_Open = "O";
@@ -222,7 +243,7 @@ namespace VASLogic.Models
                        acs.Name AS Acct_Schema_Name,
                        acs.C_Currency_ID AS C_Currency_ID,
                        cur.ISO_Code AS Currency_Iso,
-                       COALESCE(cur.CurSymbol,cur.ISO_Code) AS Currency_Symbol,
+                       COALESCE(cur.CurSymbol," + CodeAsText("cur.ISO_Code") + @") AS Currency_Symbol,
                        cur.StdPrecision AS Std_Precision
                 FROM AD_ClientInfo ci
                 INNER JOIN C_AcctSchema acs ON (acs.C_AcctSchema_ID=ci.C_AcctSchema1_ID)
@@ -1038,7 +1059,11 @@ namespace VASLogic.Models
 
             List<int> tableIds = new List<int>(recordsByTable.Keys);
             LoadSourceTables(tableIds);
-            LoadDefaultWindows(ctx, rows, tableIds);
+
+            /* The record ids, not just the table ids: which SCREEN a row opens on is a
+               property of the record, not of its table - see LoadDefaultWindows. The
+               screen NAME follows from the window, so it is resolved after. */
+            LoadDefaultWindows(ctx, rows, recordsByTable);
             LoadScreenNames(ctx, rows, tableIds);
 
             foreach (KeyValuePair<int, List<int>> entry in recordsByTable)
@@ -1064,68 +1089,366 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Gives every document-backed row a window to open, where its check did not
-        /// name one.
+        /// Gives every document-backed row the window that actually HOLDS it, where its
+        /// check did not name one.
         ///
         /// Unlike Fact_Acct, the transaction tables these checks read carry no
         /// AD_Window_ID - a purchase invoice row knows it is a C_Invoice, not which
         /// screen a user opens it on. Without this the document number would render as
-        /// dead text on every check, so the table's primary window is resolved from the
-        /// dictionary: the header tab (TabLevel 0) of an active, menu-reachable window
-        /// over that table. Lowest window id breaks a tie, so the same installation
-        /// always lands on the same screen.
+        /// dead text on every check.
         ///
-        /// One query for the whole page. A table with no window simply keeps 0 and its
-        /// rows stay non-navigable.
+        /// It used to be answered per TABLE, with the lowest window id over it. That is
+        /// wrong wherever a table is opened on more than one screen, which is most of
+        /// them: every M_Inventory row went to whichever of Inventory Count and Internal
+        /// Use Inventory happened to have the smaller id, and every C_Order row to one of
+        /// Sales Order / Purchase Order / Blanket. The name shown under the document
+        /// number came from that same window, so the row ANNOUNCED the wrong screen and
+        /// then opened it - where the window's own filter excluded the record and the
+        /// user landed on an empty screen.
+        ///
+        /// So it is answered per RECORD, and by the dictionary's own rule: a window's tab
+        /// carries the WhereClause the framework applies when it opens that window, so
+        /// the window that holds a record is the one whose clause the record satisfies.
+        /// Those clauses test the document TYPE far more often than anything else, which
+        /// is why <see cref="ReadRecordWindows"/> joins C_DocType.
+        ///
+        /// One dictionary query for the page plus one lookup per distinct table - never
+        /// one per row. A record no screen claims, a table with no screen at all, or a
+        /// lookup that fails all fall back to the table's primary window, exactly as
+        /// before; a table with no window keeps 0 and its rows stay non-navigable.
+        /// Chronological development:
+        ///   VAI154      2026-08-26 Resolved per record from the tab WhereClause and the
+        ///                          document type; was the table's lowest window id
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="rows">Page rows to fill.</param>
-        /// <param name="tableIds">Distinct AD_Table_IDs on the page.</param>
-        private void LoadDefaultWindows(Ctx ctx, List<DetailRow> rows, List<int> tableIds)
+        /// <param name="recordsByTable">Record ids wanted, grouped by AD_Table_ID.</param>
+        private void LoadDefaultWindows(Ctx ctx, List<DetailRow> rows, Dictionary<int, List<int>> recordsByTable)
         {
-            if (tableIds.Count == 0) { return; }
+            if (recordsByTable == null || recordsByTable.Count == 0) { return; }
+
+            List<int> tableIds = new List<int>(recordsByTable.Keys);
+            Dictionary<int, List<ScreenDef>> screensByTable = ReadScreens(ctx, tableIds);
+
+            foreach (KeyValuePair<int, List<int>> entry in recordsByTable)
+            {
+                List<ScreenDef> screens;
+                if (!screensByTable.TryGetValue(entry.Key, out screens) || screens.Count == 0) { continue; }
+
+                /* The table's main window, and the answer for every record no screen
+                   filter claims - a table opened on one screen never reaches the lookup
+                   at all. */
+                int fallback = PickPrimaryScreen(screens).AD_Window_ID;
+
+                Dictionary<int, int> windowByRecord = ReadRecordWindows(ctx,
+                    FindSourceTable(entry.Key), screens, entry.Value);
+
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    DetailRow row = rows[i];
+
+                    /* A check that named its own window keeps it - that one is specific
+                       to the posting, this one only resolves what the row could not. */
+                    if (row.AD_Window_ID > 0 || row.AD_Table_ID != entry.Key) { continue; }
+
+                    int windowId;
+                    if (!windowByRecord.TryGetValue(row.Record_ID, out windowId) || windowId <= 0)
+                    {
+                        windowId = fallback;
+                    }
+
+                    if (windowId > 0) { row.AD_Window_ID = windowId; }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Which screen each of a table's records belongs to, decided the way the
+        /// framework itself decides it: by the tab WhereClause of every window over the
+        /// table, evaluated against the record.
+        ///
+        /// One statement for the whole table, not one per record and not one per screen -
+        /// a CASE running down the screens in order, returning the first window whose
+        /// filter the record satisfies. The source table is aliased to its OWN NAME
+        /// because a tab clause qualifies its columns with the table name
+        /// ("C_Order.IsSOTrx='Y'"), and C_DocType is joined under its own name for the
+        /// same reason: the clauses that separate Delivery Order from Material Receipt,
+        /// or Blanket Sales Order from Sales Order, are predicates over the document TYPE.
+        ///
+        /// Screens are taken NARROWEST FIRST - longest filter first - so where two
+        /// windows overlap the record goes to the one that describes it most closely: a
+        /// blanket order satisfies the Sales Order filter as well as its own, and belongs
+        /// to Blanket Sales Order. A heuristic, and meant as one; SQL offers no way to ask
+        /// whether one predicate implies another.
+        ///
+        /// Every clause is dictionary data that has already been resolved against the
+        /// session context and checked by <see cref="ResolveWhereClause"/>; it is checked
+        /// again here for the tables it qualifies, because this statement can only resolve
+        /// two of them. Nothing from the browser reaches any part of it.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="table">Validated source-table metadata; may be null.</param>
+        /// <param name="screens">The table's screens, in dictionary order.</param>
+        /// <param name="recordIds">Record ids wanted from that table.</param>
+        /// <returns>Record_ID -> AD_Window_ID (never null; empty when nothing applies).</returns>
+        private Dictionary<int, int> ReadRecordWindows(Ctx ctx, SourceTable table,
+            List<ScreenDef> screens, List<int> recordIds)
+        {
+            Dictionary<int, int> result = new Dictionary<int, int>();
+
+            if (table == null || recordIds == null || recordIds.Count == 0) { return result; }
+            if (!IsSafeIdentifier(table.TableName) || !IsSafeIdentifier(table.KeyColumn)) { return result; }
+
+            List<ScreenDef> filtered = UsableScreenFilters(table, screens);
+            if (filtered.Count == 0) { return result; }
+
+            string alias = table.TableName;
+            bool needsDocType = false;
+
+            StringBuilder branches = new StringBuilder();
+            for (int i = 0; i < filtered.Count; i++)
+            {
+                branches.Append(" WHEN (").Append(filtered[i].WhereClause).Append(") THEN ")
+                        .Append(filtered[i].AD_Window_ID.ToString(CultureInfo.InvariantCulture));
+
+                if (ClauseNamesDocType(filtered[i].WhereClause)) { needsDocType = true; }
+            }
 
             List<SqlParameter> parameters = new List<SqlParameter>();
-            string inList = BuildIdInList(tableIds, "@AD_Table_ID", parameters);
 
-            string sql = @"
-                SELECT tab.AD_Table_ID AS AD_Table_ID,
-                       MIN(w.AD_Window_ID) AS AD_Window_ID
-                FROM AD_Tab tab
-                INNER JOIN AD_Window w ON (w.AD_Window_ID=tab.AD_Window_ID)
-                INNER JOIN AD_Menu m ON (m.AD_Window_ID=w.AD_Window_ID)
-                WHERE tab.IsActive='Y'
-                  AND COALESCE(tab.TabLevel,0)=0
-                  AND w.IsActive='Y'
-                  AND m.IsActive='Y'
-                  AND tab.AD_Table_ID IN (" + inList + @")
-                GROUP BY tab.AD_Table_ID";
+            StringBuilder sql = new StringBuilder();
+            sql.Append("SELECT ").Append(alias).Append(".").Append(table.KeyColumn).Append(" AS Record_ID")
+               .Append(",CASE").Append(branches.ToString()).Append(" ELSE 0 END AS AD_Window_ID")
+               .Append(" FROM ").Append(table.TableName).Append(" ").Append(alias);
 
-            Dictionary<int, int> windowByTable = new Dictionary<int, int>();
-
-            DataSet ds = DB.ExecuteDataset(sql, parameters.ToArray(), null);
-            if (ds != null && ds.Tables.Count > 0)
+            if (needsDocType)
             {
-                DataTable dt = ds.Tables[0];
-                for (int i = 0; i < dt.Rows.Count; i++)
+                /* The TARGET type where the table has one - it is what the user picked and
+                   is populated from the moment a document is drafted, while C_DocType_ID
+                   is only set when it completes. Joining on the latter alone would leave
+                   every unprocessed row - precisely the rows check 01 lists - matching no
+                   type-based screen at all. */
+                string key = DocTypeKeyExpr(alias, table.HasDocType, table.HasDocTypeTarget);
+
+                /* Empty only when the table carries no document type at all, in which case
+                   the clause that named C_DocType brought its own FROM and resolves
+                   itself - adding a join on nothing would be a syntax error. */
+                if (key.Length > 0)
                 {
-                    int tableId = Util.GetValueOfInt(dt.Rows[i]["AD_Table_ID"]);
-                    int windowId = Util.GetValueOfInt(dt.Rows[i]["AD_Window_ID"]);
-                    if (tableId > 0 && windowId > 0) { windowByTable[tableId] = windowId; }
+                    sql.Append(" LEFT OUTER JOIN ").Append(TABLE_DOCTYPE).Append(" ").Append(TABLE_DOCTYPE)
+                       .Append(" ON (").Append(TABLE_DOCTYPE).Append(".C_DocType_ID=").Append(key).Append(")");
                 }
             }
 
-            for (int i = 0; i < rows.Count; i++)
+            sql.Append(" WHERE ");
+
+            if (IsSafeIdentifier(table.ClientColumn))
             {
-                DetailRow row = rows[i];
-
-                /* A check that named its own window keeps it - that one is specific to
-                   the posting, this one is only the table's default. */
-                if (row.AD_Window_ID > 0 || row.AD_Table_ID <= 0) { continue; }
-
-                int windowId;
-                if (windowByTable.TryGetValue(row.AD_Table_ID, out windowId)) { row.AD_Window_ID = windowId; }
+                sql.Append(alias).Append(".").Append(table.ClientColumn).Append(" IN (0,@AD_Client_ID) AND ");
+                parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
             }
+
+            sql.Append(alias).Append(".").Append(table.KeyColumn).Append(" IN (")
+               .Append(BuildIdInList(recordIds, "@Record_ID", parameters)).Append(")");
+
+            DataSet ds;
+            try
+            {
+                ds = DB.ExecuteDataset(sql.ToString(), parameters.ToArray(), null);
+            }
+            catch (Exception ex)
+            {
+                /* A dictionary clause the database will not accept must not take the
+                   modal down with it: every row of this table falls back to the table's
+                   primary window, which is what it used before this resolver existed. */
+                Log.Log(Level.WARNING, "VAS_195: screen lookup failed for " + table.TableName, ex);
+                return result;
+            }
+
+            if (ds == null || ds.Tables.Count == 0) { return result; }
+
+            DataTable dt = ds.Tables[0];
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                int recordId = Util.GetValueOfInt(dt.Rows[i]["Record_ID"]);
+                if (recordId <= 0) { continue; }
+
+                result[recordId] = Util.GetValueOfInt(dt.Rows[i]["AD_Window_ID"]);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// The screens whose filters this statement can actually evaluate, narrowest
+        /// first.
+        ///
+        /// A screen with no filter is left out rather than made a branch: it claims
+        /// everything, so a branch for it would swallow every record that reached it and
+        /// nothing after it would ever be tested. It is the FALLBACK instead - which is
+        /// exactly what an unfiltered window is, the one showing the whole table.
+        /// </summary>
+        /// <param name="table">Validated source-table metadata.</param>
+        /// <param name="screens">The table's screens, in dictionary order.</param>
+        /// <returns>Usable filtered screens, narrowest first (never null).</returns>
+        private List<ScreenDef> UsableScreenFilters(SourceTable table, List<ScreenDef> screens)
+        {
+            List<ScreenDef> usable = new List<ScreenDef>();
+            if (screens == null) { return usable; }
+
+            for (int i = 0; i < screens.Count; i++)
+            {
+                ScreenDef screen = screens[i];
+
+                if (screen.AD_Window_ID <= 0) { continue; }
+                if (string.IsNullOrEmpty(screen.WhereClause)) { continue; }
+                if (!ClauseResolvesHere(screen.WhereClause, table)) { continue; }
+
+                usable.Add(screen);
+            }
+
+            usable.Sort(delegate (ScreenDef a, ScreenDef b)
+            {
+                int byLength = b.WhereClause.Length.CompareTo(a.WhereClause.Length);
+                return byLength != 0 ? byLength : a.AD_Window_ID.CompareTo(b.AD_Window_ID);
+            });
+
+            return usable;
+        }
+
+        /// <summary>
+        /// Whether every table a tab filter qualifies a column with is one this statement
+        /// resolves: the source table itself, C_DocType (which the statement joins when
+        /// the table carries a C_DocType_ID column), or a table the clause's own subquery
+        /// declares.
+        ///
+        /// A clause reaching anywhere else does not return the wrong rows, it throws - and
+        /// takes the whole table's lookup with it - so it is refused here and its window
+        /// simply never becomes a branch.
+        /// </summary>
+        /// <param name="clause">Resolved tab WhereClause.</param>
+        /// <param name="table">Validated source-table metadata.</param>
+        /// <returns>true when the clause can be evaluated by this statement.</returns>
+        private bool ClauseResolvesHere(string clause, SourceTable table)
+        {
+            if (string.IsNullOrEmpty(clause) || table == null) { return false; }
+
+            List<string> declared = CollectClauseSources(clause);
+            bool canJoinDocType = table.HasDocType || table.HasDocTypeTarget;
+
+            bool inLiteral = false;
+
+            for (int i = 0; i < clause.Length; i++)
+            {
+                char ch = clause[i];
+
+                if (ch == '\'') { inLiteral = !inLiteral; continue; }
+                if (inLiteral || ch != '.') { continue; }
+
+                if (i + 1 >= clause.Length) { continue; }
+                char next = clause[i + 1];
+                if (!((next >= 'A' && next <= 'Z') || (next >= 'a' && next <= 'z') || next == '_')) { continue; }
+
+                int end = i;
+                int start = i;
+                while (start > 0 && IsClauseIdentifierChar(clause[start - 1])) { start--; }
+                if (start == end) { continue; }
+
+                string qualifier = clause.Substring(start, end - start);
+
+                char first = qualifier[0];
+                if (!((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z') || first == '_')) { continue; }
+
+                if (qualifier.Equals(table.TableName, StringComparison.OrdinalIgnoreCase)) { continue; }
+                if (canJoinDocType && qualifier.Equals(TABLE_DOCTYPE, StringComparison.OrdinalIgnoreCase)) { continue; }
+                if (Contains(declared, qualifier)) { continue; }
+
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// The table names and aliases a clause introduces for itself - the identifiers
+        /// after each FROM / JOIN inside it. A subquery resolves its own qualifiers
+        /// wherever it appears, so those must not count against it.
+        ///
+        /// A tokeniser, not a parser. Over-collecting only ever WIDENS what a qualifier
+        /// may name, and the clause has already been through the safety check in
+        /// <see cref="ResolveWhereClause"/>.
+        /// </summary>
+        /// <param name="clause">Resolved tab WhereClause.</param>
+        /// <returns>Identifiers the clause resolves on its own (never null).</returns>
+        private List<string> CollectClauseSources(string clause)
+        {
+            List<string> declared = new List<string>();
+            if (string.IsNullOrEmpty(clause)) { return declared; }
+
+            bool inLiteral = false;
+            int pending = 0;
+
+            int i = 0;
+            while (i < clause.Length)
+            {
+                char ch = clause[i];
+
+                if (ch == '\'') { inLiteral = !inLiteral; i++; continue; }
+                if (inLiteral || !IsClauseIdentifierChar(ch)) { i++; continue; }
+
+                int start = i;
+                while (i < clause.Length && IsClauseIdentifierChar(clause[i])) { i++; }
+                string word = clause.Substring(start, i - start);
+
+                if (word.Equals("FROM", StringComparison.OrdinalIgnoreCase)
+                    || word.Equals("JOIN", StringComparison.OrdinalIgnoreCase))
+                {
+                    pending = 2;
+                    continue;
+                }
+
+                if (pending == 0) { continue; }
+                if (Contains(SCREEN_CLAUSE_KEYWORDS, word)) { pending = 0; continue; }
+
+                if (!Contains(declared, word)) { declared.Add(word); }
+                pending--;
+            }
+
+            return declared;
+        }
+
+        /// <summary>Whether a clause qualifies anything with C_DocType.</summary>
+        /// <param name="clause">Resolved tab WhereClause.</param>
+        /// <returns>true when the statement has to join C_DocType.</returns>
+        private bool ClauseNamesDocType(string clause)
+        {
+            return !string.IsNullOrEmpty(clause)
+                && clause.IndexOf(TABLE_DOCTYPE + ".", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>Whether a character may appear inside an unquoted SQL identifier.</summary>
+        /// <param name="ch">Character under test.</param>
+        /// <returns>true for a letter, a digit or an underscore.</returns>
+        private bool IsClauseIdentifierChar(char ch)
+        {
+            return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')
+                || (ch >= '0' && ch <= '9') || ch == '_';
+        }
+
+        /// <summary>Case-insensitive membership test.</summary>
+        /// <param name="values">Names to search.</param>
+        /// <param name="name">Name wanted.</param>
+        /// <returns>true when present.</returns>
+        private bool Contains(List<string> values, string name)
+        {
+            if (values == null || string.IsNullOrEmpty(name)) { return false; }
+
+            for (int i = 0; i < values.Count; i++)
+            {
+                if (name.Equals(values[i], StringComparison.OrdinalIgnoreCase)) { return true; }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -1259,13 +1582,12 @@ namespace VASLogic.Models
                        MAX(CASE WHEN c.IsKey='Y' THEN c.ColumnName END) AS Key_Column,
                        MAX(CASE WHEN c.ColumnName='DocumentNo' THEN c.ColumnName END) AS Document_Column,
                        MAX(CASE WHEN c.ColumnName='Value' THEN c.ColumnName END) AS Value_Column,
-                       MAX(CASE WHEN c.ColumnName='AD_Client_ID' THEN c.ColumnName END) AS Client_Column
+                       MAX(CASE WHEN c.ColumnName='AD_Client_ID' THEN c.ColumnName END) AS Client_Column,
+                       MAX(CASE WHEN c.ColumnName='C_DocType_ID' THEN c.ColumnName END) AS Doc_Type_Column,
+                       MAX(CASE WHEN c.ColumnName='C_DocTypeTarget_ID' THEN c.ColumnName END) AS Doc_Type_Target_Column
                 FROM AD_Table t
                 INNER JOIN AD_Column c ON (c.AD_Table_ID=t.AD_Table_ID AND c.IsActive='Y')
                 WHERE t.IsActive='Y'
-                  /* COALESCE, not a bare comparison: AD_Table.IsView is NULLable and
-                     unset on most tables, so 't.IsView=''N''' is NULL rather than true
-                     and would resolve no source table at all. */
                   AND COALESCE(t.IsView,'N')='N'
                   AND t.AD_Table_ID IN (" + inList + @")
                 GROUP BY t.AD_Table_ID,t.TableName";
@@ -1285,6 +1607,8 @@ namespace VASLogic.Models
                 table.DocumentColumn = Util.GetValueOfString(dr["Document_Column"]);
                 table.ValueColumn = Util.GetValueOfString(dr["Value_Column"]);
                 table.ClientColumn = Util.GetValueOfString(dr["Client_Column"]);
+                table.HasDocType = IsSafeIdentifier(Util.GetValueOfString(dr["Doc_Type_Column"]));
+                table.HasDocTypeTarget = IsSafeIdentifier(Util.GetValueOfString(dr["Doc_Type_Target_Column"]));
                 table.IdentifierColumns = new List<string>();
 
                 /* No safe physical name or no key column means nothing can be read from
@@ -1702,6 +2026,54 @@ namespace VASLogic.Models
                  + " ON (" + trlAlias + ".AD_Ref_List_ID=" + listAlias + ".AD_Ref_List_ID"
                  + " AND " + trlAlias + ".AD_Language=" + languageBind
                  + " AND " + trlAlias + ".IsActive='Y')";
+        }
+
+        /// <summary>
+        /// What to SELECT beside a <see cref="ListNameJoin"/>: the translated list name,
+        /// then the untranslated one, then the stored code as it stands.
+        ///
+        /// One place for the shape, because the code has to be CAST - see
+        /// <see cref="CodeAsText"/> - and getting that wrong throws rather than merely
+        /// looking odd.
+        /// </summary>
+        /// <param name="trlAlias">Alias of the translation row.</param>
+        /// <param name="listAlias">Alias of the AD_Ref_List row.</param>
+        /// <param name="codeExpr">Qualified column holding the stored code.</param>
+        /// <returns>Scalar expression yielding the readable name.</returns>
+        protected string ListNameExpr(string trlAlias, string listAlias, string codeExpr)
+        {
+            return "COALESCE(" + trlAlias + ".Name," + listAlias + ".Name,"
+                 + CodeAsText(codeExpr) + ",N'')";
+        }
+
+        /// <summary>
+        /// A stored CODE, in the character type the NAME columns beside it are held in.
+        ///
+        /// On ORACLE this cast is not optional. A dictionary NAME is NVARCHAR2, in the
+        /// national character set; a code column - DocStatus, DocBaseType, TenderType,
+        /// MovementType, PeriodStatus - is a plain VARCHAR2 in the database character
+        /// set. COALESCE requires its later arguments to be convertible to the FIRST
+        /// one's type, and Oracle refuses to mix the two character sets: it raises
+        /// ORA-12704 "character set mismatch" and the whole statement fails, so a check
+        /// reports an error rather than a coarser label. The same applies ACROSS a UNION,
+        /// which is why a branch with no list join casts its bare code column too - one
+        /// branch yielding NVARCHAR2 and its sibling VARCHAR2 will not unite.
+        ///
+        /// PostgreSQL has one text type and needs no cast, and NVARCHAR2 is not a type it
+        /// knows, so the cast is emitted for Oracle only. 100 characters is comfortably
+        /// above anything a reference code stores; the length only has to avoid
+        /// truncating.
+        /// Chronological development:
+        ///   VAI154      2026-08-26 Created - the same mismatch confirmed on VAS_196's
+        ///                          COALESCE(dbt.Name,pc.DocBaseType)
+        /// </summary>
+        /// <param name="codeExpr">Qualified column holding the stored code.</param>
+        /// <returns>The expression, cast where the backend requires it.</returns>
+        protected string CodeAsText(string codeExpr)
+        {
+            if (string.IsNullOrEmpty(codeExpr)) { return "N''"; }
+
+            return DB.IsOracle() ? "CAST(" + codeExpr + " AS NVARCHAR2(100))" : codeExpr;
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -2240,6 +2612,18 @@ namespace VASLogic.Models
             public string DocumentColumn { get; set; }
             public string ValueColumn { get; set; }
             public string ClientColumn { get; set; }
+
+            /// <summary>
+            /// Which document-type columns the table carries. A screen filter that tells
+            /// two windows over one table apart nearly always tests the document TYPE, so
+            /// these are what the window resolver joins C_DocType on - through
+            /// <see cref="DocTypeKeyExpr"/>, which prefers the TARGET type for the same
+            /// reason the document-type column does: it is set from the moment a document
+            /// is drafted, while C_DocType_ID is only filled in when it completes.
+            /// </summary>
+            public bool HasDocType { get; set; }
+            public bool HasDocTypeTarget { get; set; }
+
             public List<string> IdentifierColumns { get; set; }
         }
     }

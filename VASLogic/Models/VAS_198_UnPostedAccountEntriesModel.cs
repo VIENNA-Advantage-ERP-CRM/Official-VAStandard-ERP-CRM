@@ -41,12 +41,17 @@ namespace VASLogic.Models
     ///               column out of a user-facing card, and it is the same test VAS_195
     ///               applies, so the two agree on what counts as a document.
     ///
-    ///               A tab DISPLAYING the Posted field is preferred but is no longer
-    ///               required. It used to be, and it was too strict: a table whose
-    ///               windows declare no field over Posted returned no screen, and the
-    ///               table was dropped from the card in silence - all of its unposted
-    ///               documents with it, while VAS_195 listed every one. Such a table now
-    ///               falls back to its primary window and contributes one unsplit row.
+    ///               A SCREEN is any menu-reachable window whose HEADER tab is over the
+    ///               table. It is deliberately NOT "a window that DISPLAYS the Posted
+    ///               field": which columns a window chooses to show has nothing to do
+    ///               with which records it holds, and requiring that field silently
+    ///               under-split every table whose windows do not all declare one.
+    ///               M_Inventory is the case that shows it - Inventory Count and Internal
+    ///               Use Inventory are one table separated by IsInternalUse, and losing
+    ///               either screen left its documents reported under, and zoomed into, a
+    ///               window whose own filter excludes them. A table with no displayed
+    ///               header tab at all still falls back to its primary window and
+    ///               contributes one unsplit row rather than vanishing from the card.
     ///
     ///               A row of the card is a SCREEN, not a table: one table displayed
     ///               on several windows is several rows, so C_Invoice appears as AP
@@ -64,24 +69,42 @@ namespace VASLogic.Models
     ///               its columns with the TABLE name, every generated statement aliases
     ///               the source table to its own name rather than to something short.
     ///
-    ///               Where those clauses cannot separate the windows - a clause with
-    ///               @context@ variables this widget cannot resolve, a clause reaching
-    ///               for a table this statement does not join, or none at all - the
-    ///               table collapses back to ONE row covering all its records. One
-    ///               honest row beats several rows each listing the same documents.
+    ///               Those clauses overwhelmingly separate windows by DOCUMENT TYPE
+    ///               rather than by a flag on the document - Delivery Order from Material
+    ///               Receipt, Blanket Sales Order from Sales Order - so the statement
+    ///               JOINS C_DocType under its own name whenever a screen's filter names
+    ///               it, and a clause's own subquery aliases resolve themselves. Neither
+    ///               used to be accepted, and the windows they describe were therefore
+    ///               inseparable and collapsed into one another's rows.
+    ///
+    ///               Where a clause still cannot separate the windows - @context@
+    ///               variables this widget cannot resolve, a table beyond C_DocType that
+    ///               this statement does not join, or no clause at all - the table
+    ///               collapses back to ONE row covering all its records. One honest row
+    ///               beats several rows each listing the same documents.
     ///
     ///               THE SPLIT IS EXHAUSTIVE. Whatever the screens claim, every record
-    ///               of the table lands in exactly one row of the card, because the
+    ///               of the table lands in at least one row of the card, because the
     ///               filtered screens are always accompanied by a row carrying their
-    ///               complement. Three separate ways a record used to escape that
+    ///               complement. Four separate ways a record used to escape that
     ///               guarantee are now closed: a table all of whose screens are filtered
     ///               had no window to hang the complement on and so had no complement
-    ///               row at all; the complement was written as NOT(a) AND NOT(b), which
-    ///               is NULL - and therefore not true - wherever a sibling clause tests
-    ///               a NULLable column; and a clause naming a table outside the FROM
-    ///               made the whole query throw, whereupon that screen was logged and
-    ///               skipped. Each one silently under-reported unposted documents that
-    ///               VAS_195, which applies no tab filter at all, went on listing.
+    ///               row at all - and, worse, threw the whole split away rather than let
+    ///               two rows share a window; the complement was written as NOT(a) AND
+    ///               NOT(b), which is NULL - and therefore not true - wherever a sibling
+    ///               clause tests a NULLable column; and a clause naming a table outside
+    ///               the FROM made the whole query throw, whereupon that screen was
+    ///               logged and skipped. Each one silently under-reported unposted
+    ///               documents that VAS_195, which applies no tab filter at all, went on
+    ///               listing.
+    ///
+    ///               AND IT IS DISJOINT. Two windows over one table can overlap - a
+    ///               Blanket Sales Order is a sales order, so it satisfies the Sales
+    ///               Order tab filter as well as its own - and a record matching both
+    ///               used to be counted, and valued, under each. Screens are therefore
+    ///               ordered NARROWEST FIRST and each one claims only what no narrower
+    ///               sibling already has, so a blanket order is reported under Blanket
+    ///               Sales Order alone: the window it actually opens in.
     ///
     ///               Zoom therefore needs no rule at all: a row IS a screen, so it
     ///               opens that screen.
@@ -139,6 +162,20 @@ namespace VASLogic.Models
     ///   VAI145      2026-08-25 Screen split made exhaustive, and a table with no
     ///                          Posted-bearing tab falls back to its primary window
     ///                          instead of vanishing - both to agree with VAS_195
+    ///   VAI154      2026-08-26 Screens are now every menu-reachable header window over
+    ///                          the table, not only the ones displaying Posted; the
+    ///                          catch-all row may share a window with a filtered screen
+    ///                          instead of collapsing the split; and overlapping screens
+    ///                          are made disjoint narrowest-first. Together these are
+    ///                          what put a document under its OWN screen - Inventory
+    ///                          Count vs Internal Use Inventory, Sales Order vs Blanket
+    ///                          Sales Order - and therefore what makes Zoom open the
+    ///                          window that actually holds it
+    ///   VAI154      2026-08-26 A screen filter may name C_DocType (joined) or its own
+    ///                          subquery aliases - which is how most windows over one
+    ///                          table are actually told apart; and a colliding row is
+    ///                          never qualified with its tab name, so no more
+    ///                          "Delivery Order · Delivery Order" or "Sales Order · Order"
     /// </summary>
     public class VAS_198_UnPostedAccountEntriesModel
     {
@@ -150,6 +187,11 @@ namespace VASLogic.Models
 
         /* C_PeriodControl.PeriodStatus stored code for an open control row. */
         private const string PERIODSTATUS_Open = "O";
+
+        /* The one AD_Message this class needs: the word that qualifies a catch-all row
+           whose name would otherwise repeat a real screen's. Seeded through System
+           Messages; unseeded it renders as readable English - see OtherRecordsLabel. */
+        private const string MESSAGE_OTHERRECORDS = "VAS_198_OtherRecords";
 
         /* The dictionary column that marks a table as an accounting source, and the
            document states worth chasing. A document that is still drafted or in
@@ -270,6 +312,24 @@ namespace VASLogic.Models
         private const string COLUMN_STATEMENTDATE = "StatementDate";
         private const string COLUMN_DOCSTATUS = "DocStatus";
         private const string COLUMN_DOCTYPE = "C_DocType_ID";
+
+        /* The ONE other table a screen filter may reach for, because the statement joins
+           it: a document's type is what separates most windows over one table - Delivery
+           Order from Material Receipt, Blanket Sales Order from Sales Order - and those
+           tab filters name C_DocType directly. Joined under its own name so a clause
+           reading "C_DocType.DocBaseType='MMS'" resolves exactly as it does when the
+           framework opens that window. */
+        private const string TABLE_DOCTYPE = "C_DocType";
+
+        /* Words that can follow a table name in a FROM / JOIN without being its alias -
+           the stop list <see cref="CollectClauseSources"/> reads a clause's own sources
+           with. */
+        private static readonly List<string> NotAnAlias = new List<string>
+        {
+            "WHERE", "ON", "AND", "OR", "NOT", "JOIN", "INNER", "LEFT", "RIGHT", "FULL",
+            "OUTER", "CROSS", "GROUP", "ORDER", "HAVING", "UNION", "SELECT", "AS", "FROM",
+            "IN", "EXISTS", "LIMIT", "FETCH", "OFFSET", "START", "CONNECT"
+        };
         private const string COLUMN_CURRENCY = "C_Currency_ID";
         private const string COLUMN_CONVERSIONTYPE = "C_ConversionType_ID";
 
@@ -485,21 +545,21 @@ namespace VASLogic.Models
                 List<ScreenItem> screens;
                 if (!screensByTable.TryGetValue(item.AD_Table_ID, out screens) || screens.Count == 0)
                 {
-                    /* No tab DISPLAYS the Posted field - the column is there, the
-                       posting is real, but no window declares a field over it, or the
-                       only ones that do sit on tabs marked not displayed.
+                    /* No DISPLAYED header tab - the column is there, the posting is
+                       real, but every window over the table hides its header tab, so
+                       the screen query returned nothing.
 
                        Dropping the table here is what used to happen, and it cost the
                        card every record of that table while the VAS_195 checklist -
                        which asks only for a menu-reachable window over the TABLE -
                        listed all of them. A screen is how this card LABELS a row, not
-                       what makes a document unposted, so a table with no Posted-bearing
-                       screen falls back to its primary window and contributes one
-                       unsplit row rather than nothing at all. */
+                       what makes a document unposted, so a table with no screen of its
+                       own falls back to its primary window and contributes one unsplit
+                       row rather than nothing at all. */
                     if (primary == null) { continue; }
 
-                    Log.Log(Level.INFO, "VAS_198: " + item.TableName + " has a Posted column but no tab"
-                        + " displaying it; falling back to its primary window as a single unsplit row");
+                    Log.Log(Level.INFO, "VAS_198: " + item.TableName + " has a Posted column but no"
+                        + " displayed header tab; falling back to its primary window as a single unsplit row");
 
                     screens = new List<ScreenItem>();
                     screens.Add(primary);
@@ -524,7 +584,7 @@ namespace VASLogic.Models
                 return byTableId != 0 ? byTableId : a.AD_Window_ID.CompareTo(b.AD_Window_ID);
             });
 
-            DisambiguateDisplayNames(sources);
+            DisambiguateDisplayNames(ctx, sources);
 
             return sources;
         }
@@ -879,6 +939,33 @@ namespace VASLogic.Models
             return sb.ToString();
         }
 
+        /// <summary>
+        /// A stored CODE, in the character type the NAME columns beside it are held in.
+        ///
+        /// On ORACLE this cast is not optional. A dictionary NAME or symbol is NVARCHAR2,
+        /// in the national character set; a code column - ISO_Code, DocBaseType,
+        /// DocStatus - is a plain CHAR / VARCHAR2 in the database character set. COALESCE
+        /// and CASE both require their arms to be convertible to the first one's type, and
+        /// Oracle refuses to mix the two character sets: it raises ORA-12704 "character
+        /// set mismatch" and the whole statement fails, so the widget shows a load error
+        /// rather than a coarser label.
+        ///
+        /// PostgreSQL has one text type and needs no cast, and NVARCHAR2 is not a type it
+        /// knows, so the cast is emitted for Oracle only. 100 characters is comfortably
+        /// above anything a code column stores; the length only has to avoid truncating.
+        /// Chronological development:
+        ///   VAI154      2026-08-26 Created - the same mismatch confirmed on VAS_196's
+        ///                          COALESCE(dbt.Name,pc.DocBaseType)
+        /// </summary>
+        /// <param name="codeExpr">Qualified column holding the stored code.</param>
+        /// <returns>The expression, cast where the backend requires it.</returns>
+        private string CodeAsText(string codeExpr)
+        {
+            if (string.IsNullOrEmpty(codeExpr)) { return "N''"; }
+
+            return DB.IsOracle() ? "CAST(" + codeExpr + " AS NVARCHAR2(100))" : codeExpr;
+        }
+
         /// <summary>Case-insensitive membership test over a confirmed column list.</summary>
         /// <param name="columns">Column names the dictionary reported.</param>
         /// <param name="name">Column the strategy needs.</param>
@@ -957,12 +1044,30 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Every screen each discovered table's Posted field is displayed on - all of
-        /// them, not one: the SCREEN is what a card row stands for, so a table shown
-        /// on four windows is four candidate rows.
+        /// Every screen each discovered table can be OPENED on - all of them, not one:
+        /// the SCREEN is what a card row stands for, so a table reachable through four
+        /// windows is four candidate rows.
         ///
-        /// The tab's own WhereClause comes back with each: it is what makes two
-        /// windows over one table different lists rather than the same list twice.
+        /// A screen is a menu-reachable, active window whose HEADER tab (TabLevel 0) is
+        /// over the table - the window that opens the record itself rather than showing
+        /// it as somebody else's child tab. That is the same test <see cref="ReadPrimaryScreens"/>
+        /// and VAS_195 apply, and it is deliberately NOT "a tab that declares a field
+        /// over Posted".
+        ///
+        /// Requiring the Posted field used to decide the screen set, and it silently
+        /// under-split every table whose windows do not all put Posted on their header
+        /// tab. M_Inventory is the case that shows it: Inventory Count and Internal Use
+        /// Inventory are two windows separated by IsInternalUse, and if only one of them
+        /// declares the field, the other's documents were reported under - and zoomed
+        /// into - a window whose own filter excludes them. Which columns a window chooses
+        /// to DISPLAY has nothing to do with which records it holds; the tab's
+        /// WhereClause has, so that is what the screen set is built from.
+        ///
+        /// The tab's own WhereClause comes back with each: it is what makes two windows
+        /// over one table different lists rather than the same list twice.
+        /// Chronological development:
+        ///   VAI154      2026-08-26 Screen set widened from Posted-bearing tabs to every
+        ///                          menu-reachable header window over the table
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <returns>Screens grouped by AD_Table_ID, each list in a stable order.</returns>
@@ -986,30 +1091,36 @@ namespace VASLogic.Models
                        w.AD_Window_ID AS AD_Window_ID,
                        COALESCE(wtrl.Name,w.DisplayName,w.Name,N'') AS Window_Name
                 FROM AD_Table t
-                INNER JOIN AD_Column c ON (c.AD_Table_ID=t.AD_Table_ID)
-                INNER JOIN AD_Field f ON (f.AD_Column_ID=c.AD_Column_ID)
-                INNER JOIN AD_Tab tab ON (tab.AD_Tab_ID=f.AD_Tab_ID)
+                INNER JOIN AD_Tab tab ON (tab.AD_Table_ID=t.AD_Table_ID)
                 INNER JOIN AD_Window w ON (w.AD_Window_ID=tab.AD_Window_ID)
                 INNER JOIN AD_Menu m ON (m.AD_Window_ID=w.AD_Window_ID)
                 LEFT OUTER JOIN AD_Window_Trl wtrl ON (wtrl.AD_Window_ID=w.AD_Window_ID AND wtrl.AD_Language=@AD_Language AND wtrl.IsActive='Y')
                 LEFT OUTER JOIN AD_Tab_Trl tabtrl ON (tabtrl.AD_Tab_ID=tab.AD_Tab_ID AND tabtrl.AD_Language=@AD_Language AND tabtrl.IsActive='Y')
-                WHERE t.IsActive='Y' 
+                WHERE t.IsActive='Y'
                   AND m.IsActive = 'Y'
-                  AND c.IsActive='Y'
-                  AND c.ColumnName='" + COLUMN_POSTED + @"'
-                  AND f.IsActive='Y'
-                  /*AND f.IsDisplayed='Y'*/
                   AND COALESCE(t.IsView,'N')='N'
+                  AND EXISTS(SELECT 1 FROM AD_Column pc WHERE pc.AD_Table_ID=t.AD_Table_ID AND pc.ColumnName='" + COLUMN_POSTED + @"' AND pc.IsActive='Y')
                   AND tab.IsActive='Y'
                   AND tab.IsDisplayed='Y'
+                  /* Header tabs only. COALESCE because TabLevel is NULLable, and a bare
+                     comparison would be NULL - never true - on every row that leaves it
+                     unset, which is most of them. */
+                  AND COALESCE(tab.TabLevel,0)=0
                   AND w.IsActive='Y'";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "t", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             /* A total order, so the same installation always produces the same rows in
                the same sequence - the first tab of a window is the one whose clause
-               represents that window. */
-            sql += " ORDER BY t.AD_Table_ID,Window_Name,tab.SeqNo,w.AD_Window_ID,tab.AD_Tab_ID";
+               represents that window.
+
+               Ordered by the dictionary's own sequence, NOT by window name. The first
+               screen of a table is the one a reader would call its main window, and the
+               catch-all row is hung on it (see PickComplementCarrier); ordering by name
+               made that an alphabetical accident instead - which is how every plain
+               sales order came to be reported under, and zoomed into, "Blanket Sales
+               Order" merely because B sorts before S. */
+            sql += " ORDER BY t.AD_Table_ID,tab.SeqNo,w.AD_Window_ID,tab.AD_Tab_ID";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
@@ -1146,8 +1257,8 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Turns one discovered table into the card rows it deserves: one per SCREEN
-        /// its Posted field appears on.
+        /// Turns one discovered table into the card rows it deserves: one per SCREEN it
+        /// can be opened on.
         ///
         /// Two windows over one table are only different rows if their records can be
         /// told apart, and what tells them apart is the tab's own WhereClause - the
@@ -1161,17 +1272,21 @@ namespace VASLogic.Models
         /// to ONE row covering all of its records. That is the deliberate choice: one
         /// honest row beats several rows each listing the same documents.
         ///
-        /// Whatever the split, it is EXHAUSTIVE. Every record of the table lands in
-        /// exactly one row of the card, because the filtered screens are always
-        /// accompanied by a row carrying their complement - see
-        /// <see cref="ComplementClause"/>. Without that guarantee a document simply
-        /// disappears from the card while remaining unposted, which is the one failure
-        /// this widget cannot have.
+        /// Whatever the split, it is EXHAUSTIVE and DISJOINT - every record of the table
+        /// lands in exactly one row of the card. Exhaustive because the filtered screens
+        /// are always accompanied by a row carrying their complement (see
+        /// <see cref="ComplementClause"/>); without that a document simply disappears
+        /// from the card while remaining unposted, which is the one failure this widget
+        /// cannot have. Disjoint because screens whose filters overlap - a Blanket Sales
+        /// Order satisfies the Sales Order filter too - are taken narrowest first, each
+        /// claiming only what no narrower sibling already has (see
+        /// <see cref="ExclusiveClause"/>); without that the same document is counted, and
+        /// valued, under two screens and opens on whichever the reader happened to click.
         /// </summary>
         /// <param name="item">Discovered table.</param>
-        /// <param name="screens">Every screen its Posted field is displayed on.</param>
-        /// <param name="primary">The table's primary window, to carry the complement
-        /// row when no screen of its own can; may be null.</param>
+        /// <param name="screens">Every screen the table can be opened on.</param>
+        /// <param name="primary">The table's primary window - preferred to carry the
+        /// catch-all row; may be null.</param>
         /// <returns>One or more sources (never null; empty when there is no screen).</returns>
         private List<SourceItem> SplitByScreen(SourceItem item, List<ScreenItem> screens, ScreenItem primary)
         {
@@ -1186,7 +1301,7 @@ namespace VASLogic.Models
                 string clause = screens[i].WhereClause;
 
                 if (clause != null && clause.Trim().Length > 0
-                    && IsUsableWhereClause(clause) && ReferencesOnlyTable(clause, item.TableName))
+                    && IsUsableWhereClause(clause) && ReferencesResolvableTables(clause, item))
                 {
                     separable.Add(screens[i]);
                 }
@@ -1196,18 +1311,57 @@ namespace VASLogic.Models
                 }
             }
 
-            /* Nothing separable: one row covering every record of the table. */
+            /* Nothing separable: one row covering every record of the table, hung on the
+               table's main window rather than on whichever screen happened to come first. */
             if (separable.Count == 0)
             {
-                SourceItem single = CloneForScreen(item, screens[0]);
+                SourceItem single = CloneForScreen(item, PickCatchAllScreen(unfiltered, primary, screens));
                 single.WhereClause = "";
                 result.Add(single);
                 return result;
             }
 
+            /* Narrowest screen first, so an overlapping pair is claimed by the screen
+               that describes it best - see CompareSpecificity. */
+            separable.Sort(CompareSpecificity);
+
+            /* Each screen claims what its own filter matches AND what no NARROWER screen
+               has already claimed, which is what makes the rows DISJOINT.
+
+               Without that, overlapping screens double count: Blanket Sales Order is a
+               sales order whose document type is a blanket, so it satisfies the Sales
+               Order tab filter too, and a blanket order was reported - and valued - under
+               both rows. Ordering by specificity and subtracting the earlier claims gives
+               it to Blanket Sales Order alone, which is also the window it opens in. */
+            List<ScreenItem> claimed = new List<ScreenItem>();
+
             for (int i = 0; i < separable.Count; i++)
             {
-                result.Add(CloneForScreen(item, separable[i]));
+                SourceItem row = CloneForScreen(item, separable[i]);
+
+                if (claimed.Count > 0)
+                {
+                    string exclusive = ExclusiveClause(item, separable[i], claimed);
+
+                    /* A composition too long to be pasted in leaves this row overlapping
+                       its narrower siblings. Double counting is not a wrong screen, so
+                       the row still stands on its own filter - the miss is logged rather
+                       than costing the table its split. */
+                    if (exclusive.Length > 0 && exclusive.Length <= WHERECLAUSE_COMPOSED_MAX)
+                    {
+                        row.WhereClause = exclusive;
+                        row.IsComposedWhereClause = true;
+                    }
+                    else
+                    {
+                        Log.Log(Level.WARNING, "VAS_198: " + item.TableName + " screen '"
+                            + separable[i].WindowName + "' could not be made exclusive of its"
+                            + " narrower siblings; a record matching both is counted twice");
+                    }
+                }
+
+                claimed.Add(separable[i]);
+                result.Add(row);
             }
 
             /* Whatever the filtered screens did not claim still has to appear somewhere,
@@ -1219,42 +1373,21 @@ namespace VASLogic.Models
                matched none of the surviving rows and appeared nowhere on the card. Its
                row is therefore the COMPLEMENT of its filtered siblings: everything the
                other screens did not claim. That keeps the split exhaustive without
-               double counting, which a plain unfiltered row would not.
+               double counting, which a plain unfiltered row would not. */
+            ScreenItem carrier = PickCatchAllScreen(unfiltered, primary, screens);
+            string complement = ComplementClause(item, separable);
 
-               A window with no filter of its own is the natural place to hang it, and
-               those are unique by window. When EVERY screen of the table carries a filter
-               there is no such window - and that case used to produce no complement row
-               at all, so every record matching none of the tab filters was invisible on
-               this card while the VAS_195 checklist, which applies no tab filter, counted
-               all of them. The table's primary window stands in.
-
-               That stand-in comes from a different query, though, and may well BE one of
-               the filtered screens. Two card rows sharing a window id cannot be told
-               apart by a drill-down request, which identifies a row by table and window
-               alone, so a colliding carrier is refused and the table collapses to one row
-               below. */
-            ScreenItem carrier = unfiltered.Count > 0 ? unfiltered[0] : primary;
-            if (carrier != null && unfiltered.Count == 0 && ClaimsWindow(separable, carrier.AD_Window_ID))
-            {
-                carrier = null;
-            }
-
-            string complement = carrier != null ? ComplementClause(item, separable) : "";
-
-            /* Two ways the complement can fail to exist: no window to hang it on, or a
-               composition too long to be one. Either way the split is no longer known to
-               be exhaustive, and a split that might lose a record is worse than no split
-               at all - so the table collapses to one honest row over all of it. Coarser
-               than intended, never short of documents. */
-            if (carrier == null || complement.Length == 0
-                || complement.Length > WHERECLAUSE_COMPOSED_MAX)
+            /* The complement could not be composed at all, or is too long to paste in.
+               The split is then no longer known to be exhaustive, and a split that might
+               lose a record is worse than no split at all - so the table collapses to one
+               honest row over all of it. Coarser than intended, never short of documents. */
+            if (complement.Length == 0 || complement.Length > WHERECLAUSE_COMPOSED_MAX)
             {
                 Log.Log(Level.WARNING, "VAS_198: " + item.TableName + " has " + separable.Count
-                    + " filtered screens whose complement cannot be expressed"
-                    + (carrier == null ? " (no window to carry it)" : " (composed filter too long)")
-                    + "; reporting the whole table as one row");
+                    + " filtered screens whose complement cannot be expressed (composed filter"
+                    + " too long); reporting the whole table as one row");
 
-                SourceItem whole = CloneForScreen(item, carrier != null ? carrier : screens[0]);
+                SourceItem whole = CloneForScreen(item, carrier);
                 whole.WhereClause = "";
 
                 result.Clear();
@@ -1269,30 +1402,104 @@ namespace VASLogic.Models
                allowed to be and it qualifies its own inner alias, so the raw-clause
                guards must not be applied to it a second time. */
             rest.IsComposedWhereClause = true;
+
+            /* The other half of this row's identity. The carrier may well BE one of the
+               filtered screens - when every window of the table carries a filter there is
+               no unfiltered one to hang the leftovers on - and two rows sharing a window
+               id used to be indistinguishable to a drill-down request, so the whole split
+               was thrown away instead. It is the flag, not the window, that tells them
+               apart now; the split survives, and each filtered screen keeps its own name
+               and its own zoom target. */
+            rest.IsComplement = true;
             result.Add(rest);
 
             if (unfiltered.Count > 1)
             {
                 Log.Log(Level.WARNING, "VAS_198: " + item.TableName + " has "
                     + unfiltered.Count + " screens with no usable filter; '"
-                    + unfiltered[0].WindowName + "' represents them all as the catch-all row");
+                    + carrier.WindowName + "' represents them all as the catch-all row");
             }
 
             return result;
         }
 
-        /// <summary>Whether any of these screens already occupies a given window.</summary>
-        /// <param name="screens">Screens already holding a row of the card.</param>
-        /// <param name="windowId">Window a further row would want to use.</param>
-        /// <returns>true when the window is taken.</returns>
-        private bool ClaimsWindow(List<ScreenItem> screens, int windowId)
+        /// <summary>
+        /// Which screen carries the records no filtered screen claims - the table's main
+        /// window, as a reader would name it.
+        ///
+        /// The table's PRIMARY window is that window by definition, so it is preferred
+        /// whenever it holds no filter of its own. Failing that, the first screen with no
+        /// filter - the screen list is in the dictionary's own tab / window sequence, so
+        /// "first" is the lowest-sequenced window over the table and not an alphabetical
+        /// accident. Failing even that, the primary window itself: it then shares its
+        /// window with a filtered screen, which the complement flag tells apart.
+        /// </summary>
+        /// <param name="unfiltered">Screens carrying no usable filter, in dictionary order.</param>
+        /// <param name="primary">The table's primary window; may be null.</param>
+        /// <param name="screens">Every screen of the table, in dictionary order.</param>
+        /// <returns>The screen to hang the catch-all row on (never null).</returns>
+        private ScreenItem PickCatchAllScreen(List<ScreenItem> unfiltered, ScreenItem primary,
+            List<ScreenItem> screens)
         {
-            for (int i = 0; i < screens.Count; i++)
+            if (primary != null && unfiltered != null)
             {
-                if (screens[i].AD_Window_ID == windowId) { return true; }
+                for (int i = 0; i < unfiltered.Count; i++)
+                {
+                    if (unfiltered[i].AD_Window_ID == primary.AD_Window_ID) { return unfiltered[i]; }
+                }
             }
 
-            return false;
+            if (unfiltered != null && unfiltered.Count > 0) { return unfiltered[0]; }
+            if (primary != null) { return primary; }
+
+            return screens[0];
+        }
+
+        /// <summary>
+        /// Orders screens NARROWEST FIRST, so that where two screen filters overlap the
+        /// record is claimed by the one that describes it most closely.
+        ///
+        /// Specificity is taken to be the length of the resolved filter, which is a
+        /// heuristic and is meant as one: SQL gives no way to ask whether one predicate
+        /// implies another, and the dictionary declares no precedence between two windows
+        /// over one table. It holds for the shape that actually occurs - a specialised
+        /// window repeats its general sibling's predicate and adds to it, as Blanket Sales
+        /// Order does to Sales Order - and where it does not hold, the split is still a
+        /// partition, just one that assigns a shared record to the other screen.
+        /// The window id breaks ties so the same installation always splits the same way.
+        /// </summary>
+        /// <param name="a">One screen.</param>
+        /// <param name="b">The screen to compare it with.</param>
+        /// <returns>Negative when a is the narrower screen.</returns>
+        private int CompareSpecificity(ScreenItem a, ScreenItem b)
+        {
+            int byLength = b.WhereClause.Length.CompareTo(a.WhereClause.Length);
+            if (byLength != 0) { return byLength; }
+
+            return a.AD_Window_ID.CompareTo(b.AD_Window_ID);
+        }
+
+        /// <summary>
+        /// One screen's own filter, minus everything a narrower screen has already
+        /// claimed - the predicate that makes the card's rows disjoint.
+        ///
+        /// The subtraction is a NOT EXISTS keyed on the table's own primary key for the
+        /// same three-valued-logic reason <see cref="ComplementClause"/> is: a plain
+        /// NOT (sibling) is NULL - and therefore not true - wherever the sibling tests a
+        /// NULLable column, which would drop the record from this row as well as from the
+        /// sibling's. EXISTS is two-valued, so a record the sibling does not genuinely
+        /// claim stays here.
+        /// </summary>
+        /// <param name="item">Discovered table, supplying the table and key names.</param>
+        /// <param name="screen">The screen this row stands for.</param>
+        /// <param name="claimed">Narrower screens already holding a row.</param>
+        /// <returns>Predicate fragment, or "" when it cannot be composed.</returns>
+        private string ExclusiveClause(SourceItem item, ScreenItem screen, List<ScreenItem> claimed)
+        {
+            string complement = ComplementClause(item, claimed);
+            if (complement.Length == 0) { return ""; }
+
+            return "(" + screen.WhereClause + ") AND " + complement;
         }
 
         /// <summary>
@@ -1347,35 +1554,59 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Whether a resolved WhereClause reads ONLY the source table's own columns.
+        /// Whether every table a resolved WhereClause qualifies a column with is one
+        /// THIS statement can resolve.
         ///
         /// A tab filter is executed by the framework against a statement that joins
         /// whatever that window joins, so a perfectly valid clause can say
-        /// "C_DocType.DocBaseType='ARC'" - and this widget's statement selects from the
-        /// transaction table alone. Pasting such a clause in does not return the wrong
-        /// rows, it throws; ReadSourceTotal then logs the failure and returns null, and
-        /// GetPeriodData skips that source entirely. The result is a screen's worth of
-        /// unposted documents missing from the card with nothing on screen to say so,
-        /// while VAS_195 - which applies no tab filter - reports every one of them.
+        /// "C_DocType.DocBaseType='MMS'". Pasting a clause naming a table the statement
+        /// does not have does not return the wrong rows, it throws; ReadSourceTotal then
+        /// logs the failure and returns null, and GetPeriodData skips that source
+        /// entirely. The result is a screen's worth of unposted documents missing from
+        /// the card with nothing on screen to say so, while VAS_195 - which applies no
+        /// tab filter - reports every one of them.
         ///
-        /// So a clause reaching for another table is refused here instead, and the
-        /// screen degrades to an unfiltered one. That is a coarser split, never a lost
-        /// record: an unfiltered screen either becomes the complement row or collapses
-        /// the table to a single row, both of which still cover everything.
+        /// Three kinds of qualifier resolve, and the third is the one that matters:
         ///
-        /// The scan is deliberately literal-aware - a quoted string may contain a dot
-        /// and means nothing here - and ignores a dot that is part of a number. A
-        /// qualifier is accepted when it names the source table itself; a subquery that
-        /// brings its own FROM and qualifies nothing is accepted too, since it resolves
-        /// on its own.
+        ///   the source table   aliased to its own name, which is why
+        ///                      <see cref="SourceAlias"/> does not shorten it.
+        ///   the clause's own   a subquery that brings its own FROM resolves whatever it
+        ///                      declares, table name or alias alike - "EXISTS(SELECT 1
+        ///                      FROM C_DocType dt WHERE dt.DocBaseType=...)" is
+        ///                      self-contained and was being refused for the alias it
+        ///                      declares itself.
+        ///   C_DocType          JOINED by every query that needs it (see
+        ///                      <see cref="NeedsDocTypeJoin"/>). This is what actually
+        ///                      separates most windows over one table: Delivery Order
+        ///                      from Material Receipt, Blanket Sales Order from Sales
+        ///                      Order - the document TYPE, not a flag on the document.
+        ///                      Refusing it left those windows inseparable, which is why
+        ///                      they collapsed into one another's rows. A source whose
+        ///                      table carries no C_DocType_ID column has nothing to join
+        ///                      on, so for it the clause is still refused.
+        ///
+        /// Anything else is refused, and the screen degrades to an unfiltered one. That
+        /// is a coarser split, never a lost record: an unfiltered screen either becomes
+        /// the catch-all row or collapses the table to a single row, both of which still
+        /// cover everything.
+        ///
+        /// The scan is deliberately literal-aware - a quoted string may contain a dot and
+        /// means nothing here - and ignores a dot that is part of a number.
+        /// Chronological development:
+        ///   VAI154      2026-08-26 C_DocType and the clause's own subquery aliases
+        ///                          admitted; was source table only
         /// </summary>
         /// <param name="clause">Resolved WhereClause.</param>
-        /// <param name="tableName">The only table this statement can resolve.</param>
-        /// <returns>true when every qualified reference names the source table.</returns>
-        private bool ReferencesOnlyTable(string clause, string tableName)
+        /// <param name="item">The source the clause would filter - supplies the table
+        /// name and whether a C_DocType join is possible at all.</param>
+        /// <returns>true when every qualified reference resolves.</returns>
+        private bool ReferencesResolvableTables(string clause, SourceItem item)
         {
             if (string.IsNullOrEmpty(clause)) { return false; }
-            if (string.IsNullOrEmpty(tableName)) { return false; }
+            if (item == null || string.IsNullOrEmpty(item.TableName)) { return false; }
+
+            List<string> declared = CollectClauseSources(clause);
+            bool canJoinDocType = IsSafeIdentifier(item.DocTypeColumn);
 
             bool inLiteral = false;
 
@@ -1404,10 +1635,73 @@ namespace VASLogic.Models
                 char first = qualifier[0];
                 if (!((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z') || first == '_')) { continue; }
 
-                if (!qualifier.Equals(tableName, StringComparison.OrdinalIgnoreCase)) { return false; }
+                if (qualifier.Equals(item.TableName, StringComparison.OrdinalIgnoreCase)) { continue; }
+                if (canJoinDocType && qualifier.Equals(TABLE_DOCTYPE, StringComparison.OrdinalIgnoreCase)) { continue; }
+                if (HasColumn(declared, qualifier)) { continue; }
+
+                return false;
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// The table names and aliases a clause introduces for ITSELF - everything that
+        /// follows a FROM or a JOIN inside it, plus the alias declared after each.
+        ///
+        /// A subquery resolves its own qualifiers wherever it appears, so a clause built
+        /// as "EXISTS(SELECT 1 FROM C_DocType dt WHERE dt.C_DocType_ID=...)" is complete
+        /// as it stands and needs nothing from the statement around it. Reading those
+        /// names out is what lets <see cref="ReferencesResolvableTables"/> accept the
+        /// clause instead of refusing it for the alias it declares itself.
+        ///
+        /// The scan is a tokeniser, not a parser: it skips quoted text and takes the one
+        /// or two identifiers after each FROM / JOIN keyword, stopping at a word that is
+        /// plainly a keyword rather than an alias. Over-collecting is harmless here - the
+        /// result only ever WIDENS what a qualifier may name, and every clause has
+        /// already been through <see cref="IsSafeClauseText"/>.
+        /// </summary>
+        /// <param name="clause">Resolved WhereClause.</param>
+        /// <returns>Identifiers the clause resolves on its own (never null).</returns>
+        private List<string> CollectClauseSources(string clause)
+        {
+            List<string> declared = new List<string>();
+            if (string.IsNullOrEmpty(clause)) { return declared; }
+
+            bool inLiteral = false;
+            int pending = 0;                     // identifiers still expected after FROM / JOIN
+
+            int i = 0;
+            while (i < clause.Length)
+            {
+                char ch = clause[i];
+
+                if (ch == '\'') { inLiteral = !inLiteral; i++; continue; }
+
+                if (inLiteral || !IsIdentifierChar(ch)) { i++; continue; }
+
+                int start = i;
+                while (i < clause.Length && IsIdentifierChar(clause[i])) { i++; }
+                string word = clause.Substring(start, i - start);
+
+                if (word.Equals("FROM", StringComparison.OrdinalIgnoreCase)
+                    || word.Equals("JOIN", StringComparison.OrdinalIgnoreCase))
+                {
+                    pending = 2;                 // the table, then possibly its alias
+                    continue;
+                }
+
+                if (pending == 0) { continue; }
+
+                /* A keyword ends the run: what follows FROM is a table and at most one
+                   alias, and "FROM C_DocType WHERE" declares no alias at all. */
+                if (HasColumn(NotAnAlias, word)) { pending = 0; continue; }
+
+                if (!HasColumn(declared, word)) { declared.Add(word); }
+                pending--;
+            }
+
+            return declared;
         }
 
         /// <summary>Whether a character may appear inside an unquoted SQL identifier.</summary>
@@ -1574,7 +1868,47 @@ namespace VASLogic.Models
             }
 
             return IsUsableWhereClause(source.WhereClause)
-                && ReferencesOnlyTable(source.WhereClause, source.TableName);
+                && ReferencesResolvableTables(source.WhereClause, source);
+        }
+
+        /// <summary>
+        /// Whether this source's statement has to join C_DocType - because the filter it
+        /// is about to run qualifies a column with it.
+        ///
+        /// Read off the FINAL clause rather than remembered from the tab, so a composed
+        /// one counts too: a catch-all row negates its siblings' filters, and if one of
+        /// those named C_DocType then so does the negation.
+        ///
+        /// The clause's own subqueries are the one thing that does NOT need the join -
+        /// they declare their own source - but joining anyway costs a single indexed
+        /// lookup per row and keeps this a text test rather than a parse.
+        /// </summary>
+        /// <param name="source">Discovered, already validated source.</param>
+        /// <returns>true when the statement must join C_DocType under its own name.</returns>
+        private bool NeedsDocTypeJoin(SourceItem source)
+        {
+            if (!IsUsableClauseFor(source)) { return false; }
+            if (!IsSafeIdentifier(source.DocTypeColumn)) { return false; }
+
+            return source.WhereClause.IndexOf(TABLE_DOCTYPE + ".", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>
+        /// The join that makes "C_DocType.DocBaseType='MMS'" resolve, aliased to the
+        /// table's own name for the same reason <see cref="SourceAlias"/> is: a tab
+        /// filter qualifies with the TABLE name, because that is how the framework runs
+        /// it. LEFT OUTER so a document whose type has been deactivated is still counted
+        /// by a filter that does not mention the type at all.
+        /// </summary>
+        /// <param name="source">Discovered, already validated source.</param>
+        /// <returns>Join clause, or "" when the statement does not need it.</returns>
+        private string DocTypeJoin(SourceItem source)
+        {
+            if (!NeedsDocTypeJoin(source)) { return ""; }
+
+            return " LEFT OUTER JOIN " + TABLE_DOCTYPE + " " + TABLE_DOCTYPE
+                 + " ON (" + TABLE_DOCTYPE + "." + COLUMN_DOCTYPE + "="
+                 + SourceAlias(source) + "." + source.DocTypeColumn + ")";
         }
 
         /// <summary>
@@ -1594,11 +1928,82 @@ namespace VASLogic.Models
         /// <summary>
         /// Two tables can be displayed on the SAME window (header and a posted child
         /// tab, for instance), and two rows reading "Material Receipt" would be
-        /// indistinguishable. Only the colliding rows are qualified with their tab
-        /// name; a name that is already unique is left alone.
+        /// indistinguishable. Only the colliding rows are qualified; a name that is
+        /// already unique is left alone.
+        ///
+        /// Never with the TAB NAME. A header tab is named after its own window or after
+        /// the entity generically, so appending it produced "Delivery Order · Delivery
+        /// Order" and "Sales Order · Order" - qualifiers that distinguish nothing and
+        /// read as a mistake. Three steps instead, each one earning its place:
+        ///
+        ///   the catch-all   qualified FIRST and alone. Where a table's leftovers sit on
+        ///                   one of its own screens those two rows are the only pair
+        ///                   colliding, and naming the odd one out settles it - the real
+        ///                   screen keeps its own plain name.
+        ///   the table       what is left is two different TABLES wearing one window
+        ///                   name, so each says which table it is - and only if that says
+        ///                   something the row's name does not already contain.
+        ///   the window id   the last resort, for two windows carrying the same name over
+        ///                   the same table. Nobody wants to read it; two rows the reader
+        ///                   cannot tell apart are worse.
+        /// Chronological development:
+        ///   VAI154      2026-08-26 Tab name dropped as a qualifier; catch-all qualified
+        ///                          first and alone, then the table, then the window id
         /// </summary>
+        /// <param name="ctx">Session context (supplies the message language).</param>
         /// <param name="sources">Discovered sources, already sorted by display name.</param>
-        private void DisambiguateDisplayNames(List<SourceItem> sources)
+        private void DisambiguateDisplayNames(Ctx ctx, List<SourceItem> sources)
+        {
+            /* The catch-all row goes first, and alone, because it is the row that is
+               different. Where a table's leftovers sit on one of its own screens, that
+               screen and its catch-all are the only two rows colliding - and qualifying
+               BOTH of them produced "Sales Order · Order" beside "Sales Order · Other",
+               burdening the real screen with its tab's name to distinguish it from a row
+               that had already distinguished itself. Naming the odd one out is enough. */
+            Dictionary<string, int> counts = CountDisplayNames(sources);
+
+            for (int i = 0; i < sources.Count; i++)
+            {
+                SourceItem item = sources[i];
+                if (!item.IsComplement || counts[item.DisplayName] <= 1) { continue; }
+
+                item.DisplayName = item.DisplayName + " · " + OtherRecordsLabel(ctx);
+            }
+
+            /* What still collides is two genuinely different things wearing one name -
+               most often two tables on one window - so each says what it is. */
+            counts = CountDisplayNames(sources);
+
+            for (int i = 0; i < sources.Count; i++)
+            {
+                SourceItem item = sources[i];
+                if (counts[item.DisplayName] <= 1) { continue; }
+
+                string qualifier = PickQualifier(item);
+                if (qualifier.Length == 0) { continue; }
+
+                item.DisplayName = item.DisplayName + " · " + qualifier;
+            }
+
+            /* Whatever is still ambiguous had nothing of its own to say. The window id is
+               not a label anybody wants to read, which is exactly why it is the last
+               resort - but two rows the reader cannot tell apart are worse. */
+            counts = CountDisplayNames(sources);
+
+            for (int i = 0; i < sources.Count; i++)
+            {
+                SourceItem item = sources[i];
+                if (counts[item.DisplayName] <= 1) { continue; }
+
+                item.DisplayName = item.DisplayName + " #"
+                    + item.AD_Window_ID.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
+        /// <summary>How many sources carry each display name.</summary>
+        /// <param name="sources">Discovered sources.</param>
+        /// <returns>Display name -> occurrences.</returns>
+        private Dictionary<string, int> CountDisplayNames(List<SourceItem> sources)
         {
             Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase);
 
@@ -1608,14 +2013,64 @@ namespace VASLogic.Models
                 counts[name] = counts.ContainsKey(name) ? counts[name] + 1 : 1;
             }
 
-            for (int i = 0; i < sources.Count; i++)
-            {
-                SourceItem item = sources[i];
-                if (counts[item.DisplayName] <= 1) { continue; }
+            return counts;
+        }
 
-                string qualifier = !string.IsNullOrEmpty(item.TabName) ? item.TabName : item.TableName;
-                item.DisplayName = item.DisplayName + " · " + qualifier;
+        /// <summary>
+        /// What to qualify a colliding row with: what the row IS, which is its table.
+        ///
+        /// The TAB NAME is deliberately not a candidate. A header tab is named after its
+        /// own window or after the entity generically - the Sales Order window's tab is
+        /// "Order" - so appending it yields "Sales Order · Order": a qualifier that adds
+        /// nothing and reads as noise. Two rows wearing one window name are two different
+        /// TABLES, so the table is what separates them and the table is what is shown.
+        /// </summary>
+        /// <param name="item">The colliding source.</param>
+        /// <returns>Qualifier, or "" when the row has nothing distinguishing to add.</returns>
+        private string PickQualifier(SourceItem item)
+        {
+            if (AddsMeaning(item.TableDisplayName, item.DisplayName)) { return item.TableDisplayName; }
+            if (AddsMeaning(item.TableName, item.DisplayName)) { return item.TableName; }
+
+            return "";
+        }
+
+        /// <summary>
+        /// Whether appending a candidate would tell the reader anything: it has to be
+        /// there, and it has to be neither the name itself nor a fragment of it. "Order"
+        /// against "Sales Order" fails on the last count - the reader already has that
+        /// word, and repeating it only looks like a mistake.
+        /// </summary>
+        /// <param name="candidate">Qualifier under consideration.</param>
+        /// <param name="name">The display name it would be appended to.</param>
+        /// <returns>true when appending it would tell the reader something.</returns>
+        private bool AddsMeaning(string candidate, string name)
+        {
+            if (string.IsNullOrEmpty(candidate) || string.IsNullOrEmpty(name)) { return false; }
+
+            return name.IndexOf(candidate, StringComparison.CurrentCultureIgnoreCase) < 0
+                && candidate.IndexOf(name, StringComparison.CurrentCultureIgnoreCase) < 0;
+        }
+
+        /// <summary>
+        /// The word that qualifies a catch-all row sharing its name with a real screen.
+        /// Seeded as the AD_Message VAS_198_OtherRecords; an installation that has not
+        /// seeded it gets readable English rather than the raw key, which is the same
+        /// contract the widget's own labels follow.
+        /// </summary>
+        /// <param name="ctx">Session context (supplies the message language).</param>
+        /// <returns>Translated qualifier, or "Other".</returns>
+        private string OtherRecordsLabel(Ctx ctx)
+        {
+            string text = Msg.GetMsg(ctx, MESSAGE_OTHERRECORDS);
+
+            if (string.IsNullOrEmpty(text)
+                || text.Equals(MESSAGE_OTHERRECORDS, StringComparison.OrdinalIgnoreCase))
+            {
+                return "Other";
             }
+
+            return text;
         }
 
         /// <summary>
@@ -1739,6 +2194,7 @@ namespace VASLogic.Models
             SourceTotal total = new SourceTotal();
             total.AD_Table_ID = source.AD_Table_ID;
             total.AD_Window_ID = source.AD_Window_ID;
+            total.IsComplement = source.IsComplement;
             total.TableName = source.TableName;
             total.DisplayName = source.DisplayName;
             total.HasValue = HasValueStrategy(source);
@@ -1759,9 +2215,12 @@ namespace VASLogic.Models
                again. */
             string rowValue = total.HasValue ? SourceValueExpr(source, baseCurrency) : "0";
 
+            /* The screen's own filter may name the document TYPE - that is what separates
+               Delivery Order from Material Receipt - so the statement carries the join
+               that makes it resolve. */
             string inner = @"
                 SELECT " + rowValue + @" AS Row_Value
-                FROM " + source.TableName + " " + alias + @"
+                FROM " + source.TableName + " " + alias + DocTypeJoin(source) + @"
                 WHERE " + SourceWhere(source);
 
             inner = MRole.GetDefault(ctx).AddAccessSQL(inner, alias, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -1811,18 +2270,22 @@ namespace VASLogic.Models
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="periodId">C_Period_ID selected by the user.</param>
         /// <param name="tableId">AD_Table_ID of the transaction type opened.</param>
-        /// <param name="windowId">AD_Window_ID of the screen opened - the second half
+        /// <param name="windowId">AD_Window_ID of the screen opened - the second part
         /// of the row's identity, since one table can appear on several.</param>
+        /// <param name="isComplement">Whether the row opened is the table's catch-all -
+        /// the third part of its identity, because a catch-all may share a window with a
+        /// filtered screen.</param>
         /// <param name="pageNo">1-based page number.</param>
         /// <param name="pageSize">Rows per page (clamped server-side).</param>
         /// <returns>Populated <see cref="RecordPage"/> (never null).</returns>
         public RecordPage GetRecords(Ctx ctx, int periodId, int tableId, int windowId,
-            int pageNo, int pageSize)
+            bool isComplement, int pageNo, int pageSize)
         {
             RecordPage result = new RecordPage();
             result.Rows = new List<UnPostedRow>();
             result.AD_Table_ID = tableId;
             result.AD_Window_ID = windowId;
+            result.IsComplement = isComplement;
             result.C_Period_ID = periodId;
 
             if (ctx == null) { return result; }
@@ -1839,7 +2302,7 @@ namespace VASLogic.Models
             /* The client's ids are only ever a KEY into what discovery returned - a
                pair the dictionary did not hand out reaches no query at all, and the
                screen filter that comes with it is the server's, never the client's. */
-            SourceItem source = FindSource(ctx, tableId, windowId);
+            SourceItem source = FindSource(ctx, tableId, windowId, isComplement);
             if (source == null)
             {
                 result.ErrorCode = ERROR_INVALID_REQUEST;
@@ -1851,6 +2314,7 @@ namespace VASLogic.Models
             result.KeyColumn = source.KeyColumn;
             result.DateColumn = source.DateColumn;
             result.AD_Window_ID = source.AD_Window_ID;
+            result.IsComplement = source.IsComplement;
             result.HasValue = HasValueStrategy(source);
 
             /* A line-valued type reports no document currency even if its table
@@ -1907,15 +2371,27 @@ namespace VASLogic.Models
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="tableId">AD_Table_ID the client selected.</param>
-        /// <param name="windowId">AD_Window_ID the client selected - the other half of
+        /// <param name="windowId">AD_Window_ID the client selected - the second part of
         /// a row's identity, since one table can be several rows.</param>
+        /// <param name="isComplement">Whether the row selected was the table's catch-all
+        /// - the third part, since a catch-all can share a window with a filtered
+        /// screen. Matched exactly first, so the two never answer for each other.</param>
         /// <returns>The matching source, or null when it is not a discovered one.</returns>
-        private SourceItem FindSource(Ctx ctx, int tableId, int windowId)
+        private SourceItem FindSource(Ctx ctx, int tableId, int windowId, bool isComplement)
         {
             if (tableId <= 0) { return null; }
 
             List<SourceItem> sources = DiscoverSources(ctx);
 
+            for (int i = 0; i < sources.Count; i++)
+            {
+                if (sources[i].AD_Table_ID != tableId) { continue; }
+                if (sources[i].AD_Window_ID != windowId) { continue; }
+                if (sources[i].IsComplement == isComplement) { return sources[i]; }
+            }
+
+            /* The window still identifies the row on its own wherever no catch-all
+               shares it, which is the ordinary case. */
             for (int i = 0; i < sources.Count; i++)
             {
                 if (sources[i].AD_Table_ID != tableId) { continue; }
@@ -1972,13 +2448,16 @@ namespace VASLogic.Models
                holds standard orders and blanket orders alike - so this column is what
                tells the rows of one list apart. A table without a C_DocType_ID column
                simply has none to show. */
-            sb.Append(",").Append(hasDocType ? "COALESCE(dttrl.Name,dt.Name,N'')" : "N''")
+            sb.Append(",").Append(hasDocType ? "COALESCE(dttrl.Name," + TABLE_DOCTYPE + ".Name,N'')" : "N''")
               .Append(" AS Doc_Type_Name");
 
             /* The document's own currency, and its own value in it. Without a
                currency column there is nothing to label a document amount with. */
-            sb.Append(",").Append(hasCurrency ? "COALESCE(cur.ISO_Code,N'')" : "N''").Append(" AS Currency_Iso");
-            sb.Append(",").Append(hasCurrency ? "COALESCE(cur.CurSymbol,cur.ISO_Code,N'')" : "N''")
+            /* ISO_Code is a plain CHAR column while CurSymbol is national text, so it is
+               cast before it stands beside one - see CodeAsText. */
+            sb.Append(",").Append(hasCurrency ? "COALESCE(" + CodeAsText("cur.ISO_Code") + ",N'')" : "N''")
+              .Append(" AS Currency_Iso");
+            sb.Append(",").Append(hasCurrency ? "COALESCE(cur.CurSymbol," + CodeAsText("cur.ISO_Code") + ",N'')" : "N''")
               .Append(" AS Currency_Symbol");
             sb.Append(",").Append(hasCurrency ? "COALESCE(cur.StdPrecision,2)" : "2").Append(" AS Currency_Precision");
 
@@ -2001,9 +2480,21 @@ namespace VASLogic.Models
             sb.Append(" FROM ").Append(source.TableName).Append(" ").Append(alias);
             if (hasDocType)
             {
-                sb.Append(" LEFT OUTER JOIN C_DocType dt ON (dt.C_DocType_ID=").Append(alias).Append(".")
-                  .Append(source.DocTypeColumn).Append(" AND dt.IsActive='Y')");
-                sb.Append(" LEFT OUTER JOIN C_DocType_Trl dttrl ON (dttrl.C_DocType_ID=dt.C_DocType_ID AND dttrl.AD_Language=@AD_Language AND dttrl.IsActive='Y')");
+                /* Aliased to the table's own name so it serves BOTH purposes at once:
+                   naming the type in the list, and resolving a screen filter that says
+                   "C_DocType.DocBaseType='MMS'" - the predicate that separates Delivery
+                   Order from Material Receipt. One join, because the count query and this
+                   one must select from the same shape or they disagree.
+
+                   No IsActive test on the join: a document whose type was deactivated
+                   still exists and is still unposted, and nulling the join would drop it
+                   from every type-based screen rather than merely leaving it unnamed. */
+                sb.Append(" LEFT OUTER JOIN ").Append(TABLE_DOCTYPE).Append(" ").Append(TABLE_DOCTYPE)
+                  .Append(" ON (").Append(TABLE_DOCTYPE).Append(".").Append(COLUMN_DOCTYPE).Append("=")
+                  .Append(alias).Append(".").Append(source.DocTypeColumn).Append(")");
+                sb.Append(" LEFT OUTER JOIN C_DocType_Trl dttrl ON (dttrl.C_DocType_ID=")
+                  .Append(TABLE_DOCTYPE).Append(".").Append(COLUMN_DOCTYPE)
+                  .Append(" AND dttrl.AD_Language=@AD_Language AND dttrl.IsActive='Y')");
             }
             if (hasCurrency)
             {
@@ -2286,10 +2777,12 @@ namespace VASLogic.Models
             BaseCurrency result = new BaseCurrency();
             result.Precision = 2;
 
+            /* The CASE arms are cast to one character type: CurSymbol is national text and
+               ISO_Code is not, and Oracle will not decide between them - see CodeAsText. */
             string sql = @"
                 SELECT AcctSchema.C_Currency_ID AS Acct_Currency_ID,
                        Currency.StdPrecision AS Std_Precision,
-                       CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Currency_Symbol,
+                       CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE " + CodeAsText("Currency.ISO_Code") + @" END AS Currency_Symbol,
                        Currency.ISO_Code AS Currency_Iso
                 FROM AD_ClientInfo ClientInfo
                 INNER JOIN C_AcctSchema AcctSchema ON (AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID)
@@ -2409,16 +2902,26 @@ namespace VASLogic.Models
 
             /// <summary>
             /// Whether <see cref="WhereClause"/> was COMPOSED here rather than read from
-            /// AD_Tab - true only on a complement row. It decides which guard
-            /// <see cref="IsUsableClauseFor"/> applies, because a composed filter is
-            /// longer than a tab filter may be and names an alias of its own.
+            /// AD_Tab - true on a complement row and on any screen made exclusive of its
+            /// narrower siblings. It decides which guard <see cref="IsUsableClauseFor"/>
+            /// applies, because a composed filter is longer than a tab filter may be and
+            /// names an alias of its own.
             /// </summary>
             public bool IsComposedWhereClause { get; set; }
+
+            /// <summary>
+            /// Whether this row is the table's CATCH-ALL - the records none of its
+            /// filtered screens claim. The third component of a row's identity, and the
+            /// one that lets the catch-all share a window with a filtered screen: without
+            /// it the two are indistinguishable to a drill-down request, which is why the
+            /// whole split used to be abandoned whenever every window carried a filter.
+            /// </summary>
+            public bool IsComplement { get; set; }
         }
 
         /// <summary>
-        /// One screen a discovered table's Posted field is displayed on. Server-side
-        /// only - the WhereClause it carries is never sent anywhere.
+        /// One screen a discovered table can be opened on. Server-side only - the
+        /// WhereClause it carries is never sent anywhere.
         /// </summary>
         private class ScreenItem
         {
@@ -2430,10 +2933,10 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// One transaction type's headline figures. A "type" is a SCREEN - a table AND
-        /// a window - because Purchase Order and Sales Order are two screens over one
-        /// C_Order table, so that pair is what identifies the row and what the client
-        /// sends back to open it.
+        /// One transaction type's headline figures. A "type" is a SCREEN - a table, a
+        /// window, and whether it is that table's catch-all - because Purchase Order and
+        /// Sales Order are two screens over one C_Order table, so those three are what
+        /// identify the row and what the client sends back to open it.
         /// </summary>
         public class SourceTotal
         {
@@ -2458,10 +2961,18 @@ namespace VASLogic.Models
             public bool HasValue { get; set; }
 
             /// <summary>
-            /// The screen. Half of the row's identity, and the window its records zoom
+            /// The screen. Part of the row's identity, and the window its records zoom
             /// into - which is the same thing, since the row IS that screen.
             /// </summary>
             public int AD_Window_ID { get; set; }
+
+            /// <summary>
+            /// true on the table's catch-all row - the records none of its filtered
+            /// screens claim. The rest of the row's identity: a catch-all may share a
+            /// window with a filtered screen, so the client sends this back alongside the
+            /// table and the window when it opens the row.
+            /// </summary>
+            public bool IsComplement { get; set; }
         }
 
         /// <summary>Everything the card shows for one period.</summary>
@@ -2554,6 +3065,12 @@ namespace VASLogic.Models
 
             /// <summary>Window the Zoom opens.</summary>
             public int AD_Window_ID { get; set; }
+
+            /// <summary>
+            /// Echo of the catch-all half of the row's identity, so a client holding this
+            /// page can page it without having to remember what it asked for.
+            /// </summary>
+            public bool IsComplement { get; set; }
 
             /// <summary>
             /// false when the type has no trusted amount strategy - both amount
