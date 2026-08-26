@@ -3795,7 +3795,7 @@ namespace VASLogic.Models
                   AND fa.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND fa.PostingType=@PostingType
                   AND fa.IsActive='Y'
-                  AND COALESCE(ev.AccountType,N'')<>@AccountType
+                  AND COALESCE(ev.AccountType,'')<>@AccountType
                   AND " + ChartOfAccountsWhere(c, "ev", "E", parameters) + @"
                   AND " + PeriodWhere(c, "fa", "DateAcct", "F", parameters);
 
@@ -3875,7 +3875,7 @@ namespace VASLogic.Models
                   AND fa.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND fa.PostingType=@PostingType
                   AND fa.IsActive='Y'
-                  AND COALESCE(ev.AccountType,N'')<>@AccountType
+                  AND COALESCE(ev.AccountType,'')<>@AccountType
                   AND " + ChartOfAccountsWhere(c, "ev", "S", parameters) + @"
                   AND " + PeriodWhere(c, "fa", "DateAcct", "F", parameters);
 
