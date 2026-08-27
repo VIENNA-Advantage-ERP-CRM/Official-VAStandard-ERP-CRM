@@ -3262,6 +3262,12 @@ namespace VIS.Controllers
         public String PostingType = "";
         public MAcctSchema[] ASchemas = null;
         public MAcctSchema ASchema = null;
+        //	Logger used by the Account Viewer segment diagnostics below
+        private static VLogger _acctViewerLog = VLogger.GetVLogger(typeof(CommonModel).FullName);
+        //	Fact_Acct key column -> the Accounting Schema Element it was created from.
+        //	Filled by CreateKeyColumns(), read by ValidateLookupColumns() so the log line can
+        //	name the element the user has to correct.
+        private Dictionary<String, MAcctSchemaElement> _elementByColumn = new Dictionary<String, MAcctSchemaElement>();
 
         /// <summary>
         /// Get Account Viewer Data
@@ -3431,6 +3437,10 @@ namespace VIS.Controllers
             RModel rm = new RModel("Fact_Acct");
             //  Add Key (Lookups)
             List<String> keys = CreateKeyColumns();
+            //  Every key column below is rendered through a TableDir style lookup. That lookup is
+            //  empty when the referenced table carries no Identifier column, which silently breaks
+            //  the whole Fact_Acct query - report it before it happens.
+            ValidateLookupColumns(keys);
             int max = _leadingColumns;
             if (max == 0)
             {
@@ -3579,6 +3589,8 @@ namespace VIS.Controllers
                 //
                 MAcctSchemaElement ase = elements[i];
                 String columnName = ase.GetColumnName();
+                //	remember which element produced this column, for ValidateLookupColumns()
+                _elementByColumn[columnName] = ase;
                 if (columnName.StartsWith("UserElement"))
                 {
                     if (columnName.IndexOf("1") != -1)
@@ -3629,6 +3641,215 @@ namespace VIS.Controllers
                 _leadingColumns = columns.Count;
             }
             return columns;
+        }
+
+        /// <summary>
+        /// Account Viewer renders every _ID segment through a TableDir style lookup. RColumn builds
+        /// that lookup with VLookUpFactory.GetLookup_TableDirEmbed, which concatenates the columns
+        /// of the referenced table flagged IsIdentifier='Y'. When the referenced table has no such
+        /// column (or does not exist at all) the factory hands back an empty string, RColumn stores
+        /// "MyColumn_ID,()" as the column SQL, and the whole Fact_Acct SELECT fails. RModelData.Query
+        /// swallows that failure - it logs only the raw SQL and returns no rows - so the viewer comes
+        /// up empty with nothing in the log tying it to the Accounting Schema Element at fault.
+        /// This check runs before the query and writes one line per broken segment naming the
+        /// element, the column and the reference table, so the user can fix the dictionary entry.
+        /// Diagnostics only: it never throws and never changes the query.
+        /// </summary>
+        /// <param name="keys">Key columns produced by CreateKeyColumns()</param>
+        private void ValidateLookupColumns(List<String> keys)
+        {
+            if (keys == null || keys.Count == 0)
+            {
+                return;
+            }
+            try
+            {
+                //	Fact_Acct column -> table the lookup will be built against
+                Dictionary<String, String> tableByColumn = new Dictionary<String, String>();
+                List<String> tableNames = new List<String>();
+                for (int i = 0; i < keys.Count; i++)
+                {
+                    String column = keys[i];
+                    if (String.IsNullOrEmpty(column) || !column.EndsWith("_ID"))
+                    {
+                        continue;
+                    }
+                    String tableName = GetLookupTableName(column, GetRefColumnName(column));
+                    if (!IsSafeDictionaryName(tableName) || tableByColumn.ContainsKey(column))
+                    {
+                        continue;
+                    }
+                    tableByColumn[column] = tableName;
+                    if (!tableNames.Contains(tableName.ToUpper()))
+                    {
+                        tableNames.Add(tableName.ToUpper());
+                    }
+                }
+                if (tableNames.Count == 0)
+                {
+                    return;
+                }
+
+                //	One metadata round trip for all segments. AD_Image_ID is excluded because
+                //	GetLookup_TableDirEmbed skips it when it builds the display expression. No
+                //	AddAccessSQL here on purpose - these are System rows and the factory reads them
+                //	unfiltered too, so filtering by role would raise false alarms.
+                StringBuilder sql = new StringBuilder();
+                sql.Append("SELECT UPPER(t.TableName) AS TableName, ")
+                   .Append("SUM(CASE WHEN c.IsIdentifier='Y' AND c.ColumnName<>'AD_Image_ID' THEN 1 ELSE 0 END) AS Identifiers ")
+                   .Append("FROM AD_Table t LEFT JOIN AD_Column c ON (t.AD_Table_ID=c.AD_Table_ID) ")
+                   .Append("WHERE UPPER(t.TableName) IN ('").Append(String.Join("','", tableNames.ToArray())).Append("') ")
+                   .Append("GROUP BY UPPER(t.TableName)");
+                Dictionary<String, int> identifiersByTable = new Dictionary<String, int>();
+                DataSet ds = DB.ExecuteDataset(sql.ToString());
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+                        identifiersByTable[Util.GetValueOfString(ds.Tables[0].Rows[i]["TableName"])] =
+                            Util.GetValueOfInt(ds.Tables[0].Rows[i]["Identifiers"]);
+                    }
+                }
+
+                foreach (KeyValuePair<String, String> segment in tableByColumn)
+                {
+                    String column = segment.Key;
+                    String tableName = segment.Value;
+                    int identifiers = 0;
+                    bool tableExists = identifiersByTable.TryGetValue(tableName.ToUpper(), out identifiers);
+                    if (tableExists && identifiers > 0)
+                    {
+                        continue;
+                    }
+                    _acctViewerLog.Log(Level.SEVERE, BuildLookupErrorMessage(column, tableName, tableExists));
+                }
+            }
+            catch (Exception ex)
+            {
+                //	never let the diagnostic itself break the viewer
+                _acctViewerLog.Log(Level.WARNING, "Account Viewer: unable to verify segment lookups", ex);
+            }
+        }
+
+        /// <summary>
+        /// Readable log line for a segment whose lookup cannot be built
+        /// </summary>
+        /// <param name="column">Fact_Acct column</param>
+        /// <param name="tableName">Reference table the lookup is built against</param>
+        /// <param name="tableExists">True when the table exists but has no Identifier column</param>
+        /// <returns>Message</returns>
+        private String BuildLookupErrorMessage(String column, String tableName, bool tableExists)
+        {
+            StringBuilder msg = new StringBuilder("Account Viewer: no data will be loaded - ");
+            msg.Append(tableExists
+                ? "reference table " + tableName + " has no column marked as Identifier"
+                : "reference table " + tableName + " does not exist");
+            msg.Append(" [Fact_Acct column=").Append(column);
+            String refColumn = GetRefColumnName(column);
+            if (!String.IsNullOrEmpty(refColumn))
+            {
+                msg.Append(", linked column=").Append(refColumn);
+            }
+            MAcctSchemaElement ase = null;
+            if (_elementByColumn.TryGetValue(column, out ase) && ase != null)
+            {
+                msg.Append(", Accounting Schema Element=").Append(ase.GetName())
+                   .Append(" (ElementType=").Append(ase.GetElementType()).Append(")");
+            }
+            if (ASchema != null)
+            {
+                msg.Append(", Accounting Schema=").Append(ASchema.GetName());
+            }
+            msg.Append("]");
+            msg.Append(tableExists
+                ? " - mark at least one column of " + tableName + " as Identifier in the Table and Column window, otherwise the segment lookup stays empty and the Fact_Acct query fails."
+                : " - the Accounting Schema Element points at a column whose reference table is not in the dictionary.");
+            return msg.ToString();
+        }
+
+        /// <summary>
+        /// Table the segment lookup is built against - mirrors the resolution done inside RColumn
+        /// </summary>
+        /// <param name="column">Fact_Acct column</param>
+        /// <param name="refColumn">Display column of the element, for UserElement segments</param>
+        /// <returns>Table name</returns>
+        private String GetLookupTableName(String column, String refColumn)
+        {
+            if ("Account_ID".Equals(column) || "User1_ID".Equals(column) || "User2_ID".Equals(column))
+            {
+                return "C_ElementValue";
+            }
+            if (column.StartsWith("UserElement") && refColumn != null)
+            {
+                return TrimIDSuffix(refColumn);
+            }
+            if ("C_LocFrom_ID".Equals(column) || "C_LocTo_ID".Equals(column))
+            {
+                return "C_Location";
+            }
+            if ("AD_OrgTrx_ID".Equals(column))
+            {
+                return "AD_Org";
+            }
+            return TrimIDSuffix(column);
+        }
+
+        /// <summary>
+        /// Display column configured on the UserElement segment - same selection GetRModel() makes
+        /// </summary>
+        /// <param name="column">Fact_Acct column</param>
+        /// <returns>Reference column name, null when the column is not a UserElement segment</returns>
+        private String GetRefColumnName(String column)
+        {
+            if (column == null || !column.StartsWith("UserElement"))
+            {
+                return null;
+            }
+            if (column.IndexOf("1") != -1) { return _ref1; }
+            if (column.IndexOf("2") != -1) { return _ref2; }
+            if (column.IndexOf("3") != -1) { return _ref3; }
+            if (column.IndexOf("4") != -1) { return _ref4; }
+            if (column.IndexOf("5") != -1) { return _ref5; }
+            if (column.IndexOf("6") != -1) { return _ref6; }
+            if (column.IndexOf("7") != -1) { return _ref7; }
+            if (column.IndexOf("8") != -1) { return _ref8; }
+            return _ref9;
+        }
+
+        /// <summary>
+        /// Drop the trailing _ID, the way GetLookup_TableDirEmbed derives the table name
+        /// </summary>
+        /// <param name="columnName">Column name</param>
+        /// <returns>Table name</returns>
+        private String TrimIDSuffix(String columnName)
+        {
+            if (columnName != null && columnName.Length > 3 && columnName.EndsWith("_ID"))
+            {
+                return columnName.Substring(0, columnName.Length - 3);
+            }
+            return columnName;
+        }
+
+        /// <summary>
+        /// Dictionary names are inlined in the metadata query above, so keep them to the characters
+        /// a table name can actually hold
+        /// </summary>
+        /// <param name="name">Name</param>
+        /// <returns>True when safe to inline</returns>
+        private bool IsSafeDictionaryName(String name)
+        {
+            if (String.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+            for (int i = 0; i < name.Length; i++)
+            {
+                if (!Char.IsLetterOrDigit(name[i]) && name[i] != '_')
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         #endregion
