@@ -261,6 +261,34 @@
 ///                          rather than dictionary-guarded: it is a module column,
 ///                          so selecting it alongside the header would fail the
 ///                          WHOLE overview on a deployment that has not taken it.
+///   VAI163   2026-08-26  - The e-mail feed was EMPTY on databases that have mails.
+///                          Two causes, both here. The AD_Table id was a SCALAR
+///                          sub-select, and AD_Table can carry more than one row
+///                          named C_Order — which on Oracle RAISES rather than
+///                          answering, taking the whole lookup into its catch. And
+///                          AttachmentType was required to equal 'M', a value that
+///                          varies between installations and is sometimes null. It
+///                          is IN + UPPER for the table and "not 'I'" for the kind
+///                          now: 'I' is a letter and anything else a mail, so the
+///                          two partition the table — nothing hidden, and nothing
+///                          double-counted against the shared loader, which takes
+///                          the letters (it is called with includeMail: false).
+///                        - IsShipConfirmTarget (LoadShipConfirmTarget):
+///                          IsShipConfirm on C_DocTypeTarget_ID, falling back to
+///                          the completed type. The progress line's Shipped and
+///                          Delivered stages read the delivery order differently
+///                          with confirmation on — where it SITS In Process
+///                          awaiting confirmation — than with it off, where
+///                          completion is the milestone. Its own attempted
+///                          statement, like LoadEmailSent.
+///                        - Deliveries, invoices and receipts each carry
+///                          CompletedDate: the document's workflow DocComplete
+///                          stamp, falling back to its own Updated stamp, and null
+///                          while it is open. The Delivered / Invoiced / Paid
+///                          stages date themselves by these — they went green on a
+///                          document merely EXISTING before, so a drafted invoice
+///                          reported an invoiced order. Read for each set in ONE
+///                          statement (LoadCompletionStamps), not per document.
 /// </summary>
 
 using System;
@@ -416,6 +444,10 @@ namespace VASLogic.Models
             // Has the order been e-mailed to the customer? Drives the header's
             // "Email Sent" badge.
             LoadEmailSent(C_Order_ID, result);
+
+            // Is this order shipped WITH a confirmation? The progress line's Shipped
+            // and Delivered stages read the delivery order differently either way.
+            LoadShipConfirmTarget(C_Order_ID, result);
 
             // ----- Child data -----
             LoadAddresses(shipLocId, billLocId, result);
@@ -1532,6 +1564,7 @@ namespace VASLogic.Models
                                   io.MovementDate,
                                   io.TrackingNo,
                                   io.Created,
+                                  io.Updated,
                                   wh.Name AS WarehouseName,
                                   COALESCE(SUM(COALESCE(iol.MovementQty, 0)), 0) AS DeliveredQty,
                                   COUNT(iol.M_InOutLine_ID) AS LineCount,
@@ -1558,10 +1591,16 @@ namespace VASLogic.Models
                                   AND io.IsSOTrx    = 'Y'
                                   AND io.DocStatus NOT IN ('RE', 'VO')
                                 GROUP BY io.M_InOut_ID, io.DocumentNo, io.DocStatus, io.MovementDate,
-                                         io.TrackingNo, io.Created, wh.Name
+                                         io.TrackingNo, io.Created, io.Updated, wh.Name
                                 ORDER BY io.MovementDate DESC, io.DocumentNo DESC";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return rows;
+
+                // When each shipment COMPLETED, for the progress line's Shipped and
+                // Delivered stages. Read for the whole set in one statement.
+                Dictionary<int, DateTime> stamps = LoadCompletionStamps("M_InOut",
+                    "SELECT dio.M_InOut_ID FROM M_InOut dio WHERE dio.C_Order_ID = "
+                    + C_Order_ID + " AND dio.IsSOTrx = 'Y'");
 
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
@@ -1580,6 +1619,10 @@ namespace VASLogic.Models
                     // on which nothing had yet been entered. Follows VAS_092.
                     dv.Created       = Util.GetValueOfDateTime(r["Created"]);
                     dv.DeliveredValue = Util.GetValueOfDecimal(r["DeliveredValue"]);
+                    // Null until the shipment is completed — the Delivered stage
+                    // dates itself with this, and an open shipment has no such date.
+                    dv.CompletedDate = CompletedOn(stamps, dv.M_InOut_ID, dv.DocStatus,
+                                                   Util.GetValueOfDateTime(r["Updated"]));
                     rows.Add(dv);
                 }
             }
@@ -1605,6 +1648,7 @@ namespace VASLogic.Models
                                   inv.DocStatus,
                                   inv.DateInvoiced,
                                   inv.Created,
+                                  inv.Updated,
                                   COALESCE(inv.GrandTotal, 0) AS GrandTotal,
                                   inv.IsPaid
                                 FROM C_Invoice inv
@@ -1616,6 +1660,12 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return rows;
 
+                // When each invoice COMPLETED — the Invoiced stage reports the
+                // LATEST of these, and a drafted invoice contributes none.
+                Dictionary<int, DateTime> stamps = LoadCompletionStamps("C_Invoice",
+                    "SELECT div.C_Invoice_ID FROM C_Invoice div WHERE div.C_Order_ID = "
+                    + C_Order_ID + " AND div.IsSOTrx = 'Y'");
+
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
                     InvoiceData iv = new InvoiceData();
@@ -1626,6 +1676,8 @@ namespace VASLogic.Models
                     iv.Created      = Util.GetValueOfDateTime(r["Created"]);
                     iv.GrandTotal   = Util.GetValueOfDecimal(r["GrandTotal"]);
                     iv.IsPaid       = Util.GetValueOfString(r["IsPaid"]) == "Y";
+                    iv.CompletedDate = CompletedOn(stamps, iv.C_Invoice_ID, iv.DocStatus,
+                                                   Util.GetValueOfDateTime(r["Updated"]));
                     rows.Add(iv);
                 }
             }
@@ -1732,6 +1784,7 @@ namespace VASLogic.Models
                                                p.DocumentNo,
                                                p.DocStatus,
                                                p.DateTrx,
+                                               p.Updated,
                                                COALESCE(p.PayAmt, 0)      AS PayAmt,
                                                COALESCE(p.DiscountAmt, 0) AS DiscountAmt
                                  FROM C_Payment p
@@ -1744,16 +1797,27 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
 
+                // When each receipt COMPLETED — the Paid stage reports the LATEST of
+                // these, and a drafted receipt contributes none.
+                Dictionary<int, DateTime> stamps = LoadCompletionStamps("C_Payment",
+                    @"SELECT DISTINCT dal.C_Payment_ID FROM C_AllocationLine dal
+                       INNER JOIN C_Invoice dci ON (dal.C_Invoice_ID = dci.C_Invoice_ID)
+                       WHERE dci.C_Order_ID = " + C_Order_ID + " AND dal.C_Payment_ID IS NOT NULL");
+
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
+                    int paymentId = Util.GetValueOfInt(r["C_Payment_ID"]);
+                    string status = Util.GetValueOfString(r["DocStatus"]);
                     list.Add(new SalesOrderDocumentData
                     {
                         Type        = "receipt",
                         TableName   = "C_Payment",
-                        RecordId    = Util.GetValueOfInt(r["C_Payment_ID"]),
+                        RecordId    = paymentId,
                         DocumentNo  = Util.GetValueOfString(r["DocumentNo"]),
-                        DocStatus   = Util.GetValueOfString(r["DocStatus"]),
+                        DocStatus   = status,
                         DocDate     = Util.GetValueOfDateTime(r["DateTrx"]),
+                        CompletedDate = CompletedOn(stamps, paymentId, status,
+                                                    Util.GetValueOfDateTime(r["Updated"])),
                         Amount      = Util.GetValueOfDecimal(r["PayAmt"]),
                         DiscountAmt = Util.GetValueOfDecimal(r["DiscountAmt"])
                     });
@@ -1856,9 +1920,23 @@ namespace VASLogic.Models
         {
             try
             {
-                // AttachmentType 'M' is a mail (platform convention — see
-                // MRequest / SendRequestNotification); anything else on this table
-                // is a letter / inbound document, not an e-mail sent from here.
+                // Two things kept real mails off this feed, and both are here:
+                //
+                //   - The table id was a SCALAR sub-select. AD_Table can carry more
+                //     than one row named C_Order (a differently-cased or duplicated
+                //     dictionary entry), and a scalar sub-select returning more than
+                //     one row RAISES on Oracle — taking the whole lookup, and with
+                //     it every e-mail, into the catch below. IN + UPPER answers
+                //     whichever rows there are.
+                //   - AttachmentType was required to equal 'M'. That value varies
+                //     between installations and some rows leave it null, so
+                //     demanding 'M' hid mails that were really there. The two kinds
+                //     on this table PARTITION it: a letter is 'I' and an e-mail is
+                //     anything else. Reading it as not-'I' hides nothing — and it
+                //     still has to be read, because the shared sources loader brings
+                //     the letters in separately and dropping the test altogether
+                //     would list every letter twice.
+                //
                 // COALESCE, not NVL: this panel's SQL runs on both databases.
                 string sql = @"SELECT ma.MailAddress,
                                       ma.MailAddressCc,
@@ -1871,11 +1949,12 @@ namespace VASLogic.Models
                                       u.Name AS UserName
                                  FROM MailAttachment1 ma
                                  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy)
-                                WHERE ma.AD_Table_ID =
-                                      (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'C_Order')
+                                WHERE ma.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'C_ORDER')
                                   AND ma.Record_ID = @C_Order_ID
-                                  AND COALESCE(ma.IsActive, 'Y')       = 'Y'
-                                  AND COALESCE(ma.AttachmentType, 'M') = 'M'
+                                  AND COALESCE(ma.IsActive, 'Y')        = 'Y'
+                                  AND COALESCE(ma.AttachmentType, 'M') <> 'I'
                                 ORDER BY ma.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
@@ -2708,6 +2787,129 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// Remembers whether the target document type's IsShipConfirm can be read
+        /// against this schema, for the same reason
+        /// <see cref="_emailSentLookupUsable"/> exists.
+        /// </summary>
+        private static bool? _shipConfirmLookupUsable;
+
+        /// <summary>
+        /// Whether this order's TARGET document type asks for a shipment
+        /// confirmation (C_DocTypeTarget_ID -> C_DocType.IsShipConfirm).
+        ///
+        /// The target type, not the completed one: it is the type the order is being
+        /// processed AS — the one the user picks on the record — and C_DocType_ID
+        /// only catches up with it when the document completes. The completed type
+        /// is kept as the fallback, so a schema that leaves the target unset still
+        /// answers from the type the order ended on.
+        ///
+        /// This is what splits the progress line's Shipped and Delivered stages in
+        /// two. With confirmation ON, the delivery order sits In Process awaiting its
+        /// confirmation and never reaches Completed on its own, so the stages have to
+        /// read that state as progress rather than as nothing having happened; with
+        /// it OFF, completion is the milestone.
+        ///
+        /// Its own statement, ATTEMPTED rather than gated: reading it beside the
+        /// header would fail the whole overview on a schema that lacks the column.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected sales order id.</param>
+        /// <param name="d">Overview being populated.</param>
+        private void LoadShipConfirmTarget(int C_Order_ID, SalesOrderOverviewData d)
+        {
+            if (_shipConfirmLookupUsable == false) return;
+
+            try
+            {
+                string sql = @"SELECT COALESCE(dtt.IsShipConfirm, dt.IsShipConfirm, 'N') AS IsShipConfirm
+                                 FROM C_Order o
+                                 LEFT OUTER JOIN C_DocType dtt ON (dtt.C_DocType_ID = o.C_DocTypeTarget_ID)
+                                 LEFT OUTER JOIN C_DocType dt  ON (dt.C_DocType_ID  = o.C_DocType_ID)
+                                WHERE o.C_Order_ID = @C_Order_ID";
+                object v = DB.ExecuteScalar(sql, OrderParam(C_Order_ID), null);
+                _shipConfirmLookupUsable = true;
+                d.IsShipConfirmTarget = Util.GetValueOfString(v) == "Y";
+            }
+            catch (Exception ex)
+            {
+                _shipConfirmLookupUsable = false;
+                _log.Severe("LoadShipConfirmTarget (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// When each of a set of documents was COMPLETED — the Created stamp of its
+        /// workflow DocComplete activity — keyed by record id.
+        ///
+        /// One statement for the whole set rather than one per document: the
+        /// progress line needs the completion moment of every delivery, invoice and
+        /// receipt the order touches, and asking per record would put an unbounded
+        /// number of round trips behind one panel load.
+        ///
+        /// Both the table name and the id source are written in as literals. They
+        /// are this file's own SQL, never user text, and it keeps the statement free
+        /// of binds entirely — the app's Oracle layer binds by POSITION, so an id
+        /// source carrying a bind name would have to be kept in step with the
+        /// parameter array for no gain.
+        /// </summary>
+        /// <param name="tableName">AD_Table.TableName of the documents' table.</param>
+        /// <param name="recordIdSource">SELECT yielding the record ids to look up.</param>
+        /// <returns>Record id -> completion moment; empty when none has completed.</returns>
+        private Dictionary<int, DateTime> LoadCompletionStamps(string tableName, string recordIdSource)
+        {
+            Dictionary<int, DateTime> map = new Dictionary<int, DateTime>();
+            try
+            {
+                string sql = @"SELECT wfp.Record_ID, MAX(wfa.Created) AS CompletedOn
+                                 FROM AD_WF_Process wfp
+                                INNER JOIN AD_WF_Activity wfa
+                                        ON (wfa.AD_WF_Process_ID = wfp.AD_WF_Process_ID)
+                                INNER JOIN AD_WF_Node wfn
+                                        ON (wfn.AD_WF_Node_ID = wfa.AD_WF_Node_ID)
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = wfp.AD_Table_ID)
+                                WHERE UPPER(adt.TableName) = '" + tableName.ToUpper() + @"'
+                                  AND wfp.Record_ID IN (" + recordIdSource + @")
+                                  AND wfp.IsActive = 'Y'
+                                  AND wfa.IsActive = 'Y'
+                                  AND wfn.IsActive = 'Y'
+                                  AND wfa.WFState  = 'CC'
+                                  AND UPPER(TRIM(wfn.Value)) IN ('DOCCOMPLETE', 'COMPLETE', '(DOCCOMPLETE)')
+                                GROUP BY wfp.Record_ID";
+                DataSet ds = DB.ExecuteDataset(sql, null, null);
+                if (ds == null || ds.Tables.Count == 0) return map;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    int id = Util.GetValueOfInt(r["Record_ID"]);
+                    DateTime? on = Util.GetValueOfDateTime(r["CompletedOn"]);
+                    if (id > 0 && on.HasValue) map[id] = on.Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: every caller falls back to the document's own Updated
+                // stamp, which is the closest thing a document completed outside the
+                // workflow engine has.
+                _log.Severe("LoadCompletionStamps (" + tableName + "): " + ex.Message);
+            }
+            return map;
+        }
+
+        /// <summary>
+        /// The completion moment for one document: its workflow stamp where there is
+        /// one, else the document's own last-updated stamp — but only for a document
+        /// that IS completed. An open document has no completion date, and reporting
+        /// its Updated stamp as one would date a milestone it has not reached.
+        /// </summary>
+        private static DateTime? CompletedOn(Dictionary<int, DateTime> stamps, int recordId,
+                                             string docStatus, DateTime? updated)
+        {
+            if (docStatus != "CO" && docStatus != "CL") return null;
+            if (stamps != null && stamps.ContainsKey(recordId)) return stamps[recordId];
+            return updated;
+        }
+
+        /// <summary>
         /// Returns true when the given column exists on the given table, using the
         /// AD_Column dictionary. A DB issue degrades to "absent" (false), which
         /// just drops the optional value that depends on it.
@@ -2849,6 +3051,12 @@ namespace VASLogic.Models
             public string    DocumentNo  { get; set; }
             public string    DocStatus   { get; set; }
             public DateTime? DocDate     { get; set; }
+            /// <summary>When the document COMPLETED — its workflow DocComplete
+            /// stamp, falling back to its own last-updated stamp. Null while it is
+            /// open, so the progress line can tell "not yet" from "on this
+            /// date". Carried for the receipts, which the Paid stage dates
+            /// itself by.</summary>
+            public DateTime? CompletedDate { get; set; }
             // Null for a document with no monetary total of its own (a shipment) —
             // distinct from a genuine zero.
             public decimal?  Amount      { get; set; }
@@ -2868,6 +3076,11 @@ namespace VASLogic.Models
             // progress line's Shipped / Delivered stages are dated by, since
             // MovementDate can be back-dated.
             public DateTime? Created      { get; set; }
+            /// <summary>When the shipment COMPLETED — its workflow DocComplete
+            /// stamp, falling back to its own last-updated stamp; null while it is
+            /// open. The Delivered stage dates itself by this, where Shipped reports
+            /// when the shipment was RAISED.</summary>
+            public DateTime? CompletedDate { get; set; }
             public string   TrackingNo    { get; set; }
             public string   WarehouseName { get; set; }
             public decimal  DeliveredQty  { get; set; }
@@ -2887,6 +3100,10 @@ namespace VASLogic.Models
             // progress line's Invoiced stage is dated by, since DateInvoiced can be
             // back-dated. Same treatment as DeliveryData.Created.
             public DateTime? Created      { get; set; }
+            /// <summary>When the invoice COMPLETED — its workflow DocComplete stamp,
+            /// falling back to its own last-updated stamp; null while it is drafted.
+            /// The Invoiced stage reports the LATEST of these.</summary>
+            public DateTime? CompletedDate { get; set; }
             public decimal  GrandTotal   { get; set; }
             public bool     IsPaid       { get; set; }
         }
@@ -2998,6 +3215,12 @@ namespace VASLogic.Models
             /// the customer. Drives the header's "Email Sent" badge, which is drawn
             /// only when the flag is set.</summary>
             public bool      IsEmailSent    { get; set; }
+            /// <summary>IsShipConfirm on the order's TARGET document type
+            /// (C_DocTypeTarget_ID, falling back to the completed type) — this order
+            /// is to be shipped with a confirmation. It is what decides whether the
+            /// progress line's Shipped and Delivered stages read the delivery order's
+            /// IN PROCESS state as progress or wait for it to complete.</summary>
+            public bool      IsShipConfirmTarget { get; set; }
             public string    SalesRepName   { get; set; }
             public string    PaymentTermName { get; set; }
             public string    PriceListName  { get; set; }

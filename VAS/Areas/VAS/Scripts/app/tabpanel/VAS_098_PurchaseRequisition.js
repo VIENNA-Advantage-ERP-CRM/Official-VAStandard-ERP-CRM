@@ -399,6 +399,25 @@
  *                        text, still naming the document, rather than opening the
  *                        wrong screen. Same treatment the VA075 / VAMFG chips
  *                        already had.
+ *   VAI163   2026-08-26  - Generated From names a referenced BLANKET order as one.
+ *                          A requisition raised against a C_Order carrying
+ *                          IsBlanketTrx = 'Y' read "Sales Order", which called a
+ *                          standing commitment an ordinary order. The chip follows
+ *                          data.RefOrderIsBlanket (refOrderLabel) and carries the
+ *                          blanket screen's window with it; an ordinary order is
+ *                          left on the client's own lookup, since passing a
+ *                          server-resolved 0 would take its link away. The model
+ *                          fixes the loader that should have claimed the record for
+ *                          the Blanket chip in the first place.
+ *                        - Progress: the Completed stage reads Pending while the
+ *                          document is Drafted or In Progress, where it read
+ *                          "In Progress" on both — a caption that claimed work had
+ *                          started on a record nobody had submitted, and that said
+ *                          the same thing either way. It is marked done by the
+ *                          DOCUMENT STATUS alone now (CO / CL), not also by
+ *                          IsConverted, and captions with the completion date; a
+ *                          converted requisition still lights it through the
+ *                          existing reach rule.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1002,14 +1021,31 @@
             // the trade, so the chip names the side the linked order is actually
             // on rather than assuming a sale, and opens it in that side's window.
             //
+            // A referenced order that is itself a BLANKET is named as one
+            // (RefOrderIsBlanket): a standing commitment is not an ordinary order,
+            // and the chip carries the blanket screen's window with it, since
+            // C_Order's own window cannot show a blanket. The model normally hands
+            // that record to the chip above and clears this one — this is what keeps
+            // the naming right on a schema where none of its routes can run.
+            //
             // The model clears this one when it turns out to be the same record as
             // the blanket above, so the strip never lists one document twice.
             if (data.RefOrderNo) {
-                var $order = originChip("doc",
-                    data.RefOrderIsSOTrx ? msg("SalesOrder", "Sales Order")
-                                         : msg("Order", "Order"),
-                    countedValue(data.RefOrderNo, data.RefOrderCount),
-                    "success", "C_Order", data.RefOrderId);
+                var refValue = countedValue(data.RefOrderNo, data.RefOrderCount);
+                var $order;
+                if (data.RefOrderIsBlanket) {
+                    $order = originChip("doc", refOrderLabel(), refValue,
+                        "success", "C_Order", data.RefOrderId, "",
+                        data.RefOrderWindowId,
+                        data.RefOrderIsSOTrx ? "VAS_BlanketSalesOrder"
+                                             : "VAS_BlanketPurchaseOrder");
+                } else {
+                    // No window argument at all: an ordinary order opens fine
+                    // through the client's own lookup, and a server-resolved 0
+                    // would strip the chip of its link instead.
+                    $order = originChip("doc", refOrderLabel(), refValue,
+                        "success", "C_Order", data.RefOrderId);
+                }
                 if (data.RefOrderIsSOTrx) $order.attr("data-open-sotrx", "Y");
                 $chips.append($order);
                 any = true;
@@ -1039,6 +1075,20 @@
 
             $strip.append($chips);
             $body.append($strip);
+        }
+
+        // What the referenced order chip calls itself. A blanket is named as one on
+        // both sides of the trade: the label is what tells a reader the requisition
+        // draws on a standing commitment rather than on a one-off order, and the
+        // two open different screens.
+        function refOrderLabel() {
+            if (data.RefOrderIsBlanket) {
+                return data.RefOrderIsSOTrx
+                    ? msg("BlanketSalesOrder", "Blanket Sales Order")
+                    : msg("BlanketOrder", "Blanket Purchase Order");
+            }
+            return data.RefOrderIsSOTrx ? msg("SalesOrder", "Sales Order")
+                                        : msg("Order", "Order");
         }
 
         // "REQ-1 +2" — the first document named, the rest counted, for an origin
@@ -1512,7 +1562,14 @@
         // back- or forward-dated).
         function progressStages() {
             var s = data.StatusCode;
-            var completed  = s === "CO" || s === "CL" || data.IsConverted;
+            // The DOCUMENT's own status decides this one, and only it: the stage
+            // reports whether the requisition has been completed, so it turns on the
+            // status turning Completed (or Closed) and shows the moment that
+            // happened. IsConverted used to count here too, which asked a second
+            // document's existence to answer a question about this one's status —
+            // and nothing is lost by dropping it, because a converted requisition
+            // already back-fills this stage through the reach rule below.
+            var completed  = s === "CO" || s === "CL";
             // Converted once ANYTHING has been raised from the requisition — a
             // purchase or blanket order, an RFQ, a material transfer, an inventory
             // use issue — and in fulfilment once one of those has been completed.
@@ -1618,6 +1675,16 @@
         // Caption for the stage being worked towards — forward-looking, since it
         // has not happened yet and therefore has no date to report.
         function activeSub(stg) {
+            // Completed reports the DOCUMENT's own status and nothing else. Until
+            // the document completes there is only one thing to say about it, and a
+            // requisition sitting in draft and one part-way through its workflow are
+            // the same thing here: Pending. It read "In Progress" on a drafted
+            // record, which claimed work had started on a document nobody had
+            // submitted, and it read the same on one that really was in progress —
+            // so the caption never distinguished anything. Once the status turns
+            // Completed the stage is reached, and the branch above captions it with
+            // the completion date instead of this.
+            if (stg.key === "vas_098-c2") return msg("Pending");
             if (stg.key === "vas_098-c3") return msg("ReadyToConvert");
             return msg("InProgressSub");
         }

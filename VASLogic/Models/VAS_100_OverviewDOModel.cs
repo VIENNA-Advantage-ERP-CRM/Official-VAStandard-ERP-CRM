@@ -108,6 +108,34 @@
 ///                        The body (TextMsg, flattened) travels with the row so
 ///                        the panel reveals it on click. Read in one query for
 ///                        the whole feed through VAS_ActivitySourcesModel.
+///   VAI163   2026-08-26  The timeline reports the LINKED DOCUMENTS' own progress,
+///                        which the payload could not answer before:
+///                        - CompletedDate / CompletedBy: the delivery's workflow
+///                          DocComplete stamp, falling back to its last change. The
+///                          Completed stage captioned itself with the MOVEMENT date,
+///                          which is the day the goods moved and is typed on the
+///                          document — a delivery entered for last month and
+///                          completed today reported last month.
+///                        - IsShipConfirmTarget: IsShipConfirm on the TARGET
+///                          document type (C_DocTypeTarget_ID), which is the type
+///                          the delivery is being processed as. C_DocType_ID only
+///                          catches up at completion, so the existing
+///                          IsShipConfirmDocType said "no confirmation" on exactly
+///                          the deliveries whose confirmation is still ahead of
+///                          them. It still feeds the snapshot cards, unchanged.
+///                        - HasConfirmation / ConfirmStatus / ConfirmCompletedDate
+///                          (LoadConfirmationState): the shipment confirmation that
+///                          speaks for the delivery — a completed one where there is
+///                          one, else the newest open one — and when it completed.
+///                        - HasInvoice / InvoiceStatus / InvoiceCompletedDate
+///                          (LoadInvoiceState): the AR invoices billing THIS
+///                          delivery's lines (C_InvoiceLine.M_InOutLine_ID, the same
+///                          delivery-scoped link LoadInvoiceDocuments uses), and the
+///                          completion moment of the LATEST COMPLETED one.
+///                        The workflow DocComplete lookup is written once for any
+///                        table (GetWorkflowCompletedDate). Every one of these
+///                        stages falls back to the document's own Updated stamp when
+///                        it was completed outside the workflow engine.
 /// </summary>
 
 using System;
@@ -168,6 +196,21 @@ namespace VASLogic.Models
             bool hasShipConfirm = ColumnExists("C_DocType", "IsShipConfirm");
             string shipConfirmExpr = hasShipConfirm ? "COALESCE(dt.IsShipConfirm, 'N')" : "'N'";
 
+            // The timeline's Confirmed stage reads the same flag off the TARGET
+            // document type (M_InOut.C_DocTypeTarget_ID) — the type the delivery is
+            // being processed AS, which is what the user picks on the record and
+            // what decides whether a confirmation is raised at all. C_DocType_ID
+            // only catches up with it at completion, so asking that column alone
+            // hid the stage on exactly the deliveries whose confirmation is still
+            // ahead of them. The completed type stays as the fallback.
+            bool hasTargetDocType = ColumnExists("M_InOut", "C_DocTypeTarget_ID");
+            string targetDocJoin = hasTargetDocType
+                ? "LEFT OUTER JOIN C_DocType dtt ON (io.C_DocTypeTarget_ID = dtt.C_DocType_ID)"
+                : "";
+            string shipConfirmTargetExpr = !hasShipConfirm ? "'N'"
+                : (hasTargetDocType ? "COALESCE(dtt.IsShipConfirm, dt.IsShipConfirm, 'N')"
+                                    : shipConfirmExpr);
+
             // The confirmation quantities: what was accepted, the gap against the
             // target, and what was scrapped. Each is guarded on its own column so a
             // schema missing one still reports the others.
@@ -198,6 +241,7 @@ namespace VASLogic.Models
                               io.Processed,
                               io.Posted,
                               io.Created,
+                              io.Updated,
                               io.MovementDate,
                               io.PriorityRule,
                               io.POReference,
@@ -255,11 +299,13 @@ namespace VASLogic.Models
                                 WHERE l.M_InOut_ID = io.M_InOut_ID
                                   AND l.IsActive   = 'Y')                       AS LineDeliveryValue,
                               " + shipConfirmExpr  + @"                         AS IsShipConfirmDocType,
+                              " + shipConfirmTargetExpr + @"                    AS IsShipConfirmTarget,
                               " + confirmedQtySel  + @"                         AS AcceptedQty,
                               " + differenceQtySel + @"                         AS DifferenceQty,
                               " + scrappedQtySel   + @"                         AS ScrappedQty
                             FROM M_InOut io
                             LEFT OUTER JOIN C_DocType dt     ON (io.C_DocType_ID         = dt.C_DocType_ID)
+                            " + targetDocJoin + @"
                             INNER JOIN C_BPartner bp        ON (io.C_BPartner_ID          = bp.C_BPartner_ID)
                             LEFT OUTER JOIN C_Order so       ON (io.C_Order_ID            = so.C_Order_ID)
                             LEFT OUTER JOIN C_BPartner_Location bpl ON (io.C_BPartner_Location_ID = bpl.C_BPartner_Location_ID)
@@ -402,6 +448,8 @@ namespace VASLogic.Models
             // ----- Quality confirmation -----
             result.IsShipConfirmDocType =
                 Util.GetValueOfString(r["IsShipConfirmDocType"]) == "Y";
+            result.IsShipConfirmTarget  =
+                Util.GetValueOfString(r["IsShipConfirmTarget"]) == "Y";
             result.AcceptedQty   = Util.GetValueOfDecimal(r["AcceptedQty"]);
             result.DifferenceQty = Util.GetValueOfDecimal(r["DifferenceQty"]);
             result.ScrappedQty   = Util.GetValueOfDecimal(r["ScrappedQty"]);
@@ -419,8 +467,31 @@ namespace VASLogic.Models
             // probing) duplicated and kept in step by hand.
             LoadQualityParams(M_InOut_ID, result);
 
-            // When posting actually ran, for the timeline's Posted stage.
+            // When posting actually ran. The timeline no longer carries a Posted
+            // stage, but the header's Posted pill and the activity trail still
+            // report the moment, so it is still read.
             result.PostedDate = GetPostedDate(M_InOut_ID);
+
+            // ----- Timeline state -----
+            // When the delivery itself completed: the workflow's own DocComplete
+            // stamp. NOT the movement date, which is the day the goods moved, typed
+            // on the document — a delivery entered for last month and completed
+            // today would caption its Completed stage with last month.
+            if (result.StatusCode == "CO" || result.StatusCode == "CL")
+            {
+                result.CompletedDate = GetWorkflowCompletedDate("M_InOut", M_InOut_ID);
+                result.CompletedBy   = _lastCompletedByName;
+                // Completed outside the workflow engine — the last change is the
+                // closest stamp there is.
+                if (!result.CompletedDate.HasValue)
+                    result.CompletedDate = Util.GetValueOfDateTime(r["Updated"]);
+            }
+
+            // The Confirmed and Invoiced stages report a LINKED document's own
+            // progress, not the delivery's, so each needs that document's status
+            // and — once it is completed — the moment it completed.
+            LoadConfirmationState(M_InOut_ID, result);
+            LoadInvoiceState(M_InOut_ID, result);
 
             // ----- Documents raised against this delivery -----
             result.Documents = LoadDocuments(M_InOut_ID);
@@ -824,6 +895,174 @@ namespace VASLogic.Models
         private SqlParameter[] InOutParam(int M_InOut_ID)
         {
             return new SqlParameter[] { new SqlParameter("@M_InOut_ID", M_InOut_ID) };
+        }
+
+        /// <summary>
+        /// Set by <see cref="GetWorkflowCompletedDate"/> alongside its return value,
+        /// so a caller gets both the moment and the actor from one query.
+        /// </summary>
+        private string _lastCompletedByName;
+
+        /// <summary>
+        /// The moment ANY document was completed: the Created stamp of the
+        /// DocComplete activity of the workflow run against it, or null when it has
+        /// no such node (completed outside the workflow engine, or never completed).
+        /// The completing user comes back in <see cref="_lastCompletedByName"/>.
+        ///
+        /// The delivery is not the only document the timeline reports on — its
+        /// shipment confirmation and its AR invoices have completion moments of
+        /// their own — so the lookup is written once and told which table to read.
+        ///
+        /// <paramref name="tableName"/> is written into the statement as a literal.
+        /// It is only ever one of this file's own constants, never user text, and
+        /// the record id stays the statement's SINGLE bind: the app's Oracle layer
+        /// binds by POSITION, so a second placeholder would have to be kept in step
+        /// with the parameter array for no gain.
+        /// </summary>
+        /// <param name="tableName">AD_Table.TableName of the document's table.</param>
+        /// <param name="recordId">The document's record id.</param>
+        private DateTime? GetWorkflowCompletedDate(string tableName, int recordId)
+        {
+            _lastCompletedByName = "";
+            if (recordId <= 0) return null;
+            try
+            {
+                string sql = @"SELECT wfa.Created, u.Name AS UserName
+                                 FROM AD_WF_Process wfp
+                                INNER JOIN AD_WF_Activity wfa
+                                        ON (wfa.AD_WF_Process_ID = wfp.AD_WF_Process_ID)
+                                INNER JOIN AD_WF_Node wfn
+                                        ON (wfn.AD_WF_Node_ID = wfa.AD_WF_Node_ID)
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = wfp.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_User u ON (wfa.CreatedBy = u.AD_User_ID)
+                                WHERE wfp.Record_ID = @Record_ID
+                                  AND adt.TableName = '" + tableName + @"'
+                                  AND NVL(wfp.IsActive, 'Y') = 'Y'
+                                  AND NVL(wfa.IsActive, 'Y') = 'Y'
+                                  AND NVL(wfn.IsActive, 'Y') = 'Y'
+                                  AND wfa.WFState = 'CC'
+                                  AND UPPER(TRIM(wfn.Value)) IN ('DOCCOMPLETE', 'COMPLETE', '(DOCCOMPLETE)')
+                                ORDER BY wfa.Created DESC";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@Record_ID", recordId)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return null;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                _lastCompletedByName = Util.GetValueOfString(r["UserName"]);
+                return Util.GetValueOfDateTime(r["Created"]);
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: every caller falls back to the document's own stamp.
+                _log.Severe("GetWorkflowCompletedDate (" + tableName + "=" + recordId + "): " + ex.Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Fills the timeline's Confirmed stage: whether a shipment confirmation
+        /// (M_InOutConfirm) has been raised for this delivery at all, the status of
+        /// the one that speaks for it, and — once it is completed — when that
+        /// happened.
+        ///
+        /// The confirmation that speaks for the delivery is a COMPLETED one where
+        /// there is one; only when none has completed does the newest open one
+        /// answer, which is what leaves the stage reading "In Process". Reversed and
+        /// voided confirmations are ignored, as they are everywhere else here.
+        ///
+        /// The completion moment is the confirmation's own workflow stamp, falling
+        /// back to its last-updated stamp for one completed outside the workflow
+        /// engine — the rule the delivery's own Completed stage follows.
+        /// </summary>
+        private void LoadConfirmationState(int M_InOut_ID, DOOverviewData result)
+        {
+            try
+            {
+                string sql = @"SELECT c.M_InOutConfirm_ID, c.DocStatus, c.Updated
+                                 FROM M_InOutConfirm c
+                                WHERE c.M_InOut_ID = @M_InOut_ID
+                                  AND NVL(c.IsActive, 'Y') = 'Y'
+                                  AND c.DocStatus NOT IN ('RE', 'VO')
+                                ORDER BY CASE WHEN c.DocStatus IN ('CO', 'CL') THEN 0 ELSE 1 END,
+                                         c.Updated DESC,
+                                         c.M_InOutConfirm_ID DESC";
+                DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                result.HasConfirmation = true;
+                result.ConfirmStatus   = Util.GetValueOfString(r["DocStatus"]);
+                if (result.ConfirmStatus != "CO" && result.ConfirmStatus != "CL") return;
+
+                int confirmId = Util.GetValueOfInt(r["M_InOutConfirm_ID"]);
+                result.ConfirmCompletedDate = GetWorkflowCompletedDate("M_InOutConfirm", confirmId)
+                                              ?? Util.GetValueOfDateTime(r["Updated"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadConfirmationState (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Fills the timeline's Invoiced stage: whether an AR invoice exists for this
+        /// delivery at all, and the completion moment of the LATEST completed one
+        /// where several have been raised against it.
+        ///
+        /// Scoped to the DELIVERY's own lines (C_InvoiceLine.M_InOutLine_ID), the
+        /// same link <see cref="LoadInvoiceDocuments"/> uses — an invoice covering
+        /// another shipment of the same order has not invoiced this one.
+        /// </summary>
+        private void LoadInvoiceState(int M_InOut_ID, DOOverviewData result)
+        {
+            try
+            {
+                // Completed first, newest first within each group — so the first
+                // completed row is the latest completed invoice.
+                string sql = @"SELECT inv.C_Invoice_ID, inv.DocStatus, inv.Updated
+                                 FROM C_Invoice inv
+                                WHERE inv.IsActive   = 'Y'
+                                  AND inv.IsSOTrx    = 'Y'
+                                  AND inv.DocStatus NOT IN ('RE', 'VO')
+                                  AND EXISTS (SELECT 1
+                                                FROM C_InvoiceLine il
+                                               INNER JOIN M_InOutLine iol
+                                                       ON (iol.M_InOutLine_ID = il.M_InOutLine_ID)
+                                               WHERE il.C_Invoice_ID = inv.C_Invoice_ID
+                                                 AND il.IsActive     = 'Y'
+                                                 AND iol.M_InOut_ID  = @M_InOut_ID)
+                                ORDER BY CASE WHEN inv.DocStatus IN ('CO', 'CL') THEN 0 ELSE 1 END,
+                                         inv.Updated DESC,
+                                         inv.C_Invoice_ID DESC";
+                DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                result.HasInvoice = true;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    string status = Util.GetValueOfString(r["DocStatus"]);
+                    if (status != "CO" && status != "CL") continue;
+
+                    int invoiceId = Util.GetValueOfInt(r["C_Invoice_ID"]);
+                    result.InvoiceCompletedDate = GetWorkflowCompletedDate("C_Invoice", invoiceId)
+                                                  ?? Util.GetValueOfDateTime(r["Updated"]);
+                    result.InvoiceStatus = status;
+                    return;
+                }
+
+                // Raised but not completed — the stage stays pending, captioned by
+                // the status the panel now knows.
+                result.InvoiceStatus = Util.GetValueOfString(ds.Tables[0].Rows[0]["DocStatus"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadInvoiceState (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
+            }
         }
 
         /// <summary>
@@ -1681,6 +1920,13 @@ namespace VASLogic.Models
             /// the timeline's Posted stage is captioned with it.</summary>
             public DateTime? PostedDate     { get; set; }
             public DateTime? Created        { get; set; }   // record creation stamp
+            /// <summary>When the delivery was COMPLETED — the workflow's DocComplete
+            /// stamp, falling back to the last change for one completed outside the
+            /// workflow engine. Null until it completes. The timeline's Completed
+            /// stage captions with this, NOT with the movement date, which is the day
+            /// the goods moved and is typed on the document.</summary>
+            public DateTime? CompletedDate  { get; set; }
+            public string    CompletedBy    { get; set; }   // who completed it
             public DateTime? MovementDate   { get; set; }
             public string    PriorityCode   { get; set; }   // PriorityRule code
             public string    OrderReference { get; set; }   // POReference
@@ -1752,12 +1998,36 @@ namespace VASLogic.Models
             /// shipment confirmation. Decides whether the panel shows the three
             /// confirmation cards at all.</summary>
             public bool      IsShipConfirmDocType { get; set; }
+            /// <summary>IsShipConfirm on the TARGET document type
+            /// (M_InOut.C_DocTypeTarget_ID, falling back to the completed type) —
+            /// whether this delivery is to be confirmed at all, which is what decides
+            /// that the timeline carries a Confirmed stage.</summary>
+            public bool      IsShipConfirmTarget  { get; set; }
             public decimal   AcceptedQty      { get; set; }   // Σ M_InOutLineConfirm.ConfirmedQty
             public decimal   DifferenceQty    { get; set; }   // Σ M_InOutLineConfirm.DifferenceQty
             public decimal   ScrappedQty      { get; set; }   // Σ M_InOutLineConfirm.ScrappedQty
             /// <summary>How many delivery lines carry a product with QA parameters
             /// defined — the Confirmation Check card's sub-label.</summary>
             public int       QaParamLineCount { get; set; }
+
+            // Timeline: linked-document state
+            /// <summary>A shipment confirmation (M_InOutConfirm) has been raised,
+            /// whatever state it is in.</summary>
+            public bool      HasConfirmation      { get; set; }
+            /// <summary>DocStatus of the confirmation that speaks for the delivery —
+            /// a completed one where there is one, else the newest open one.</summary>
+            public string    ConfirmStatus        { get; set; }
+            /// <summary>When that confirmation completed; null until it does.</summary>
+            public DateTime? ConfirmCompletedDate { get; set; }
+            /// <summary>An AR invoice exists against this delivery's lines, whatever
+            /// state it is in.</summary>
+            public bool      HasInvoice           { get; set; }
+            /// <summary>DocStatus of the invoice the stage reports — the latest
+            /// completed one where any has completed, else the newest.</summary>
+            public string    InvoiceStatus        { get; set; }
+            /// <summary>When the LATEST completed AR invoice completed; null while
+            /// none has.</summary>
+            public DateTime? InvoiceCompletedDate { get; set; }
 
             // Collections
             public List<DOLineData>         Lines         { get; set; }
