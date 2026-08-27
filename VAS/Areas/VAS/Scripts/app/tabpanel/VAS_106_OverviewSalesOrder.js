@@ -1,4 +1,4 @@
-﻿/************************************************************
+/************************************************************
  * Module Name    : VAS
  * Purpose        : Sales Order Overview tab panel. Renders a review-and-act
  *                  overview of the selected sales order (C_Order, IsSOTrx = 'Y'):
@@ -414,6 +414,49 @@
  *                          that marker (canBeActive), which is what holds Shipped
  *                          at Pending. Partial Delivered, Delivered, Invoiced and
  *                          Paid are untouched.
+ *   VAI163   2026-08-26  Order Progress reworked to follow the order through its
+ *                        DOCUMENTS: Drafted -> Completed -> Shipped -> Delivered
+ *                        -> Invoiced -> Paid. Every stage past the first reports a
+ *                        document's own state, and states it itself: the stepper
+ *                        no longer marks the first not-done stage "In progress" on
+ *                        its own account, which captioned stages whose documents
+ *                        did not exist as though work were under way. canBeActive
+ *                        goes with it.
+ *                        - PARTIAL DELIVERED is gone as a stage. It was never a
+ *                          stage the order stopped at - an order delivered in full
+ *                          had passed through it, so it sat permanently done behind
+ *                          Delivered saying nothing that stage did not. Partial
+ *                          delivery is a caption ON Delivered now.
+ *                        - COMPLETED reads Pending while the order is drafted, In
+ *                          Process once it has moved, and the completion date once
+ *                          it completes.
+ *                        - SHIPPED and DELIVERED split on IsShipConfirm of the
+ *                          TARGET document type (data.IsShipConfirmTarget, model
+ *                          side). With confirmation ON a delivery order SITS In
+ *                          Process awaiting it and may never complete on its own,
+ *                          so reaching that state is the shipment and Shipped dates
+ *                          itself by when the delivery order was raised; with it
+ *                          OFF, completion is the milestone. Delivered waits for a
+ *                          COMPLETED delivery order either way, then asks how much
+ *                          of the order went with it - all of it dates the stage,
+ *                          part of it captions it Partial Delivered.
+ *                        - INVOICED and PAID wait for their document to COMPLETE.
+ *                          Invoiced went green on an invoice merely existing, and
+ *                          Paid on C_Invoice.IsPaid; both now report the LATEST
+ *                          COMPLETED AR invoice / AR receipt and its completion
+ *                          date (model side), and a drafted one leaves the stage
+ *                          Pending.
+ *                        - The POSTED badge is gone from the Order Progress
+ *                          heading. Posting is an accounting act, not a step of the
+ *                          order's progress through its documents. postBadge and
+ *                          the four now-unused date helpers (lastDeliveryDate /
+ *                          lastInvoiceDate / lastPaymentDate / shippedStage) are
+ *                          removed with it.
+ *                        - The unit price cell no longer draws a HELP cursor for
+ *                          its list-price tooltip (stylesheet). The question mark
+ *                          hanging off the pointer read as a query about the
+ *                          amount; the tooltip stays and is found by resting on the
+ *                          cell, as every other tooltip here is.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1198,168 +1241,181 @@
         //  Order Progress stepper                                            //
         // ----------------------------------------------------------------- //
 
-        // The latest delivery raised against this order, for the Shipped and
-        // Delivered stages. Taken as the maximum rather than the first row, so the
-        // stage does not depend on the order the server happened to return them in.
+        // The DELIVERY ORDERS' collective state, which both the Shipped and the
+        // Delivered stage are read from. One pass, because the two stages ask
+        // different questions of the same rows and must never disagree about them.
         //
-        // Dated by when the delivery RECORD was created (M_InOut.Created), not by
-        // its movement date: the movement date is a document field a user can
-        // back-date or set forward, so the stage could report a day on which nothing
-        // had yet been entered. It is a real timestamp, so it is read as UTC and
-        // rendered in the viewer's own zone; MovementDate remains the fallback for a
-        // shipment whose create stamp cannot be read.
-        function lastDeliveryDate() {
-            var dv = data.Deliveries || [], best = null;
-            for (var i = 0; i < dv.length; i++) {
-                var d = parseDbDate(dv[i].Created, true) || parseDbDate(dv[i].MovementDate, false);
-                if (d && (!best || d > best)) best = d;
-            }
-            return best;
-        }
-
-        // When the order was invoiced, for the Invoiced stage — the LATEST invoice
-        // raised against it, which is the point the order reached its current
-        // billed position. Read from the invoice RECORD's create stamp for the same
-        // reason the deliveries are, with DateInvoiced as the fallback: that is a
-        // document field a user can back-date, so on its own the stage could report
-        // a day on which nothing had been entered.
-        function lastInvoiceDate() {
-            var inv = data.Invoices || [], best = null;
-            for (var i = 0; i < inv.length; i++) {
-                var d = parseDbDate(inv[i].Created, true) || parseDbDate(inv[i].DateInvoiced, false);
-                if (d && (!best || d > best)) best = d;
-            }
-            return best;
-        }
-
-        // When the order was last PAID against, for the Paid stage: the most recent
-        // customer receipt allocated to one of its invoices (Documents, type
-        // "receipt" — C_Payment.DateTrx, model side). Null when nothing has been
-        // received yet, which leaves the stage on its pending caption.
-        function lastPaymentDate() {
-            var docs = data.Documents || [], best = null;
-            for (var i = 0; i < docs.length; i++) {
-                if (docs[i].Type !== "receipt") continue;
-                var d = parseDbDate(docs[i].DocDate, false);
-                if (d && (!best || d > best)) best = d;
-            }
-            return best;
-        }
-
-        // The Shipped stage, resolved from the DELIVERY ORDERS raised against this
-        // sales order and from nothing else:
-        //
-        //   done       — a delivery order has been COMPLETED (or closed). Dated by
-        //                that delivery order's own creation stamp (M_InOut.Created,
-        //                model side), not by MovementDate, which a user can
-        //                back-date. The EARLIEST completed one is used: Shipped is
-        //                the moment the order first went out, where Delivered and
-        //                Partial Delivered below report the latest movement.
-        //   inProgress — nothing completed yet, but a delivery order EXISTS and is
-        //                still drafted. This is the only state that shows the stage
-        //                as active.
-        //   neither    — no delivery order at all, so the stage is Pending.
-        //
-        // Completing the sales order does not touch any of this. It used to: the
-        // stepper marks the first not-done stage "In progress", so a completed order
-        // with nothing shipped showed Shipped as in progress — claiming a delivery
-        // that had not been raised. canBeActive:false on the stage is what holds it
-        // at Pending instead.
-        function shippedStage() {
+        //   raisedDate    — the EARLIEST delivery order that has left draft. Shipped
+        //                   reports when the order first went out, so it takes the
+        //                   first, where Delivered below reports the latest movement.
+        //   completedDate — the LATEST completed delivery order's completion moment
+        //                   (its workflow DocComplete stamp, model side), falling
+        //                   back to when it was raised.
+        //   inProcess     — a delivery order exists that is neither drafted nor
+        //                   completed. Under ship confirmation that is where a
+        //                   delivery order SITS, waiting to be confirmed, so it is a
+        //                   state the stages have to report as progress rather than
+        //                   as nothing having happened.
+        //   onlyDrafted   — every delivery order raised is still in draft, which the
+        //                   stages read exactly as "none raised": Pending.
+        function deliveryState() {
             var dv = data.Deliveries || [];
-            var doneDate = null, drafted = false;
+            var raised = null, completed = null, inProcess = false, open = 0;
             for (var i = 0; i < dv.length; i++) {
                 var st = dv[i].DocStatus;
                 if (st === "CO" || st === "CL") {
-                    var d = parseDbDate(dv[i].Created, true) || parseDbDate(dv[i].MovementDate, false);
-                    if (d && (!doneDate || d < doneDate)) doneDate = d;
-                } else if (st === "DR") {
-                    drafted = true;
+                    var c = parseDbDate(dv[i].CompletedDate, true) ||
+                            parseDbDate(dv[i].Created, true) ||
+                            parseDbDate(dv[i].MovementDate, false);
+                    if (c && (!completed || c > completed)) completed = c;
+                } else if (st !== "DR") {
+                    inProcess = true;
+                }
+                if (st !== "DR") {
+                    open++;
+                    var r = parseDbDate(dv[i].Created, true) ||
+                            parseDbDate(dv[i].MovementDate, false);
+                    if (r && (!raised || r < raised)) raised = r;
                 }
             }
             return {
-                done: !!doneDate,
-                date: doneDate,
-                inProgress: !doneDate && drafted
+                exists: dv.length > 0,
+                raisedDate: raised,
+                completedDate: completed,
+                completed: !!completed,
+                inProcess: inProcess,
+                onlyDrafted: dv.length > 0 && open === 0
             };
         }
 
+        // When the order was INVOICED: the latest COMPLETED AR invoice's completion
+        // moment. A drafted invoice is not an invoiced order — it contributes
+        // nothing, which is what leaves the stage Pending.
+        function invoiceCompletedDate() {
+            var inv = data.Invoices || [], best = null;
+            for (var i = 0; i < inv.length; i++) {
+                var st = inv[i].DocStatus;
+                if (st !== "CO" && st !== "CL") continue;
+                var d = parseDbDate(inv[i].CompletedDate, true) ||
+                        parseDbDate(inv[i].Created, true) ||
+                        parseDbDate(inv[i].DateInvoiced, false);
+                if (d && (!best || d > best)) best = d;
+            }
+            return best;
+        }
+
+        // When the order was PAID: the latest COMPLETED customer receipt's
+        // completion moment, read from the same Documents rows the section below
+        // lists. A drafted receipt counts for nothing, as a drafted invoice does.
+        function receiptCompletedDate() {
+            var docs = data.Documents || [], best = null;
+            for (var i = 0; i < docs.length; i++) {
+                if (docs[i].Type !== "receipt") continue;
+                var st = docs[i].DocStatus;
+                if (st !== "CO" && st !== "CL") continue;
+                var d = parseDbDate(docs[i].CompletedDate, true) ||
+                        parseDbDate(docs[i].DocDate, false);
+                if (d && (!best || d > best)) best = d;
+            }
+            return best;
+        }
+
+        // The order's document lifecycle: Drafted -> Completed -> Shipped ->
+        // Delivered -> Invoiced -> Paid.
+        //
+        // Every stage past the first answers for a DOCUMENT — this order, its
+        // delivery orders, its AR invoices, its AR receipts — and reports that
+        // document's own state: a date once it is reached, and where it is up to
+        // until then. `pending` carries that caption, and `active` says the stage is
+        // under way rather than merely waiting.
+        //
+        // Partial Delivered is gone as a stage. It was never a stage the order
+        // stopped at: an order delivered in full had passed through it, so it sat
+        // permanently done behind the Delivered stage and told the reader nothing
+        // that stage did not. Partial delivery is a caption ON Delivered now, which
+        // is where the question is actually asked.
         function progressStages() {
-            var f = fulfilment(), iv = invoiced(), inv = data.Invoices || [], dv = data.Deliveries || [];
+            var f = fulfilment();
             var completed = isCompleted();
-            var shipped = dv.length > 0;
-            // Shipped is driven by the DELIVERY ORDER's own lifecycle, never by the
-            // sales order reaching Completed — see shippedStage().
-            var ship = shippedStage();
-            var delivered = f.total > 0 ? (f.full >= f.total) : shipped;
-            // Partial Delivered is a stage the order PASSES THROUGH, not a state it
-            // is either in or out of: an order that is delivered in full reached
-            // this point on the way, so the stage stays done behind it. Anything
-            // shipped against a stock line puts the order here; an order with no
-            // stock lines at all follows its shipments, as Delivered does.
-            var partDelivered = f.total > 0 ? (f.started > 0 || delivered) : shipped;
-            var invd = iv.amount > 0;
-            var paid = inv.length > 0 && iv.state === getMsg("VAS_106_Paid", "paid");
-            var lastDelivery = lastDeliveryDate();
+            var drafted = !data.DocStatus || data.DocStatus === "DR";
+            var shipConfirm = !!data.IsShipConfirmTarget;
+            var dl = deliveryState();
+            var inProcess = getMsg("VAS_106_InProcess", "In Process");
+
+            // Shipped. With ship confirmation ON the delivery order sits In Process
+            // awaiting confirmation and may never complete on its own, so reaching
+            // that state IS the shipment and the stage dates itself by when the
+            // delivery order was raised. With it OFF, completion is the milestone
+            // and the stage dates itself by that. Either way a delivery order that
+            // is still drafted, or none at all, leaves the stage Pending — including
+            // on a completed sales order, which says nothing about whether anything
+            // has shipped.
+            var shipDone = shipConfirm ? (dl.inProcess || dl.completed) : dl.completed;
+            var shipDate = shipConfirm ? (dl.raisedDate || dl.completedDate) : dl.completedDate;
+
+            // Delivered. Nothing raised, or nothing out of draft, is Pending. Once a
+            // delivery order has COMPLETED the question is how much of the order it
+            // took: all of it dates the stage, part of it captions it Partial
+            // Delivered — a state, not a date. A delivery order under way but not
+            // completed is In Process.
+            var deliveredFull = f.total > 0 ? (f.full >= f.total) : dl.completed;
+            var delDone = dl.completed && deliveredFull;
+            var delPending = null, delActive = false;
+            if (!delDone) {
+                if (!dl.exists || dl.onlyDrafted) {
+                    delPending = null;                     // Pending
+                } else if (dl.completed) {
+                    delPending = getMsg("VAS_106_PartialDelivered", "Partial Delivered");
+                    delActive = true;
+                } else {
+                    delPending = inProcess;
+                    delActive = true;
+                }
+            }
+
+            var invDate = invoiceCompletedDate();
+            var payDate = receiptCompletedDate();
+
             return [
-                { key: "VAS_106_Drafted",   label: "Drafted",   done: true,      date: data.Created || data.DateOrdered },
-                // "Completed", not "Confirmed" — this stage is the document
-                // reaching Completed, so it is named for that and dated by when it
-                // actually happened (the workflow's DocComplete stamp, model side)
-                // rather than by DateOrdered, which is a document field a user can
-                // back-date.
+                // The record exists, so this one is always reached; it reports the
+                // day the order was created whatever state it has moved on to.
+                { key: "VAS_106_Drafted", label: "Drafted", done: true,
+                  date: parseDbDate(data.Created, true) || parseDbDate(data.DateOrdered, false) },
+                // Dated by when the order actually completed (the workflow's
+                // DocComplete stamp, model side) rather than by DateOrdered, which is
+                // a document field a user can back-date. Until then it says where the
+                // document is: nothing has been done to a drafted order, and one past
+                // draft is In Process.
                 { key: "VAS_106_Completed", label: "Completed", done: completed,
-                  date: completed ? (data.CompletedDate || data.DateOrdered) : null },
-                // Shipped answers for the DELIVERY ORDER, not for the sales order.
-                // It is done once a delivery order against this sales order has been
-                // completed, dated by that delivery order's creation stamp; it is
-                // "In progress" only while one exists and is still drafted. Anything
-                // else — no delivery order at all — leaves it Pending, INCLUDING a
-                // completed sales order, which used to drag the stage into "In
-                // progress" purely by being the first stage not yet done.
-                { key: "VAS_106_Shipped",   label: "Shipped",   done: ship.done,
-                  date: ship.date, canBeActive: ship.inProgress },
-                // Delivery in progress: some of the order has gone out, the rest has
-                // not. Counted in LINES, like Delivered beside it — the lines
-                // anything has shipped against, out of the stock lines there are.
-                //
-                // The count is only carried once something HAS shipped. A stage that
-                // nothing has reached yet showed "0/1", which reads as a measured
-                // result; with no count the stepper says "Pending", which is what a
-                // stage waiting on a delivery that does not exist actually means.
-                { key: "VAS_106_PartialDelivered", label: "Partial Delivered",
-                  done: partDelivered, date: partDelivered ? lastDelivery : null,
-                  meta: (f.total && f.started > 0) ? (f.started + "/" + f.total) : null },
-                // Dated by the LATEST delivery raised against the order — the
-                // delivery that carried it to this state.
-                { key: "VAS_106_Delivered", label: "Delivered", done: delivered, date: lastDelivery,
+                  date: completed ? (parseDbDate(data.CompletedDate, true) ||
+                                     parseDbDate(data.DateOrdered, false)) : null,
+                  pending: drafted ? null : inProcess, active: !drafted },
+                { key: "VAS_106_Shipped", label: "Shipped", done: shipDone, date: shipDate },
+                { key: "VAS_106_Delivered", label: "Delivered", done: delDone,
+                  date: dl.completedDate, pending: delPending, active: delActive,
                   meta: (f.total && f.full > 0) ? (f.full + "/" + f.total) : null },
-                // Dated by the LATEST invoice raised against the order. It used to
-                // carry the billed PERCENTAGE instead — a figure the Invoiced KPI
-                // card above already reports, where every other stage on this line
-                // answers "when did this happen".
-                { key: "VAS_106_Invoiced",  label: "Invoiced",  done: invd,
-                  date: invd ? lastInvoiceDate() : null },
-                // Dated by the LAST payment received against the order, for the
-                // same reason. It used to repeat the paid / unpaid state, which is
-                // what the stage's own done-or-not already says.
-                { key: "VAS_106_Paid",      label: "Paid",      done: paid,
-                  date: paid ? lastPaymentDate() : null }
+                // The LATEST completed AR invoice, which is the point the order
+                // reached its current billed position.
+                { key: "VAS_106_Invoiced", label: "Invoiced", done: !!invDate, date: invDate },
+                // The LATEST completed AR receipt, for the same reason.
+                { key: "VAS_106_Paid", label: "Paid", done: !!payDate, date: payDate }
             ];
         }
 
         function renderStepper() {
             var stages = progressStages();
-            // Active = first not-done stage (else the last).
+            // Active = first not-done stage (else the last). Used for the "stage n
+            // of m" summary; each stage's own caption is its own business.
             var active = stages.length;
             for (var a = 0; a < stages.length; a++) { if (!stages[a].done) { active = a; break; } }
 
-            var posted = data.Posted === "Y";
             var $sec = $('<section class="vas_106-sec"></section>');
             var $head = $('<div class="vas_106-secHead"></div>');
+            // The Posted badge is gone from this heading. Posting is an accounting
+            // act, not a step of the order's progress through its documents, and the
+            // badge sat inside the heading of a line that reports exactly that —
+            // answering a question the line does not ask.
             var $title = $('<h2 class="vas_106-secTitle"></h2>').text(getMsg("VAS_106_OrderProgress", "Order Progress"));
-            var $posted = postBadge(posted);
-            if ($posted) $title.append($posted);
             $head.append($title);
             $head.append($('<div class="vas_106-secRight"></div>').append(
                 $('<span class="vas_106-secSummary"></span>').text(
@@ -1371,31 +1427,21 @@
             for (var i = 0; i < stages.length; i++) {
                 var s = stages[i];
                 var stateCls, metaText;
-                // A stage may refuse the automatic "in progress" marker: being the
-                // first stage not yet done is not, on its own, evidence that anything
-                // is under way. Shipped sets canBeActive from the delivery order's
-                // own status, so a completed sales order with nothing raised against
-                // it stays Pending there. Every other stage leaves it undefined and
-                // keeps the original behaviour.
-                var mayBeActive = (s.canBeActive !== false);
-                if (i === active && !s.done && mayBeActive) { stateCls = "vas_106-is-active"; metaText = getMsg("VAS_106_InProgress", "In progress"); }
-                else if (s.done) { stateCls = "vas_106-is-done"; metaText = formatDate(s.date) || s.meta || getMsg("VAS_106_Done", "Done"); }
-                else { stateCls = "is-pending"; metaText = s.meta || getMsg("VAS_106_Pending", "Pending"); }
+                // Every stage states its own case. The stepper no longer marks the
+                // first not-done stage "In progress" on its own account: being next
+                // in line is not evidence that anything has started, and it captioned
+                // stages whose documents did not exist as though work were under way.
+                if (s.done) {
+                    stateCls = "vas_106-is-done";
+                    metaText = formatDate(s.date) || s.meta || getMsg("VAS_106_Done", "Done");
+                } else {
+                    stateCls = s.active ? "vas_106-is-active" : "is-pending";
+                    metaText = s.pending || getMsg("VAS_106_Pending", "Pending");
+                }
                 $tl.append(stepEntry(i + 1, getMsg(s.key, s.label), metaText, s.done, stateCls));
             }
             $sec.append($tl);
             $body.append($sec);
-        }
-
-        // The Posted badge, drawn only once the order IS posted. It used to render
-        // for every record, reading "Not Posted" on every drafted order — which is
-        // not news about a document that cannot be posted yet. It is a milestone
-        // badge now: absent until the milestone is reached. Returns null so the
-        // caller appends nothing at all.
-        function postBadge(posted) {
-            if (!posted) return null;
-            return $('<span class="vas_106-postBadge vas_106-posted"></span>')
-                .text(getMsg("VAS_106_Posted", "Posted"));
         }
 
         function stepEntry(num, title, meta, done, stateCls) {

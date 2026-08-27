@@ -47,6 +47,15 @@
     --cil-shadow-pop: 0 0.625em 1.5em rgba(15, 61, 97, 0.12);
     --cil-shadow-dialog: 0 1.25em 3.125em rgba(15, 61, 97, 0.2);
     --cil-font: "Roboto", "Helvetica Neue", Arial, sans-serif;
+    /* Grid geometry of the line rows. The "..." track is the LAST column, so whatever
+       width it takes is pushed off the right edge of the Taxable Amount column - and
+       Taxable Amount is the figure a reader compares against the Grand Total below it.
+       So the track is sized to what it actually holds and nothing more: the row Undo
+       (1.5em) + gap (0.25em) + the "..." button (1.5em), all of which resolve in the
+       CELL's font-size (0.875em), i.e. 2.844em of row-em. 2.875em covers that exactly.
+       Every em trimmed here moves the Taxable Amount column that much further right. */
+    --cil-col-gap: 0.75em;
+    --cil-more-col: 2.575em;
 }
 
 .vas-cil-root {
@@ -280,13 +289,13 @@
 
 /* ---------- table ---------- */
 .vas-cil-table {
-    padding: 0.5em 1.25em 1.125em;
+    padding: 0.5em 0.5em 0.5em;
 }
 
 .vas-cil-row {
     display: grid;
-    grid-template-columns: 2em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(4.75em, 0.4fr) minmax(6.75em, 0.85fr) 3.5em;
-    gap: 0.75em;
+    grid-template-columns: 2em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(4.75em, 0.4fr) minmax(6.75em, 0.85fr) var(--cil-more-col);
+    gap: var(--cil-col-gap);
     align-items: start;
     padding: 0.5em 0;
     border-bottom: 0.0625em solid var(--cil-divider);
@@ -497,10 +506,13 @@
     align-items: flex-end;
 }
 
+/* Buttons pinned to the RIGHT of their track (was centred), so the "..." sits hard
+   against the panel edge and every remaining pixel of the track belongs to the
+   Taxable Amount column beside it. */
 .vas-cil-cell--more {
     flex-direction: row;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
     gap: 0.25em;
 }
 
@@ -2093,8 +2105,10 @@
 
 /* ---------- responsive ---------- */
 @media (max-width: 60em) {
+    /* Narrow layout drops Description + Tax, but the "..." is still the last track -
+       so the totals keep the same inset and stay aligned with Taxable Amount. */
     .vas-cil-row {
-        grid-template-columns: 1.75em minmax(0, 1.6fr) 7em 6em 6em 3.5em;
+        grid-template-columns: 1.75em minmax(0, 1.6fr) 7em 6em 6em var(--cil-more-col);
     }
 
     .vas-cil-row--head .vas-cil-cell:nth-child(3), .vas-cil-row--line .vas-cil-cell:nth-child(3),

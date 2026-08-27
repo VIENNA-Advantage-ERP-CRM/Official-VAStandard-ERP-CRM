@@ -731,7 +731,7 @@ namespace VASLogic.Models
                         WHERE (al.C_Payment_ID=@C_Payment_ID OR al.Ref_Payment_ID=@Ref_C_Payment_ID)
                           AND al.IsActive='Y'
                           AND ah.IsActive='Y'
-                          AND ah.DocStatus IN ('CO','CL')
+                          AND ah.DocStatus NOT IN ('RE','VO')
                           AND al.AD_Client_ID=@AD_Client_ID");
 
             string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
