@@ -223,8 +223,8 @@
 }
 
 .vas-202-row-main {
-    font-size: .75em;
-    font-weight: 700;
+    font-size: .85em;
+    font-weight: 600;
     color: #102C3F;
     line-height: 1.25;
     overflow: hidden;
@@ -256,7 +256,7 @@
 .vas-202-row .vas-202-cell-num {
     font-size: .75em;
     font-weight: 400;
-    color: #102C3F;
+    color: black;
 }
 
 /* An unconfigured control account: muted, and never a figure - a "0" here would read
