@@ -749,24 +749,61 @@
             $picker.html(html);
         }
 
+        /* The panel is fixed and lives on <body>, so it only stays glued to the chip if
+           something re-anchors it. The dashboard scrolls in its own container, not the
+           window, and scroll events do not bubble - a capture listener on document is
+           the only one that sees every scroll, whichever container moved. Scrolling is
+           not a dismissal: the panel travels with the chip, off the top or bottom of
+           the screen included, and closes only on a pick, an outside click or Escape.
+
+           Panel size is measured once at opening - it cannot change while the user
+           scrolls, and re-measuring on every scroll event would thrash layout. */
+        var _pickerW = 0;
+        var _pickerH = 0;
+
+        function measurePicker() {
+            $picker.css('max-height', '');
+            _pickerW = $picker.outerWidth();
+            _pickerH = $picker.outerHeight();
+        }
+
         function positionPicker() {
             if (!$picker || !$periodBtn || !$periodBtn[0]) { return; }
 
             var rect = $periodBtn[0].getBoundingClientRect();
-            var pw = $picker.outerWidth();
-            var ph = $picker.outerHeight();
             var gap = 6;
+            var edge = 8;
 
-            var left = Math.min(rect.left, window.innerWidth - pw - 8);
-            left = Math.max(8, left);
+            var roomBelow = window.innerHeight - rect.bottom - gap - edge;
+            var roomAbove = rect.top - gap - edge;
 
-            var top = rect.bottom + gap;
-            if (top + ph > window.innerHeight - 8) {
-                var above = rect.top - ph - gap;
-                top = above >= 8 ? above : Math.max(8, window.innerHeight - ph - 8);
+            /* Hangs below the chip by default and flips above only when the list
+               plainly fits better there. It is never pushed off the chip to make it
+               fit on screen - where the room is short it is capped instead and the
+               list scrolls inside itself, so the panel always reads as belonging to
+               the period label it was opened from. */
+            var below = _pickerH <= roomBelow || roomBelow >= roomAbove;
+            var room = below ? roomBelow : roomAbove;
+
+            var ph = _pickerH;
+            if (ph > room) {
+                /* .vas-195-pp is border-box, so the cap is the outer height. */
+                ph = Math.max(140, room);
+                $picker.css('max-height', ph + 'px');
+            } else {
+                $picker.css('max-height', '');
             }
 
+            var top = below ? rect.bottom + gap : rect.top - ph - gap;
+
+            var left = Math.min(rect.left, window.innerWidth - _pickerW - edge);
+            left = Math.max(edge, left);
+
             $picker.css({ left: Math.round(left) + 'px', top: Math.round(top) + 'px' });
+        }
+
+        function onAnchorScroll() {
+            if (_pickerOpen) { positionPicker(); }
         }
 
         function openPicker() {
@@ -775,12 +812,15 @@
 
             fillPicker();
             $picker.removeClass('vas-195-hidden');
-            positionPicker();
             _pickerOpen = true;
+            measurePicker();
 
             $(document).on('click' + _ns, onDocumentClick);
             $(document).on('keydown' + _ns, onPickerKeyDown);
-            $(window).on('resize' + _ns + ' scroll' + _ns, closePicker);
+            $(window).on('resize' + _ns, positionPicker);
+            document.addEventListener('scroll', onAnchorScroll, true);
+
+            positionPicker();
         }
 
         function closePicker() {
@@ -790,7 +830,8 @@
 
             $(document).off('click' + _ns);
             $(document).off('keydown' + _ns);
-            $(window).off('resize' + _ns + ' scroll' + _ns);
+            $(window).off('resize' + _ns);
+            document.removeEventListener('scroll', onAnchorScroll, true);
         }
 
         function togglePicker() {
