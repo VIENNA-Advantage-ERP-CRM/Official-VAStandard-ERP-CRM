@@ -791,6 +791,19 @@
             $popup.find('.vas-196-fpop-arrow').css('left', Math.round(caret) + 'px');
         }
 
+        /* Both panels are fixed and live on <body>, so they only stay glued to their
+           button while something re-anchors them. The dashboard scrolls in its own
+           container rather than the window, and scroll events do not bubble - a capture
+           listener on document is the only one that sees every scroll, whichever
+           container moved. Bound only while the panel is open. */
+        function onFilterAnchorScroll() {
+            if (_popupOpen) { positionFilterPopup(); }
+        }
+
+        function onProcessAnchorScroll() {
+            if (_processPopupOpen) { positionProcessPopup(); }
+        }
+
         function openFilterPopup() {
             if (!$filterPopup) { buildFilterPopup(); }
 
@@ -819,7 +832,8 @@
             /* Follow the funnel instead of closing: a lookup's Info window can shift
                the page, and closing there would pull the control out from under an
                interaction the user is in the middle of. */
-            $(window).on('resize' + _nsFilter + ' scroll' + _nsFilter, positionFilterPopup);
+            $(window).on('resize' + _nsFilter, positionFilterPopup);
+            document.addEventListener('scroll', onFilterAnchorScroll, true);
         }
 
         function closeFilterPopup() {
@@ -831,7 +845,8 @@
             blockCard(false);
 
             $(document).off('keydown' + _nsFilter);
-            $(window).off('resize' + _nsFilter + ' scroll' + _nsFilter);
+            $(window).off('resize' + _nsFilter);
+            document.removeEventListener('scroll', onFilterAnchorScroll, true);
         }
 
         function toggleFilterPopup() {
@@ -948,7 +963,8 @@
                own namespace, and it follows its button rather than closing when the
                page moves under a lookup's Info window. */
             $(document).on('keydown' + _nsProcess, onProcessKeyDown);
-            $(window).on('resize' + _nsProcess + ' scroll' + _nsProcess, positionProcessPopup);
+            $(window).on('resize' + _nsProcess, positionProcessPopup);
+            document.addEventListener('scroll', onProcessAnchorScroll, true);
         }
 
         function closeProcessPopup() {
@@ -960,7 +976,8 @@
             blockCard(false);
 
             $(document).off('keydown' + _nsProcess);
-            $(window).off('resize' + _nsProcess + ' scroll' + _nsProcess);
+            $(window).off('resize' + _nsProcess);
+            document.removeEventListener('scroll', onProcessAnchorScroll, true);
         }
 
         /* Makes the card inert while one of the two popovers is open - the card only,
