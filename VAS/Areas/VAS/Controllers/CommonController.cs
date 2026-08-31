@@ -394,6 +394,25 @@ namespace VIS.Controllers
 
 
 
+        /// <summary>
+        /// Window name for an AD_Window_ID.
+        /// Called from JS as VAS.Model.GetWindowName(AD_Window_ID) - dataContext wraps a
+        /// plain string argument as { fields: "..." }, hence the parameter name.
+        /// </summary>
+        /// <param name="fields">AD_Window_ID</param>
+        /// <returns>The name as a JSON string, "" when it cannot be resolved</returns>
+        public JsonResult GetWindowName(string fields)
+        {
+            string retJSON = JsonConvert.SerializeObject("");
+            if (Session["Ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                CommonModel objCommonModel = new CommonModel();
+                retJSON = JsonConvert.SerializeObject(objCommonModel.GetWindowName(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
         public JsonResult CheckTableDeletable(string fields)
         {
             string retJSON = "";
@@ -3262,8 +3281,7 @@ namespace VIS.Controllers
         public String PostingType = "";
         public MAcctSchema[] ASchemas = null;
         public MAcctSchema ASchema = null;
-        //	Logger used by the Account Viewer segment diagnostics below
-        private static VLogger _acctViewerLog = VLogger.GetVLogger(typeof(CommonModel).FullName);
+        private static VLogger _log = VLogger.GetVLogger(typeof(CommonModel).FullName);
         //	Fact_Acct key column -> the Accounting Schema Element it was created from.
         //	Filled by CreateKeyColumns(), read by ValidateLookupColumns() so the log line can
         //	name the element the user has to correct.
@@ -3721,13 +3739,13 @@ namespace VIS.Controllers
                     {
                         continue;
                     }
-                    _acctViewerLog.Log(Level.SEVERE, BuildLookupErrorMessage(column, tableName, tableExists));
+                    _log.Log(Level.SEVERE, BuildLookupErrorMessage(column, tableName, tableExists));
                 }
             }
             catch (Exception ex)
             {
                 //	never let the diagnostic itself break the viewer
-                _acctViewerLog.Log(Level.WARNING, "Account Viewer: unable to verify segment lookups", ex);
+                _log.Log(Level.WARNING, "Account Viewer: unable to verify segment lookups", ex);
             }
         }
 
@@ -4133,6 +4151,42 @@ namespace VIS.Controllers
         }
 
 
+
+        /// <summary>
+        /// Window name for an AD_Window_ID, in the login language.
+        /// Translation is layered over the base row rather than queried separately, so a
+        /// window with no AD_Window_Trl entry still comes back with its base name.
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="fields">AD_Window_ID</param>
+        /// <returns>Window name, empty string when the id is not a window the role can read</returns>
+        public string GetWindowName(Ctx ctx, string fields)
+        {
+            int AD_Window_ID = Util.GetValueOfInt(fields);
+            if (AD_Window_ID <= 0)
+            {
+                return "";
+            }
+
+            try
+            {
+                string sql = @"SELECT w.Name AS Name
+                                 FROM AD_Window w
+                                WHERE w.AD_Window_ID = @AD_Window_ID";
+                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "w", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+                SqlParameter[] param = new SqlParameter[] {
+                    new SqlParameter("@AD_Window_ID", AD_Window_ID)
+                };
+
+                return Util.GetValueOfString(DB.ExecuteScalar(sql, param, null));
+            }
+            catch (Exception ex)
+            {
+                _log.Log(Level.SEVERE, "GetWindowName - AD_Window_ID=" + AD_Window_ID, ex);
+                return "";
+            }
+        }
 
         /// <summary>
         /// Check whether table is deletable on AD_Table window
