@@ -1076,6 +1076,29 @@
     <Compile Include="Areas\VAS\Controllers\VAS_217_OpenRequisitionsWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_217_OpenRequisitionsWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_217_OpenRequisitionsWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_219_ActiveSetupsWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_219_ActiveSetupsWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Recurring\VAS_219_ActiveSetupsWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_220_SchedulesDueWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_220_SchedulesDueWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Recurring\VAS_220_SchedulesDueWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_221_RecordGeneratedWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_221_RecordGeneratedWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Recurring\VAS_221_RecordGeneratedWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_222_UpcomingRecurringSchedulesController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_222_UpcomingRecurringSchedules.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Recurring\VAS_222_UpcomingRecurringSchedules.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_223_ByDocumentTypeWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_223_ByDocumentTypeWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Recurring\VAS_223_ByDocumentTypeWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_224_RecentlyGeneratedRecordsController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_224_RecentlyGeneratedRecords.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Recurring\VAS_224_RecentlyGeneratedRecords.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_225_SetupsExpiringSoonWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_225_SetupsExpiringSoonWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Recurring\VAS_225_SetupsExpiringSoonWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_226_NewRecurringWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Recurring\VAS_226_NewRecurringWidget.js" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>
