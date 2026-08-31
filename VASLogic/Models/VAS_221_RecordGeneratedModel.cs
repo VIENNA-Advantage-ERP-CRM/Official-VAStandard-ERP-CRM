@@ -172,8 +172,10 @@ namespace VASLogic.Models
         /// <returns>Number of matching runs.</returns>
         private int CountRuns(Ctx ctx, DateTime from, DateTime toExclusive)
         {
-            int orgId = ctx.GetAD_Org_ID();
-
+            /* No org predicate is written here: MRole.AddAccessSQL appends the
+               organisation access clause for the main table itself, so restating it
+               would duplicate the filter and risk disagreeing with the role's own
+               rule. */
             StringBuilder sql = new StringBuilder();
             sql.Append(@"
                 SELECT COUNT(1) AS Records_Generated
@@ -183,12 +185,9 @@ namespace VASLogic.Models
                   AND rr.DateDoc>=@DateFrom
                   AND rr.DateDoc<@DateToExclusive");
 
-            sql.Append(OrgPredicate(orgId));
-
             /* MRole only on the main physical table (C_Recurring_Run / alias rr). It
-               also supplies the rr.AD_Client_ID / rr.AD_Org_ID access predicates, so
-               the explicit tenant filter above is a second, independent guard rather
-               than the only one. */
+               supplies the organisation access clause, and the explicit tenant filter
+               above is a second, independent guard rather than the only one. */
             string finalSql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql.ToString(), "rr", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -198,7 +197,6 @@ namespace VASLogic.Models
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
             parameters.Add(new SqlParameter("@DateFrom", from));
             parameters.Add(new SqlParameter("@DateToExclusive", toExclusive));
-            AddOrgParameter(parameters, orgId);
 
             return Util.GetValueOfInt(DB.ExecuteScalar(finalSql, parameters.ToArray(), null));
         }
@@ -286,8 +284,6 @@ namespace VASLogic.Models
         private void LoadRows(Ctx ctx, PeriodWindow window,
             int offset, int pageSize, GeneratedRecordsPage result)
         {
-            int orgId = ctx.GetAD_Org_ID();
-
             /* The amount is reported in the generated document's OWN currency - no
                conversion. Each row therefore carries its currency alongside the
                figure, and the list shows a currency column rather than implying one
@@ -334,9 +330,10 @@ namespace VASLogic.Models
                   AND rr.DateDoc>=@DateFrom
                   AND rr.DateDoc<@DateToExclusive");
 
-            sql.Append(OrgPredicate(orgId));
-
-            /* MRole only on the main physical table (C_Recurring_Run / alias rr). */
+            /* MRole only on the main physical table (C_Recurring_Run / alias rr). It
+               supplies the organisation access clause, so no org predicate is written
+               by hand above - restating it would duplicate the filter and risk
+               disagreeing with the role's own rule. */
             string finalSql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql.ToString(), "rr", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -347,14 +344,13 @@ namespace VASLogic.Models
                 ORDER BY rr.DateDoc DESC,rr.C_Recurring_Run_ID DESC";
             finalSql += PagingSuffix(pageSize, offset);
 
-            /* Parameters in the order their placeholders appear in the statement: the
-               WHERE clause binds, then the optional org bind. Each occurrence carries
-               its own unique name because the provider binds positionally. */
+            /* Parameters in the order their placeholders appear in the statement. Each
+               occurrence carries its own unique name because the provider binds
+               positionally. */
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
             parameters.Add(new SqlParameter("@DateFrom", window.From));
             parameters.Add(new SqlParameter("@DateToExclusive", window.ToExclusive));
-            AddOrgParameter(parameters, orgId);
 
             DataSet ds = DB.ExecuteDataset(finalSql, parameters.ToArray(), null);
             if (ds == null || ds.Tables.Count == 0) { return; }
@@ -530,37 +526,6 @@ namespace VASLogic.Models
         // ─────────────────────────────────────────────────────────────────────
         // §4  Shared query fragments
         // ─────────────────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Org predicate for the session's login org. 0 is the '*' organisation and
-        /// is a legitimate login value meaning "every org this role can reach" - only
-        /// then is the org filter left to MRole. A specific login org narrows to that
-        /// org plus the shared (AD_Org_ID=0) rows, which belong to every org by
-        /// definition.
-        /// </summary>
-        /// <param name="orgId">Login org from the session context.</param>
-        /// <returns>SQL fragment, or an empty string for the '*' org.</returns>
-        private string OrgPredicate(int orgId)
-        {
-            if (orgId <= 0) { return ""; }
-
-            return @"
-                  AND rr.AD_Org_ID IN (0,@AD_Org_ID)";
-        }
-
-        /// <summary>
-        /// Adds the org bind whenever <see cref="OrgPredicate"/> emitted its clause,
-        /// so the predicate and its parameter can never get out of step.
-        /// </summary>
-        /// <param name="parameters">Parameter list being built, in statement order.</param>
-        /// <param name="orgId">Login org from the session context.</param>
-        /// <returns>void</returns>
-        private void AddOrgParameter(List<SqlParameter> parameters, int orgId)
-        {
-            if (orgId <= 0) { return; }
-
-            parameters.Add(new SqlParameter("@AD_Org_ID", orgId));
-        }
 
         /// <summary>
         /// Database-specific paging suffix: OFFSET / FETCH on Oracle, LIMIT / OFFSET

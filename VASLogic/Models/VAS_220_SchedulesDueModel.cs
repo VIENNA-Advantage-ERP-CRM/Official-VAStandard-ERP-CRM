@@ -131,8 +131,6 @@ namespace VASLogic.Models
             result.DateFrom = dateFrom.ToString("yyyy-MM-dd");
             result.DateTo = dateToInclusive.ToString("yyyy-MM-dd");
 
-            int orgId = ctx.GetAD_Org_ID();
-
             /* The amount is reported in the source document's OWN currency - no
                conversion. Each row therefore carries its currency alongside the
                figure, and the list shows a currency column rather than implying one
@@ -169,24 +167,13 @@ namespace VASLogic.Models
                   AND r.DateNextRun>=@DateFrom
                   AND r.DateNextRun<@DateToExclusive");
 
-            /* Login org. 0 is the '*' organisation and is a legitimate login value
-               meaning "every org this role can reach" - only then is the org
-               predicate left to MRole. When a specific org is selected, narrow to
-               that org plus the shared (AD_Org_ID=0) setups, which belong to every
-               org by definition. Added before AddAccessSQL so the WHERE clause is
-               complete when the parser sees it. */
-            if (orgId > 0)
-            {
-                sql.Append(@"
-                  AND r.AD_Org_ID IN (0,@AD_Org_ID)");
-            }
-
             string finalSql = sql.ToString();
 
-            /* MRole only on the main physical table (C_Recurring / alias r). It also
-               supplies the r.AD_Client_ID / r.AD_Org_ID access predicates, so the
-               explicit tenant filter above is a second, independent guard rather
-               than the only one. */
+            /* MRole only on the main physical table (C_Recurring / alias r). It
+               supplies the organisation access clause, so no org predicate is written
+               by hand above - restating it would duplicate the filter and risk
+               disagreeing with the role's own rule. The explicit tenant filter is a
+               second, independent guard rather than the only one. */
             finalSql = MRole.GetDefault(ctx).AddAccessSQL(finalSql, "r", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             /* Soonest first, then by name so two setups falling on the same day keep
@@ -196,17 +183,12 @@ namespace VASLogic.Models
                 ORDER BY r.DateNextRun,r.Name";
 
             /* The provider binds positionally, so every parameter is added in the
-               order its placeholder appears in the statement text: the WHERE clause
-               binds, then the optional org bind. Each occurrence carries its own
-               unique name. */
+               order its placeholder appears in the statement text. Each occurrence
+               carries its own unique name. */
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
             parameters.Add(new SqlParameter("@DateFrom", dateFrom));
             parameters.Add(new SqlParameter("@DateToExclusive", dateToExclusive));
-            if (orgId > 0)
-            {
-                parameters.Add(new SqlParameter("@AD_Org_ID", orgId));
-            }
 
             try
             {

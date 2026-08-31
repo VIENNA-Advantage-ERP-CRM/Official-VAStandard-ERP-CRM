@@ -58,13 +58,10 @@ namespace VASLogic.Models
 
             if (ctx == null) { return result; }
 
-            /* Login org. 0 is the '*' organisation and is a legitimate login value
-               meaning "every org this role can reach" - only then is the org
-               predicate left to MRole. When a specific org is selected, narrow to
-               that org plus the shared (AD_Org_ID=0) setups, which belong to every
-               org by definition. */
-            int orgId = ctx.GetAD_Org_ID();
-
+            /* No org predicate is written here: MRole.AddAccessSQL appends the
+               organisation access clause for the main table itself, so restating it
+               would duplicate the filter and risk disagreeing with the role's own
+               rule. */
             string sql = @"
                 SELECT COUNT(1) AS Active_Setups
                 FROM C_Recurring r
@@ -72,28 +69,16 @@ namespace VASLogic.Models
                   AND r.AD_Client_ID IN (@AD_Client_ID)
                   AND COALESCE(r.RunsRemaining,0)>0";
 
-            if (orgId > 0)
-            {
-                sql += @"
-                  AND r.AD_Org_ID IN (0,@AD_Org_ID)";
-            }
-
-            /* MRole only on the main physical table (C_Recurring / alias r). It also
-               supplies the r.AD_Client_ID / r.AD_Org_ID access predicates, so the
-               explicit tenant filter above is a second, independent guard rather
-               than the only one. Applied last so the WHERE clause is complete
-               before the parser sees it. */
+            /* MRole only on the main physical table (C_Recurring / alias r). It
+               supplies the organisation access clause, and the explicit tenant filter
+               above is a second, independent guard rather than the only one. Applied
+               last so the WHERE clause is complete before the parser sees it. */
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "r", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             /* The provider binds positionally, so the parameters are added in the
-               order their placeholders appear in the statement text: @AD_Client_ID
-               first, @AD_Org_ID second (and only when the org predicate was added). */
+               order their placeholders appear in the statement text. */
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
-            if (orgId > 0)
-            {
-                parameters.Add(new SqlParameter("@AD_Org_ID", orgId));
-            }
 
             try
             {
