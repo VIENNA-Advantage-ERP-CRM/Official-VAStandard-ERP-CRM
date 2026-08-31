@@ -1775,16 +1775,17 @@
             else if (ln.LineType === "charge" && ln.ChargeName) sub += " · " + ln.ChargeName;
             if (sub) $item.append($('<div class="vas_106-itSku"></div>').text(sub).attr("title", sub));
 
-            // A third line: whether the goods on this line go straight to the
-            // customer (C_OrderLine.IsDropShip). Stated on EVERY line, Yes or No —
-            // drawn only for a line that is dropped, the reader could not tell a
-            // line that is not from one the panel had nothing to say about, and
-            // which lines we are expected to ship is the point of the answer.
-            var dropLabel = getMsg("VAS_106_DropShipment", "Drop Shipment") + ": " +
-                (ln.IsDropShip ? getMsg("VAS_106_Yes", "Yes") : getMsg("VAS_106_No", "No"));
-            var $drop = $('<div class="vas_106-itDrop"></div>').text(dropLabel).attr("title", dropLabel);
-            if (ln.IsDropShip) $drop.addClass("vas_106-is-drop");
-            $item.append($drop);
+            // A third line, drawn ONLY for a line whose goods go straight to the
+            // customer (C_OrderLine.IsDropShip). It used to be stated on every
+            // line, Yes or No; the "No" is the ordinary case and the row it sat on
+            // already says nothing else about shipping, so the flag now marks the
+            // exception and its presence is the answer.
+            if (ln.IsDropShip) {
+                var dropLabel = getMsg("VAS_106_DropShipment", "Drop Shipment") + ": " +
+                    getMsg("VAS_106_Yes", "Yes");
+                $item.append($('<div class="vas_106-itDrop"></div>')
+                    .text(dropLabel).attr("title", dropLabel));
+            }
             $tr.append($item);
 
             var uomP = +ln.UOMPrecision || 0;
@@ -2132,6 +2133,12 @@
         var ACT_TYPES = {
             Note:      { tone: "info",    icon: "note",  label: "Note" },
             Email:     { tone: "purple",  icon: "mail",  label: "Email" },
+            // Correspondence with the CUSTOMER (MailAttachment1 anchored on
+            // C_BPartner), not about this order. Named outright so the badge does
+            // not ask the dictionary for VAS_106_ActEmail and read "Email" —
+            // which is the one thing this row must not be mistaken for.
+            EmailPartner: { tone: "info", icon: "mail", label: "Customer Mail",
+                            key: "VAS_106_TagPartnerMail" },
             Delivery:  { tone: "success", icon: "truck", label: "Delivery" },
             Invoice:   { tone: "warning", icon: "fileText", label: "Invoice" },
             Created:   { tone: "neutral", icon: "plus",  label: "Created" },
@@ -2244,7 +2251,14 @@
         }
 
         function activityRow(a) {
-            var meta = ACT_TYPES[a.EventType] || ACT_TYPES.Updated;
+            // Mail filed against the CUSTOMER rather than against this order
+            // (model side, IsPartnerMail) gets a badge of its own. It is real
+            // correspondence and belongs in the feed, but every order of that
+            // customer's carries the same rows — so it must not read as this
+            // document's own trail.
+            var meta = (a.EventType === "Email" && a.IsPartnerMail)
+                ? ACT_TYPES.EmailPartner
+                : (ACT_TYPES[a.EventType] || ACT_TYPES.Updated);
             var $row = $('<div class="vas_106-actRow"></div>');
             var $badge = $('<span class="vas_106-actBadge"></span>').addClass("vas_106-tone-" + meta.tone);
             $badge.append(svgIcon(meta.icon));
@@ -2278,7 +2292,13 @@
             // An e-mail names its recipients under the subject: the To list, plus a
             // count of the Cc / Bcc addresses so the reader can see at a glance
             // that others were copied. Every address itself is listed in the body.
-            if (a.EventType === "Email") {
+            // ...and so does a LETTER, which is the same MailAttachment1 record
+            // filed under AttachmentType 'I', carrying the same addresses. An
+            // installation that files its outgoing mail under that type reached
+            // the feed through the shared sources reader and lost its recipients
+            // here, which read as the mail activity being absent. VAS_092 and
+            // VAS_100 both treat the two alike.
+            if (a.EventType === "Email" || a.EventType === "letter") {
                 var to = recipientSummary(a);
                 if (to) {
                     $main.append($('<div class="vas_106-actSub"></div>')
@@ -2342,7 +2362,10 @@
         // task opens onto the e-mails sent against it instead.
         function hasActivityBody(a) {
             if (!a) return false;
-            if (a.EventType === "Email") return !!(a.Body && String(a.Body).trim());
+            // A letter opens like a mail: same table, same body, same addresses.
+            if (a.EventType === "Email" || a.EventType === "letter") {
+                return !!(a.Body && String(a.Body).trim());
+            }
             if (a.EventType === "appointment" || a.EventType === "task") {
                 return activityMails(a).length > 0;
             }
@@ -2459,7 +2482,7 @@
             if (a.EventType === "Note") return a.Title || getMsg("VAS_106_ActNote", "Note");
             // An e-mail's headline is its subject; a mail sent without one still
             // has to name itself.
-            if (a.EventType === "Email")
+            if (a.EventType === "Email" || a.EventType === "letter")
                 return a.Title || getMsg("VAS_106_ActNoSubject", "(No subject)");
             if (a.EventType === "Invoice")
                 return getMsg("VAS_106_ActInvoiceTxt", "Invoice") + " " + (a.Title || "") +

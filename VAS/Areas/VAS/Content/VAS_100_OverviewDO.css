@@ -799,18 +799,18 @@
     white-space: nowrap;
 }
 
-/* Line 4 — drop shipment. Muted while it reads "No", which is the ordinary
-   case and should not draw the eye; a drop-shipped line takes the accent, since
-   goods that never pass through our warehouse are the exception worth seeing. */
+/* Line 4 — drop shipment. Drawn only on a line that IS one, so it always takes
+   the accent: goods that never pass through our warehouse are the exception
+   worth seeing. The muted "No" state it used to carry no longer renders. */
 .vas_100-itDrop {
     font-size: 0.9231em;
-    color: var(--do-muted);
+    color: var(--do-action-dk);
+    font-weight: 700;
     margin-top: 0.125em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.vas_100-itDrop.vas_100-is-drop { color: var(--do-action-dk); font-weight: 700; }
 
 /* Delivered cell (mini bar + value) */
 .vas_100-recv {
