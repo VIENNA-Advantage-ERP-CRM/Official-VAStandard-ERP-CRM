@@ -1,0 +1,302 @@
+/* VAS_225_SetupsExpiringSoonWidget.css
+   Setups Expiring Soon list widget (Recurring dashboard, 3x2).
+   Design source: design.md -> dashboard-widgets.md "List Widget (FinanceListCard
+   pattern)", "Widget Header" and "Widget Footer Pager".
+   The glass surface comes from the shared .vas-widget-bg class - this file never
+   re-declares a background on the card. Internal sizing is em-driven off the widget
+   root anchor; borders, radii and shadows stay in px because they are physical edges
+   (see "Not Scaled With em"). */
+
+.vas-225-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so a narrow or zoomed-in cell can step the card base
+       font below its 16px clamp floor (mirrors VAS_192). */
+    container: vas-225 / inline-size;
+}
+
+.vas-225-root,
+.vas-225-root * {
+    box-sizing: border-box;
+}
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. The card is a fixed-height flex column -
+   head and foot hold their size, the list takes the remainder and never scrolls. */
+.vas-225-card {
+    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    text-align: left;
+    padding: .875em;
+    /* Radius is a physical edge and must not scale with the em anchor, so it is
+       pinned here over the shared class's em value. */
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    color: #102C3F;
+    overflow: hidden;
+}
+
+/* ---- Header: icon well + title/subtitle stack ---- */
+.vas-225-head {
+    display: flex;
+    align-items: center;
+    gap: .625em;
+    min-width: 0;
+    flex: none;
+    margin-bottom: .625em;
+}
+
+.vas-225-icon {
+    width: 2em;
+    height: 2em;
+    border-radius: 10px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+.vas-225-icon svg {
+    width: 1em;
+    height: 1em;
+    display: block;
+}
+
+.vas-225-titles {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Shared header clamp off --dash-inline-size so it never depends on a
+   container-query ancestor. */
+.vas-225-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-225-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- List ----
+   The body owns the leftover height and clips rather than scrolls - the row count is
+   derived from this box at runtime and the footer pager is the contract for
+   "more rows exist".
+   Flex-basis is 0, not auto: the box must be sized purely by the space its siblings
+   leave, never by the rows inside it, or the rendered content feeds back into the
+   height the row count is measured from. */
+.vas-225-body {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* One row per setup: name over meta on the left, runs-left chip on the right. */
+.vas-225-row {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    padding: .625em 0;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.vas-225-row:last-child {
+    border-bottom: 0;
+}
+
+.vas-225-left {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Item label matches the sibling list widget's scale; the meta beneath sits one step
+   below. */
+.vas-225-label {
+    font-size: .875em;
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-225-meta {
+    font-size: .75em;
+    font-weight: 400;
+    color: #748494;
+    line-height: 1.3;
+    margin-top: .05em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The chip cell centres its pill rather than letting it sit on the row's text
+   baseline - a padded inline-block baselines on its own text, which parks the pill a
+   couple of pixels above the label beside it. */
+.vas-225-chipwrap {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+.vas-225-chip {
+    display: inline-block;
+    max-width: 100%;
+    padding: .15em .5em;
+    border-radius: 999px;
+    font-size: .75em;
+    font-weight: 500;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Last run - the one worth noticing. */
+.vas-225-chip-warn {
+    background: #FBEFD6;
+    color: #9A6500;
+}
+
+/* Further out; muted so the warn tone keeps its meaning. */
+.vas-225-chip-muted {
+    background: #EEF2F6;
+    color: #5F7283;
+}
+
+/* ---- Body states ---- */
+.vas-225-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 1em .5em;
+    font-size: .8125em;
+    color: #5F7283;
+}
+
+.vas-225-state-error {
+    color: #9A6500;
+}
+
+/* ---- Footer ----
+   Helper text left, pager right. min-height holds the band at the pager's height so
+   the footer does not resize when the pager is hidden, which would resize the list
+   box the row count is measured from. */
+.vas-225-foot {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    min-height: calc(24px + .5em);
+    padding-top: .5em;
+}
+
+.vas-225-foot-note {
+    font-size: .75em;
+    color: #748494;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Canonical widget pager: 24px buttons, 14px chevrons. */
+.vas-225-pager {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    flex: none;
+}
+
+.vas-225-pager:empty {
+    display: none;
+}
+
+.vas-225-pbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid #E4EDF4;
+    background: rgba(255, 255, 255, .7);
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    transition: background .15s ease;
+}
+
+.vas-225-pbtn:hover:not(:disabled) {
+    background: #EEF8FF;
+}
+
+.vas-225-pbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+    border-color: #E2EAF1;
+    background: #F9FBFC;
+}
+
+.vas-225-pbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-225-ptxt {
+    font-size: .8125em;
+    font-weight: 500;
+    color: #102C3F;
+    min-width: 3.4em;
+    text-align: center;
+}
+
+/* ---- Responsive ----
+   The card interior scales off the em anchor clamp, so no per-breakpoint font
+   stepping is needed at normal widths. Only a narrow or zoomed-in cell needs the
+   base font pushed below the 16px clamp floor, and that is a container concern,
+   not a viewport one (mirrors VAS_192). */
+@container vas-225 (max-width: 340px) {
+    .vas-225-card { font-size: 13px; }
+}
+
+@container vas-225 (max-width: 250px) {
+    .vas-225-card { font-size: 11px; }
+}
