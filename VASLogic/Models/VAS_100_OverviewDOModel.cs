@@ -1726,12 +1726,12 @@ namespace VASLogic.Models
         /// (Title), body (TextMsg), when and who sent it. The body travels with the
         /// row so the panel can reveal it on click without a second round trip.
         ///
-        /// "Has an address" is tested against a SPACE, not against ''. Oracle
-        /// stores the empty string as NULL, so NVL(TRIM(x), '') yields NULL and
-        /// `&lt;&gt; ''` compares against NULL — UNKNOWN for every row, including
-        /// the ones that DO carry an address. Comparing to ' ' keeps the fallback
-        /// non-null on Oracle, and SQL Server blank-pads the comparison so an empty
-        /// address still fails it.
+        /// A mail is NOT required to carry an address, which VAS_092 and VAS_106
+        /// do not require either: the recipient is resolved on the server at send
+        /// time and is not always written back to MailAddress, so demanding one
+        /// dropped real mails out of the feed. The drawer omits any address line
+        /// that is blank, so such a row still reads as its subject, moment,
+        /// sender and body.
         /// </summary>
         private void LoadEmailActivity(int M_InOut_ID, List<DOActivityData> list)
         {
@@ -1759,9 +1759,6 @@ namespace VASLogic.Models
                                   -- them here would report each one twice. Every
                                   -- other AttachmentType still counts as a mail.
                                   AND COALESCE(ma.AttachmentType, 'M') <> 'I'
-                                  AND (NVL(TRIM(ma.MailAddress), ' ')    <> ' '
-                                    OR NVL(TRIM(ma.MailAddressCc), ' ')  <> ' '
-                                    OR NVL(TRIM(ma.MailAddressBcc), ' ') <> ' ')
                                 ORDER BY ma.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;

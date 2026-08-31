@@ -460,7 +460,7 @@ namespace VASLogic.Models
             // One flat list for the Documents section, built from the two above
             // plus the receipts allocated to those invoices.
             result.Documents        = LoadDocuments(C_Order_ID, result.Deliveries, result.Invoices);
-            result.Activity         = LoadActivity(C_Order_ID);
+            result.Activity         = LoadActivity(C_Order_ID, result.C_BPartner_ID);
             result.Notes            = LoadNotes(C_Order_ID);
             // Frequencies are no longer loaded: they populated the panel's inline
             // contract form, which is gone — the Contract cell is read-only now.
@@ -1838,7 +1838,7 @@ namespace VASLogic.Models
         /// (AppointmentsInfo / R_Request are intentionally not joined here —
         /// no verified direct C_Order link exists for them.)
         /// </summary>
-        private List<ActivityData> LoadActivity(int C_Order_ID)
+        private List<ActivityData> LoadActivity(int C_Order_ID, int C_BPartner_ID)
         {
             // A runaway guard, not a headline count. It used to be 15 — the same
             // number the panel PAGES at — so the feed could never exceed one page,
@@ -1850,6 +1850,10 @@ namespace VASLogic.Models
 
             LoadNoteActivity(C_Order_ID, activity);
             LoadEmailActivity(C_Order_ID, activity);
+            // ...and the mail filed against the CUSTOMER rather than against this
+            // order, which is where the platform's mail sync anchors anything it
+            // matches by correspondent instead of by document.
+            LoadPartnerEmailActivity(C_BPartner_ID, activity);
             LoadDeliveryActivity(C_Order_ID, activity);
             LoadInvoiceActivity(C_Order_ID, activity);
             LoadOrderMilestoneActivity(C_Order_ID, activity);
@@ -1985,6 +1989,101 @@ namespace VASLogic.Models
                 // Non-fatal: a schema without MailAttachment1 simply shows no
                 // e-mail rows, and the rest of the feed is unaffected.
                 _log.Severe("LoadEmailActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// The mail filed against the CUSTOMER (MailAttachment1 anchored on
+        /// C_BPartner + Record_ID = C_BPartner_ID), added to the feed alongside
+        /// the order's own correspondence.
+        ///
+        /// The platform's mail sync anchors an incoming message by WHO it is from,
+        /// not by which document it concerns: with TABLEATTACH = C_BPartner it
+        /// files the row against the partner (see AttachMailToBP), and only a
+        /// message whose subject carries the encoded table/record marker is ever
+        /// anchored to the order itself. Correspondence with a customer therefore
+        /// never reached this feed, while a partner-level history panel listed it
+        /// in full.
+        ///
+        /// These rows are NOT about this order — every order of that customer's
+        /// carries the same ones — so each is flagged IsPartnerMail and the panel
+        /// tags it apart rather than letting it read as this document's trail.
+        ///
+        /// Capped independently of the feed's own guard: a long-standing customer
+        /// can carry years of correspondence, and without a cap of its own it
+        /// would crowd out the order's real history once the feed is trimmed.
+        /// </summary>
+        /// <param name="C_BPartner_ID">Customer on the order.</param>
+        /// <param name="list">Activity list being populated.</param>
+        private void LoadPartnerEmailActivity(int C_BPartner_ID, List<ActivityData> list)
+        {
+            if (C_BPartner_ID <= 0) return;
+
+            // The newest correspondence only. Trimmed here rather than in SQL so
+            // the statement stays the same on both databases.
+            const int MAX_PARTNER_MAILS = 50;
+
+            try
+            {
+                // Same shape as LoadEmailActivity, anchored on the partner: IN +
+                // UPPER over AD_Table (a scalar sub-select RAISES on Oracle when
+                // the dictionary carries more than one row of that name), and
+                // "not 'I'" for the type, so a letter is left to the shared
+                // sources reader and cannot be listed twice.
+                string sql = @"SELECT ma.MailAddress,
+                                      ma.MailAddressCc,
+                                      ma.MailAddressBcc,
+                                      ma.MailAddressFrom,
+                                      ma.Title,
+                                      ma.TextMsg,
+                                      ma.Created,
+                                      ma.IsMailSent,
+                                      u.Name AS UserName
+                                 FROM MailAttachment1 ma
+                                 LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy)
+                                WHERE ma.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'C_BPARTNER')
+                                  AND ma.Record_ID = @C_BPartner_ID
+                                  AND COALESCE(ma.IsActive, 'Y')        = 'Y'
+                                  AND COALESCE(ma.AttachmentType, 'M') <> 'I'
+                                ORDER BY ma.Created DESC";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@C_BPartner_ID", C_BPartner_ID)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0) return;
+
+                int taken = 0;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    if (taken >= MAX_PARTNER_MAILS) break;
+                    taken++;
+
+                    list.Add(new ActivityData
+                    {
+                        EventType     = "Email",
+                        IsPartnerMail = true,
+                        Title         = Util.GetValueOfString(r["Title"]),
+                        // Mails sent as HTML store their markup in TextMsg; the
+                        // panel shows a body as text, so it is flattened here.
+                        Body          = MailBodyToText(Util.GetValueOfString(r["TextMsg"])),
+                        MailTo        = Util.GetValueOfString(r["MailAddress"]),
+                        MailCc        = Util.GetValueOfString(r["MailAddressCc"]),
+                        MailBcc       = Util.GetValueOfString(r["MailAddressBcc"]),
+                        MailFrom      = Util.GetValueOfString(r["MailAddressFrom"]),
+                        IsMailSent    = Util.GetValueOfString(r["IsMailSent"]) == "Y",
+                        ActorName     = Util.GetValueOfString(r["UserName"]),
+                        EventTime     = Util.GetValueOfDateTime(r["Created"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal, exactly as the order's own pass: the rest of the feed
+                // is unaffected.
+                _log.Severe("LoadPartnerEmailActivity (C_BPartner_ID=" + C_BPartner_ID + "): " + ex.Message);
             }
         }
 
@@ -3136,6 +3235,13 @@ namespace VASLogic.Models
             public string   MailBcc    { get; set; }   // MailAddressBcc
             public string   MailFrom   { get; set; }   // MailAddressFrom
             public bool     IsMailSent { get; set; }
+
+            /// <summary>True when the mail is filed against the CUSTOMER
+            /// (MailAttachment1 anchored on C_BPartner) rather than against this
+            /// order. It is correspondence with the partner, not about this
+            /// document, so the panel tags it apart — every order of theirs
+            /// carries the same rows.</summary>
+            public bool     IsPartnerMail { get; set; }
 
             // Appointment / task rows (AppointmentsInfo): where the meeting is and
             // whether it has been dealt with. Empty on every other event type.

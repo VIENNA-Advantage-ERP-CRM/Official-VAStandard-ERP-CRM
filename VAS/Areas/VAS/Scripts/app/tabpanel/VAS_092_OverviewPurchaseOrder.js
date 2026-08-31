@@ -1011,13 +1011,15 @@
             var cur = (data.ISO_Code || "") + (data.CurSymbol ? " (" + data.CurSymbol + ")" : "");
             if (cur.trim())           $right.append(headerField(getMsg("VAS_092_Currency"), cur));
             if (data.WarehouseName) $right.append(headerField(getMsg("VAS_092_ShipTo"), data.WarehouseName));
-            // Drop Shipment (C_Order.IsDropShip) — always shown, Yes or No: "No"
-            // is as much of an answer as "Yes" here, and the reader is looking at
-            // a Warehouse right above it that a drop-shipped order never reaches.
-            // Reads as the WORD, like every other field in this column, so the
-            // answer needs no glyph to be decoded first.
-            $right.append(headerField(getMsg("VAS_092_DropShipment"),
-                data.IsDropShip ? getMsg("VAS_092_Yes") : getMsg("VAS_092_No")));
+            // Drop Shipment (C_Order.IsDropShip) — shown ONLY when the order IS a
+            // drop shipment. A "No" row said nothing the Warehouse line above it
+            // does not already say, so the field is now an exception flag: its
+            // presence is the message. Reads as the WORD, like every other field
+            // in this column, so the answer needs no glyph to be decoded first.
+            if (data.IsDropShip) {
+                $right.append(headerField(getMsg("VAS_092_DropShipment"),
+                    getMsg("VAS_092_Yes")));
+            }
             //if (data.OrgName) $right.append(headerField(getMsg("VAS_092_BillTo"), data.OrgName));
             if ($right.children().length) $card.append($right);
 
@@ -1353,6 +1355,15 @@
             var withVendorMeta = data.IsEmailSent
                 ? getMsg("VAS_092_EmailSent")
                 : getMsg("VAS_092_Pending");
+            // Some tenants have VAS_092_WithVendor seeded in AD_Message with the
+            // SAME text as VAS_092_Completed, which renders the timeline as two
+            // consecutive "Completed" stages and loses the distinction the stage
+            // exists to draw. A translation that collides with the stage above it
+            // is not a translation — fall back to the built-in wording.
+            var withVendorLabel = getMsg("VAS_092_WithVendor");
+            if (withVendorLabel === getMsg("VAS_092_Completed")) {
+                withVendorLabel = MSG_DEFAULTS.VAS_092_WithVendor;
+            }
             return [
                 // stamp: true marks a date that is a stored TIMESTAMP (UTC, no
                 // zone designator) rather than a document date field, so it is
@@ -1360,7 +1371,7 @@
                 // late in the local evening reports the following UTC day.
                 { key: "VAS_092_Drafted",          done: true,                     active: data.CurrentStage === 1, date: data.Created || data.DateOrdered, stamp: true },
                 { key: "VAS_092_Completed",        done: data.IsCompleted,         active: data.CurrentStage === 2, date: data.OrderCompletedDate || data.DateOrdered },
-                { key: "VAS_092_WithVendor",       done: data.IsWithVendor,        active: data.CurrentStage === 3, date: data.OrderCompletedDate || data.DateOrdered, meta: withVendorMeta },
+                { key: "VAS_092_WithVendor",       label: withVendorLabel, done: data.IsWithVendor, active: data.CurrentStage === 3, date: data.OrderCompletedDate || data.DateOrdered, meta: withVendorMeta },
                 { key: "VAS_092_ExpectedDelivery", done: data.IsExpectedDelivery,  active: data.CurrentStage === 4, date: data.DatePromised, required: true },
                 // The receipt stage dates from when the GRN was CREATED (model
                 // side), which is a stamp — not the movement date it used to

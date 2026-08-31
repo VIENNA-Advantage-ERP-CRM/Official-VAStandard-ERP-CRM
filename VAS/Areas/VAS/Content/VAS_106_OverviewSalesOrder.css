@@ -317,24 +317,31 @@
     gap: 0.5em; margin-top: 0.875em;
 }
 
-.vas_106-btn {
+/* Scoped to the action bar, NOT a bare .vas_106-btn: this file declares
+   .vas_106-btn a second time further down (the table / dialog button set), and
+   that later block sets `border: none`, so an unscoped rule here lost its
+   OUTLINE to source order and the Send Invoice pill rendered borderless.
+   Scoping raises the specificity so the action pill keeps the same outlined
+   style VAS_092 uses (.vas_092-btn): 1px in the action colour on white. */
+.vas_106-actions .vas_106-btn {
     font-family: inherit; font-size: 0.8125em; font-weight: 400; line-height: 1.2;
     cursor: pointer; display: inline-flex; align-items: center; gap: 0.5em;
-    padding: 0.5em 0.875em; border-radius: 999px;
+    height: auto; padding: 0.5em 0.875em; border-radius: 999px;
     border: 1px solid var(--vaso-action); background: #fff; color: var(--vaso-action);
     transition: background .15s, border-color .15s, color .15s;
 }
-.vas_106-btn:hover:not(:disabled) {
+.vas_106-actions .vas_106-btn:hover:not(:disabled) {
     background: var(--vaso-faint-blue);
     border-color: var(--vaso-action-dk); color: var(--vaso-action-dk);
 }
 /* Disabled, not hidden: the window carries no print process, so there is nothing
-   to share — an absent button would read as a missing feature. */
-.vas_106-btn:disabled {
+   to share — an absent button would read as a missing feature. Stated in full
+   (not the later block's opacity fade) so the outline mutes with the label. */
+.vas_106-actions .vas_106-btn:disabled {
     border-color: var(--vaso-card-bd); color: var(--vaso-muted);
-    background: #fff; cursor: not-allowed;
+    background: #fff; cursor: not-allowed; opacity: 1;
 }
-.vas_106-btn .vas_106-ic { color: currentColor; display: inline-flex; flex: none; }
+.vas_106-actions .vas_106-btn .vas_106-ic { color: currentColor; display: inline-flex; flex: none; }
 
 /* ----------------------------------------------------------- */
 /*  Customer identity card                                      */
@@ -730,8 +737,9 @@
 /* Drop Shipment: Yes / No — the line's third detail, under the unit. Muted like
    the sub-line above it when the answer is No, and coloured when it is Yes: a
    line that ships direct is the one worth spotting down the column. */
-.vas_106-itDrop { font-size: 0.9231em; color: var(--vaso-muted); margin-top: 0.125em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vas_106-itDrop.vas_106-is-drop { color: var(--vaso-info-tx); font-weight: 600; }
+/* Drawn only on a line that IS a drop shipment, so it always takes the accent;
+   the muted "No" state it used to carry no longer renders. */
+.vas_106-itDrop { font-size: 0.9231em; color: var(--vaso-info-tx); font-weight: 600; margin-top: 0.125em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Delivery Readiness: the unit has a COLUMN of its own after the product name.
    It used to lead the name on the same line (.vas_106-uomTag / -nameTxt, with
