@@ -1817,16 +1817,15 @@
                     .attr("title", ln.Description).text(ln.Description));
             }
 
-            // 4 — drop shipment. Always drawn, Yes or No: "No" is as much of an
-            // answer as "Yes", and a line that reads nothing here would leave the
-            // reader unable to tell an ordinary line from one the panel simply
-            // failed to flag.
-            var dropYes = !!ln.IsDropShip;
-            var dropTxt = msg("VAS_100_DropShipment", "Drop Shipment") + ": " +
-                (dropYes ? msg("VAS_100_Yes", "Yes") : msg("VAS_100_No", "No"));
-            $item.append($('<div class="vas_100-itDrop"></div>')
-                .toggleClass("vas_100-is-drop", dropYes)
-                .attr("title", dropTxt).text(dropTxt));
+            // 4 — drop shipment, drawn ONLY for a line that IS one. It used to be
+            // stated on every line, Yes or No; the "No" is the ordinary case, so
+            // the flag now marks the exception and its presence is the answer.
+            if (ln.IsDropShip) {
+                var dropTxt = msg("VAS_100_DropShipment", "Drop Shipment") + ": " +
+                    msg("VAS_100_Yes", "Yes");
+                $item.append($('<div class="vas_100-itDrop"></div>')
+                    .attr("title", dropTxt).text(dropTxt));
+            }
 
             $tr.append($item);
 

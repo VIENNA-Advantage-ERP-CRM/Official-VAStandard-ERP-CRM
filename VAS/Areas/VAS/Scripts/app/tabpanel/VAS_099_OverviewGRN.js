@@ -958,9 +958,14 @@
             $right.append(headerField(msg("VAS_099_Warehouse", "Warehouse"), na(data.WarehouseName), false));
             $right.append(headerField(msg("VAS_099_ReceivedDate", "Received Date"),
                 na(formatDate(data.MovementDate)), false));
-            // Drop Shipment flag (M_InOut.IsDropShip).
-            $right.append(headerField(msg("VAS_099_DropShipment", "Drop Shipment"),
-                data.IsDropShip ? msg("VAS_099_Yes", "Yes") : msg("VAS_099_No", "No"), false));
+            // Drop Shipment flag (M_InOut.IsDropShip) — shown ONLY when the
+            // receipt IS a drop shipment. A "No" row states the ordinary case and
+            // earns no space; the field is an exception flag, so its presence is
+            // the message.
+            if (data.IsDropShip) {
+                $right.append(headerField(msg("VAS_099_DropShipment", "Drop Shipment"),
+                    msg("VAS_099_Yes", "Yes"), false));
+            }
             $card.append($right);
 
             $body.append($card);
