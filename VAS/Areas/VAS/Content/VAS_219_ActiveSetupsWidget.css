@@ -1,0 +1,165 @@
+/* VAS_219_ActiveSetupsWidget.css
+   Active Setups KPI tile (Recurring dashboard, 2x1).
+   Design source: design.md -> dashboard-widgets.md "KPI And Summary Widget".
+   The glass surface (gradient + white border) comes from the shared .vas-widget-bg
+   class - this file never re-declares a background on the card. All internal sizing
+   is em-driven off the widget root anchor; borders, radii and shadows stay in px
+   because they are physical edges (see "Not Scaled With em"). */
+
+.vas-219-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so a narrow or zoomed-in cell can step the card base
+       font below its 16px clamp floor (mirrors VAS_192). */
+    container: vas-219 / inline-size;
+}
+
+.vas-219-root,
+.vas-219-root * {
+    box-sizing: border-box;
+}
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Header row and value are distributed by
+   space-between so the content centres on zoom-out instead of hugging the top. */
+.vas-219-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: .5em;
+    text-align: left;
+    padding: .875em;
+    /* Radius is a physical edge and must not scale with the em anchor, so it is
+       pinned here over the shared class's em value. */
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    overflow: hidden;
+}
+
+/* Failed load: flag it on the edge only - the glass surface stays untinted so the
+   card still reads as part of the dashboard family. */
+.vas-219-card.vas-219-card-error {
+    border-color: #F0DEB4;
+}
+
+/* ---- Header row: icon well + widget title ---- */
+.vas-219-top {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    min-width: 0;
+}
+
+.vas-219-icon {
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 9px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+.vas-219-icon svg {
+    width: .95em;
+    height: .95em;
+    display: block;
+}
+
+/* The stat label IS the widget title - shared header clamp off --dash-inline-size
+   so it never depends on a container-query ancestor. */
+.vas-219-label {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.3;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The value owns whatever height is left under the header and centres the number
+   in it, both axes. The wrapper is the centring box; the inner span carries the
+   type and the truncation, because ellipsis does not apply to the anonymous text
+   of a flex container. */
+.vas-219-value {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 0;
+    min-height: 0;
+}
+
+/* KPI value: em-anchored so it scales on the same lever as padding and label. */
+.vas-219-value-text {
+    font-size: 1.75em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.05;
+    letter-spacing: -.01em;
+    font-variant-numeric: tabular-nums;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-left: .3125em;
+}
+
+/* Error explainer. Collapsed while empty so the card keeps its two-line rhythm in
+   the normal case. */
+.vas-219-meta {
+    font-size: .6875em;
+    font-weight: 400;
+    color: #9A6500;
+    line-height: 1.3;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-219-meta:empty {
+    display: none;
+}
+
+.vas-219-busy {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, .7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 14px;
+}
+
+.vas-219-hidden {
+    display: none !important;
+}
+
+/* ---- Responsive ----
+   The card interior scales off the em anchor clamp, so no per-breakpoint font
+   stepping is needed at normal widths. Only a narrow or zoomed-in cell needs the
+   base font pushed below the 16px clamp floor, and that is a container concern,
+   not a viewport one (mirrors VAS_192). */
+@container vas-219 (max-width: 300px) {
+    .vas-219-card { font-size: 13px; }
+}
+
+@container vas-219 (max-width: 220px) {
+    .vas-219-card { font-size: 11px; }
+}

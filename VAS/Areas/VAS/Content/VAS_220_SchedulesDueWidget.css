@@ -1,0 +1,578 @@
+/* VAS_220_SchedulesDueWidget.css
+   Schedules Due KPI tile + drill-down modal (Recurring dashboard, 2x1).
+   Design source: design.md -> dashboard-widgets.md "KPI And Summary Widget",
+   "Grid Data Widget" (separator tones, header rail) and "Widget Footer Pager".
+   The card's glass surface comes from the shared .vas-widget-bg class - this file
+   never re-declares a background on the card. Card internals are em-driven off the
+   widget root anchor; the dialog is a window surface and uses its own anchor.
+   Borders, radii and shadows stay in px because they are physical edges
+   (see "Not Scaled With em"). */
+
+.vas-220-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so a narrow or zoomed-in cell can step the card base
+       font below its 16px clamp floor (mirrors VAS_192). */
+    container: vas-220 / inline-size;
+}
+
+.vas-220-root,
+.vas-220-root * {
+    box-sizing: border-box;
+}
+
+/* ============================================================
+   2x1 KPI CARD
+   ============================================================ */
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Header row, value and meta are distributed
+   by space-between so the content centres on zoom-out instead of hugging the top. */
+.vas-220-card {
+    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    /* Tightened from .375em when the subtitle line was added, so the four-line stack
+       still clears the 2x1 content budget at the 1280px laptop floor. */
+    gap: .25em;
+    text-align: left;
+    padding: .875em;
+    /* Radius is a physical edge and must not scale with the em anchor, so it is
+       pinned here over the shared class's em value. */
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    color: #102C3F;
+    cursor: pointer;
+    outline: none;
+    overflow: hidden;
+    transition: box-shadow .15s ease, border-color .15s ease;
+}
+
+/* Hover deepens the shadow only. The card must not translate - it sits in a grid
+   of neighbours and any movement reads as the tile jumping out of its slot. */
+.vas-220-card:hover:not([aria-disabled="true"]) {
+    box-shadow: 0 14px 28px rgba(31, 131, 255, .14);
+}
+
+.vas-220-card:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: 2px;
+}
+
+/* Failed load: nothing to drill into, so the card stops being actionable and the
+   state is flagged on the edge only - the glass surface stays untinted. The card is
+   a div, so the state lives on aria-disabled rather than on :disabled. */
+.vas-220-card[aria-disabled="true"] {
+    cursor: default;
+}
+
+.vas-220-card.vas-220-card-error {
+    border-color: #F0DEB4;
+}
+
+/* ---- Header row: icon well + title/subtitle stack ---- */
+.vas-220-top {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    min-width: 0;
+}
+
+.vas-220-titles {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas-220-icon {
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 9px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+.vas-220-icon svg {
+    width: .95em;
+    height: .95em;
+    display: block;
+}
+
+/* The stat label IS the widget title - shared header clamp off --dash-inline-size
+   so it never depends on a container-query ancestor. */
+.vas-220-label {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Shared widget subtitle: names the window the card is reporting on. Same clamp
+   lever as the title, one step down, with the fixed 2px pairing margin from the
+   Widget Header spec. */
+.vas-220-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-220-subtitle:empty {
+    display: none;
+}
+
+/* KPI value: em-anchored so it scales on the same lever as padding and label. */
+.vas-220-value {
+    font-size: 1.75em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.05;
+    letter-spacing: -.01em;
+    font-variant-numeric: tabular-nums;
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-left: .3125em;
+}
+
+/* Meta row: "N due today" on the left, the drill-down cue on the right. One step
+   below the label above the value, so the explanation reads as secondary. */
+.vas-220-meta {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    min-width: 0;
+    font-size: .6875em;
+    line-height: 1.35;
+}
+
+.vas-220-today {
+    color: #748494;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-220-link {
+    color: #106AB0;
+    font-weight: 500;
+    white-space: nowrap;
+    margin-left: auto;
+    flex: 0 0 auto;
+}
+
+.vas-220-link:empty {
+    display: none;
+}
+
+/* Error explainer. Collapsed while empty so the card keeps its normal rhythm. */
+.vas-220-error {
+    font-size: .6875em;
+    font-weight: 400;
+    color: #9A6500;
+    line-height: 1.3;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-220-error:empty {
+    display: none;
+}
+
+.vas-220-busy {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, .7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 14px;
+}
+
+.vas-220-hidden {
+    display: none !important;
+}
+
+/* ---- Responsive ----
+   The card interior scales off the em anchor clamp, so no per-breakpoint font
+   stepping is needed at normal widths. Only a narrow or zoomed-in cell needs the
+   base font pushed below the 16px clamp floor, and that is a container concern,
+   not a viewport one (mirrors VAS_192). */
+@container vas-220 (max-width: 300px) {
+    .vas-220-card { font-size: 13px; }
+}
+
+@container vas-220 (max-width: 220px) {
+    .vas-220-card { font-size: 11px; }
+}
+
+/* ============================================================
+   DRILL-DOWN MODAL
+   The dialog is a window surface, not a dashboard widget, so it carries its own
+   type anchor instead of the widget root clamp.
+   ============================================================ */
+
+.vas-220-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 38, 64, .34);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: min(4vh, 28px) min(3vw, 28px);
+}
+
+/* Fixed height, not max-height: the dialog must not resize as the user pages
+   through rows or as a short last page comes in. The body scrolls inside it and the
+   footer stays pinned. */
+.vas-220-modal {
+    width: min(1080px, 94vw);
+    height: min(720px, 88dvh);
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 16px;
+    box-shadow: 0 28px 64px rgba(15, 61, 97, .26);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #102C3F;
+}
+
+.vas-220-modal-head {
+    flex: none;
+    padding: 14px 16px;
+    border-bottom: 1px solid #1F83FF;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    background: #FFFFFF;
+}
+
+.vas-220-htxt {
+    min-width: 0;
+}
+
+.vas-220-mtitle {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #141414;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-220-msub {
+    font-size: .8125rem;
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-220-xbtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    color: #141414;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    padding: 0;
+    flex: none;
+    transition: background .15s ease;
+}
+
+.vas-220-xbtn:hover {
+    background: #F1F4F8;
+}
+
+.vas-220-xbtn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.vas-220-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: .5em .875em 1em;
+    display: flex;
+    flex-direction: column;
+    /* Dialog type anchor - the modal is a window surface and sizes independently
+       of the dashboard widget clamp. */
+    font-size: clamp(15px, 1vw, 17px);
+}
+
+.vas-220-tbl {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* One shared column template across the header and every body row - the header and
+   the rows must never be given different templates or the columns drift. */
+.vas-220-trow {
+    display: grid;
+    gap: .75em;
+    padding: 0 .5em;
+    align-items: center;
+}
+
+/* Next run | Setup | Type | Business partner | Frequency | Currency | Amount.
+   Amount is the trailing column and the currency it is expressed in sits directly
+   before it, so the unit is read before the figure. */
+.vas-220-due-grid {
+    grid-template-columns:
+        minmax(0, .9fr) minmax(0, 1.1fr) minmax(0, 1.2fr)
+        minmax(0, 1.4fr) minmax(0, .9fr) minmax(0, .55fr) minmax(0, 1fr);
+}
+
+/* Header rail: transparent background, capitalize, one step below the row data,
+   and a divider darker than the body dividers. */
+.vas-220-thead {
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    padding: .5em;
+    border-bottom: 1px solid #C5D2DD;
+    position: sticky;
+    top: 0;
+    background: #FFFFFF;
+    z-index: 2;
+    flex: none;
+}
+
+.vas-220-tbody {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.vas-220-tbody-row {
+    font-size: .8125em;
+    padding: .625em .5em;
+    border-bottom: 1px solid #E2EAF1;
+    transition: background .12s ease;
+}
+
+.vas-220-tbody-row:hover {
+    background: #F4FAFF;
+}
+
+.vas-220-tbody-row:last-child {
+    border-bottom: 0;
+}
+
+/* Cells: every cell truncates and carries its full value in a title tooltip, so
+   alignment wins without losing information. */
+.vas-220-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas-220-c-right {
+    text-align: right;
+}
+
+.vas-220-c-num {
+    color: #5F7283;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-220-c-prim {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-220-c-std {
+    color: #5F7283;
+}
+
+.vas-220-c-val {
+    font-weight: 700;
+    color: #102C3F;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* The unit the amount beside it is expressed in - supporting metadata, so it reads
+   below the figure's weight without shrinking out of the row's type size. */
+.vas-220-c-cur {
+    color: #41576A;
+    letter-spacing: .01em;
+}
+
+/* "Today" marker beside the next-run date - the one row state a user scanning the
+   list needs to spot immediately. */
+.vas-220-chip {
+    display: inline-block;
+    margin-left: .4em;
+    padding: .15em .5em;
+    border-radius: 999px;
+    font-size: .8125em;
+    font-weight: 500;
+    line-height: 1.3;
+    background: #FBEFD6;
+    color: #9A6500;
+    vertical-align: middle;
+}
+
+.vas-220-row-today .vas-220-c-num {
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas-220-empty {
+    padding: 2em .5em;
+    text-align: center;
+    font-size: .8125em;
+    color: #5F7283;
+}
+
+.vas-220-modal-foot {
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #FBFDFF;
+}
+
+.vas-220-foot-note {
+    font-size: .8125rem;
+    color: #5F7283;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-220-foot-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+}
+
+/* Canonical widget pager: 24px buttons, 14px chevrons. */
+.vas-220-pager {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+}
+
+.vas-220-pager:empty {
+    display: none;
+}
+
+.vas-220-pbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #FFFFFF;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    transition: background .15s ease;
+}
+
+.vas-220-pbtn:hover:not(:disabled) {
+    background: #EEF8FF;
+}
+
+.vas-220-pbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+    border-color: #E2EAF1;
+    background: #F9FBFC;
+}
+
+.vas-220-pbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-220-ptxt {
+    font-size: .8125rem;
+    font-weight: 500;
+    color: #102C3F;
+    min-width: 3.4em;
+    text-align: center;
+}
+
+.vas-220-btn {
+    border-radius: 999px;
+    padding: .5em .875em;
+    font-family: inherit;
+    font-size: .8125rem;
+    font-weight: 500;
+    border: 1px solid #0083DA;
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+    outline: none;
+    transition: background .15s ease, color .15s ease;
+}
+
+.vas-220-btn:hover {
+    background: #EEF8FF;
+}
+
+.vas-220-btn-primary {
+    background: #0083DA;
+    color: #FFFFFF;
+}
+
+.vas-220-btn-primary:hover {
+    background: #0069AE;
+}
