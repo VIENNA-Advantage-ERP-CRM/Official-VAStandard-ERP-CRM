@@ -1,0 +1,67 @@
+/* ==========================================================
+   VAS_227 Search Recurring Widget
+
+   The full-width 1x9 search bar for the Recurring dashboard. Its
+   chrome - the transparent outer wrapper, the 80% centred glass
+   bar, the body-mounted results dropdown, the rows, chips, status
+   pills and the empty / loading / error states - all come from the
+   shared vas-dssrch-* stylesheet (VAS_DocumentSearchWidgets.css),
+   which the VAS_067 / 068 / 069 / 070 search bars already use.
+
+   Only what is unique to recurring setups lives here:
+     - the two chip variants the shared sheet has no colour for
+       (project, and the fallback for an unknown RecurringType);
+     - the three-line result row (setup name, partner, detail line),
+       which needs the type chip pinned to the top rather than
+       centred against a taller body.
+
+   Scoped to .vas-227-root / .vas-227-panel so the sibling search
+   widgets are untouched.
+
+   Panel chrome is an overlay, so it is sized in rem per the hybrid
+   unit rules; borders and radii stay in px (physical edges).
+   ========================================================== */
+
+/* ---------- Type chips the shared sheet does not define ---------- */
+/* Project setups copy a C_Project; green keeps them apart from the
+   document chips (blue) and the journal chips (violet). */
+.vas-227-panel .vas-dssrch-chip-project {
+    background: rgba(46, 158, 91, 0.14);
+    color: #2E9E5B;
+}
+
+/* Fallback for a RecurringType the client has no label for - the row
+   still renders, quietly, instead of showing an unstyled chip. */
+.vas-227-panel .vas-dssrch-chip-other {
+    background: rgba(16, 47, 74, 0.08);
+    color: #5F7283;
+}
+
+/* ---------- Three-line result row ---------- */
+/* The row body carries the setup name, the partner and a detail line,
+   so the chip is aligned to the first of them rather than floated in
+   the middle of the row. */
+.vas-227-panel .vas-dssrch-row {
+    align-items: flex-start;
+}
+
+.vas-227-panel .vas-dssrch-chip {
+    margin-top: 0.15rem;
+    max-width: 6.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* "GL Journal Batch" and a long setup name must not push the amount
+   column off the row; the text side gives way first. */
+.vas-227-panel .vas-dssrch-meta {
+    max-width: 38%;
+    padding-top: 0.1rem;
+}
+
+/* Amount and next run read as one right-hand block, so the date sits
+   directly under the figure. */
+.vas-227-panel .vas-dssrch-date {
+    margin-top: 0.1rem;
+}

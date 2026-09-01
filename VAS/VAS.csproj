@@ -1099,6 +1099,9 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\Recurring\VAS_225_SetupsExpiringSoonWidget.js" />
     <Content Include="Areas\VAS\Content\VAS_226_NewRecurringWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\Recurring\VAS_226_NewRecurringWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_227_SearchRecurringWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_227_SearchRecurringWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Recurring\VAS_227_SearchRecurringWidget.js" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>

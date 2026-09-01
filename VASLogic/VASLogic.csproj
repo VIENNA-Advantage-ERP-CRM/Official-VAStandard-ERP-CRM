@@ -184,6 +184,7 @@
     <Compile Include="Models\VAS_223_ByDocumentTypeModel.cs" />
     <Compile Include="Models\VAS_224_RecentlyGeneratedModel.cs" />
     <Compile Include="Models\VAS_225_SetupsExpiringSoonModel.cs" />
+    <Compile Include="Models\VAS_227_SearchRecurringModel.cs" />
     <Compile Include="Models\VAS_InvoiceOverviewModel.cs" />
     <Compile Include="Models\VAS_PaymentVoucherPanelModel.cs" />
     <Compile Include="Models\VAS_RecentReceiptsModel.cs" />
