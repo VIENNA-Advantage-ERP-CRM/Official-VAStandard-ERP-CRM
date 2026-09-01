@@ -1,0 +1,432 @@
+/* VAS_222_UpcomingRecurringSchedules.css
+   Upcoming Recurring Schedules grid widget (Recurring dashboard, 6x2).
+   Design source: design.md -> dashboard-widgets.md "Grid Data Widget" (header rail,
+   separator tones, column sizing and truncation), "Widget Header" and
+   "Widget Footer Pager".
+   The glass surface comes from the shared .vas-widget-bg class - this file never
+   re-declares a background on the card. Internal sizing is em-driven off the widget
+   root anchor; borders, radii and shadows stay in px because they are physical edges
+   (see "Not Scaled With em"). */
+
+.vas-222-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so a narrow or zoomed-in cell can step the card base
+       font below its 16px clamp floor (mirrors VAS_192). */
+    container: vas-222 / inline-size;
+}
+
+.vas-222-root,
+.vas-222-root * {
+    box-sizing: border-box;
+}
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. The card is a fixed-height flex column -
+   head and foot hold their size, the body takes the remainder and never scrolls. */
+.vas-222-card {
+    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    text-align: left;
+    padding: .875em;
+    /* Radius is a physical edge and must not scale with the em anchor, so it is
+       pinned here over the shared class's em value. */
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    color: #102C3F;
+    overflow: hidden;
+}
+
+/* ---- Header: icon well + title/subtitle stack ---- */
+.vas-222-head {
+    display: flex;
+    align-items: center;
+    gap: .625em;
+    min-width: 0;
+    flex: none;
+    margin-bottom: .625em;
+}
+
+.vas-222-icon {
+    width: 2em;
+    height: 2em;
+    border-radius: 10px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+.vas-222-icon svg {
+    width: 1em;
+    height: 1em;
+    display: block;
+}
+
+.vas-222-titles {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Shared header clamp off --dash-inline-size so it never depends on a
+   container-query ancestor. */
+.vas-222-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-222-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Table ----
+   One shared column template across the header and every body row - the header and
+   the rows must never be given different templates or the columns drift. Every
+   column is minmax(0, Nfr) so cells can shrink below content width and the row can
+   never blow out of the cell.
+   Next run | Setup | Type | Business partner | Frequency | Currency | Amount |
+   Status | Generate. Amount trails the data columns with its currency directly
+   before it, matching the sibling Recurring widgets. */
+.vas-222-trow {
+    display: grid;
+    gap: .6em;
+    align-items: center;
+    padding: 0 .5em;
+}
+
+/* Setup carries the longest values (document-number style names) and was the column
+   truncating first, so it takes the largest share. Type and Frequency give the room
+   back - both hold short, predictable list labels. */
+.vas-222-grid {
+    grid-template-columns:
+        minmax(0, .95fr) minmax(0, 1.7fr) minmax(0, .85fr) minmax(0, 1.15fr)
+        minmax(0, .75fr) minmax(0, .55fr) minmax(0, .9fr) minmax(0, .8fr)
+        minmax(0, .9fr);
+}
+
+/* Header rail: transparent background, capitalize, one step below the row data, and
+   a divider darker than the body dividers. */
+.vas-222-thead {
+    flex: none;
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    padding: 0 .5em .5em;
+    border-bottom: 1px solid #C5D2DD;
+}
+
+/* The body owns the leftover height and clips rather than scrolls - the row count is
+   derived from this box at runtime and the footer pager is the contract for
+   "more rows exist".
+   Flex-basis is 0, not auto: the box must be sized purely by the space its siblings
+   leave, never by the rows inside it. With an auto basis the rendered content feeds
+   back into the height, the resize observer wakes, and the widget refetches in a
+   loop. */
+.vas-222-body {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-222-body-row {
+    flex: none;
+    font-size: .75em;
+    padding: .625em .5em;
+    border-bottom: 1px solid #E2EAF1;
+    transition: background .12s ease;
+}
+
+.vas-222-body-row:hover {
+    background: #F4FAFF;
+}
+
+.vas-222-body-row:last-child {
+    border-bottom: 0;
+}
+
+/* Cells: every cell truncates and carries its full value in a title tooltip, so
+   alignment wins without losing information. */
+.vas-222-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas-222-c-right {
+    text-align: right;
+}
+
+.vas-222-c-num {
+    color: #5F7283;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-222-c-prim {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-222-c-std {
+    color: #5F7283;
+}
+
+/* The unit the amount beside it is expressed in - supporting metadata, so it reads
+   below the figure's weight without shrinking out of the row's type size. */
+.vas-222-c-cur {
+    color: #41576A;
+    letter-spacing: .01em;
+}
+
+/* Regular weight, not bold: the setup name is the row's primary, and a bold amount
+   beside it gave the row two competing anchors. Colour still separates it from the
+   muted metadata cells. */
+.vas-222-c-val {
+    font-weight: 400;
+    color: #102C3F;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-222-c-action {
+    display: flex;
+    justify-content: flex-end;
+    overflow: visible;
+}
+
+/* ---- Status chips ----
+   The cell centres the chip itself rather than letting it sit on the row's text
+   baseline. A padded inline-block baselines on its text, which parks the pill a
+   couple of pixels above the plain-text cells and the Generate button beside it. */
+.vas-222-c-status {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.vas-222-chip {
+    display: inline-block;
+    max-width: 100%;
+    padding: .15em .5em;
+    border-radius: 999px;
+    font-size: .9166em;
+    font-weight: 500;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-222-chip-warn {
+    background: #FBEFD6;
+    color: #9A6500;
+}
+
+.vas-222-chip-info {
+    background: #DFF1FF;
+    color: #106AB0;
+}
+
+.vas-222-chip-muted {
+    background: #EEF2F6;
+    color: #5F7283;
+}
+
+/* ---- Row action ---- */
+.vas-222-btn-gen {
+    display: inline-flex;
+    align-items: center;
+    gap: .35em;
+    font-family: inherit;
+    font-size: .9166em;
+    font-weight: 600;
+    letter-spacing: .01em;
+    color: #FFFFFF;
+    background: linear-gradient(180deg, #2E97FF, #1F83FF);
+    border: none;
+    border-radius: 999px;
+    padding: .35em .7em .35em .55em;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(31, 131, 255, .28);
+    transition: background .15s ease, box-shadow .15s ease;
+}
+
+.vas-222-btn-gen:hover:not(:disabled) {
+    background: linear-gradient(180deg, #1F8BF5, #0F75EC);
+    box-shadow: 0 4px 11px rgba(31, 131, 255, .38);
+}
+
+.vas-222-btn-gen:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: 2px;
+}
+
+/* Disabled, not hidden: the queue reads consistently and the tooltip explains why
+   this particular row cannot run yet. */
+.vas-222-btn-gen:disabled {
+    background: #EEF2F6;
+    color: #9AAAB8;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.vas-222-btn-gen svg {
+    width: 1em;
+    height: 1em;
+    flex: 0 0 auto;
+}
+
+/* ---- Body states ---- */
+.vas-222-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 1em .5em;
+    font-size: .75em;
+    color: #5F7283;
+}
+
+.vas-222-state-error {
+    color: #9A6500;
+}
+
+/* ---- Footer pager ----
+   min-height holds the band at its tallest state (the 24px pager buttons) so the
+   footer does not change size when the pager is hidden on a single-page result.
+   A footer that resizes would resize the body, which would wake the resize observer
+   and refetch the list. */
+.vas-222-foot {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    min-height: calc(24px + .5em);
+    padding-top: .5em;
+    border-top: 1px solid #D9E2EB;
+}
+
+.vas-222-foot-note {
+    font-size: .75em;
+    color: #748494;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Canonical widget pager: 24px buttons, 14px chevrons. */
+.vas-222-pager {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    flex: none;
+}
+
+.vas-222-pager:empty {
+    display: none;
+}
+
+.vas-222-pbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid #E4EDF4;
+    background: rgba(255, 255, 255, .7);
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    transition: background .15s ease;
+}
+
+.vas-222-pbtn:hover:not(:disabled) {
+    background: #EEF8FF;
+}
+
+.vas-222-pbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+    border-color: #E2EAF1;
+    background: #F9FBFC;
+}
+
+.vas-222-pbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-222-ptxt {
+    font-size: .8125em;
+    font-weight: 500;
+    color: #102C3F;
+    min-width: 3.4em;
+    text-align: center;
+}
+
+/* ---- Busy overlay ---- */
+.vas-222-busy {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, .7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 14px;
+}
+
+.vas-222-hidden {
+    display: none !important;
+}
+
+/* ---- Responsive ----
+   The card interior scales off the em anchor clamp, so no per-breakpoint font
+   stepping is needed at normal widths. Only a narrow or zoomed-in cell needs the
+   base font pushed below the 16px clamp floor, and that is a container concern,
+   not a viewport one (mirrors VAS_192). */
+@container vas-222 (max-width: 640px) {
+    .vas-222-card { font-size: 13px; }
+}
+
+@container vas-222 (max-width: 460px) {
+    .vas-222-card { font-size: 11px; }
+}
