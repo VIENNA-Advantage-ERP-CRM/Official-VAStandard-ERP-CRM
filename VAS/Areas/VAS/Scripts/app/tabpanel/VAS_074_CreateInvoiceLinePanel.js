@@ -838,6 +838,18 @@
            When false the whole panel is read-only: no Add / Save / Delete and no cell edit. */
         function panelEditable() { return !!(parent && parent.IsEditable); }
 
+        /* Every field in the "..." (Additional Info) modal is read-only when EITHER
+           reason applies:
+             - the document itself can no longer be edited (Completed / Closed / Voided /
+               Reversed) - the same lock the grid, Add, Save and Delete already honour. The
+               modal writes straight into line.values, so without this a completed invoice
+               offered editable fields that the server would refuse to save anyway;
+             - the hosting tab has an unsaved edit (moreViewOnly), which lets the user read
+               the additional info but not change it until the tab is saved.
+           Read live rather than captured, so it also holds for a modal rebuilt in place by
+           refreshMoreDialog. */
+        function moreFieldsLocked() { return moreViewOnly || !panelEditable(); }
+
         function renderHeaderButtons() {
             var n = unsavedLines().length;
             var locked = !panelEditable();
@@ -1244,11 +1256,18 @@
             backdrop.append(dialog);
             $("body").append(backdrop);
             // View-only: say WHY the fields can't be edited, just above the footer (same slot as
-            // the mandatory-field message, warning tone instead of danger).
-            if (moreViewOnly) {
+            // the mandatory-field message, warning tone instead of danger). A locked document
+            // and a pending tab edit both make the fields read-only (see moreFieldsLocked), but
+            // for different reasons, so the note names the one that actually applies. The
+            // document lock is checked first - it is the one the user cannot clear from here.
+            var lockNote = !panelEditable()
+                ? lbl("VAS_074_DocLockedViewOnly", "View only - this document is no longer editable")
+                : (moreViewOnly
+                    ? lbl("VAS_074_TabChangesViewOnly", "View only - save the changes on the tab first to edit these fields")
+                    : "");
+            if (lockNote) {
                 dialog.find(".vas-cil-dialog__footer").before(
-                    $('<div class="vas-cil-more-note" role="status"></div>')
-                        .text(lbl("VAS_074_TabChangesViewOnly", "View only - save the changes on the tab first to edit these fields")));
+                    $('<div class="vas-cil-more-note" role="status"></div>').text(lockNote));
             }
 
             var $body = dialog.find("#vasCilMoreBody");
@@ -1261,9 +1280,10 @@
             function done() {
                 // Block close while a conditionally-mandatory curated field (e.g. Capital/Expense
                 // on an Asset-Related line) is still empty - show the message in the modal and
-                // keep it open until the required value is set. Skipped in view-only mode: the
-                // fields are read-only there, so the user could never satisfy the check.
-                var miss = moreViewOnly ? null : firstMissingDynMandatory(line);
+                // keep it open until the required value is set. Skipped whenever the fields are
+                // locked (document not editable, or a pending tab edit): they are read-only
+                // there, so the user could never satisfy the check.
+                var miss = moreFieldsLocked() ? null : firstMissingDynMandatory(line);
                 if (miss) { showMoreDialogError(miss); return; }
                 commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line);
             }
@@ -2694,9 +2714,9 @@
         }
 
         function buildDynField(line, m) {
-            // View-only modal (pending tab edit) forces EVERY field read-only, whatever the
-            // column's own IsReadOnly / ReadOnlyLogic says.
-            var ro = moreViewOnly || isColumnReadOnly(line, m.ColumnName);
+            // A locked modal (document no longer editable, or a pending tab edit) forces EVERY
+            // field read-only, whatever the column's own IsReadOnly / ReadOnlyLogic says.
+            var ro = moreFieldsLocked() || isColumnReadOnly(line, m.ColumnName);
             var kind = dynFieldKind(m);
             // Caption only - the framework renders the mandatory red asterisk itself.
             var caption = m.Name || m.ColumnName;
@@ -3066,6 +3086,11 @@
            loaded on the page and otherwise falls back to the server RunColumnCallout - so a
            modal field's callout fires even when its client class isn't present on the page. */
         function setDyn(line, col, value, refresh) {
+            // Belt and braces: every control is already built read-only when the modal is
+            // locked, but a framework control can still raise fireValueChanged (e.g. on a
+            // programmatic setValue during a rebuild) - swallow it rather than dirty a line
+            // the document lock says cannot change.
+            if (moreFieldsLocked()) return;
             var prev = lineVal(line, col);
             setLineVal(line, col, value);
             // Keep the window context current so a dependent FK's val rule (and any control
