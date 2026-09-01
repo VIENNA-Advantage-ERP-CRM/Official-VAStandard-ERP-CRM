@@ -173,6 +173,8 @@
     <Compile Include="Models\VAS_200_BankReconcilationModel.cs" />
     <Compile Include="Models\VAS_201_UnMatchedGRNInvoiceModel.cs" />
     <Compile Include="Models\VAS_202_SuspenseBalancesModel.cs" />
+    <Compile Include="Models\VAS_219_ActiveSetupsModel.cs" />
+    <Compile Include="Models\VAS_220_SchedulesDueModel.cs" />
     <Compile Include="Models\VAS_100_OverviewDOModel.cs" />
     <Compile Include="Models\VAS_101_OverviewInventoryCountModel.cs" />
     <Compile Include="Models\VAS_102_OverviewInternalUseModel.cs" />
@@ -180,6 +182,12 @@
     <Compile Include="Models\VAS_104_OverviewShipGRNConfirmationModel.cs" />
     <Compile Include="Models\VAS_105_AccountRightPanelModel.cs" />
     <Compile Include="Models\VAS_106_OverviewSalesOrderModel.cs" />
+    <Compile Include="Models\VAS_221_RecordGeneratedModel.cs" />
+    <Compile Include="Models\VAS_222_UpcomingSchedulesModel.cs" />
+    <Compile Include="Models\VAS_223_ByDocumentTypeModel.cs" />
+    <Compile Include="Models\VAS_224_RecentlyGeneratedModel.cs" />
+    <Compile Include="Models\VAS_225_SetupsExpiringSoonModel.cs" />
+    <Compile Include="Models\VAS_227_SearchRecurringModel.cs" />
     <Compile Include="Models\VAS_InvoiceOverviewModel.cs" />
     <Compile Include="Models\VAS_PaymentVoucherPanelModel.cs" />
     <Compile Include="Models\VAS_RecentReceiptsModel.cs" />
