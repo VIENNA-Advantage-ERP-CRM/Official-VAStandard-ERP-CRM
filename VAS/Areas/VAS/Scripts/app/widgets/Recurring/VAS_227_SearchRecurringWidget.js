@@ -37,7 +37,7 @@
  *                  Summary Message Table
  *                   # | Current Text                                          | Message Key
  *                  ---+-------------------------------------------------------+--------------------------------
- *                   1 | Search recurring setups - name, document no, project or business partner | VAS_227_Placeholder
+ *                   1 | Search recurring setups - Name, Document no, Type, Project or Business Partner | VAS_227_Placeholder
  *                   2 | Type at least 2 characters to search                   | VAS_227_TypeToSearch
  *                   3 | No matching recurring setups                           | VAS_227_NoResults
  *                   4 | Search failed. Please try again.                       | VAS_227_CouldntLoad
@@ -168,7 +168,7 @@
         /* ------------------------------------------------------------ */
         function buildShell() {
             var placeholder = getMsg('VAS_227_Placeholder',
-                'Search recurring setups - name, document no, project or business partner');
+                'Search recurring setups - Name, Document no, Type, Project or Business Partner');
 
             $bar = $('<div class="vas-dssrch-bar" id="vas_227_bar_' + widgetID + '">');
             $bar.append(
