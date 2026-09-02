@@ -1,9 +1,12 @@
 /* ─────────────────────────────────────────────────────────────────────────
  * VAS_229_NewBankJournalWidget — Quick Action dashboard widget that opens a new
- * bank journal (C_BankStatement) on the host VAS_BankJournal window.
+ * bank journal (C_BankStatement) on the host VAS_BankStatement window.
  *
- * Styling mirrors VAS_226_NewRecurringWidget.css so the quick-action tiles
- * read as one family across the VAS dashboards.
+ * Styling mirrors VAS_226_NewRecurringWidget.css value for value, so the
+ * quick-action tiles read as ONE family across the VAS dashboards. That family
+ * look is the contract here: when this tile and VAS_226 sit on the same
+ * dashboard row they must be indistinguishable apart from their label. Change
+ * both files together or neither.
  *
  * Design: dashboard-widgets.md §"Quick Action Widget" —
  *   2px #9ED1FF border, pale blue-to-white gradient surface, 14px radius,
