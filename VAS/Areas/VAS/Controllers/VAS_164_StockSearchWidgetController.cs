@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -16,7 +17,11 @@ namespace VAS.Controllers
      * - Product Category: M_Product_Category (M_Product_Category_ID, Name)
      * - Unit of Measure: C_UOM (C_UOM_ID, Name, UOMSymbol)
      * - Storage / On-Hand: M_Storage (M_Product_ID, M_Locator_ID, QtyOnHand)
-     * - Locator: M_Locator (M_Locator_ID, M_Warehouse_ID, Value)
+     * - Locator: M_Locator (M_Locator_ID, M_Warehouse_ID, Value, LocatorCombination)
+     *   Visible locator value is COALESCE(LocatorCombination, Value) - the source prompt states
+     *   this twice ("Use COALESCE(M_Locator.LocatorCombination, M_Locator.Value) as the visible
+     *   Locator value" and "Locator display: M_Locator.LocatorCombination, with M_Locator.Value
+     *   as fallback"). Value alone is the code/identifier, not the name.
      * - Warehouse: M_Warehouse (M_Warehouse_ID, Value, Name)
      * Cross-Database: COALESCE used for Oracle and PostgreSQL compatibility.
      */
@@ -43,11 +48,56 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
+                // Locator search (user request 2026-08-29). The source prompt originally scoped
+                // search to product name/code/category and said "Do not advertise locator search
+                // unless locator search is deliberately added later with a separately approved
+                // requirement" - this is that requirement, so the locator predicates are added and
+                // the input placeholder that already mentioned locators becomes truthful.
+                //
+                // LOCATOR MATCH TAKES PRECEDENCE, it is not simply OR'd in. The requirement is
+                // "display ONLY the products available in the corresponding locator", and a plain
+                // OR cannot deliver that: on DB 1 the locator codes are 1000000..1000006 while
+                // product codes run 10000030..10000038, so searching the locator code "1000003"
+                // under an OR also dragged in every product whose CODE merely contains it.
+                //
+                // So: when the term matches any locator the user can see, only storage rows in a
+                // matching locator qualify - products with no stock there disappear, and the summed
+                // on-hand becomes that locator's quantity. When the term matches no locator, the
+                // NOT EXISTS opens up and it behaves as the original product search, with the
+                // on-hand still summed across every locator.
+                //
+                // Bound as parameters, not concatenated. The prompt's implementation rules require
+                // "Use parameterized SQL only. Never concatenate search text ... into SQL", and the
+                // previous concatenation of user input straight into the LIKE was an injection
+                // vector. Each occurrence binds its own name rather than reusing one - VAS_073 is
+                // the repo's precedent for binding a separate name per occurrence - and they are
+                // added in the order they appear in the statement.
                 string searchFilter = "";
+                List<SqlParameter> parameters = new List<SqlParameter>();
+
                 if (!string.IsNullOrEmpty(query))
                 {
-                    string q = query.Trim().ToUpper();
-                    searchFilter = " AND (UPPER(p.Value) LIKE '%" + q + "%' OR UPPER(p.Name) LIKE '%" + q + "%' OR UPPER(pc.Name) LIKE '%" + q + "%')";
+                    string pattern = "%" + query.Trim().ToUpper() + "%";
+
+                    searchFilter = @" AND (UPPER(loc.Value) LIKE @QLocatorCode
+                                        OR UPPER(loc.LocatorCombination) LIKE @QLocatorName
+                                        OR (NOT EXISTS (SELECT 1
+                                                          FROM M_Locator lx
+                                                         WHERE lx.IsActive = 'Y'
+                                                           AND lx.AD_Client_ID = p.AD_Client_ID
+                                                           AND (UPPER(lx.Value) LIKE @QLocatorMatchCode
+                                                             OR UPPER(lx.LocatorCombination) LIKE @QLocatorMatchName))
+                                            AND (UPPER(p.Value) LIKE @QProductCode
+                                              OR UPPER(p.Name) LIKE @QProductName
+                                              OR UPPER(pc.Name) LIKE @QCategory)))";
+
+                    parameters.Add(new SqlParameter("@QLocatorCode", pattern));
+                    parameters.Add(new SqlParameter("@QLocatorName", pattern));
+                    parameters.Add(new SqlParameter("@QLocatorMatchCode", pattern));
+                    parameters.Add(new SqlParameter("@QLocatorMatchName", pattern));
+                    parameters.Add(new SqlParameter("@QProductCode", pattern));
+                    parameters.Add(new SqlParameter("@QProductName", pattern));
+                    parameters.Add(new SqlParameter("@QCategory", pattern));
                 }
 
                 string sql = @"SELECT p.M_Product_ID, 
@@ -62,6 +112,7 @@ namespace VAS.Controllers
                                LEFT JOIN M_Product_Category pc ON (p.M_Product_Category_ID = pc.M_Product_Category_ID) 
                                LEFT JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID) 
                                LEFT JOIN M_Storage s ON (p.M_Product_ID = s.M_Product_ID AND s.IsActive = 'Y') 
+                               LEFT JOIN M_Locator loc ON (s.M_Locator_ID = loc.M_Locator_ID AND loc.IsActive = 'Y') 
                                WHERE p.IsActive = 'Y' 
                                  AND p.IsStocked = 'Y' 
                                  AND p.ProductType = 'I'" + searchFilter;
@@ -69,7 +120,7 @@ namespace VAS.Controllers
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                 sql += " GROUP BY p.M_Product_ID, p.Value, p.Name, p.ProductType, pc.Name, u.UOMSymbol, u.Name, p.IsActive ORDER BY TotalQtyOnHand DESC, p.Name ASC";
 
-                dr = DB.ExecuteReader(sql, null, null);
+                dr = DB.ExecuteReader(sql, parameters.Count > 0 ? parameters.ToArray() : null, null);
                 int count = 0;
                 while (dr != null && dr.Read() && count < 20)
                 {
@@ -191,7 +242,7 @@ namespace VAS.Controllers
                 // different batches in one locator collapse into a single untraceable row.
                 // asi.Description is NVARCHAR2: selected raw, never COALESCE'd against a literal
                 // (that raises ORA-12704 - see VAS_161 / VAS_163 / VAS_165). Blank when absent.
-                string sql = @"SELECT loc.Value AS LocatorCode,
+                string sql = @"SELECT COALESCE(loc.LocatorCombination, loc.Value) AS LocatorCode,
                                       w.Name AS WarehouseName,
                                       asi.Description AS AttributeDesc,
                                       SUM(s.QtyOnHand) AS QtyOnHand
@@ -202,7 +253,8 @@ namespace VAS.Controllers
                                WHERE s.IsActive = 'Y' AND s.M_Product_ID = " + productId;
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "s", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                sql += " GROUP BY loc.Value, w.Name, asi.Description ORDER BY QtyOnHand DESC, loc.Value ASC";
+                sql += " GROUP BY COALESCE(loc.LocatorCombination, loc.Value), w.Name, asi.Description"
+                     + " ORDER BY QtyOnHand DESC, COALESCE(loc.LocatorCombination, loc.Value) ASC";
 
                 dr = DB.ExecuteReader(sql, null, null);
                 while (dr != null && dr.Read())
@@ -257,7 +309,7 @@ namespace VAS.Controllers
                                       i.MovementDate,
                                       i.DocStatus,
                                       w.Name AS WarehouseName,
-                                      loc.Value AS LocatorCode,
+                                      COALESCE(loc.LocatorCombination, loc.Value) AS LocatorCode,
                                       asi.Description AS AttributeDesc,
                                       COALESCE(il.QtyBook, 0) AS QtyBook,
                                       COALESCE(il.QtyCount, 0) AS QtyCount

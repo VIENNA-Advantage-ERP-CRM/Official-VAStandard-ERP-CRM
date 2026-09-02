@@ -1,4 +1,4 @@
-/************************************************************
+﻿﻿﻿﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Representative Wise PO Widget (Purchase Order Dashboard - Widget 13)
  * Description    : Ranks purchase order spend and count by buying representative (C_Order.SalesRep_ID)
@@ -516,16 +516,32 @@ namespace VIS.Controllers
                     SELECT
                         ol.C_OrderLine_ID,
                         ol.Line,
-                        p.Value AS ProductCode,
-                        p.Name AS ProductName,
-                        asi.Description AS AttributeDesc,
+                        COALESCE(p.Value, N'') AS ProductCode,
+                        -- A charge line, or a product that is not of Item type, carries no
+                        -- stock movement: the widget shows its name, UOM, ordered, rate and
+                        -- amount, and dashes for received / pending / line status.
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
+                             THEN COALESCE(ch.Name, N'')
+                             ELSE COALESCE(p.Name, N'') END AS ProductName,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
+                             WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
+                             ELSE 'N' END AS IsNonStock,
+                        CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
+                             THEN COALESCE(asi.Description, N'')
+                             ELSE N'' END AS AttributeDesc,
                         COALESCE(uom.UOMSymbol, uom.Name) AS UomName,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
+                        -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
+                        -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
+                        -- widget shows the selected UOM, so quantities are scaled to it.
+                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0) AS PriceActual,
                         COALESCE(ol.LineNetAmt, 0) AS LineNetAmt
                     FROM C_OrderLine ol
-                    INNER JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    -- Charge lines have no M_Product, so this must not be an INNER JOIN.
+                    LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN C_UOM uom ON uom.C_UOM_ID = ol.C_UOM_ID
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
                     WHERE ol.C_Order_ID = @OrderID
@@ -540,6 +556,15 @@ namespace VIS.Controllers
                     {
                         decimal qtyOrd = Util.GetValueOfDecimal(dr["QtyOrdered"]);
                         decimal qtyDel = Util.GetValueOfDecimal(dr["QtyDelivered"]);
+
+                        // Quantities are shown in the UOM the line was entered in. QtyEntered is in the
+                        // line's own C_UOM_ID; QtyOrdered / QtyDelivered are in the product's base UOM,
+                        // so delivered is scaled by this line's own entered/ordered ratio. Header
+                        // roll-ups above stay in the base UOM - summing mixed UOMs is meaningless.
+                        decimal enteredQtyUom = Util.GetValueOfDecimal(dr["QtyEntered"]);
+                        decimal uomRatio = (qtyOrd != 0) ? (enteredQtyUom / qtyOrd) : 1m;
+                        qtyOrd = enteredQtyUom;
+                        qtyDel = qtyDel * uomRatio;
                         decimal qtyPend = Math.Max(0, qtyOrd - qtyDel);
                         decimal rate = Util.GetValueOfDecimal(dr["PriceActual"]);
                         decimal amount = Util.GetValueOfDecimal(dr["LineNetAmt"]);
@@ -586,6 +611,9 @@ namespace VIS.Controllers
                             pend = qtyPend,
                             rate = rate,
                             amount = amount,
+                            // Charge / non-Item lines are never received - the client renders dashes
+                            // for received, pending and line status.
+                            isNonStock = Util.GetValueOfString(dr["IsNonStock"]) == "Y",
                             statusText = lineStatus,
                             statusChip = lineChip
                         });

@@ -112,10 +112,31 @@
         return sym + n.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    /* The controller returns dates through ASP.NET MVC's JavaScriptSerializer, which
+       writes DateTime as "/Date(1755302400000)/". new Date() cannot parse that form, so
+       the raw string used to be printed instead of a date. Unwrap it first, then fall
+       back to the native parser for ISO / already-formatted values. */
+    function parseDateValue(dateVal) {
+        if (dateVal === null || dateVal === undefined || dateVal === '') { return null; }
+        if (dateVal instanceof Date) { return isNaN(dateVal.getTime()) ? null : dateVal; }
+        if (typeof dateVal === 'number') { return new Date(dateVal); }
+
+        var raw = String(dateVal);
+        var msMatch = /\/Date\((-?\d+)([+-]\d{4})?\)\//.exec(raw);
+        if (msMatch) {
+            var parsed = new Date(parseInt(msMatch[1], 10));
+            return isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        var d = new Date(raw);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    var DASH = '–';
+
     function formatDate(dateVal) {
-        if (!dateVal) { return '—'; }
-        var d = new Date(dateVal);
-        if (isNaN(d.getTime())) { return String(dateVal); }
+        var d = parseDateValue(dateVal);
+        if (!d) { return (dateVal ? String(dateVal) : '—'); }
         return d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short', year: 'numeric' });
     }
 
@@ -203,14 +224,16 @@
         var activeWarehouseOrders = [];
         var activeWarehouseStats = {};
         var ordersPage = 1;
-        var ORDERS_PAGE_SIZE = 10;
+        // Rows per page in the modal table. The stylesheet sizes the table body to
+        // exactly this many rows (--vas-211-rows), so the two must stay in step.
+        var ORDERS_PAGE_SIZE = 6;
 
         // PO Lines pagination state
         var activeOrderHeader = null;
         var activeOrderLines = [];
         var activeOrderStats = {};
         var linesPage = 1;
-        var LINES_PAGE_SIZE = 8;
+        var LINES_PAGE_SIZE = 6;
 
         this.Initalize = function () {
             buildWidget();
@@ -855,19 +878,29 @@
 
             for (var i = 0; i < pageSlice.length; i++) {
                 var l = pageSlice[i];
-                var lineStatusDisplay = getLineStatusText(l.lineStatus);
+                /* Charge lines and non-Item products (service / resource / expense) are never
+                   received, so Received, Pending and Line status show a dash instead of a
+                   figure or a status chip. Attribute stays blank when the line has none. */
+                var isNonStock = !!l.isNonStock;
+                var attrDisp = l.attributeDesc ? String(l.attributeDesc) : '';
+                var lineStatusDisplay = isNonStock ? DASH : getLineStatusText(l.lineStatus);
+                var receivedDisp = isNonStock ? DASH : formatNumber(l.qtyDelivered);
+                var pendingDisp = isNonStock ? DASH : formatNumber(l.qtyPending);
+                var statusCell = isNonStock
+                    ? '<span class="vas-211-cell vas-211-c-std" title="' + DASH + '">' + DASH + '</span>'
+                    : '<span class="vas-211-cell" title="' + escapeHtml(lineStatusDisplay) + '"><span class="vas-211-chip vas-211-' + l.lineChip + '">' + escapeHtml(lineStatusDisplay) + '</span></span>';
                 var $row = $(
                     '<div class="vas-211-mrow vas-211-lines-grid">' +
                         '<span class="vas-211-cell vas-211-right vas-211-c-std" title="' + l.lineIndex + '">' + l.lineIndex + '</span>' +
                         '<span class="vas-211-cell vas-211-c-prim" title="' + escapeHtml(l.productName) + '">' + escapeHtml(l.productName) + '</span>' +
-                        '<span class="vas-211-cell vas-211-c-std" title="' + escapeHtml(l.attributeDesc) + '">' + escapeHtml(l.attributeDesc) + '</span>' +
+                        '<span class="vas-211-cell vas-211-c-std" title="' + escapeHtml(attrDisp) + '">' + escapeHtml(attrDisp) + '</span>' +
                         '<span class="vas-211-cell" title="' + escapeHtml(l.uomName) + '">' + escapeHtml(l.uomName) + '</span>' +
                         '<span class="vas-211-cell vas-211-right" title="' + formatNumber(l.qtyOrdered) + '">' + formatNumber(l.qtyOrdered) + '</span>' +
-                        '<span class="vas-211-cell vas-211-right" title="' + formatNumber(l.qtyDelivered) + '">' + formatNumber(l.qtyDelivered) + '</span>' +
-                        '<span class="vas-211-cell vas-211-right vas-211-c-prim" title="' + formatNumber(l.qtyPending) + '">' + formatNumber(l.qtyPending) + '</span>' +
+                        '<span class="vas-211-cell vas-211-right" title="' + receivedDisp + '">' + receivedDisp + '</span>' +
+                        '<span class="vas-211-cell vas-211-right vas-211-c-prim" title="' + pendingDisp + '">' + pendingDisp + '</span>' +
                         '<span class="vas-211-cell vas-211-right" title="' + formatAmount(l.priceActual, curSymbol) + '">' + formatAmount(l.priceActual, curSymbol) + '</span>' +
                         '<span class="vas-211-cell vas-211-right vas-211-c-emph" title="' + formatAmount(l.lineNetAmt, curSymbol) + '">' + formatAmount(l.lineNetAmt, curSymbol) + '</span>' +
-                        '<span class="vas-211-cell" title="' + escapeHtml(lineStatusDisplay) + '"><span class="vas-211-chip vas-211-' + l.lineChip + '">' + escapeHtml(lineStatusDisplay) + '</span></span>' +
+                        statusCell +
                     '</div>'
                 );
                 $body.append($row);

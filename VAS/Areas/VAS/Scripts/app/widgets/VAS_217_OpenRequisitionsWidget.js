@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VAS_217_OpenRequisitionsWidget
  * Purchase Order Dashboard — Widget 15: Open Requisitions (3x3 Grid Widget)
  *
@@ -145,7 +145,24 @@
         var curIso = "INR";
 
         var currentPage = 0; // 0-indexed
-        var pageSize = 6;
+
+        /* ---- Adaptive row count (pattern proven on VAS_161 / VAS_165) ----------------------
+           The card's height is fixed by the dashboard grid (3x3), so the number of rows that
+           genuinely fit can be MEASURED. The source design asks for "six rows a page", which
+           only holds at the size the mock was drawn at: at the real 3x3 tile the sixth row was
+           clipped by .vas-217-orw-tbody's overflow while the pager still honestly claimed
+           "Showing 1-6 of N".
+           DEFAULT_PAGE_ROWS is therefore a SEED for the very first paint only - it guarantees
+           there is a rendered row to measure. From then on pageSize is whatever actually fits
+           at the current widget size, zoom level and screen resolution. */
+        var DEFAULT_PAGE_ROWS = 6;
+        var pageSize = DEFAULT_PAGE_ROWS;
+        /* Height of one rendered data row, in px. Cached because it only moves when the widget
+           is resized - the row font-size is driven by --widget-inline-size, so a WIDTH change
+           shifts it just as a height change does. Cleared by the ResizeObserver. */
+        var measuredRowHeight = 0;
+        /* Re-entrancy guard: the refit repaint mutates the DOM the ResizeObserver watches. */
+        var refittingRows = false;
         var totalPages = 1;
 
         // Modal Stack & PO Conversion State
@@ -169,7 +186,10 @@
         function lbl(key, fallback) {
             if (window.VIS && VIS.Msg && VIS.Msg.getMsg) {
                 var msg = VIS.Msg.getMsg(key);
-                if (msg && msg !== key && msg.indexOf('**') === -1) {
+                // VIS.Msg.getMsg returns "[KEY]" when the AD_Message row is missing;
+                // that must fall through to the English fallback, not render as-is.
+                if (msg && msg !== key && msg !== '[' + key + ']' && msg.charAt(0) !== '['
+                    && msg.indexOf('**') === -1) {
                     return msg;
                 }
             }
@@ -257,6 +277,21 @@
                         if (width > 0 && $root[0]) {
                             $root[0].style.setProperty('--widget-inline-size', width + 'px');
                         }
+                    }
+
+                    /* The row height follows the widget's size (font-size comes from
+                       --widget-inline-size and the available height changes directly), so the
+                       cached measurement is dropped and the page repainted at the new fit.
+                       The guard is required because that repaint mutates the observed subtree. */
+                    if (refittingRows) { return; }
+                    if (!requisitionsData || requisitionsData.length === 0) { return; }
+
+                    refittingRows = true;
+                    try {
+                        measuredRowHeight = 0;
+                        renderGridPage();
+                    } finally {
+                        refittingRows = false;
                     }
                 });
                 widgetObserver.observe($wrapper[0]);
@@ -396,7 +431,8 @@
             $tblBody.empty();
             var R_COLS = 'minmax(0, 1.6fr) minmax(0, 0.6fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1fr)';
             var html = '';
-            for (var i = 0; i < 6; i++) {
+            // Seeded from pageSize so the placeholder never paints more rows than fit.
+            for (var i = 0; i < pageSize; i++) {
                 html += '<div class="vas-217-orw-trow" style="grid-template-columns:' + R_COLS + ';">' +
                     '<span class="vas-217-orw-cell"><span style="display:block;width:70%;height:1em;background:#EAF1F7;border-radius:4px;"></span></span>' +
                     '<span class="vas-217-orw-cell right"><span style="display:inline-block;width:40%;height:1em;background:#EAF1F7;border-radius:4px;"></span></span>' +
@@ -428,7 +464,39 @@
             $nextBtn.prop('disabled', true);
         }
 
-        function renderGridPage() {
+        /* How many requisition rows actually fit the card at its current size.
+
+           The CARD's height is imposed from outside (the 3x3 dashboard track), so it can be
+           measured - the opposite of a content-sized dialog, where measuring the container
+           would be circular because its height comes from the rows.
+
+           Returns the CURRENT pageSize whenever it cannot measure (widget not laid out yet,
+           hidden tab, no real row on screen) so an unmeasurable moment never changes the page. */
+        function rowsThatFit() {
+            var el = $tblBody && $tblBody[0];
+            if (!el) { return pageSize; }
+
+            var available = el.clientHeight;
+            if (!available) { return pageSize; }
+
+            if (!measuredRowHeight) {
+                /* Probe a REAL data row: skeleton rows carry .vas-217-orw-trow too but never
+                   .pickable, and the empty / error boxes are not rows at all. */
+                var probe = el.querySelector('.vas-217-orw-trow.pickable');
+                if (probe) {
+                    var h = probe.getBoundingClientRect().height;
+                    if (h > 0) { measuredRowHeight = h; }
+                }
+            }
+
+            if (!measuredRowHeight) { return pageSize; }
+
+            /* Half a pixel of slack absorbs sub-pixel row heights, which would otherwise round
+               a row that does fit down to one that does not. Never below one row. */
+            return Math.max(1, Math.floor((available + 0.5) / measuredRowHeight));
+        }
+
+        function renderGridPage(isRefit) {
             $tblBody.empty();
             var count = requisitionsData.length;
 
@@ -471,6 +539,21 @@
             }
 
             $tblBody.html(rowsHtml);
+
+            /* Real rows are on screen now, so one can be measured. If the number that fits is
+               not the number just rendered, adopt it and repaint once. isRefit stops the second
+               pass from measuring again, so this can never loop. */
+            if (!isRefit) {
+                var fit = rowsThatFit();
+                if (fit !== pageSize) {
+                    pageSize = fit;
+                    var refitPages = Math.max(1, Math.ceil(count / pageSize));
+                    if (currentPage > refitPages - 1) { currentPage = refitPages - 1; }
+                    if (currentPage < 0) { currentPage = 0; }
+                    renderGridPage(true);
+                    return;
+                }
+            }
 
             // Update footer helper and pager
             var helperString = lbl('VAS_Showing', 'Showing') + ' ' + (startIdx + 1) + '–' + endIdx + ' ' +
