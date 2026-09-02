@@ -193,6 +193,15 @@ namespace VASLogic.Models
             const string documentCurrencyExpression =
                 "COALESCE(inv.C_Currency_ID,ord.C_Currency_ID,pay.C_Currency_ID)";
 
+            /* JOIN ORDER IS LOAD-BEARING - the two COALESCE joins must not be last.
+               AccessSqlParser strips each ON condition at its closing parenthesis, and
+               for the LAST ON (where there is no following " ON " to search back from)
+               it takes the FIRST ')' in the clause - which, with a COALESCE in that
+               condition, is the function's. It then leaves a stray ')' behind and reads
+               the trailing alias as "doccur)", so MRole emits access predicates against
+               a nonexistent alias and the statement fails at the database. GL_Journal
+               and GL_JournalBatch join r directly and nothing references them, so they
+               sit last and keep a function-free ON at the end. */
             StringBuilder sql = new StringBuilder();
             sql.Append(@"
                 SELECT r.C_Recurring_ID AS C_Recurring_ID,
@@ -215,10 +224,10 @@ namespace VASLogic.Models
                 LEFT OUTER JOIN C_Order ord ON (ord.C_Order_ID=r.C_Order_ID)
                 LEFT OUTER JOIN C_Payment pay ON (pay.C_Payment_ID=r.C_Payment_ID)
                 LEFT OUTER JOIN C_Project prj ON (prj.C_Project_ID=r.C_Project_ID)
-                LEFT OUTER JOIN GL_Journal glj ON (glj.GL_Journal_ID=r.GL_Journal_ID)
-                LEFT OUTER JOIN GL_JournalBatch glb ON (glb.GL_JournalBatch_ID=r.GL_JournalBatch_ID)
                 LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=COALESCE(inv.C_BPartner_ID,ord.C_BPartner_ID,pay.C_BPartner_ID,prj.C_BPartner_ID))
-                LEFT OUTER JOIN C_Currency doccur ON (doccur.C_Currency_ID=").Append(documentCurrencyExpression).Append(@")");
+                LEFT OUTER JOIN C_Currency doccur ON (doccur.C_Currency_ID=").Append(documentCurrencyExpression).Append(@")
+                LEFT OUTER JOIN GL_Journal glj ON (glj.GL_Journal_ID=r.GL_Journal_ID)
+                LEFT OUTER JOIN GL_JournalBatch glb ON (glb.GL_JournalBatch_ID=r.GL_JournalBatch_ID)");
             sql.Append(QueuePredicate());
 
             /* MRole only on the main physical table (C_Recurring / alias r). It

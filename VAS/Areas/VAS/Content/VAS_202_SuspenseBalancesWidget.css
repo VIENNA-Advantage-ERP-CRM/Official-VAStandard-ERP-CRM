@@ -34,7 +34,10 @@
     box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
     backdrop-filter: blur(10px);
     box-sizing: border-box;
-    /* No inner scrollbars: the card holds exactly three account rows. */
+    /* The card holds exactly four account rows (Suspense Balancing, Suspense Error,
+       Currency Balancing, Rounding Off). The card itself never scrolls - only the
+       account list takes a scrollbar, and only when the dashboard cell is too short
+       for all four rows. */
     overflow: hidden;
 }
 
@@ -137,7 +140,7 @@
     outline-offset: 1px;
 }
 
-/* ---- Body: column header + three account rows + footer total ---- */
+/* ---- Body: column header + four account rows + footer total ---- */
 .vas-202-body {
     flex: 1 1 auto;
     min-height: 0;
@@ -169,22 +172,31 @@
     text-transform: capitalize;
 }
 
+/* Four rows now share the height three used to. The list still lays them out at their
+   natural height - it does not squeeze them - and takes a scrollbar only when the
+   dashboard cell genuinely cannot show all four, which is better than clipping the
+   last control account out of sight. No scrollbar-gutter: reserving the track
+   permanently would shift the numeric columns on every card that does fit. */
 .vas-202-list {
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 /* One control account. Row cells sit one step below the widget title (List / Grid
    Hierarchy Rule); the separator carries the scan-down rhythm and is never optional -
    only the last row drops it. */
 .vas-202-row {
-    padding: .4em .35em;
+    /* .32em, not .4em: the fourth control account has to come out of the row padding,
+       not out of the type sizes, which the List / Grid Hierarchy Rule fixes. */
+    padding: .32em .35em;
     border-bottom: 1px solid #E2EAF1;
     border-radius: 6px;
+    flex: 0 0 auto;
 }
 
 .vas-202-row:last-child {
@@ -242,7 +254,7 @@
     white-space: nowrap;
 }
 
-/* Numeric columns right-aligned so the figures line up across the three rows.
+/* Numeric columns right-aligned so the figures line up across all four rows.
    The end padding is not cosmetic: a cell clips its own overflow, and a glyph's INK
    can reach past the advance width its box is measured from - an italic tail (the "d"
    of "Not configured") or a currency symbol otherwise loses a sliver at the cell

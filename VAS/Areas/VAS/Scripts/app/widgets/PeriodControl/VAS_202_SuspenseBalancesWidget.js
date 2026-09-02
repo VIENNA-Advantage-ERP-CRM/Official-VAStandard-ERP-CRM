@@ -2,7 +2,7 @@
  * VAS_202_SuspenseBalancesWidget
  * 3x2 grid widget for the Period Control dashboard.
  *
- * The three CONTROL accounts of the tenant's primary accounting schema that should
+ * The four CONTROL accounts of the tenant's primary accounting schema that should
  * carry nothing at all, and what is actually sitting on them in ONE open
  * accounting period:
  *
@@ -10,6 +10,7 @@
  *   ---------------------------------------------------
  *   99100 - Suspense Balancing         3     4,200.00
  *   99200 - Suspense Error             2     1,850.00
+ *   99250 - Currency Balancing         4       310.00
  *   99300 - Rounding Off               5       120.00
  *
  * Clicking a row opens a paged list of the postings behind it. Each posting names
@@ -18,7 +19,7 @@
  * Fact_Acct.AD_Window_ID, so the widget can be dropped on any dashboard and still
  * land on the right screen.
  *
- * All three rows are always shown, configured or not: these are control-account
+ * All four rows are always shown, configured or not: these are control-account
  * SETTINGS, and a missing one is itself the finding. An unconfigured row reads
  * "Not configured" and does not drill through; a configured row with nothing on it
  * reads 0 and stays visible, because a suspense account at zero is the good news.
@@ -54,33 +55,34 @@
  *  5 | Balance                                       | VAS_202_Balance
  *  6 | Suspense Balancing                            | VAS_202_SuspenseBalancing
  *  7 | Suspense Error                                | VAS_202_SuspenseError
- *  8 | Rounding Off                                  | VAS_202_RoundingOff
- *  9 | Total suspense to clear                       | VAS_202_TotalToClear
- * 10 | Not configured                                | VAS_202_NotConfigured
- * 11 | Postings                                      | VAS_202_Postings
- * 12 | Screen                                        | VAS_202_Screen
- * 13 | Document Date                                 | VAS_202_DocumentDate
- * 14 | Account Date                                  | VAS_202_AccountDate
- * 15 | Dr / Cr                                       | VAS_202_DrCr
- * 16 | Debit                                         | VAS_202_Debit
- * 17 | Credit                                        | VAS_202_Credit
- * 18 | Amount                                        | VAS_202_Amount
- * 19 | No postings in this period                    | VAS_202_NoPostings
- * 20 | Primary calendar not configured               | VAS_202_NoCalendar
- * 21 | Primary accounting schema not configured      | VAS_202_NoAcctSchema
- * 22 | Suspense account not configured               | VAS_202_AccountNotConfigured
- * 23 | Account combination cannot be resolved        | VAS_202_AccountUnresolved
- * 24 | Same account is configured more than once     | VAS_202_DuplicateAccount
- * 25 | Source record no longer exists                | VAS_202_RecordMissing
- * 26 | Document No                                   | DocumentNo             (reuse)
- * 27 | No open accounting period                     | VAS_201_NoOpenPeriod   (reuse)
- * 28 | Dashboard period                              | VAS_201_DashboardPeriod(reuse)
- * 29 | Close                                         | VAS_018_Close          (reuse)
- * 30 | Couldn't load                                 | VAS_192_CouldntLoad    (reuse)
- * 31 | Showing                                       | VAS_026_Showing        (reuse)
- * 32 | of                                            | VAS_026_Of             (reuse)
- * 33 | Previous                                      | VAS_026_Prev           (reuse)
- * 34 | Next                                          | VAS_026_Next           (reuse)
+ *  8 | Currency Balancing                            | VAS_202_CurrencyBalancing
+ *  9 | Rounding Off                                  | VAS_202_RoundingOff
+ * 10 | Total suspense to clear                       | VAS_202_TotalToClear
+ * 11 | Not configured                                | VAS_202_NotConfigured
+ * 12 | Postings                                      | VAS_202_Postings
+ * 13 | Screen                                        | VAS_202_Screen
+ * 14 | Document Date                                 | VAS_202_DocumentDate
+ * 15 | Account Date                                  | VAS_202_AccountDate
+ * 16 | Dr / Cr                                       | VAS_202_DrCr
+ * 17 | Debit                                         | VAS_202_Debit
+ * 18 | Credit                                        | VAS_202_Credit
+ * 19 | Amount                                        | VAS_202_Amount
+ * 20 | No postings in this period                    | VAS_202_NoPostings
+ * 21 | Primary calendar not configured               | VAS_202_NoCalendar
+ * 22 | Primary accounting schema not configured      | VAS_202_NoAcctSchema
+ * 23 | Suspense account not configured               | VAS_202_AccountNotConfigured
+ * 24 | Account combination cannot be resolved        | VAS_202_AccountUnresolved
+ * 25 | Same account is configured more than once     | VAS_202_DuplicateAccount
+ * 26 | Source record no longer exists                | VAS_202_RecordMissing
+ * 27 | Document No                                   | DocumentNo             (reuse)
+ * 28 | No open accounting period                     | VAS_201_NoOpenPeriod   (reuse)
+ * 29 | Dashboard period                              | VAS_201_DashboardPeriod(reuse)
+ * 30 | Close                                         | VAS_018_Close          (reuse)
+ * 31 | Couldn't load                                 | VAS_192_CouldntLoad    (reuse)
+ * 32 | Showing                                       | VAS_026_Showing        (reuse)
+ * 33 | of                                            | VAS_026_Of             (reuse)
+ * 34 | Previous                                      | VAS_026_Prev           (reuse)
+ * 35 | Next                                          | VAS_026_Next           (reuse)
  */
 ; VAS = window.VAS || {};
 
@@ -105,11 +107,14 @@
         write();
     }
 
-    /* The three C_AcctSchema_GL settings, in display order. `type` is the server-side
-       token; kept in lock-step with VASLogic.Models.VAS_202_SuspenseBalancesModel. */
+    /* The four C_AcctSchema_GL settings, in display order. `type` is the server-side
+       token; kept in lock-step with VASLogic.Models.VAS_202_SuspenseBalancesModel.
+       Currency Balancing follows Suspense Error - it is the same class of finding
+       (the schema's UseCurrencyBalancing offset), not an operating account. */
     var ACCOUNT_TYPES = [
         { type: 'SuspenseBalancing', key: 'VAS_202_SuspenseBalancing', text: 'Suspense Balancing' },
         { type: 'SuspenseError', key: 'VAS_202_SuspenseError', text: 'Suspense Error' },
+        { type: 'CurrencyBalancing', key: 'VAS_202_CurrencyBalancing', text: 'Currency Balancing' },
         { type: 'RoundingOff', key: 'VAS_202_RoundingOff', text: 'Rounding Off' }
     ];
 
@@ -567,7 +572,7 @@
         /* Footer: the money still to clear, and - when the setup itself is the problem -
            what is wrong with it. The total is the server's, never re-summed here: it is
            the sum of ABSOLUTE balances over DISTINCT accounts, which a client-side sum
-           over the three painted rows would get wrong on both counts. */
+           over the four painted rows would get wrong on both counts. */
         function paintFooter() {
             if (!_data) { $foot.empty(); return; }
 

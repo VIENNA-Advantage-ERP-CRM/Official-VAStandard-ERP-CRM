@@ -1,0 +1,122 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_229_NewBankJournalWidget — Quick Action dashboard widget that opens a new
+ * bank journal (C_BankStatement) on the host VAS_BankJournal window.
+ *
+ * Styling mirrors VAS_226_NewRecurringWidget.css so the quick-action tiles
+ * read as one family across the VAS dashboards.
+ *
+ * Design: dashboard-widgets.md §"Quick Action Widget" —
+ *   2px #9ED1FF border, pale blue-to-white gradient surface, 14px radius,
+ *   0.85em padding. Flex column: solid-blue icon well pinned top-left, title
+ *   pinned to the bottom.
+ * Internal type/spacing use em against the widget root anchor
+ * (clamp resolved dashboard-relative via --dash-inline-size); physical edges
+ * (border, radius, shadow) stay in px. Namespaced vas-229-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-229-root {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;           /* prevent card min-height from bleeding outside the cell */
+    container-type: inline-size;
+}
+
+    .vas-229-root,
+    .vas-229-root * {
+        box-sizing: border-box;
+    }
+
+/* ── Quick-action card — icon top-left, title bottom-left ───────────────── */
+
+.vas-229-card {
+    width: 100%;
+    height: 100%;
+    /* Widget root anchor (dashboard-widgets.md §"Widget Root Anchor"):
+       dashboard-relative via --dash-inline-size. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    font-family: inherit;
+    /* Action border + pale blue-to-white surface signal "create new". */
+    border: 2px #9ED1FF;
+    border-radius: 14px;
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.05);
+    background: linear-gradient(180deg, rgba(255,255,255,1), rgba(255,255,255,0.6));
+    padding: 0.85em;
+    /* Column layout: icon anchored at the top, title pushed to the bottom via
+       margin-top:auto. */
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    cursor: pointer;
+    text-align: left;
+    color: #102C3F;
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    overflow: hidden;
+}
+
+    .vas-229-card:hover {
+        border-color: #7CC0FF;
+        background: linear-gradient(180deg, #DEEEFC 0%, #F0F7FD 100%);
+        box-shadow: 0 8px 18px rgba(16, 47, 74, 0.08);
+    }
+
+    .vas-229-card:focus-visible {
+        outline: 0.125em solid #0083DA;
+        outline-offset: 0.125em;
+    }
+
+    .vas-229-card:active {
+        transform: scale(0.99);
+    }
+
+/* ── Icon well: solid blue rounded square with white glyph ──────────────── */
+
+.vas-229-icon {
+    width: 2.5em;
+    height: 2.5em;
+    min-width: 2.5em;
+    border-radius: 10px;
+    background: #1F83FF;
+    color: #FFFFFF;
+    box-shadow: 0 10px 24px rgba(31, 131, 255, 0.22);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    align-self: flex-start; /* pinned to the top of the flex column */
+}
+
+    .vas-229-icon svg {
+        /* Glyph white via currentColor. */
+        width: 1.25em;
+        height: 1.25em;
+        stroke: currentColor;
+    }
+
+/* ── Title: bottom-left, dark ──────────────────────────────────────────── */
+
+.vas-229-title {
+    display: block;
+    font-size: clamp(18px, calc(var(--dash-inline-size, 100vw) * .01), 32px);
+    margin-top: auto; /* push the title to the bottom */
+    align-self: flex-start;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0; /* allow flex item to shrink below content width */
+    max-width: 100%;
+    white-space: normal; /* wrap rather than truncate — show the full name */
+    overflow-wrap: break-word;
+}
+
+/* ── Responsive: shrink the whole card on narrow dashboard cells by
+ *    lowering its base font-size. Inner em sizing scales automatically. */
+@container (max-width: 12.5em) { /* < 200px */
+    .vas-229-card { font-size: 0.875em; }
+}
+
+@container (max-width: 10em) { /* < 160px */
+    .vas-229-card {
+        font-size: 0.8125em;
+        padding: 0.75em;
+    }
+}
