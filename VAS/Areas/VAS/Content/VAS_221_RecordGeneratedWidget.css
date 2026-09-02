@@ -293,8 +293,33 @@
     background: #FFFFFF;
 }
 
+/* Dialog icon well - the card's glyph and well repeated in the header so the modal
+   reads as this widget's own surface rather than a generic list. Sized in px, not em:
+   the dialog is body-level and carries no widget root anchor to scale against. */
+.vas-221-modal-ico {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #E2F5EF;
+    color: #0B6B45;
+}
+
+.vas-221-modal-ico svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+/* Grows into the space between the icon well and the close button, so the title and
+   subtitle still truncate against the dialog width rather than the header pushing
+   the button off. */
 .vas-221-htxt {
     min-width: 0;
+    flex: 1 1 auto;
 }
 
 .vas-221-mtitle {

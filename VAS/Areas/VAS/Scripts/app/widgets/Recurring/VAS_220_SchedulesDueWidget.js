@@ -451,6 +451,9 @@
                 '<div class="vas-220-mask" role="dialog" aria-modal="true" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-220-modal">' +
                 '<div class="vas-220-modal-head">' +
+                /* Same glyph and well as the card header, so the dialog reads as this
+                   widget's own surface rather than a generic list. */
+                '<span class="vas-220-modal-ico">' + ICON_SCHEDULE + '</span>' +
                 '<div class="vas-220-htxt">' +
                 '<h2 class="vas-220-mtitle">' + escapeHtml(title) + '</h2>' +
                 '<div class="vas-220-msub">' + escapeHtml(subtitle) + '</div>' +
