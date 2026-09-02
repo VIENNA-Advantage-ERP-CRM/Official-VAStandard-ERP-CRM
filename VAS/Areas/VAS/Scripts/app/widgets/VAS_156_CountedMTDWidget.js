@@ -170,9 +170,20 @@
             });
         }
 
+        /* The status chip was rendering "Completed;" / "Closed;".
+
+           VIS.Msg.getMsg returns VIS.I18N.labels[key] split on the six-space MsgText/MsgTip
+           separator and hands back the MsgText half - and the seeded MsgText for these
+           document-status labels carries a trailing separator character. It is part of the label
+           data, not of the status, so it is stripped at the point of display. Harmless when the
+           label has no trailing punctuation. */
+        function stripTrailingSeparator(text) {
+            return String(text == null ? '' : text).replace(/[\s;:,]+$/, '');
+        }
+
         function statusLabel(code) {
-            if (code === 'CO') { return lbl("Completed", "Completed"); }
-            if (code === 'CL') { return lbl("Closed", "Closed"); }
+            if (code === 'CO') { return stripTrailingSeparator(lbl("Completed", "Completed")); }
+            if (code === 'CL') { return stripTrailingSeparator(lbl("Closed", "Closed")); }
             return code || '';
         }
 

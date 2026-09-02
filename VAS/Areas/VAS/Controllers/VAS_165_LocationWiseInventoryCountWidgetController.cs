@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -15,7 +15,10 @@ namespace VAS.Controllers
      * TABLE & FIELD MAPPING FOR LOCATION WISE INVENTORY COUNT WIDGET:
      * - Inventory Header: M_Inventory (M_Inventory_ID, MovementDate, DocStatus IN ('CO', 'CL'))
      * - Inventory Line: M_InventoryLine (M_InventoryLine_ID, M_Inventory_ID, M_Product_ID, M_Locator_ID, M_AttributeSetInstance_ID, QtyCount, C_Charge_ID)
-     * - Locator: M_Locator (M_Locator_ID, M_Warehouse_ID, Value)
+     * - Locator: M_Locator (M_Locator_ID, M_Warehouse_ID, Value, LocatorCombination)
+     *   Value is the CODE and stays the drill-down key; COALESCE(LocatorCombination, Value) is the
+     *   NAME shown to the user. On this data Value is a numeric surrogate (1000000..1000006 on
+     *   DB 1), which is the "locator ID" the user reported seeing.
      * - Warehouse: M_Warehouse (M_Warehouse_ID, Value, Name)
      * - Product: M_Product (M_Product_ID, Name)
      * - Attribute: M_AttributeSetInstance (M_AttributeSetInstance_ID, Description)
@@ -27,6 +30,26 @@ namespace VAS.Controllers
     public class VAS_165_LocationWiseInventoryCountWidgetController : Controller
     {
         private static readonly VLogger _log = VLogger.GetVLogger(typeof(VAS_165_LocationWiseInventoryCountWidgetController));
+
+        /*
+         * COUNT CORRECTNESS (user report "Wrong count is visible here", 2026-08-29).
+         *
+         * Both queries were missing two of the four approved filters - the identical omission found
+         * in VAS_161 on the same day:
+         *     - M_Inventory.IsActive      = 'Y'      (was present)
+         *     - M_InventoryLine.IsActive  = 'Y'      <- MISSING
+         *     - M_Inventory.IsInternalUse = 'N'      <- MISSING
+         *     - M_Inventory.DocStatus IN ('CO','CL') (was present)
+         *
+         * Without the IsInternalUse filter the widget counted INTERNAL USE / material issue
+         * documents as inventory counts, inflating the session count and the counted quantity and
+         * able to list locators that were never counted. Without il.IsActive it also summed
+         * inactive count lines.
+         *
+         * NOT VERIFIED AGAINST A DATABASE. DB 2 was unreachable; DB 1 contains no internal-use
+         * documents and no inactive lines, so it cannot demonstrate the difference either.
+         * See issues/UNFIXED/2026-08-29-db2-unreachable-verification-backlog.md.
+         */
 
         /// <summary>
         /// Gets available distinct years from inventory count records.
@@ -98,10 +121,20 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                DateTime startDate = new DateTime(year, month, 1);
-                DateTime endDate = startDate.AddMonths(1).AddDays(-1);
+                /* HALF-OPEN range [monthStart, nextMonthStart), per the approved source prompt.
+                   The previous CLOSED range ended at the last day of the month at MIDNIGHT
+                   (DB.TO_DATE(.., true) emits a date-only literal), so any document stamped with a
+                   time component on that last day fell outside the range and was silently dropped
+                   from both the card and the popup. Latent on DB 2 today - 0 of 166 completed /
+                   closed inventory documents carry a time component - and verified there to return
+                   exactly the same sessions, lines, quantities and locators for all 15 periods
+                   that hold data. Both queries changed together: fixing only one would let the
+                   card and the popup disagree. */
+                DateTime monthStart = new DateTime(year, month, 1);
+                DateTime nextMonthStart = monthStart.AddMonths(1);
 
-                string sql = @"SELECT loc.Value AS LocatorCode, 
+                string sql = @"SELECT loc.Value AS LocatorCode,
+                                      COALESCE(loc.LocatorCombination, loc.Value) AS LocatorName, 
                                       w.Name AS WarehouseName, 
                                       COUNT(DISTINCT i.M_Inventory_ID) AS SessionCount, 
                                       COALESCE(SUM(il.QtyCount), 0) AS TotalQtyCounted
@@ -110,19 +143,27 @@ namespace VAS.Controllers
                                JOIN M_Locator loc ON (il.M_Locator_ID = loc.M_Locator_ID) 
                                JOIN M_Warehouse w ON (loc.M_Warehouse_ID = w.M_Warehouse_ID) 
                                WHERE i.IsActive = 'Y' 
+                                 AND il.IsActive = 'Y' 
+                                 AND COALESCE(i.IsInternalUse, 'N') = 'N' 
                                  AND i.DocStatus IN ('CO', 'CL') 
-                                 AND i.MovementDate >= " + DB.TO_DATE(startDate, true) + @" 
-                                 AND i.MovementDate <= " + DB.TO_DATE(endDate, true);
+                                 AND i.MovementDate >= " + DB.TO_DATE(monthStart, true) + @" 
+                                 AND i.MovementDate < " + DB.TO_DATE(nextMonthStart, true);
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                sql += " GROUP BY loc.Value, w.Name ORDER BY TotalQtyCounted DESC";
+                sql += " GROUP BY loc.Value, COALESCE(loc.LocatorCombination, loc.Value), w.Name"
+                     + " ORDER BY TotalQtyCounted DESC";
 
                 dr = DB.ExecuteReader(sql, null, null);
                 while (dr != null && dr.Read())
                 {
                     list.Add(new
                     {
+                        // 'locator' stays the CODE: the browser sends it straight back as
+                        // GetLocationDetail's locatorCode, which filters on loc.Value. Swapping it
+                        // for the name here would silently break the drill-down. The name is a
+                        // separate field used only for display.
                         locator = Util.GetValueOfString(dr["LocatorCode"]),
+                        locatorName = Util.GetValueOfString(dr["LocatorName"]),
                         warehouse = Util.GetValueOfString(dr["WarehouseName"]),
                         sessionCount = Util.GetValueOfInt(dr["SessionCount"]),
                         totalQtyCounted = Util.GetValueOfDecimal(dr["TotalQtyCounted"])
@@ -164,8 +205,17 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                DateTime startDate = new DateTime(year, month, 1);
-                DateTime endDate = startDate.AddMonths(1).AddDays(-1);
+                /* HALF-OPEN range [monthStart, nextMonthStart), per the approved source prompt.
+                   The previous CLOSED range ended at the last day of the month at MIDNIGHT
+                   (DB.TO_DATE(.., true) emits a date-only literal), so any document stamped with a
+                   time component on that last day fell outside the range and was silently dropped
+                   from both the card and the popup. Latent on DB 2 today - 0 of 166 completed /
+                   closed inventory documents carry a time component - and verified there to return
+                   exactly the same sessions, lines, quantities and locators for all 15 periods
+                   that hold data. Both queries changed together: fixing only one would let the
+                   card and the popup disagree. */
+                DateTime monthStart = new DateTime(year, month, 1);
+                DateTime nextMonthStart = monthStart.AddMonths(1);
 
                 // asi.Description is NVARCHAR2 (national character set); 'Standard' is a plain
                 // literal. COALESCE across the two raises ORA-12704 "character set mismatch", the
@@ -179,7 +229,7 @@ namespace VAS.Controllers
                 // broke the statement and was injectable.
                 string sql = @"SELECT p.Name AS ProductName,
                                       asi.Description AS AttributeDesc,
-                                      loc.Value AS LocatorValue,
+                                      COALESCE(loc.LocatorCombination, loc.Value) AS LocatorValue,
                                       CASE WHEN il.C_Charge_ID IS NOT NULL THEN 'Charge Account' ELSE 'Inventory Difference' END AS InventoryType,
                                       il.QtyCount AS Qty,
                                       i.M_Inventory_ID
@@ -189,10 +239,12 @@ namespace VAS.Controllers
                                JOIN M_Locator loc ON (il.M_Locator_ID = loc.M_Locator_ID)
                                LEFT JOIN M_AttributeSetInstance asi ON (il.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
                                WHERE i.IsActive = 'Y'
+                                 AND il.IsActive = 'Y'
+                                 AND COALESCE(i.IsInternalUse, 'N') = 'N'
                                  AND i.DocStatus IN ('CO', 'CL')
                                  AND loc.Value = @LocatorCode
-                                 AND i.MovementDate >= " + DB.TO_DATE(startDate, true) + @"
-                                 AND i.MovementDate <= " + DB.TO_DATE(endDate, true);
+                                 AND i.MovementDate >= " + DB.TO_DATE(monthStart, true) + @"
+                                 AND i.MovementDate < " + DB.TO_DATE(nextMonthStart, true);
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                 sql += " ORDER BY p.Name ASC";
@@ -208,11 +260,14 @@ namespace VAS.Controllers
                     sessionIds.Add(invId);
                     totalQty += qty;
 
+                    // A line with no attribute set instance shows NOTHING under the product.
+                    // It used to fall back to Msg.GetMsg(ctx, "VAS_Standard") ?? "Standard", which
+                    // reads as a product category to the user (their words) and is not a real
+                    // attribute. Two bugs in one line: the placeholder itself, and the fact that
+                    // Msg.GetMsg returns "[VAS_Standard]" - not null - when the AD_Message row is
+                    // missing, so the "?? " fallback never fired and the raw bracketed key could
+                    // reach the UI. Same Msg.GetMsg trap fixed in VAS_158 on 2026-08-27.
                     string attribute = Util.GetValueOfString(dr["AttributeDesc"]);
-                    if (string.IsNullOrEmpty(attribute))
-                    {
-                        attribute = Msg.GetMsg(ctx, "VAS_Standard") ?? "Standard";
-                    }
 
                     lines.Add(new
                     {

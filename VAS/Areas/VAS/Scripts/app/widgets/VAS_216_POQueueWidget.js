@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VAS_216_POQueueWidget
  * Purchase Order Dashboard — Widget 14: PO Queue
  * Widget size: 6 columns x 3 rows (6x3 Queue Table).
@@ -250,7 +250,13 @@
         var currentModalCfg = null;
         var MT = {};
         var MT_SEQ = 0;
-        var MAX_MODAL_ROWS = 10;
+        // Rows per page inside the modal table. This is the single source of truth:
+        // pagedTable() writes it onto the table wrapper as --vas-216-rows, and the
+        // stylesheet sizes the table body to exactly this many rows. The dialog is
+        // therefore the same height whether a page holds 4 rows or the full 6, and
+        // everything past a page is reached through the pager.
+        var MODAL_ROWS = 6;
+        var MAX_MODAL_ROWS = MODAL_ROWS;
 
         function showBusy(show) {
             if (!$busy) { return; }
@@ -539,6 +545,9 @@
            ============================================================ */
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) { return; }
+            // Navigating away must dismiss the popup: the record opens behind it
+            // otherwise, leaving the dialog stranded over the window it just opened.
+            closeModal();
 
             // 1. Fire value changed if tab panel / dashboard router is listening
             try {
@@ -722,7 +731,8 @@
                 fixed: !!opts.fixed
             };
 
-            return '<div class="vas-216-mtwrap' + (opts.fixed ? ' vas-216-fixed' : '') + '" id="' + id + '"></div>';
+            return '<div class="vas-216-mtwrap' + (opts.fixed ? ' vas-216-fixed' : '') + '" id="' + id + '"' +
+                   ' style="--vas-216-rows:' + initialSize + '"></div>';
         }
 
         function drawTable(id) {
@@ -793,35 +803,13 @@
             });
         }
 
-        function fitTable(id) {
-            var t = MT[id];
-            var el = document.getElementById(id);
-            if (!t || !el || t.fixed) { return; }
-
-            var avail = el.clientHeight;
-            if (avail < 40) { return; }
-
-            var head = el.querySelector('.vas-216-mhead');
-            var foot = el.querySelector('.vas-216-mtfoot');
-            var row = el.querySelector('.vas-216-mbody .vas-216-mrow');
-            if (!head || !row) { return; }
-
-            var rowH = row.getBoundingClientRect().height || 30;
-            var used = head.getBoundingClientRect().height + (foot ? foot.getBoundingClientRect().height + 8 : 0);
-            var n = Math.floor((avail - used) / rowH);
-            n = Math.max(2, Math.min(t.max, n));
-
-            if (n !== t.size) {
-                t.size = n;
-                drawTable(id);
-            }
-        }
-
+        /* Rows per page are fixed (MODAL_ROWS) and the stylesheet sizes the table body
+           to exactly that many rows, so there is nothing to measure and re-fit here.
+           The previous implementation derived the row count from the rendered row
+           height - but the rows stretch (flex: 1 1 0), so it was measuring a value it
+           had itself produced, and it bailed out entirely whenever the table had not
+           been given a height yet. */
         function fitAllTables() {
-            Object.keys(MT).forEach(function (id) {
-                if (document.getElementById(id)) { fitTable(id); }
-            });
-
             if ($modalHost) {
                 var mBody = $modalHost.find('.vas-216-modal-body')[0];
                 if (mBody) {
@@ -914,18 +902,22 @@
                                 var rateFmt = formatMoney(l.Rate, curSym, curIso, curPrec);
                                 var amtFmt = formatMoney(l.LineAmount, curSym, curIso, curPrec);
                                 var lStInfo = getLineStatusInfo(l.LineStatus);
+                                /* A charge line, or a product that is not of Item type, is never
+                                   received - show a dash for received, pending and line status. */
+                                var nonStock = !!l.IsNonStock;
+                                var NS = '–';
 
                                 return [
                                     String(l.LineNo || (idx + 1)),
                                     l.ProductName || l.ProductCode || '—',
-                                    l.AttributeDescription || '—',
+                                    l.AttributeDescription || '',
                                     l.UOM || '—',
                                     formatDecimal(l.OrderedQty),
-                                    formatDecimal(l.ReceivedQty),
-                                    formatDecimal(l.PendingQty),
+                                    nonStock ? NS : formatDecimal(l.ReceivedQty),
+                                    nonStock ? NS : formatDecimal(l.PendingQty),
                                     rateFmt,
                                     amtFmt,
-                                    { chip: lStInfo.chip, text: lStInfo.text }
+                                    nonStock ? NS : { chip: lStInfo.chip, text: lStInfo.text }
                                 ];
                             });
 

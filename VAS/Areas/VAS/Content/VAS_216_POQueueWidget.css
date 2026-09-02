@@ -96,18 +96,23 @@
 }
 
 .vas-216-msel {
+    /* Shared filter control size across every PO widget: one type scale, one padding,
+       and month / year min-widths wide enough for the longest values ("September",
+       4-digit years). Values are in em so the control tracks the widget's scale. */
+    /* The closed control keeps the centred house style; only the values in the open
+       dropdown list are left-aligned (see the option rule below). */
     appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     background-image: none !important;
     font-family: inherit;
-    font-size: 0.6875em;
+    font-size: 0.8125em;
     font-weight: 500;
     color: #41576A;
     background-color: #FFFFFF;
     border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: 0.35em 0.75em;
+    padding: 0.45em 0.85em;
     line-height: 1.2;
     cursor: pointer;
     box-shadow: 0 1px 2px rgba(16, 47, 74, 0.04);
@@ -117,6 +122,11 @@
     transition: background-color 0.15s ease, border-color 0.15s ease;
     box-sizing: border-box;
 }
+
+.vas-216-msel option {
+    text-align: left;
+}
+
 
 .vas-216-msel:hover {
     background-color: #EEF8FF;
@@ -129,11 +139,11 @@
 }
 
 .vas-216-msel.vas-216-month-sel {
-    min-width: 7.5em;
+    min-width: 8.5em;
 }
 
 .vas-216-msel.vas-216-year-sel {
-    min-width: 5.2em;
+    min-width: 6em;
 }
 
 /* ============================================================
@@ -345,6 +355,11 @@
 }
 
 .vas-216-modal {
+    /* The type scale lives on the dialog, not just its body, so the header and
+       footer scale with the content instead of staying pinned at the app default. */
+    --panel-anchor: clamp(15px, 1.15vw, 26px);
+    font-size: var(--panel-anchor);
+
     width: min(1240px, 94vw);
     max-height: min(880px, 90dvh);
     background: #FFFFFF;
@@ -368,14 +383,14 @@
 }
 
 .vas-216-modal-header {
-    height: 56px;
+    height: 3.2em;
     flex: none;
-    padding: 0 16px;
+    padding: 0 0.8em;
     border-bottom: 1px solid #1F83FF;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
     box-sizing: border-box;
 }
 
@@ -438,7 +453,11 @@
 }
 
 .vas-216-modal-body {
-    flex: 1 1 0;
+    /* Sizes to its content (the fixed-height table) so the dialog is
+       header + table + footer tall. flex:1 1 0 contributed zero intrinsic
+       height, which collapsed the dialog to just its header and footer.
+       Shrink is still allowed so max-height can cap an over-tall body. */
+    flex: 0 1 auto;
     min-height: 0;
     overflow: hidden;
     padding: 1.125em 0.875em;
@@ -446,8 +465,13 @@
     flex-direction: column;
     gap: 0.75em;
     container-type: inline-size;
-    --panel-anchor: clamp(18px, 1vw, 20px);
-    font-size: var(--panel-anchor);
+    /* The modal type scale. The previous clamp(18px, 1vw, 20px) only varied between a
+       ~1800px and ~2000px viewport - on every other screen it sat pinned to one of its
+       bounds, so the popup never grew with resolution. This range tracks across the
+       resolutions actually in use (~15px at 1366px, ~22px at 1920px, 26px at 2560px).
+       Everything inside the popup is sized in em against it, so the whole dialog -
+       rows, chips, buttons, icons - scales together. */
+    font-size: inherit;
     box-sizing: border-box;
 }
 
@@ -519,10 +543,21 @@
 }
 
 /* Modal Table */
+/* The modal table is a FIXED-SIZE viewport of --vas-216-rows rows (the JS writes
+   that custom property from its own MODAL_ROWS constant, so there is one source of
+   truth). It does not stretch and it does not shrink: a page holding 4 rows is the
+   same height as a page holding the full 6, and anything beyond a page goes to the
+   pager. Every measurement below is in em, so the whole dialog scales with the
+   modal's font-size - no px anywhere. */
 .vas-216-mtwrap {
+    /* Row height is expressed in em against .vas-216-modal-body's font-size, which is
+       clamp(15px, 1.15vw, 26px) - so the dialog grows and shrinks with the screen while
+       always showing the same number of rows. --vas-216-rows is written by the JS. */
+    --vas-216-row-h: 1.9em;
+
     display: flex;
     flex-direction: column;
-    flex: 1 1 0;
+    flex: none;
     min-height: 0;
     overflow: hidden;
 }
@@ -530,7 +565,7 @@
 .vas-216-mtbl {
     display: flex;
     flex-direction: column;
-    flex: 1 1 0;
+    flex: none;
     min-height: 0;
     overflow: hidden;
 }
@@ -560,13 +595,21 @@
 .vas-216-mbody {
     display: flex;
     flex-direction: column;
-    flex: 1 1 0;
+    flex: none;
+    justify-content: flex-start;
     min-height: 0;
     overflow: hidden;
+    /* Height of exactly --vas-216-rows rows, independent of how many are drawn. */
+    height: calc(var(--vas-216-rows, 6) * var(--vas-216-row-h, 1.9em));
 }
 
 .vas-216-mbody .vas-216-mrow {
-    flex: 1 1 0;
+    /* One row occupies exactly 1/rows of the body. Percentage (not em) because the
+       row sets its own font-size below - an em basis would resolve against that and
+       break the division. Fixed basis with no grow, so a page holding 4 rows shows
+       4 normal-height rows from the top with empty space under them, instead of
+       stretching them to fill. */
+    flex: 0 0 calc(100% / var(--vas-216-rows, 6));
     min-height: 0;
     font-size: 0.75em;
     padding: 0.4em 0.5em;
@@ -596,11 +639,11 @@
 .vas-216-modal-foot {
     flex: none;
     border-top: 1px solid #D9E2EB;
-    padding: 12px 16px;
+    padding: 0.6em 0.8em;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
     background: #FBFDFF;
     box-sizing: border-box;
 }
