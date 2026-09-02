@@ -858,10 +858,29 @@
         }
         /* Repaint the hosting window's current tab so the parent grid/single view picks up the
            invoice totals the save just recalculated. Guarded - the framework only sets curTab
-           when the panel is started from a tab. */
+           when the panel is started from a tab.
+
+           dataRefresh(), NOT dataRefreshAll(). The two are not interchangeable:
+
+             GridTab.dataRefresh()     re-reads the CURRENT row and restores it
+                                       (gridTable.dataRefresh(currentRow) then
+                                        setCurrentRow(currentRow, true))
+             GridTab.dataRefreshAll()  -> GridTable.dataRefreshAll(), which does
+                                       dataIgnore(); close(false); open(maxRows) - the whole
+                                       query is closed and re-run, and nothing restores the
+                                       current row
+
+           So dataRefreshAll moved the window OFF the record the user was on, which is
+           unmissable right after creating an invoice: save a line and the window jumped to
+           another record. The totals are a column on the current row, so refreshing that one
+           row is all this ever needed. dataRefreshAll stays only as a fallback for a host
+           whose tab does not expose dataRefresh. */
         function refreshCurTab() {
             try {
-                if ($self.curTab && typeof $self.curTab.dataRefreshAll === "function") $self.curTab.dataRefreshAll();
+                var t = $self.curTab;
+                if (!t) return;
+                if (typeof t.dataRefresh === "function") { t.dataRefresh(); return; }
+                if (typeof t.dataRefreshAll === "function") t.dataRefreshAll();
             } catch (e) { if (window.console) console.log(e); }
         }
         /* True when the hosting tab has an edit the user hasn't saved yet (a header field
