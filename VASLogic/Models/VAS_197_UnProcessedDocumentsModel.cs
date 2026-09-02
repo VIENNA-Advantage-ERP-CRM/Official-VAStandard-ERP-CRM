@@ -1567,7 +1567,7 @@ namespace VASLogic.Models
                Always present - it is what made this table a source in the first
                place. */
             sb.Append(",COALESCE(").Append(alias).Append(".").Append(source.DocStatusColumn)
-              .Append(",N'') AS Doc_Status");
+              .Append(",'') AS Doc_Status");
 
             /* The document type, preferring its translation for the session language.
                One screen can carry several types - a Purchase Order window holds
