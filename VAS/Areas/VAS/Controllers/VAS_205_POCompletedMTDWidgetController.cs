@@ -1,4 +1,4 @@
-/************************************************************
+﻿﻿﻿﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Widget 03 — Purchase Orders Completed MTD
  *                  KPI card & document drill-down modal counting
@@ -413,16 +413,31 @@ namespace VIS.Controllers
                     SELECT
                         ol.C_OrderLine_ID,
                         ol.Line,
-                        COALESCE(p.Name, ol.Description, '—') AS ProductName,
+                        -- A charge line, or a product that is not of Item type, carries no
+                        -- stock movement: the widget shows its name, UOM, ordered, rate and
+                        -- amount, and dashes for received / pending / line status.
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
+                             THEN COALESCE(ch.Name, N'')
+                             ELSE COALESCE(p.Name, ol.Description, N'—') END AS ProductName,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
+                             WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
+                             ELSE 'N' END AS IsNonStock,
                         p.Value AS ProductSku,
-                        asi.Description AS AttributeDesc,
-                        COALESCE(uom.UOMSymbol, uom.Name, '') AS UOMSymbol,
+                        CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
+                             THEN COALESCE(asi.Description, N'')
+                             ELSE N'' END AS AttributeDesc,
+                        COALESCE(uom.UOMSymbol, uom.Name, N'') AS UOMSymbol,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
+                        -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
+                        -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
+                        -- widget shows the selected UOM, so quantities are scaled to it.
+                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0) AS PriceActual,
                         COALESCE(ol.LineNetAmt, 0) AS LineNetAmt
                     FROM C_OrderLine ol
                     LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
                     LEFT JOIN C_UOM uom ON uom.C_UOM_ID = ol.C_UOM_ID
                     WHERE ol.C_Order_ID = @C_Order_ID
@@ -454,6 +469,15 @@ namespace VIS.Controllers
                         totalOrderedQty += ordered;
                         totalDeliveredQty += delivered;
                         totalLineNetAmt += amount;
+
+                        // Quantities are shown in the UOM the line was entered in. QtyEntered is in the
+                        // line's own C_UOM_ID; QtyOrdered / QtyDelivered are in the product's base UOM,
+                        // so delivered is scaled by this line's own entered/ordered ratio. Header
+                        // roll-ups above stay in the base UOM - summing mixed UOMs is meaningless.
+                        decimal enteredQtyUom = Util.GetValueOfDecimal(lr["QtyEntered"]);
+                        decimal uomRatio = (ordered != 0) ? (enteredQtyUom / ordered) : 1m;
+                        ordered = enteredQtyUom;
+                        delivered = delivered * uomRatio;
 
                         decimal pending = Math.Max(0m, ordered - delivered);
 
@@ -499,6 +523,9 @@ namespace VIS.Controllers
                             QtyPending = pending,
                             PriceActual = price,
                             LineNetAmt = amount,
+                            // Charge / non-Item lines are never received - the client renders dashes
+                            // for received, pending and line status.
+                            IsNonStock = Util.GetValueOfString(lr["IsNonStock"]) == "Y",
                             LineStatus = lineStatusText,
                             LineStatusChip = lineStatusChip
                         });
@@ -573,6 +600,7 @@ namespace VIS.Controllers
 
         private class POLineItem
         {
+            public bool IsNonStock { get; set; }
             public int OrderLineId { get; set; }
             public int LineNo { get; set; }
             public string ProductName { get; set; }

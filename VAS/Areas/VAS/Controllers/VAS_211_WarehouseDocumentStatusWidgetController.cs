@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -63,9 +63,18 @@ namespace VAS.Controllers
                       AND o.IsSOTrx = 'N' 
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N' 
                       AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL') 
-                      AND o.DateOrdered IS NOT NULL";
+                      AND o.DateOrdered IS NOT NULL
+                      AND o.C_Order_ID IN (@P_ORDER_ACCESS@)";
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // EXTRACT(YEAR FROM o.DateOrdered) makes AccessSqlParser believe there is a
+                // second FROM clause; it then fails to identify the table ("TableName not
+                // correctly parsed") and appends the access predicates in the wrong place,
+                // which is why the year list came back empty. Apply role access through a
+                // simple, parseable sub-query instead.
+                string orderAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + ctx.GetAD_Client_ID(),
+                    "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql = sql.Replace("@P_ORDER_ACCESS@", orderAccessSql);
                 sql += " ORDER BY OrderYear DESC";
 
                 dr = DB.ExecuteReader(sql, null, null);
@@ -281,9 +290,15 @@ namespace VAS.Controllers
                       AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL')
                       AND o.M_Warehouse_ID = " + warehouseId + @"
                       AND o.DateOrdered >= " + DB.TO_DATE(startDate, true) + @"
-                      AND o.DateOrdered < " + DB.TO_DATE(endDateExclusive, true);
+                      AND o.DateOrdered < " + DB.TO_DATE(endDateExclusive, true) + @"
+                      AND o.C_Order_ID IN (@P_ORDER_ACCESS@)";
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // The derived table above makes AccessSqlParser report "More than one FROM
+                // clause"; apply role access through a simple, parseable sub-query instead.
+                string orderAccessSql2 = MRole.GetDefault(ctx).AddAccessSQL(
+                    "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + ctx.GetAD_Client_ID(),
+                    "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql = sql.Replace("@P_ORDER_ACCESS@", orderAccessSql2);
                 sql += " ORDER BY o.DateOrdered DESC, o.DocumentNo DESC";
 
                 dr = DB.ExecuteReader(sql, null, null);
@@ -482,19 +497,34 @@ namespace VAS.Controllers
                 if (dr != null) { dr.Close(); dr.Dispose(); dr = null; }
 
                 // 2. Fetch Line Items
+                // A line is "non stock" when it carries a Charge, or a product that is not of
+                // Item type (Service / Resource / Expense). Those lines are never received, so the
+                // widget shows the charge/product name, UOM, Ordered, Rate and Amount only.
+                // QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer picked);
+                // QtyOrdered / QtyDelivered are in the product's base UOM. The widget displays the
+                // selected UOM, so delivered is scaled by the line's own entered/ordered ratio.
                 string lineSql = @"
                     SELECT
                         ol.C_OrderLine_ID AS OrderLineID,
                         ol.Line           AS LineNo,
-                        COALESCE(p.Name, N'Standard Product')  AS ProductName,
-                        COALESCE(asi.Description, N'Standard') AS AttributeDesc,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
+                             THEN COALESCE(ch.Name, N'')
+                             ELSE COALESCE(p.Name, N'') END    AS ProductName,
+                        CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
+                             THEN COALESCE(asi.Description, N'')
+                             ELSE N'' END                      AS AttributeDesc,
                         COALESCE(uom.UOMSymbol, uom.Name, N'') AS UomName,
+                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyOrdered, 0)   AS QtyOrdered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0)  AS PriceActual,
-                        COALESCE(ol.LineNetAmt, 0)   AS LineNetAmt
+                        COALESCE(ol.LineNetAmt, 0)   AS LineNetAmt,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
+                             WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
+                             ELSE 'N' END            AS IsNonStock
                     FROM C_OrderLine ol
                     LEFT JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
+                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
                     LEFT JOIN C_UOM uom ON (uom.C_UOM_ID = ol.C_UOM_ID)
                     WHERE ol.C_Order_ID = " + orderId + @"
@@ -507,13 +537,30 @@ namespace VAS.Controllers
                 {
                     decimal ord = Util.GetValueOfDecimal(dr["QtyOrdered"]);
                     decimal del = Util.GetValueOfDecimal(dr["QtyDelivered"]);
+                    decimal entered = Util.GetValueOfDecimal(dr["QtyEntered"]);
+                    bool isNonStock = Util.GetValueOfString(dr["IsNonStock"]) == "Y";
+
+                    // Header roll-ups stay in the product base UOM: summing mixed UOMs
+                    // (millilitres with each) across lines would be meaningless.
                     totalQtyOrdered += ord;
                     totalQtyDelivered += del;
+
+                    // Per-line figures are shown in the UOM the line was entered in.
+                    decimal uomRatio = (ord != 0) ? (entered / ord) : 1m;
+                    decimal orderedInUom = entered;
+                    decimal deliveredInUom = del * uomRatio;
+                    decimal pendingInUom = Math.Max(0, orderedInUom - deliveredInUom);
 
                     string lineStatus = "Pending";
                     string lineChip   = "chip-neutral";
 
-                    if (parentDocStatus.Equals("DR", StringComparison.OrdinalIgnoreCase))
+                    if (isNonStock)
+                    {
+                        // Charges and non-Item products are never received.
+                        lineStatus = "";
+                        lineChip   = "chip-neutral";
+                    }
+                    else if (parentDocStatus.Equals("DR", StringComparison.OrdinalIgnoreCase))
                     {
                         lineStatus = "Drafted";
                         lineChip   = "chip-neutral";
@@ -541,13 +588,14 @@ namespace VAS.Controllers
                         productName   = Util.GetValueOfString(dr["ProductName"]),
                         attributeDesc = Util.GetValueOfString(dr["AttributeDesc"]),
                         uomName       = Util.GetValueOfString(dr["UomName"]),
-                        qtyOrdered    = ord,
-                        qtyDelivered  = del,
-                        qtyPending    = Math.Max(0, ord - del),
+                        qtyOrdered    = orderedInUom,
+                        qtyDelivered  = deliveredInUom,
+                        qtyPending    = pendingInUom,
                         priceActual   = Util.GetValueOfDecimal(dr["PriceActual"]),
                         lineNetAmt    = Util.GetValueOfDecimal(dr["LineNetAmt"]),
                         lineStatus    = lineStatus,
-                        lineChip      = lineChip
+                        lineChip      = lineChip,
+                        isNonStock    = isNonStock
                     });
                 }
             }

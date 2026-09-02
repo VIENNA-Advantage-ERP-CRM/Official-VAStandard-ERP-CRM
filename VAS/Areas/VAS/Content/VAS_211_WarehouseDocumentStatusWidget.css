@@ -66,18 +66,23 @@
 }
 
 .vas-211-msel {
+    /* Shared filter control size across every PO widget: one type scale, one padding,
+       and month / year min-widths wide enough for the longest values ("September",
+       4-digit years). Values are in em so the control tracks the widget's scale. */
+    /* The closed control keeps the centred house style; only the values in the open
+       dropdown list are left-aligned (see the option rule below). */
     appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     background-image: none !important;
     font-family: inherit;
-    font-size: 0.6875em;
+    font-size: 0.8125em;
     font-weight: 500;
     color: #41576A;
     background-color: #FFFFFF;
     border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: 0.35em 0.75em;
+    padding: 0.45em 0.85em;
     line-height: 1.1;
     cursor: pointer;
     box-shadow: 0 1px 2px rgba(16, 47, 74, 0.04);
@@ -88,12 +93,17 @@
     box-sizing: border-box;
 }
 
+.vas-211-msel option {
+    text-align: left;
+}
+
+
 .vas-211-msel.vas-211-month {
-    min-width: 7.5em;
+    min-width: 8.5em;
 }
 
 .vas-211-msel.vas-211-year {
-    min-width: 5.2em;
+    min-width: 6em;
 }
 
 .vas-211-msel:hover {
@@ -369,6 +379,11 @@
 }
 
 .vas-211-modal {
+    /* The type scale lives on the dialog, not just its body, so the header and
+       footer scale with the content instead of staying pinned at the app default. */
+    --panel-anchor: clamp(15px, 1.15vw, 26px);
+    font-size: var(--panel-anchor);
+
     width: min(1240px, 94vw);
     max-height: min(880px, 90dvh);
     height: auto;
@@ -392,15 +407,15 @@
 
 /* Modal Header (56px) */
 .vas-211-modal-header {
-    height: 56px;
-    min-height: 56px;
+    height: 3.2em;
+    min-height: 3.2em;
     flex: none;
-    padding: 0 16px;
+    padding: 0 0.8em;
     border-bottom: 2px solid #1F83FF;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
     box-sizing: border-box;
 }
 
@@ -469,7 +484,7 @@
 
 /* Modal Body */
 .vas-211-modal-body {
-    flex: 1;
+    flex: 0 1 auto;
     min-height: 0;
     overflow: hidden;
     padding: 1.125em 0.875em;
@@ -477,7 +492,7 @@
     flex-direction: column;
     gap: 0.75em;
     container-type: inline-size;
-    font-size: clamp(14px, 1vw, 18px);
+    font-size: inherit;
     box-sizing: border-box;
 }
 
@@ -495,11 +510,11 @@
 .vas-211-modal-foot {
     flex: none;
     border-top: 1px solid #D9E2EB;
-    padding: 12px 16px;
+    padding: 0.6em 0.8em;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
     background: #FBFDFF;
     box-sizing: border-box;
 }
@@ -596,9 +611,12 @@
 
 /* Modal Tables */
 .vas-211-mtwrap {
+    --vas-211-rows: 6;
+    --vas-211-row-h: 1.9em;
+
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: none;
     min-height: 0;
     overflow: hidden;
 }
@@ -606,7 +624,7 @@
 .vas-211-mtbl {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: none;
     min-height: 0;
     overflow: hidden;
 }
@@ -640,12 +658,19 @@
     z-index: 2;
 }
 
+/* Fixed-size modal table, matching VAS_216_POQueueWidget:
+   the body is exactly --vas-211-rows rows tall and never changes with how many rows a
+   page actually holds, each row occupies 1/rows of it and they stack from the top,
+   and anything beyond a page is reached through the pager. Sizing is in em against
+   the modal body's font-size, so the dialog scales with the screen - no px. */
 .vas-211-mbody {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: none;
     min-height: 0;
     overflow: hidden;
+    justify-content: flex-start;
+    height: calc(var(--vas-211-rows, 6) * var(--vas-211-row-h, 1.9em));
 }
 
 .vas-211-mbody .vas-211-mrow {
@@ -653,7 +678,7 @@
     padding-top: 0.55em;
     padding-bottom: 0.55em;
     border-bottom: 1px solid #E2EAF1;
-    flex: 1 1 0;
+    flex: 0 0 calc(100% / var(--vas-211-rows, 6));
     min-height: 0;
 }
 
@@ -724,9 +749,9 @@
 
 /* Action Icon Button */
 .vas-211-iconbtn {
-    width: 1.5em;
-    height: 1.5em;
-    border-radius: 7px;
+    width: 1.8em;
+    height: 1.8em;
+    border-radius: 8px;
     border: 1px solid #D9E2EB;
     background: #FFFFFF;
     display: flex;
@@ -737,6 +762,7 @@
     padding: 0;
     flex: none;
     transition: background-color 0.15s ease, border-color 0.15s ease;
+    line-height: 1;
 }
 
 .vas-211-iconbtn:hover {
@@ -750,6 +776,8 @@
 }
 
 .vas-211-iconbtn svg {
-    width: 0.85em;
-    height: 0.85em;
+    width: 1em;
+    height: 1em;
+    display: block;
+    flex: none;
 }

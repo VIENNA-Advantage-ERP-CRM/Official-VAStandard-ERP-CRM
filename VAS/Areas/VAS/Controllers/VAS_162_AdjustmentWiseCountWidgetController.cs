@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Web.Mvc;
@@ -185,6 +185,7 @@ namespace VAS.Controllers
                 string sql = @"SELECT p.Name AS ProductName,
                                        asi.Description AS AttributeDesc,
                                        i.DocumentNo AS DocumentNo,
+                                       i.M_Inventory_ID AS M_Inventory_ID,
                                        COALESCE(il.QtyBook, 0) AS QtyBook,
                                        COALESCE(il.DifferenceQty, COALESCE(il.QtyCount, 0) - COALESCE(il.QtyBook, 0)) AS DiffQty, 
                                        COALESCE(il.AsOnDateCount, COALESCE(il.QtyCount, COALESCE(il.QtyBook, 0) + COALESCE(il.DifferenceQty, 0))) AS AsOnDateCount, 
@@ -213,6 +214,12 @@ namespace VAS.Controllers
                         // "Standard" placeholder.
                         attribute = Util.GetValueOfString(dr["AttributeDesc"]),
                         documentNo = Util.GetValueOfString(dr["DocumentNo"]),
+                        // Carried so the modal's document number can navigate to THIS record.
+                        // M_Inventory_ID is the key the navigation restriction uses, so it is
+                        // taken straight from the row rather than re-derived from the visible
+                        // DocumentNo text (which would cost a second lookup, and relies on an
+                        // uniqueness the schema does not guarantee).
+                        inventoryId = Util.GetValueOfInt(dr["M_Inventory_ID"]),
                         qty = Util.GetValueOfDecimal(dr["QtyBook"]),
                         diffQty = Util.GetValueOfDecimal(dr["DiffQty"]),
                         asOnDateCount = Util.GetValueOfDecimal(dr["AsOnDateCount"])

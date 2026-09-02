@@ -182,7 +182,7 @@
    Hierarchy Rule); the separator carries the scan-down rhythm and is never
    optional - only the last row drops it. */
 .vas-201-row {
-    padding: .5em .35em;
+    padding: 0.62em .35em;
     border-bottom: 1px solid #E2EAF1;
     cursor: pointer;
     border-radius: 6px;
@@ -812,8 +812,8 @@
     }
 
     .vas-201-row {
-        padding-top: .45em;
-        padding-bottom: .45em;
+        padding-top: 0.57em;
+        padding-bottom: 0.57em;
     }
 }
 

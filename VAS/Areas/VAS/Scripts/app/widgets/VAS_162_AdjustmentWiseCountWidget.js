@@ -27,6 +27,11 @@
     /* Lines the popup holds before paging. MUST stay in step with --vas-rows in
        VAS_162_AdjustmentWiseCountWidget.css, which sizes the dialog to exactly this many rows. */
     var MODAL_PAGE_SIZE = 7;
+    /* Window name / search key for the Inventory Count screen - the same target VAS_156 and
+       VAS_158 navigate to. Window IDs differ per installation, so it is resolved by NAME.
+       Hardcoding an id is what made VAS_160 answer "With your current role and settings, you
+       cannot view this information." */
+    var COUNT_WINDOW_NAME = "VAS_PhysicalInventory";
 
     /* Product and attribute text comes from the database and was previously concatenated straight
        into innerHTML. The source prompt requires the opposite: "Render database text through
@@ -85,6 +90,7 @@
         var selectedYear = now.getFullYear();
         var widgetObserver = null;
         var $modalOverlay = null;
+        var $modalOriginTile = null;
 
         this.Initalize = function () {
             createWidget();
@@ -253,6 +259,61 @@
             });
         }
 
+        /* Modal teardown. Lifted out of openDetailModal's closure so the document-number
+       handlers created in renderDetailGrid - a sibling function - can close the popup after
+       navigating. openDetailModal's local closeModal now just delegates here. */
+        function closeDetailModal() {
+            if (!$modalOverlay) { return; }
+
+            $modalOverlay.remove();
+            $modalOverlay = null;
+
+            if ($modalOriginTile) {
+                $modalOriginTile.focus();
+            }
+        }
+
+        /* The framework navigates IN-PLACE only when the payload's ActionName equals the name of
+           the window currently HOSTING this widget; otherwise VIS.dynamicWidget resolves
+           ActionName through UserPreference/GetWindowID and opens that window. Resolve the host
+           name from the listener chain. Established pattern - VAS_156 / VAS_158. */
+        function hostWindowName() {
+            try {
+                var l = $self.listener;
+                for (var i = 0; i < 6 && l; i++) {
+                    if (l.apanel && l.apanel.gridWindow && l.apanel.gridWindow.getName) {
+                        return l.apanel.gridWindow.getName();
+                    }
+                    if (l.gridWindow && l.gridWindow.getName) { return l.gridWindow.getName(); }
+                    l = l.listener;
+                }
+            } catch (e) { }
+            return '';
+        }
+
+        /* Open the Inventory Count screen on the clicked document.
+
+           The id comes from the row (M_Inventory_ID), not from the document number text. Several
+           adjustment lines share one document, and M_Inventory_ID is the key the navigation
+           restriction needs - re-deriving it from the visible text would cost a second lookup and
+           lean on a DocumentNo uniqueness the schema does not enforce.
+
+           The navigation happens on the screen behind the popup, so the popup is closed straight
+           after - otherwise it sits on top of the record it just opened. */
+        function openInventoryWindow(inventoryId) {
+            if (!inventoryId) { return; }
+
+            $self.widgetFirevalueChanged({
+                "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                "TabIndex": "0",
+                "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
+                "ActionType": "W"
+            });
+
+            closeDetailModal();
+        }
+
         function openDetailModal(typeCode, typeTitle, $originTile) {
             if ($modalOverlay) {
                 $modalOverlay.remove();
@@ -283,15 +344,12 @@
             $overlay.append($dialog);
             $('body').append($overlay);
             $modalOverlay = $overlay;
+            $modalOriginTile = $originTile || null;
 
             $closeBtn.focus();
 
             var closeModal = function () {
-                $overlay.remove();
-                $modalOverlay = null;
-                if ($originTile) {
-                    $originTile.focus();
-                }
+                closeDetailModal();
             };
 
             $closeBtn.on('click', closeModal);
@@ -422,16 +480,27 @@
                     // Attribute stays blank when the line has none - no "Standard" placeholder.
                     var attr = item.attribute || "";
 
-                    $rows.append($(
+                    var $row = $(
                         '<div class="vas-adjwisecount-grid-row vas-adjwisecount-data-row">' +
-                        '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-doc" title="' + esc(item.documentNo) + '">' + esc(item.documentNo) + '</div>' +
+                        '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-doc vas-adjwisecount-doclink" role="link" tabindex="0" title="' + esc(item.documentNo) + '">' + esc(item.documentNo) + '</div>' +
                         '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-product" title="' + esc(item.product) + '">' + esc(item.product) + '</div>' +
                         '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-attr" title="' + esc(attr) + '">' + esc(attr) + '</div>' +
                         '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-num" title="' + esc(item.qty) + '">' + esc(item.qty) + '</div>' +
                         '<div class="vas-adjwisecount-cell ' + diffClass + '" title="' + esc(diffText) + '">' + esc(diffText) + '</div>' +
                         '<div class="vas-adjwisecount-cell vas-adjwisecount-cell-num" title="' + esc(item.asOnDateCount) + '">' + esc(item.asOnDateCount) + '</div>' +
                         '</div>'
-                    ));
+                    );
+
+                    (function ($r, record) {
+                        $r.find('.vas-adjwisecount-doclink').on('click keydown', function (e) {
+                            if (e.type === 'click' || e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                openInventoryWindow(record.inventoryId);
+                            }
+                        });
+                    })($row, item);
+
+                    $rows.append($row);
                 }
 
                 // Hold the popup at MODAL_PAGE_SIZE lines regardless of what this page holds.
@@ -474,6 +543,17 @@
             }
             $wrapper.remove();
         };
+    };
+
+    /* Required for the navigation channel: widgetFirevalueChanged is what the widget calls,
+       addChangeListener is how the host registers itself. VAS_162 had neither, so even a correct
+       payload had nowhere to go. Same gap VAS_158 and VAS_160 had. */
+    VAS.VAS_162_AdjustmentWiseCountWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) { this.listener.widgetFirevalueChanged(value); }
+    };
+
+    VAS.VAS_162_AdjustmentWiseCountWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
     };
 
     VAS.VAS_162_AdjustmentWiseCountWidget.prototype.init = function (windowNo, frame) {

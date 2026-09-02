@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -116,6 +116,7 @@ namespace VIS.Controllers
                 WHERE r.AD_Client_ID = @AD_Client_ID
                   AND r.IsActive = 'Y'
                   AND r.DocStatus = 'CO'
+                  AND r.M_Requisition_ID IN (@P_REQ_ACCESS@)
                 GROUP BY
                     r.M_Requisition_ID,
                     r.DocumentNo,
@@ -136,12 +137,17 @@ namespace VIS.Controllers
                 ) > 0
                 ORDER BY r.DateRequired, r.DocumentNo";
 
-            string sql = MRole.GetDefault(ctx).AddAccessSQL(
-                rawSql,
-                "r",
+            // MRole.AddAccessSQL cannot parse this statement (GROUP BY / HAVING / JOIN..ON):
+            // AccessSqlParser mis-locates the insertion point and appends the access predicates
+            // after GROUP BY / HAVING / ORDER BY, producing ORA-00979 / ORA-00933. Apply the same
+            // role access through a simple, parseable sub-query on M_Requisition instead.
+            string reqAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                "SELECT accessReq.M_Requisition_ID FROM M_Requisition accessReq WHERE accessReq.AD_Client_ID = " + ctx.GetAD_Client_ID(),
+                "accessReq",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
+            string sql = rawSql.Replace("@P_REQ_ACCESS@", reqAccessSql);
 
             List<SqlParameter> parameters = new List<SqlParameter>
             {
@@ -272,7 +278,9 @@ namespace VIS.Controllers
                     COALESCE(p.Name, rl.Description, N'') AS product_name,
                     COALESCE(p.Value, N'') AS product_code,
                     rl.M_AttributeSetInstance_ID AS attribute_set_instance_id,
-                    COALESCE(asi.Description, N'Standard specification') AS attribute_description,
+                    CASE WHEN COALESCE(rl.M_AttributeSetInstance_ID, 0) > 0
+                             THEN COALESCE(asi.Description, N'')
+                             ELSE N'' END AS attribute_description,
                     COALESCE(rl.C_UOM_ID, p.C_UOM_ID, 0) AS uom_id,
                     COALESCE(u.UOMSymbol, u.Name, N'') AS uom_name,
                     COALESCE(rl.Qty, 0) AS requested_qty,
@@ -285,7 +293,7 @@ namespace VIS.Controllers
                     COALESCE(rl.PriceActual, 0) AS requisition_rate,
                     COALESCE(rl.Description, N'') AS description,
                     COALESCE(rl.PrintDescription, N'') AS print_description,
-                    COALESCE(rl.C_BPartner_ID, r.C_BPartner_ID, 0) AS line_vendor_id,
+                    COALESCE(r.C_BPartner_ID, 0) AS line_vendor_id,
                     COALESCE(bp.Name, N'') AS line_vendor_name
                 FROM M_RequisitionLine rl
                 INNER JOIN M_Requisition r
@@ -297,20 +305,26 @@ namespace VIS.Controllers
                 LEFT JOIN C_UOM u
                     ON u.C_UOM_ID = COALESCE(rl.C_UOM_ID, p.C_UOM_ID)
                 LEFT JOIN C_BPartner bp
-                    ON bp.C_BPartner_ID = COALESCE(rl.C_BPartner_ID, r.C_BPartner_ID)
+                    ON bp.C_BPartner_ID = r.C_BPartner_ID
                 WHERE rl.M_Requisition_ID = @M_Requisition_ID
                   AND rl.IsActive = 'Y'
                   AND r.IsActive = 'Y'
                   AND r.DocStatus = 'CO'
+                  AND r.M_Requisition_ID IN (@P_REQ_ACCESS@)
                   AND COALESCE(rl.Qty, 0) > COALESCE(rl.QtyOrdered, 0)
                 ORDER BY rl.Line ASC";
 
-            string sql = MRole.GetDefault(ctx).AddAccessSQL(
-                rawSql,
-                "r",
+            // MRole.AddAccessSQL cannot parse this statement (GROUP BY / HAVING / JOIN..ON):
+            // AccessSqlParser mis-locates the insertion point and appends the access predicates
+            // after GROUP BY / HAVING / ORDER BY, producing ORA-00979 / ORA-00933. Apply the same
+            // role access through a simple, parseable sub-query on M_Requisition instead.
+            string reqAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                "SELECT accessReq.M_Requisition_ID FROM M_Requisition accessReq WHERE accessReq.AD_Client_ID = " + ctx.GetAD_Client_ID(),
+                "accessReq",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
+            string sql = rawSql.Replace("@P_REQ_ACCESS@", reqAccessSql);
 
             List<SqlParameter> parameters = new List<SqlParameter>
             {

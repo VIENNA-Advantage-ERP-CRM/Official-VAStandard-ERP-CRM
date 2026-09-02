@@ -1,9 +1,29 @@
 /* ============================================================
    VAS_205_POCompletedMTDWidget.css
-   Widget 03: Purchase Orders Completed MTD
+   Purchase Order Dashboard - Widget 03: Purchase Orders Completed MTD
+   2x1 Success KPI Card. Shares the card architecture of VAS_206
+   (POs Pending Delivery) and VAS_207 (Drafted / In-Process POs):
+   same glass surface, same head/body-row scaffold, same hover, same
+   self-sizing anchor - adapted to a 2-column slot instead of a 3-column one.
    100% Fluid Responsive CSS with Clamp & Relative Units
    ============================================================ */
 
+/* ---------- Container & Root Anchor ---------- */
+/* Self-sizing anchor, structurally identical to VAS_206 / VAS_207: the type scale
+   follows the widget's OWN inline size, published by a ResizeObserver as
+   --widget-inline-size on this element.
+
+   The coefficient is the one place the 3x1 pattern must NOT be copied verbatim.
+   The siblings are 3 columns wide and use 0.045; a 2-column tile is ~2/3 of that
+   width at the same dashboard size, so the coefficient is scaled by 3/2
+   (0.045 * 1.5 = 0.0675) and the clamp bounds are kept identical. That lands this
+   card on exactly the same rendered 16px..22px scale as VAS_206 / VAS_207 instead
+   of sitting permanently pinned to the clamp floor - which is what the previous
+   0.012 coefficient did (a ~270px tile resolved to ~3px, so the floor always won
+   and the card never scaled with resolution at all).
+   The last-resort default is likewise the 2-wide equivalent of the siblings'
+   400px (400 * 2/3 = 267px), so a no-ResizeObserver fallback still renders at the
+   same ~18px as they do. */
 .vas-w205-container {
     width: 100%;
     height: 100%;
@@ -12,28 +32,24 @@
     flex-direction: column;
     min-height: 0;
     min-width: 0;
-}
-
-.vas-w205-root {
-    width: 100%;
-    height: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
     container-type: inline-size;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    min-width: 0;
+    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 267px)) * 0.0675), 22px);
+    color: #102C3F;
 }
 
-.vas-w205-root,
-.vas-w205-root * {
+.vas-w205-container *,
+.vas-w205-container *::before,
+.vas-w205-container *::after {
     box-sizing: border-box;
 }
 
-/* ---------- 2x1 KPI GLASS WIDGET CARD ---------- */
+/* ---------- 2x1 KPI GLASS CARD ---------- */
 .vas-w205-card {
-    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
-    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * 0.012), 20px);
+    width: 100%;
+    height: 100%;
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     border: 2px solid #CBEEDD;
     border-radius: 14px;
@@ -41,16 +57,16 @@
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
+    justify-content: space-between;
     min-height: 0;
     min-width: 0;
     overflow: hidden;
-    position: relative;
+    font-size: inherit;
+    font-family: inherit;
+    color: inherit;
     text-align: left;
-    color: #102C3F;
     cursor: pointer;
+    position: relative;
     outline: none;
     transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
 }
@@ -58,6 +74,7 @@
 .vas-w205-card:hover {
     box-shadow: 0 14px 30px rgba(15, 61, 97, 0.12);
     transform: translateY(-1px);
+    border-color: #A6E0C4;
 }
 
 .vas-w205-card:focus-visible {
@@ -65,68 +82,99 @@
     outline-offset: 2px;
 }
 
-/* Open cue drill-down icon */
-.vas-w205-opencue {
-    position: absolute;
-    top: 0.85em;
-    right: 0.85em;
-    width: 1em;
-    height: 1em;
-    color: #9AB8CE;
-    pointer-events: none;
-    transition: color 0.15s ease;
+/* Semantic emphasis on a KPI card comes from border colour and value colour only -
+   the surface is never tinted. Success family, matching border-ok in the source design. */
+.vas-w205-border-ok {
+    border-color: #CBEEDD;
 }
 
-.vas-w205-card:hover .vas-w205-opencue {
-    color: #0083DA;
+/* ---------- Head ---------- */
+.vas-w205-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5em;
+    flex: none;
 }
 
-/* Title / Label */
+.vas-w205-head-txt {
+    min-width: 0;
+    flex: 1;
+}
+
+/* The stat label IS the widget title on a KPI card - no subtitle. */
 .vas-w205-title {
-    font-family: inherit;
-    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * 0.011375), 17px);
     font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
     margin: 0;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-/* Main Value */
-.vas-w205-val {
-    font-family: inherit;
+/* ---------- Body row ---------- */
+/* Same scaffold as VAS_206's body-row / VAS_207's kpi-row. The 3-wide siblings park
+   a secondary stat in a right-hand kpi-side block; a 2-wide tile has no room for one,
+   so the left block simply takes the full row. Keeping the row wrapper means the
+   value/meta hierarchy sits at the same depth and the same baseline as the siblings. */
+.vas-w205-body-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75em;
+    flex: 1;
+    min-height: 0;
+    margin-top: 0.25em;
+}
+
+.vas-w205-left-block {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.vas-w205-kpi-val {
     font-size: 1.75em;
     font-weight: 600;
     line-height: 1.05;
-    color: #0B6B45;
-    margin: 0.25em 0 0 0;
-    transition: color 0.15s ease;
-}
-
-/* Meta line */
-.vas-w205-meta {
-    font-family: inherit;
-    font-size: 0.6875em;
-    font-weight: 400;
-    color: #5F7283;
-    line-height: 1.3;
-    margin-top: 0.25em;
-    margin-bottom: 0;
+    margin: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    transition: color 0.15s ease;
 }
 
-/* Busy overlay */
+.vas-w205-kpi-val.vas-w205-ok {
+    color: #0B6B45;
+}
+
+/* The meta sentence is longer here than on the siblings (it carries both the received
+   value and the closed-short count, per this widget's own source design) while the tile
+   is narrower. Rather than bake in a 3-column assumption and let it clip to a single
+   ellipsised line, it is allowed to run to a second line and clamps there; the full
+   string stays reachable through the title attribute set in JS. */
+.vas-w205-kpi-meta {
+    font-size: 0.6875em;
+    color: #5F7283;
+    line-height: 1.3;
+    margin: 0.35em 0 0 0;
+    overflow: hidden;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* ---------- Busy overlay ---------- */
 .vas-w205-busy {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.45);
+    inset: 0;
+    background: rgba(255, 255, 255, 0.6);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -159,6 +207,11 @@
 }
 
 .vas-w205-modal {
+    /* The type scale lives on the dialog, not just its body, so the header and
+       footer scale with the content instead of staying pinned at the app default. */
+    --panel-anchor: clamp(15px, 1.15vw, 26px);
+    font-size: var(--panel-anchor);
+
     width: min(1240px, 94vw);
     max-height: min(880px, 90dvh);
     background: #FFFFFF;
@@ -180,14 +233,14 @@
 
 /* Header */
 .vas-w205-modal-header {
-    height: 56px;
+    height: 3.2em;
     flex: none;
-    padding: 0 16px;
+    padding: 0 0.8em;
     border-bottom: 1px solid #1F83FF;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
     background: #FFFFFF;
 }
 
@@ -250,8 +303,13 @@
     flex-direction: column;
     gap: 0.75em;
     container-type: inline-size;
-    --panel-anchor: clamp(18px, 1vw, 20px);
-    font-size: var(--panel-anchor);
+    /* The modal type scale. The previous clamp(18px, 1vw, 20px) only varied between a
+       ~1800px and ~2000px viewport - on every other screen it sat pinned to one of its
+       bounds, so the popup never grew with resolution. This range tracks across the
+       resolutions actually in use (~15px at 1366px, ~22px at 1920px, 26px at 2560px).
+       Everything inside the popup is sized in em against it, so the whole dialog -
+       rows, chips, buttons, icons - scales together. */
+    font-size: inherit;
     font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
     color: #102C3F;
 }
@@ -270,11 +328,11 @@
 .vas-w205-modal-foot {
     flex: none;
     border-top: 1px solid #D9E2EB;
-    padding: 12px 16px;
+    padding: 0.6em 0.8em;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
     background: #FBFDFF;
 }
 
@@ -395,7 +453,7 @@
 
 .vas-w205-tbody .vas-w205-trow {
     font-size: 0.75em;
-    padding: 0.55em 0.5em;
+    padding: 0.67em 0.5em;
     border-bottom: 1px solid #E2EAF1;
     transition: background 0.12s ease;
 }
@@ -467,9 +525,9 @@
 
 /* Icon Button (Document Lines Glyph) */
 .vas-w205-iconbtn {
-    width: 1.5em;
-    height: 1.5em;
-    border-radius: 7px;
+    width: 1.8em;
+    height: 1.8em;
+    border-radius: 8px;
     border: 1px solid #D9E2EB;
     background: #FFFFFF;
     display: grid;
@@ -479,6 +537,7 @@
     padding: 0;
     flex: none;
     transition: background 0.15s ease, border-color 0.15s ease;
+    line-height: 1;
 }
 
 .vas-w205-iconbtn:hover {
@@ -487,8 +546,10 @@
 }
 
 .vas-w205-iconbtn svg {
-    width: 0.85em;
-    height: 0.85em;
+    width: 1em;
+    height: 1em;
+    display: block;
+    flex: none;
 }
 
 /* Action buttons */

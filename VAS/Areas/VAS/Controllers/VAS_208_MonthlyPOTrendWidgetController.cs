@@ -1,4 +1,4 @@
-/************************************************************
+﻿﻿﻿﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Controller for Widget 06: Monthly Purchase Order Trend (VAS_208_MonthlyPOTrendWidget)
  * Created Date   : 17 Aug 2026
@@ -407,6 +407,11 @@ namespace VAS.Areas.VAS.Controllers
                         }
 
                         monthValue += convertedAmt;
+
+                        // Header roll-ups stay in each product's base UOM: a purchase order can mix
+                        // several line UOMs, so there is no single UOM to scale the header total to.
+                        // The per-line popup (GetPOLineDetails) is where quantities are converted to
+                        // the UOM the buyer actually entered.
                         if (!string.IsNullOrEmpty(vendor))
                         {
                             vendorSet.Add(vendor);
@@ -539,11 +544,25 @@ namespace VAS.Areas.VAS.Controllers
                     SELECT
                         ol.C_OrderLine_ID,
                         ol.Line,
-                        p.Name AS ProductName,
+                        -- A charge line, or a product that is not of Item type, carries no
+                        -- stock movement: the widget shows its name, UOM, ordered, rate and
+                        -- amount, and dashes for received / pending / line status.
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
+                             THEN COALESCE(ch.Name, N'')
+                             ELSE p.Name END AS ProductName,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
+                             WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
+                             ELSE 'N' END AS IsNonStock,
                         p.Value AS ProductCode,
-                        asi.Description AS AttributeDesc,
+                        CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
+                             THEN COALESCE(asi.Description, N'')
+                             ELSE N'' END AS AttributeDesc,
                         COALESCE(uom.UOMSymbol, uom.Name) AS UOMSymbol,
                         ol.QtyOrdered,
+                        -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
+                        -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
+                        -- widget shows the selected UOM, so quantities are scaled to it.
+                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         ol.QtyDelivered,
                         ol.PriceActual,
                         ol.LineNetAmt,
@@ -551,6 +570,7 @@ namespace VAS.Areas.VAS.Controllers
                     FROM C_OrderLine ol
                     INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
                     LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
                     LEFT JOIN C_UOM uom ON uom.C_UOM_ID = ol.C_UOM_ID
                     WHERE ol.C_Order_ID = " + orderId + @"
@@ -573,6 +593,15 @@ namespace VAS.Areas.VAS.Controllers
                         decimal rate = Util.GetValueOfDecimal(dr["PriceActual"]);
                         decimal amount = Util.GetValueOfDecimal(dr["LineNetAmt"]);
                         string parentDocStatus = Util.GetValueOfString(dr["DocStatus"]);
+
+                        // QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
+                        // picked) while QtyOrdered / QtyDelivered are in the product's base UOM.
+                        // The row shows that line UOM, so both quantities are scaled to it by this
+                        // line's own entered/ordered ratio.
+                        decimal enteredQtyUom = Util.GetValueOfDecimal(dr["QtyEntered"]);
+                        decimal uomRatio = (qtyOrdered != 0) ? (enteredQtyUom / qtyOrdered) : 1m;
+                        qtyOrdered = enteredQtyUom;
+                        qtyDelivered = qtyDelivered * uomRatio;
 
                         decimal qtyPending = Math.Max(0, qtyOrdered - qtyDelivered);
 
@@ -617,6 +646,9 @@ namespace VAS.Areas.VAS.Controllers
                             qtyPending = qtyPending,
                             rate = rate,
                             amount = amount,
+                            // Charge / non-Item lines are never received - the client renders dashes
+                            // for received, pending and line status.
+                            isNonStock = Util.GetValueOfString(dr["IsNonStock"]) == "Y",
                             status = lineStatus,
                             statusChip = lineChip
                         });
