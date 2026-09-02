@@ -89,7 +89,7 @@ namespace VASLogic.Models
                 if (bpId <= 0)
                 {
                     result.Success = false;
-                    result.Message = "No Business Partner is linked to this record";
+                    result.Message = Msg.GetMsg(ctx, "VAS_NoBPlinkedwithRecord"); //"No Business Partner is linked to this record";
                     return result;
                 }
 
@@ -98,7 +98,7 @@ namespace VASLogic.Models
                 if (string.IsNullOrEmpty(result.EMailID))
                 {
                     result.Success = false;
-                    result.Message = "No email address is configured for the customer's contact";
+                    result.Message = Msg.GetMsg(ctx, "VAS_NoEmailonUserContact");//  "No email address is configured for the business partner contact";
                     return result;
                 }
 

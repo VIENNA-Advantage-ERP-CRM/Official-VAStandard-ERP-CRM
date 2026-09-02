@@ -324,6 +324,81 @@
  *                        visibly cleared rather than looking like a rendering
  *                        gap. A row said WHICH field moved but never what it
  *                        moved from or to.
+ *   VAI163   2026-08-20  - The Work Order, Field Service Request and Production
+ *                          Order chips take the window they open from the PAYLOAD
+ *                          (WorkOrderWindowId / FieldServiceReqWindowId /
+ *                          ProductionOrderWindowId, resolved and access-checked on
+ *                          the server). Those three belong to modules this
+ *                          solution does not ship, so their screens cannot be
+ *                          named here and the browser's zoom lookup does not know
+ *                          their tables — the panel used to click first and find
+ *                          out afterwards, and a click reported an error from a
+ *                          window opened with a query it could not run. A chip
+ *                          whose window did not resolve is now drawn as plain text
+ *                          instead of as a link that fails.
+ *                        - openRecord takes that id as its first choice, ahead of
+ *                          the named window and the zoom target.
+ *                        - The items footer shows a NEGATIVE budget rather than
+ *                          reading N/A at it. A budget is a figure, not a
+ *                          quantity, and only the absence of one is N/A.
+ *                        - The progress line's Posted stage reads Pending while
+ *                          the document is unposted, like every other stage still
+ *                          ahead. "Not Posted" restated the stage's own label as
+ *                          though it were news.
+ *                        - A stage that has been REACHED renders as done and shows
+ *                          the moment it happened. The last reached stage was
+ *                          drawn "active" instead, which replaced its date with a
+ *                          forward-looking caption — a converted requisition read
+ *                          "Ready to Convert" and never showed the date it was
+ *                          converted on. The active marker moves to the first
+ *                          stage still ahead, which is the one being worked
+ *                          towards.
+ *                        - Converted / In Fulfilment answer for every document
+ *                          raised from the requisition, not only its purchase
+ *                          orders: RFQs, material transfers and inventory-use
+ *                          issues count too, with the dates to match (model side).
+ *                        - The items table's "Received On Hand" column becomes
+ *                          "Received": a progress bar over the received / ordered
+ *                          ratio ("8/10"), summed across the goods receipts,
+ *                          material transfers and inventory-use issues that
+ *                          delivered the line. Green once the line has everything
+ *                          it asked for, orange while it is short. The old column
+ *                          reported the warehouse's stock POSITION, which moves
+ *                          for reasons having nothing to do with the requisition.
+ *                          sourceCell -> receivedCell.
+ *                        - The Reference strip gains the BLANKET order the
+ *                          requisition draws on, opening the blanket sales or
+ *                          blanket purchase screen as the record's side requires.
+ *                          originChip takes a named window for it — a blanket is a
+ *                          C_Order like any other, so nothing about the record
+ *                          says which screen it belongs to.
+ *                        - Window resolution follows VAS_092's order throughout:
+ *                          the window NAMED for the record first, then the zoom
+ *                          target, and only then the dictionary's table lookup.
+ *                          VAMFG_M_WorkOrder joins WINDOW_NAME_BY_TABLE under the
+ *                          name VAS_102 opens it by (VAMFG_ProductionOrder) —
+ *                          it went straight to the table lookup, which is the last
+ *                          resort for a screen that cannot be named, and the
+ *                          production order's can. The two VA075 documents still
+ *                          fall through to it, since theirs genuinely cannot.
+ *   VAI163   2026-08-21  Activity: a Task or Appointment row now says how many
+ *                        e-mails were sent against it, and opens on click onto
+ *                        each one - who it went to, its subject, when it went
+ *                        and who sent it, then the message itself. The body is
+ *                        shown ONLY once the row is opened.
+ *   VAI163   2026-08-24  The Reference strip's BLANKET ORDER chip takes its window
+ *                        from the payload (data.BlanketOrderWindowId) rather than
+ *                        resolving the name for itself. The name is still sent and
+ *                        still tried, but only second: the client's own lookup
+ *                        falls through to the TABLE's zoom target when it comes
+ *                        back empty, and C_Order's zoom target is the ordinary
+ *                        order screen — so a blanket SALES order opened the Sales
+ *                        Order window filtered to a record that window does not
+ *                        carry, instead of VAS_BlanketSalesOrder. A window the
+ *                        server could not resolve now leaves the chip as plain
+ *                        text, still naming the document, rather than opening the
+ *                        wrong screen. Same treatment the VA075 / VAMFG chips
+ *                        already had.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -843,10 +918,23 @@
 
             // Maintenance work order first — it is the strongest origin when more
             // than one is present.
-            if (data.WorkOrderNo) {
+            //
+            // The window comes from the payload: VA075 is not part of this
+            // solution, so its screen cannot be named here and the browser's zoom
+            // lookup does not know its table. A chip whose window the server could
+            // not resolve is drawn as plain text — it still names the document,
+            // and it cannot fail on click.
+            //
+            // Drawn on the record's ID, not on its number: the model no longer
+            // invents "#1000042" for a document whose identifier column it could
+            // not read, so a chip keyed on the number would vanish for exactly
+            // those records. It is the LINK that matters — the label says what the
+            // document is and the click opens it, with or without a number to show.
+            if (data.VA075_WorkOrder_ID > 0) {
                 $chips.append(originChip("wrench", msg("WorkOrder", "Work Order"),
                     countedValue(data.WorkOrderNo, data.WorkOrderCount),
-                    "warning", "VA075_WorkOrder", data.VA075_WorkOrder_ID));
+                    "warning", "VA075_WorkOrder", data.VA075_WorkOrder_ID, "",
+                    data.WorkOrderWindowId));
                 any = true;
             }
 
@@ -855,22 +943,57 @@
             // to the work order above — a request can exist without one, and one
             // work order can serve several — so it gets its own chip rather than
             // sharing.
-            if (data.FieldServiceReqNo) {
+            if (data.VA075_FieldServiceReq_ID > 0) {
                 $chips.append(originChip("clipboard",
                     msg("FieldServiceRequest", "Field Service Request"),
                     countedValue(data.FieldServiceReqNo, data.FieldServiceReqCount),
-                    "info", "VA075_FieldServiceReq", data.VA075_FieldServiceReq_ID));
+                    "info", "VA075_FieldServiceReq", data.VA075_FieldServiceReq_ID, "",
+                    data.FieldServiceReqWindowId));
                 any = true;
             }
 
             // Production order (VAMFG) — a manufacturing document, NOT the
             // maintenance work order above. Reached from the line's own work order
             // or from the component it was raised for (model side).
-            if (data.ProductionOrderNo) {
+            if (data.VAMFG_M_WorkOrder_ID > 0) {
                 $chips.append(originChip("factory",
                     msg("ProductionOrder", "Production Order"),
                     countedValue(data.ProductionOrderNo, data.ProductionOrderCount),
-                    "warning", "VAMFG_M_WorkOrder", data.VAMFG_M_WorkOrder_ID));
+                    "warning", "VAMFG_M_WorkOrder", data.VAMFG_M_WorkOrder_ID, "",
+                    data.ProductionOrderWindowId));
+                any = true;
+            }
+
+            // The BLANKET order the requisition draws on — the standing commitment
+            // behind the request, reached from the same reference either directly or
+            // through the release it points at (model side).
+            //
+            // Its window comes from the PAYLOAD, resolved on the server by name and
+            // against the role. A blanket order is a C_Order like any other, so
+            // nothing about the record itself says it opens the blanket screen
+            // rather than the ordinary order one — and a blanket SALES order opens a
+            // different one again.
+            //
+            // The name travels too, but only as the second attempt: it is the
+            // server-resolved id that matters here, because the client's own name
+            // lookup falls through to the TABLE's zoom target when it comes back
+            // empty, and C_Order's zoom target is the ordinary order screen. That
+            // fall-through is what stopped a blanket sales order opening — the click
+            // started the Sales Order window filtered to a record it does not carry.
+            // A window the server could not resolve now leaves the chip as plain
+            // text, still naming the document, rather than opening the wrong screen.
+            if (data.BlanketOrderNo) {
+                var $blanket = originChip("doc",
+                    data.BlanketOrderIsSOTrx
+                        ? msg("BlanketSalesOrder", "Blanket Sales Order")
+                        : msg("BlanketOrder", "Blanket Purchase Order"),
+                    countedValue(data.BlanketOrderNo, data.BlanketOrderCount),
+                    "success", "C_Order", data.BlanketOrderId, "",
+                    data.BlanketOrderWindowId,
+                    data.BlanketOrderIsSOTrx ? "VAS_BlanketSalesOrder"
+                                             : "VAS_BlanketPurchaseOrder");
+                if (data.BlanketOrderIsSOTrx) $blanket.attr("data-open-sotrx", "Y");
+                $chips.append($blanket);
                 any = true;
             }
 
@@ -878,6 +1001,9 @@
             // (M_RequisitionLine.Ref_OrderLine_ID). C_Order carries both sides of
             // the trade, so the chip names the side the linked order is actually
             // on rather than assuming a sale, and opens it in that side's window.
+            //
+            // The model clears this one when it turns out to be the same record as
+            // the blanket above, so the strip never lists one document twice.
             if (data.RefOrderNo) {
                 var $order = originChip("doc",
                     data.RefOrderIsSOTrx ? msg("SalesOrder", "Sales Order")
@@ -940,15 +1066,33 @@
         // Origin chip: leading (tinted) icon + grey label + dark value. Given a
         // table and a record id it becomes a link that opens that record, marked
         // with a trailing arrow.
-        function originChip(icon, label, value, iconTone, tableName, recordId, tooltip) {
+        //
+        // windowId is for the chips whose screen only the SERVER can name — the
+        // two VA075 documents and the VAMFG production order. Passing it (even as
+        // 0) says "this chip's window was resolved for me": a real id travels with
+        // the chip and is used straight away, and 0 means there is no window the
+        // role can open, so the chip stays plain text rather than becoming a link
+        // that reports an error when it is clicked. Omitting the argument leaves a
+        // chip on the ordinary path, where the client resolves the window itself.
+        //
+        // namedWindow is the other half of that: a window this side CAN name but
+        // the table cannot choose, because two records of the same table open
+        // different screens. That is the blanket order — a C_Order like any other,
+        // opening the blanket screen rather than the ordinary order one.
+        function originChip(icon, label, value, iconTone, tableName, recordId, tooltip,
+                            windowId, namedWindow) {
             var $chip = $('<span class="vas_098-chip"></span>')
                 .addClass("vas_098-ic-" + (iconTone || "muted"));
 
-            var isLink = tableName && recordId && +recordId > 0;
+            var serverResolved = (windowId !== undefined && windowId !== null);
+            var isLink = tableName && recordId && +recordId > 0 &&
+                (!serverResolved || +windowId > 0);
             if (isLink) {
                 $chip.addClass("vas_098-is-link")
                     .attr("data-open-table", tableName)
                     .attr("data-open-id", recordId);
+                if (serverResolved) $chip.attr("data-open-windowid", +windowId);
+                if (namedWindow) $chip.attr("data-open-window", namedWindow);
             }
 
             $chip.append(svgIcon(icon));
@@ -1067,9 +1211,10 @@
                 ? tag(msg(st.key), st.tone)
                 : tag(d.DocStatus || msg("NA"), "vas_098-draft")));
 
-            // An RFQ and a material transfer have no monetary total of their own,
-            // and the model sends null rather than a zero for them — a zero here
-            // would read as "this document is worth nothing".
+            // A document this schema records no total for sends null rather than a
+            // zero — a zero here would read as "this document is worth nothing".
+            // A material transfer always carries one now: the same value its own
+            // screen shows, summed from its lines (model side).
             var $amt = $('<span class="vas_098-ta-r"></span>');
             $amt.text((d.Amount === null || d.Amount === undefined) ? DASH : money(d.Amount));
             $r.append($amt);
@@ -1089,7 +1234,10 @@
                     // A row may name the window itself where its TABLE cannot
                     // choose one — a blanket order and an ordinary purchase order
                     // are both C_Order, and open different screens.
-                    $(this).attr("data-open-window"));
+                    $(this).attr("data-open-window"),
+                    // Or carry the window id outright, for a record whose screen
+                    // only the server could resolve (the VA075 / VAMFG chips).
+                    $(this).attr("data-open-windowid"));
             });
         }
 
@@ -1101,11 +1249,17 @@
         //
         // Any further screen that needs naming belongs here; nothing else has to
         // change.
+        // VAMFG_M_WorkOrder is here for the same reason the rest are, and it is the
+        // name VAS_102 opens that screen by: the production order's window can be
+        // named, so it is named, and the dictionary lookup below is left for the
+        // two VA075 documents that genuinely cannot be. Naming it also means a
+        // click resolves the same way whether or not the payload carried an id.
         var WINDOW_NAME_BY_TABLE = {
-            "C_RfQ":      "VAS_RFQ",
-            "C_Project":  "VAS_Project",
-            "C_Order":    "VAS_PurchaseOrder",
-            "M_Movement": "VAS_MaterialTransfer"
+            "C_RfQ":             "VAS_RFQ",
+            "C_Project":         "VAS_Project",
+            "C_Order":           "VAS_PurchaseOrder",
+            "M_Movement":        "VAS_MaterialTransfer",
+            "VAMFG_M_WorkOrder": "VAMFG_ProductionOrder"
         };
 
         // The same map for a record opened as a SALES transaction. C_Order serves
@@ -1191,14 +1345,19 @@
             }
         }
 
-        // Opens the record's window filtered to that row, in three steps: the
-        // window named for this table when it has one, else the table's default
-        // zoom target, else the window the DICTIONARY says the table opens in.
-        // Either way the window is started with an equal-query on the table's key
-        // column. Degrades to a toast so a click never throws.
-        function openRecord(tableName, recordId, isSOTrx, namedWindow) {
+        // Opens the record's window filtered to that row: the id the row already
+        // carries when it has one, else the window named for this table, else the
+        // table's default zoom target, else the window the DICTIONARY says the
+        // table opens in. Either way the window is started with an equal-query on
+        // the table's key column. Degrades to a toast so a click never throws.
+        function openRecord(tableName, recordId, isSOTrx, namedWindow, knownWindowId) {
             if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
             try {
+                // A window the ROW already knows wins outright — the payload
+                // resolved it on the server, against the dictionary and the role,
+                // for a table whose screen this side cannot name at all.
+                var windowId = +knownWindowId || 0;
+
                 // A window named on the ROW wins over both maps: it is the only
                 // thing that can tell two records of the same table apart, which is
                 // exactly the blanket-order case (C_Order opens either the purchase
@@ -1207,11 +1366,13 @@
                 // Failing that, a sales-transaction record takes its own window
                 // name where the table has one; everything else takes the plain
                 // mapping.
-                var windowName = namedWindow ||
-                    ((isSOTrx && WINDOW_NAME_BY_TABLE_SOTRX[tableName])
-                        ? WINDOW_NAME_BY_TABLE_SOTRX[tableName]
-                        : WINDOW_NAME_BY_TABLE[tableName]);
-                var windowId = resolveWindowIdByName(windowName);
+                if (windowId <= 0) {
+                    var windowName = namedWindow ||
+                        ((isSOTrx && WINDOW_NAME_BY_TABLE_SOTRX[tableName])
+                            ? WINDOW_NAME_BY_TABLE_SOTRX[tableName]
+                            : WINDOW_NAME_BY_TABLE[tableName]);
+                    windowId = resolveWindowIdByName(windowName);
+                }
 
                 if (windowId <= 0 &&
                     VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
@@ -1352,9 +1513,13 @@
         function progressStages() {
             var s = data.StatusCode;
             var completed  = s === "CO" || s === "CL" || data.IsConverted;
+            // Converted once ANYTHING has been raised from the requisition — a
+            // purchase or blanket order, an RFQ, a material transfer, an inventory
+            // use issue — and in fulfilment once one of those has been completed.
+            // Both flags and both dates come from the model, which reads every one
+            // of those documents (LoadConversionMilestones); the stepper used to
+            // know about purchase orders alone.
             var converted  = data.IsConverted;
-            // In fulfilment once a purchase order raised from this requisition has
-            // been completed — not from a per-line ordered quantity.
             var fulfilment = data.HasOrdered;
 
             // Every stage below is dated by a stored TIMESTAMP — when the record
@@ -1427,20 +1592,33 @@
                 if (s >= LIFECYCLE_STAGES) {
                     // Posted: done or not, on its own flag. It is never the
                     // "active" stage — nobody is working towards it, the posting
-                    // engine either has run or has not.
+                    // engine either has run or has not. Unposted reads Pending like
+                    // any other stage still ahead: "Not Posted" restated the stage's
+                    // own label as though it were news.
                     if (stg.done) { stateCls = "vas_098-done"; showCheck = true; sub = stg.sub || msg("Posted"); }
-                    else { stateCls = "vas_098-pending"; showCheck = false; sub = msg("NotPosted", "Not Posted"); }
-                } else if (s + 1 < current) { stateCls = "vas_098-done";    showCheck = true;  sub = stg.sub || ""; }
-                else if (s + 1 === current) { stateCls = "vas_098-active"; showCheck = false; sub = activeSub(stg, current); }
-                else { stateCls = "vas_098-pending"; showCheck = false; sub = msg("Pending"); }
+                    else { stateCls = "vas_098-pending"; showCheck = false; sub = msg("Pending"); }
+                } else if (reached[s]) {
+                    // A stage that has been REACHED is done, and shows the moment it
+                    // happened. The last reached stage used to be drawn "active"
+                    // instead, which replaced its date with a forward-looking caption
+                    // — a converted requisition read "Ready to Convert" and never
+                    // showed the date it was converted on.
+                    stateCls = "vas_098-done"; showCheck = true; sub = stg.sub || "";
+                } else if (s === current) {
+                    // The first stage still ahead is the one being worked towards.
+                    stateCls = "vas_098-active"; showCheck = false; sub = activeSub(stg);
+                } else {
+                    stateCls = "vas_098-pending"; showCheck = false; sub = msg("Pending");
+                }
                 $stepper.append(stepEntry(s + 1, stg, stateCls, showCheck, sub));
             }
             $body.append($stepper);
         }
 
-        function activeSub(stg, current) {
+        // Caption for the stage being worked towards — forward-looking, since it
+        // has not happened yet and therefore has no date to report.
+        function activeSub(stg) {
             if (stg.key === "vas_098-c3") return msg("ReadyToConvert");
-            if (stg.sub) return stg.sub;
             return msg("InProgressSub");
         }
 
@@ -1514,12 +1692,15 @@
             $head.append($('<span></span>').text(msg("Item")));
             $head.append($('<span></span>').text(msg("UOM", "UOM")));
             $head.append($('<span class="vas_098-ta-c"></span>').text(msg("Qty")));
-            // "Received On Hand": what is actually held in the warehouse the goods
-            // come from or land in. It used to read "Source Stock", which only ever
-            // described the internal-fulfilment case — the column now covers the
-            // purchased one too, where the figure rises as receipts complete.
+            // "Received": how much of what the line asked for has actually been
+            // delivered against it, across every document that can deliver it —
+            // goods receipts, material transfers and inventory-use issues (model
+            // side). It replaces "Received On Hand", which reported the warehouse's
+            // stock POSITION: a figure that answers "is there any?" rather than
+            // "did this line get what it asked for", and that moves for reasons
+            // having nothing to do with this requisition.
             $head.append($('<span class="vas_098-ta-r"></span>')
-                .text(msg("ReceivedOnHand", "Received On Hand")));
+                .text(msg("Received", "Received")));
             $head.append($('<span class="vas_098-ta-r"></span>').text(msg("UnitCost")));
             $head.append($('<span class="vas_098-ta-r"></span>').text(msg("EstTotal")));
             $items.append($head);
@@ -1626,7 +1807,7 @@
 
             $r.append($('<span class="vas_098-ta-c"></span>').text(formatNumber(ln.RequestedQty, ln.UOMPrecision)));
 
-            $r.append(sourceCell(ln));
+            $r.append(receivedCell(ln));
 
             // The unit price is per SELECTED unit (model side) and is shown to the
             // currency's own precision rather than rounded to whole units: a rate
@@ -1642,50 +1823,45 @@
             return $r;
         }
 
-        // On-hand stock for this line's product at the warehouse it is served from
-        // or received into, against the requested quantity. Both figures are in the
-        // line's selected UOM (model side), so they read against each other and
-        // against the Qty column beside them.
+        // What has actually been DELIVERED against this line, against what it asked
+        // for: a progress bar over the ratio, "8/10". Both figures are in the line's
+        // selected UOM (model side), so they read against each other and against the
+        // Qty column beside them.
         //
-        // The tooltip names the warehouse the figure was read at and, once a goods
-        // receipt has completed against the line, how much it brought in — the
-        // event that moved the on-hand in the first place.
+        // The received side sums every document that can deliver the line — a goods
+        // receipt raised from its purchase order, a material transfer, an
+        // inventory-use issue — counting only those that completed (model side,
+        // LoadReceivedQty). The requested side is the line's own quantity.
         //
-        // N/A only when no warehouse could be resolved at all; with one, no stock
-        // reads as 0, not N/A.
+        // The bar is green once the line has everything it asked for and orange
+        // while it is short, so it turns green of its own accord on the refresh
+        // after the last delivery completes.
         //
-        // A CHARGE line is left blank. A charge is not stocked, so it has no
-        // on-hand anywhere; "0" or "N/A" both read as a fact about the charge's
-        // availability, and neither is one.
-        function sourceCell(ln) {
+        // A CHARGE line is left blank. A charge is not delivered — it is a cost
+        // added to a document — so it has no received quantity, and "0" would read
+        // as an outstanding delivery that is never coming.
+        function receivedCell(ln) {
             var $c = $('<span class="vas_098-ta-r"></span>');
             if (isChargeLine(ln)) return $c;
-            if (!ln.HasSourceData) {
-                $c.append($('<span class="vas_098-na"></span>').text(msg("NA")));
-                return $c;
-            }
-            var req = +ln.RequestedQty || 0;
-            var onHand = +ln.SourceQtyOnHand || 0;
-            var pct = req > 0 ? Math.round((onHand / req) * 100) : (onHand > 0 ? 100 : 0);
-            var cls = (req > 0 && onHand >= req) ? "vas_098-full" : "vas_098-short";
-            var $src = $('<span class="vas_098-src"></span>').addClass(cls);
 
-            var tip = [msg("OnHandAtSource", "on hand")];
-            var wh = data.StockWarehouseName || data.SourceWarehouseName;
-            if (wh) tip.push(wh);
+            var req = +ln.RequestedQty || 0;
             var received = +ln.ReceivedQty || 0;
-            if (received > 0) {
-                tip.push(msg("ReceivedQty", "Received") + ": " +
-                    formatNumber(received, ln.UOMPrecision) +
-                    (ln.UOMName ? " " + ln.UOMName : ""));
-            }
-            $src.attr("title", tip.join(" · "));
+            var full = req > 0 && received >= req;
+            var pct = req > 0 ? Math.round((received / req) * 100) : (received > 0 ? 100 : 0);
+
+            var $recv = $('<span class="vas_098-recv"></span>')
+                .addClass(full ? "vas_098-full" : "vas_098-short");
+            $recv.attr("title", msg("ReceivedOfOrdered", "Received of ordered") + ": " +
+                formatNumber(received, ln.UOMPrecision) + " / " +
+                formatNumber(req, ln.UOMPrecision) +
+                (ln.UOMName ? " " + ln.UOMName : ""));
+
             var $bar = $('<span class="vas_098-bar"><i></i></span>');
             $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
-            $src.append($bar);
-            $src.append(document.createTextNode(
-                formatNumber(onHand, ln.UOMPrecision) + "/" + formatNumber(req, ln.UOMPrecision)));
-            $c.append($src);
+            $recv.append($bar);
+            $recv.append($('<span class="vas_098-recvRatio"></span>').text(
+                formatNumber(received, ln.UOMPrecision) + "/" + formatNumber(req, ln.UOMPrecision)));
+            $c.append($recv);
             return $c;
         }
 
@@ -1706,10 +1882,13 @@
             // against — that process rarely runs, and the field used to read N/A
             // on almost every record. The tooltip says which of the two the figure
             // is, so a whole budget is never mistaken for a remaining balance.
+            // Only the ABSENCE of a budget reads N/A. A negative figure is a real
+            // one — a budget carried on the credit side nets that way — and
+            // hiding it said "no budget" about a record that has one.
             var budget = +data.AvailableBudget || 0;
             var $budget = footBit(msg("Budget", "Budget"),
-                budget > 0 ? money(budget) : msg("NA"), false);
-            if (budget > 0) {
+                budget !== 0 ? money(budget) : msg("NA"), false);
+            if (budget !== 0) {
                 $budget.attr("title", data.BudgetIsRequisitionLevel
                     ? msg("BudgetForRequisition", "Budget set for this requisition")
                     : msg("BudgetAvailableOnLines", "Budget available to the requisition's lines"));
@@ -1745,8 +1924,19 @@
             grn:         { cls: "vas_098-grn", key: "ActGRN",         fallback: "GRN" },
             grncomplete: { cls: "vas_098-grn", key: "ActGRNComplete", fallback: "GRN" },
             // E-mails sent against the requisition (MailAttachment1).
-            email:       { cls: "vas_098-email", key: "ActEmail",     fallback: "Email" }
+            email:       { cls: "vas_098-email", key: "ActEmail",     fallback: "Email" },
+            // The correspondence and engagement sources shared with every other
+            // overview panel (model side, VAS_ActivitySourcesModel): meetings and
+            // tasks from AppointmentsInfo, calls from VA048_CallDetails, and the
+            // inbound letters MailAttachment1 files under AttachmentType 'I'.
+            appointment: { cls: "vas_098-appt",   key: "ActAppointment", fallback: "Meeting" },
+            task:        { cls: "vas_098-task",   key: "ActTask",        fallback: "Task" },
+            call:        { cls: "vas_098-call",   key: "ActCall",        fallback: "Call" },
+            letter:      { cls: "vas_098-letter", key: "ActLetter",      fallback: "Letter" }
         };
+
+        // The four types above, for the places that treat them as a family.
+        var ACT_SOURCE_TYPES = { appointment: 1, task: 1, call: 1, letter: 1 };
 
         // Maximum activity rows shown per page; the feed paginates beyond this.
         // A requisition accumulates every status change and every downstream PO /
@@ -1847,9 +2037,37 @@
             // An e-mail names its recipients under the subject — every address on
             // the To, Cc and Bcc lists, in full. No tooltip: the line is no longer
             // an abridgement of something the reader has to hover to see.
-            if (a.Type === "email") {
+            // ... and so does a letter, which is the same record filed under a
+            // different attachment type.
+            if (a.Type === "email" || a.Type === "letter") {
                 var to = recipientSummary(a);
                 if (to) $main.append($('<div class="vas_098-actsub"></div>').text(to));
+            }
+
+            // A call names the number it was placed to, where one was recorded —
+            // the same slot, answering the same question of who it reached.
+            if (a.Type === "call" && a.MailTo) {
+                $main.append($('<div class="vas_098-actsub"></div>')
+                    .text(a.MailTo).attr("title", a.MailTo));
+            }
+
+            // A meeting or task names where it is and whether it is done.
+            if (a.Type === "appointment" || a.Type === "task") {
+                var bits = [];
+                if (a.Location) bits.push(a.Location);
+                if (a.IsCancelled) bits.push(msg("ActCancelled", "Cancelled"));
+                else if (a.IsClosed) bits.push(msg("ActCompleted", "Completed"));
+                // What was e-mailed about this meeting or task. The count only —
+                // the addresses, subjects and bodies are in the drawer, and a
+                // meeting that generated several notices would otherwise push
+                // everything else off the sub-line.
+                var apptMails = activityMails(a);
+                if (apptMails.length) bits.push(mailCountLabel(apptMails.length));
+                if (bits.length) {
+                    var sub = bits.join(" · ");
+                    $main.append($('<div class="vas_098-actsub"></div>')
+                        .text(sub).attr("title", sub));
+                }
             }
 
             // A line edit names the line it landed on, on the same sub-line. The
@@ -1867,15 +2085,23 @@
 
             // Rows carrying a body are clickable; the caret shows the state.
             if (hasActivityBody(a)) {
-                $row.addClass("vas_098-openable")
-                    .attr("title", msg("ShowMailBody", "Click to read the message"));
+                // A meeting or task opens onto the e-mails sent about it; every
+                // other openable row onto its own message.
+                var isAppt = (a.Type === "appointment" || a.Type === "task");
+                var showHint = isAppt
+                    ? msg("ShowMails", "Click to read the e-mails")
+                    : msg("ShowMailBody", "Click to read the message");
+                var hideHint = isAppt
+                    ? msg("HideMails", "Click to hide the e-mails")
+                    : msg("HideMailBody", "Click to hide the message");
+
+                $row.addClass("vas_098-openable").attr("title", showHint);
                 $row.on("click", function () {
                     var $panel = $row.next(".vas_098-actbody");
                     if (!$panel.length) return;
                     var nowOpen = !$row.hasClass("vas_098-open");
                     $row.toggleClass("vas_098-open", nowOpen)
-                        .attr("title", nowOpen ? msg("HideMailBody", "Click to hide the message")
-                                               : msg("ShowMailBody", "Click to read the message"));
+                        .attr("title", nowOpen ? hideHint : showHint);
                     $panel.toggle(nowOpen);
                 });
             }
@@ -1885,8 +2111,29 @@
 
         // Only an e-mail carries a body worth opening; a mail stored without one
         // stays a plain, non-clickable row.
+        // A letter opens like a mail: it is the same record in the same table,
+        // with the same body and the same addresses on it.
+        // A meeting or task opens onto the e-mails sent against it instead.
         function hasActivityBody(a) {
-            return !!(a && a.Type === "email" && a.Body && String(a.Body).trim());
+            if (!a) return false;
+            if (a.Type === "email" || a.Type === "letter") {
+                return !!(a.Body && String(a.Body).trim());
+            }
+            if (a.Type === "appointment" || a.Type === "task") {
+                return activityMails(a).length > 0;
+            }
+            return false;
+        }
+
+        // The e-mails sent against an appointment or task (MailAttachment1 keyed
+        // on AppointmentsInfo). Always an array, so callers can count and loop
+        // without guarding.
+        function activityMails(a) {
+            return (a && a.Mails && a.Mails.length) ? a.Mails : [];
+        }
+
+        function mailCountLabel(n) {
+            return n + " " + (n === 1 ? msg("Email", "email") : msg("Emails", "emails"));
         }
 
         // The e-mail body, collapsed beneath its activity row. The full recipient
@@ -1896,12 +2143,53 @@
             if (!hasActivityBody(a)) return null;
 
             var $panel = $('<div class="vas_098-actbody" style="display:none;"></div>');
+
+            // An appointment or task opens onto the e-mails sent about it, each
+            // with its own recipient, subject, moment and sender. They are listed
+            // newest first (model order).
+            if (a.Type === "appointment" || a.Type === "task") {
+                var mails = activityMails(a);
+                for (var i = 0; i < mails.length; i++) {
+                    $panel.append(activityMailEntry(mails[i], i > 0));
+                }
+                return $panel;
+            }
+
             appendMailMeta($panel, "MailFrom", "From:", a.MailFrom);
             appendMailMeta($panel, "MailTo",   "To:",   a.MailTo);
             appendMailMeta($panel, "MailCc",   "Cc:",   a.MailCc);
             appendMailMeta($panel, "MailBcc",  "Bcc:",  a.MailBcc);
             $panel.append($('<p></p>').text(String(a.Body).trim()));
             return $panel;
+        }
+
+        // One e-mail inside an appointment's or task's drawer: who it went to and
+        // what it was about, then when and by whom, then the message. Separated
+        // from the one before it so several notices do not read as one.
+        function activityMailEntry(m, separated) {
+            var $wrap = $('<div class="vas_098-actmailitem"></div>');
+            if (separated) $wrap.addClass("vas_098-actmailsplit");
+
+            appendMailMeta($wrap, "MailTo", "To:", m.MailTo);
+            appendMailMeta($wrap, "MailSubject", "Subject:",
+                (m.Subject && String(m.Subject).trim())
+                    ? m.Subject : msg("NoSubject", "(no subject)"));
+
+            // "when · by whom", the same two parts in the same order as the row
+            // above it.
+            var when = formatDateTime(m.SentOn);
+            if (m.SentBy) {
+                when = when ? when + " · " + msg("By", "by") + " " + m.SentBy
+                            : msg("By", "by") + " " + m.SentBy;
+            }
+            if (when) $wrap.append($('<div class="vas_098-actmeta"></div>').text(when));
+
+            // The body is the thing the click was for; a mail filed without one
+            // still shows its envelope rather than an empty gap.
+            if (m.Body && String(m.Body).trim()) {
+                $wrap.append($('<p></p>').text(String(m.Body).trim()));
+            }
+            return $wrap;
         }
 
         function appendMailMeta($panel, key, fallback, value) {
@@ -1985,6 +2273,15 @@
             // beneath (activityRow).
             if (a.Type === "updated" && a.FieldName) {
                 return msg("ActFieldUpdated", "Updated") + " " + a.FieldName;
+            }
+
+            // A meeting, task, call or letter headlines with its own subject, note
+            // or title. Where it carries none the KIND stands in — a call with no
+            // note reads "Call", not the comment wording the default below would
+            // otherwise lend it.
+            if (ACT_SOURCE_TYPES.hasOwnProperty(a.Type)) {
+                var src = ACT_BADGE[a.Type];
+                return (a.Text || "").trim() || msg(src.key, src.fallback);
             }
 
             return a.Text || msg("ActComment");

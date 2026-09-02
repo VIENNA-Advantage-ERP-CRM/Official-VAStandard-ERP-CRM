@@ -70,6 +70,8 @@
  *                        LOCATION; Withholding Details section added; direction
  *                        wording moved onto isReceiptDoc() (DocBaseType 'ARR'
  *                        fallback) so a receipt never reads "Paid".
+ *   VAI145   2026-08-18  Send action hidden when the payment carries no
+ *                        C_BPartner_ID - there is no recipient to resolve.
  *
  * -- Labels / Message Keys ---------------------------------------------------
  *  Panel, header and summary cards
@@ -1080,7 +1082,9 @@
            Send / Download PDF both run off the tab's print process, so they share
            one enablement test: nothing can be printed or mailed without it. They
            are drawn disabled rather than hidden, so the user can see the action
-           exists and why it is unavailable. */
+           exists and why it is unavailable. The ONE exception is Send on a
+           partner-less payment, which is dropped from the bar entirely - see
+           below. */
         function renderActions() {
             var $row = $('<div class="' + CLS + 'actions"></div>');
             
@@ -1094,15 +1098,23 @@
                reference's neutral ghost treatment - they are utilities, not
                document actions. */
             var canPrint = hasPrintProcess();
-            /* The send action names the document it sends, and that differs by
-               direction: money coming IN is acknowledged with a remittance, money
-               going OUT is announced with a payment advice. */
-            var sendLabel = isReceiptDoc()
-                ? msg("VAS_191_EmailRemittance", "Email Remittance")
-                : msg("VAS_191_SendPaymentAdvice", "Send Payment Advice");
-            $row.append(actionPill("send", sendLabel, function () {
-                sendPaymentEmail();
-            }, "ghost", !canPrint));
+            /* Send is HIDDEN, not merely disabled, on a payment with no business
+               partner: VAS_SentEmailDoc resolves the recipient on the server from
+               C_BPartner_ID -> AD_User, so without a partner there is nobody for
+               the mail to go to. A disabled pill would advertise an action this
+               document can never offer; the print process, which needs no
+               recipient, keeps Download PDF in the bar. */
+            if (hasBPartner()) {
+                /* The send action names the document it sends, and that differs by
+                   direction: money coming IN is acknowledged with a remittance,
+                   money going OUT is announced with a payment advice. */
+                var sendLabel = isReceiptDoc()
+                    ? msg("VAS_191_EmailRemittance", "Email Remittance")
+                    : msg("VAS_191_SendPaymentAdvice", "Send Payment Advice");
+                $row.append(actionPill("send", sendLabel, function () {
+                    sendPaymentEmail();
+                }, "ghost", !canPrint));
+            }
             $row.append(actionPill("download", msg("VAS_191_DownloadPDF", "Download PDF"), function () {
                 downloadPaymentPDF();
             }, "ghost", !canPrint));
@@ -1352,6 +1364,10 @@
            the panel does not need a contact column on C_Payment. */
         function sendPaymentEmail() {
             if (!$self.record_ID || !$self.curTab) return;
+            /* No partner, no recipient - the same test that keeps the pill out of
+               the action bar, repeated here because the bar is not the only way
+               into this function. */
+            if (!hasBPartner()) return;
             if (!VAS.VAS_SentEmailDoc || typeof VAS.VAS_SentEmailDoc.sendEmail !== "function") {
                 error(msg("VAS_191_ActionFailed", "The action could not be completed."));
                 return;
@@ -1370,8 +1386,8 @@
                 AD_Table_ID: pc.AD_Table_ID,
                 RecordID: pc.RecordID,
                 AD_Window_ID: pc.AD_Window_ID,
-                Name: "",
-                EMailID: ""
+                Name: data.BPName,
+                EMailID: data.BPEMail
             });
         }
 

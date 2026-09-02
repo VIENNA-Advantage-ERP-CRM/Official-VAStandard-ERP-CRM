@@ -54,8 +54,16 @@
         var $busy;
         var $pills;
 
+// ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
         var selectedMonthsWindow = 6;
         var seriesData = [];
+        var currencyIso = '';
+        var currencySymbol = '';
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//      var selectedMonthsWindow = 6;
+//      var seriesData = [];
+// ----- END OLD CODE -----
 
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
@@ -83,15 +91,67 @@
             return n.toLocaleString(window.navigator.language);
         }
 
-        function formatINR(value) {
-            var val = Number(value || 0);
-            if (val >= 100000) {
-                return '₹' + (val / 100000).toFixed(1) + 'L';
-            } else if (val >= 1000) {
-                return '₹' + (val / 1000).toFixed(1) + 'k';
-            }
-            return '₹' + val.toLocaleString(window.navigator.language);
+// ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
+        var INDIAN_ISOS = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function isIndianIso(iso) {
+            var code = String(iso || '').toUpperCase();
+            return INDIAN_ISOS.indexOf(code) >= 0;
         }
+
+        function formatCompactValue(value) {
+            var val = Number(value || 0);
+            var absVal = Math.abs(val);
+            var sign = val < 0 ? '-' : '';
+            var sym = currencySymbol || '';
+
+            if (typeof VIS !== 'undefined' && VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
+                var compactStr = VIS.Util.formatCompactAmount(val, currencyIso, 1);
+                return sign + sym + compactStr;
+            }
+
+            if (isIndianIso(currencyIso)) {
+                if (absVal >= 10000000) {
+                    return sign + sym + (absVal / 10000000).toFixed(1) + 'Cr';
+                } else if (absVal >= 100000) {
+                    return sign + sym + (absVal / 100000).toFixed(1) + 'L';
+                } else if (absVal >= 1000) {
+                    return sign + sym + (absVal / 1000).toFixed(1) + 'k';
+                }
+            } else {
+                if (absVal >= 1000000000) {
+                    return sign + sym + (absVal / 1000000000).toFixed(1) + 'B';
+                } else if (absVal >= 1000000) {
+                    return sign + sym + (absVal / 1000000).toFixed(1) + 'M';
+                } else if (absVal >= 1000) {
+                    return sign + sym + (absVal / 1000).toFixed(1) + 'k';
+                }
+            }
+            return sign + sym + absVal.toLocaleString(window.navigator.language);
+        }
+
+        function formatFullValue(value) {
+            var val = Number(value || 0);
+            var sign = val < 0 ? '-' : '';
+            var absVal = Math.abs(val);
+            var sym = currencySymbol || '';
+            return sign + sym + absVal.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//      function formatINR(value) {
+//          var val = Number(value || 0);
+//          if (val >= 100000) {
+//              return '₹' + (val / 100000).toFixed(1) + 'L';
+//          } else if (val >= 1000) {
+//              return '₹' + (val / 1000).toFixed(1) + 'k';
+//          }
+//          return '₹' + val.toLocaleString(window.navigator.language);
+//      }
+// ----- END OLD CODE -----
 
         function showBusy(show) {
             if (!$busy || !$busy[0]) { return; }
@@ -130,9 +190,20 @@
                 data: { months: selectedMonthsWindow },
                 cache: false,
                 success: function (res) {
+// ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
                     var data = parseResponse(res);
                     seriesData = data.series || [];
+                    if (data.currency) {
+                        currencyIso = data.currency.iso || '';
+                        currencySymbol = data.currency.symbol || '';
+                    }
                     renderChart();
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                  var data = parseResponse(res);
+//                  seriesData = data.series || [];
+//                  renderChart();
+// ----- END OLD CODE -----
                 },
                 error: function () {
                     seriesData = [];
@@ -207,11 +278,19 @@
                 rect.setAttribute('cursor', 'pointer');
                 rect.setAttribute('data-idx', j);
 
+// ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
                 var titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
                 titleEl.textContent = item.fullMonth + ': ' + label("VAS_185_Qty", "Qty") + ' ' + formatQty(item.qty)
                     + ', ' + label("VAS_185_Value", "Value") + ' ' + formatINR(item.val);
                 rect.appendChild(titleEl);
                 $svg.append(rect);
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//              var titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+//              titleEl.textContent = item.fullMonth + ': Qty ' + formatQty(item.qty) + ', Value ' + formatINR(item.val);
+//              rect.appendChild(titleEl);
+//              $svg.append(rect);
+// ----- END OLD CODE -----
 
                 // Qty inline label on 3M/6M
                 if (selectedMonthsWindow <= 6 && item.qty > 0) {
@@ -272,10 +351,32 @@
                 circle.setAttribute('cursor', 'pointer');
                 circle.setAttribute('data-idx', pt.idx);
 
+// ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
                 var titlePt = document.createElementNS('http://www.w3.org/2000/svg', 'title');
                 titlePt.textContent = pt.item.fullMonth + ': ' + label("VAS_185_Value", "Value") + ' ' + formatINR(pt.item.val);
                 circle.appendChild(titlePt);
                 $svg.append(circle);
+
+                // Value inline label on 3M/6M
+                if (selectedMonthsWindow <= 6 && pt.item.val > 0) {
+                    var textVal = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    var textY = (pt.y - 8 < padTop) ? pt.y + 14 : pt.y - 6;
+                    textVal.setAttribute('x', pt.x);
+                    textVal.setAttribute('y', textY);
+                    textVal.setAttribute('text-anchor', 'middle');
+                    textVal.setAttribute('font-size', '9');
+                    textVal.setAttribute('font-weight', '700');
+                    textVal.setAttribute('fill', '#9A6500');
+                    textVal.textContent = formatCompactValue(pt.item.val);
+                    $svg.append(textVal);
+                }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//              var titlePt = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+//              titlePt.textContent = pt.item.fullMonth + ': Value ' + formatINR(pt.item.val);
+//              circle.appendChild(titlePt);
+//              $svg.append(circle);
+// ----- END OLD CODE -----
             }
         }
 
@@ -287,10 +388,18 @@
             var item = seriesData[idx];
             if (!item) { return; }
 
+// ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
             $popover.find('.vas-iut-pop-title').text(item.fullMonth);
             $popover.find('.vas-iut-pop-qty').text(formatQty(item.qty));
-            $popover.find('.vas-iut-pop-val').text(formatINR(item.val));
+            $popover.find('.vas-iut-pop-val').text(formatFullValue(item.val)).attr('title', formatFullValue(item.val) + ' (' + item.val + ')');
             $popover.find('.vas-iut-pop-docs').text(item.docs || 0);
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//          $popover.find('.vas-iut-pop-title').text(item.fullMonth);
+//          $popover.find('.vas-iut-pop-qty').text(formatQty(item.qty));
+//          $popover.find('.vas-iut-pop-val').text(formatINR(item.val));
+//          $popover.find('.vas-iut-pop-docs').text(item.docs || 0);
+// ----- END OLD CODE -----
 
             // Nested in the card this inherited the card's font-size; on <body> it must be copied
             // across so the em-based inner sizing renders at the original scale.

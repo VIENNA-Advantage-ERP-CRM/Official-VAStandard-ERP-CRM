@@ -1213,3 +1213,71 @@
     margin: 0;
     color: #0B6B45;
 }
+
+/* ============================================================================
+   Receive-lines attribute picker (2026-08-18).
+   The Attribute cell was a plain read-only span; it is now a button that opens
+   VIS.PAttributesForm for products whose attribute set yields an instance.
+   Products without an attribute set keep the plain text rendering.
+   ============================================================================ */
+.vas-ra-attr-plain {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-ra-attr-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    max-width: 100%;
+    font-family: inherit;
+    font-size: 0.9em;
+    color: #0083DA;
+    background: #FFFFFF;
+    border: 1px dashed #9ED1FF;
+    border-radius: 0.4em;
+    padding: 0.2em 0.5em;
+    cursor: pointer;
+    outline: none;
+}
+
+    .vas-ra-attr-btn:hover {
+        background: #EEF8FF;
+        border-color: #0083DA;
+    }
+
+    /* An instance is set: solid border, neutral text - it reads as data, not as an action. */
+    .vas-ra-attr-btn.vas-ra-attr-set {
+        border-style: solid;
+        border-color: #D9E2EB;
+        color: #102C3F;
+    }
+
+    /* Mandatory attribute still missing - this line blocks the GRN. */
+    .vas-ra-attr-btn.vas-ra-attr-missing {
+        border-style: solid;
+        border-color: #A33F3F;
+        background: #FCEFEF;
+        color: #A33F3F;
+        font-weight: 500;
+    }
+
+.vas-ra-attr-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-ra-attr-flag {
+    flex: 0 0 auto;
+    width: 1.1em;
+    height: 1.1em;
+    border-radius: 50%;
+    background: #A33F3F;
+    color: #FFFFFF;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1.1em;
+    text-align: center;
+}

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Web.Mvc;
+using System.Data.SqlClient;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
@@ -170,9 +171,66 @@ namespace VIS.Controllers
                     });
                 }
 
-                return Json(JsonConvert.SerializeObject(new { series = series, success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
+                return Json(JsonConvert.SerializeObject(new { series = series, currency = GetCurrencyInfo(ctx), success = true }), JsonRequestBehavior.AllowGet);
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//              return Json(JsonConvert.SerializeObject(new { series = series, success = true }), JsonRequestBehavior.AllowGet);
+// ----- END OLD CODE -----
             }
         }
+
+// ===== NEW CODE START — currency format (agent A07, 2026-08-19) =====
+        /// <summary>
+        /// Retrieves currency ISO code and symbol based on session $C_Currency_ID or C_AcctSchema fallback.
+        /// </summary>
+        private object GetCurrencyInfo(Ctx ctx)
+        {
+            string iso = "";
+            string symbol = "";
+            int currencyId = ctx != null ? ctx.GetContextAsInt("$C_Currency_ID") : 0;
+            if (currencyId > 0)
+            {
+                IDataReader cdr = null;
+                try
+                {
+                    cdr = DB.ExecuteReader(
+                        "SELECT ISO_Code, CurSymbol FROM C_Currency WHERE C_Currency_ID = @Cur",
+                        new SqlParameter[] { new SqlParameter("@Cur", currencyId) });
+                    if (cdr != null && cdr.Read())
+                    {
+                        iso = Util.GetValueOfString(cdr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                    }
+                }
+                finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
+            }
+
+            if (string.IsNullOrEmpty(iso) && ctx != null)
+            {
+                int clientId = ctx.GetAD_Client_ID();
+                IDataReader cdr = null;
+                try
+                {
+                    cdr = DB.ExecuteReader(
+                        @"SELECT c.ISO_Code, c.CurSymbol 
+                          FROM AD_ClientInfo ci 
+                          INNER JOIN C_AcctSchema ac ON (ac.C_AcctSchema_ID = ci.C_AcctSchema1_ID) 
+                          INNER JOIN C_Currency c ON (c.C_Currency_ID = ac.C_Currency_ID) 
+                          WHERE ci.AD_Client_ID = @Client",
+                        new SqlParameter[] { new SqlParameter("@Client", clientId) });
+                    if (cdr != null && cdr.Read())
+                    {
+                        iso = Util.GetValueOfString(cdr["ISO_Code"]);
+                        symbol = Util.GetValueOfString(cdr["CurSymbol"]);
+                    }
+                }
+                finally { if (cdr != null) { cdr.Close(); cdr.Dispose(); } }
+            }
+
+            return new { iso = iso, symbol = symbol };
+        }
+// ===== NEW CODE END — currency format =====
 
         private static string ToSqlDate(DateTime date)
         {

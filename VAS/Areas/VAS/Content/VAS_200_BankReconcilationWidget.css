@@ -1,0 +1,922 @@
+/* VAS_200_BankReconcilationWidget.css
+   Bank Reconciliation (Period Control dashboard, 6x2).
+   Design source: design.md -> dashboard-widgets.md (Widget Header, Glass Widget,
+   Grid Data Widget, Row And Header Separators, Adaptive Row Count, No Inner
+   Scrollbars, Widget Footer Pager). All internal sizing is em-driven off the
+   widget root anchor; borders, radii and shadows stay in px because they are
+   physical edges ("Not Scaled With em"). */
+
+.vas-200-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container (mirrors VAS_192 / VAS_196 / VAS_199) so a narrow or
+       zoomed-in cell can step the card base font below its 16px clamp floor, and
+       so the card's own breakpoints can query ITS width rather than the viewport. */
+    container: vas-200 / inline-size;
+}
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Everything inside is em against this. */
+.vas-200-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: .875em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    box-sizing: border-box;
+    /* No inner scrollbars: the accounts list pages what does not fit. */
+    overflow: hidden;
+}
+
+/* ---- Header: icon well + title / subtitle + period chip ----
+   Well and glyph are driven off the same --dash-inline-size lever as the title
+   (2x and ~1.1x the title clamp) so the header stays balanced at every width. */
+.vas-200-header {
+    display: flex;
+    align-items: center;
+    gap: .625em;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: .625em;
+}
+
+.vas-200-icon {
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * .022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * .022750), 40px);
+    flex: 0 0 auto;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+.vas-200-icon svg {
+    width: clamp(18px, calc(var(--dash-inline-size, 100vw) * .012500), 22px);
+    height: clamp(18px, calc(var(--dash-inline-size, 100vw) * .012500), 22px);
+}
+
+.vas-200-head-text {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-200-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-200-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    /* Fixed 2px pairs the two lines at every width (Widget Header rule). */
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Period chip: names the period every figure belongs to, opens the picker ---- */
+.vas-200-periodchip {
+    flex: 0 0 auto;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: .3em;
+    max-width: 30%;
+    font-family: inherit;
+    font-size: .625em;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #0083DA;
+    background: rgba(0, 131, 218, .08);
+    border: 1px solid #BFE4FF;
+    border-radius: 999px;
+    padding: .32em .6em;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.vas-200-periodchip:hover {
+    background: rgba(0, 131, 218, .14);
+}
+
+.vas-200-periodchip svg {
+    width: 1em;
+    height: 1em;
+    flex: 0 0 auto;
+}
+
+.vas-200-periodchip-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-200-periodchip:focus-visible {
+    outline: 2px solid #BFE4FF;
+    outline-offset: 1px;
+}
+
+/* ---- Body: two columns split by a hairline rule ---- */
+.vas-200-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas-200-split {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    /* 1px rule between two equal columns - a real track, so neither column can
+       borrow width from the divider. */
+    grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+    gap: .9em;
+}
+
+.vas-200-vr {
+    background: #EDF2F6;
+}
+
+.vas-200-col {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Section label above each column. */
+.vas-200-seclabel {
+    flex: 0 0 auto;
+    font-size: .6875em;
+    font-weight: 700;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    line-height: 1.3;
+    margin-bottom: .15em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-200-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* One row on either side. Row cells sit one step below the widget title (List /
+   Grid Hierarchy Rule); the separator carries the scan-down rhythm and is never
+   optional - only the last row drops it. */
+.vas-200-row {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    padding: .5em .35em;
+    border-bottom: 1px solid #E2EAF1;
+    cursor: pointer;
+    border-radius: 6px;
+}
+
+.vas-200-row:last-child {
+    border-bottom: 0;
+}
+
+.vas-200-row:hover {
+    background: rgba(0, 131, 218, .06);
+}
+
+.vas-200-row:focus-visible {
+    outline: 2px solid #BFE4FF;
+    outline-offset: -2px;
+}
+
+.vas-200-cell-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-200-cell-name {
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-200-cell-meta {
+    font-size: .6875em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.3;
+    margin-top: .1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-200-cell-count {
+    flex: 0 0 auto;
+    font-size: .875em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+.vas-200-cell-status {
+    flex: 0 0 auto;
+    font-size: .6875em;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Tone carries the operational reading. Applied to the count, the status word and
+   the meta line alike, so colour and label can never disagree. */
+.vas-200-tone-ok {
+    color: #20A464;
+}
+
+.vas-200-tone-warn {
+    color: #D78B10;
+}
+
+.vas-200-tone-fail {
+    color: #D14545;
+}
+
+.vas-200-tone-plain {
+    color: #102C3F;
+}
+
+.vas-200-rowchev {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    color: #9DB2C2;
+}
+
+.vas-200-rowchev svg {
+    width: 1em;
+    height: 1em;
+}
+
+/* Load error / empty state takes over a column. */
+.vas-200-state {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: .5em;
+    font-size: .75em;
+    color: #748494;
+    line-height: 1.4;
+}
+
+.vas-200-state-error {
+    color: #D14545;
+}
+
+/* ---- Accounts pager: the canonical widget footer pager, under its column ---- */
+.vas-200-acc-pager {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+}
+
+.vas-200-acc-pager:empty {
+    display: none;
+}
+
+.vas-200-acc-pager .vas-200-pager-info {
+    font-size: .75em;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-200-pager-nav {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vas-200-pager-label {
+    font-size: .8125em;
+    font-weight: 500;
+    color: #102C3F;
+    min-width: 3.5em;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.vas-200-pgbtn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, .7);
+    color: #0083DA;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-200-pgbtn:hover:not(:disabled) {
+    background: #EAF8FF;
+}
+
+.vas-200-pgbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+}
+
+.vas-200-pgbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ---- Busy overlay ---- */
+.vas-200-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .45);
+    border-radius: 14px;
+    z-index: 2;
+}
+
+.vas-200-hidden {
+    display: none !important;
+}
+
+/* ==========================================================
+   Period picker — anchored under the chip, appended to <body>
+   A menu, not a dialog: it closes on an outside click, on Escape and on any
+   layout change. It is a document-baseline surface, not part of the widget's em
+   scale, so it declares its own anchor.
+   ========================================================== */
+.vas-200-pp {
+    position: fixed;
+    /* Same narrow band the sibling Period Control popovers use: above the glass
+       cards, below every framework layer (jQuery UI .ui-front = 100, dialogs 101+). */
+    z-index: 95;
+    box-sizing: border-box;
+    min-width: 190px;
+    max-width: calc(100vw - 16px);
+    max-height: 60vh;
+    overflow: auto;
+    padding: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(8, 24, 38, .22);
+/*    font-family: Roboto, sans-serif;*/
+    color: #102C3F;
+}
+
+.vas-200-pp-h {
+    font-size: .6875rem;
+    font-weight: 700;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 8px 10px 4px;
+}
+
+.vas-200-pp-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .875rem;
+    color: #102C3F;
+    padding: 9px 10px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+.vas-200-pp-opt:hover {
+    background: #EAF8FF;
+}
+
+.vas-200-pp-opt[aria-selected="true"] {
+    background: #EAF8FF;
+    font-weight: 700;
+    color: #0083DA;
+}
+
+.vas-200-pp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-200-pp-meta {
+    flex: 0 0 auto;
+    font-size: .75rem;
+    font-weight: 400;
+    color: #748494;
+}
+
+.vas-200-pp-tick {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+    color: #0083DA;
+    opacity: 0;
+}
+
+.vas-200-pp-opt[aria-selected="true"] .vas-200-pp-tick {
+    opacity: 1;
+}
+
+.vas-200-pp-tick svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ==========================================================
+   Detail modal — the payments behind one row
+   A real dialog: modal scrim, Escape / scrim / close button dismiss. Server-side
+   paged, and its body height is pinned to one page so the panel never resizes
+   between pages, categories or states.
+   ========================================================== */
+.vas-200-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 96;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(8, 24, 38, .45);
+}
+
+.vas-200-modal {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(940px, 100%);
+    max-height: 82vh;
+    overflow: hidden;
+    background: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(8, 24, 38, .3);
+    /*font-family: Roboto, sans-serif;*/
+    color: #102C3F;
+}
+
+/* Busy layer over the whole panel - shown from the moment the dialog opens and on
+   every page turn, so the user never faces an empty box. */
+.vas-200-modal-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .6);
+    border-radius: 16px;
+    z-index: 1;
+}
+
+.vas-200-modal-head {
+    flex: 0 0 auto;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    border-bottom: 1px solid #E4EDF4;
+}
+
+/* The card's header glyph carried into the dialog. Fixed px rather than the
+   card's --dash-inline-size clamp: the dialog is a document-baseline surface. */
+.vas-200-modal-ico {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+.vas-200-modal-ico svg {
+    width: 18px;
+    height: 18px;
+}
+
+.vas-200-modal-heads {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-200-modal-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-200-modal-sub {
+    font-size: .8125rem;
+    font-weight: 400;
+    color: #5F7283;
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-200-modal-close {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    color: #141414;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+.vas-200-modal-close:hover {
+    background: #F0F4F8;
+}
+
+.vas-200-modal-close svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* The body is pinned to one page's worth of rows by an inline height the widget
+   sets from the page size. min-height:0 stays so the flex item can still shrink
+   under the dialog's 82vh cap on a short viewport. scrollbar-gutter reserves the
+   scrollbar's width whether or not it is showing - without it a page that scrolls
+   and a page that does not would render the columns at two different widths. */
+.vas-200-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+    padding: 6px 20px 16px;
+}
+
+.vas-200-modal-state {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: .875rem;
+    color: #748494;
+}
+
+.vas-200-modal-state-error {
+    color: #D14545;
+}
+
+/* ---- Detail grid: ONE shared column template for the header and every row ----
+   minmax(0, Nfr) only, so the columns line up down the list and no cell can blow
+   the row out of the panel (Column Sizing And Truncation). */
+.vas-200-dhead,
+.vas-200-drow {
+    display: grid;
+    /* Amount gets the widest share after the partner name and the account: it
+       carries a currency symbol plus grouped digits at that currency's own
+       precision, and it is the one column where truncating misleads. */
+    grid-template-columns:
+        minmax(0, 1.1fr) minmax(0, .85fr) minmax(0, .75fr)
+        minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 1.3fr);
+    gap: 12px;
+    align-items: center;
+}
+
+/* Header separator is darker than the body row separator - it is a section
+   boundary, not another row divider. */
+.vas-200-dhead {
+    position: sticky;
+    top: 0;
+    background: #FFFFFF;
+    padding: 11px 0;
+    border-bottom: 1px solid #C5D2DD;
+    font-size: .8125rem;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+}
+
+.vas-200-drow {
+    padding: 12px 0;
+    border-bottom: 1px solid #E2EAF1;
+    font-size: .875rem;
+}
+
+.vas-200-drow:last-child {
+    border-bottom: 0;
+}
+
+/* Every cell truncates and carries its raw value in `title` - clipping is
+   acceptable, loss of information is not. */
+.vas-200-dcell {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #5F7283;
+}
+
+.vas-200-dcell-b {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+/* Numeric columns right-aligned so values line up across rows - header included,
+   otherwise the caption floats away from its own column. */
+.vas-200-dcell-amt {
+    text-align: right;
+}
+
+/* Regular weight, dark text: the alignment carries the column without shouting
+   over the document number, which is the row's identity. */
+.vas-200-drow .vas-200-dcell-amt {
+    font-weight: 400;
+    color: #102C3F;
+}
+
+/* Document number = the zoom affordance. Styled as a link, built as a button: it
+   opens a window rather than following a URL. */
+.vas-200-dcell-doc {
+    display: block;
+}
+
+.vas-200-doclink {
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    line-height: inherit;
+    color: #106AB0;
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-200-doclink:hover {
+    text-decoration: underline;
+    color: #0083DA;
+}
+
+.vas-200-doclink:focus-visible {
+    outline: 2px solid #BFE4FF;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* ---- Modal footer: the canonical widget pager, in the dialog ----
+   Always present, even on the empty and error states (with both arrows disabled)
+   - a footer that came and went would change the dialog's height. */
+.vas-200-modal-foot {
+    flex: 0 0 auto;
+    min-height: 49px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+    border-top: 1px solid #D9E2EB;
+}
+
+.vas-200-modal-foot .vas-200-pager-info {
+    font-size: .8125rem;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-200-modal-foot .vas-200-pager-label {
+    font-size: .8125rem;
+}
+
+/* ==========================================================
+   Responsive
+   Two different mechanisms, deliberately:
+
+   • The CARD uses CONTAINER queries against its own named container (`vas-200`,
+     declared on .vas-200-root). What matters to the card is how wide ITS CELL is
+     - a 6-span cell is ~790px on a 1208px dashboard but far narrower once a
+     sidebar and a right panel are both open, at the very same viewport width.
+     A media query cannot see that; a container query can.
+
+   • The MODAL and the PERIOD PICKER use MEDIA queries. Both are appended to
+     <body>, outside the widget's container, so they have no container to resolve
+     against - the viewport is genuinely what bounds them.
+
+   Both only ever REMOVE ornament or tighten spacing, or - in the modal - drop the
+   least load-bearing column. No breakpoint hides a count, a status or an amount.
+   ========================================================== */
+
+/* ---- Card: the two columns stop fitting side by side ---- */
+@container vas-200 (max-width: 560px) {
+
+    /* Stacked, with the rule turned into a horizontal divider between the two
+       halves. The accounts list keeps its pager, so nothing is lost - there is
+       simply less room for it, and the adaptive row count absorbs that. */
+    .vas-200-split {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) 1px minmax(0, 1fr);
+        gap: .5em;
+    }
+}
+
+/* ---- Card: narrow cell ---- */
+@container vas-200 (max-width: 400px) {
+
+    .vas-200-header {
+        gap: .5em;
+    }
+
+    .vas-200-periodchip {
+        max-width: 38%;
+        padding: .3em .5em;
+    }
+
+    .vas-200-row {
+        padding: .4em .3em;
+    }
+
+    /* The range helper folds away first; the arrows and "n of m" stay. */
+    .vas-200-acc-pager .vas-200-pager-info {
+        display: none;
+    }
+
+    .vas-200-acc-pager {
+        justify-content: flex-end;
+    }
+}
+
+/* ---- Card: very narrow cell ---- */
+@container vas-200 (max-width: 300px) {
+
+    /* The title alone identifies the card at this width. */
+    .vas-200-subtitle {
+        display: none;
+    }
+
+    /* The calendar glyph goes; the chevron still says "this opens". */
+    .vas-200-periodchip svg:first-child {
+        display: none;
+    }
+
+    .vas-200-seclabel {
+        letter-spacing: .04em;
+    }
+}
+
+/* ==========================================================
+   Modal / picker — viewport-driven
+   The detail grid drops columns as the viewport narrows, least-informative
+   first: Type (the bucket or account the modal was opened from already frames
+   these payments), then the accounting date (every row belongs to the one period
+   named in the dialog header). Document number, partner, the fifth column and the
+   amount survive every width - without those a row cannot be identified or
+   judged, and the amount is now the only one on the row.
+   Hiding a cell with display:none removes it from the grid flow, so the
+   remaining cells fill the shorter template in order.
+   ========================================================== */
+
+@media (max-width: 980px) {
+
+    .vas-200-overlay {
+        padding: 16px;
+    }
+
+    .vas-200-modal-body {
+        padding: 6px 14px 14px;
+    }
+
+    .vas-200-modal-head,
+    .vas-200-modal-foot {
+        padding: 10px 14px;
+    }
+
+    /* Tighten only - six columns still fit; nothing is dropped this early. */
+    .vas-200-dhead,
+    .vas-200-drow {
+        gap: 8px;
+    }
+}
+
+@media (max-width: 720px) {
+
+    .vas-200-overlay {
+        padding: 10px;
+    }
+
+    .vas-200-modal {
+        max-height: 90vh;
+        border-radius: 12px;
+    }
+
+    .vas-200-dhead,
+    .vas-200-drow {
+        font-size: .8125rem;
+        grid-template-columns:
+            minmax(0, 1.1fr) minmax(0, .85fr) minmax(0, 1.45fr)
+            minmax(0, 1.25fr) minmax(0, 1.35fr);
+    }
+
+    .vas-200-dhead > :nth-child(3),
+    .vas-200-drow > :nth-child(3) {
+        display: none;
+    }
+
+    .vas-200-modal-ico {
+        display: none;
+    }
+}
+
+@media (max-width: 500px) {
+
+    .vas-200-dhead,
+    .vas-200-drow {
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.4fr) minmax(0, 1.3fr) minmax(0, 1.35fr);
+    }
+
+    .vas-200-dhead > :nth-child(2),
+    .vas-200-drow > :nth-child(2) {
+        display: none;
+    }
+
+    .vas-200-modal-foot .vas-200-pager-info {
+        display: none;
+    }
+
+    .vas-200-modal-foot {
+        justify-content: flex-end;
+    }
+
+    .vas-200-pp {
+        min-width: 150px;
+        max-width: calc(100vw - 20px);
+    }
+}

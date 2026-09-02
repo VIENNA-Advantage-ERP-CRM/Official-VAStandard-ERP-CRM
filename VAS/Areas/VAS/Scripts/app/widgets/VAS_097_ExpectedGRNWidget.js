@@ -5,7 +5,7 @@
  *           quantity to receive. Each row shows PO number, supplier, ship-to
  *           address, destination warehouse, line count and PO value. A row click
  *           opens the shared GRN line-entry modal (Item | PO Qty | Received
- *           editable input, defaulting to open qty) whose "Select & Make GRN"
+ *           editable input, defaulting to open qty) whose "Create GRN"
  *           button creates and completes the receipt.
  * Backend - VAS_097_ExpectedGRNWidget/GetExpectedPurchaseOrders
  *           VAS_097_ExpectedGRNWidget/GetPurchaseOrderLines
@@ -28,10 +28,10 @@
  * 11  | Received                                          | VAS_Received
  * 12  | UOM                                               | VAS_Uom
  * 13  | Enter received quantity against each PO line...   | VAS_EnterReceivedQtyAgainstLine
- * 14  | Select & Make GRN                                 | VAS_SelectAndMakeGRN
+ * 14  | Create GRN                                       | VAS_097_CreateGRN
  * 15  | Received quantity cannot be negative.             | VAS_NegativeReceivedQty
  * 16  | Enter received quantity for at least one line.    | VAS_ReceivedQtyRequired
- * 17  | Received quantity cannot be greater than open...  | VAS_ReceivedQtyTooHigh
+ * 17  | Received quantity cannot be greater than order... | VAS_ReceivedQtyTooHigh
  * 18  | GRN could not be created.                         | VAS_GRNCouldNotBeCreated
  * 19  | Attribute                                         | VAS_Attribute
  * 20  | Purchase Order (modal document field)             | PurchaseOrder
@@ -85,7 +85,9 @@
         var rcvPageNo = 1;
         var lineEntry = {};
         var pageNo = 1;
-        var pageSize = 4;
+        /* Lines shown on the card before paging. */
+        var CARD_ROWS = 4;
+        var pageSize = CARD_ROWS;
         var totalPages = 0;
         var totalRecords = 0;
         var loading = false;
@@ -165,16 +167,13 @@
         }
 
         function measurePageSize() {
-            if (!$body || !$body[0]) { return pageSize; }
-
-            var $rows = $body.find('.vas-egrn-rows');
-            var listHeight = $rows.innerHeight();
-            var rowHeight = $rows.find('.vas-egrn-row').first().outerHeight(true) || 58;
-            if (!listHeight || !rowHeight) { return pageSize; }
-
-            /* Paged like the Material Receipt Register: at least 4 records on
-               the standard card; the count still grows with taller screens. */
-            return Math.max(4, Math.floor(listHeight / rowHeight));
+            /* The card ALWAYS shows CARD_ROWS lines; anything beyond that pages.
+               The count is fixed rather than measured so the layout is predictable at every
+               resolution - the rows themselves flex to share the list height (see the CSS
+               .vas-egrn-rows > .vas-egrn-row rule), so 4 rows fill the card exactly whether it is
+               rendered on a 1080p or a 4K screen. Because the count is a constant there is no
+               measure-then-resize feedback loop. */
+            return CARD_ROWS;
         }
 
         function syncPageSize() {
@@ -561,7 +560,7 @@
                 '<div class="vas-egrn-rcv-viewport"><div class="vas-egrn-lines">' + rows + '</div></div>' +
                 linePagerHtml(rcvPageNo, totalPages, currentLines.length, rcvPageSize) +
                 '<div class="vas-egrn-error vas-egrn-hidden"></div>' +
-                '<div class="vas-egrn-action"><button type="button" class="vas-egrn-create-btn">' + checkIcon() + '<span>' + escapeHtml(lbl("VAS_SelectAndMakeGRN", "Select & Make GRN")) + '</span></button></div>'
+                '<div class="vas-egrn-action"><button type="button" class="vas-egrn-create-btn">' + checkIcon() + '<span>' + escapeHtml(lbl("VAS_097_CreateGRN", "Create GRN")) + '</span></button></div>'
             );
 
             validateLines();
@@ -625,7 +624,7 @@
                 }
                 if (qty > openQty) {
                     invalid = true;
-                    message = lbl("VAS_ReceivedQtyTooHigh", "Received quantity cannot be greater than open quantity.");
+                    message = lbl("VAS_ReceivedQtyTooHigh", "Received quantity cannot be greater than ordered quantity.");
                     break;
                 }
                 if (qty > 0) {

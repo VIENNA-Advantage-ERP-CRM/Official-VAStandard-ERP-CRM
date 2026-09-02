@@ -12,6 +12,28 @@
  *                  One write action is wired to the server (never mutate
  *                  documents from the browser): Create Contract from a service /
  *                  charge line (CreateContract).
+ *
+ * ── Labels / Message Keys ──────────────────────────────────────────────
+ *  Every visible string goes through getMsg("VAS_106_<Key>", "<English>"):
+ *  the AD_Message text wins, and the second argument is the fallback for a key
+ *  this client has not seeded, so the panel never renders a raw key.
+ *
+ *  Added / changed 2026-08-20 — these are the codes to seed:
+ *
+ *  #  | Current Text          | Message Key                 | MsgText
+ * ----+-----------------------+-----------------------------+----------------------
+ *  1  | Order Total           | VAS_106_OrderTotal          | Order Total
+ *  2  | Exclusive Taxes       | VAS_106_ExclTax             | Exclusive Taxes
+ *  3  | Fully delivered       | VAS_106_FullyDelivered      | Fully delivered
+ *  4  | Partially delivered   | VAS_106_PartiallyDelivered  | Partially delivered
+ *  5  | Ready to ship         | VAS_106_ReadyToShip         | Ready to ship
+ *  6  | Short by              | VAS_106_ShortBy             | Short by
+ *
+ *  (1) and (6) already existed and are unchanged — listed because the Order
+ *  Total card and the Readiness column are what these keys now caption together.
+ *  VAS_106_InclTax ("incl. tax") is no longer used by any string on the panel:
+ *  the Order Total card states the NET amount, so its sub-line reads (2).
+ *
  * Chronological development:
  *   VAI163   2026-07-08  Created
  *   VAI163   2026-08-05  Class prefix renamed MPC-vaso- -> vas_106- so the panel's
@@ -331,6 +353,67 @@
  *                        landed on (a.ChangeScope — line number + item), on the
  *                        sub-line the e-mail recipients use. Both follow
  *                        VAS_101 / VAS_104.
+ *   VAI163   2026-08-20  - Delivery Readiness names EVERY state again
+ *                          (readinessTag): Fully delivered, Partially delivered,
+ *                          Ready to ship, Short by n. Drawing a pill for a
+ *                          shortage alone left the column empty on the ordinary
+ *                          case — a column headed Readiness that reports nothing
+ *                          about a line that is ready. The tones carry the signal
+ *                          instead: amber short, blue under way, green ready.
+ *                        - The line's sub-line leads with the product's SEARCH KEY
+ *                          (M_Product.Value) rather than the word PRODUCT /
+ *                          SERVICE / CHARGE. The family classifies the row; the key
+ *                          identifies it, and is what every other system quotes it
+ *                          by. The family remains the fallback for a line carrying
+ *                          no product.
+ *                        - The Invoiced stage is dated by the latest invoice
+ *                          (C_Invoice.Created, model side) instead of carrying the
+ *                          billed percentage, which the Invoiced KPI card already
+ *                          reports; the Paid stage is dated by the last customer
+ *                          receipt (lastPaymentDate, over the Documents rows)
+ *                          instead of repeating the paid state its own tick says.
+ *                          Every stage on the line now answers "when".
+ *                        - The Order Total card leads with the NET amount
+ *                          (C_Order.TotalLines) over "<ISO> · Exclusive Taxes",
+ *                          so the figure states its own basis. It led with the
+ *                          grand total under "incl. tax".
+ *                        - The Created From strip draws a Project chip for an
+ *                          order carrying only C_Order.C_ProjectRef_ID (model
+ *                          side); it read "Manual".
+ *   VAI163   2026-08-21  Activity: a Task or Appointment row now says how many
+ *                        e-mails were sent against it, and opens on click onto
+ *                        each one - who it went to, its subject, when it went
+ *                        and who sent it, then the message itself. The body is
+ *                        shown ONLY once the row is opened.
+ *   VAI163   2026-08-24  - A Send Invoice button in the header strip
+ *                          (.vas_106-actions) opens the Preview and Share Document
+ *                          form on this order through the shared VAS_SentEmailDoc
+ *                          form, with the recipient seeded from the CUSTOMER - its
+ *                          name and e-mail address. It runs off the tab's own print
+ *                          process, so it is disabled (not hidden) on a window that
+ *                          carries none; a blank address is not a failure,
+ *                          VAS_SentEmailDoc resolves the recipient on the server
+ *                          from AD_Table_ID + RecordID. Follows
+ *                          VAS_189_ARInvoiceDetailPanel.
+ *                        - An "Email Sent" badge (C_Order.VAS_IsEmailSent) sits
+ *                          beside Posted in the header, drawn only when the flag is
+ *                          set - the same milestone rule Posted follows. There is
+ *                          no "Not Sent" counterpart.
+ *                        - Order Progress: SHIPPED is driven by the delivery
+ *                          order's own lifecycle and nothing else (shippedStage).
+ *                          Done once a delivery order against this sales order is
+ *                          COMPLETED, dated by that delivery order's creation
+ *                          stamp - the EARLIEST completed one, since Shipped is
+ *                          when the order first went out where Delivered reports
+ *                          the latest movement. "In progress" ONLY while a delivery
+ *                          order exists and is still drafted. Completing the SALES
+ *                          order no longer drags the stage into "in progress":
+ *                          the stepper marks the first not-done stage active, so a
+ *                          completed order with nothing raised against it claimed a
+ *                          delivery that did not exist. A stage can now decline
+ *                          that marker (canBeActive), which is what holds Shipped
+ *                          at Pending. Partial Delivered, Delivered, Invoiced and
+ *                          Paid are untouched.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -370,6 +453,7 @@
         this.record_ID = 0;
         this.table_ID = 0;
         this.windowNo = 0;
+        this.AD_Window_ID = 0;
         this.curTab = null;
         this.selectedRow = null;
         this.panelWidth;
@@ -753,10 +837,86 @@
             // badge follows.
             if (data.Posted === "Y")
                 $pills.append(headerPill(getMsg("VAS_106_Posted", "Posted"), "success", null, true));
+            // "Email Sent" (C_Order.VAS_IsEmailSent) sits beside Posted and follows
+            // the same rule: a milestone badge, drawn once the milestone is reached
+            // and absent before it. There is no "Not Sent" counterpart — that is not
+            // news about an order nobody has sent yet.
+            if (data.IsEmailSent)
+                $pills.append(headerPill(getMsg("VAS_106_EmailSent", "Email Sent"), "info", "mail", false));
             $top.append($pills);
 
             $strip.append($top);
+            renderActions($strip);
             $body.append($strip);
+        }
+
+        // ----------------------------------------------------------------- //
+        //  Header action bar                                                 //
+        // ----------------------------------------------------------------- //
+
+        // Send Invoice runs off the TAB's print process (the same one the framework's
+        // own print button uses), so the control is disabled — not hidden — when the
+        // window carries none: an absent button reads as a missing feature, a
+        // disabled one as a document that cannot be printed.
+        function renderActions($parent) {
+            var hasPrintProcess = $self.curTab
+                && typeof $self.curTab.getAD_Process_ID === "function"
+                && +$self.curTab.getAD_Process_ID() > 0;
+
+            var $a = $('<div class="vas_106-actions"></div>');
+            var $send = $('<button type="button" class="vas_106-btn"></button>');
+            $send.append(svgIcon("send"));
+            $send.append($('<span></span>').text(getMsg("VAS_106_SendInvoice", "Send Invoice")));
+            $send.prop("disabled", !hasPrintProcess);
+            $send.on("click", function () { if (hasPrintProcess) sendInvoiceEmail(); });
+            $a.append($send);
+            $parent.append($a);
+        }
+
+        // AD_Process_ID / AD_Table_ID / AD_Window_ID for the share flow, read off the
+        // current grid tab — the same values the framework's print button works from.
+        // Mirrors VAS_189_ARInvoiceDetailPanel.
+        function printContext() {
+            var tab = $self.curTab;
+            return {
+                AD_Process_ID: (tab && typeof tab.getAD_Process_ID === "function") ? tab.getAD_Process_ID() : 0,
+                AD_Table_ID: (tab && typeof tab.getAD_Table_ID === "function") ? tab.getAD_Table_ID() : ($self.table_ID || 0),
+                AD_Window_ID: (tab && typeof tab.getAD_Window_ID === "function") ? tab.getAD_Window_ID() : ($self.AD_Window_ID || 0),
+                RecordID: $self.record_ID,
+                ToName: (data && data.CustomerName) ? data.CustomerName : "",
+                ToEmail: (data && data.CustomerEmail) ? data.CustomerEmail : ""
+            };
+        }
+
+        // Open the Preview and Share Document form (the shared VA112 share/e-mail
+        // panel) on this sales order, with the recipient seeded from the CUSTOMER —
+        // its name and e-mail address. When the address is blank VAS_SentEmailDoc
+        // resolves it on the server from AD_Table_ID + RecordID, so a customer with
+        // no address on the order still reaches its contact.
+        function sendInvoiceEmail() {
+            if (!$self.record_ID || !$self.curTab) return;
+            if (!VAS.VAS_SentEmailDoc || typeof VAS.VAS_SentEmailDoc.sendEmail !== "function") {
+                toast(getMsg("VAS_106_ActionFailed", "The action could not be completed."), true);
+                return;
+            }
+
+            var ctxRes = printContext();
+            if (!ctxRes.AD_Process_ID || !ctxRes.AD_Table_ID || !ctxRes.AD_Window_ID) {
+                toast(getMsg("VAS_106_ActionFailed", "The action could not be completed."), true);
+                return;
+            }
+
+            // Called as a plain static, not with `new`: it returns nothing and
+            // instantiates the form itself.
+            VAS.VAS_SentEmailDoc.sendEmail({
+                windowNo: $self.windowNo,
+                AD_Process_ID: ctxRes.AD_Process_ID,
+                AD_Table_ID: ctxRes.AD_Table_ID,
+                RecordID: ctxRes.RecordID,
+                AD_Window_ID: ctxRes.AD_Window_ID,
+                Name: ctxRes.ToName,
+                EMailID: ctxRes.ToEmail
+            });
         }
 
         function headerPill(label, tone, icon, withDot) {
@@ -884,13 +1044,13 @@
             // it "Manual".
             if (data.BlanketOrderId > 0) {
                 $chips.append(originChip("calendar", getMsg("VAS_106_BlanketOrder", "Blanket Sales Order"),
-                    data.BlanketOrderNo || ("#" + data.BlanketOrderId), null, "success",
+                    data.BlanketOrderNo || "", null, "success",
                     "C_Order", data.BlanketOrderId, "VAS_BlanketSalesOrder"));
                 any = true;
             }
             if (data.OpportunityId) {
                 $chips.append(originChip("target", getMsg("VAS_106_Opportunity", "Opportunity"),
-                    data.OpportunityName || ("#" + data.OpportunityId), null, "success",
+                    data.OpportunityName || "", null, "success",
                     "VAS_Opportunity", data.OpportunityId));
                 any = true;
             }
@@ -900,7 +1060,7 @@
             // identifier. The name moves onto the chip's tooltip.
             if (data.ProjectId) {
                 var $proj = originChip("folder", getMsg("VAS_106_Project", "Project"),
-                    data.ProjectNo || data.ProjectName || ("#" + data.ProjectId), null, "muted",
+                    data.ProjectNo || data.ProjectName || "", null, "muted",
                     "C_Project", data.ProjectId);
                 if (data.ProjectName) $proj.attr("title", data.ProjectName);
                 $chips.append($proj);
@@ -917,7 +1077,7 @@
             // be hard-coded here, so openRecord falls through to asking the server
             // which window the TABLE opens in.
             if (data.ContractId > 0 && data.ContractTable) {
-                var contractNo = data.ContractNo || ("#" + data.ContractId);
+                var contractNo = data.ContractNo || "";
                 var $con = originChip("fileText", getMsg("VAS_106_Contract", "Contract"),
                     contractNo, null, "info", data.ContractTable, data.ContractId);
                 // Several lines can each carry their own contract; the chip names the
@@ -977,10 +1137,18 @@
         function renderKpis() {
             var $snap = $('<section class="vas_106-snap"></section>');
 
-            // Order Total.
-            var totSub = (data.ISO_Code || "") + (data.ISO_Code ? " · " : "") + getMsg("VAS_106_InclTax", "incl. tax");
+            // Order Total — the card keeps its name; the FIGURE is now the net
+            // amount, the order's own subtotal before tax (C_Order.TotalLines),
+            // with the currency and the basis under it.
+            //
+            // The sub-line is what distinguishes the two totals, so it says outright
+            // which one this is (VAS_106_ExclTax) rather than leaving the reader to
+            // infer it from the label. It used to lead with the grand total under
+            // "incl. tax"; the footer of the lines table still carries all three.
+            var totSub = (data.ISO_Code || "") + (data.ISO_Code ? " · " : "") +
+                getMsg("VAS_106_ExclTax", "Exclusive Taxes");
             $snap.append(metricCard("total", "coins", getMsg("VAS_106_OrderTotal", "Order Total"),
-                formatAmount(+data.GrandTotal || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision),
+                formatAmount(+data.TotalLines || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision),
                 totSub, null));
 
             // Fulfilment.
@@ -1049,10 +1217,80 @@
             return best;
         }
 
+        // When the order was invoiced, for the Invoiced stage — the LATEST invoice
+        // raised against it, which is the point the order reached its current
+        // billed position. Read from the invoice RECORD's create stamp for the same
+        // reason the deliveries are, with DateInvoiced as the fallback: that is a
+        // document field a user can back-date, so on its own the stage could report
+        // a day on which nothing had been entered.
+        function lastInvoiceDate() {
+            var inv = data.Invoices || [], best = null;
+            for (var i = 0; i < inv.length; i++) {
+                var d = parseDbDate(inv[i].Created, true) || parseDbDate(inv[i].DateInvoiced, false);
+                if (d && (!best || d > best)) best = d;
+            }
+            return best;
+        }
+
+        // When the order was last PAID against, for the Paid stage: the most recent
+        // customer receipt allocated to one of its invoices (Documents, type
+        // "receipt" — C_Payment.DateTrx, model side). Null when nothing has been
+        // received yet, which leaves the stage on its pending caption.
+        function lastPaymentDate() {
+            var docs = data.Documents || [], best = null;
+            for (var i = 0; i < docs.length; i++) {
+                if (docs[i].Type !== "receipt") continue;
+                var d = parseDbDate(docs[i].DocDate, false);
+                if (d && (!best || d > best)) best = d;
+            }
+            return best;
+        }
+
+        // The Shipped stage, resolved from the DELIVERY ORDERS raised against this
+        // sales order and from nothing else:
+        //
+        //   done       — a delivery order has been COMPLETED (or closed). Dated by
+        //                that delivery order's own creation stamp (M_InOut.Created,
+        //                model side), not by MovementDate, which a user can
+        //                back-date. The EARLIEST completed one is used: Shipped is
+        //                the moment the order first went out, where Delivered and
+        //                Partial Delivered below report the latest movement.
+        //   inProgress — nothing completed yet, but a delivery order EXISTS and is
+        //                still drafted. This is the only state that shows the stage
+        //                as active.
+        //   neither    — no delivery order at all, so the stage is Pending.
+        //
+        // Completing the sales order does not touch any of this. It used to: the
+        // stepper marks the first not-done stage "In progress", so a completed order
+        // with nothing shipped showed Shipped as in progress — claiming a delivery
+        // that had not been raised. canBeActive:false on the stage is what holds it
+        // at Pending instead.
+        function shippedStage() {
+            var dv = data.Deliveries || [];
+            var doneDate = null, drafted = false;
+            for (var i = 0; i < dv.length; i++) {
+                var st = dv[i].DocStatus;
+                if (st === "CO" || st === "CL") {
+                    var d = parseDbDate(dv[i].Created, true) || parseDbDate(dv[i].MovementDate, false);
+                    if (d && (!doneDate || d < doneDate)) doneDate = d;
+                } else if (st === "DR") {
+                    drafted = true;
+                }
+            }
+            return {
+                done: !!doneDate,
+                date: doneDate,
+                inProgress: !doneDate && drafted
+            };
+        }
+
         function progressStages() {
             var f = fulfilment(), iv = invoiced(), inv = data.Invoices || [], dv = data.Deliveries || [];
             var completed = isCompleted();
             var shipped = dv.length > 0;
+            // Shipped is driven by the DELIVERY ORDER's own lifecycle, never by the
+            // sales order reaching Completed — see shippedStage().
+            var ship = shippedStage();
             var delivered = f.total > 0 ? (f.full >= f.total) : shipped;
             // Partial Delivered is a stage the order PASSES THROUGH, not a state it
             // is either in or out of: an order that is delivered in full reached
@@ -1072,7 +1310,15 @@
                 // back-date.
                 { key: "VAS_106_Completed", label: "Completed", done: completed,
                   date: completed ? (data.CompletedDate || data.DateOrdered) : null },
-                { key: "VAS_106_Shipped",   label: "Shipped",   done: shipped,   date: lastDelivery },
+                // Shipped answers for the DELIVERY ORDER, not for the sales order.
+                // It is done once a delivery order against this sales order has been
+                // completed, dated by that delivery order's creation stamp; it is
+                // "In progress" only while one exists and is still drafted. Anything
+                // else — no delivery order at all — leaves it Pending, INCLUDING a
+                // completed sales order, which used to drag the stage into "In
+                // progress" purely by being the first stage not yet done.
+                { key: "VAS_106_Shipped",   label: "Shipped",   done: ship.done,
+                  date: ship.date, canBeActive: ship.inProgress },
                 // Delivery in progress: some of the order has gone out, the rest has
                 // not. Counted in LINES, like Delivered beside it — the lines
                 // anything has shipped against, out of the stock lines there are.
@@ -1088,9 +1334,17 @@
                 // delivery that carried it to this state.
                 { key: "VAS_106_Delivered", label: "Delivered", done: delivered, date: lastDelivery,
                   meta: (f.total && f.full > 0) ? (f.full + "/" + f.total) : null },
-                { key: "VAS_106_Invoiced",  label: "Invoiced",  done: invd,      date: null,
-                  meta: invd ? (iv.pct + "%") : null },
-                { key: "VAS_106_Paid",      label: "Paid",      done: paid,      date: null }
+                // Dated by the LATEST invoice raised against the order. It used to
+                // carry the billed PERCENTAGE instead — a figure the Invoiced KPI
+                // card above already reports, where every other stage on this line
+                // answers "when did this happen".
+                { key: "VAS_106_Invoiced",  label: "Invoiced",  done: invd,
+                  date: invd ? lastInvoiceDate() : null },
+                // Dated by the LAST payment received against the order, for the
+                // same reason. It used to repeat the paid / unpaid state, which is
+                // what the stage's own done-or-not already says.
+                { key: "VAS_106_Paid",      label: "Paid",      done: paid,
+                  date: paid ? lastPaymentDate() : null }
             ];
         }
 
@@ -1117,7 +1371,14 @@
             for (var i = 0; i < stages.length; i++) {
                 var s = stages[i];
                 var stateCls, metaText;
-                if (i === active && !s.done) { stateCls = "vas_106-is-active"; metaText = getMsg("VAS_106_InProgress", "In progress"); }
+                // A stage may refuse the automatic "in progress" marker: being the
+                // first stage not yet done is not, on its own, evidence that anything
+                // is under way. Shipped sets canBeActive from the delivery order's
+                // own status, so a completed sales order with nothing raised against
+                // it stays Pending there. Every other stage leaves it undefined and
+                // keeps the original behaviour.
+                var mayBeActive = (s.canBeActive !== false);
+                if (i === active && !s.done && mayBeActive) { stateCls = "vas_106-is-active"; metaText = getMsg("VAS_106_InProgress", "In progress"); }
                 else if (s.done) { stateCls = "vas_106-is-done"; metaText = formatDate(s.date) || s.meta || getMsg("VAS_106_Done", "Done"); }
                 else { stateCls = "is-pending"; metaText = s.meta || getMsg("VAS_106_Pending", "Pending"); }
                 $tl.append(stepEntry(i + 1, getMsg(s.key, s.label), metaText, s.done, stateCls));
@@ -1354,6 +1615,12 @@
         // timestamp in place of the item (the item is the line it hangs under),
         // then Qty, Unit price, Disc and Line total exactly as the line renders
         // them, and finally who made the change in the Delivered column's track.
+        //
+        // "The same columns" is now literal: the drawer inherits the lines table's
+        // own grid rather than restating its proportions (CSS), so these cells land
+        // on tracks 1..n of the row above and the action / Contract tracks are left
+        // empty. Restating them could not line up — the line row divides its free
+        // space across two more tracks and one more gap.
         function buildLineHistory(ln, rows, showDiscount) {
             var $wrap = $('<div class="vas_106-lineHist"></div>');
             if (!lineHistOpen[ln.C_OrderLine_ID]) $wrap.hide();
@@ -1440,15 +1707,23 @@
                 $item.append($('<div class="vas_106-itAttr"></div>').text(asi).attr("title", asi));
             }
 
-            // The sub-line carries the line family and its UNIT OF MEASURE. It used
-            // to carry the product's search key ("SKU ..."), which repeats what the
-            // name already identifies; the unit is what the quantity beside it is
-            // counted in and was nowhere on the row.
-            var sub;
-            if (ln.LineType === "product") sub = getMsg("VAS_106_ProductTag", "PRODUCT");
-            else if (ln.LineType === "service") sub = getMsg("VAS_106_ServiceTag", "SERVICE");
-            else if (ln.LineType === "charge") sub = getMsg("VAS_106_ChargeTag", "CHARGE");
-            else sub = "";
+            // The sub-line leads with the product's SEARCH KEY (M_Product.Value,
+            // "100049") and follows it with the line's UNIT OF MEASURE.
+            //
+            // It carried the line FAMILY there instead — the word PRODUCT, SERVICE
+            // or CHARGE — which classifies the row rather than identifying it: the
+            // reader can see it is a product, and cannot see which one the
+            // warehouse and the price list know it as. The key is the thing quoted
+            // back in every other system, so it is what the row is keyed by here.
+            // The family stays as the fallback for a line with no product of its
+            // own, which is the only case where it says anything the name does not.
+            var sub = (ln.ProductValue || "").trim();
+            if (!sub) {
+                if (ln.LineType === "product") sub = getMsg("VAS_106_ProductTag", "PRODUCT");
+                else if (ln.LineType === "service") sub = getMsg("VAS_106_ServiceTag", "SERVICE");
+                else if (ln.LineType === "charge") sub = getMsg("VAS_106_ChargeTag", "CHARGE");
+                else sub = "";
+            }
             var uomLabel = (ln.UOMName || ln.UOMSymbol || "").trim();
             if (uomLabel) sub += (sub ? " · " : "") + uomLabel;
             else if (ln.LineType === "charge" && ln.ChargeName) sub += " · " + ln.ChargeName;
@@ -1551,7 +1826,8 @@
                 .attr("aria-readonly", "true");
             if (contracted || ln.IsContractFlag) $sw.addClass("vas_106-on");
             $sw.attr("title", contracted
-                ? getMsg("VAS_106_Contract", "Contract") + ": " + (ln.ContractNo || ("#" + ln.C_Contract_ID))
+                ? getMsg("VAS_106_Contract", "Contract") +
+                  (ln.ContractNo ? ": " + ln.ContractNo : "")
                 : getMsg("VAS_106_NoContract", "No contract"));
             $lc.append($sw);
             $cell.append($lc);
@@ -1651,30 +1927,52 @@
             $tr.append($('<span class="vas_106-ta-c"></span>').text(formatNumber(+rd.PendingQty || 0, 0)));
             $tr.append($('<span class="vas_106-ta-c"></span>').text(formatNumber(+rd.QtyOnHand || 0, 0)));
 
-            // ONLY a shortage is tagged.
+            // Every state is named, which is what a column headed Readiness is for.
             //
-            // The column used to name every state — Fully delivered, Partially
-            // Delivered, Ready to ship, Short by n — which is a pill on every row
-            // and no signal at all. The one state that asks anything of the reader
-            // is the one the warehouse cannot cover, so that is the only one drawn;
-            // the rest leave the cell blank, and the quantities two columns to the
-            // left already say where the line stands.
+            // It briefly drew a pill for a SHORTAGE only, on the argument that a
+            // pill on every row is no signal — but the column then sat empty on the
+            // ordinary case, saying nothing at all rather than saying the line is
+            // fine. The states carry their own tones instead, so a shortage still
+            // stands out: amber for short, blue for a delivery under way, green for
+            // one that can ship now or is already out.
             //
-            // The other states are still classified server-side — the Delivery
-            // Readiness KPI card is derived from the same rows.
-            var $rt = $('<span class="vas_106-ta-r"></span>');
-            if (rd.Readiness === "short") {
-                var shortBy = (+rd.PendingQty || 0) - (+rd.QtyOnHand || 0);
-                var $pill = $('<span class="vas_106-rdTag vas_106-short"></span>');
-                $pill.append($('<span class="vas_106-rdDot"></span>'));
-                $pill.append($('<span></span>').text(
-                    getMsg("VAS_106_ShortBy", "Short by") + " " +
-                    formatNumber(shortBy > 0 ? shortBy : (+rd.PendingQty || 0), 0) +
-                    (ruom ? " " + ruom : "")));
-                $rt.append($pill);
-            }
-            $tr.append($rt);
+            // The model classifies all four (ready | partial | instock | short);
+            // the Delivery Readiness KPI card is derived from the same rows.
+            $tr.append($('<span class="vas_106-ta-r"></span>').append(readinessTag(rd, ruom)));
             return $tr;
+        }
+
+        // The Readiness cell's pill: the state's own tone and a label that says
+        // what it means for THIS line, a shortage naming the quantity it is short
+        // by. Returns null for a state the model could not classify, which leaves
+        // the cell empty rather than inventing a verdict.
+        function readinessTag(rd, ruom) {
+            var state = rd.Readiness, tone, label;
+
+            if (state === "short") {
+                var shortBy = (+rd.PendingQty || 0) - (+rd.QtyOnHand || 0);
+                tone  = "vas_106-short";
+                label = getMsg("VAS_106_ShortBy", "Short by") + " " +
+                    formatNumber(shortBy > 0 ? shortBy : (+rd.PendingQty || 0), 0) +
+                    (ruom ? " " + ruom : "");
+            } else if (state === "partial") {
+                tone  = "vas_106-partial";
+                label = getMsg("VAS_106_PartiallyDelivered", "Partially delivered");
+            } else if (state === "instock") {
+                tone  = "vas_106-ready";
+                label = getMsg("VAS_106_ReadyToShip", "Ready to ship");
+            } else if (state === "ready") {
+                // Nothing is pending: the line has gone out in full.
+                tone  = "vas_106-ready";
+                label = getMsg("VAS_106_FullyDelivered", "Fully delivered");
+            } else {
+                return null;
+            }
+
+            var $pill = $('<span class="vas_106-rdTag"></span>').addClass(tone);
+            $pill.append($('<span class="vas_106-rdDot"></span>'));
+            $pill.append($('<span></span>').text(label));
+            return $pill;
         }
 
         // ----------------------------------------------------------------- //
@@ -1794,7 +2092,23 @@
             // The order reaching Completed. It used to be typed "Updated", which now
             // means what it says: a field was edited.
             Completed: { tone: "success", icon: "check", label: "Completed" },
-            Updated:   { tone: "purple",  icon: "pencil", label: "Updated" }
+            Updated:   { tone: "purple",  icon: "pencil", label: "Updated" },
+            // The correspondence and engagement sources shared with every other
+            // overview panel (model side, VAS_ActivitySourcesModel): meetings and
+            // tasks from AppointmentsInfo, calls from VA048_CallDetails, and the
+            // inbound letters MailAttachment1 files under AttachmentType 'I'.
+            //
+            // Lower-case keys, unlike the rest of this map: the key is matched
+            // against EventType exactly as the model emits it, and the shared
+            // reader names its kinds in lower case so every panel tags them alike.
+            // Each names its message key outright. The badge otherwise builds one
+            // as "VAS_106_Act" + EventType, and these four types are lower-case
+            // (the shared reader's naming), which would have asked the dictionary
+            // for VAS_106_Actappointment — a key nobody would think to seed.
+            appointment: { tone: "info",    icon: "clock",    label: "Meeting", key: "VAS_106_TagAppointment" },
+            task:        { tone: "warning", icon: "check",    label: "Task",    key: "VAS_106_TagTask" },
+            call:        { tone: "success", icon: "phone",    label: "Call",    key: "VAS_106_TagCall" },
+            letter:      { tone: "purple",  icon: "mail",     label: "Letter",  key: "VAS_106_TagLetter" }
         };
 
         function renderActivity() {
@@ -1888,7 +2202,8 @@
             var $row = $('<div class="vas_106-actRow"></div>');
             var $badge = $('<span class="vas_106-actBadge"></span>').addClass("vas_106-tone-" + meta.tone);
             $badge.append(svgIcon(meta.icon));
-            $badge.append($('<span></span>').text(getMsg("VAS_106_Act" + a.EventType, meta.label)));
+            $badge.append($('<span></span>').text(
+                getMsg(meta.key || ("VAS_106_Act" + a.EventType), meta.label)));
             $row.append($badge);
 
             var $main = $('<div class="vas_106-actMain"></div>');
@@ -1925,6 +2240,18 @@
                 }
             }
 
+            // A meeting or task says what was e-mailed about it. The count only —
+            // the addresses, subjects and bodies are in the drawer, and a meeting
+            // that generated several notices would otherwise fill the feed.
+            if (a.EventType === "appointment" || a.EventType === "task") {
+                var apptMails = activityMails(a);
+                if (apptMails.length) {
+                    var mailSub = mailCountLabel(apptMails.length);
+                    $main.append($('<div class="vas_106-actSub"></div>')
+                        .text(mailSub).attr("title", mailSub));
+                }
+            }
+
             // A field edit names the record it landed on — a LINE edit says which
             // line — and then the move itself. The headline stays "Updated <field>":
             // which field moved is the question, and both of these qualify it
@@ -1940,26 +2267,52 @@
 
             // A row carrying a message opens on click; the caret shows the state.
             if (hasActivityBody(a)) {
-                $row.addClass("vas_106-is-openable")
-                    .attr("title", getMsg("VAS_106_ShowMailBody", "Show message"));
+                // A meeting or task opens onto the e-mails sent about it; every
+                // other openable row onto its own message.
+                var isAppt = (a.EventType === "appointment" || a.EventType === "task");
+                var showHint = isAppt
+                    ? getMsg("VAS_106_ShowMails", "Show e-mails")
+                    : getMsg("VAS_106_ShowMailBody", "Show message");
+                var hideHint = isAppt
+                    ? getMsg("VAS_106_HideMails", "Hide e-mails")
+                    : getMsg("VAS_106_HideMailBody", "Hide message");
+
+                $row.addClass("vas_106-is-openable").attr("title", showHint);
                 $row.append($('<span class="vas_106-actCaret"></span>').append(svgIcon("chevRight")));
                 $row.on("click", function () {
                     var $panel = $row.next(".vas_106-actBody");
                     if (!$panel.length) return;
                     var nowOpen = !$row.hasClass("vas_106-is-open");
                     $row.toggleClass("vas_106-is-open", nowOpen)
-                        .attr("title", nowOpen ? getMsg("VAS_106_HideMailBody", "Hide message")
-                                               : getMsg("VAS_106_ShowMailBody", "Show message"));
+                        .attr("title", nowOpen ? hideHint : showHint);
                     $panel.toggle(nowOpen);
                 });
             }
             return $row;
         }
 
-        // Only an e-mail carries a body, and only one that actually has text —
-        // an empty message is nothing to open.
+        // What opens on click. An e-mail carries a body, and only one that
+        // actually has text — an empty message is nothing to open. A meeting or
+        // task opens onto the e-mails sent against it instead.
         function hasActivityBody(a) {
-            return !!(a && a.EventType === "Email" && a.Body && String(a.Body).trim());
+            if (!a) return false;
+            if (a.EventType === "Email") return !!(a.Body && String(a.Body).trim());
+            if (a.EventType === "appointment" || a.EventType === "task") {
+                return activityMails(a).length > 0;
+            }
+            return false;
+        }
+
+        // The e-mails sent against an appointment or task (MailAttachment1 keyed
+        // on AppointmentsInfo). Always an array, so callers can count and loop
+        // without guarding.
+        function activityMails(a) {
+            return (a && a.Mails && a.Mails.length) ? a.Mails : [];
+        }
+
+        function mailCountLabel(n) {
+            return n + " " + (n === 1 ? getMsg("VAS_106_Email", "email")
+                                      : getMsg("VAS_106_Emails", "emails"));
         }
 
         // The e-mail message, collapsed beneath its activity row. The full
@@ -1971,6 +2324,18 @@
             if (!hasActivityBody(a)) return null;
 
             var $panel = $('<div class="vas_106-actBody" style="display:none;"></div>');
+
+            // An appointment or task opens onto the e-mails sent about it, each
+            // with its own recipient, subject, moment and sender. They are listed
+            // newest first (model order).
+            if (a.EventType === "appointment" || a.EventType === "task") {
+                var mails = activityMails(a);
+                for (var i = 0; i < mails.length; i++) {
+                    $panel.append(activityMailEntry(mails[i], i > 0));
+                }
+                return $panel;
+            }
+
             appendMailMeta($panel, "VAS_106_MailFrom", "From", a.MailFrom);
             appendMailMeta($panel, "VAS_106_MailTo",   "To",   a.MailTo);
             appendMailMeta($panel, "VAS_106_MailCc",   "Cc",   a.MailCc);
@@ -1983,6 +2348,35 @@
             if (!value || !String(value).trim()) return;
             $panel.append($('<div class="vas_106-actMeta"></div>')
                 .text(getMsg(key, fallback) + " " + String(value).trim()));
+        }
+
+        // One e-mail inside an appointment's or task's drawer: who it went to and
+        // what it was about, then when and by whom, then the message. Separated
+        // from the one before it so several notices do not read as one.
+        function activityMailEntry(m, separated) {
+            var $wrap = $('<div class="vas_106-actMailItem"></div>');
+            if (separated) $wrap.addClass("vas_106-actMailSplit");
+
+            appendMailMeta($wrap, "VAS_106_MailTo", "To", m.MailTo);
+            appendMailMeta($wrap, "VAS_106_MailSubject", "Subject",
+                (m.Subject && String(m.Subject).trim())
+                    ? m.Subject : getMsg("VAS_106_NoSubject", "(no subject)"));
+
+            // "when · by whom", the same two parts in the same order as the row
+            // above it.
+            var when = formatDateTime(m.SentOn);
+            if (m.SentBy) {
+                when = when ? when + " · " + getMsg("VAS_106_By", "by") + " " + m.SentBy
+                            : getMsg("VAS_106_By", "by") + " " + m.SentBy;
+            }
+            if (when) $wrap.append($('<div class="vas_106-actMeta"></div>').text(when));
+
+            // The body is the thing the click was for; a mail filed without one
+            // still shows its envelope rather than an empty gap.
+            if (m.Body && String(m.Body).trim()) {
+                $wrap.append($('<p></p>').text(String(m.Body).trim()));
+            }
+            return $wrap;
         }
 
         // Row sub-line: the To list, plus "+n more" covering the Cc / Bcc
@@ -2290,7 +2684,8 @@
             chevLeft: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
             chevRight:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
             plus:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
-            arrowUpRight: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>'
+            arrowUpRight: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>',
+            send:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4Z"/></svg>'
         };
 
         function svgIcon(name) {
@@ -2378,6 +2773,11 @@
         this.curTab = curTab;
         if (curTab && typeof curTab.getAD_Table_ID === "function") {
             this.table_ID = curTab.getAD_Table_ID();
+        }
+        // Cached for the share flow's fallback, so printContext() still resolves the
+        // window on a build whose tab does not expose the getter.
+        if (curTab && typeof curTab.getAD_Window_ID === "function") {
+            this.AD_Window_ID = curTab.getAD_Window_ID();
         }
         this.init();
         // Watch the tab itself so New Record / Copy Record (neither of which

@@ -1,0 +1,757 @@
+/* VAS_196_PeriodControlMatrixWidget.css
+   Period Control Matrix (Period Control dashboard, 3x2).
+   Design source: design.md -> dashboard-widgets.md (Widget Header, Grid Data
+   Widget, Adaptive Row Count, No Inner Scrollbars, Widget Footer Pager).
+   All internal sizing is em-driven off the widget root anchor; borders, radii and
+   shadows stay in px because they are physical edges ("Not Scaled With em"). */
+
+.vas-196-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container (mirrors VAS_018 / VAS_192) so a narrow or zoomed-in
+       cell can step the card base font below its 16px clamp floor. */
+    container: vas-196 / inline-size;
+}
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Everything inside is em against this. */
+.vas-196-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: .875em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    box-sizing: border-box;
+    /* No inner scrollbars: overflow is paged, never scrolled. */
+    overflow: hidden;
+}
+
+/* ---- Header: icon well + title / subtitle ----
+   Well and glyph are driven off the same --dash-inline-size lever as the title
+   (2x and ~1.1x the title clamp) so the header stays balanced at every width. */
+.vas-196-header {
+    display: flex;
+    align-items: center;
+    gap: .625em;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: .625em;
+}
+
+.vas-196-icon {
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * .022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * .022750), 40px);
+    flex: 0 0 auto;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+.vas-196-icon svg {
+    width: clamp(18px, calc(var(--dash-inline-size, 100vw) * .012500), 22px);
+    height: clamp(18px, calc(var(--dash-inline-size, 100vw) * .012500), 22px);
+}
+
+.vas-196-head-text {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-196-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-196-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    /* Fixed 2px pairs the two lines at every width (Widget Header rule). */
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Header link, top right: opens the period process dialog ----
+   A link, not a button: it leads into the standard C_Period process rather than
+   acting on the matrix, so it carries no surface of its own. It sits at the end of
+   the header row (the title block takes the remaining width) and never wraps. */
+.vas-196-headlink {
+    flex: 0 0 auto;
+    align-self: flex-start;
+    font-family: inherit;
+    font-size: .75em;
+    font-weight: 500;
+    line-height: 1.3;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #0083DA;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.vas-196-headlink:hover,
+.vas-196-headlink-open {
+    text-decoration: underline;
+}
+
+/* No focus ring: it is a text link in the header, and the browser's box around it
+   reads as a stray border on the card. The open state is already visible through
+   the underline. */
+.vas-196-headlink:focus,
+.vas-196-headlink:focus-visible,
+.vas-196-headlink:active {
+    outline: 0 none;
+    box-shadow: none;
+}
+
+/* While either popover is open the card takes no input at all: the Calendar /
+   Year / Period selectors, the funnel and the row Open / Close buttons all stop
+   responding. Only the control the open panel hangs from keeps its clicks, so the
+   panel can always be toggled shut from the same spot. Nothing outside this card
+   is covered - the rest of the dashboard stays live. */
+.vas-196-card-blocked .vas-196-header,
+.vas-196-card-blocked .vas-196-body {
+    pointer-events: none;
+}
+
+.vas-196-card-blocked .vas-196-blocked-live {
+    pointer-events: auto;
+}
+
+/* ---- Body: filters (fixed) + list (flexible) + pager (fixed) ---- */
+.vas-196-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas-196-filters {
+    display: flex;
+    gap: .4em;
+    flex: 0 0 auto;
+    margin-bottom: .5em;
+}
+
+/* Cascading Calendar / Year / Period selectors - equal share of the row, each
+   free to shrink so a long calendar name never widens the widget. */
+.vas-196-sel {
+    flex: 1 1 0;
+    min-width: 0;
+    font-family: inherit;
+    font-size: .6875em;
+    line-height: 1.3;
+    color: #102C3F;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid #E4EDF4;
+    border-radius: 6px;
+    padding: .4em .45em;
+    cursor: pointer;
+}
+
+.vas-196-sel:disabled {
+    color: #9F9F9F;
+    cursor: default;
+}
+
+.vas-196-sel:focus-visible {
+    outline: 2px solid #BFE4FF;
+    outline-offset: -1px;
+}
+
+/* ---- Funnel toggle: opens the search panel below the selectors ---- */
+.vas-196-filter-btn {
+    flex: 0 0 auto;
+    position: relative;
+    width: 2em;
+    height: 2em;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #DDE7F0;
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: #5F7283;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.vas-196-filter-btn svg {
+    width: .95em;
+    height: .95em;
+}
+
+.vas-196-filter-btn:hover {
+    background: #EAF8FF;
+    border-color: #BFE4FF;
+    color: #0083DA;
+}
+
+/* Popover open - the icon stays visibly "pressed" while its panel is showing. */
+.vas-196-filter-btn-open {
+    background: #EAF8FF;
+    border-color: #BFE4FF;
+    color: #0083DA;
+}
+
+/* A filter is committed - stays visible after the panel collapses, so a filtered
+   matrix never looks like an empty one. */
+.vas-196-filter-btn-active {
+    color: #0083DA;
+    border-color: #BFE4FF;
+}
+
+.vas-196-filter-btn-active::after {
+    content: "";
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #0083DA;
+    box-shadow: 0 0 0 2px #FFFFFF;
+}
+
+.vas-196-filter-btn:focus-visible {
+    outline: 2px solid #BFE4FF;
+    outline-offset: 1px;
+}
+
+/* ==========================================================
+   Filter popover — anchored under the funnel, appended to <body>
+   Not a dialog: no modal overlay, no backdrop, nothing outside this widget is
+   blocked while it is open. It carries the two VIS lookup dropdowns (AD_Org_ID,
+   C_DocBaseType_ID). Borderless: depth comes from the shadow and the caret that
+   ties it to the icon, not from an outline. It is a document-baseline surface,
+   not part of the widget's em scale, so it declares its own anchor and the VIS
+   controls keep their standard chrome.
+   ========================================================== */
+.vas-196-fpop {
+    position: fixed;
+    /* Stacking, deliberately in a narrow band BELOW 100: the dashboard cards are in
+       normal flow so 95 clears them, but every framework layer the lookups need must
+       stay ON TOP of this panel - the type-ahead menu is jQuery UI .ui-front (100)
+       and the Info window rides .web_dialog_overlay (101) / .vis-PopupWrap (102).
+       Anything higher here buries the control's own data. Same band as the VAS_063 /
+       VAS_067 filter popovers, which carry the same lookups. */
+    z-index: 95;
+    box-sizing: border-box;
+    width: 300px;
+    max-width: calc(100vw - 16px);
+    padding: 0.75em 0.875em 0.625em;
+    background: #FFFFFF;
+    border: 0;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(8, 24, 38, 0.22);
+    /*font-family: Roboto, sans-serif;*/
+    font-size: clamp(14px, 0.9vw, 16px);
+    color: #102C3F;
+}
+
+/* Caret pinned to the funnel's centre by the positioner; it is the only thing
+   that visually attaches the panel to the icon. */
+.vas-196-fpop-arrow {
+    position: absolute;
+    top: -6px;
+    width: 12px;
+    height: 12px;
+    margin-left: -6px;
+    background: #FFFFFF;
+    transform: rotate(45deg);
+    border-radius: 2px;
+}
+
+/* Flipped above the icon when the viewport has no room below. */
+.vas-196-fpop-above .vas-196-fpop-arrow {
+    top: auto;
+    bottom: -6px;
+}
+
+/* ---- Filter field: caption above an underlined control row ----
+   Same treatment as the VAS_063 / VAS_067 search filters: a bold caption on its
+   own line, then a borderless control whose only edge is the row's bottom rule,
+   which runs unbroken beneath the text box AND its lookup button. */
+.vas-196-frow + .vas-196-frow {
+    margin-top: 0.75rem;
+}
+
+.vas-196-flabel {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-196-fctrlrow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-size: 0.75rem;
+    border-bottom: 1px solid #E4EDF4;
+}
+
+.vas-196-fctrlrow:focus-within {
+    border-bottom-color: #B6DEFB;
+}
+
+/* The row owns the underline; the field inside must not draw a second one. */
+.vas-196-fpop .vas-196-fctrl,
+.vas-196-fpop .vas-196-fctrl:focus {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    height: 2.375em;
+    padding: 0 0.25em !important;
+    margin: 0 !important;
+    /* One step larger than the caption - 1.2em of the 0.75rem row context; the em
+       height/padding above scale with it, so the field grows as a whole. */
+    font-size: 1.2em;
+    color: #102C3F;
+    background: transparent !important;
+    border: 0 none !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.vas-196-fbtnwrap {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+}
+
+/* The framework's lookup button keeps its glyph, drops all chrome and takes the
+   accent colour - it reads as the field's trailing affordance. */
+.vas-196-fbtnwrap > * {
+    height: 2.375em;
+    min-width: 1.75em;
+    padding: 0 0.25em;
+    border: 0 none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+/* Borderless action column - text buttons with no surface of their own, so they
+   read as chrome under the fields rather than a second control row. */
+.vas-196-fpop-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75em;
+    margin-top: 1em;
+}
+
+.vas-196-linkbtn {
+    font-family: inherit;
+    font-size: 0.8125em;
+    font-weight: 500;
+    line-height: 1.3;
+    padding: 0.25em 0.15em;
+    border: 0;
+    background: transparent;
+    color: #5F7283;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.vas-196-linkbtn-primary {
+    color: #0083DA;
+}
+
+.vas-196-linkbtn:hover {
+    text-decoration: underline;
+}
+
+.vas-196-linkbtn:focus-visible {
+    outline: 2px solid #BFE4FF;
+    outline-offset: 1px;
+    border-radius: 4px;
+}
+
+/* ==========================================================
+   Period process popover — the header link's panel
+   Same surface as the filter popover (it reuses .vas-196-fpop and the field
+   treatment below it); only the extras live here: the mandatory marker the
+   standard process dialog shows, and the plain Period Action select. It carries no
+   title of its own - the link that opened it already names it.
+   ========================================================== */
+.vas-196-ppop {
+    width: 320px;
+}
+
+/* Mandatory marker, exactly as the framework's process dialog renders it. */
+.vas-196-freq {
+    color: #D93025;
+    margin-left: 2px;
+}
+
+/* Dropdown inside a field row - the filter's Organization / Document BaseType
+   combos and the process dialog's Period Action. It draws its own text but leaves
+   the underline to the row it sits in, like the lookup text boxes. */
+.vas-196-fsel,
+.vas-196-fsel:focus {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    height: 2.375em;
+    font-family: inherit;
+    font-size: 1.2em;
+    color: #102C3F;
+    /* !important for the same reason .vas-196-fctrl needs it: the framework control
+       arrives with its own chrome, and the row owns the only edge here. */
+    background: transparent !important;
+    border: 0 none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    margin: 0 !important;
+    padding: 0 0.25em !important;
+    cursor: pointer;
+}
+
+/* The list adapts its visible row count to this box's height and never scrolls;
+   whatever does not fit is paged (design.md "Adaptive Row Count"). */
+.vas-196-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ---- Matrix row: one shared grid template for every row ----
+   minmax(0, Nfr) only, so the columns line up down the list and no cell can
+   blow the row out of the card. */
+.vas-196-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 0.9fr);
+    align-items: center;
+    gap: .5em;
+    padding: .45em 0;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.vas-196-row:last-child {
+    border-bottom: 0;
+}
+
+/* Same single template, wider identity column: applied to the whole list when the
+   name cell has to carry the organization as well. */
+.vas-196-list-org .vas-196-row {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+
+/* Primary row cell: one step below the widget title (List / Grid Hierarchy Rule).
+   Holds an optional organization prefix ahead of the document base type; both
+   share the sm size and are told apart by weight and color, per the Cell Types
+   rule - the whole cell truncates as one run. */
+.vas-196-cell-name {
+    font-size: .75em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.3;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Organization the control belongs to - rendered only when the period is
+   controlled per org (a set of purely tenant-wide controls shows no org at all). */
+.vas-196-cell-org {
+    font-weight: 400;
+    color: #5F7283;
+}
+
+.vas-196-cell-sep {
+    font-weight: 400;
+    color: #9DB2C2;
+    margin: 0 .35em;
+}
+
+/* ---- Status pill: one shape, tone carried by the modifier class only ---- */
+.vas-196-pill {
+    justify-self: start;
+    max-width: 100%;
+    font-size: .6875em;
+    font-weight: 500;
+    line-height: 1.3;
+    padding: .18em .6em;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: .35em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-196-pill::before {
+    content: "";
+    width: .45em;
+    height: .45em;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: .9;
+    flex: 0 0 auto;
+}
+
+/* Open */
+.vas-196-pill-ok {
+    color: #0B6B45;
+    background: #E6F6F0;
+}
+
+/* Closed */
+.vas-196-pill-plain {
+    color: #41576A;
+    background: #EEF2F6;
+}
+
+/* Never Opened - the one status that needs setting up before posting can happen */
+.vas-196-pill-fail {
+    color: #D14545;
+    background: #FBE9E9;
+}
+
+/* Permanently Closed */
+.vas-196-pill-dark {
+    color: #FFFFFF;
+    background: #41576A;
+}
+
+/* ---- Action button: Open (primary) / Close (danger) / disabled ---- */
+.vas-196-btn {
+    justify-self: end;
+    max-width: 100%;
+    font-family: inherit;
+    font-size: .6875em;
+    font-weight: 500;
+    line-height: 1.3;
+    padding: .3em .7em;
+    border-radius: 999px;
+    border: 1px solid #BFE4FF;
+    background: rgba(255, 255, 255, 0.8);
+    color: #0083DA;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background .15s ease, border-color .15s ease;
+}
+
+.vas-196-btn-close {
+    color: #D14545;
+    border-color: #F0C9C9;
+    background: #FCEFEF;
+}
+
+.vas-196-btn:hover:not(:disabled) {
+    background: #EAF8FF;
+}
+
+.vas-196-btn-close:hover:not(:disabled) {
+    background: #FBE9E9;
+}
+
+.vas-196-btn:focus-visible {
+    outline: 2px solid #BFE4FF;
+    outline-offset: 1px;
+}
+
+/* Permanently closed (or a run in flight): visibly inactive, never just hidden. */
+.vas-196-btn:disabled,
+.vas-196-btn-disabled {
+    color: #9F9F9F;
+    border-color: #E4EDF4;
+    background: #F1F4F7;
+    cursor: not-allowed;
+}
+
+.vas-196-btn-working {
+    opacity: .6;
+}
+
+/* ---- Empty / error state ---- */
+.vas-196-state {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: .75em;
+    color: #5F7283;
+    line-height: 1.4;
+}
+
+.vas-196-state-error {
+    color: #D14545;
+}
+
+/* ---- Canonical Widget Footer Pager (design.md) ----
+   Helper text left, compact prev / "n of m" / next right. The band reserves its
+   height even on a single page so the list's measured height stays constant and
+   the adaptive row fit does not oscillate when the pager appears. */
+.vas-196-pager {
+    flex: 0 0 auto;
+    /* Matches the rendered pager row (.5em margin + .4em padding + 1.5em button)
+       so the list height is identical whether or not the pager is shown - the
+       adaptive row fit must not oscillate as the pager toggles. */
+    min-height: 2.5em;
+}
+
+.vas-196-pager-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    margin-top: .5em;
+    padding-top: .4em;
+    border-top: 1px solid #D9E2EB;
+}
+
+.vas-196-pager-info {
+    font-size: .75em;
+    color: #748494;
+    line-height: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-196-pager-nav {
+    display: flex;
+    align-items: center;
+    gap: .35em;
+    flex: 0 0 auto;
+}
+
+.vas-196-pager-label {
+    font-size: .8125em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas-196-pgbtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.7);
+    color: #0083DA;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+}
+
+.vas-196-pgbtn:hover:not(:disabled) {
+    background: #EAF8FF;
+    border-color: #C6D6E4;
+}
+
+.vas-196-pgbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+}
+
+.vas-196-pgbtn svg {
+    width: .875em;
+    height: .875em;
+}
+
+/* ---- Busy overlay ---- */
+.vas-196-busy {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 14px;
+}
+
+.vas-196-hidden {
+    display: none !important;
+}
+
+/* ---- Responsive ----
+   The card interior scales off the em anchor clamp, so no per-breakpoint font
+   stepping is needed at normal widths. A narrow or zoomed-in cell needs the base
+   font pushed below the 16px clamp floor - a container concern, not a viewport
+   one (mirrors VAS_018 / VAS_192). */
+@container vas-196 (max-width: 420px) {
+    .vas-196-row {
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 1fr);
+        gap: .4em;
+    }
+
+    /* Restated because the org variant is the more specific selector and would
+       otherwise keep the wide-cell ratio here. */
+    .vas-196-list-org .vas-196-row {
+        grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1fr);
+    }
+}
+
+@container vas-196 (max-width: 300px) {
+    .vas-196-card { font-size: 13px; }
+
+    /* Selectors stack rather than squeeze to three unreadable stubs; the funnel
+       keeps its square and trails them. */
+    .vas-196-filters { flex-wrap: wrap; }
+    .vas-196-sel { flex: 1 1 45%; }
+}
+
+@container vas-196 (max-width: 220px) {
+    .vas-196-card { font-size: 11px; }
+
+    .vas-196-sel { flex: 1 1 100%; }
+}
+
+/* Small viewports: tighten the row rhythm so the same number of rows still fits
+   the shorter cell a narrow dashboard produces. */
+@media (max-width: 768px) {
+    .vas-196-row { gap: .35em; padding: .4em 0; }
+
+    .vas-196-filters { gap: .3em; }
+}
+
+/* ---- RTL ----
+   The flex/grid layout mirrors itself; only the fixed chevron glyphs need to be
+   flipped once the pager nav reverses. */
+[dir="rtl"] .vas-196-pgbtn svg {
+    transform: scaleX(-1);
+}

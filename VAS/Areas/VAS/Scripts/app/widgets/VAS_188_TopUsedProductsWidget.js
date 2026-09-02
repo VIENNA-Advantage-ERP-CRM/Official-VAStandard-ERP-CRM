@@ -104,15 +104,75 @@
             return n.toLocaleString(window.navigator.language);
         }
 
-        function formatINR(value) {
-            var val = Number(value || 0);
-            if (val >= 100000) {
-                return '₹' + (val / 100000).toFixed(1) + 'L';
-            } else if (val >= 1000) {
-                return '₹' + (val / 1000).toFixed(1) + 'k';
-            }
-            return '₹' + val.toLocaleString(window.navigator.language);
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
+        var currencyIso = '';
+        var currencySymbol = '';
+
+        function isIndianISO(iso) {
+            if (!iso) { return false; }
+            var indianIsos = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+            return indianIsos.indexOf(String(iso).toUpperCase()) !== -1;
         }
+
+        function getDisplaySymbol() {
+            return currencySymbol || currencyIso || '';
+        }
+
+        function formatCurrencyCompact(value) {
+            var val = Number(value || 0);
+            if (isNaN(val)) { val = 0; }
+            var sym = getDisplaySymbol();
+            var prefix = sym ? (sym + (sym.length > 2 ? ' ' : '')) : '';
+            var sign = val < 0 ? '-' : '';
+            var absVal = Math.abs(val);
+
+            if (isIndianISO(currencyIso)) {
+                if (absVal >= 10000000) {
+                    return sign + prefix + (absVal / 10000000).toFixed(1) + 'Cr';
+                } else if (absVal >= 100000) {
+                    return sign + prefix + (absVal / 100000).toFixed(1) + 'L';
+                } else if (absVal >= 1000) {
+                    return sign + prefix + (absVal / 1000).toFixed(1) + 'k';
+                }
+                return sign + prefix + absVal.toLocaleString('en-IN');
+            } else {
+                if (absVal >= 1000000000) {
+                    return sign + prefix + (absVal / 1000000000).toFixed(1) + 'B';
+                } else if (absVal >= 1000000) {
+                    return sign + prefix + (absVal / 1000000).toFixed(1) + 'M';
+                } else if (absVal >= 1000) {
+                    return sign + prefix + (absVal / 1000).toFixed(1) + 'k';
+                }
+                return sign + prefix + absVal.toLocaleString(window.navigator.language || 'en-US');
+            }
+        }
+
+        function formatCurrencyFull(value) {
+            var val = Number(value || 0);
+            if (isNaN(val)) { val = 0; }
+            var sym = getDisplaySymbol();
+            var prefix = sym ? (sym + (sym.length > 2 ? ' ' : '')) : '';
+            var sign = val < 0 ? '-' : '';
+            var absVal = Math.abs(val);
+
+            if (isIndianISO(currencyIso)) {
+                return sign + prefix + absVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } else {
+                return sign + prefix + absVal.toLocaleString(window.navigator.language || 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+        }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//      function formatINR(value) {
+//          var val = Number(value || 0);
+//          if (val >= 100000) {
+//              return '₹' + (val / 100000).toFixed(1) + 'L';
+//          } else if (val >= 1000) {
+//              return '₹' + (val / 1000).toFixed(1) + 'k';
+//          }
+//          return '₹' + val.toLocaleString(window.navigator.language);
+//      }
+// ----- END OLD CODE -----
 
         function formatMonthName(m) {
             var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -165,10 +225,22 @@
                 data: { month: selectedMonth, year: selectedYear, measure: activeMeasure },
                 cache: false,
                 success: function (res) {
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
                     var data = parseResponse(res);
+                    if (data.currency) {
+                        currencyIso = data.currency.iso || currencyIso;
+                        currencySymbol = data.currency.symbol || currencySymbol;
+                    }
                     productsData = data.products || [];
                     pageNo = 1;
                     renderProducts();
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                  var data = parseResponse(res);
+//                  productsData = data.products || [];
+//                  pageNo = 1;
+//                  renderProducts();
+// ----- END OLD CODE -----
                 },
                 error: function () {
                     productsData = [];
@@ -211,7 +283,12 @@
                     '</div>' +
                     '<div class="vas-tup-row-right">' +
                     '<div class="vas-tup-qty-uom">' + formatQty(item.totalQty) + ' ' + escapeHtml(item.uomName || "Nos") + '</div>' +
-                    '<div class="vas-tup-val">' + formatINR(item.totalValue) + '</div>' +
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
+                    '<div class="vas-tup-val" title="' + escapeHtml(formatCurrencyFull(item.totalValue)) + '">' + escapeHtml(formatCurrencyCompact(item.totalValue)) + '</div>' +
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                  '<div class="vas-tup-val">' + formatINR(item.totalValue) + '</div>' +
+// ----- END OLD CODE -----
                     '</div>' +
                     '</button>';
             }
@@ -249,7 +326,7 @@
                 '<div class="vas-tup-summary-grid">' +
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_Month", "Month")) + '</div><div class="vas-tup-field-val">' + escapeHtml(monthFull) + '</div></div>' +
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedQty", "Consumed Qty")) + '</div><div class="vas-tup-field-val">' + escapeHtml(formatQty(totalQty) + ' ' + uomName) + '</div></div>' +
-                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedValue", "Consumed Value")) + '</div><div class="vas-tup-field-val">' + escapeHtml(formatINR(totalValue)) + '</div></div>' +
+                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedValue", "Consumed Value")) + '</div><div class="vas-tup-field-val" title="' + escapeHtml(formatCurrencyFull(totalValue)) + '">' + escapeHtml(formatCurrencyCompact(totalValue)) + '</div></div>' +
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_IssueLines", "Issue Lines")) + '</div><div class="vas-tup-field-val vas-tup-m-lines-cnt">—</div></div>' +
                 '</div>' +
                 '<table class="vas-tup-lines-table">' +
@@ -329,7 +406,12 @@
                         '<td>' + escapeHtml(rec.movementDate) + '</td>' +
                         '<td title="' + escapeHtml(rec.whLoc) + '">' + escapeHtml(rec.whLoc) + '</td>' +
                         '<td>' + escapeHtml(formatQty(rec.qty)) + '</td>' +
-                        '<td>' + escapeHtml(formatINR(rec.value)) + '</td>' +
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
+                        '<td title="' + escapeHtml(formatCurrencyFull(rec.value)) + '">' + escapeHtml(formatCurrencyCompact(rec.value)) + '</td>' +
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//                      '<td>' + escapeHtml(formatINR(rec.value)) + '</td>' +
+// ----- END OLD CODE -----
                         '</tr>';
                 }
 
@@ -378,14 +460,28 @@
                 url: VIS.Application.contextUrl + 'VAS_188_TopUsedProductsWidget/GetProductUsageDetails',
                 type: 'GET',
                 data: { productId: pid, month: selectedMonth, year: selectedYear },
-                cache: false,
+// ===== NEW CODE START — currency format (agent A10, 2026-08-19) =====
                 success: function (res) {
                     var data = parseResponse(res);
+                    if (data.currency) {
+                        currencyIso = data.currency.iso || currencyIso;
+                        currencySymbol = data.currency.symbol || currencySymbol;
+                    }
                     usageLines = data.lines || [];
                     $modal.find('.vas-tup-m-lines-cnt').text(usageLines.length);
                     mPageNo = 1;
                     renderLinesTable();
                 }
+// ===== NEW CODE END — currency format =====
+// ----- OLD CODE (kept for rollback, do not delete) -----
+//              success: function (res) {
+//                  var data = parseResponse(res);
+//                  usageLines = data.lines || [];
+//                  $modal.find('.vas-tup-m-lines-cnt').text(usageLines.length);
+//                  mPageNo = 1;
+//                  renderLinesTable();
+//              }
+// ----- END OLD CODE -----
             });
         }
 
@@ -539,3 +635,4 @@
     };
 
 })(VAS, jQuery);
+

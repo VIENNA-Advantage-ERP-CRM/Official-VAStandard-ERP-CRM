@@ -122,6 +122,14 @@
  *                          "was X → now Y" under the field's name, the old
  *                          value struck through and the new one carrying the
  *                          row's colour. Matches VAS_101 / VAS_104.
+ *   VAI163   2026-08-21  Nothing overlaps anything at any zoom level. Item and
+ *                        document cells clip (min-width:0 alone lets the cell
+ *                        shrink, but its text still paints outside the box, over
+ *                        the column beside it). The stepper's steps can shrink
+ *                        (min-width:0) and their labels break inside the word, so
+ *                        a long stage name neither sets the stepper's floor nor
+ *                        prints over the stage next to it. Narrow-panel header
+ *                        grids took the minmax(0, 1fr) floor.
  ***********************************************************/
 
 .vas_098-root {
@@ -313,7 +321,10 @@
 /* ---------- Stepper ---------- */
 .vas_098-stepper { display:flex; background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px;
     padding:15px 12px 11px; box-shadow:var(--rq-widget-shadow); margin-bottom:14px }
-.vas_098-step { flex:1; position:relative; display:flex; flex-direction:column; align-items:center; text-align:center;
+/* min-width:0 so a long stage label shrinks its step instead of widening the
+   stepper past the panel; the label itself breaks inside its word (below), so
+   the six stages stay on one rail at any panel width or zoom level. */
+.vas_098-step { flex:1; min-width:0; position:relative; display:flex; flex-direction:column; align-items:center; text-align:center;
     padding:0 2px; --nb:#E7ECF1; --nf:#5A6B79; --ln:#E1EAF2 }
 .vas_098-step.vas_098-c1{--nb:#E4E9EF;--nf:#5A6B79}
 .vas_098-step.vas_098-c2{--nb:#D6F0E2;--nf:#0C5D38}
@@ -328,9 +339,14 @@
     font-size:11px; font-weight:700; background:var(--nb); color:var(--nf) }
 .vas_098-step.vas_098-active .vas_098-node { border:2px solid var(--nf); box-shadow:0 0 0 4px rgba(15,61,97,0.06) }
 .vas_098-step.vas_098-pending .vas_098-node { opacity:.8 }
-.vas_098-slabel { margin-top:9px; font-size:11.5px; font-weight:500; color:var(--rq-text-2); line-height:1.2 }
+/* A single long stage name ("Acknowledged", "Partially Ordered") is an
+   unbreakable word: without overflow-wrap it sets the step's floor, and once the
+   step is allowed to shrink past it the label paints over its neighbour instead.
+   Breaking inside the word is what keeps the stages side by side at any zoom. */
+.vas_098-slabel { margin-top:9px; font-size:11.5px; font-weight:500; color:var(--rq-text-2); line-height:1.2;
+    overflow-wrap:anywhere }
 .vas_098-step.vas_098-done .vas_098-slabel, .vas_098-step.vas_098-active .vas_098-slabel { color:var(--rq-text); font-weight:700 }
-.vas_098-ssub2 { margin-top:2px; font-size:10.5px; color:var(--rq-text-muted) }
+.vas_098-ssub2 { margin-top:2px; font-size:10.5px; color:var(--rq-text-muted); overflow-wrap:anywhere }
 .vas_098-step.vas_098-active .vas_098-ssub2 { color:var(--nf); font-weight:700 }
 
 /* ---------- Lower region (Items / Activity / Notes, stacked) ---------- */
@@ -354,8 +370,11 @@
    that it has no floor width. */
 .vas_098-itrow { display:grid; grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,0.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr); align-items:center; padding:9px 14px; gap:10px }
 /* Grid items default to min-width:auto, which blocks the ellipsis on the cells
-   below from ever kicking in. */
-.vas_098-itrow > * { min-width:0 }
+   below from ever kicking in. overflow:hidden is the other half of it: a cell
+   that keeps min-width:auto anywhere (or simply holds an unbreakable word wider
+   than its track) paints straight over the column beside it, and a clipped cell
+   is the only thing that cannot. */
+.vas_098-itrow > * { min-width:0; overflow:hidden; text-overflow:ellipsis }
 .vas_098-ithead { background:var(--rq-faint-blue); font-size:12px; color:var(--rq-text-muted); border-bottom:1px solid var(--rq-border) }
 .vas_098-itbody { font-size:13.5px; border-bottom:1px solid var(--rq-divider) }
 .vas_098-itbody:last-of-type { border-bottom:none }
@@ -376,6 +395,17 @@
 .vas_098-src .vas_098-bar i { display:block; height:100%; border-radius:99px }
 .vas_098-src.vas_098-full i { background:var(--rq-success-tx) } .vas_098-src.vas_098-short i { background:var(--rq-warn-tx) }
 .vas_098-src.vas_098-full { color:var(--rq-success-tx); font-weight:500 } .vas_098-src.vas_098-short { color:var(--rq-warn-tx); font-weight:500 }
+/* Received cell: the bar sits ABOVE the received/ordered ratio rather than beside
+   it, so the bar can be wide enough to read as a proportion in a column narrow
+   enough to hold the ratio. Green once the line has everything it asked for,
+   orange while it is short — the same two tones the source cell above uses, so
+   "short" means the same thing wherever it is drawn. */
+.vas_098-recv { display:inline-flex; flex-direction:column; align-items:flex-end; gap:3px; font-size:12.5px; max-width:100% }
+.vas_098-recv .vas_098-bar { width:72px; max-width:100%; height:5px; border-radius:99px; background:#E7EEF4; overflow:hidden; flex:none }
+.vas_098-recv .vas_098-bar i { display:block; height:100%; border-radius:99px }
+.vas_098-recvRatio { line-height:1.2; white-space:nowrap }
+.vas_098-recv.vas_098-full i { background:var(--rq-success-tx) } .vas_098-recv.vas_098-short i { background:var(--rq-warn-tx) }
+.vas_098-recv.vas_098-full { color:var(--rq-success-tx); font-weight:500 } .vas_098-recv.vas_098-short { color:var(--rq-warn-tx); font-weight:500 }
 .vas_098-itfoot { display:flex; align-items:center; justify-content:flex-end; gap:22px; flex-wrap:wrap; padding:10px 16px;
     background:var(--rq-faint-blue); border-top:1px solid var(--rq-border); font-size:13px }
 .vas_098-tf { color:var(--rq-text-2) } .vas_098-tf b { color:var(--rq-text); font-weight:600; margin-left:6px }
@@ -390,7 +420,7 @@
    meanings, so neither table's grid can reach the other's. */
 .vas_098-docRow { display:grid; grid-template-columns:minmax(0,2.4fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);
     align-items:center; padding:9px 14px; gap:10px }
-.vas_098-docRow > * { min-width:0 }
+.vas_098-docRow > * { min-width:0; overflow:hidden; text-overflow:ellipsis }
 .vas_098-docItem { display:flex; align-items:center; gap:8px; min-width:0 }
 .vas_098-docTxt { min-width:0; flex:1 }
 /* A whole document row is clickable — the open arrow and the doc no tint on
@@ -428,6 +458,14 @@
 .vas_098-actbadge.vas_098-po  { background:#E4F0FF; color:#0E5DA8 }
 .vas_098-actbadge.vas_098-grn { background:#CCEFDD; color:#0C5D38 }
 .vas_098-actbadge.vas_098-email { background:#EFEAFF; color:#5F4AA6 }
+/* The shared correspondence / engagement sources. A letter wears the mail's
+   colours — it is the same record in the same table, filed under a different
+   attachment type — while a meeting, a task and a call each take one of their
+   own, so a reader scanning the feed can tell the four apart at a glance. */
+.vas_098-actbadge.vas_098-letter { background:#EFEAFF; color:#5F4AA6 }
+.vas_098-actbadge.vas_098-appt   { background:#E8F2FC; color:#0E5DA8 }
+.vas_098-actbadge.vas_098-task   { background:#FCEFD2; color:#9A6500 }
+.vas_098-actbadge.vas_098-call   { background:#E0F2F1; color:#0B7A6B }
 .vas_098-actmain { flex:1; min-width:0 }
 /* Headline left, "when · by whom" right — wrapping when the two cannot share a
    line. The stamp now carries the actor's name on every row, not just an
@@ -524,10 +562,10 @@
        value on the row's tooltip; a hidden one carries nothing. */
 }
 @container (max-width: 460px) {
-    .vas_098-hdrCard { grid-template-columns:1fr }
+    .vas_098-hdrCard { grid-template-columns:minmax(0, 1fr) }
     .vas_098-hdrColL { border-right:none; padding-right:0; border-bottom:1px solid var(--rq-divider); padding-bottom:12px }
     /* Two field columns are too cramped this narrow — back to a single stack. */
-    .vas_098-hdrColR { grid-template-columns:1fr }
+    .vas_098-hdrColR { grid-template-columns:minmax(0, 1fr) }
     .vas_098-hdrTop { flex-direction:column }
     .vas_098-hdrPills { justify-content:flex-start }
 }
@@ -568,4 +606,13 @@
 .vas_098-cvNew {
     color: var(--rq-text); font-weight: 700;
     overflow-wrap: break-word; word-break: break-word;
+}
+
+/* Each e-mail sent against an appointment or task, inside that row's drawer.
+   The second and later ones are ruled off, so several notices about the same
+   meeting do not read as one long message. */
+.vas_098-actmailsplit {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--rq-divider);
 }

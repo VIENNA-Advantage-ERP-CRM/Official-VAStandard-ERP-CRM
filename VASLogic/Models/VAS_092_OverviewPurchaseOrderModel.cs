@@ -296,6 +296,56 @@
 ///                        UPPER, which is the single point at which the whole
 ///                        loader could return nothing while the log was full of
 ///                        good rows.
+///   VAI163   2026-08-20  A field-level activity row reports what the field SHOWS,
+///                        not what the change log STORED (DisplayChangeValue):
+///                          * a reference resolves to the referenced record's
+///                            identifier — "Business Partner was 1000042 → now
+///                            1000117" named the edit and nothing else. The table,
+///                            its key and its display column all come from the
+///                            dictionary (AD_Ref_Table, else the platform's own
+///                            ColumnName-minus-_ID convention, with
+///                            AD_Column.IsIdentifier for the display), so it works
+///                            for a module's own references too, and every name it
+///                            writes into a statement passes SAFE_NAME first;
+///                          * a list value resolves through AD_Ref_List.Name;
+///                          * a date reports the DATE alone. The log stores a full
+///                            timestamp, so an edited Date Promised read
+///                            "20-08-2026 00:00:00" — a midnight nobody chose,
+///                            against a field that has no time part at all.
+///                        Anything unresolvable keeps the logged value, and both
+///                        lookups are cached per request, so a field edited ten
+///                        times costs one read per distinct value.
+///                        The no-real-edit test compares the RAW values, before
+///                        either is resolved: two records can share a name, and
+///                        dropping such a row would hide a real edit.
+///   VAI163   2026-08-21  Activity: an appointment or task now carries the
+///                        e-mails sent against IT - MailAttachment1 keyed on
+///                        AppointmentsInfo rather than on this panel's own
+///                        table - with the recipient (MailAddress), subject
+///                        (Title), when (Created) and who sent it (CreatedBy).
+///                        The body (TextMsg, flattened) travels with the row so
+///                        the panel reveals it on click. Read in one query for
+///                        the whole feed through VAS_ActivitySourcesModel.
+///   VAI163   2026-08-24  - VendorEmail: the address the panel's Send Invoice
+///                          button seeds the share/e-mail form's recipient with,
+///                          beside the vendor's name. The order's own contact
+///                          address is preferred; any active contact of the
+///                          vendor (MIN over AD_User, so the scalar sub-select
+///                          cannot return two rows and raise on Oracle) stands in
+///                          when the order names none. A blank one is not a
+///                          failure — VAS_SentEmailDocModel resolves the
+///                          recipient from AD_Table_ID + RecordID on the server.
+///                        - IsEmailSent (C_Order.VAS_IsEmailSent) so the Order
+///                          Progress "With Vendor" stage can report "Email Sent"
+///                          or "Pending" rather than repeating the completion
+///                          date the stage above it already carries. Read in its
+///                          OWN statement (LoadEmailSent) and ATTEMPTED rather
+///                          than gated on ColumnExists: it is a module column, so
+///                          selecting it alongside the header would fail the
+///                          WHOLE overview on a deployment that has not taken it,
+///                          and the dictionary guard has its own failure modes
+///                          (see LoadBlanketOrigin). A missing column throws once
+///                          and the stage reads "Pending".
 /// </summary>
 
 using System;
@@ -354,6 +404,17 @@ namespace VASLogic.Models
                               bpc.Name            AS ContactName,
                               bpc.Phone           AS ContactPhone,
                               bpc.EMail           AS ContactEmail,
+                              -- The VENDOR's own e-mail address, used to seed the
+                              -- Send Invoice recipient when the order names no
+                              -- contact of its own. MIN, not a bare column: a
+                              -- vendor can carry several contacts and a scalar
+                              -- sub-select that returns more than one row raises
+                              -- on Oracle instead of answering.
+                              (SELECT MIN(bpu.EMail)
+                                 FROM AD_User bpu
+                                WHERE bpu.C_BPartner_ID = o.C_BPartner_ID
+                                  AND bpu.IsActive      = 'Y'
+                                  AND bpu.EMail IS NOT NULL)                    AS VendorEMail,
                               sr.Name             AS BuyerName,
                               cu.Name             AS CreatedByName,
                               pt.Name             AS PaymentTermName,
@@ -467,6 +528,13 @@ namespace VASLogic.Models
             result.ContactName   = Util.GetValueOfString(r["ContactName"]);
             result.ContactPhone  = Util.GetValueOfString(r["ContactPhone"]);
             result.ContactEmail  = Util.GetValueOfString(r["ContactEmail"]);
+            // Recipient seed for the Send Invoice / share-document flow. The
+            // order's own contact address is preferred — it is the person this
+            // purchase order was actually placed with — and any active contact of
+            // the vendor stands in when the order names none.
+            result.VendorEmail   = result.ContactEmail.Trim().Length > 0
+                                   ? result.ContactEmail
+                                   : Util.GetValueOfString(r["VendorEMail"]);
             result.BuyerName     = Util.GetValueOfString(r["BuyerName"]);
             result.CreatedByName = Util.GetValueOfString(r["CreatedByName"]);
             result.PaymentTermName = Util.GetValueOfString(r["PaymentTermName"]);
@@ -557,6 +625,9 @@ namespace VASLogic.Models
             result.IsInvoiceRaised    = invoiced;
             result.IsPaymentDone      = paid;
             result.CurrentStage       = ComputeCurrentStage(result);
+
+            // ----- With Vendor: has the order been e-mailed out? -----
+            LoadEmailSent(C_Order_ID, result);
 
             // ----- Per-stage action dates (for the progress stepper) -----
             result.OrderCompletedDate = GetOrderCompletedDate(C_Order_ID);
@@ -1447,6 +1518,8 @@ namespace VASLogic.Models
             LoadOrderMilestoneActivity(C_Order_ID, activity);
             LoadOrderWorkflowActivity(C_Order_ID, activity);
             LoadOrderChangeActivity(C_Order_ID, activity);
+            // Appointments, tasks, calls and letters filed against the order.
+            LoadSharedSourceActivity(C_Order_ID, activity);
 
             // Newest first; entries with no timestamp sink to the bottom.
             activity.Sort((a, b) =>
@@ -1456,6 +1529,50 @@ namespace VASLogic.Models
             if (activity.Count > MAX_ENTRIES)
                 activity = activity.GetRange(0, MAX_ENTRIES);
             return activity;
+        }
+
+        /// <summary>Reads the appointment / task / call / letter sources every
+        /// overview panel shares (VAS_ActivitySourcesModel).</summary>
+        private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
+
+        /// <summary>
+        /// The correspondence and engagement sources shared with every other
+        /// overview panel: appointments and tasks (AppointmentsInfo, split on
+        /// IsTask), calls (VA048_CallDetails) and letters (MailAttachment1,
+        /// AttachmentType 'I'). Each hangs off the order by AD_Table_ID +
+        /// Record_ID.
+        ///
+        /// Mails are not taken from here — LoadEmailActivity already reads them
+        /// with the recipient and body detail the mail drawer needs, and it has
+        /// always asked for AttachmentType 'M', so the two kinds cannot overlap.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected purchase order id.</param>
+        /// <param name="list">Activity list being populated.</param>
+        private void LoadSharedSourceActivity(int C_Order_ID, List<ActivityData> list)
+        {
+            List<VAS_ActivitySourceRow> rows =
+                _activitySources.Load("C_Order", C_Order_ID, false);
+            foreach (VAS_ActivitySourceRow s in rows)
+            {
+                list.Add(new ActivityData
+                {
+                    Type        = s.Kind,      // appointment | task | call | letter
+                    Text        = s.Title,
+                    Body        = s.Body,
+                    Location    = s.Location,
+                    IsClosed    = s.IsClosed,
+                    IsCancelled = s.IsCancelled,
+                    MailTo      = s.MailTo,
+                    MailCc      = s.MailCc,
+                    MailBcc     = s.MailBcc,
+                    MailFrom    = s.MailFrom,
+                    IsMailSent  = s.IsMailSent,
+                    // An appointment or task brings the mails sent against it.
+                    Mails       = s.Mails,
+                    UserName    = s.ActorName,
+                    Created     = s.EventTime
+                });
+            }
         }
 
         /// <summary>
@@ -2074,7 +2191,9 @@ namespace VASLogic.Models
                                       cl.NewValue     AS NewValue,
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
-                                      col.ColumnName  AS FieldColumn
+                                      col.ColumnName  AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId
                                  FROM AD_ChangeLog cl
                                  INNER JOIN AD_Table adt
                                          ON (adt.AD_Table_ID = cl.AD_Table_ID)
@@ -2114,6 +2233,8 @@ namespace VASLogic.Models
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
                                       col.ColumnName  AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId,
                                       ol.Line         AS LineNo,
                                       p.Name          AS ProductName,
                                       ch.Name         AS ChargeName
@@ -2161,22 +2282,27 @@ namespace VASLogic.Models
         private void AddChangeRow(DataRow r, string scope, List<ActivityData> list)
         {
             string field = Util.GetValueOfString(r["FieldLabel"]);
-            if (string.IsNullOrEmpty(field))
-                field = Util.GetValueOfString(r["FieldColumn"]);
+            string column = Util.GetValueOfString(r["FieldColumn"]);
+            if (string.IsNullOrEmpty(field)) field = column;
             if (string.IsNullOrEmpty(field)) return;
 
-            string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
-            string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
+            string oldRaw = ChangeValue(Util.GetValueOfString(r["OldValue"]));
+            string newRaw = ChangeValue(Util.GetValueOfString(r["NewValue"]));
             // A save that rewrites a field with the value it already had is not an
-            // edit, and the platform logs plenty of those.
-            if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) return;
+            // edit, and the platform logs plenty of those. Compared on the RAW
+            // values, before either is resolved: two different records can share a
+            // name, and dropping such a row would hide a real edit.
+            if (string.Equals(oldRaw, newRaw, StringComparison.Ordinal)) return;
+
+            int refType    = Util.GetValueOfInt(r["RefType"]);
+            int refValueId = Util.GetValueOfInt(r["RefValueId"]);
 
             list.Add(new ActivityData
             {
                 Type        = "updated",
                 FieldName   = field,
-                OldValue    = oldValue,
-                NewValue    = newValue,
+                OldValue    = _changeValues.Display(oldRaw, column, refType, refValueId),
+                NewValue    = _changeValues.Display(newRaw, column, refType, refValueId),
                 ChangeScope = scope,
                 UserName    = Util.GetValueOfString(r["UserName"]),
                 Created     = Util.GetValueOfDateTime(r["EventOn"])
@@ -2195,10 +2321,67 @@ namespace VASLogic.Models
             return string.Equals(v, "null", StringComparison.OrdinalIgnoreCase) ? "" : v;
         }
 
+        /// <summary>
+        /// Resolves a change-log value into the text the field shows. Shared with
+        /// the other nine overview panels — see VAS_ChangeLogValueModel, which is
+        /// where this used to live privately. One per request, so its caches last
+        /// exactly as long as the feed being built.
+        /// </summary>
+        private readonly VAS_ChangeLogValueModel _changeValues = new VAS_ChangeLogValueModel();
+
         /// <summary>Single-parameter helper for the C_Order-scoped activity queries.</summary>
         private SqlParameter[] OrderParam(int C_Order_ID)
         {
             return new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) };
+        }
+
+        /// <summary>
+        /// Remembers whether C_Order.VAS_IsEmailSent is readable against this
+        /// schema, so a deployment without the column reports it once rather than
+        /// on every order the panel opens.
+        /// </summary>
+        private static bool? _emailSentLookupUsable;
+
+        /// <summary>
+        /// Whether the purchase order has been e-mailed to the vendor
+        /// (C_Order.VAS_IsEmailSent = 'Y'), which is what the Order Progress
+        /// "With Vendor" stage reports — "Email Sent" against a true flag,
+        /// "Pending" otherwise.
+        ///
+        /// Read in its OWN statement rather than as a column of the main SELECT,
+        /// and ATTEMPTED rather than gated on ColumnExists — the same reasoning as
+        /// <see cref="LoadBlanketOrigin"/>. VAS_IsEmailSent is a module column: a
+        /// deployment that has not taken it would fail the whole overview if it
+        /// were selected alongside the header, and the dictionary guard has its own
+        /// failure modes (a missing AD_Column row, or an AD_Table carrying more
+        /// than one row named C_Order, which makes the guard's scalar sub-select
+        /// raise instead of answer). A genuinely missing column throws once here
+        /// and the stage simply reads "Pending".
+        /// </summary>
+        /// <param name="C_Order_ID">Selected purchase order id.</param>
+        /// <param name="d">Overview being populated.</param>
+        private void LoadEmailSent(int C_Order_ID, PurchaseOrderOverviewData d)
+        {
+            if (_emailSentLookupUsable == false) return;
+
+            try
+            {
+                // COALESCE, not NVL: this statement has to read the same on Oracle
+                // and PostgreSQL.
+                string sql = @"SELECT COALESCE(o.VAS_IsEmailSent, 'N') AS IsEmailSent
+                                 FROM C_Order o
+                                WHERE o.C_Order_ID = @C_Order_ID";
+                object v = DB.ExecuteScalar(sql, OrderParam(C_Order_ID), null);
+                _emailSentLookupUsable = true;
+                d.IsEmailSent = Util.GetValueOfString(v) == "Y";
+            }
+            catch (Exception ex)
+            {
+                // Almost certainly "no such column" on a schema without the
+                // module column. Recorded so the next order skips the attempt.
+                _emailSentLookupUsable = false;
+                _log.Severe("LoadEmailSent (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
         }
 
         /// <summary>
@@ -3075,13 +3258,29 @@ namespace VASLogic.Models
             public string    ChangeScope     { get; set; }
             public DateTime? Created         { get; set; }
 
-            // E-mail (MailAttachment1) — the body is revealed on click.
+            // Appointment / task rows (AppointmentsInfo): where the meeting is and
+            // whether it has been dealt with. Empty on every other type.
+            public string    Location        { get; set; }
+            public bool      IsClosed        { get; set; }
+            public bool      IsCancelled     { get; set; }
+
+            // E-mail (MailAttachment1) — the body is revealed on click. A LETTER is
+            // the same record filed under AttachmentType 'I' and carries the same
+            // fields.
             public string    Body            { get; set; }
             public string    MailTo          { get; set; }
             public string    MailCc          { get; set; }
             public string    MailBcc         { get; set; }
             public string    MailFrom        { get; set; }
             public bool      IsMailSent      { get; set; }
+
+            /// <summary>The e-mails sent against an APPOINTMENT or TASK itself
+            /// (MailAttachment1 anchored on AppointmentsInfo): recipient, subject,
+            /// body, when and by whom. Distinct from the mail fields above, which
+            /// are correspondence about the ORDER. Empty on every other type; the
+            /// bodies travel with the row so the panel reveals them on click
+            /// without a second round trip.</summary>
+            public List<VAS_ActivityMailRow> Mails { get; set; }
         }
 
         /// <summary>An e-mail sent against the order (MailAttachment1).</summary>
@@ -3123,6 +3322,10 @@ namespace VASLogic.Models
             public string    ContactName     { get; set; }
             public string    ContactPhone    { get; set; }
             public string    ContactEmail    { get; set; }
+            /// <summary>Vendor e-mail address that seeds the Send Invoice
+            /// recipient: the order's own contact address, falling back to any
+            /// active contact of the vendor.</summary>
+            public string    VendorEmail     { get; set; }
 
             // Meta
             public string    BuyerName       { get; set; }
@@ -3204,6 +3407,10 @@ namespace VASLogic.Models
             public bool      IsInvoiceRaised    { get; set; }
             public bool      IsPaymentDone      { get; set; }
             public int       CurrentStage       { get; set; }    // 1..7
+            /// <summary>C_Order.VAS_IsEmailSent = 'Y' — the order was e-mailed to
+            /// the vendor. Reported by the "With Vendor" stage as "Email Sent"
+            /// against a true flag and "Pending" otherwise.</summary>
+            public bool      IsEmailSent        { get; set; }
 
             // Per-stage action dates (progress stepper sub-line)
             public DateTime? OrderCompletedDate { get; set; }    // DocComplete workflow node
