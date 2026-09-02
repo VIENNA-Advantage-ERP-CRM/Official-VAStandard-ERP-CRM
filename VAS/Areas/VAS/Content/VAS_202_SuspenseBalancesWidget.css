@@ -34,10 +34,7 @@
     box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
     backdrop-filter: blur(10px);
     box-sizing: border-box;
-    /* The card holds exactly four account rows (Suspense Balancing, Suspense Error,
-       Currency Balancing, Rounding Off). The card itself never scrolls - only the
-       account list takes a scrollbar, and only when the dashboard cell is too short
-       for all four rows. */
+    /* No inner scrollbars: the card holds exactly three account rows. */
     overflow: hidden;
 }
 
@@ -140,7 +137,7 @@
     outline-offset: 1px;
 }
 
-/* ---- Body: column header + four account rows + footer total ---- */
+/* ---- Body: column header + three account rows + footer total ---- */
 .vas-202-body {
     flex: 1 1 auto;
     min-height: 0;
@@ -172,31 +169,22 @@
     text-transform: capitalize;
 }
 
-/* Four rows now share the height three used to. The list still lays them out at their
-   natural height - it does not squeeze them - and takes a scrollbar only when the
-   dashboard cell genuinely cannot show all four, which is better than clipping the
-   last control account out of sight. No scrollbar-gutter: reserving the track
-   permanently would shift the numeric columns on every card that does fit. */
 .vas-202-list {
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 /* One control account. Row cells sit one step below the widget title (List / Grid
    Hierarchy Rule); the separator carries the scan-down rhythm and is never optional -
    only the last row drops it. */
 .vas-202-row {
-    /* .32em, not .4em: the fourth control account has to come out of the row padding,
-       not out of the type sizes, which the List / Grid Hierarchy Rule fixes. */
-    padding: .32em .35em;
+    padding: .4em .35em;
     border-bottom: 1px solid #E2EAF1;
     border-radius: 6px;
-    flex: 0 0 auto;
 }
 
 .vas-202-row:last-child {
@@ -235,8 +223,8 @@
 }
 
 .vas-202-row-main {
-    font-size: .85em;
-    font-weight: 600;
+    font-size: .75em;
+    font-weight: 700;
     color: #102C3F;
     line-height: 1.25;
     overflow: hidden;
@@ -254,7 +242,7 @@
     white-space: nowrap;
 }
 
-/* Numeric columns right-aligned so the figures line up across all four rows.
+/* Numeric columns right-aligned so the figures line up across the three rows.
    The end padding is not cosmetic: a cell clips its own overflow, and a glyph's INK
    can reach past the advance width its box is measured from - an italic tail (the "d"
    of "Not configured") or a currency symbol otherwise loses a sliver at the cell
@@ -268,7 +256,7 @@
 .vas-202-row .vas-202-cell-num {
     font-size: .75em;
     font-weight: 400;
-    color: black;
+    color: #102C3F;
 }
 
 /* An unconfigured control account: muted, and never a figure - a "0" here would read
@@ -598,20 +586,14 @@
    from the page size. min-height:0 stays so the flex item can still shrink under the
    dialog's 82vh cap on a short viewport. scrollbar-gutter reserves the scrollbar's
    width whether or not it is showing - without it a page that scrolls and a page that
-   does not would render the columns at two different widths.
-
-   NO padding-top, deliberately. A sticky header pins to the top of its scroll
-   container's PADDING box, not its content box - any padding-top here would leave a
-   band above the pinned header through which scrolled rows stay visible, so the list
-   appears to run over its own column captions. The header supplies that breathing
-   room with its own padding instead, where it scrolls away with nothing behind it. */
+   does not would render the columns at two different widths. */
 .vas-202-modal-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-gutter: stable;
-    padding: 0 20px 16px;
+    padding: 6px 20px 16px;
 }
 
 .vas-202-modal-state {
@@ -645,20 +627,17 @@
     align-items: center;
 }
 
-/* Header separator is darker than the body row separator. The opaque background and
-   the z-index are what a row passes UNDER as it scrolls - both are load-bearing, not
-   decoration. */
+/* Header separator is darker than the body row separator. */
 .vas-202-dhead {
     position: sticky;
     top: 0;
     background: #FFFFFF;
-    padding: 11px 0 10px;
+    padding: 11px 0;
     border-bottom: 1px solid #C5D2DD;
     font-size: .8125rem;
     font-weight: 500;
     color: #41576A;
     text-transform: capitalize;
-    z-index: 2;
 }
 
 .vas-202-drow {
@@ -968,7 +947,7 @@
     }
 
     .vas-202-modal-body {
-        padding: 0 14px 14px;
+        padding: 6px 14px 14px;
     }
 
     .vas-202-modal-head,
