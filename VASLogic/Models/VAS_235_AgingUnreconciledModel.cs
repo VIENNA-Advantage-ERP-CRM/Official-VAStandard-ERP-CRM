@@ -34,7 +34,6 @@ namespace VASLogic.Models
     ///                 Unreconciled  IsActive='Y', DocStatus IN ('CO','CL'),
     ///                               C_BankAccount_ID IS NOT NULL,
     ///                               COALESCE(IsReconciled,'N') &lt;&gt; 'Y',
-    ///                               COALESCE(IsReversal,'N') &lt;&gt; 'Y',
     ///                               DateAcct &lt; AsOfDateExclusive.
     ///                               Reconciliation is read from IsReconciled ALONE -
     ///                               never inferred from IsAllocated, IsPrepayment or an
@@ -252,9 +251,8 @@ namespace VASLogic.Models
 
             /* The target currency is a server-resolved id, never client input, so it is
                inlined rather than bound - the provider binds by POSITION, and a value used
-               inside a converted sum does not need a name of its own. ABS() because the
-               direction is carried by IsReceipt, never by the stored sign. */
-            string convert = "currencyConvert(ABS(p.PayAmt),p.C_Currency_ID," + acctCurrencyId
+               inside a converted sum does not need a name of its own. */
+            string convert = "currencyConvert(p.PayAmt,p.C_Currency_ID," + acctCurrencyId
                 + ",p.DateAcct,p.C_ConversionType_ID,p.AD_Client_ID,p.AD_Org_ID)";
 
             /* The bucket expression appears TWICE - once in the SELECT and once in the
@@ -354,8 +352,7 @@ namespace VASLogic.Models
                   AND p.AD_Client_ID=@AD_Client_ID
                   AND p.DocStatus IN ('").Append(DOCSTATUS_Completed).Append("','").Append(DOCSTATUS_Closed).Append(@"')
                   AND p.C_BankAccount_ID IS NOT NULL
-                  AND COALESCE(p.IsReconciled,'N')<>'").Append(FLAG_Yes).Append(@"'
-                  AND COALESCE(p.IsReversal,'N')<>'").Append(FLAG_Yes).Append("'");
+                  AND COALESCE(p.IsReconciled,'N')<>'").Append(FLAG_Yes).Append(@"'");
 
             /* One bank account rather than all of them. The id is not trusted - it is
                simply an extra equality on top of the tenant filter and MRole's own access

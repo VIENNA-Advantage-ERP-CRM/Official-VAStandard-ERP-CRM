@@ -366,3 +366,4 @@ import "../app/widgets/BankingJournal/VAS_231_NetMovementWidget.js";
 import "../app/widgets/BankingJournal/VAS_233_BankChargesWidget.js";
 import "../app/widgets/BankingJournal/VAS_234_AccountBalanceWidget.js";
 import "../app/widgets/BankingJournal/VAS_235_AgingUnreconciledWidget.js";
+import "../app/widgets/BankingJournal/VAS_236_ReceiptvsPaymentWidget.js";

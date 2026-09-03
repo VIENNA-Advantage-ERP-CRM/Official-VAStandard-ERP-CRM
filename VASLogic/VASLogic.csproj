@@ -189,6 +189,7 @@
     <Compile Include="Models\VAS_233_BankChargesModel.cs" />
     <Compile Include="Models\VAS_234_AccountBalanceModel.cs" />
     <Compile Include="Models\VAS_235_AgingUnreconciledModel.cs" />
+    <Compile Include="Models\VAS_236_ReceiptvsPaymentModel.cs" />
     <Compile Include="Models\VAS_InvoiceOverviewModel.cs" />
     <Compile Include="Models\VAS_PaymentVoucherPanelModel.cs" />
     <Compile Include="Models\VAS_RecentReceiptsModel.cs" />
