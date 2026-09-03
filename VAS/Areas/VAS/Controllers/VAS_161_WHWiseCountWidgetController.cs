@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Web.Mvc;
@@ -15,7 +15,11 @@ namespace VAS.Controllers
      * - Warehouse: M_Warehouse (M_Warehouse_ID, Value, Name)
      * - Inventory Header: M_Inventory (M_Inventory_ID, M_Warehouse_ID, MovementDate, DocStatus IN ('CO', 'CL'))
      * - Inventory Line: M_InventoryLine (M_InventoryLine_ID, M_Inventory_ID, M_Product_ID, M_Locator_ID, M_AttributeSetInstance_ID, QtyCount, C_Charge_ID)
-     * - Locator: M_Locator (M_Locator_ID, Value)
+     * - Locator: M_Locator (M_Locator_ID, Value, LocatorCombination)
+     *   Displayed as COALESCE(LocatorCombination, Value). Value on this data is a numeric
+     *   surrogate (1000000..1000006 on DB 1) - an ID as far as the user is concerned - while the
+     *   readable name lives in LocatorCombination. The source prompt says "Display locator value:
+     *   M_Locator.Value"; the user overrode that on 2026-08-29 asking for the NAME.
      * - Product: M_Product (M_Product_ID, Name)
      * - Attribute: M_AttributeSetInstance (M_AttributeSetInstance_ID, Description)
      * Cross-Database: COALESCE used for Oracle and PostgreSQL compatibility.
@@ -26,6 +30,53 @@ namespace VAS.Controllers
     public class VAS_161_WHWiseCountWidgetController : Controller
     {
         private static readonly VLogger _log = VLogger.GetVLogger(typeof(VAS_161_WHWiseCountWidgetController));
+
+        /*
+         * COUNT CORRECTNESS (user report "Incorrect counts is visible", 2026-08-29).
+         *
+         * All three queries were missing two of the four filters the source prompt lists under
+         * FILTERS as approved:
+         *     - M_Inventory.IsActive      = 'Y'          (was present)
+         *     - M_InventoryLine.IsActive  = 'Y'          <- MISSING
+         *     - M_Inventory.IsInternalUse = 'N'          <- MISSING
+         *     - M_Inventory.DocStatus IN ('CO','CL')     (was present)
+         *
+         * Without the IsInternalUse filter the widget counted INTERNAL USE / material issue
+         * documents as if they were inventory counts, inflating both the session count and the
+         * counted quantity and potentially listing warehouses that were never counted at all.
+         * Without il.IsActive it also summed inactive count lines.
+         *
+         * Applied to GetWarehouseSummary, GetWarehouseLocatorsString and GetWarehouseDetail so the
+         * card, the locator list and the popup all share one population.
+         *
+         * NOTE: this could NOT be reproduced on DB 1 - that database contains no internal-use
+         * documents, no inactive inventory lines and no null-locator lines, so before and after
+         * are identical there. The change is made because the approved rules require it; the
+         * discrepancy the user sees is expected to be on their own environment.
+         */
+
+        /*
+         * DATE RANGE: HALF-OPEN, NOT CLOSED (2026-09-02).
+         *
+         * All three queries built a CLOSED range:
+         *     endDate = startDate.AddMonths(1).AddDays(-1);   // last calendar day of the month
+         *     ... AND i.MovementDate <= <endDate>
+         *
+         * DB.TO_DATE(date, true) renders a DATE-ONLY literal, i.e. midnight, so "<= last day"
+         * actually means "<= last day 00:00:00" and silently drops every document stamped with a
+         * time on the final day of the month. The approved source prompt specifies the half-open
+         * form, which is what all three queries now use:
+         *     ... AND i.MovementDate >= <monthStart> AND i.MovementDate < <nextMonthStart>
+         *
+         * LATENT, NOT ACTIVE: verified on DB 2 (2026-09-02) that 0 of the 111 completed/closed,
+         * non-internal-use inventory documents carry a time component on MovementDate. All 40
+         * warehouse-by-month aggregates (111 sessions, 400 lines, 440,668 total qty) come out
+         * byte-identical under both forms, so this changes no number on that database today. It
+         * is made for correctness and spec compliance, and applied to GetWarehouseSummary,
+         * GetWarehouseLocatorsString and GetWarehouseDetail together so the card, the locator
+         * list and the popup keep ONE shared definition of "this month". A partial fix would
+         * make the card and the popup disagree.
+         */
 
         /// <summary>
         /// Gets available distinct years from inventory count records.
@@ -97,8 +148,8 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                DateTime startDate = new DateTime(year, month, 1);
-                DateTime endDate = startDate.AddMonths(1).AddDays(-1);
+                DateTime monthStart = new DateTime(year, month, 1);
+                DateTime nextMonthStart = monthStart.AddMonths(1);
 
                 string sql = @"SELECT w.M_Warehouse_ID, 
                                       w.Value AS WarehouseCode, 
@@ -109,9 +160,11 @@ namespace VAS.Controllers
                                JOIN M_Warehouse w ON (i.M_Warehouse_ID = w.M_Warehouse_ID) 
                                JOIN M_InventoryLine il ON (i.M_Inventory_ID = il.M_Inventory_ID) 
                                WHERE i.IsActive = 'Y' 
+                                 AND il.IsActive = 'Y' 
+                                 AND COALESCE(i.IsInternalUse, 'N') = 'N' 
                                  AND i.DocStatus IN ('CO', 'CL') 
-                                 AND i.MovementDate >= " + DB.TO_DATE(startDate, true) + @" 
-                                 AND i.MovementDate <= " + DB.TO_DATE(endDate, true);
+                                 AND i.MovementDate >= " + DB.TO_DATE(monthStart, true) + @" 
+                                 AND i.MovementDate < " + DB.TO_DATE(nextMonthStart, true);
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                 sql += " GROUP BY w.M_Warehouse_ID, w.Value, w.Name ORDER BY TotalQtyCounted DESC";
@@ -120,7 +173,7 @@ namespace VAS.Controllers
                 while (dr != null && dr.Read())
                 {
                     int whId = Util.GetValueOfInt(dr["M_Warehouse_ID"]);
-                    string locatorsStr = GetWarehouseLocatorsString(ctx, whId, startDate, endDate);
+                    string locatorsStr = GetWarehouseLocatorsString(ctx, whId, monthStart, nextMonthStart);
 
                     list.Add(new
                     {
@@ -149,24 +202,29 @@ namespace VAS.Controllers
             return Json(new { data = list }, JsonRequestBehavior.AllowGet);
         }
 
-        private string GetWarehouseLocatorsString(Ctx ctx, int warehouseId, DateTime startDate, DateTime endDate)
+        private string GetWarehouseLocatorsString(Ctx ctx, int warehouseId, DateTime monthStart, DateTime nextMonthStart)
         {
             List<string> locators = new List<string>();
             IDataReader dr = null;
             try
             {
-                string sql = @"SELECT DISTINCT loc.Value AS LocatorValue 
+                string sql = @"SELECT DISTINCT COALESCE(loc.LocatorCombination, loc.Value) AS LocatorValue 
                                FROM M_InventoryLine il 
                                JOIN M_Inventory i ON (il.M_Inventory_ID = i.M_Inventory_ID) 
                                JOIN M_Locator loc ON (il.M_Locator_ID = loc.M_Locator_ID) 
                                WHERE i.IsActive = 'Y' 
+                                 AND il.IsActive = 'Y' 
+                                 AND COALESCE(i.IsInternalUse, 'N') = 'N' 
                                  AND i.DocStatus IN ('CO', 'CL') 
                                  AND i.M_Warehouse_ID = " + warehouseId + @" 
-                                 AND i.MovementDate >= " + DB.TO_DATE(startDate, true) + @" 
-                                 AND i.MovementDate <= " + DB.TO_DATE(endDate, true);
+                                 AND i.MovementDate >= " + DB.TO_DATE(monthStart, true) + @" 
+                                 AND i.MovementDate < " + DB.TO_DATE(nextMonthStart, true);
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                sql += " ORDER BY loc.Value ASC";
+                // ORDER BY the select-list ALIAS, not the bare column: with SELECT DISTINCT
+                // over a COALESCE expression, ordering by loc.Value would sort on something that
+                // is not in the select list. Verified on DB 1.
+                sql += " ORDER BY LocatorValue ASC";
 
                 dr = DB.ExecuteReader(sql, null, null);
                 while (dr != null && dr.Read())
@@ -214,8 +272,8 @@ namespace VAS.Controllers
             IDataReader dr = null;
             try
             {
-                DateTime startDate = new DateTime(year, month, 1);
-                DateTime endDate = startDate.AddMonths(1).AddDays(-1);
+                DateTime monthStart = new DateTime(year, month, 1);
+                DateTime nextMonthStart = monthStart.AddMonths(1);
 
                 // asi.Description is NVARCHAR2 (national character set); 'Standard' is a plain
                 // literal. COALESCE across the two raises ORA-12704 "character set mismatch", the
@@ -225,7 +283,7 @@ namespace VAS.Controllers
                 // instruction not to display a "Standard" placeholder.
                 string sql = @"SELECT p.Name AS ProductName,
                                       asi.Description AS AttributeDesc,
-                                      loc.Value AS LocatorValue,
+                                      COALESCE(loc.LocatorCombination, loc.Value) AS LocatorValue,
                                       CASE WHEN il.C_Charge_ID IS NOT NULL THEN 'Charge Account' ELSE 'Inventory Difference' END AS InventoryType, 
                                       il.QtyCount AS Qty, 
                                       i.M_Inventory_ID 
@@ -235,10 +293,12 @@ namespace VAS.Controllers
                                LEFT JOIN M_Locator loc ON (il.M_Locator_ID = loc.M_Locator_ID) 
                                LEFT JOIN M_AttributeSetInstance asi ON (il.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID) 
                                WHERE i.IsActive = 'Y' 
+                                 AND il.IsActive = 'Y' 
+                                 AND COALESCE(i.IsInternalUse, 'N') = 'N' 
                                  AND i.DocStatus IN ('CO', 'CL') 
                                  AND i.M_Warehouse_ID = " + warehouseId + @" 
-                                 AND i.MovementDate >= " + DB.TO_DATE(startDate, true) + @" 
-                                 AND i.MovementDate <= " + DB.TO_DATE(endDate, true);
+                                 AND i.MovementDate >= " + DB.TO_DATE(monthStart, true) + @" 
+                                 AND i.MovementDate < " + DB.TO_DATE(nextMonthStart, true);
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                 sql += " ORDER BY p.Name ASC";

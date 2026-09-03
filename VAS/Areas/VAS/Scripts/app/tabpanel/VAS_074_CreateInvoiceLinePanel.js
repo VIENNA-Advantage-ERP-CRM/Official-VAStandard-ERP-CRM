@@ -272,7 +272,25 @@
             // (record_ID > 0). A new/unsaved parent never flashes the empty box.
             applyTabVisibility(false);
             $(document).on("mousedown.vascil", onDocMouseDown);
+            /* Browser zoom fires resize, so this is where a stale host width is re-released.
+               Debounced through rAF - a zoom or a drag-resize emits a burst of events and the
+               work is a DOM write. */
+            $(window).on("resize.vascil074", function () {
+                if (fitRaf) return;
+                var run = function () { fitRaf = null; fitHostWidth(); };
+                // Called through `window.` on purpose: a detached requestAnimationFrame
+                // reference throws "Illegal invocation" in some browsers.
+                fitRaf = window.requestAnimationFrame
+                    ? window.requestAnimationFrame(run)
+                    : window.setTimeout(run, 16);
+            });
         };
+
+        /* Pending rAF/timeout handle for the resize-driven re-fit. */
+        var fitRaf = null;
+
+        /* Exposed so the prototype's sizeChanged (a framework callback) can re-fit too. */
+        this.fitHostWidth = function () { fitHostWidth(); };
 
         function createBusyIndicator() {
             $busy = $('<div class="vis-apanel-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
@@ -305,6 +323,38 @@
                 if ($host.length) $head = $host.find(".vis-ad-w-p-ap-tp-o-b-head");
             }
             $head.addClass("vas-cil-tab-hidden");
+            fitHostWidth();
+        }
+
+        /* True when the browser understands :has(), i.e. when the stylesheet's own
+           full-width rule for the tab-panel host is doing the job. */
+        function supportsHas() {
+            try { return !!(window.CSS && CSS.supports && CSS.supports("selector(:has(*))")); }
+            catch (e) { return false; }
+        }
+
+        /* Fallback for browsers WITHOUT :has() - see the "Full-width host" block in
+           VAS_074_CreateInvoiceLinePanel.css for the full explanation.
+
+           Short version: the framework's stylesheet sizes the tab-panel host at 250px (the
+           right-dock width) and framework JS stretches a bottom-docked panel to its real
+           width with an INLINE pixel width, computed once. Browser zoom changes the viewport
+           but not that inline width, so after a zoom the host stays at its pre-zoom width and
+           the panel renders short of the window's right edge.
+
+           The CSS rule handles this on its own where :has() is supported (an author
+           !important beats an inline style), so this only runs where that rule cannot match.
+           Writing width:auto INLINE is what beats the framework's own inline pixel width
+           there. */
+        function fitHostWidth() {
+            if (supportsHas()) return;
+            try {
+                if (!$root || !$root.length) return;
+                var host = $root.closest(".vis-ad-w-p-ap-tp-outerwrap");
+                if (!host.length) return;
+                host[0].style.width = "auto";
+                host[0].style.maxWidth = "100%";
+            } catch (e) { if (window.console) console.log(e); }
         }
 
         this.fetchData = function (recordID, page) {
@@ -320,6 +370,9 @@
             // vis-apanel-busy, so we skip ours there to avoid a stacked double spinner.
             var isPageChange = (typeof page === "number");
             if (isPageChange) showBusy(true);
+            // Re-baseline the lock watcher: whatever this load paints is the state the next
+            // data-status event is compared against (see onTabDataStatus).
+            lastLockState = null;
             // Tear down any open dialog FIRST. The framework calls fetchData to (re)load the
             // record - including after a save - and a still-open dialog's position:fixed
             // backdrop would otherwise be left orphaned over the page (morePopoverFor is
@@ -370,6 +423,10 @@
                     if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
                     editing = null; morePopoverFor = null;
                     taxSummary = null;   // drop the prior record's breakdown -> fallback shows first
+                    // Re-baseline the lock watcher against what this render actually paints. Reset
+                    // HERE as well as at request start, because a data-status event arriving while
+                    // the request was in flight would have baselined it off the previous parent.
+                    lastLockState = null;
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
                     refreshSummary();    // then load this invoice's server tax breakdown
@@ -386,7 +443,7 @@
             // Also tear down any open dialog so a fixed backdrop isn't orphaned over the page.
             closeDialogs();
             try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
-            parent = null; lines = []; render();
+            parent = null; lines = []; lastLockState = null; render();
         };
 
         function fromServerRow(r) {
@@ -801,10 +858,29 @@
         }
         /* Repaint the hosting window's current tab so the parent grid/single view picks up the
            invoice totals the save just recalculated. Guarded - the framework only sets curTab
-           when the panel is started from a tab. */
+           when the panel is started from a tab.
+
+           dataRefresh(), NOT dataRefreshAll(). The two are not interchangeable:
+
+             GridTab.dataRefresh()     re-reads the CURRENT row and restores it
+                                       (gridTable.dataRefresh(currentRow) then
+                                        setCurrentRow(currentRow, true))
+             GridTab.dataRefreshAll()  -> GridTable.dataRefreshAll(), which does
+                                       dataIgnore(); close(false); open(maxRows) - the whole
+                                       query is closed and re-run, and nothing restores the
+                                       current row
+
+           So dataRefreshAll moved the window OFF the record the user was on, which is
+           unmissable right after creating an invoice: save a line and the window jumped to
+           another record. The totals are a column on the current row, so refreshing that one
+           row is all this ever needed. dataRefreshAll stays only as a fallback for a host
+           whose tab does not expose dataRefresh. */
         function refreshCurTab() {
             try {
-                if ($self.curTab && typeof $self.curTab.dataRefreshAll === "function") $self.curTab.dataRefreshAll();
+                var t = $self.curTab;
+                if (!t) return;
+                if (typeof t.dataRefresh === "function") { t.dataRefresh(); return; }
+                if (typeof t.dataRefreshAll === "function") t.dataRefreshAll();
             } catch (e) { if (window.console) console.log(e); }
         }
         /* True when the hosting tab has an edit the user hasn't saved yet (a header field
@@ -833,10 +909,88 @@
            the column isn't set; read case-insensitively (PG lowercases the key). */
         function lineTcs(line) { return +lineVal(line, "VA106_TCSAmount") || 0; }
 
+        /* Doc statuses that end the invoice's editable life - the same set the server uses
+           for IsEditable (DocStatus NOT IN (CO, CL, VO, RE)). */
+        var LOCKED_DOC_STATUS = { CO: 1, CL: 1, VO: 1, RE: 1 };
+
+        /* The LIVE lock state, read straight off the hosting GridTab; null when the tab
+           cannot answer.
+
+           parent.IsEditable is only a SNAPSHOT, taken when the panel last fetched. Completing
+           (or voiding / closing / reversing) the invoice from the tab's own toolbar changes
+           DocStatus WITHOUT the panel reloading, so the snapshot still says "editable" and the
+           grid would keep accepting edits the server then refuses on save. The GridTab knows
+           the new status immediately, so it is asked first.
+
+           It answers in BOTH directions - a re-activated document unlocks the panel just as
+           promptly - and only when the tab is sitting on the very record the panel is showing,
+           so a tab pointing elsewhere falls back to the server snapshot rather than guessing. */
+        function liveDocLocked() {
+            var t = $self.curTab;
+            if (!t) return null;
+            try {
+                // Bail only on a DEFINITE mismatch - an id the tab can't supply (0 / undefined)
+                // is not evidence that it is pointing somewhere else.
+                var tabId = (typeof t.getRecord_ID === "function") ? (+t.getRecord_ID() || 0) : 0;
+                var panelId = +$self.record_ID || 0;
+                if (tabId > 0 && panelId > 0 && tabId !== panelId) return null;
+                // Processed is conclusive on its own, whatever DocStatus reads.
+                if (typeof t.getIsProcessed === "function" && t.getIsProcessed()) return true;
+                if (typeof t.getValueAsString !== "function") return null;
+                var st = $.trim(t.getValueAsString("DocStatus") || "");
+                if (!st) return null;   // tab has no answer - fall back to the snapshot
+                return !!LOCKED_DOC_STATUS[st.toUpperCase()];
+            } catch (e) { if (window.console) console.log(e); return null; }
+        }
+
         /* The panel is editable only while the invoice can still take line changes -
-           server-computed IsEditable = !Processed && DocStatus NOT IN (CO, CL, VO, RE).
+           server-computed IsEditable = !Processed && DocStatus NOT IN (CO, CL, VO, RE),
+           overridden by the tab's live status when it has one (see liveDocLocked).
            When false the whole panel is read-only: no Add / Save / Delete and no cell edit. */
-        function panelEditable() { return !!(parent && parent.IsEditable); }
+        function panelEditable() {
+            if (!parent) return false;
+            var locked = liveDocLocked();
+            if (locked !== null) return !locked;
+            return !!parent.IsEditable;
+        }
+
+        /* Lock state the panel was last painted for; null until the first data-status event
+           after a load, so the initial event (which agrees with what fetchData already
+           painted) neither repaints nor announces anything. */
+        var lastLockState = null;
+
+        /* The hosting tab's data status changed - a doc action (Complete / Void / Close /
+           Reverse / Re-activate) is the case that matters here, because it flips the invoice's
+           editable state under an already-loaded panel. Repaint only on a real transition. */
+        function onTabDataStatus() {
+            if (!parent) return;                     // nothing loaded - nothing to lock
+            var locked = !panelEditable();
+            if (lastLockState === null) { lastLockState = locked; return; }
+            if (locked === lastLockState) return;
+            lastLockState = locked;
+            // Any open dialog was built against the previous state (the "..." modal's fields,
+            // the attribute picker), so it goes rather than being left half-valid.
+            closeDialogs();
+            render();                                // rebuilds rows + toolbar for the new state
+            if (locked) {
+                showToast(lbl("VAS_074_DocLockedNow",
+                    "This document is no longer editable - the lines are now read-only"));
+            }
+        }
+        /* Registered on the GridTab by startPanel, released by dispose. */
+        this.tabDataListener = { dataStatusChanged: function (e) { onTabDataStatus(e); } };
+
+        /* Every field in the "..." (Additional Info) modal is read-only when EITHER
+           reason applies:
+             - the document itself can no longer be edited (Completed / Closed / Voided /
+               Reversed) - the same lock the grid, Add, Save and Delete already honour. The
+               modal writes straight into line.values, so without this a completed invoice
+               offered editable fields that the server would refuse to save anyway;
+             - the hosting tab has an unsaved edit (moreViewOnly), which lets the user read
+               the additional info but not change it until the tab is saved.
+           Read live rather than captured, so it also holds for a modal rebuilt in place by
+           refreshMoreDialog. */
+        function moreFieldsLocked() { return moreViewOnly || !panelEditable(); }
 
         function renderHeaderButtons() {
             var n = unsavedLines().length;
@@ -1244,11 +1398,18 @@
             backdrop.append(dialog);
             $("body").append(backdrop);
             // View-only: say WHY the fields can't be edited, just above the footer (same slot as
-            // the mandatory-field message, warning tone instead of danger).
-            if (moreViewOnly) {
+            // the mandatory-field message, warning tone instead of danger). A locked document
+            // and a pending tab edit both make the fields read-only (see moreFieldsLocked), but
+            // for different reasons, so the note names the one that actually applies. The
+            // document lock is checked first - it is the one the user cannot clear from here.
+            var lockNote = !panelEditable()
+                ? lbl("VAS_074_DocLockedViewOnly", "View only - this document is no longer editable")
+                : (moreViewOnly
+                    ? lbl("VAS_074_TabChangesViewOnly", "View only - save the changes on the tab first to edit these fields")
+                    : "");
+            if (lockNote) {
                 dialog.find(".vas-cil-dialog__footer").before(
-                    $('<div class="vas-cil-more-note" role="status"></div>')
-                        .text(lbl("VAS_074_TabChangesViewOnly", "View only - save the changes on the tab first to edit these fields")));
+                    $('<div class="vas-cil-more-note" role="status"></div>').text(lockNote));
             }
 
             var $body = dialog.find("#vasCilMoreBody");
@@ -1261,9 +1422,10 @@
             function done() {
                 // Block close while a conditionally-mandatory curated field (e.g. Capital/Expense
                 // on an Asset-Related line) is still empty - show the message in the modal and
-                // keep it open until the required value is set. Skipped in view-only mode: the
-                // fields are read-only there, so the user could never satisfy the check.
-                var miss = moreViewOnly ? null : firstMissingDynMandatory(line);
+                // keep it open until the required value is set. Skipped whenever the fields are
+                // locked (document not editable, or a pending tab edit): they are read-only
+                // there, so the user could never satisfy the check.
+                var miss = moreFieldsLocked() ? null : firstMissingDynMandatory(line);
                 if (miss) { showMoreDialogError(miss); return; }
                 commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line);
             }
@@ -2694,9 +2856,9 @@
         }
 
         function buildDynField(line, m) {
-            // View-only modal (pending tab edit) forces EVERY field read-only, whatever the
-            // column's own IsReadOnly / ReadOnlyLogic says.
-            var ro = moreViewOnly || isColumnReadOnly(line, m.ColumnName);
+            // A locked modal (document no longer editable, or a pending tab edit) forces EVERY
+            // field read-only, whatever the column's own IsReadOnly / ReadOnlyLogic says.
+            var ro = moreFieldsLocked() || isColumnReadOnly(line, m.ColumnName);
             var kind = dynFieldKind(m);
             // Caption only - the framework renders the mandatory red asterisk itself.
             var caption = m.Name || m.ColumnName;
@@ -2925,6 +3087,22 @@
                 if (iv !== null)
                     ctrl.setValue(iv);
             } catch (e) { }
+            /* The constructor's readOnly argument only RECORDS the flag (it is what
+               getIsReadonly() reports) - it does NOT disable the DOM element. So a
+               VComboBox / VTextBoxButton built read-only still dropped its list open on a
+               completed invoice, which is the "fields still editable in Additional Info"
+               bug. setReadOnly(true) is the framework's own API for this: IControl's
+               implementation does `this.ctrl.prop("disabled", true)`.
+
+               Applied AFTER setValue on purpose - VTextBox.setValue can itself flip
+               setReadOnly for obscured columns, so setting the value last would undo it. */
+            if (ro) {
+                try { if (typeof ctrl.setReadOnly === "function") ctrl.setReadOnly(true); }
+                catch (e) { if (window.console) console.log("VAS_074 setReadOnly " + col, e); }
+                // Belt and braces for a control whose setReadOnly is missing / overridden:
+                // disable the element itself so it cannot take focus or open a list.
+                try { $(ctrl.getControl()).prop("disabled", true).attr("aria-disabled", "true"); } catch (e) { }
+            }
             ctrl.fireValueChanged = function (ev) {
                 setDyn(line, col, viennaNewVal(dt, ev ? ev.newValue : null), isChangeKind(dt));
             };
@@ -2948,6 +3126,17 @@
                     var btn0 = null;
                     try { btn0 = ctrl.getBtn(0); } catch (eb) { btn0 = null; }
                     var $bw = btn0 ? $('<div class="input-group-append"></div>').append(btn0) : null;
+                    // setReadOnly only disables the control's own input - the lookup button is
+                    // a SEPARATE element and would still open the framework Info window on a
+                    // locked document. `disabled` alone is not enough here: the framework
+                    // renders the button as an <a>/<span> in some builds, where the property is
+                    // inert - so the wrapper also gets a pointer-events:none class.
+                    if (ro && $bw) {
+                        try {
+                            $bw.addClass("vas-cil-dyn-btn-off").attr("aria-disabled", "true");
+                            $bw.find("*").prop("disabled", true);
+                        } catch (e) { }
+                    }
                     if ($bw && $bw.children().length) {
                         $c.attr("data-hasbtn", " ");
                         return $('<div class="input-group vis-input-wrap"></div>').append($cw).append($bw);
@@ -3066,6 +3255,11 @@
            loaded on the page and otherwise falls back to the server RunColumnCallout - so a
            modal field's callout fires even when its client class isn't present on the page. */
         function setDyn(line, col, value, refresh) {
+            // Belt and braces: every control is already built read-only when the modal is
+            // locked, but a framework control can still raise fireValueChanged (e.g. on a
+            // programmatic setValue during a rebuild) - swallow it rather than dirty a line
+            // the document lock says cannot change.
+            if (moreFieldsLocked()) return;
             var prev = lineVal(line, col);
             setLineVal(line, col, value);
             // Keep the window context current so a dependent FK's val rule (and any control
@@ -4256,6 +4450,13 @@
         if (curTab && typeof curTab.getAD_Table_ID === "function") this.table_ID = curTab.getAD_Table_ID();
         if (curTab && typeof curTab.getAD_Window_ID === "function") this.AD_Window_ID = curTab.getAD_Window_ID();
         this.init();
+        /* Watch the tab itself, so a doc action taken on the header (Complete / Void / Close /
+           Reverse / Re-activate) locks or unlocks the panel straight away. Without this the
+           panel keeps the IsEditable snapshot from its last load and goes on offering edits
+           the server would refuse. Same hook the sibling overview panels use. */
+        if (curTab && typeof curTab.addDataStatusListener === "function") {
+            try { curTab.addDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
     };
 
     VAS.VAS_074_CreateInvoiceLinePanel.prototype.refreshPanelData = function (recordID, selectedRow) {
@@ -4265,12 +4466,29 @@
         this.fetchData(recordID);
     };
 
-    VAS.VAS_074_CreateInvoiceLinePanel.prototype.sizeChanged = function (width) { this.panelWidth = width; };
+    /* The framework calls sizeChanged(HEIGHT, WIDTH) - in that order. The old single-arg
+       `function (width)` signature therefore stored the height in panelWidth (harmless only
+       because nothing read it). The width argument cannot be trusted either: on a window
+       resize the framework calls viewManager.sizeChanged(h, window.innerwidth) - lower-case
+       "w", so the value is undefined. Both are recorded for completeness, but the actual
+       re-fit re-measures from the DOM instead of believing either number. */
+    VAS.VAS_074_CreateInvoiceLinePanel.prototype.sizeChanged = function (height, width) {
+        this.panelHeight = height;
+        this.panelWidth = width;
+        if (typeof this.fitHostWidth === "function") this.fitHostWidth();
+    };
 
     VAS.VAS_074_CreateInvoiceLinePanel.prototype.dispose = function () {
         $(document).off("mousedown.vascil").off("keydown.vascil");
+        $(window).off("resize.vascil074");
         if (this._shortcutFn) { document.removeEventListener("keydown", this._shortcutFn, true); this._shortcutFn = null; }
         $("#vasCilAttr, #vasCilScan, .vas-cil-toast").remove();
+        // Release the tab watcher before curTab is dropped, or the GridTab keeps a reference
+        // to this disposed panel and goes on calling into it.
+        if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
+            try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
+        }
+        this.tabDataListener = null;
         this.record_ID = 0; this.table_ID = 0; this.windowNo = 0;
         this.curTab = null; this.selectedRow = null; this.panelWidth = null;
     };

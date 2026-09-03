@@ -15,9 +15,24 @@
  * dialogs / toast (which mount outside .vas-ol-root).
  * ============================================================ */
 
+/* Applied to the root element and framework title bar when no saved opportunity is
+   selected (new record or record_ID <= 0). !important overrides the framework's
+   inline .show()/.setSize() so it cannot flash the empty panel back. */
+.vas-ol-tab-hidden {
+    display: none !important;
+}
+
+/* Permanently hide the framework title bar that sits immediately before our root —
+   the panel has its own "Opportunity Lines" header. :has() fallback for older browsers
+   is handled via JS in applyTabVisibility(). */
+.vis-ad-w-p-ap-tp-body-head:has(+ .vas-ol-root) {
+    display: none !important;
+}
+
 .vas-ol-root,
 .vas-ol-dialog-backdrop,
-.vas-ol-toast {
+.vas-ol-toast,
+.vas-ol-catalog-popover {
     --cil-action-blue: #0083da;
     --cil-action-blue-hover: #0069ae;
     --cil-link-deep: #005fa3;
@@ -111,8 +126,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 0.875em;
-    height: 0.875em;
+    /* 1.125em matches the visual footprint of VAS_074's emoji icon at the same button font-size.
+       The Lucide SVG viewBox has internal padding that makes 0.875em appear smaller than an emoji. */
+    width: 1.125em;
+    height: 1.125em;
+    flex-shrink: 0;
+    color: inherit;
 }
 
 .vas-ol-is-hidden {
@@ -170,11 +189,11 @@
     align-items: center;
     gap: 0.375em;
     padding: 0.5em 0.875em;
-    border: 1px solid transparent;
+    border: 0.0625em solid transparent;
     border-radius: var(--cil-r-pill);
     background: transparent;
     font-family: inherit;
-    font-size: 0.85em;
+    font-size: 0.8125em;
     line-height: 1.2;
     cursor: pointer;
     transition: background .12s, color .12s, border-color .12s;
@@ -194,7 +213,7 @@
     background: var(--cil-surface);
     border-color: var(--cil-action-blue);
     color: var(--cil-action-blue);
-    font-size: 0.75em;
+    font-size: 0.8125em;
     font-weight: 600;
     padding: 0.375em 0.75em;
 }
@@ -233,24 +252,6 @@
         background: var(--cil-surface-muted);
     }
 
-.vas-ol-btn--save {
-    background: var(--cil-surface);
-    border-color: var(--cil-purple);
-    color: var(--cil-purple);
-}
-
-    .vas-ol-btn--save:hover {
-        background: var(--cil-purple-bg);
-    }
-
-    .vas-ol-btn--save.vas-ol-is-disabled,
-    .vas-ol-btn--save:disabled {
-        cursor: not-allowed;
-        border-color: #dbe6ee;
-        color: var(--cil-text-disabled);
-        background: var(--cil-surface);
-    }
-
 .vas-ol-btn--danger {
     background: var(--cil-surface);
     border-color: var(--cil-danger-text);
@@ -266,6 +267,16 @@
     border-color: #dbe6ee;
     color: var(--cil-text-disabled);
     background: var(--cil-surface);
+}
+
+/* Faded blue for the primary (save) button when disabled — no dirty rows.
+   Uses CSS class so mousedown still fires before blur commits the active editor.
+   Mirrors VAS_074's pattern exactly. */
+.vas-ol-btn--primary.vas-ol-is-disabled {
+    background: #9fcdec;
+    border-color: #9fcdec;
+    color: #fff;
+    cursor: not-allowed;
 }
 
 /* selection count badge inside the Delete button */
@@ -447,7 +458,7 @@
     font-weight: 700;
     color: var(--cil-text-strong);
     letter-spacing: -0.02em;
-    border-top: 1px solid var(--cil-divider);
+    /*border-top: 1px solid var(--cil-divider);*/
 }
 
 .vas-ol-cell {
@@ -710,15 +721,14 @@
 }
 
 /* ---------- catalog popover ---------- */
+/* Appended to <body> via JS and positioned with position:fixed so it is never clipped
+   by the panel's overflow-y:auto or any intermediate overflow ancestor. top/bottom/left
+   are written by positionCatalog() based on the input's getBoundingClientRect(). */
 .vas-ol-catalog-popover {
-    /* Attaches flush under the input (no top gap / no top border) so the input underline
-       and the dropdown read as ONE element - not two stacked border lines. Opaque fill. */
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 100%;
-    margin-top: 0;
-    z-index: 30;
+    position: fixed;
+    z-index: 9999;
+    font-family: var(--cil-font);
+    font-size: 16px;
     min-width: 22.5em;
     background: #ffffff;
     border: 1px solid var(--cil-divider-strong);
@@ -731,14 +741,8 @@
     overscroll-behavior: contain;
 }
 
-/* Flipped state: not enough room below the input, so open UPWARD. Attaches flush ABOVE
-   the input (no bottom gap / no bottom border) so the two read as one element, mirroring
-   the default downward attachment. */
+/* Flipped state: not enough room below → open UPWARD. */
 .vas-ol-catalog-popover--above {
-    top: auto;
-    bottom: 100%;
-    margin-top: 0;
-    margin-bottom: 0;
     border-top: 1px solid var(--cil-divider-strong);
     border-bottom: none;
     border-radius: var(--cil-r-md) var(--cil-r-md) 0 0;
@@ -1487,6 +1491,25 @@
     justify-content: flex-end;
 }
 
+/* ---------- confirm dialog ---------- */
+/* Compact dialog used for delete and unsaved-changes confirmations.
+   Replaces the browser's native confirm() so it appears centered on screen
+   without the browser chrome / URL link at the top. */
+.vas-ol-confirm-dialog {
+    width: 26em;
+}
+
+.vas-ol-confirm-body {
+    padding: 1.5em 1.25em 0.75em;
+}
+
+.vas-ol-confirm-msg {
+    margin: 0;
+    font-size: 0.9375em;
+    line-height: 1.5;
+    color: var(--cil-text);
+}
+
 .vas-ol-dialog__summary {
     margin: 0;
     font-size: 0.75em;
@@ -2067,3 +2090,4 @@
 @keyframes vas-ol-spin {
     to { transform: rotate(360deg); }
 }
+

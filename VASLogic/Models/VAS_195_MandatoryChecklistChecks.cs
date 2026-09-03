@@ -144,6 +144,9 @@ namespace VASLogic.Models
     ///                          screen is resolved per record from the tab WhereClause
     ///                          and the document type; screens are header tabs only and
     ///                          are ordered by the dictionary's sequence, not by name
+    ///   VAI154      2026-09-02 Check 09 also reads C_AcctSchema_GL.CurrencyBalancing_Acct,
+    ///                          after SuspenseError_Acct; UseCurrencyBalancing now counts
+    ///                          as suspense handling being switched on
     /// </summary>
     public partial class VAS_195_MandatoryChecklistModel
     {
@@ -2071,7 +2074,8 @@ namespace VASLogic.Models
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Material balances left on the configured suspense and rounding accounts.
+        /// Material balances left on the configured suspense, currency-balancing and
+        /// rounding accounts.
         ///
         /// The balance tested is the CLOSING balance through period end, not the
         /// period's own movement: a suspense amount posted three months ago and never
@@ -2166,7 +2170,8 @@ namespace VASLogic.Models
         ///
         /// The LEDGER column carries "&lt;Value&gt; - &lt;Name&gt;" ("79200 - Suspense
         /// balancing") because the check spans every configured suspense account at
-        /// once - balancing, error and the optional rounding account - and a posting row
+        /// once - balancing, error, currency balancing and the optional rounding account -
+        /// and a posting row
         /// is meaningless without saying which of them it landed on. The CASE guards the
         /// separator: an account with no name renders as its value alone rather than as
         /// a value trailing a dangling dash.
@@ -2335,14 +2340,19 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// The configured suspense/rounding accounts of the primary accounting schema,
+        /// The configured suspense / currency-balancing / rounding accounts of the
+        /// primary accounting schema,
         /// resolved from C_AcctSchema_GL through C_ValidCombination to the natural
         /// account, with each account's closing balance through period end.
         ///
-        /// The three settings hold a C_ValidCombination_ID, NOT a Fact_Acct.Account_ID -
+        /// The four settings hold a C_ValidCombination_ID, NOT a Fact_Acct.Account_ID -
         /// comparing the setting directly against Fact_Acct would match nothing, or the
-        /// wrong account. FRPT_RoundingOff_Acct is optional in this schema and is probed
-        /// before it is named.
+        /// wrong account. CurrencyBalancing_Acct is read right after SuspenseError_Acct:
+        /// Fact.cs posts the residual difference of a multi-currency document to it when
+        /// UseCurrencyBalancing is set, so a material balance there is money to explain
+        /// before the period closes, exactly like a suspense balance.
+        /// FRPT_RoundingOff_Acct is optional in this schema and is probed before it is
+        /// named.
         /// </summary>
         /// <param name="c">Shared evaluation context.</param>
         /// <returns>Resolved accounts with balances (never null).</returns>
@@ -2353,9 +2363,10 @@ namespace VASLogic.Models
             List<string> settings = new List<string>();
             settings.Add("SuspenseBalancing_Acct");
             settings.Add("SuspenseError_Acct");
-            if (ColumnExists("C_AcctSchema_GL", "FRPT_RoundingOff_Acct")) 
+            settings.Add("CurrencyBalancing_Acct");
+            if (ColumnExists("C_AcctSchema_GL", "FRPT_RoundingOff_Acct"))
             {
-                settings.Add("FRPT_RoundingOff_Acct"); 
+                settings.Add("FRPT_RoundingOff_Acct");
             }
 
             StringBuilder select = new StringBuilder("SELECT ");
@@ -2400,13 +2411,19 @@ namespace VASLogic.Models
         /// <returns>true when a Use* flag is set.</returns>
         private bool SuspenseEnabled(CheckContext c)
         {
+            /* UseCurrencyBalancing counts too, now that CurrencyBalancing_Acct is one of
+               the accounts the check reads: a schema that balances currency differences
+               but cannot resolve the account it posts them to is misconfigured, which is
+               a finding on a BLOCKER - not "not applicable". */
             string sql = @"
                 SELECT COUNT(1) AS Enabled_Count
                 FROM C_AcctSchema_GL gl
                 WHERE gl.AD_Client_ID=@AD_Client_ID
                   AND gl.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND gl.IsActive='Y'
-                  AND (COALESCE(gl.UseSuspenseBalancing,'N')='Y' OR COALESCE(gl.UseSuspenseError,'N')='Y')";
+                  AND (COALESCE(gl.UseSuspenseBalancing,'N')='Y'
+                       OR COALESCE(gl.UseSuspenseError,'N')='Y'
+                       OR COALESCE(gl.UseCurrencyBalancing,'N')='Y')";
 
             SqlParameter[] parameters = new SqlParameter[]
             {

@@ -28,6 +28,9 @@
 
 ; (function (VAS, $) {
 
+    /* Only used until a real row can be measured - see getAdaptivePageSize(). */
+    var FALLBACK_MODAL_ROWS = 7;
+
     function ensureDashInlineSizeVar($el) {
         var container = $el.closest('.vis-widget-container, [data-dashboard-container], .vis-widget-body, body')[0] || document.documentElement;
         var write = function () {
@@ -339,13 +342,46 @@
 
             var modalPage = 1;
 
+            /* Rows the popup can actually show right now.
+
+               The previous version guessed with two magic numbers - it subtracted a hardcoded 90px
+               of chrome from the BODY height and divided by an assumed 54px row:
+
+                   var available = ($body.height() || 400) - 90;
+                   return Math.max(3, Math.floor(available / 54));
+
+               Neither constant survives a different resolution or zoom level. Row height comes
+               from the modal's own font clamp, and the chrome is a section title + header grid +
+               footer whose heights also scale, so at the user's resolution it computed 9 while
+               only 8 rows fit - the reported "shows 8 records, pagination says 46-54".
+
+               Now measured: the ROWS CONTAINER's own height divided by a real rendered row.
+               Both are read after the first paint, so nothing is assumed. */
+            var measuredRowHeight = 0;
+
             function getAdaptivePageSize() {
-                var bh = $body.height() || 400;
-                var available = bh - 90;
-                return Math.max(3, Math.floor(available / 54));
+                var el = $rowsContainer && $rowsContainer[0];
+                if (!el) { return FALLBACK_MODAL_ROWS; }
+
+                var available = el.clientHeight;
+                if (!available) { return FALLBACK_MODAL_ROWS; }
+
+                if (!measuredRowHeight) {
+                    var probe = el.querySelector('.vas-invaging-modal-data-row');
+                    if (probe) {
+                        var h = probe.getBoundingClientRect().height;
+                        if (h > 0) { measuredRowHeight = h; }
+                    }
+                }
+
+                if (!measuredRowHeight) { return FALLBACK_MODAL_ROWS; }
+
+                /* Half a pixel of slack absorbs sub-pixel row heights, which would otherwise
+                   round a row that does fit down to one that does not. */
+                return Math.max(1, Math.floor((available + 0.5) / measuredRowHeight));
             }
 
-            var modalPageSize = getAdaptivePageSize();
+            var modalPageSize = FALLBACK_MODAL_ROWS;
 
             var $sectionTitle = $('<div class="vas-invaging-table-header">Products in this bucket</div>');
             $body.append($sectionTitle);
@@ -375,9 +411,8 @@
             );
             $body.append($footer);
 
-            function updateModalPage() {
+            function updateModalPage(isRefit) {
                 $rowsContainer.empty();
-                modalPageSize = getAdaptivePageSize();
                 var totalPages = Math.ceil(totalCount / modalPageSize) || 1;
 
                 if (modalPage > totalPages) modalPage = totalPages;
@@ -395,7 +430,9 @@
                         '<div class="vas-invaging-modal-grid-template vas-invaging-modal-data-row">' +
                         '<div class="vas-invaging-cell">' +
                         '<div class="vas-invaging-prod-name" title="' + item.product + '">' + item.product + '</div>' +
-                        '<div class="vas-invaging-prod-attr" title="' + item.attribute + '">' + item.attribute + '</div>' +
+                        /* Blank when the product has no attribute - no hyphen, no "Standard".
+                           The element is still rendered so the row keeps its height. */
+                        '<div class="vas-invaging-prod-attr" title="' + (item.attribute || '') + '">' + (item.attribute || '&nbsp;') + '</div>' +
                         '</div>' +
                         '<div class="vas-invaging-cell vas-invaging-cell-text" title="' + item.warehouse + '">' + item.warehouse + '</div>' +
                         '<div class="vas-invaging-cell vas-invaging-cell-text" title="' + item.locator + '">' + item.locator + '</div>' +
@@ -403,6 +440,20 @@
                         '</div>'
                     );
                     $rowsContainer.append($mRow);
+                }
+
+                /* Rows exist now, so one can be measured. If the number that fits differs from the
+                   number just rendered, adopt it and repaint once. isRefit stops the second pass
+                   from measuring again, so this cannot loop. */
+                if (!isRefit) {
+                    var fit = getAdaptivePageSize();
+                    if (fit !== modalPageSize) {
+                        modalPageSize = fit;
+                        var refitPages = Math.ceil(totalCount / modalPageSize) || 1;
+                        if (modalPage > refitPages) { modalPage = refitPages; }
+                        updateModalPage(true);
+                        return;
+                    }
                 }
 
                 $footer.find('.vas-m-helper').text('Showing ' + (totalCount > 0 ? (start + 1) : 0) + '–' + end + ' of ' + totalCount + (totalCount === 1 ? ' product' : ' products'));
@@ -439,6 +490,10 @@
 
             $(window).off('resize.vas-invaging-modal').on('resize.vas-invaging-modal', function () {
                 if ($modalOverlay) {
+                    /* Row height is driven by the dialog's clamp(..., 1.2vw, ...) font anchor, so
+                       resizing the window changes it. The cached measurement must be dropped or
+                       the refit would divide the new height by the old row height. */
+                    measuredRowHeight = 0;
                     updateModalPage();
                 }
             });

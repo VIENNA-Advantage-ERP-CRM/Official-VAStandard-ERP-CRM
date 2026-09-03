@@ -177,7 +177,20 @@
                 .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
         }
 
-        function icon(name, glyph) { return '<span class="vas-obl-icon" data-icon="' + name + '">' + (glyph || "") + "</span>"; }
+        // Inline SVG for icons that must render as vector (inherits CSS color).
+        // Other icons fall back to the span/emoji approach.
+        var ICON_SVG = {};
+
+        function icon(name, glyph) {
+            var paths = ICON_SVG[name];
+            if (paths) {
+                return '<svg class="vas-obl-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"' +
+                       ' fill="none" stroke="currentColor" stroke-width="2"' +
+                       ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                       paths + '</svg>';
+            }
+            return '<span class="vas-obl-icon" data-icon="' + name + '">' + (glyph || "") + "</span>";
+        }
 
         /* ---------- per-line calculation (mirrors the prototype formulas) ---------- */
         function taxRate(id) { return taxRateById[id] || 0; }
@@ -528,7 +541,7 @@
                 "<span>" + esc(lbl("VAS_107_Scan", "Scan")) + "</span></button>");
             $addBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--outline" data-action="add-line" title="' + esc(lbl("VAS_107_AddLine", "Add line")) + ' (Ctrl+Alt+N)">' + icon("plus", "+") +
                 "<span>" + esc(lbl("VAS_107_AddLine", "Add line")) + "</span></button>");
-            $saveBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--save vas-obl-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_107_SaveRow", "Save row")) + ' (Ctrl+Alt+S)"></button>');
+            $saveBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--primary vas-obl-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_107_SaveRow", "Save row")) + ' (Ctrl+Alt+S)"></button>');
             $deleteBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--danger vas-obl-is-disabled" data-action="delete-selected" title="' + esc(lbl("VAS_107_DeleteRecord", "Delete record")) + ' (Ctrl+Alt+D)" disabled>' +
                 icon("trash", "🗑") + "<span>" + esc(lbl("VAS_107_DeleteRecord", "Delete record")) + ' <span class="vas-obl-sel-count"></span></span></button>');
             $refreshBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--outline" data-action="refresh" title="' + esc(lbl("VAS_107_Refresh", "Refresh")) + ' (Ctrl+Alt+Q)">' +
@@ -784,6 +797,15 @@
             var gt = $self.curTab && $self.curTab.gridTable;
             if (!gt) return false;
             return (gt.rowChanged >= 0) || (typeof gt.getIsInserting === "function" && !!gt.getIsInserting());
+        }
+
+        /* Gate in front of every panel mutation (edit, add, save, delete, attribute, scan).
+           Returns true and shows a toast when the header has unsaved changes — mirrors the
+           VAS_074 / VAS_218 blockedByTabChanges() pattern. */
+        function blockedByDirtyHeader() {
+            if (!isHeaderDirty()) return false;
+            showToast(lbl("VAS_107_SaveHeaderFirst", "Please save the header record before adding lines."));
+            return true;
         }
 
         function renderHeaderButtons() {
@@ -1107,9 +1129,10 @@
             var $btn = $('<button type="button" class="vas-obl-more-btn" title="' + _btnTitle + '">' + icon("more-horizontal", "⋯") + "</button>");
             if (morePopoverFor === line.rowId) $btn.addClass("is-open");
             if (hasAdditionalValues(line, _addlCols)) $btn.addClass("has-values");
-            // Disable when read-only OR when no additional-info field is visible for this line
-            // (same DisplayLogic check the modal runs — would show "No additional info").
-            $btn.prop("disabled", !editable || !_hasVisible);
+            // Disable only when no additional-info field is visible for this line.
+            // A completed/locked order still allows the modal to open in read-only mode
+            // so the user can view dimension values without being able to edit them.
+            $btn.prop("disabled", !_hasVisible);
             // Open the additional-fields MODAL.
             $btn.on("click", function (e) { e.stopPropagation(); openMoreDialog(line); });
             // Keyboard: Tab continues the row's tab chain (forward -> save,
@@ -1129,6 +1152,10 @@
         function openMoreDialog(line) {
             closeDialogs();
             morePopoverFor = line.rowId;
+            // When the order is completed/void/reversed/closed the modal opens in
+            // read-only mode: all fields are built non-editable and only a Close button
+            // is shown (no Done/Cancel — nothing can be committed).
+            var isRO = !panelEditable();
             // Snapshot the line's editable state BEFORE any field is touched. Dynamic
             // fields commit live to line.values/display on change, so closing via the
             // cross (Cancel) must restore this snapshot to leave the record unchanged.
@@ -1145,14 +1172,18 @@
 
             var $backdrop = $('<div class="vas-obl-dialog-backdrop" id="vasOblMore"></div>');
             var $dialog   = $('<div class="vas-obl-dialog"></div>');
+            // Read-only mode: X header button and the footer Close button both just dismiss.
+            // Editable mode: X = Cancel (discard), Done footer button = commit.
+            var footerBtn = isRO
+                ? '<button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="close-more">' + esc(lbl("VAS_107_Close", "Close")) + "</button>"
+                : '<button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="close-more">' + esc(lbl("VAS_107_Done", "Done")) + "</button>";
             $dialog.html(
                 '<header class="vas-obl-dialog__header"><div class="vas-obl-dialog__header-row">' +
                 '<h3 class="vas-obl-dialog__title">' + esc(primaryName) + " - " + esc(lbl("VAS_107_AdditionalInfo", "Additional Info")) + "</h3>" +
                 '<button type="button" class="vas-obl-dialog__close" data-act="cancel-more" aria-label="' + esc(lbl("VAS_107_Close", "Close")) + '" title="' + esc(lbl("VAS_107_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
                 "</div></header>" +
                 '<div class="vas-obl-dialog__body vas-obl-more-body vas-obl-more-grid" id="vasOblMoreBody"></div>' +
-                '<footer class="vas-obl-dialog__footer vas-obl-dialog__footer--end">' +
-                '<button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="close-more">' + esc(lbl("VAS_107_Done", "Done")) + "</button></footer>"
+                '<footer class="vas-obl-dialog__footer vas-obl-dialog__footer--end">' + footerBtn + "</footer>"
             );
             $backdrop.append($dialog);
             $("body").append($backdrop);
@@ -1164,18 +1195,22 @@
             // lookup popup) must not close the modal and lose in-flight edits.
             // Both paths return focus to the row's "..." button so Tab continues.
             function done() {
-                commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line);
+                // Read-only mode: nothing to commit — just close.
+                if (!isRO) commitMorePopover();
+                closeDialogs(); render(); focusMoreBtn(line);
             }
-            // X = Cancel: discard everything changed in the modal and restore the line
-            // to its pre-open snapshot. No mandatory validation — edits are thrown away.
+            // X = Cancel: in editable mode discard changes and restore snapshot.
+            // In read-only mode nothing was changed, so just close.
             function cancel() {
-                var l = lineById(line.rowId);
-                if (l) {
-                    l.values        = moreSnapshot.values;
-                    l.display       = moreSnapshot.display;
-                    l.dirty         = moreSnapshot.dirty;
-                    l._priceOverride = moreSnapshot._priceOverride;
-                    l._error        = moreSnapshot._error;
+                if (!isRO) {
+                    var l = lineById(line.rowId);
+                    if (l) {
+                        l.values        = moreSnapshot.values;
+                        l.display       = moreSnapshot.display;
+                        l.dirty         = moreSnapshot.dirty;
+                        l._priceOverride = moreSnapshot._priceOverride;
+                        l._error        = moreSnapshot._error;
+                    }
                 }
                 closeDialogs(); render(); focusMoreBtn(line);
             }
@@ -1209,18 +1244,20 @@
                 if (morePopoverFor !== line.rowId || !$body.parent().length) return;
                 $body.removeClass("vas-obl-dialog__body--loading").addClass("vas-obl-more-grid").empty();
                 primeLineContext(line);
-                appendDynFields(line, $body);
+                appendDynFields(line, $body, isRO);
                 applyFieldGroups($body);
                 if (!$body.children("[data-col]:not(.vas-obl-dyn-hidden)").length)
                     $body.append('<p class="vas-obl-empty-message">' +
                                  esc(lbl("VAS_107_NoAdditionalInfo", "No additional info for this line")) + "</p>");
-                $body.find("[data-col]:not(.vas-obl-dyn-hidden)").find("input,select,textarea").first().focus();
+                // In read-only mode there is nothing to focus for editing.
+                if (!isRO) $body.find("[data-col]:not(.vas-obl-dyn-hidden)").find("input,select,textarea").first().focus();
             }, 0);
         }
 
         /* ---------- edit / commit ---------- */
         function startEdit(line, field) {
             if (!panelEditable()) return;             // completed/void/reversed/closed -> read-only
+            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             if (line._saving) return;                 // row is being saved - locked until it returns
             if (fieldReadOnly(line, field)) return;   // AD_Column.ReadOnlyLogic / IsReadOnly
             commitMorePopover(); morePopoverFor = null;
@@ -1415,8 +1452,8 @@
 
         /* ---------- line operations ---------- */
         function addLine() {
-            if (!parent || !parent.IsEditable) { showToast(docMsg("VAS_107_OrderNotEditable", "This {0} cannot take new lines")); return; }
-            if (isHeaderDirty()) { showToast(lbl("VAS_107_SaveHeaderFirst", "Please save the header record before adding lines.")); return; }
+            if (!parent || !parent.IsEditable) { showToast(lbl("VAS_107_OrderNotEditable", "This order cannot take new lines")); return; }
+            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             var maxLine = 0;
             for (var i = 0; i < lines.length; i++) maxLine = Math.max(maxLine, lines[i].values.Line || 0);
             var line = {
@@ -2429,18 +2466,19 @@
             }
         }
 
-        function appendDynFields(line, $body) {
+        function appendDynFields(line, $body, forceReadOnly) {
             var cols = additionalInfoColumns(line);
             // Build every candidate field FIRST (control + lookup created), then apply
             // DisplayLogic to show/hide - so display logic runs AFTER buildDynField.
-            for (var i = 0; i < cols.length; i++) $body.append(buildDynField(line, cols[i]));
+            for (var i = 0; i < cols.length; i++) $body.append(buildDynField(line, cols[i], forceReadOnly));
             applyDynDisplay(line, $body);
             applyFieldGroups($body);   // inject collapsible Dimension / References headers
             // No overflow clip on the body - an FK dropdown would be cut off.
         }
 
-        function buildDynField(line, m) {
-            var ro = isColumnReadOnly(line, m.ColumnName);
+        function buildDynField(line, m, forceReadOnly) {
+            // forceReadOnly is true when the parent document is completed/void/reversed/closed.
+            var ro = forceReadOnly || isColumnReadOnly(line, m.ColumnName);
             var kind = dynFieldKind(m);
             // Caption only - the framework renders the mandatory red asterisk itself.
             var caption = m.Name || m.ColumnName;
@@ -3089,6 +3127,7 @@
         // (The control handles the pre-select + unchanged-OK no-op internally.)
         function openAttrDialog(line) {
             if (!line.values.M_Product_ID) return;
+            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             // The product must actually carry an attribute set (M_AttributeSet_ID > 0) for
             // the attribute control to be meaningful. A saved line whose product has no
             // attribute set defined must not open the control even if it's clicked - guard
@@ -3594,6 +3633,7 @@
 
         /* ---------- scan dialog ---------- */
         function openScanDialog() {
+            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             closeDialogs();
             scanState = { rows: [], input: "", error: "" };
             var backdrop = $('<div class="vas-obl-dialog-backdrop" id="vasOblScan"></div>');
@@ -3770,6 +3810,7 @@
            Commits the focused cell then waits for any in-flight callout to finish before
            posting — so the line saves with the recomputed price / tax / amounts. */
         function flushAndSave() {
+            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             flushActiveEdit();
             afterCallouts(function () { saveRows(); });
         }
@@ -3911,6 +3952,7 @@
 
         function deleteSelected() {
             if (!panelEditable()) return;             // read-only when doc completed/void/reversed/closed
+            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             var sel = selectedLines(); if (!sel.length) return;
             var ids = [], localOnly = [];
             sel.forEach(function (l) { if (l.values.C_OrderLine_ID > 0) ids.push(l.values.C_OrderLine_ID); else localOnly.push(l); });

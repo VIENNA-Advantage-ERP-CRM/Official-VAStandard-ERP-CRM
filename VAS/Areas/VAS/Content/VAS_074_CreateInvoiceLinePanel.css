@@ -102,8 +102,57 @@
     min-width: 0;
 }
 
+/* ---------------------------------------------------------------------------
+   Full-width host - survives browser zoom / window resize
+   ---------------------------------------------------------------------------
+   The panel itself is already fluid: .vas-cil-root is width:100% and the row grid
+   is built from fr tracks, which always fill their container. So when the lines
+   table renders narrower than the form above it, the container is the problem, not
+   the panel.
+
+   The framework's own stylesheet sizes the tab-panel host for a RIGHT-docked panel:
+
+       .vis-ad-w-p-ap-tp-outerwrap { display:flex; justify-content:flex-end; width:250px; }
+
+   and only releases that below 600px (@media (max-width:600px) -> width:auto). A
+   BOTTOM-docked panel like this one is therefore stretched to its real width by
+   framework JS, as an INLINE pixel width computed at layout time. Browser zoom
+   changes the CSS viewport but does not recompute that inline width, so the host
+   keeps its pre-zoom pixel width and the panel is left short of the window's right
+   edge - the reported gap.
+
+   Fixed here rather than in JS because an author !important declaration outranks an
+   inline style, so this keeps winning even when the framework re-asserts its own
+   width after a later relayout. Scoped with :has() to a host that actually contains
+   THIS panel, so right-docked panels keep the 250px the framework intends. (The JS
+   fitHostWidth() is the fallback for browsers without :has(), mirroring how
+   applyTabVisibility already pairs a :has() rule with a JS fallback.) */
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-cil-root) {
+    width: auto !important;
+    max-width: 100% !important;
+}
+
+/* The host's inner wrappers can carry their own computed widths; release them the
+   same way so the width actually reaches the panel root. */
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-cil-root) > .vis-ad-w-p-ap-tp-o-body,
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-cil-root) .vis-ad-w-p-ap-tp-o-b-content {
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0;
+}
+
 .vas-cil-root * {
     box-sizing: border-box;
+}
+
+/* Lookup button of a read-only "..." field (locked document / read-only column).
+   The framework renders this button as an <a>/<span> in some builds, where the
+   `disabled` property is inert - so the click is killed at the CSS layer too, or the
+   Info window would still open on a completed invoice. Lives outside .vas-cil-root's
+   descendant scope because the modal is mounted on <body>. */
+.vas-cil-dyn-btn-off {
+    pointer-events: none;
+    opacity: 0.45;
 }
 
 /* Panel Foundation Rule 4: force nested form controls to inherit the anchor. Without this,
@@ -182,7 +231,7 @@
 
 .vas-cil-panel__title {
     margin: 0;
-    font-size: 1.1em;
+    font-size: 1em;
     font-weight: 700;
     color: var(--cil-text-strong);
 }
@@ -446,6 +495,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.25em;
+    padding-right: 3em;
 }
 
 .vas-cil-summary-row {

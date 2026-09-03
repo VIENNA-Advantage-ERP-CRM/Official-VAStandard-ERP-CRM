@@ -18,7 +18,11 @@
 
 /* ---------- Glass Widget Surface ---------- */
 .vas-217-orw-root {
-    font-size: clamp(16px, 1.2cqi, 20px);
+    /* 1.2cqi resolved to ~5px at any realistic widget width, so the clamp floor
+       always won and the rows never tracked the widget size. 4.5% of the
+       container inline size is the house standard (see VAS_206). */
+    font-size: clamp(16px, 4.5cqi, 22px);
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 400px)) * 0.045), 22px);
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     border: 2px solid #FFFFFF;
     border-radius: 14px;
@@ -170,10 +174,15 @@
 
 .vas-217-orw-tbody .vas-217-orw-trow {
     font-size: 0.75em;
-    padding-top: 0.5em;
-    padding-bottom: 0.5em;
+    padding-top: 0.62em;
+    padding-bottom: 0.62em;
     border-bottom: 1px solid #E2EAF1;
     transition: background 0.15s ease, box-shadow 0.15s ease;
+    /* Rows keep their NATURAL height and never stretch or squash. rowsThatFit() in the JS
+       divides the body's clientHeight by a rendered row's height, so a row whose height
+       depended on how many rows there are would make that calculation feed back on itself
+       and the page count would never settle. Same rule as VAS_161 / VAS_165. */
+    flex: 0 0 auto;
 }
 
 .vas-217-orw-tbody .vas-217-orw-trow:last-child {
@@ -365,6 +374,11 @@
 }
 
 .vas-217-orw-modal {
+    /* The type scale lives on the dialog, not just its body, so the header and
+       footer scale with the content instead of staying pinned at the app default. */
+    --panel-anchor: clamp(15px, 1.15vw, 26px);
+    font-size: var(--panel-anchor);
+
     width: min(1240px, 94vw);
     max-height: min(880px, 90dvh);
     background: #FFFFFF;
@@ -385,14 +399,14 @@
 }
 
 .vas-217-orw-modal-header {
-    height: 56px;
+    height: 3.2em;
     flex: none;
-    padding: 0 16px;
+    padding: 0 0.8em;
     border-bottom: 1px solid #1F83FF;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
 }
 
 .vas-217-orw-mhead-left {
@@ -453,7 +467,7 @@
 
 /* Modal Body */
 .vas-217-orw-modal-body {
-    flex: 1;
+    flex: 0 1 auto;
     min-height: 0;
     overflow: hidden;
     padding: 1.125em 0.875em;
@@ -461,12 +475,17 @@
     flex-direction: column;
     gap: 0.75em;
     container-type: inline-size;
-    --panel-anchor: clamp(18px, 1vw, 20px);
-    font-size: var(--panel-anchor);
+    /* The modal type scale. The previous clamp(18px, 1vw, 20px) only varied between a
+       ~1800px and ~2000px viewport - on every other screen it sat pinned to one of its
+       bounds, so the popup never grew with resolution. This range tracks across the
+       resolutions actually in use (~15px at 1366px, ~22px at 1920px, 26px at 2560px).
+       Everything inside the popup is sized in em against it, so the whole dialog -
+       rows, chips, buttons, icons - scales together. */
+    font-size: inherit;
 }
 
 .vas-217-orw-modal-body.compact {
-    --panel-anchor: clamp(14px, 0.8vw, 16px);
+    --panel-anchor: clamp(13px, 0.95vw, 21px);
     font-size: var(--panel-anchor);
 }
 
@@ -489,11 +508,11 @@
 .vas-217-orw-modal-foot {
     flex: none;
     border-top: 1px solid #D9E2EB;
-    padding: 12px 16px;
+    padding: 0.6em 0.8em;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.6em;
     background: #FBFDFF;
 }
 
@@ -680,9 +699,12 @@ select.vas-217-orw-fctl {
 
 /* Modal Paged Table */
 .vas-217-orw-mtwrap {
+    --vas-217-orw-rows: 6;
+    --vas-217-orw-row-h: 1.9em;
+
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: none;
     min-height: 0;
     overflow: hidden;
 }
@@ -690,7 +712,7 @@ select.vas-217-orw-fctl {
 .vas-217-orw-mtbl {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: none;
     min-height: 0;
     overflow: hidden;
 }
@@ -716,19 +738,28 @@ select.vas-217-orw-fctl {
     flex: none;
 }
 
+/* Fixed-size modal table, matching VAS_216_POQueueWidget:
+   the body is exactly --vas-217-orw-rows rows tall and never changes with how many rows a
+   page actually holds, each row occupies 1/rows of it and they stack from the top,
+   and anything beyond a page is reached through the pager. Sizing is in em against
+   the modal body's font-size, so the dialog scales with the screen - no px. */
 .vas-217-orw-mbody {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: none;
     min-height: 0;
     overflow: hidden;
+    justify-content: flex-start;
+    height: calc(var(--vas-217-orw-rows, 6) * var(--vas-217-orw-row-h, 1.9em));
 }
 
 .vas-217-orw-mbody .vas-217-orw-mrow {
     font-size: 0.75em;
-    padding: 0.55em 0.5em;
+    padding: 0.8em 0.5em;
     border-bottom: 1px solid #E2EAF1;
     transition: background 0.15s ease;
+    flex: 0 0 calc(100% / var(--vas-217-orw-rows, 6));
+    min-height: 0;
 }
 
 .vas-217-orw-mbody .vas-217-orw-mrow:last-child {
@@ -761,7 +792,7 @@ select.vas-217-orw-fctl {
     color: #102C3F;
     font-family: inherit;
     font-size: 1em;
-    padding: 0.2em 0.35em;
+    padding: 0.32em 0.35em;
     width: 100%;
     min-width: 0;
     text-align: right;
@@ -779,7 +810,7 @@ select.vas-217-orw-fctl {
     color: #102C3F;
     font-family: inherit;
     font-size: 1em;
-    padding: 0.2em 1.2em 0.2em 0.35em;
+    padding: 0.32em 1.2em 0.2em 0.35em;
     width: 100%;
     min-width: 0;
     appearance: none;
@@ -806,9 +837,9 @@ select.vas-217-orw-fctl {
 }
 
 .vas-217-orw-iconbtn {
-    width: 1.5em;
-    height: 1.5em;
-    border-radius: 7px;
+    width: 1.8em;
+    height: 1.8em;
+    border-radius: 8px;
     border: 1px solid #D9E2EB;
     background: #FFFFFF;
     display: grid;
@@ -818,11 +849,12 @@ select.vas-217-orw-fctl {
     padding: 0;
     flex: none;
     transition: background 0.15s ease, border-color 0.15s ease;
+    line-height: 1;
 }
 
 .vas-217-orw-iconbtn.sm {
-    width: 1.35em;
-    height: 1.35em;
+    width: 1.85em;
+    height: 1.85em;
 }
 
 .vas-217-orw-iconbtn:hover {
@@ -831,8 +863,10 @@ select.vas-217-orw-fctl {
 }
 
 .vas-217-orw-iconbtn svg {
-    width: 0.8em;
-    height: 0.8em;
+    width: 1em;
+    height: 1em;
+    display: block;
+    flex: none;
 }
 
 .vas-217-orw-actcell {

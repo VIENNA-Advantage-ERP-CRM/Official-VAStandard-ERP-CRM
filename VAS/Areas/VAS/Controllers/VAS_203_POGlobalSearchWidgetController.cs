@@ -236,16 +236,16 @@ namespace VAS.Controllers
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                       AND (
                            LOWER(o.DocumentNo) LIKE @SearchLike
-                           OR LOWER(COALESCE(bp.Name, '')) LIKE @SearchLike
-                           OR LOWER(COALESCE(p.Name, '')) LIKE @SearchLike
-                           OR LOWER(COALESCE(p.Value, '')) LIKE @SearchLike
-                           OR LOWER(COALESCE(p.SKU, '')) LIKE @SearchLike
-                           OR LOWER(COALESCE(w.Name, '')) LIKE @SearchLike
-                           OR LOWER(COALESCE(rep.Name, '')) LIKE @SearchLike
-                           OR LOWER(COALESCE(o.POReference, '')) LIKE @SearchLike
-                           OR LOWER(COALESCE(o.Description, '')) LIKE @SearchLike
-                           OR LOWER(COALESCE(r.DocumentNo, '')) LIKE @SearchLike
-                           OR LOWER(COALESCE(bpl.Name, '')) LIKE @SearchLike
+                           OR LOWER(COALESCE(bp.Name, N'')) LIKE @SearchLike
+                           OR LOWER(COALESCE(p.Name, N'')) LIKE @SearchLike
+                           OR LOWER(COALESCE(p.Value, N'')) LIKE @SearchLike
+                           OR LOWER(COALESCE(p.SKU, N'')) LIKE @SearchLike
+                           OR LOWER(COALESCE(w.Name, N'')) LIKE @SearchLike
+                           OR LOWER(COALESCE(rep.Name, N'')) LIKE @SearchLike
+                           OR LOWER(COALESCE(o.POReference, N'')) LIKE @SearchLike
+                           OR LOWER(COALESCE(o.Description, N'')) LIKE @SearchLike
+                           OR LOWER(COALESCE(r.DocumentNo, N'')) LIKE @SearchLike
+                           OR LOWER(COALESCE(bpl.Name, N'')) LIKE @SearchLike
                       )
                     ORDER BY o.DateOrdered DESC, o.DocumentNo DESC";
 

@@ -78,7 +78,17 @@
            A fixed count (not a measured one) is required because the dialog is content-sized -
            measuring the container would be circular, since its height comes from the rows. */
         var MODAL_PAGE_ROWS = 7;
+
+        /* CARD page size. Starts at MODAL_PAGE_ROWS only so the very first paint has rows to
+           measure; from then on it is whatever actually fits (see summaryRowsThatFit). */
         var pageSize = MODAL_PAGE_ROWS;
+
+        /* Height of one rendered card row, in px. Cached because it only changes when the widget
+           is resized - the row's font-size is driven by --widget-inline-size, so a WIDTH change
+           moves it too, not just a height change. Cleared by the ResizeObserver. */
+        var measuredRowHeight = 0;
+        /* Re-entrancy guard: renderSummaryPage mutates the DOM the ResizeObserver watches. */
+        var refittingRows = false;
         var widgetObserver = null;
         var $modalOverlay = null;
 
@@ -123,7 +133,6 @@
             var $headerGrid = $(
                 '<div class="vas-whwisecount-grid-template vas-whwisecount-header-row">' +
                 '<div class="vas-whwisecount-th">Warehouse</div>' +
-                '<div class="vas-whwisecount-th">Count Locators</div>' +
                 '<div class="vas-whwisecount-th vas-whwisecount-th-right">Counts</div>' +
                 '<div class="vas-whwisecount-th vas-whwisecount-th-right">Qty Counted</div>' +
                 '</div>'
@@ -157,6 +166,21 @@
                         if (width > 0 && $root[0]) {
                             $root[0].style.setProperty('--widget-inline-size', width + 'px');
                         }
+                    }
+
+                    /* Row height follows the widget's size (font-size is driven by
+                       --widget-inline-size, and the available height changes directly), so the
+                       cached measurement is dropped and the page repainted at the new fit. The
+                       guard is required because this repaint mutates the observed subtree. */
+                    if (refittingRows) { return; }
+                    if (!summaryData || summaryData.length === 0) { return; }
+
+                    refittingRows = true;
+                    try {
+                        measuredRowHeight = 0;
+                        renderSummaryPage();
+                    } finally {
+                        refittingRows = false;
                     }
                 });
                 widgetObserver.observe($wrapper[0]);
@@ -235,8 +259,11 @@
         function appendFillerRows($rowsContainer, count) {
             for (var f = 0; f < count; f++) {
                 $rowsContainer.append(
+                    /* THREE spacer cells - one per CARD grid track. This must stay in step
+                       with .vas-whwisecount-grid-template: a stale cell count leaves a phantom
+                       column and slides the filler rows out of line with the real ones.
+                       Dropped from four when the Count Locators column was removed (2026-09-02). */
                     '<div class="vas-whwisecount-row-btn vas-whwisecount-grid-template vas-whwisecount-filler" aria-hidden="true">' +
-                    '<div class="vas-whwisecount-cell">&nbsp;</div>' +
                     '<div class="vas-whwisecount-cell">&nbsp;</div>' +
                     '<div class="vas-whwisecount-cell">&nbsp;</div>' +
                     '<div class="vas-whwisecount-cell">&nbsp;</div>' +
@@ -245,10 +272,42 @@
             }
         }
 
-        function renderSummaryPage() {
-            $rowsContainer.empty();
+        /* How many summary rows actually fit the card at its current size.
 
-            pageSize = MODAL_PAGE_ROWS;
+           The CARD's height is fixed by the dashboard grid (4x2), so it can be measured. That is
+           the opposite of the detail POPUP, whose height is derived from its row count and where
+           measuring would be circular - MODAL_PAGE_ROWS still governs the popup, unchanged.
+
+           The card previously reused that same fixed 7. At most screen sizes only about four rows
+           physically fit, so the footer honestly read "1-7 of 11" while the user could see four
+           (reported 2026-08-29). Deriving the count from the measured height is what makes the
+           footer agree with what is on screen at any resolution or zoom level. */
+        function summaryRowsThatFit() {
+            var el = $rowsContainer && $rowsContainer[0];
+            if (!el) { return MODAL_PAGE_ROWS; }
+
+            var available = el.clientHeight;
+            if (!available) { return MODAL_PAGE_ROWS; }
+
+            if (!measuredRowHeight) {
+                /* Probe a REAL row: filler rows carry .vas-whwisecount-row-btn too, but they are
+                   only appended after this runs, so the selector excludes them defensively. */
+                var probe = el.querySelector('.vas-whwisecount-row-btn:not(.vas-whwisecount-filler)');
+                if (probe) {
+                    var h = probe.getBoundingClientRect().height;
+                    if (h > 0) { measuredRowHeight = h; }
+                }
+            }
+
+            if (!measuredRowHeight) { return MODAL_PAGE_ROWS; }
+
+            /* Half a pixel of slack absorbs sub-pixel row heights, which would otherwise round a
+               row that does fit down to one that does not. */
+            return Math.max(1, Math.floor((available + 0.5) / measuredRowHeight));
+        }
+
+        function renderSummaryPage(isRefit) {
+            $rowsContainer.empty();
 
             if (!summaryData || summaryData.length === 0) {
                 $rowsContainer.html('<div class="vas-whwisecount-message">No inventory counts recorded for this period. Pick another month to review earlier counts.</div>');
@@ -279,7 +338,6 @@
                     '<div class="vas-whwisecount-wh-title" title="' + item.warehouseName + '">' + item.warehouseName + '</div>' +
                     '<div class="vas-whwisecount-wh-code" title="' + item.warehouseCode + '">' + item.warehouseCode + '</div>' +
                     '</div>' +
-                    '<div class="vas-whwisecount-cell vas-whwisecount-locators-text" title="' + item.locators + '">' + item.locators + '</div>' +
                     '<div class="vas-whwisecount-cell vas-whwisecount-counts-num" title="' + item.sessionCount + '">' + item.sessionCount + '</div>' +
                     '<div class="vas-whwisecount-cell vas-whwisecount-qty-num" title="' + formattedQty + '">' + formattedQty + '</div>' +
                     '</button>'
@@ -292,6 +350,20 @@
                 })(item, $row);
 
                 $rowsContainer.append($row);
+            }
+
+            /* Real rows are on screen now, so a row can be measured. If the number that fits is
+               not the number just rendered, adopt it and repaint once. isRefit stops that second
+               pass from measuring again, so this can never loop. */
+            if (!isRefit) {
+                var fit = summaryRowsThatFit();
+                if (fit !== pageSize) {
+                    pageSize = fit;
+                    var refitPages = Math.ceil(totalItems / pageSize) || 1;
+                    if (currentPage > refitPages) { currentPage = refitPages; }
+                    renderSummaryPage(true);
+                    return;
+                }
             }
 
             // Pad the last (or only) page so the table height is identical on every page.

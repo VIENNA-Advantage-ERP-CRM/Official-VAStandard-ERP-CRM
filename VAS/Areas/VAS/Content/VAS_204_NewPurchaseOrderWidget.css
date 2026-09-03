@@ -1,741 +1,100 @@
-﻿/* ============================================================
-   VAS_204_NewPurchaseOrderWidget.css
-   Quick Action Tile & Modal Styles for New Purchase Order (1x1)
-   100% Fluid Responsive System with relative em/rem/cqi units.
-   ============================================================ */
+﻿/* VAS_204_NewPurchaseOrderWidget - 1x1 quick action tile.
+   Mirrors the VAS_082_NewGRNWidget tile design exactly (same geometry, palette,
+   icon well and type scale), namespaced as .vas-npo-* so the two widgets stay
+   independent. The tile opens the Purchase Order window on a new record; it has
+   no dialog, so no modal rules are needed. */
 
-/* ---------- 1x1 QUICK ACTION TILE ---------- */
-.vas-204-npo-root {
+.vas-npo-root {
     width: 100%;
     height: 100%;
-    min-height: 0;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    font-size: clamp(16px, 1.2cqi, 20px);
-    box-sizing: border-box;
+    container-type: inline-size;
+    position: relative;
 }
 
-.vas-204-npo-card {
+    .vas-npo-root,
+    .vas-npo-root * {
+        box-sizing: border-box;
+    }
+
+.vas-npo-card {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
     width: 100%;
     height: 100%;
-    border: 2px dashed #9ED1FF;
-    border-radius: 14px;
-    padding: 0.85em;
-    background: linear-gradient(180deg, rgba(234, 248, 255, 0.9), rgba(255, 255, 255, 0.75));
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    cursor: pointer;
-    font-size: inherit;
-    min-height: 0;
-    overflow: hidden;
     text-align: left;
-    font-family: inherit;
-    box-sizing: border-box;
+    /* The tile paints its own surface rather than leaning on the shared
+       .vas-widget-bg, so its appearance cannot shift with stylesheet load order
+       or with any state the host puts on the button. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    padding: .875em;
+    cursor: pointer;
+    color: #102C3F;
+    -webkit-appearance: none;
+    appearance: none;
     outline: none;
-    transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    transition: box-shadow 180ms ease;
 }
 
-.vas-204-npo-card:hover {
-    background: linear-gradient(180deg, rgba(226, 244, 255, 0.95), rgba(255, 255, 255, 0.8));
-    border-color: #0083DA;
-    box-shadow: inset 0 0 0 1px #0083DA, 0 8px 20px rgba(15, 61, 97, 0.08);
+    /* Pressing and releasing must not repaint the tile: pin the surface for every
+       interactive state so only the shadow reacts. */
+    .vas-npo-card:active,
+    .vas-npo-card:focus {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+        border-color: #fff;
+        outline: none;
+    }
+
+    .vas-npo-card:hover {
+        box-shadow: 0 14px 30px rgba(15, 61, 97, .13);
+    }
+
+    .vas-npo-card:focus-visible {
+        outline: 2px solid #1F83FF;
+        outline-offset: 2px;
+    }
+
+.vas-npo-iconrow {
+    display: flex;
+    justify-content: flex-end;
 }
 
-.vas-204-npo-card:focus-visible {
-    outline: 2px solid #1F83FF;
-    outline-offset: 2px;
-}
-
-.vas-204-npo-well {
+.vas-npo-ico {
     width: 1.75em;
     height: 1.75em;
     border-radius: 10px;
     background: #1F83FF;
-    display: grid;
-    place-items: center;
-    box-shadow: 0 10px 24px rgba(31, 131, 255, 0.22);
-    margin-left: auto;
-    flex: none;
-}
-
-.vas-204-npo-well svg {
-    width: 1em;
-    height: 1em;
-    color: #FFFFFF;
-}
-
-.vas-204-npo-title {
-    display: block;
-    font-size: 0.75em;
-    font-weight: 500;
-    color: #102C3F;
-    line-height: 1.2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* ============================================================
-   MODAL ENGINE STYLES
-   ============================================================ */
-
-.vas-204-mask {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    background: rgba(0, 38, 64, 0.34);
-    display: none;
+    color: #fff;
+    display: flex;
     align-items: center;
     justify-content: center;
-    padding: min(4vh, 28px) min(3vw, 28px);
-    box-sizing: border-box;
 }
 
-.vas-204-mask.open {
-    display: flex;
-}
-
-.vas-204-modal {
-    width: min(1240px, 94vw);
-    max-height: min(880px, 90dvh);
-    background: #FFFFFF;
-    border: 1px solid #D9E2EB;
-    border-radius: 16px;
-    box-shadow: 0 28px 64px rgba(15, 61, 97, 0.26);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    font-family: inherit;
-    color: #102C3F;
-    box-sizing: border-box;
-}
-
-.vas-204-modal.md {
-    width: min(1000px, 94vw);
-}
-
-.vas-204-modal.sm {
-    width: min(760px, 94vw);
-}
-
-.vas-204-modal-header {
-    height: 56px;
-    flex: none;
-    padding: 0 16px;
-    border-bottom: 1px solid #1F83FF;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    box-sizing: border-box;
-}
-
-.vas-204-htxt-wrap {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-}
-
-.vas-204-htxt {
-    min-width: 0;
-}
-
-.vas-204-mtitle {
-    margin: 0;
-    font-size: 1em;
-    font-weight: 400;
-    color: #141414;
-    line-height: 1.2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.vas-204-msub {
-    font-size: 0.8125em;
-    color: #717182;
-    margin-top: 2px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.vas-204-hact {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: none;
-}
-
-.vas-204-xbtn {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    border: 0;
-    background: transparent;
-    color: #141414;
-    display: grid;
-    place-items: center;
-    cursor: pointer;
-    padding: 0;
-}
-
-.vas-204-xbtn:hover {
-    background: #F1F4F8;
-}
-
-.vas-204-modal-body {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    padding: 1.125em 0.875em;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75em;
-    container-type: inline-size;
-    --panel-anchor: clamp(18px, 1vw, 20px);
-    font-size: var(--panel-anchor);
-    box-sizing: border-box;
-}
-
-.vas-204-modal-body.compact {
-    --panel-anchor: clamp(14px, 0.8vw, 16px);
-    font-size: var(--panel-anchor);
-}
-
-.vas-204-modal-body.overflowing {
-    overflow-y: auto;
-}
-
-.vas-204-modal-body button,
-.vas-204-modal-body input,
-.vas-204-modal-body select,
-.vas-204-modal-body textarea,
-.vas-204-modal-body optgroup {
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
-    color: inherit;
-}
-
-.vas-204-modal-foot {
-    flex: none;
-    border-top: 1px solid #D9E2EB;
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    background: #FBFDFF;
-    box-sizing: border-box;
-}
-
-.vas-204-foot-note {
-    font-size: 0.75em;
-    color: #5F7283;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.vas-204-btn {
-    border-radius: 999px;
-    padding: 0.5em 0.875em;
-    font-size: 0.8125em;
-    font-family: inherit;
-    border: 1px solid #0083DA;
-    background: #FFFFFF;
-    color: #0083DA;
-    cursor: pointer;
-    line-height: 1;
-    transition: background 0.15s ease, color 0.15s ease;
-}
-
-.vas-204-btn:hover {
-    background: #EEF8FF;
-}
-
-.vas-204-btn-primary {
-    background: #0083DA;
-    color: #FFFFFF;
-    border-color: #0083DA;
-}
-
-.vas-204-btn-primary:hover {
-    background: #0069AE;
-    border-color: #0069AE;
-}
-
-.vas-204-btn:disabled,
-.vas-204-btn-primary:disabled {
-    border-color: #9AB0C0;
-    color: #9AB0C0;
-    background: #FFFFFF;
-    cursor: not-allowed;
-}
-
-/* ---------- STAT STRIP ---------- */
-.vas-204-mstats {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.5em;
-    flex: none;
-}
-
-.vas-204-mstat {
-    border: 1px solid #D9E2EB;
-    border-radius: 10px;
-    padding: 0.4em 0.6em;
-    background: #FBFDFF;
-    min-width: 0;
-}
-
-.vas-204-mstat .l {
-    font-size: 0.6875em;
-    color: #5F7283;
-    line-height: 1.3;
-}
-
-.vas-204-mstat .v {
-    font-size: 0.875em;
-    font-weight: 600;
-    color: #102C3F;
-    line-height: 1.2;
-    margin-top: 0.1em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.vas-204-msec {
-    font-size: 0.9375em;
-    font-weight: 500;
-    color: #102C3F;
-    margin: 0.25em 0 0.35em;
-    padding-bottom: 0.3em;
-    border-bottom: 1px solid #E2EAF1;
-    flex: none;
-}
-
-/* ---------- SUMMARY BAR ---------- */
-.vas-204-posum {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4em 1.6em;
-    border: 1px solid #D9E2EB;
-    border-radius: 10px;
-    padding: 0.5em 0.75em;
-    background: #FBFDFF;
-    flex: none;
-}
-
-.vas-204-posum div {
-    min-width: 0;
-}
-
-.vas-204-posum .l {
-    font-size: 0.6875em;
-    color: #5F7283;
-    line-height: 1.2;
-}
-
-.vas-204-posum .v {
-    font-size: 0.8125em;
-    font-weight: 700;
-    color: #102C3F;
-    line-height: 1.25;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* ---------- PAGED TABLE ---------- */
-.vas-204-mtwrap {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.vas-204-mtwrap.fixed {
-    flex: none;
-}
-
-.vas-204-mtbl {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.vas-204-mbody {
-    overflow: hidden;
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.vas-204-mrow {
-    display: grid;
-    gap: 0.75em;
-    padding: 0 0.5em;
-    align-items: center;
-    box-sizing: border-box;
-}
-
-.vas-204-mhead {
-    font-size: 0.6875em;
-    font-weight: 500;
-    color: #41576A;
-    text-transform: capitalize;
-    padding: 0.5em 0.5em;
-    border-bottom: 1px solid #C5D2DD;
-    position: sticky;
-    top: 0;
-    background: #FFFFFF;
-    z-index: 2;
-    flex: none;
-}
-
-.vas-204-mbody .vas-204-mrow {
-    font-size: 0.75em;
-    padding: 0.55em 0.5em;
-    border-bottom: 1px solid #E2EAF1;
-}
-
-.vas-204-mbody .vas-204-mrow:last-child {
-    border-bottom: 0;
-}
-
-.vas-204-mbody .vas-204-mrow.sel {
-    background: #EAF8FF;
-}
-
-.vas-204-mbody .vas-204-mrow.pick {
-    cursor: pointer;
-}
-
-.vas-204-mbody .vas-204-mrow.pick:hover {
-    background: #F4FAFF;
-}
-
-.vas-204-cell {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-}
-
-.vas-204-cell.right {
-    text-align: right;
-}
-
-.vas-204-cell.c-prim {
-    font-weight: 700;
-    color: #102C3F;
-}
-
-.vas-204-cell.c-dark {
-    font-weight: 500;
-    color: #102C3F;
-}
-
-.vas-204-cell.c-std {
-    color: #5F7283;
-}
-
-.vas-204-cell.c-emph {
-    font-weight: 700;
-    color: #0083DA;
-}
-
-.vas-204-lnk {
-    border: 0;
-    background: none;
-    padding: 0;
-    font-family: inherit;
-    font-size: inherit;
-    font-weight: 700;
-    color: #0083DA;
-    text-decoration: none;
-    cursor: pointer;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    display: block;
-    text-align: left;
-}
-
-.vas-204-lnk:hover {
-    color: #0069AE;
-}
-
-/* ---------- CHIPS ---------- */
-.vas-204-chip {
-    display: inline-block;
-    border-radius: 999px;
-    padding: 0.3125em 0.625em;
-    font-size: 0.6875em;
-    font-weight: 700;
-    line-height: 1;
-    white-space: nowrap;
-}
-
-.vas-204-chip-ok {
-    background: #E7F7EF;
-    color: #0B6B45;
-}
-
-.vas-204-chip-warn {
-    background: #FFF6E2;
-    color: #9A6500;
-}
-
-.vas-204-chip-neutral {
-    background: #F1F4F8;
-    color: #41576A;
-    font-weight: 500;
-}
-
-.vas-204-chk {
-    width: 1.1em;
-    height: 1.1em;
-    accent-color: #0083DA;
-    cursor: pointer;
-}
-
-/* ---------- FORM CONTROLS & GRID ---------- */
-.vas-204-formwrap {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.6em;
-}
-
-.vas-204-formsec {
-    font-size: 0.75em;
-    font-weight: 500;
-    color: #41576A;
-    text-transform: capitalize;
-    margin: 0.35em 0 0.2em;
-    padding-bottom: 0.2em;
-    border-bottom: 1px solid #E2EAF1;
-    flex: none;
-}
-
-.vas-204-form-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.55em 0.7em;
-}
-
-@container (max-width: 700px) {
-    .vas-204-form-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .vas-npo-ico svg {
+        width: 1em;
+        height: 1em;
     }
-}
 
-.vas-204-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2em;
-    min-width: 0;
-}
-
-.vas-204-field.span-2 {
-    grid-column: span 2;
-}
-
-.vas-204-field label {
-    font-size: 0.6875em;
-    color: #5F7283;
+.vas-npo-title {
+    font-size: .75em;
+    font-weight: 500;
+    color: #102C3F;
     line-height: 1.2;
 }
 
-.vas-204-req-star {
-    color: #D14545;
-}
-
-.vas-204-fctl {
-    border: 1px solid #D9E2EB;
-    border-radius: 8px;
-    background: #FFFFFF;
-    color: #102C3F;
-    font-family: inherit;
-    font-size: 0.75em;
-    padding: 0.42em 0.55em;
-    min-width: 0;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.vas-204-fctl:disabled {
-    background: #F5F7F9;
+.vas-npo-sub {
+    font-size: .625em;
+    font-weight: 400;
     color: #5F7283;
-}
-
-/* Arrow-less select standard */
-select.vas-204-fctl,
-select.vas-204-rowsel {
-    appearance: none !important;
-    -webkit-appearance: none !important;
-    -moz-appearance: none !important;
-    background-image: none !important;
-    text-align: center;
-    text-align-last: center;
-    background-color: #FFFFFF;
-    border: 1px solid #D9E2EB;
-    border-radius: 8px;
-    padding: 0.35em 0.75em;
-    cursor: pointer;
-    min-width: 0;
-    box-sizing: border-box;
-}
-
-select.vas-204-fctl:hover,
-select.vas-204-rowsel:hover {
-    background-color: #EEF8FF;
-    border-color: #0083DA;
-}
-
-.vas-204-rowin {
-    border: 1px solid #D9E2EB;
-    border-radius: 6px;
-    background: #FFFFFF;
-    color: #102C3F;
-    font-family: inherit;
-    font-size: 1em;
-    padding: 0.2em 0.35em;
-    width: 100%;
-    min-width: 0;
-    text-align: right;
-    box-sizing: border-box;
-}
-
-.vas-204-totline {
-    display: flex;
-    justify-content: flex-end;
-    gap: 1.5em;
-    padding: 0.4em 0.5em 0;
-    border-top: 1px solid #D9E2EB;
-    flex: none;
-}
-
-.vas-204-totline span {
-    font-size: 0.75em;
-    color: #5F7283;
-}
-
-.vas-204-totline b {
-    font-size: 0.8125em;
-    color: #102C3F;
-}
-
-.vas-204-warnnote {
-    font-size: 0.75em;
-    color: #A33F3F;
-    font-weight: 500;
-}
-
-/* ---------- TABLE FOOTER & PAGER ---------- */
-.vas-204-mtfoot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75em;
-    border-top: 1px solid #D9E2EB;
-    padding-top: 0.5em;
-    margin-top: 0.5em;
-    flex: none;
-}
-
-.vas-204-helper {
-    font-size: 0.75em;
-    color: #748494;
+    line-height: 1.25;
+    margin-top: .25em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.vas-204-pager {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: none;
-}
-
-.vas-204-pbtn {
-    width: 24px;
-    height: 24px;
-    border-radius: 7px;
-    border: 1px solid #D9E2EB;
-    background: #FFFFFF;
-    display: grid;
-    place-items: center;
-    color: #0083DA;
-    cursor: pointer;
-    padding: 0;
-}
-
-.vas-204-pbtn:hover:not(:disabled) {
-    background: #EEF8FF;
-}
-
-.vas-204-pbtn:disabled {
-    color: #B8C6D2;
-    cursor: default;
-    border-color: #E2EAF1;
-}
-
-.vas-204-pbtn svg {
-    width: 14px;
-    height: 14px;
-}
-
-.vas-204-ptxt {
-    font-size: 0.8125em;
-    font-weight: 500;
-    color: #102C3F;
-    min-width: 3.4em;
-    text-align: center;
-}
-
-/* ---------- TOAST NOTIFICATION ---------- */
-.vas-204-toast {
-    position: fixed;
-    left: 50%;
-    bottom: 56px;
-    transform: translateX(-50%) translateY(10px);
-    background: #002640;
-    color: #FFFFFF;
-    font-size: 0.8125em;
-    padding: 10px 16px;
-    border-radius: 999px;
-    box-shadow: 0 12px 28px rgba(0, 38, 64, 0.3);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.22s ease, transform 0.22s ease;
-    z-index: 10000;
-}
-
-.vas-204-toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-}
-
-.vas-204-loading,
-.vas-204-empty-msg {
-    padding: 2em;
-    text-align: center;
-    font-size: 0.85em;
-    color: #5F7283;
 }

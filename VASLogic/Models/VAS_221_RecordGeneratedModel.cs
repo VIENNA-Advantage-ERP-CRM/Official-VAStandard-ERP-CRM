@@ -295,6 +295,18 @@ namespace VASLogic.Models
             const string documentCurrencyExpression =
                 "COALESCE(inv.C_Currency_ID,ord.C_Currency_ID,pay.C_Currency_ID,glj.C_Currency_ID,glb.C_Currency_ID)";
 
+            /* JOIN ORDER IS LOAD-BEARING - the two COALESCE joins must not be last.
+               AccessSqlParser strips each ON condition at its closing parenthesis, and
+               for the LAST ON (where there is no following " ON " to search back from)
+               it takes the FIRST ')' in the clause - which, with a COALESCE in that
+               condition, is the function's. It then leaves a stray ')' behind and reads
+               the trailing alias as "doccur)", so MRole emits access predicates against
+               a nonexistent alias and the statement fails at the database.
+
+               glj / glb cannot go last here: the currency and amount expressions read
+               them, so they must be joined before doccur. C_Recurring r can - nothing
+               else's ON references it - so it closes the clause with a function-free
+               ON. Any new join with a function in its ON belongs BEFORE it. */
             StringBuilder sql = new StringBuilder();
             sql.Append(@"
                 SELECT rr.C_Recurring_Run_ID AS C_Recurring_Run_ID,
@@ -316,7 +328,6 @@ namespace VASLogic.Models
                        doccur.CurSymbol AS Amount_Currency_Symbol,
                        doccur.StdPrecision AS Amount_Currency_Precision
                 FROM C_Recurring_Run rr
-                LEFT OUTER JOIN C_Recurring r ON (r.C_Recurring_ID=rr.C_Recurring_ID)
                 LEFT OUTER JOIN C_Invoice inv ON (inv.C_Invoice_ID=rr.C_Invoice_ID)
                 LEFT OUTER JOIN C_Order ord ON (ord.C_Order_ID=rr.C_Order_ID)
                 LEFT OUTER JOIN C_Payment pay ON (pay.C_Payment_ID=rr.C_Payment_ID)
@@ -325,6 +336,7 @@ namespace VASLogic.Models
                 LEFT OUTER JOIN GL_JournalBatch glb ON (glb.GL_JournalBatch_ID=rr.GL_JournalBatch_ID)
                 LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=COALESCE(inv.C_BPartner_ID,ord.C_BPartner_ID,pay.C_BPartner_ID,prj.C_BPartner_ID))
                 LEFT OUTER JOIN C_Currency doccur ON (doccur.C_Currency_ID=").Append(documentCurrencyExpression).Append(@")
+                LEFT OUTER JOIN C_Recurring r ON (r.C_Recurring_ID=rr.C_Recurring_ID)
                 WHERE rr.IsActive='Y'
                   AND rr.AD_Client_ID IN (@AD_Client_ID)
                   AND rr.DateDoc>=@DateFrom
