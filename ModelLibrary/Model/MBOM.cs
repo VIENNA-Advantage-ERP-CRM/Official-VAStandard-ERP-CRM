@@ -107,6 +107,38 @@ namespace VAdvantage.Model
             return retValue;
         }	//	GetOfProduct
 
+        /// <summary>
+        /// VAS147: Recalculate and persist the BOM header's Unit Cost as the sum of Unit Cost
+        /// of all its active BOM Detail lines (M_BOMProduct). For a SFG component line, that
+        /// line's Unit Cost was already rolled up (in MBOMProduct.BeforeSave) from its own
+        /// child BOM's Detail lines (Unit Cost + Labour Cost).
+        /// </summary>
+        /// <param name="ctx">context</param>
+        /// <param name="M_BOM_ID">BOM header id</param>
+        /// <param name="trxName">transaction</param>
+        public static void UpdateUnitCost(Ctx ctx, int M_BOM_ID, Trx trxName)
+        {
+            if (M_BOM_ID <= 0)
+                return;
+
+            Decimal totalUnitCost = Util.GetValueOfDecimal(DB.ExecuteScalar(
+                "SELECT SUM(NVL(VAS_CurrentCostPrice, 0)) FROM M_BOMProduct WHERE M_BOM_ID=" + M_BOM_ID + " AND IsActive='Y'",
+                null, trxName));
+
+            MBOM bom = new MBOM(ctx, M_BOM_ID, trxName);
+            if (bom.Get_ID() == 0)
+                return;
+
+            if (Util.GetValueOfDecimal(bom.Get_Value("VAS_BOMCost")).CompareTo(totalUnitCost) != 0)
+            {
+                bom.Set_Value("VAS_BOMCost", totalUnitCost);
+                if (!bom.Save(trxName))
+                {
+                    bom.log.SaveError("Error", "VAS_BOMCost not updated on BOM Header : " + bom.GetM_BOM_ID());
+                }
+            }
+        }	//	UpdateUnitCost
+
 
 
         /**************************************************************************
