@@ -243,9 +243,11 @@
             if (typeof ResizeObserver === 'undefined') { return; }
             try {
                 _rootObserver = new ResizeObserver(function (entries) {
+                    if (!$root || !$root[0]) { return; }
+
                     for (var i = 0; i < entries.length; i++) {
                         var width = entries[i].contentRect.width;
-                        if (width > 0 && $root[0]) {
+                        if (width > 0) {
                             $root[0].style.setProperty('--widget-inline-size', width + 'px');
                         }
                     }
