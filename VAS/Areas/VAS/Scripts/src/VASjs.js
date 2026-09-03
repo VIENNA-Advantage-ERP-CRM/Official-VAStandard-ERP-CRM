@@ -291,6 +291,7 @@ import "../app/widgets/VAS_055_CashByCategoryCashJournalWidget.js";
 import "../app/tabpanel/VAS_065_APInvoicePanel.js";
 import "../app/tabpanel/VAS_074_CreateInvoiceLinePanel.js";
 import "../app/tabpanel/VAS_107_CreateOrderBottomPanel.js";
+import "../app/tabpanel/VAS_240_RequisitionBottomPanel.js";
 import "../app/tabpanel/VAS_218_CreateOppLines.js";
 import "../app/widgets/VAS_056_AutoAllocatedAPPaymentWidget.js";
 import "../app/widgets/VAS_072_MatchSuggestionAPPayment.js";

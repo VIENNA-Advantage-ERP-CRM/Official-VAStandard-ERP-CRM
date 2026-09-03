@@ -12,6 +12,11 @@
  * Class Used     : VAS.VAS_SentEmailDoc
  * Chronological Development
  * Created Date   : 08-May-2026
+ * VAI163  01-Sep-2026 - A recipient lookup that comes back unsuccessful no
+ *                       longer suppresses the share panel outright. It is
+ *                       fatal only when it yielded neither a name nor an
+ *                       address; otherwise the panel opens seeded with
+ *                       whatever was resolved and the user finishes the rest.
  ********************************************************/
 
 ; VAS = window.VAS || {};
@@ -72,13 +77,21 @@
                     },
                     function (raw) {
                         var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                        if (!res || !res.Success) {
+                        var gotNm = (res && res.Name) ? ("" + res.Name).trim() : recipientNm;
+                        var gotEm = (res && res.EMailID) ? ("" + res.EMailID).trim() : recipientEm;
+
+                        // A failed lookup is only fatal when it left us with NOTHING
+                        // to seed. The record having no e-mail on file is not a reason
+                        // to withhold the share panel — the caller asked to open it,
+                        // and a partly-filled recipient the user can finish beats an
+                        // error dialog that ends the flow on the screen behind it.
+                        if (!res || (!res.Success && !gotNm && !gotEm)) {
                             var msg = (res && res.Message) ? res.Message : (VIS.Msg.getMsg("VAS_RecipientLookupFailed"));
                             VIS.ADialog.error("", "", msg);
                             return;
                         }
 
-                        openAndAutomate(windowNo, processId, tableId, recordId, adWindowId, res.Name, res.EMailID);
+                        openAndAutomate(windowNo, processId, tableId, recordId, adWindowId, gotNm, gotEm);
                     },
                     function (err) {
                         log.severe("GetRecipientInfo failed: " + (err && err.statusText));

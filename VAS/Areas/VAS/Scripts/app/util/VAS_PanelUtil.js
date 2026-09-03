@@ -365,6 +365,21 @@
             var lv = substitute(m[1]).trim().replace(/^['"]|['"]$/g, "");
             var rv = substitute(m[3]).trim().replace(/^['"]|['"]$/g, "");
             if (lv.indexOf("@") >= 0 || rv.indexOf("@") >= 0) return dflt;
+            // "@X@=null" / "@X@!null" is an IS NULL test, not a comparison against the
+            // four-letter string. The dictionary uses it for optional foreign keys
+            // (C_OrderLine.IsDropShip is shown when @C_Order_Blanket@=null, i.e. the order
+            // is not a blanket release); a plain string compare made it false for every
+            // row, since an unset token resolves to "". Either side may carry the literal,
+            // and an empty resolved token counts as null on the other side.
+            var lvNull = /^null$/i.test(lv), rvNull = /^null$/i.test(rv);
+            if (lvNull || rvNull) {
+                var lIsNull = lvNull || lv === "";
+                var rIsNull = rvNull || rv === "";
+                switch (m[2]) {
+                    case "=":           return lIsNull === rIsNull;
+                    case "!": case "^": return lIsNull !== rIsNull;
+                }
+            }
             var ln = parseFloat(lv), rn = parseFloat(rv);
             var numeric = lv !== "" && rv !== "" && !isNaN(ln) && !isNaN(rn);
             switch (m[2]) {

@@ -242,6 +242,17 @@
 ///                          The category fallback stays removed: what the section
 ///                          lists is still exactly what the product's own
 ///                          Accounting tab holds.
+///   VAI163   2026-09-02  Activity timestamps render in the VIEWER's zone on
+///                        PostgreSQL too. Every date and timestamp handed to
+///                        the client now goes through Stamp(), which drops the
+///                        DateTimeKind the provider tagged the value with -
+///                        Oracle says Unspecified, Npgsql says Utc or Local,
+///                        and Newtonsoft writes a zone designator for the
+///                        latter two but not the first. The panel parses the
+///                        bare Oracle form, so the designator made it read the
+///                        value as already-zoned and skip its own conversion,
+///                        printing the stored clock. Same JSON on either engine
+///                        now. No-op on Oracle.
 /// </summary>
 
 using System;
@@ -484,7 +495,7 @@ namespace VASLogic.Models
             s.IsBOM                 = Util.GetValueOfString(r["IsBOM"]) == "Y";
             s.IsVerified            = Util.GetValueOfString(r["IsVerified"]) == "Y";
             s.IsDiscontinued        = Util.GetValueOfString(r["Discontinued"]) == "Y";
-            s.DiscontinuedFrom      = Util.GetValueOfDateTime(r["DiscontinuedFrom"]);
+            s.DiscontinuedFrom      = Stamp(r["DiscontinuedFrom"]);
             s.M_Product_Category_ID = Util.GetValueOfInt(r["M_Product_Category_ID"]);
             s.CategoryName          = Util.GetValueOfString(r["CategoryName"]);
             s.M_AttributeSet_ID     = Util.GetValueOfInt(r["M_AttributeSet_ID"]);
@@ -977,8 +988,8 @@ namespace VASLogic.Models
             info.OrderCount = Util.GetValueOfInt(r["OrderCount"]);
             if (info.OrderCount == 1)
             {
-                info.DateOrdered  = Util.GetValueOfDateTime(r["DateOrdered"]);
-                info.DatePromised = Util.GetValueOfDateTime(r["DatePromised"]);
+                info.DateOrdered  = Stamp(r["DateOrdered"]);
+                info.DatePromised = Stamp(r["DatePromised"]);
             }
             return info;
         }
@@ -1130,7 +1141,7 @@ namespace VASLogic.Models
                     Util.GetValueOfString(r["AsiDescription"]),
                     Util.GetValueOfString(r["Lot"]),
                     Util.GetValueOfString(r["SerNo"]),
-                    Util.GetValueOfDateTime(r["GuaranteeDate"]));
+                    Stamp(r["GuaranteeDate"]));
                 rows.Add(row);
             }
             return rows;
@@ -1361,7 +1372,7 @@ namespace VASLogic.Models
                     M_PriceList_Version_ID = Util.GetValueOfInt(r["M_PriceList_Version_ID"]),
                     PriceListName  = Util.GetValueOfString(r["PriceListName"]),
                     VersionName    = Util.GetValueOfString(r["VersionName"]),
-                    ValidFrom      = Util.GetValueOfDateTime(r["ValidFrom"]),
+                    ValidFrom      = Stamp(r["ValidFrom"]),
                     ISO_Code       = Util.GetValueOfString(r["ISO_Code"]),
                     CurSymbol      = Util.GetValueOfString(r["CurSymbol"]),
                     CurPrecision   = Util.GetValueOfInt(r["CurPrecision"]),
@@ -1375,7 +1386,7 @@ namespace VASLogic.Models
                         Util.GetValueOfString(r["AsiDescription"]),
                         Util.GetValueOfString(r["Lot"]),
                         Util.GetValueOfString(r["SerNo"]),
-                        Util.GetValueOfDateTime(r["GuaranteeDate"]))
+                        Stamp(r["GuaranteeDate"]))
                 });
             }
 
@@ -1488,7 +1499,7 @@ namespace VASLogic.Models
                     Name           = Util.GetValueOfString(r["BomName"]),
                     Description    = Util.GetValueOfString(r["BomDescription"]),
                     ComponentCount = Util.GetValueOfInt(r["ComponentCount"]),
-                    Created        = Util.GetValueOfDateTime(r["Created"]),
+                    Created        = Stamp(r["Created"]),
                     IsVerified     = Util.GetValueOfString(r["IsVerified"]) == "Y"
                 });
             }
@@ -1557,7 +1568,7 @@ namespace VASLogic.Models
                     Name             = Util.GetValueOfString(r["ParentProductName"]),
                     ParentProductId  = Util.GetValueOfInt(r["ParentProductId"]),
                     QtyPerParent     = Util.GetValueOfDecimal(r["BomQty"]),
-                    Created          = Util.GetValueOfDateTime(r["Created"]),
+                    Created          = Stamp(r["Created"]),
                     // The same reader the stock and price rows use: the stored
                     // description first, lot / serial / guarantee only where the
                     // instance has none.
@@ -1565,7 +1576,7 @@ namespace VASLogic.Models
                         Util.GetValueOfString(r["AsiDescription"]),
                         Util.GetValueOfString(r["Lot"]),
                         Util.GetValueOfString(r["SerNo"]),
-                        Util.GetValueOfDateTime(r["GuaranteeDate"])),
+                        Stamp(r["GuaranteeDate"])),
                     IsVerified       = Util.GetValueOfString(r["IsVerified"]) == "Y"
                 });
             }
@@ -1890,7 +1901,7 @@ namespace VASLogic.Models
             check.ConfirmationNo = Util.GetValueOfString(first["ConfirmationNo"]);
             check.BPartnerName   = Util.GetValueOfString(first["BPartnerName"]);
             check.DocIsSOTrx     = Util.GetValueOfString(first["DocIsSOTrx"]) == "Y";
-            check.CheckDate      = Util.GetValueOfDateTime(first["CheckDate"]);
+            check.CheckDate      = Stamp(first["CheckDate"]);
             check.QtyToVerify    = NullableDecimal(first["QtyToVerify"]);
             check.Lines          = new List<QualityCheckLineData>();
             check.IsComplete     = true;
@@ -1985,7 +1996,7 @@ namespace VASLogic.Models
                     VendorProductNo      = Util.GetValueOfString(r["VendorProductNo"]),
                     DeliveryTimePromised = Util.GetValueOfInt(r["DeliveryTimePromised"]),
                     PriceLastPO          = NullableDecimal(r["PriceLastPO"]),
-                    PriceLastPODate      = Util.GetValueOfDateTime(r["PriceLastPODate"]),
+                    PriceLastPODate      = Stamp(r["PriceLastPODate"]),
                     ISO_Code             = Util.GetValueOfString(r["ISO_Code"]),
                     CurSymbol            = Util.GetValueOfString(r["CurSymbol"]),
                     CurPrecision         = Util.GetValueOfInt(r["CurPrecision"])
@@ -2066,7 +2077,7 @@ namespace VASLogic.Models
                 {
                     if (rows[i].C_BPartner_ID != vendorId) continue;
 
-                    rows[i].LastOrderDate  = Util.GetValueOfDateTime(r["DateOrdered"]);
+                    rows[i].LastOrderDate  = Stamp(r["DateOrdered"]);
                     rows[i].LastOrderNo    = Util.GetValueOfString(r["DocumentNo"]);
                     rows[i].LastOrderId    = Util.GetValueOfInt(r["C_Order_ID"]);
                     rows[i].LastOrderPrice = NullableDecimal(r["PriceActual"]);
@@ -2223,8 +2234,8 @@ namespace VASLogic.Models
                     C_Order_ID     = Util.GetValueOfInt(r["C_Order_ID"]),
                     DocumentNo     = Util.GetValueOfString(r["DocumentNo"]),
                     DocStatus      = Util.GetValueOfString(r["DocStatus"]),
-                    DateOrdered    = Util.GetValueOfDateTime(r["DateOrdered"]),
-                    DatePromised   = Util.GetValueOfDateTime(r["DatePromised"]),
+                    DateOrdered    = Stamp(r["DateOrdered"]),
+                    DatePromised   = Stamp(r["DatePromised"]),
                     BPartnerName   = Util.GetValueOfString(r["BPartnerName"]),
                     Qty            = Util.GetValueOfDecimal(r["Qty"]),
                     QtyOrderedBase = ordered,
@@ -2518,7 +2529,7 @@ namespace VASLogic.Models
                 {
                     M_Transaction_ID = Util.GetValueOfInt(r["M_Transaction_ID"]),
                     MovementType     = Util.GetValueOfString(r["MovementType"]),
-                    MovementDate     = Util.GetValueOfDateTime(r["MovementDate"]),
+                    MovementDate     = Stamp(r["MovementDate"]),
                     MovementQty      = Util.GetValueOfDecimal(r["MovementQty"]),
                     DocumentNo       = Util.GetValueOfString(r["DocumentNo"]),
                     DocTypeName      = Util.GetValueOfString(r["DocTypeName"]),
@@ -2538,7 +2549,7 @@ namespace VASLogic.Models
                         Util.GetValueOfString(r["AsiDescription"]),
                         Util.GetValueOfString(r["Lot"]),
                         Util.GetValueOfString(r["SerNo"]),
-                        Util.GetValueOfDateTime(r["GuaranteeDate"]))
+                        Stamp(r["GuaranteeDate"]))
                 });
             }
             return rows;
@@ -3098,7 +3109,7 @@ namespace VASLogic.Models
                 // these when a save rewrites a field with the value it already had.
                 if (string.Equals(oldRaw, newRaw, StringComparison.Ordinal)) continue;
 
-                DateTime? at = Util.GetValueOfDateTime(r["Created"]);
+                DateTime? at = Stamp(r["Created"]);
                 string key = Util.GetValueOfString(r["ColumnName"]) + "|" + oldRaw + "|" + newRaw
                            + "|" + (at.HasValue ? at.Value.ToString("yyyyMMddHHmmss") : "");
                 if (seen.Contains(key)) continue;
@@ -3275,7 +3286,7 @@ namespace VASLogic.Models
                     StateCode = stateCode,
                     StateName = stateName,
                     Actor     = Util.GetValueOfString(r["ActorName"]),
-                    EventDate = Util.GetValueOfDateTime(r["Created"])
+                    EventDate = Stamp(r["Created"])
                 });
             }
         }
@@ -3429,6 +3440,21 @@ namespace VASLogic.Models
         /// This panel has its own appointment, mail and chat loaders, so only the
         /// CALLS are taken from it.</summary>
         private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
+        /// <summary>
+        /// Every date and timestamp this panel hands the client is read through
+        /// here rather than through Util.GetValueOfDateTime directly, so the
+        /// DateTimeKind the PROVIDER tagged the value with cannot reach the JSON.
+        /// Oracle tags Unspecified and Npgsql tags Utc or Local; Newtonsoft writes
+        /// a zone designator for the latter two and none for the first, and the
+        /// panel's parseDbDate reads the two shapes differently - which is why the
+        /// Activity feed's times were hours out on PostgreSQL. A no-op for a value
+        /// that is already Unspecified, so the Oracle path is untouched. See
+        /// VAS_ActivitySourcesModel.Stamp for the full account.
+        /// </summary>
+        private static DateTime? Stamp(object value)
+        {
+            return VAS_ActivitySourcesModel.Stamp(value);
+        }
 
         /// <summary>
         /// Calls logged against the product (VA048_CallDetails, pinned by
@@ -3488,7 +3514,7 @@ namespace VASLogic.Models
 
             foreach (DataRow r in ds.Tables[0].Rows)
             {
-                DateTime? received = Util.GetValueOfDateTime(r["DateMailReceived"]);
+                DateTime? received = Stamp(r["DateMailReceived"]);
                 ActivityData a = new ActivityData();
                 a.Id        = Util.GetValueOfInt(r["MailAttachment1_ID"]);
                 // MailAttachment1 holds two kinds of correspondence, and
@@ -3513,7 +3539,7 @@ namespace VASLogic.Models
                 a.MailBcc   = Util.GetValueOfString(r["MailAddressBcc"]);
                 a.IsSent    = Util.GetValueOfString(r["IsMailSent"]) == "Y";
                 a.Actor     = Util.GetValueOfString(r["ActorName"]);
-                a.EventDate = received.HasValue ? received : Util.GetValueOfDateTime(r["Created"]);
+                a.EventDate = received.HasValue ? received : Stamp(r["Created"]);
                 list.Add(a);
             }
         }
@@ -3551,7 +3577,7 @@ namespace VASLogic.Models
                     Title     = title,
                     Body      = Util.GetValueOfString(r["TextMsg"]),
                     Actor     = Util.GetValueOfString(r["ActorName"]),
-                    EventDate = Util.GetValueOfDateTime(r["Created"])
+                    EventDate = Stamp(r["Created"])
                 });
             }
         }
@@ -3603,7 +3629,7 @@ namespace VASLogic.Models
                     Title     = text,
                     Body      = text,
                     Actor     = Util.GetValueOfString(r["ActorName"]),
-                    EventDate = Util.GetValueOfDateTime(r["Created"])
+                    EventDate = Stamp(r["Created"])
                 });
             }
         }
@@ -3660,7 +3686,7 @@ namespace VASLogic.Models
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 bool isTask = Util.GetValueOfString(r["IsTask"]) == "Y";
-                DateTime? start = Util.GetValueOfDateTime(r["StartDate"]);
+                DateTime? start = Stamp(r["StartDate"]);
                 int apptId = Util.GetValueOfInt(r["AppointmentsInfo_ID"]);
 
                 string meetingKey = (start.HasValue ? start.Value.ToString("s") : "")
@@ -3683,10 +3709,10 @@ namespace VASLogic.Models
                     IsClosed    = Util.GetValueOfString(r["IsClosed"]) == "Y",
                     IsCancelled = Util.GetValueOfString(r["IsCancelled"]) == "Y",
                     StartDate   = start,
-                    EndDate     = Util.GetValueOfDateTime(r["EndDate"]),
+                    EndDate     = Stamp(r["EndDate"]),
                     Actor       = Util.GetValueOfString(r["ActorName"]),
                     Mails       = new List<VAS_ActivityMailRow>(),
-                    EventDate   = start.HasValue ? start : Util.GetValueOfDateTime(r["Created"])
+                    EventDate   = start.HasValue ? start : Stamp(r["Created"])
                 };
                 list.Add(a);
                 keptByMeeting[meetingKey] = a;
