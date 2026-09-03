@@ -1107,6 +1107,9 @@
     <Compile Include="Areas\VAS\Controllers\VAS_231_NetMovementWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_231_NetMovementWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_231_NetMovementWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_233_BankChargesWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_233_BankChargesWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_233_BankChargesWidget.js" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>
