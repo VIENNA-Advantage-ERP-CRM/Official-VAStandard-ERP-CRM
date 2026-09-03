@@ -457,6 +457,15 @@
  *                          hanging off the pointer read as a query about the
  *                          amount; the tooltip stays and is found by resting on the
  *                          cell, as every other tooltip here is.
+ *   VAI163   2026-09-01  SHIPPED dates itself by the delivery order's OWN date
+ *                        (M_InOut.MovementDate), with the Created stamp behind it
+ *                        for a row carrying none — so the stage and the delivery
+ *                        order agree on when the goods went out. It read the raise
+ *                        stamp before, which disagreed with the DO screen wherever
+ *                        a shipment was entered on a different day from the one it
+ *                        moves stock on. Only raisedDate changes, so this is the
+ *                        In Process date under IsShipConfirm; Delivered still dates
+ *                        itself by the completion moment.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1245,9 +1254,10 @@
         // Delivered stage are read from. One pass, because the two stages ask
         // different questions of the same rows and must never disagree about them.
         //
-        //   raisedDate    — the EARLIEST delivery order that has left draft. Shipped
-        //                   reports when the order first went out, so it takes the
-        //                   first, where Delivered below reports the latest movement.
+        //   raisedDate    — the EARLIEST delivery order that has left draft, dated
+        //                   by its own MovementDate. Shipped reports when the order
+        //                   first went out, so it takes the first, where Delivered
+        //                   below reports the latest movement.
         //   completedDate — the LATEST completed delivery order's completion moment
         //                   (its workflow DocComplete stamp, model side), falling
         //                   back to when it was raised.
@@ -1273,8 +1283,15 @@
                 }
                 if (st !== "DR") {
                     open++;
-                    var r = parseDbDate(dv[i].Created, true) ||
-                            parseDbDate(dv[i].MovementDate, false);
+                    // The delivery order's OWN date (M_InOut.MovementDate) — the
+                    // date the DO screen shows — with the raise stamp behind it for
+                    // a row that carries none. Shipped reports the shipment as the
+                    // document dates itself, so the stage and the delivery order
+                    // agree on when the goods went out; reading the Created stamp
+                    // instead made the two disagree wherever a shipment was entered
+                    // on a different day from the one it moves stock on.
+                    var r = parseDbDate(dv[i].MovementDate, false) ||
+                            parseDbDate(dv[i].Created, true);
                     if (r && (!raised || r < raised)) raised = r;
                 }
             }

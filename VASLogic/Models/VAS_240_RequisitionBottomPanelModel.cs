@@ -1,14 +1,23 @@
 /******************************************************
  * Module Name    : VASLogic
- * Purpose        : Backing model for the VAS_107_CreateOrderBottomPanel tab
- *                  panel. Provides parent-order context and existing lines,
- *                  paged Product / Charge catalog search (50 rows / scroll),
- *                  the server-side line callout (price / tax / amount), product
- *                  attribute (M_AttributeSetInstance) read + create, barcode
- *                  scan lookup and the C_OrderLine insert / update / delete
- *                  write actions (always through the MOrderLine business class).
+ * Purpose        : Backing model for the VAS_240_RequisitionBottomPanel tab
+ *                  panel — the requisition counterpart of
+ *                  VAS_107_CreateOrderBottomPanel. Provides parent-requisition
+ *                  context and existing lines, paged Product / Charge catalog
+ *                  search (50 rows / scroll), the server-side line callout
+ *                  (price / amount), product attribute
+ *                  (M_AttributeSetInstance) read + create, barcode scan lookup
+ *                  and the M_RequisitionLine insert / update / delete write
+ *                  actions (always through the MRequisitionLine business class).
+ *
+ *                  A requisition line carries NO tax: M_RequisitionLine has no
+ *                  C_Tax_ID / TaxAmt / LineTotalAmt and there is no
+ *                  M_RequisitionTax table, so the panel states one amount per
+ *                  line (Qty x PriceActual = LineNetAmt) and one document
+ *                  total. Everything tax-shaped in VAS_107 is therefore absent
+ *                  here rather than stubbed.
  * Chronological  : Development
- *   VAI154         Created  09-Jul-2026
+ *   VAI163         Created  03-Sep-2026
  ******************************************************/
 
 using System;
@@ -28,59 +37,60 @@ namespace VASLogic.Models
 {
     /// <summary>
     /// Module Name : VASLogic
-    /// Purpose     : Data + write model behind the Create Order Bottom Panel.
+    /// Purpose     : Data + write model behind the Requisition Bottom Panel.
     ///               Every SELECT is filtered through MRole.AddAccessSQL on the
     ///               main physical table alias only and uses bind parameters so
     ///               the same code runs on PostgreSQL and Oracle. All inserts go
-    ///               through MOrderLine (never a hand-written INSERT) so the
-    ///               standard order-line callouts (price / tax / amount) run.
+    ///               through MRequisitionLine (never a hand-written INSERT) so the
+    ///               standard requisition-line logic runs — pricing from the
+    ///               header price list, the QtyEntered -> Qty UOM conversion in
+    ///               MRequisitionLine.BeforeSave, and the M_Requisition.TotalLines
+    ///               roll-up in its AfterSave.
     /// Chronological development:
-    ///   VAI154         Created  09-Jul-2026
+    ///   VAI163         Created  03-Sep-2026
     /// </summary>
-    public class VAS_107_CreateOrderBottomPanelModel
+    public class VAS_240_RequisitionBottomPanelModel
     {
-        private static VLogger log = VLogger.GetVLogger(typeof(VAS_107_CreateOrderBottomPanelModel).FullName);
+        private static VLogger log = VLogger.GetVLogger(typeof(VAS_240_RequisitionBottomPanelModel).FullName);
 
         /// <summary>First page size for the Product / Charge catalog search.</summary>
         private const int CATALOG_PAGE_SIZE = 50;
 
-        /// <summary>Saved order lines loaded per page (server-side paging).</summary>
+        /// <summary>Saved requisition lines loaded per page (server-side paging).</summary>
         private const int LINE_PAGE_SIZE = 20;
 
         #region Panel (read) data
 
         /// <summary>
         /// Builds the panel header context (everything the client-side callouts
-        /// need from the parent order) plus the already-saved order lines.
-        /// Returns an empty object (C_Order_ID = 0) when the role has no access.
+        /// need from the parent requisition) plus the already-saved lines.
+        /// Returns an empty object (M_Requisition_ID = 0) when the role has no access.
         /// </summary>
         /// <param name="ctx">session context</param>
-        /// <param name="C_Order_ID">parent order</param>
+        /// <param name="M_Requisition_ID">parent requisition</param>
         /// <param name="AD_Window_ID">source window</param>
         /// <param name="page">0-based page of saved lines</param>
         /// <returns>panel view model</returns>
-        public CreateOrderPanelData GetPanelData(Ctx ctx, int C_Order_ID, int AD_Window_ID, int page = 0)
+        public RequisitionPanelData GetPanelData(Ctx ctx, int M_Requisition_ID, int AD_Window_ID, int page = 0)
         {
-            CreateOrderPanelData data = new CreateOrderPanelData();
-            if (C_Order_ID <= 0) return data;
+            RequisitionPanelData data = new RequisitionPanelData();
+            if (M_Requisition_ID <= 0) return data;
 
-            LoadParentContext(ctx, C_Order_ID, data);
-            if (data.C_Order_ID <= 0) return data;   // no access / not found
+            LoadParentContext(ctx, M_Requisition_ID, data);
+            if (data.M_Requisition_ID <= 0) return data;   // no access / not found
 
             data.AD_Window_ID = AD_Window_ID;
-            List<int> tabIds = ResolveOrderLineTabs(AD_Window_ID);
+            List<int> tabIds = ResolveRequisitionLineTabs(AD_Window_ID);
             data.AD_Tab_IDs = tabIds;
             data.AD_Tab_ID = tabIds.Count > 0 ? tabIds[0] : 0;
 
             if (page < 0) page = 0;
             int total;
-            data.Lines = LoadLines(ctx, C_Order_ID, tabIds, page, out total);
+            data.Lines = LoadLines(ctx, M_Requisition_ID, tabIds, page, out total);
             data.LinesTotal = total;
             data.LinePage = page;
             data.LinePageSize = LINE_PAGE_SIZE;
-            decimal oNet, oTax, oTcs;
-            ComputeOtherPageTotals(ctx, C_Order_ID, data.Lines, data.IsTaxIncluded, out oNet, out oTax, out oTcs);
-            data.OtherPagesSubtotal = oNet; data.OtherPagesTax = oTax; data.OtherPagesTcs = oTcs;
+            data.OtherPagesSubtotal = ComputeOtherPageTotal(ctx, M_Requisition_ID, data.Lines);
             LoadCatalogs(ctx, data);
             LoadColumns(ctx, data, tabIds);
             LoadLoginContext(ctx, data);
@@ -91,11 +101,11 @@ namespace VASLogic.Models
         /// Collects the login / session context values for every @$Token@ / @#Token@
         /// referenced by any column's DisplayLogic or ReadOnlyLogic.
         /// </summary>
-        private void LoadLoginContext(Ctx ctx, CreateOrderPanelData data)
+        private void LoadLoginContext(Ctx ctx, RequisitionPanelData data)
         {
             Regex rx = new Regex(@"@([#$][A-Za-z0-9_]+)@");
             HashSet<string> tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (OrderColumnMeta m in data.Columns)
+            foreach (RequisitionColumnMeta m in data.Columns)
             {
                 if (!string.IsNullOrEmpty(m.DisplayLogic))
                     foreach (Match mt in rx.Matches(m.DisplayLogic)) tokens.Add(mt.Groups[1].Value);
@@ -141,8 +151,8 @@ namespace VASLogic.Models
             return types;
         }
 
-        /// <summary>Loads C_OrderLine column metadata once per panel load.</summary>
-        private void LoadColumns(Ctx ctx, CreateOrderPanelData data, List<int> AD_Tab_IDs)
+        /// <summary>Loads M_RequisitionLine column metadata once per panel load.</summary>
+        private void LoadColumns(Ctx ctx, RequisitionPanelData data, List<int> AD_Tab_IDs)
         {
             if (AD_Tab_IDs != null && AD_Tab_IDs.Count > 0)
                 LoadColumnsFromTabs(ctx, data, AD_Tab_IDs);
@@ -165,16 +175,16 @@ namespace VASLogic.Models
         /// <summary>
         /// Injects VAS-specific FK columns into the panel metadata when they are not already
         /// present after <see cref="LoadColumnsFromTabs"/> and <see cref="MergeAllColumns"/>.
-        /// This handles the common case where the column exists physically on C_OrderLine but
+        /// This handles the common case where the column exists physically on M_RequisitionLine but
         /// the AD_Column entry is absent or inactive (IsActive = 'N'). The lookup definition
         /// for each injected column is resolved at query time by <see cref="ResolveRefLookup"/>
         /// from the column-name TableDir convention (VAS_Opportunity_ID → VAS_Opportunity).
         /// </summary>
         /// <param name="data">Panel data being built; Columns list is mutated in-place.</param>
-        private void InjectMissingVasColumns(CreateOrderPanelData data)
+        private void InjectMissingVasColumns(RequisitionPanelData data)
         {
             HashSet<string> have = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (OrderColumnMeta m in data.Columns) have.Add(m.ColumnName);
+            foreach (RequisitionColumnMeta m in data.Columns) have.Add(m.ColumnName);
 
             foreach (var cand in _vasInjectColumns)
             {
@@ -185,14 +195,14 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(
                     @"SELECT c.AD_Column_ID, c.AD_Reference_ID
                       FROM AD_Column c INNER JOIN AD_Table t ON (c.AD_Table_ID = t.AD_Table_ID)
-                      WHERE t.TableName = 'C_OrderLine' AND c.ColumnName = @col",
+                      WHERE t.TableName = 'M_RequisitionLine' AND c.ColumnName = @col",
                     new SqlParameter[] { new SqlParameter("@col", cand.Col) }, null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     continue; // column absent from AD_Column entirely — physical column may not exist
                 adColId = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Column_ID"]);
                 int dbRefId = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Reference_ID"]);
                 if (dbRefId > 0) refId = dbRefId;
-                data.Columns.Add(new OrderColumnMeta
+                data.Columns.Add(new RequisitionColumnMeta
                 {
                     ColumnName            = cand.Col,
                     AD_Column_ID          = adColId,
@@ -217,9 +227,9 @@ namespace VASLogic.Models
         }
 
         /// <summary>Fills inline AD_Ref_List values for List (ref 17) columns.</summary>
-        private void LoadListValues(CreateOrderPanelData data)
+        private void LoadListValues(RequisitionPanelData data)
         {
-            foreach (OrderColumnMeta m in data.Columns)
+            foreach (RequisitionColumnMeta m in data.Columns)
             {
                 if (m.AD_Reference_ID != 17 || m.AD_Reference_Value_ID <= 0) continue;
                 DataSet ds = DB.ExecuteDataset(
@@ -229,7 +239,7 @@ namespace VASLogic.Models
                     new SqlParameter[] { new SqlParameter("@ref", m.AD_Reference_Value_ID) }, null);
                 if (ds == null || ds.Tables.Count == 0) continue;
                 foreach (DataRow r in ds.Tables[0].Rows)
-                    m.RefListValues.Add(new OrderRefListItem
+                    m.RefListValues.Add(new RequisitionRefListItem
                     {
                         Value = Util.GetValueOfString(r["Value"]),
                         Name = Util.GetValueOfString(r["Name"])
@@ -237,19 +247,19 @@ namespace VASLogic.Models
             }
         }
 
-        private Dictionary<int, List<int>> _olTabsByWindow;
+        private Dictionary<int, List<int>> _rlTabsByWindow;
 
-        /// <summary>Finds every active AD_Tab bound to C_OrderLine inside the given window.</summary>
-        private List<int> ResolveOrderLineTabs(int AD_Window_ID)
+        /// <summary>Finds every active AD_Tab bound to M_RequisitionLine inside the given window.</summary>
+        private List<int> ResolveRequisitionLineTabs(int AD_Window_ID)
         {
-            if (_olTabsByWindow == null) _olTabsByWindow = new Dictionary<int, List<int>>();
+            if (_rlTabsByWindow == null) _rlTabsByWindow = new Dictionary<int, List<int>>();
             List<int> cached;
-            if (_olTabsByWindow.TryGetValue(AD_Window_ID, out cached)) return cached;
+            if (_rlTabsByWindow.TryGetValue(AD_Window_ID, out cached)) return cached;
 
             List<int> tabs = new List<int>();
             if (AD_Window_ID > 0)
             {
-                int tableId = X_C_OrderLine.Table_ID;
+                int tableId = X_M_RequisitionLine.Table_ID;
                 if (tableId > 0)
                 {
                     DataSet ds = DB.ExecuteDataset(
@@ -267,7 +277,7 @@ namespace VASLogic.Models
                         }
                 }
             }
-            _olTabsByWindow[AD_Window_ID] = tabs;
+            _rlTabsByWindow[AD_Window_ID] = tabs;
             return tabs;
         }
 
@@ -298,7 +308,7 @@ namespace VASLogic.Models
                                 INNER JOIN AD_Table tt2 ON (t2.AD_Table_ID = tt2.AD_Table_ID)
                                 WHERE f2.AD_Column_ID = c.AD_Column_ID
                                   AND f2.IsActive = 'Y'
-                                  AND tt2.TableName = 'C_OrderLine'
+                                  AND tt2.TableName = 'M_RequisitionLine'
                                   AND f2.ReadOnlyLogic IS NOT NULL
                                   AND LENGTH(TRIM(f2.ReadOnlyLogic)) > 0), N''), ");
             sb.Append("c.ReadOnlyLogic, N'')");
@@ -318,7 +328,7 @@ namespace VASLogic.Models
             // VAS / VIS platform-core columns
             "VAS_", "VIS_", "VA_", "VB_",
             // Core columns whose prefix is a ROLE, not a module. The prefix rule takes
-            // everything up to the first underscore, so C_OrderLine.Ref_OrderLine_ID
+            // everything up to the first underscore, so M_RequisitionLine.Ref_OrderLine_ID
             // ("Original PO Line") yielded "Ref_" — read as an optional module, failed
             // Env.IsModuleInstalled, and the column was stripped from the payload before
             // the panel ever saw it. Link_ is the same shape (Link_OrderLine_ID).
@@ -346,7 +356,7 @@ namespace VASLogic.Models
         }
 
         /// <summary>Reads AD_Field -> AD_Column metadata across all the window's order-line tabs.</summary>
-        private bool LoadColumnsFromTabs(Ctx ctx, CreateOrderPanelData data, List<int> AD_Tab_IDs)
+        private bool LoadColumnsFromTabs(Ctx ctx, RequisitionPanelData data, List<int> AD_Tab_IDs)
         {
             string inList = string.Join(",", AD_Tab_IDs.ToArray());
             string roLogicExpr = ReadOnlyLogicSelectExpr(true);
@@ -393,16 +403,16 @@ namespace VASLogic.Models
                 if (!seen.Add(name)) continue;
                 // Skip columns from optional modules that are not installed on this deployment.
                 if (!IsColumnModuleInstalled(name)) continue;
-                data.Columns.Add(MapOrderColumnMeta(r, true));
+                data.Columns.Add(MapRequisitionColumnMeta(r, true));
             }
             return true;
         }
 
-        /// <summary>Merges every active C_OrderLine column not already loaded from the tab.</summary>
-        private void MergeAllColumns(Ctx ctx, CreateOrderPanelData data)
+        /// <summary>Merges every active M_RequisitionLine column not already loaded from the tab.</summary>
+        private void MergeAllColumns(Ctx ctx, RequisitionPanelData data)
         {
             HashSet<string> have = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (OrderColumnMeta cm in data.Columns) have.Add(cm.ColumnName);
+            foreach (RequisitionColumnMeta cm in data.Columns) have.Add(cm.ColumnName);
 
             string roLogicExpr = ReadOnlyLogicSelectExpr(false);
             string sql = @"SELECT c.ColumnName,
@@ -424,14 +434,14 @@ namespace VASLogic.Models
                                                 INNER JOIN AD_Table tt2 ON (t2.AD_Table_ID = tt2.AD_Table_ID)
                                                 WHERE f2.AD_Column_ID = c.AD_Column_ID
                                                   AND f2.IsActive = 'Y'
-                                                  AND tt2.TableName = 'C_OrderLine'
+                                                  AND tt2.TableName = 'M_RequisitionLine'
                                                   AND f2.DisplayLogic IS NOT NULL
                                                   AND LENGTH(TRIM(f2.DisplayLogic)) > 0), N'') AS DisplayLogic
                            FROM AD_Column c
                            INNER JOIN AD_Table t ON (c.AD_Table_ID = t.AD_Table_ID)
                            LEFT JOIN AD_Val_Rule vr ON (c.AD_Val_Rule_ID = vr.AD_Val_Rule_ID
                                 AND vr.IsActive = 'Y')
-                           WHERE t.TableName = 'C_OrderLine'
+                           WHERE t.TableName = 'M_RequisitionLine'
                              AND c.IsActive = 'Y'";
 
             DataSet ds = DB.ExecuteDataset(sql);
@@ -442,14 +452,14 @@ namespace VASLogic.Models
                 if (have.Contains(colName)) continue;
                 // Skip columns from optional modules that are not installed on this deployment.
                 if (!IsColumnModuleInstalled(colName)) continue;
-                data.Columns.Add(MapOrderColumnMeta(r, false));
+                data.Columns.Add(MapRequisitionColumnMeta(r, false));
             }
         }
 
         /// <summary>Maps a column-meta row.</summary>
-        private OrderColumnMeta MapOrderColumnMeta(DataRow r, bool fromField)
+        private RequisitionColumnMeta MapRequisitionColumnMeta(DataRow r, bool fromField)
         {
-            OrderColumnMeta m = new OrderColumnMeta
+            RequisitionColumnMeta m = new RequisitionColumnMeta
             {
                 ColumnName = Util.GetValueOfString(r["ColumnName"]),
                 AD_Column_ID = Util.GetValueOfInt(r["AD_Column_ID"]),
@@ -496,28 +506,30 @@ namespace VASLogic.Models
             return "";
         }
 
-        /// <summary>Loads UOM + tax dropdown catalogs using the order header context.</summary>
-        private void LoadCatalogs(Ctx ctx, CreateOrderPanelData data)
+        /// <summary>
+        /// Loads the UOM dropdown catalog using the requisition header context.
+        /// There is no tax catalog: a requisition line carries no C_Tax_ID.
+        /// </summary>
+        private void LoadCatalogs(Ctx ctx, RequisitionPanelData data)
         {
-            data.UomList = LoadUomList(ctx, data.C_Order_ID, null);
-            data.TaxList = LoadTaxList(ctx, data.C_Order_ID, null);
+            data.UomList = LoadUomList(ctx, data.M_Requisition_ID, null);
         }
 
         /// <summary>Builds the UOM dropdown list, enforcing the C_UOM_ID column's AD_Val_Rule.</summary>
-        private List<OrderUomItem> LoadUomList(Ctx ctx, int C_Order_ID, Dictionary<string, string> rowVars)
+        private List<RequisitionUomItem> LoadUomList(Ctx ctx, int M_Requisition_ID, Dictionary<string, string> rowVars)
         {
-            List<OrderUomItem> list = new List<OrderUomItem>();
+            List<RequisitionUomItem> list = new List<RequisitionUomItem>();
             string uomSql = @"SELECT u.C_UOM_ID, u.Name AS UOMName
                               FROM C_UOM u
                               WHERE u.IsActive = 'Y'";
-            string uomPred = GetValRulePredicate(ctx, "C_UOM_ID", "C_UOM", "u", C_Order_ID, rowVars);
+            string uomPred = GetValRulePredicate(ctx, "C_UOM_ID", "C_UOM", "u", M_Requisition_ID, rowVars);
             if (uomPred.Length > 0) uomSql += " AND (" + uomPred + ")";
             uomSql += " ORDER BY u.Name";
             uomSql = MRole.GetDefault(ctx).AddAccessSQL(uomSql, "u", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             DataSet uds = DB.ExecuteDataset(uomSql);
             if (uds != null && uds.Tables.Count > 0)
                 foreach (DataRow r in uds.Tables[0].Rows)
-                    list.Add(new OrderUomItem
+                    list.Add(new RequisitionUomItem
                     {
                         C_UOM_ID = Util.GetValueOfInt(r["C_UOM_ID"]),
                         Name = Util.GetValueOfString(r["UOMName"])
@@ -525,62 +537,36 @@ namespace VASLogic.Models
             return list;
         }
 
-        /// <summary>Builds the tax dropdown list (rate included), enforcing the C_Tax_ID column's AD_Val_Rule.</summary>
-        private List<OrderTaxItem> LoadTaxList(Ctx ctx, int C_Order_ID, Dictionary<string, string> rowVars)
-        {
-            List<OrderTaxItem> list = new List<OrderTaxItem>();
-            string taxSql = @"SELECT t.C_Tax_ID, t.Name, t.Rate
-                              FROM C_Tax t
-                              WHERE t.IsActive = 'Y'
-                                AND COALESCE(t.IsSummary, 'N') = 'N'
-                                AND t.AD_Client_ID IN (0, " + ctx.GetAD_Client_ID() + ")";
-            string taxPred = GetValRulePredicate(ctx, "C_Tax_ID", "C_Tax", "t", C_Order_ID, rowVars);
-            if (taxPred.Length > 0) taxSql += " AND (" + taxPred + ")";
-            taxSql += " ORDER BY t.Rate, t.Name";
-            taxSql = MRole.GetDefault(ctx).AddAccessSQL(taxSql, "t", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            DataSet tds = DB.ExecuteDataset(taxSql);
-            if (tds != null && tds.Tables.Count > 0)
-                foreach (DataRow r in tds.Tables[0].Rows)
-                    list.Add(new OrderTaxItem
-                    {
-                        C_Tax_ID = Util.GetValueOfInt(r["C_Tax_ID"]),
-                        Name = Util.GetValueOfString(r["Name"]),
-                        Rate = Util.GetValueOfDecimal(r["Rate"])
-                    });
-            return list;
-        }
-
         /// <summary>
-        /// Re-fetches the per-row filtered UOM + tax lists for one order line,
-        /// honouring each column's AD_Val_Rule against the line's current values.
+        /// Re-fetches the per-row filtered UOM list for one requisition line,
+        /// honouring the column's AD_Val_Rule against the line's current values.
         /// </summary>
-        public OrderLookupData GetLookupData(Ctx ctx, OrderLookupRequest req)
+        public RequisitionLookupData GetLookupData(Ctx ctx, RequisitionLookupRequest req)
         {
-            OrderLookupData data = new OrderLookupData();
-            if (req == null || req.C_Order_ID <= 0) return data;
+            RequisitionLookupData data = new RequisitionLookupData();
+            if (req == null || req.M_Requisition_ID <= 0) return data;
 
-            CreateOrderPanelData parent = new CreateOrderPanelData();
-            LoadParentContext(ctx, req.C_Order_ID, parent);
-            if (parent.C_Order_ID <= 0) return data;
+            RequisitionPanelData parent = new RequisitionPanelData();
+            LoadParentContext(ctx, req.M_Requisition_ID, parent);
+            if (parent.M_Requisition_ID <= 0) return data;
 
-            data.C_Order_ID = req.C_Order_ID;
+            data.M_Requisition_ID = req.M_Requisition_ID;
             Dictionary<string, string> rowVars = BuildRowVars(req.RowValues);
-            data.UomList = LoadUomList(ctx, req.C_Order_ID, rowVars);
-            data.TaxList = LoadTaxList(ctx, req.C_Order_ID, rowVars);
+            data.UomList = LoadUomList(ctx, req.M_Requisition_ID, rowVars);
             return data;
         }
 
         /// <summary>
-        /// Generic FK lookup for a dynamic C_OrderLine field (Table / TableDir / Search).
+        /// Generic FK lookup for a dynamic M_RequisitionLine field (Table / TableDir / Search).
         /// </summary>
-        public List<OrderRefItem> GetRefLookup(Ctx ctx, OrderRefLookupRequest req)
+        public List<RequisitionRefItem> GetRefLookup(Ctx ctx, RequisitionRefLookupRequest req)
         {
-            List<OrderRefItem> items = new List<OrderRefItem>();
-            if (req == null || req.C_Order_ID <= 0 || string.IsNullOrEmpty(req.ColumnName)) return items;
+            List<RequisitionRefItem> items = new List<RequisitionRefItem>();
+            if (req == null || req.M_Requisition_ID <= 0 || string.IsNullOrEmpty(req.ColumnName)) return items;
 
-            CreateOrderPanelData parent = new CreateOrderPanelData();
-            LoadParentContext(ctx, req.C_Order_ID, parent);
-            if (parent.C_Order_ID <= 0) return items;
+            RequisitionPanelData parent = new RequisitionPanelData();
+            LoadParentContext(ctx, req.M_Requisition_ID, parent);
+            if (parent.M_Requisition_ID <= 0) return items;
 
             RefLookupDef def = ResolveRefLookup(req.ColumnName);
             if (def == null) return items;
@@ -613,7 +599,7 @@ namespace VASLogic.Models
                     ps.Add(new SqlParameter("@kw", "%" + term.ToLower() + "%"));
                 }
                 Dictionary<string, string> rowVars = BuildRowVars(req.RowValues);
-                string pred = GetValRulePredicate(ctx, req.ColumnName, def.TableName, alias, req.C_Order_ID, rowVars);
+                string pred = GetValRulePredicate(ctx, req.ColumnName, def.TableName, alias, req.M_Requisition_ID, rowVars);
                 if (pred.Length > 0) sql.Append(" AND (").Append(pred).Append(")");
             }
 
@@ -624,7 +610,7 @@ namespace VASLogic.Models
             DataSet ds = DB.ExecuteDataset(secured, ps.ToArray(), null);
             if (ds == null || ds.Tables.Count == 0) return items;
             foreach (DataRow r in ds.Tables[0].Rows)
-                items.Add(new OrderRefItem { Id = Util.GetValueOfInt(r["Id"]), Name = Util.GetValueOfString(r["Name"]) });
+                items.Add(new RequisitionRefItem { Id = Util.GetValueOfInt(r["Id"]), Name = Util.GetValueOfString(r["Name"]) });
             return items;
         }
 
@@ -633,33 +619,48 @@ namespace VASLogic.Models
             new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
             {
                 { "AD_OrgTrx_ID", new string[] { "AD_Org", "AD_Org_ID" } },
-                // Order-line self references: the TableDir convention would derive the
-                // non-existent tables "C_OrderLine_Blanket" / "C_Quotation_Line" / "Ref_OrderLine".
-                { "C_OrderLine_Blanket_ID", new string[] { "C_OrderLine", "C_OrderLine_ID" } },
-                { "C_Quotation_Line_ID",    new string[] { "C_OrderLine", "C_OrderLine_ID" } },
-                { "Ref_OrderLine_ID",       new string[] { "C_OrderLine", "C_OrderLine_ID" } },
-                // "Original PO Line" - the label belongs to this column, not to
-                // Ref_OrderLine_ID; both exist on C_OrderLine.
-                { "Ref_C_Orderline_ID",     new string[] { "C_OrderLine", "C_OrderLine_ID" } }
+                // The requisition line's link to the purchase-order line it was
+                // converted into. The TableDir convention already derives
+                // C_OrderLine / C_OrderLine_ID from the name, but it is listed
+                // explicitly because the display expression below depends on it.
+                { "C_OrderLine_ID", new string[] { "C_OrderLine", "C_OrderLine_ID" } },
+                // Requisition-line self reference (a module's "source line" column):
+                // the convention would derive a table that does not exist.
+                { "Ref_M_RequisitionLine_ID", new string[] { "M_RequisitionLine", "M_RequisitionLine_ID" } }
             };
 
         /// <summary>
-        /// Display expression for a lookup that points at C_OrderLine (blanket order line,
-        /// quotation line). C_OrderLine has no identifier column, so the generic builder
-        /// would fall back to showing the raw id — name the line by its document instead:
-        /// "&lt;order DocumentNo&gt; - &lt;line no&gt;".
+        /// Display expression for a lookup that points at a DOCUMENT LINE table
+        /// (M_RequisitionLine for a module's source-line column, C_OrderLine for
+        /// the purchase-order line a requisition line was converted into). Neither
+        /// table has an identifier column, so the generic builder would fall back
+        /// to showing the raw id — name the line by its document instead:
+        /// "&lt;DocumentNo&gt; - &lt;line no&gt;".
         /// </summary>
-        private string OrderLineDisplayExpr()
+        /// <param name="headerTable">parent document table (M_Requisition / C_Order)</param>
+        /// <param name="headerKey">parent key column on the line</param>
+        private string DocLineDisplayExpr(string headerTable, string headerKey)
         {
-            const string docNo = "(SELECT o.DocumentNo FROM C_Order o WHERE o.C_Order_ID = {a}.C_Order_ID)";
+            string docNo = "(SELECT h.DocumentNo FROM " + headerTable + " h WHERE h."
+                + headerKey + " = {a}." + headerKey + ")";
             if (DB.IsPostgreSQL() || DB.IsOracle())
                 return docNo + " || ' - ' || {a}.Line";
             return "CONCAT(" + docNo + ", ' - ', {a}.Line)";
         }
 
+        /// <summary>Display expression for the line table a lookup points at, or null for any other table.</summary>
+        private string LineTableDisplayExpr(string table)
+        {
+            if ("M_RequisitionLine".Equals(table, StringComparison.OrdinalIgnoreCase))
+                return DocLineDisplayExpr("M_Requisition", "M_Requisition_ID");
+            if ("C_OrderLine".Equals(table, StringComparison.OrdinalIgnoreCase))
+                return DocLineDisplayExpr("C_Order", "C_Order_ID");
+            return null;
+        }
+
         private Dictionary<string, RefLookupDef> _refDefByColumn;
 
-        /// <summary>Resolves a C_OrderLine FK column to its lookup table, key and display expression.</summary>
+        /// <summary>Resolves a M_RequisitionLine FK column to its lookup table, key and display expression.</summary>
         private RefLookupDef ResolveRefLookup(string columnName)
         {
             if (_refDefByColumn == null) _refDefByColumn = new Dictionary<string, RefLookupDef>(StringComparer.OrdinalIgnoreCase);
@@ -670,7 +671,7 @@ namespace VASLogic.Models
             DataSet rs = DB.ExecuteDataset(
                 @"SELECT c.AD_Reference_ID, COALESCE(c.AD_Reference_Value_ID, 0) AS AD_Reference_Value_ID
                   FROM AD_Column c INNER JOIN AD_Table t ON (c.AD_Table_ID = t.AD_Table_ID)
-                  WHERE t.TableName = 'C_OrderLine' AND c.ColumnName = @c AND c.IsActive = 'Y'",
+                  WHERE t.TableName = 'M_RequisitionLine' AND c.ColumnName = @c AND c.IsActive = 'Y'",
                 new SqlParameter[] { new SqlParameter("@c", columnName) }, null);
             if (rs != null && rs.Tables.Count > 0 && rs.Tables[0].Rows.Count > 0)
             {
@@ -714,8 +715,8 @@ namespace VASLogic.Models
 
                 if (table != null && key != null && display != null)
                 {
-                    if ("C_OrderLine".Equals(table, StringComparison.OrdinalIgnoreCase))
-                        display = OrderLineDisplayExpr();
+                    string lineExpr = LineTableDisplayExpr(table);
+                    if (lineExpr != null) display = lineExpr;
                     def = new RefLookupDef { TableName = table, KeyColumn = key, DisplayExpr = display, HasIsActive = true, HasClientId = true };
                 }
             }
@@ -729,8 +730,7 @@ namespace VASLogic.Models
                 string tbl, kc;
                 if (TableDirOverrides.TryGetValue(columnName, out ov)) { tbl = ov[0]; kc = ov[1]; }
                 else { tbl = columnName.Substring(0, columnName.Length - 3); kc = columnName; }
-                string dispExpr = "C_OrderLine".Equals(tbl, StringComparison.OrdinalIgnoreCase)
-                    ? OrderLineDisplayExpr() : BuildIdentifierExpr(tbl);
+                string dispExpr = LineTableDisplayExpr(tbl) ?? BuildIdentifierExpr(tbl);
                 def = new RefLookupDef { TableName = tbl, KeyColumn = kc, DisplayExpr = dispExpr, HasIsActive = true, HasClientId = true };
             }
 
@@ -807,125 +807,92 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// SELECT-list item for one optional C_Order transaction-type flag: the column
-        /// itself where the dictionary has it, the literal 'N' where it does not, always
-        /// under its own name so the reader below is unconditional.
+        /// SELECT-list item for one optional M_Requisition column that a
+        /// requisition-line field's DisplayLogic reads as a token
+        /// (@M_Warehouse_ID@, @PriorityRule@, ...). The column where the
+        /// dictionary has it, NULL where it does not, always under its own name.
+        /// NULL rather than a literal default on purpose: the logic distinguishes
+        /// "not set" from any real value, and the client resolves a null token to
+        /// "" so "@x@=null" matches and "@x@&gt;0" does not.
         /// </summary>
-        /// <param name="column">C_Order flag column (IsSalesQuotation / IsBlanketTrx / IsReturnTrx).</param>
-        private string TrxFlagExpr(string column)
-        {
-            return ColumnExists("C_Order", column)
-                ? "COALESCE(o." + column + ", 'N') AS " + column + ","
-                : "'N' AS " + column + ",";
-        }
-
-        /// <summary>
-        /// SELECT-list item for one optional C_Order column that an order-line field's
-        /// DisplayLogic reads as a token (@C_Order_Blanket@, @VAS_OrderType@, ...). The
-        /// column where the dictionary has it, NULL where it does not, always under its own
-        /// name. NULL rather than a literal default on purpose: the logic distinguishes
-        /// "not set" from any real value, and the client resolves a null token to "" so
-        /// "@x@=null" matches and "@x@&gt;0" does not.
-        /// </summary>
-        /// <param name="column">C_Order column named by a DisplayLogic token.</param>
+        /// <param name="column">M_Requisition column named by a DisplayLogic token.</param>
         private string LogicTokenExpr(string column)
         {
-            return ColumnExists("C_Order", column)
+            return ColumnExists("M_Requisition", column)
                 ? "o." + column + " AS " + column + ","
                 : "NULL AS " + column + ",";
         }
 
         /// <summary>
-        /// C_Order columns that C_OrderLine field DisplayLogic refers to by token, and that
-        /// the panel therefore has to carry on the header for the logic to evaluate at all.
-        /// Taken from the dictionary's own logic for the Additional Info columns:
-        ///   @C_Order_Blanket@   - IsDropShip ("=null"), C_OrderLine_Blanket_ID ("&gt;0")
-        ///   @BlanketOrderType@  - C_OrderLine_Blanket_ID (second variant)
-        ///   @Ref_C_Order_ID@    - Ref_C_Orderline_ID / Original PO Line
-        ///   @VAS_OrderType@     - Ref_C_Orderline_ID / Original PO Line
-        /// Without these the tokens resolved to "" and the fields were judged invisible,
-        /// which is why they never appeared however the panel's own gating was written.
+        /// M_Requisition columns that M_RequisitionLine field DisplayLogic /
+        /// ReadOnlyLogic refer to by token, and that the panel therefore has to
+        /// carry on the header for the logic to evaluate at all. Without these the
+        /// tokens resolve to "" and every field whose logic names one is judged
+        /// invisible, whatever the panel's own gating says.
+        ///
+        /// M_Requisition.DateRequired and M_Warehouse_ID are the ones the standard
+        /// dictionary names; the rest are carried because module columns on the
+        /// line commonly gate on them. Each is guarded, so a schema without one
+        /// simply reports it as absent.
         /// </summary>
         private static readonly string[] _logicTokenColumns =
         {
-            "C_Order_Blanket", "BlanketOrderType", "Ref_C_Order_ID", "VAS_OrderType"
+            "DocumentNo", "PriorityRule", "M_Warehouse_ID", "DateRequired",
+            "AD_User_ID", "C_BPartner_ID", "DTD001_MWarehouseSource_ID"
         };
 
-        /// <summary>Loads the parent order header values used as callout context.</summary>
-        private void LoadParentContext(Ctx ctx, int C_Order_ID, CreateOrderPanelData data)
+        /// <summary>Loads the parent requisition header values used as callout context.</summary>
+        private void LoadParentContext(Ctx ctx, int M_Requisition_ID, RequisitionPanelData data)
         {
-            // The three flags that, with IsSOTrx, say WHICH KIND of document this is:
-            // sales order / purchase order / quotation / blanket / return. One panel serves
-            // all of them, so its heading and its messages are named from these rather than
-            // from any one document's wording. All are core C_Order columns, but older
-            // dictionaries can lack them — each is selected under a guard, defaulting to 'N',
-            // so the panel still loads and simply reports the plainer kind where absent.
-            string quotationCol = TrxFlagExpr("IsSalesQuotation");
-            string blanketCol   = TrxFlagExpr("IsBlanketTrx");
-            string returnCol    = TrxFlagExpr("IsReturnTrx");
-            // C_Order.IsDropShip — the HEADER drop-shipment flag. The line-level IsDropShip
-            // field is only meaningful on an order the header marks as a drop shipment, so
-            // the panel carries the header flag to gate it. Guarded like the others: an
-            // older dictionary without the column reads as 'N'.
-            string dropShipCol  = TrxFlagExpr("IsDropShip");
-            // ...and the header columns the order line's own DisplayLogic reads by token.
+            // Header columns the requisition line's own DisplayLogic reads by token.
             StringBuilder logicCols = new StringBuilder();
             foreach (string c in _logicTokenColumns) logicCols.Append(LogicTokenExpr(c)).Append(' ');
+            // A requisition has no currency of its own: the amounts are stated in the
+            // currency of its PRICE LIST (M_PriceList.C_Currency_ID) — the same reading
+            // VAS_098 takes — so precision and symbol come from there. Both joins are
+            // INNER: a requisition without a price list cannot price a line, and the
+            // panel would have nothing to state the amounts in.
             string sql = @"SELECT
                               " + logicCols + @"
-                              " + quotationCol + @"
-                              " + blanketCol + @"
-                              " + returnCol + @"
-                              " + dropShipCol + @"
-                              o.C_Order_ID,
+                              o.M_Requisition_ID,
                               o.AD_Client_ID,
                               o.AD_Org_ID,
-                              o.C_BPartner_ID,
-                              o.C_BPartner_Location_ID,
                               o.M_PriceList_ID,
-                              o.C_Currency_ID,
-                              o.DateOrdered,
-                              o.DateAcct,
-                              o.IsSOTrx,
-                              COALESCE(pl.IsTaxIncluded, 'N') AS IsTaxIncluded,
+                              pl.C_Currency_ID,
+                              o.DateDoc,
                               o.DocStatus,
                               COALESCE(o.Processed, 'N') AS Processed,
                               cur.StdPrecision  AS StdPrecision,
                               cur.CurSymbol     AS CurrencySymbol,
                               cur.ISO_Code      AS CurrencyISOCode
-                           FROM C_Order o
-                           INNER JOIN C_Currency cur ON (o.C_Currency_ID = cur.C_Currency_ID)
+                           FROM M_Requisition o
                            INNER JOIN M_PriceList pl ON (o.M_PriceList_ID = pl.M_PriceList_ID)
-                           WHERE o.C_Order_ID = @C_Order_ID
+                           INNER JOIN C_Currency cur ON (pl.C_Currency_ID = cur.C_Currency_ID)
+                           WHERE o.M_Requisition_ID = @M_Requisition_ID
                              AND o.IsActive = 'Y'";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             DataSet ds = DB.ExecuteDataset(sql,
-                new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) }, null);
+                new SqlParameter[] { new SqlParameter("@M_Requisition_ID", M_Requisition_ID) }, null);
             if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
 
             DataRow r = ds.Tables[0].Rows[0];
-            data.C_Order_ID = Util.GetValueOfInt(r["C_Order_ID"]);
+            data.M_Requisition_ID = Util.GetValueOfInt(r["M_Requisition_ID"]);
             data.AD_Client_ID = Util.GetValueOfInt(r["AD_Client_ID"]);
             data.AD_Org_ID = Util.GetValueOfInt(r["AD_Org_ID"]);
-            data.C_BPartner_ID = Util.GetValueOfInt(r["C_BPartner_ID"]);
-            data.C_BPartner_Location_ID = Util.GetValueOfInt(r["C_BPartner_Location_ID"]);
             data.M_PriceList_ID = Util.GetValueOfInt(r["M_PriceList_ID"]);
             data.C_Currency_ID = Util.GetValueOfInt(r["C_Currency_ID"]);
-            data.DateOrdered = Util.GetValueOfDateTime(r["DateOrdered"]);
-            data.DateAcct = Util.GetValueOfDateTime(r["DateAcct"]);
-            data.IsSOTrx = Util.GetValueOfString(r["IsSOTrx"]) == "Y";
-            data.IsSalesQuotation = Util.GetValueOfString(r["IsSalesQuotation"]) == "Y";
-            data.IsBlanketTrx = Util.GetValueOfString(r["IsBlanketTrx"]) == "Y";
-            data.IsReturnTrx = Util.GetValueOfString(r["IsReturnTrx"]) == "Y";
-            data.IsDropShip = Util.GetValueOfString(r["IsDropShip"]) == "Y";
-            // Header values named by order-line DisplayLogic tokens. A DBNull stays absent
-            // from the bag rather than becoming "" or 0, so the client can tell "not set"
-            // from a real value and "@token@=null" evaluates the way the dictionary means.
+            data.DateDoc = Util.GetValueOfDateTime(r["DateDoc"]);
+            // Header values named by requisition-line DisplayLogic tokens. A DBNull stays
+            // absent from the bag rather than becoming "" or 0, so the client can tell
+            // "not set" from a real value and "@token@=null" evaluates the way the
+            // dictionary means.
             foreach (string c in _logicTokenColumns)
                 if (r[c] != DBNull.Value) data.LogicContext[c] = Util.GetValueOfString(r[c]);
-            data.IsTaxIncluded = Util.GetValueOfString(r["IsTaxIncluded"]) == "Y";
+            data.DocumentNo = LogicValue(data, "DocumentNo");
+            data.M_Warehouse_ID = Util.GetValueOfInt(LogicValue(data, "M_Warehouse_ID"));
+            data.C_BPartner_ID = Util.GetValueOfInt(LogicValue(data, "C_BPartner_ID"));
             data.DocStatus = Util.GetValueOfString(r["DocStatus"]);
             data.Processed = Util.GetValueOfString(r["Processed"]) == "Y";
             data.StdPrecision = Util.GetValueOfInt(r["StdPrecision"]);
@@ -936,77 +903,82 @@ namespace VASLogic.Models
                 && data.DocStatus != "VO" && data.DocStatus != "RE";
         }
 
-        /// <summary>Loads the order lines saved against the parent order.</summary>
-        private List<OrderLineRow> LoadLines(Ctx ctx, int C_Order_ID, List<int> AD_Tab_IDs, int page, out int total)
+        /// <summary>Reads one header token out of the LogicContext bag ("" when absent).</summary>
+        private static string LogicValue(RequisitionPanelData data, string column)
         {
-            List<OrderLineRow> rows = new List<OrderLineRow>();
+            string v;
+            return (data.LogicContext != null && data.LogicContext.TryGetValue(column, out v)) ? v : "";
+        }
 
-            string countSql = "SELECT COUNT(*) FROM C_OrderLine ol WHERE ol.C_Order_ID = @C_Order_ID AND ol.IsActive = 'Y'";
-            countSql = MRole.GetDefault(ctx).AddAccessSQL(countSql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+        /// <summary>Loads the requisition lines saved against the parent requisition.</summary>
+        private List<RequisitionLineRow> LoadLines(Ctx ctx, int M_Requisition_ID, List<int> AD_Tab_IDs, int page, out int total)
+        {
+            List<RequisitionLineRow> rows = new List<RequisitionLineRow>();
+
+            string countSql = "SELECT COUNT(*) FROM M_RequisitionLine rl WHERE rl.M_Requisition_ID = @M_Requisition_ID AND rl.IsActive = 'Y'";
+            countSql = MRole.GetDefault(ctx).AddAccessSQL(countSql, "rl", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             total = Util.GetValueOfInt(DB.ExecuteScalar(countSql,
-                new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) }, null));
+                new SqlParameter[] { new SqlParameter("@M_Requisition_ID", M_Requisition_ID) }, null));
 
             StringBuilder cols = new StringBuilder();
             foreach (string cn in GetLineProjectionColumns(AD_Tab_IDs))
-                cols.Append("ol.").Append(cn).Append(", ");
+                cols.Append("rl.").Append(cn).Append(", ");
             if (cols.Length == 0)
-                cols.Append("ol.C_OrderLine_ID, ol.Line, ol.M_Product_ID, ol.C_Charge_ID, ol.QtyEntered, ol.QtyOrdered, ol.C_UOM_ID, ol.PriceEntered, ol.C_Tax_ID, ol.TaxAmt, ol.TaxableAmt, ol.LineNetAmt, ol.LineTotalAmt, ol.M_AttributeSetInstance_ID, ol.Description, ");
+                cols.Append("rl.M_RequisitionLine_ID, rl.Line, rl.M_Product_ID, rl.C_Charge_ID, rl.Qty, rl.C_UOM_ID, rl.PriceActual, rl.LineNetAmt, rl.M_AttributeSetInstance_ID, rl.Description, ");
 
             string sql = "SELECT " + cols.ToString() +
                 @"COALESCE(p.Name, N'') AS VASOLDISP_ProductName,
                   COALESCE(ch.Name, N'') AS VASOLDISP_ChargeName,
                   COALESCE(uom.Name, N'') AS VASOLDISP_UOMName,
-                  COALESCE(t.Name, N'') AS VASOLDISP_TaxName,
                   COALESCE(asi.Description, N'') AS VASOLDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASOLDISP_HasAttrSet,
                   COALESCE(p.ProductType, '') AS VASOLDISP_ProductType
-               FROM C_OrderLine ol
-               LEFT JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
-               LEFT JOIN C_Charge ch ON (ol.C_Charge_ID = ch.C_Charge_ID)
-               LEFT JOIN C_UOM uom ON (ol.C_UOM_ID = uom.C_UOM_ID)
-               LEFT JOIN C_Tax t ON (ol.C_Tax_ID = t.C_Tax_ID)
-               LEFT JOIN M_AttributeSetInstance asi ON (ol.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
-               WHERE ol.C_Order_ID = @C_Order_ID
-                 AND ol.IsActive = 'Y'";
+               FROM M_RequisitionLine rl
+               LEFT JOIN M_Product p ON (rl.M_Product_ID = p.M_Product_ID)
+               LEFT JOIN C_Charge ch ON (rl.C_Charge_ID = ch.C_Charge_ID)
+               LEFT JOIN C_UOM uom ON (rl.C_UOM_ID = uom.C_UOM_ID)
+               LEFT JOIN M_AttributeSetInstance asi ON (rl.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
+               WHERE rl.M_Requisition_ID = @M_Requisition_ID
+                 AND rl.IsActive = 'Y'";
 
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "rl", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             if (page < 0) page = 0;
-            sql += " ORDER BY ol.Line" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
+            sql += " ORDER BY rl.Line" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
 
             DataSet ds = DB.ExecuteDataset(sql,
-                new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) }, null);
+                new SqlParameter[] { new SqlParameter("@M_Requisition_ID", M_Requisition_ID) }, null);
             if (ds == null || ds.Tables.Count == 0) return rows;
 
             DataTable dt = ds.Tables[0];
             foreach (DataRow r in dt.Rows)
             {
-                OrderLineRow row = new OrderLineRow();
+                RequisitionLineRow row = new RequisitionLineRow();
                 foreach (DataColumn dc in dt.Columns)
                 {
                     // OrdinalIgnoreCase: PostgreSQL lowercases aliases (vasoldisp_*),
                     // Oracle uppercases them (VASOLDISP_*) — both must be excluded from
-                    // the generic Values bag so only real C_OrderLine columns are sent.
+                    // the generic Values bag so only real M_RequisitionLine columns are sent.
                     if (dc.ColumnName.StartsWith("VASOLDISP_", StringComparison.OrdinalIgnoreCase)) continue;
                     row.Values[dc.ColumnName] = (r[dc] == DBNull.Value) ? null : r[dc];
                 }
-                row.C_OrderLine_ID = Util.GetValueOfInt(r["C_OrderLine_ID"]);
+                row.M_RequisitionLine_ID = Util.GetValueOfInt(r["M_RequisitionLine_ID"]);
                 row.Line = Util.GetValueOfInt(r["Line"]);
                 row.M_Product_ID = Util.GetValueOfInt(r["M_Product_ID"]);
                 row.ProductName = Util.GetValueOfString(r["VASOLDISP_ProductName"]);
                 row.C_Charge_ID = Util.GetValueOfInt(r["C_Charge_ID"]);
                 row.ChargeName = Util.GetValueOfString(r["VASOLDISP_ChargeName"]);
                 row.Description = Util.GetValueOfString(r["Description"]);
-                row.QtyOrdered = Util.GetValueOfDecimal(r["QtyOrdered"]);
-                row.QtyEntered = dt.Columns.Contains("QtyEntered") ? Util.GetValueOfDecimal(r["QtyEntered"]) : row.QtyOrdered;
+                row.Qty = Util.GetValueOfDecimal(r["Qty"]);
+                // QtyEntered — the quantity in the line's SELECTED unit — is an optional
+                // column that only the requisition window maintains (a line raised by
+                // replenishment or by a work order carries Qty alone). Where it is absent,
+                // or zero on such a line, the selected-unit figure IS the base figure.
+                row.QtyEntered = dt.Columns.Contains("QtyEntered") ? Util.GetValueOfDecimal(r["QtyEntered"]) : row.Qty;
+                if (row.QtyEntered == 0) row.QtyEntered = row.Qty;
                 row.C_UOM_ID = Util.GetValueOfInt(r["C_UOM_ID"]);
                 row.UOMName = Util.GetValueOfString(r["VASOLDISP_UOMName"]);
-                row.PriceEntered = Util.GetValueOfDecimal(r["PriceEntered"]);
-                row.C_Tax_ID = Util.GetValueOfInt(r["C_Tax_ID"]);
-                row.TaxName = Util.GetValueOfString(r["VASOLDISP_TaxName"]);
-                row.TaxAmt = Util.GetValueOfDecimal(r["TaxAmt"]);
-                row.TaxableAmt = Util.GetValueOfDecimal(r["TaxableAmt"]);
+                row.PriceActual = Util.GetValueOfDecimal(r["PriceActual"]);
                 row.LineNetAmt = Util.GetValueOfDecimal(r["LineNetAmt"]);
-                row.LineTotalAmt = Util.GetValueOfDecimal(r["LineTotalAmt"]);
                 row.M_AttributeSetInstance_ID = Util.GetValueOfInt(r["M_AttributeSetInstance_ID"]);
                 row.AttrName = Util.GetValueOfString(r["VASOLDISP_AttrName"]);
                 int hasAttrSetRaw = Util.GetValueOfInt(r["VASOLDISP_HasAttrSet"]);
@@ -1024,208 +996,79 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Sums saved-line amounts across the whole order.
-        /// Sub Total (Net) is derived from LineNetAmt rather than TaxBaseAmt: for
-        /// tax-inclusive orders the extracted tax (TaxAmt + SurchargeAmt) is subtracted
-        /// to give the true taxable base; for tax-exclusive orders LineNetAmt IS the
-        /// taxable base. This avoids relying on the stored TaxBaseAmt column, which
-        /// may not be registered in AD_Column and can hold stale / incorrect values.
+        /// Sums LineNetAmt across every saved line of the requisition. This is the
+        /// document total the requisition itself keeps in M_Requisition.TotalLines
+        /// (MRequisitionLine.AfterSave rolls it up), read from the lines rather than
+        /// from the header so it is right the moment a line is saved, whatever the
+        /// header roll-up has done. A requisition carries no tax, so this single
+        /// figure IS the document total.
         /// </summary>
         /// <param name="ctx">session context</param>
-        /// <param name="C_Order_ID">parent order</param>
-        /// <param name="taxIncluded">true when the price list has IsTaxIncluded = Y</param>
-        /// <param name="net">output: order sub-total (taxable base)</param>
-        /// <param name="tax">output: order total tax (TaxAmt + SurchargeAmt)</param>
-        /// <param name="tcs">output: order total TCS (VA106)</param>
-        private void LoadGrandTotals(Ctx ctx, int C_Order_ID, bool taxIncluded, out decimal net, out decimal tax, out decimal tcs)
+        /// <param name="M_Requisition_ID">parent requisition</param>
+        /// <returns>sum of LineNetAmt over all active lines</returns>
+        private decimal LoadGrandTotal(Ctx ctx, int M_Requisition_ID)
         {
-            net = 0; tax = 0; tcs = 0;
-            string tcsExpr = ColumnExists("C_OrderLine", "VA106_TCSAmount")
-                ? "COALESCE(SUM(ol.VA106_TCSAmount), 0)" : "0";
-            string surExpr = " + COALESCE(SUM(ol.SurchargeAmt), 0)";
-            // For tax-inclusive orders: taxable base = LineNetAmt - TaxAmt - SurchargeAmt.
-            // For tax-exclusive orders: taxable base = LineNetAmt (tax is additive, not extracted).
-            string netExpr = taxIncluded
-                ? "COALESCE(SUM(ol.LineNetAmt - ol.TaxAmt - COALESCE(ol.SurchargeAmt, 0)), 0)"
-                : "COALESCE(SUM(ol.LineNetAmt), 0)";
-            string sql = "SELECT " + netExpr + " AS Net, COALESCE(SUM(ol.TaxAmt), 0)" + surExpr + " AS Tax, "
-                + tcsExpr + " AS Tcs"
-                + " FROM C_OrderLine ol WHERE ol.C_Order_ID = @C_Order_ID AND ol.IsActive = 'Y'";
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            string sql = "SELECT COALESCE(SUM(rl.LineNetAmt), 0) AS Net"
+                + " FROM M_RequisitionLine rl WHERE rl.M_Requisition_ID = @M_Requisition_ID AND rl.IsActive = 'Y'";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "rl", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             DataSet ds = DB.ExecuteDataset(sql,
-                new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) }, null);
+                new SqlParameter[] { new SqlParameter("@M_Requisition_ID", M_Requisition_ID) }, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-            {
-                DataRow r = ds.Tables[0].Rows[0];
-                net = Util.GetValueOfDecimal(r["Net"]);
-                tax = Util.GetValueOfDecimal(r["Tax"]);
-                tcs = Util.GetValueOfDecimal(r["Tcs"]);
-            }
-        }
-
-        /// <summary>Computes totals of every saved line NOT on the current page.</summary>
-        /// <param name="ctx">session context</param>
-        /// <param name="C_Order_ID">parent order</param>
-        /// <param name="pageRows">lines loaded for the current page</param>
-        /// <param name="taxIncluded">true when the price list has IsTaxIncluded = Y</param>
-        /// <param name="otherNet">output: sub-total for lines NOT on current page</param>
-        /// <param name="otherTax">output: tax for lines NOT on current page</param>
-        /// <param name="otherTcs">output: TCS for lines NOT on current page</param>
-        private void ComputeOtherPageTotals(Ctx ctx, int C_Order_ID, List<OrderLineRow> pageRows,
-            bool taxIncluded, out decimal otherNet, out decimal otherTax, out decimal otherTcs)
-        {
-            decimal gNet, gTax, gTcs;
-            LoadGrandTotals(ctx, C_Order_ID, taxIncluded, out gNet, out gTax, out gTcs);
-            decimal pNet = 0, pTax = 0, pTcs = 0;
-            if (pageRows != null)
-                foreach (OrderLineRow row in pageRows)
-                {
-                    // Mirror the LoadGrandTotals formula so grand - page = other-pages.
-                    // Tax-inclusive: taxable base = LineNetAmt - TaxAmt - SurchargeAmt.
-                    // Tax-exclusive: taxable base = LineNetAmt.
-                    decimal surcharge = RowOrderDecimal(row, "SurchargeAmt");
-                    pNet += taxIncluded ? row.LineNetAmt - row.TaxAmt - surcharge : row.LineNetAmt;
-                    pTax += row.TaxAmt + surcharge;
-                    pTcs += RowOrderTcs(row);
-                }
-            otherNet = gNet - pNet;
-            otherTax = gTax - pTax;
-            otherTcs = gTcs - pTcs;
-        }
-
-        /// <summary>
-        /// Returns the aggregated per-tax breakdown for the whole order from C_OrderTax.
-        /// C_OrderTax is updated by the framework whenever a C_OrderLine is saved, so
-        /// this reflects every saved line across all pages — not just the loaded page.
-        /// The client uses this to display correct individual tax rows in the totals footer.
-        /// </summary>
-        /// <param name="ctx">session context</param>
-        /// <param name="C_Order_ID">parent sales order</param>
-        /// <returns>one item per tax plus header totals; empty list when no rows exist yet</returns>
-        public List<OrderTaxBreakdownItem> LoadOrderTaxBreakdown(Ctx ctx, int C_Order_ID)
-        {
-            List<OrderTaxBreakdownItem> result = new List<OrderTaxBreakdownItem>();
-            if (C_Order_ID <= 0) return result;
-
-            // C_Order is the leading (FROM) table so AddAccessSQL correctly identifies
-            // alias "co" as the main table and injects the security predicates.
-            // Previously C_OrderTax was first in FROM but alias "co" was passed to
-            // AddAccessSQL — the AccessSqlParser mismatch logged a SEVERE warning and
-            // skipped all security predicates.
-            //
-            // VA106_TCSTotalAmount is intentionally excluded from this query.
-            // Env.IsModuleInstalled checks the module registry which can be populated
-            // before the column migration runs, so the column may be absent on C_Order
-            // even when the check returns true. TCS is read from C_OrderLine.VA106_TCSAmount
-            // in the second query below where it is reliably present when VA106 is installed.
-            // Sub Total must be the taxable base (net of tax), not the gross LineNetAmt stored in
-            // C_Order.TotalLines. For a tax-inclusive price list, TotalLines = sum of LineNetAmt
-            // which embeds the tax, so it is LARGER than the taxable base. Using SUM(TaxableAmt)
-            // from C_OrderLine mirrors VAS_074's SUM(TaxBaseAmt) pattern and is correct for both
-            // tax-inclusive and tax-exclusive price lists.
-            string sql = @"SELECT t.Name AS TaxName, ot.TaxAmt, ot.TaxBaseAmt,
-                                  (SELECT COALESCE(SUM(ol2.TaxableAmt), 0) FROM C_OrderLine ol2
-                                   WHERE ol2.C_Order_ID = co.C_Order_ID AND ol2.IsActive = 'Y') AS TotalLines,
-                                  co.GrandTotal, cy.CurSymbol, cy.StdPrecision
-                           FROM C_Order co
-                           INNER JOIN C_OrderTax ot ON (ot.C_Order_ID = co.C_Order_ID)
-                           INNER JOIN C_Tax t ON (t.C_Tax_ID = ot.C_Tax_ID)
-                           INNER JOIN C_Currency cy ON (cy.C_Currency_ID = co.C_Currency_ID)
-                           WHERE co.C_Order_ID = @C_Order_ID
-                           AND ot.IsActive = 'Y'
-                           ORDER BY t.Name";
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "co", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            DataSet ds = DB.ExecuteDataset(sql,
-                new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) }, null);
-            if (ds == null || ds.Tables.Count == 0) return result;
-            foreach (DataRow r in ds.Tables[0].Rows)
-            {
-                result.Add(new OrderTaxBreakdownItem
-                {
-                    TaxName      = Util.GetValueOfString(r["TaxName"]),
-                    TaxAmt       = Util.GetValueOfDecimal(r["TaxAmt"]),
-                    TaxBaseAmt   = Util.GetValueOfDecimal(r["TaxBaseAmt"]),
-                    TotalLines   = Util.GetValueOfDecimal(r["TotalLines"]),
-                    GrandTotal   = Util.GetValueOfDecimal(r["GrandTotal"]),
-                    CurSymbol    = Util.GetValueOfString(r["CurSymbol"]),
-                    StdPrecision = Util.GetValueOfInt(r["StdPrecision"])
-                });
-            }
-
-            // SurchargeAmt and VA106_TCSAmount live on C_OrderLine, not C_OrderTax.
-            // Fetch both in one round-trip and store on result[0] so the client can
-            // render them as separate rows in the totals footer.
-            if (result.Count > 0)
-            {
-                bool hasTcs = Env.IsModuleInstalled("VA106_");
-                string tcsCol = hasTcs ? ", COALESCE(SUM(ol.VA106_TCSAmount), 0) AS TotalTCS" : "";
-                string surgSql = @"SELECT COALESCE(SUM(ol.SurchargeAmt), 0) AS TotalSurcharge"
-                                 + tcsCol +
-                                 @" FROM C_OrderLine ol
-                                    WHERE ol.C_Order_ID = @C_Order_ID AND ol.IsActive = 'Y'";
-                surgSql = MRole.GetDefault(ctx).AddAccessSQL(surgSql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                DataSet ds2 = DB.ExecuteDataset(surgSql,
-                    new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) }, null);
-                if (ds2 != null && ds2.Tables.Count > 0 && ds2.Tables[0].Rows.Count > 0)
-                {
-                    DataRow r2 = ds2.Tables[0].Rows[0];
-                    result[0].TotalSurcharge = Util.GetValueOfDecimal(r2["TotalSurcharge"]);
-                    if (hasTcs)
-                        result[0].TCSAmount = Util.GetValueOfDecimal(r2["TotalTCS"]);
-                }
-            }
-
-            return result;
-        }
-
-        private static decimal RowOrderTcs(OrderLineRow row)
-        {
-            return RowOrderDecimal(row, "VA106_TCSAmount");
-        }
-
-        private static decimal RowOrderDecimal(OrderLineRow row, string columnName)
-        {
-            if (row == null || row.Values == null) return 0;
-            foreach (KeyValuePair<string, object> kv in row.Values)
-                if (string.Equals(kv.Key, columnName, StringComparison.OrdinalIgnoreCase))
-                    return Util.GetValueOfDecimal(kv.Value);
+                return Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Net"]);
             return 0;
         }
 
-        private List<string> _olColumns;
-
-        /// <summary>Returns (and caches) the active C_OrderLine column names from the dictionary.</summary>
-        private List<string> GetOrderLineColumns()
+        /// <summary>
+        /// Total of every saved line NOT on the current page, so the client can add
+        /// the page it holds and state a document total without loading every line.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="M_Requisition_ID">parent requisition</param>
+        /// <param name="pageRows">lines loaded for the current page</param>
+        /// <returns>sum of LineNetAmt for the lines NOT on the current page</returns>
+        private decimal ComputeOtherPageTotal(Ctx ctx, int M_Requisition_ID, List<RequisitionLineRow> pageRows)
         {
-            if (_olColumns != null) return _olColumns;
-            _olColumns = new List<string>();
+            decimal grand = LoadGrandTotal(ctx, M_Requisition_ID);
+            decimal page = 0;
+            if (pageRows != null)
+                foreach (RequisitionLineRow row in pageRows) page += row.LineNetAmt;
+            return grand - page;
+        }
+
+        private List<string> _rlColumns;
+
+        /// <summary>Returns (and caches) the active M_RequisitionLine column names from the dictionary.</summary>
+        private List<string> GetRequisitionLineColumns()
+        {
+            if (_rlColumns != null) return _rlColumns;
+            _rlColumns = new List<string>();
             DataSet ds = DB.ExecuteDataset(
                 @"SELECT c.ColumnName
                   FROM AD_Column c
                   INNER JOIN AD_Table t ON (c.AD_Table_ID = t.AD_Table_ID)
-                  WHERE t.TableName = 'C_OrderLine' AND c.IsActive = 'Y' AND c.ColumnSQL IS NULL ");
+                  WHERE t.TableName = 'M_RequisitionLine' AND c.IsActive = 'Y' AND c.ColumnSQL IS NULL ");
             if (ds != null && ds.Tables.Count > 0)
                 foreach (DataRow r in ds.Tables[0].Rows)
-                    _olColumns.Add(Util.GetValueOfString(r["ColumnName"]));
-            return _olColumns;
+                    _rlColumns.Add(Util.GetValueOfString(r["ColumnName"]));
+            return _rlColumns;
         }
 
         private static readonly string[] ESSENTIAL_LINE_COLUMNS = new string[]
         {
-            "C_OrderLine_ID", "C_Order_ID", "Line", "M_Product_ID", "C_Charge_ID",
-            "QtyEntered", "QtyOrdered", "C_UOM_ID", "PriceEntered", "C_Tax_ID", "TaxAmt",
-            "TaxableAmt", "LineNetAmt", "LineTotalAmt", "M_AttributeSetInstance_ID", "Description"
+            "M_RequisitionLine_ID", "M_Requisition_ID", "Line", "M_Product_ID", "C_Charge_ID",
+            "QtyEntered", "Qty", "C_UOM_ID", "PriceActual", "LineNetAmt",
+            "M_AttributeSetInstance_ID", "Description"
         };
 
-        /// <summary>Builds the C_OrderLine column projection for LoadLines.</summary>
+        /// <summary>Builds the M_RequisitionLine column projection for LoadLines.</summary>
         private List<string> GetLineProjectionColumns(List<int> AD_Tab_IDs)
         {
-            return GetOrderLineColumns();
+            return GetRequisitionLineColumns();
         }
 
         private Dictionary<int, List<string>> _tabLineColumns;
 
-        /// <summary>Returns (and caches) the C_OrderLine column names for a given tab.</summary>
+        /// <summary>Returns (and caches) the M_RequisitionLine column names for a given tab.</summary>
         private List<string> GetTabLineColumns(int AD_Tab_ID)
         {
             if (_tabLineColumns == null) _tabLineColumns = new Dictionary<int, List<string>>();
@@ -1256,11 +1099,11 @@ namespace VASLogic.Models
         /// <summary>
         /// Paged Product / Charge catalog search for the line picker.
         /// </summary>
-        public List<OrderCatalogItem> SearchProductsCharges(Ctx ctx, int C_Order_ID,
+        public List<RequisitionCatalogItem> SearchProductsCharges(Ctx ctx, int M_Requisition_ID,
             string query, int pageSize, int offset, Dictionary<string, object> rowValues = null)
         {
-            List<OrderCatalogItem> items = new List<OrderCatalogItem>();
-            if (C_Order_ID <= 0) return items;
+            List<RequisitionCatalogItem> items = new List<RequisitionCatalogItem>();
+            if (M_Requisition_ID <= 0) return items;
 
             if (pageSize <= 0 || pageSize > CATALOG_PAGE_SIZE) pageSize = CATALOG_PAGE_SIZE;
             if (offset < 0) offset = 0;
@@ -1282,7 +1125,7 @@ namespace VASLogic.Models
                                  AND (LOWER(p.Value) LIKE @kwPV
                                    OR LOWER(p.Name) LIKE @kwPN
                                    OR LOWER(COALESCE(p.UPC, N'')) LIKE @kwPU)";
-            string prodPred = GetValRulePredicate(ctx, "M_Product_ID", "M_Product", "p", C_Order_ID, rowVars);
+            string prodPred = GetValRulePredicate(ctx, "M_Product_ID", "M_Product", "p", M_Requisition_ID, rowVars);
             if (prodPred.Length > 0) prodSql += " AND (" + prodPred + ")";
             prodSql = MRole.GetDefault(ctx).AddAccessSQL(prodSql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -1296,7 +1139,7 @@ namespace VASLogic.Models
                                    AND ch.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
                                    AND (LOWER(ch.Name) LIKE @kwCN
                                      OR LOWER(COALESCE(ch.Description, N'')) LIKE @kwCD)";
-            string chargePred = GetValRulePredicate(ctx, "C_Charge_ID", "C_Charge", "ch", C_Order_ID, rowVars);
+            string chargePred = GetValRulePredicate(ctx, "C_Charge_ID", "C_Charge", "ch", M_Requisition_ID, rowVars);
             if (chargePred.Length > 0) chargeSql += " AND (" + chargePred + ")";
             chargeSql = MRole.GetDefault(ctx).AddAccessSQL(chargeSql, "ch", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -1313,13 +1156,13 @@ namespace VASLogic.Models
             }, null);
             if (ds == null || ds.Tables.Count == 0)
             {
-                log.Severe("VAS_107 SearchProductsCharges SQL failed. Term: " + like);
+                log.Severe("VAS_240 SearchProductsCharges SQL failed. Term: " + like);
                 return items;
             }
 
             foreach (DataRow r in ds.Tables[0].Rows)
             {
-                OrderCatalogItem it = new OrderCatalogItem();
+                RequisitionCatalogItem it = new RequisitionCatalogItem();
                 it.RecordId = Util.GetValueOfInt(r["RecordId"]);
                 it.Kind = Util.GetValueOfString(r["Kind"]);
                 it.SearchKey = Util.GetValueOfString(r["SearchKey"]);
@@ -1333,10 +1176,10 @@ namespace VASLogic.Models
         }
 
         /// <summary>Looks up a single product / charge by a scanned barcode.</summary>
-        public OrderCatalogItem ScanLookup(Ctx ctx, int C_Order_ID, string code)
+        public RequisitionCatalogItem ScanLookup(Ctx ctx, int M_Requisition_ID, string code)
         {
-            OrderCatalogItem none = new OrderCatalogItem();
-            if (C_Order_ID <= 0 || string.IsNullOrEmpty(code)) return none;
+            RequisitionCatalogItem none = new RequisitionCatalogItem();
+            if (M_Requisition_ID <= 0 || string.IsNullOrEmpty(code)) return none;
             string key = code.Trim();
 
             string prodSql = @"SELECT p.M_Product_ID AS RecordId, 'P' AS Kind, p.Value AS SearchKey,
@@ -1347,7 +1190,7 @@ namespace VASLogic.Models
                                WHERE p.IsActive = 'Y'
                                  AND p.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
                                  AND (UPPER(p.UPC) = UPPER(@code) OR UPPER(p.Value) = UPPER(@code))";
-            string scanProdPred = GetValRulePredicate(ctx, "M_Product_ID", "M_Product", "p", C_Order_ID);
+            string scanProdPred = GetValRulePredicate(ctx, "M_Product_ID", "M_Product", "p", M_Requisition_ID);
             if (scanProdPred.Length > 0) prodSql += " AND (" + scanProdPred + ")";
             prodSql = MRole.GetDefault(ctx).AddAccessSQL(prodSql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -1355,7 +1198,7 @@ namespace VASLogic.Models
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 DataRow r = ds.Tables[0].Rows[0];
-                OrderCatalogItem it = new OrderCatalogItem();
+                RequisitionCatalogItem it = new RequisitionCatalogItem();
                 it.RecordId = Util.GetValueOfInt(r["RecordId"]);
                 it.Kind = "P";
                 it.SearchKey = Util.GetValueOfString(r["SearchKey"]);
@@ -1372,14 +1215,14 @@ namespace VASLogic.Models
                                  WHERE ch.IsActive = 'Y'
                                    AND ch.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
                                    AND UPPER(ch.Name) = UPPER(@code)";
-            string scanChargePred = GetValRulePredicate(ctx, "C_Charge_ID", "C_Charge", "ch", C_Order_ID);
+            string scanChargePred = GetValRulePredicate(ctx, "C_Charge_ID", "C_Charge", "ch", M_Requisition_ID);
             if (scanChargePred.Length > 0) chargeSql += " AND (" + scanChargePred + ")";
             chargeSql = MRole.GetDefault(ctx).AddAccessSQL(chargeSql, "ch", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             ds = DB.ExecuteDataset(chargeSql, new SqlParameter[] { new SqlParameter("@code", key) }, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 DataRow r = ds.Tables[0].Rows[0];
-                OrderCatalogItem it = new OrderCatalogItem();
+                RequisitionCatalogItem it = new RequisitionCatalogItem();
                 it.RecordId = Util.GetValueOfInt(r["RecordId"]);
                 it.Kind = "C";
                 it.SearchKey = Util.GetValueOfString(r["SearchKey"]);
@@ -1394,9 +1237,9 @@ namespace VASLogic.Models
         #region AD_Val_Rule enforcement
 
         private Dictionary<string, string> _valRuleByColumn;
-        private Dictionary<string, string> _orderVars;
+        private Dictionary<string, string> _reqVars;
 
-        /// <summary>Returns the SQL validation code linked to a C_OrderLine lookup column.</summary>
+        /// <summary>Returns the SQL validation code linked to a M_RequisitionLine lookup column.</summary>
         private string GetColumnValRule(string columnName)
         {
             if (_valRuleByColumn == null) _valRuleByColumn = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -1407,7 +1250,7 @@ namespace VASLogic.Models
                   FROM AD_Column c
                   INNER JOIN AD_Table t ON (c.AD_Table_ID = t.AD_Table_ID)
                   INNER JOIN AD_Val_Rule vr ON (c.AD_Val_Rule_ID = vr.AD_Val_Rule_ID)
-                  WHERE t.TableName = 'C_OrderLine'
+                  WHERE t.TableName = 'M_RequisitionLine'
                     AND c.ColumnName = @c
                     AND c.IsActive = 'Y'
                     AND vr.IsActive = 'Y'
@@ -1418,20 +1261,20 @@ namespace VASLogic.Models
             return code;
         }
 
-        private string GetValRulePredicate(Ctx ctx, string columnName, string tableName, string alias, int C_Order_ID)
+        private string GetValRulePredicate(Ctx ctx, string columnName, string tableName, string alias, int M_Requisition_ID)
         {
-            return GetValRulePredicate(ctx, columnName, tableName, alias, C_Order_ID, null);
+            return GetValRulePredicate(ctx, columnName, tableName, alias, M_Requisition_ID, null);
         }
 
         private string GetValRulePredicate(Ctx ctx, string columnName, string tableName, string alias,
-            int C_Order_ID, Dictionary<string, string> rowVars)
+            int M_Requisition_ID, Dictionary<string, string> rowVars)
         {
             string code = GetColumnValRule(columnName);
             if (string.IsNullOrEmpty(code)) return "";
 
             string frag = Regex.Replace(code, @"\b" + Regex.Escape(tableName) + @"\.", alias + ".", RegexOptions.IgnoreCase);
 
-            Dictionary<string, string> oVars = GetOrderVars(ctx, C_Order_ID);
+            Dictionary<string, string> oVars = GetRequisitionVars(ctx, M_Requisition_ID);
             frag = Regex.Replace(frag, @"@(#?[A-Za-z0-9_]+)@", delegate (Match m)
             {
                 string token = m.Groups[1].Value;
@@ -1445,7 +1288,7 @@ namespace VASLogic.Models
 
             if (frag.IndexOf('@') >= 0)
             {
-                log.Warning("VAS_107 val rule skipped for " + columnName + " (unresolved context): " + code);
+                log.Warning("VAS_240 val rule skipped for " + columnName + " (unresolved context): " + code);
                 return "";
             }
             return frag;
@@ -1486,29 +1329,42 @@ namespace VASLogic.Models
             return "'" + v.Replace("'", "''") + "'";
         }
 
-        /// <summary>Parent-order context values (as SQL literals) for val-rule substitution.</summary>
-        private Dictionary<string, string> GetOrderVars(Ctx ctx, int C_Order_ID)
+        /// <summary>
+        /// Parent-requisition context values (as SQL literals) for val-rule substitution.
+        /// IsSOTrx is stated as 'N': a requisition is always a purchase-side document,
+        /// and the standard product / charge val rules gate on that token.
+        /// </summary>
+        private Dictionary<string, string> GetRequisitionVars(Ctx ctx, int M_Requisition_ID)
         {
-            if (_orderVars != null) return _orderVars;
-            _orderVars = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (_reqVars != null) return _reqVars;
+            _reqVars = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            // C_BPartner_ID (the requester) and M_Warehouse_ID are read under a guard:
+            // both are standard, but a val rule naming one must not take down the whole
+            // lookup on a schema that lacks it.
+            string bpCol = ColumnExists("M_Requisition", "C_BPartner_ID") ? "r.C_BPartner_ID" : "0";
+            string whCol = ColumnExists("M_Requisition", "M_Warehouse_ID") ? "r.M_Warehouse_ID" : "0";
             DataSet ds = DB.ExecuteDataset(
-                @"SELECT AD_Client_ID, AD_Org_ID, C_BPartner_ID, C_BPartner_Location_ID,
-                         M_PriceList_ID, C_Currency_ID, COALESCE(IsSOTrx, 'N') AS IsSOTrx
-                  FROM C_Order WHERE C_Order_ID = @id",
-                new SqlParameter[] { new SqlParameter("@id", C_Order_ID) }, null);
+                @"SELECT r.AD_Client_ID, r.AD_Org_ID, r.M_PriceList_ID,
+                         pl.C_Currency_ID,
+                         " + bpCol + @" AS C_BPartner_ID,
+                         " + whCol + @" AS M_Warehouse_ID
+                  FROM M_Requisition r
+                  LEFT JOIN M_PriceList pl ON (pl.M_PriceList_ID = r.M_PriceList_ID)
+                  WHERE r.M_Requisition_ID = @id",
+                new SqlParameter[] { new SqlParameter("@id", M_Requisition_ID) }, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 DataRow r = ds.Tables[0].Rows[0];
-                _orderVars["AD_Client_ID"] = Util.GetValueOfInt(r["AD_Client_ID"]).ToString();
-                _orderVars["AD_Org_ID"] = Util.GetValueOfInt(r["AD_Org_ID"]).ToString();
-                _orderVars["C_BPartner_ID"] = Util.GetValueOfInt(r["C_BPartner_ID"]).ToString();
-                _orderVars["C_BPartner_Location_ID"] = Util.GetValueOfInt(r["C_BPartner_Location_ID"]).ToString();
-                _orderVars["M_PriceList_ID"] = Util.GetValueOfInt(r["M_PriceList_ID"]).ToString();
-                _orderVars["C_Currency_ID"] = Util.GetValueOfInt(r["C_Currency_ID"]).ToString();
-                _orderVars["C_Order_ID"] = C_Order_ID.ToString();
-                _orderVars["IsSOTrx"] = "'" + (Util.GetValueOfString(r["IsSOTrx"]) == "Y" ? "Y" : "N") + "'";
+                _reqVars["AD_Client_ID"] = Util.GetValueOfInt(r["AD_Client_ID"]).ToString();
+                _reqVars["AD_Org_ID"] = Util.GetValueOfInt(r["AD_Org_ID"]).ToString();
+                _reqVars["C_BPartner_ID"] = Util.GetValueOfInt(r["C_BPartner_ID"]).ToString();
+                _reqVars["M_PriceList_ID"] = Util.GetValueOfInt(r["M_PriceList_ID"]).ToString();
+                _reqVars["C_Currency_ID"] = Util.GetValueOfInt(r["C_Currency_ID"]).ToString();
+                _reqVars["M_Warehouse_ID"] = Util.GetValueOfInt(r["M_Warehouse_ID"]).ToString();
+                _reqVars["M_Requisition_ID"] = M_Requisition_ID.ToString();
+                _reqVars["IsSOTrx"] = "'N'";
             }
-            return _orderVars;
+            return _reqVars;
         }
 
         #endregion
@@ -1525,59 +1381,56 @@ namespace VASLogic.Models
 
         #endregion
 
-        #region Line callout (server-side price / tax / amount)
+        #region Line callout (server-side price / amount)
 
         /// <summary>
-        /// Server-side replacement for the C_OrderLine callout chain. Builds a
-        /// transient MOrderLine, applies product / charge / qty / price / tax and
+        /// Server-side replacement for the M_RequisitionLine callout chain. Builds a
+        /// transient MRequisitionLine, applies product / charge / qty / price and
         /// returns the framework-computed values. No row is written.
         /// </summary>
-        public OrderLineCalcResult CalcLine(Ctx ctx, OrderLineCalcRequest req)
+        public RequisitionLineCalcResult CalcLine(Ctx ctx, RequisitionLineCalcRequest req)
         {
-            OrderLineCalcResult res = new OrderLineCalcResult();
-            if (req == null || req.C_Order_ID <= 0) return res;
+            RequisitionLineCalcResult res = new RequisitionLineCalcResult();
+            if (req == null || req.M_Requisition_ID <= 0) return res;
 
-            MOrder order;
-            MOrderLine line = BuildCalcLine(ctx, req, out order);
+            MRequisition req_ = null;
+            MRequisitionLine line = BuildCalcLine(ctx, req, out req_);
             if (line == null || (req.M_Product_ID <= 0 && req.C_Charge_ID <= 0)) return res;
 
-            res.C_UOM_ID = line.GetC_UOM_ID();
-            res.C_Tax_ID = line.GetC_Tax_ID();
-            res.PriceEntered = line.GetPriceEntered();
+            res.C_UOM_ID = LineUomId(line);
+            res.PriceActual = line.GetPriceActual();
             res.LineNetAmt = line.GetLineNetAmt();
-            res.TaxAmt = line.GetTaxAmt();
-            res.LineTotalAmt = decimal.Add(res.LineNetAmt, res.TaxAmt);
-            res.QtyOrdered = req.QtyOrdered > 0 ? req.QtyOrdered : 1;
+            res.Qty = line.GetQty();
             res.UOMName = GetUomLabel(ctx, res.C_UOM_ID);
-            res.TaxName = res.C_Tax_ID > 0 ? MTax.Get(ctx, res.C_Tax_ID).GetName() : "";
             return res;
         }
 
         /// <summary>
-        /// Builds a transient MOrderLine and applies the product / charge / qty / price / tax
-        /// the same way the standard C_OrderLine callouts do. Shared by CalcLine and RunColumnCallout.
+        /// Builds a transient MRequisitionLine and applies the product / charge / qty /
+        /// price the same way the standard requisition-line callouts do. Shared by
+        /// CalcLine and RunColumnCallout.
+        ///
+        /// The quantity is handled the way MRequisitionLine.BeforeSave does: the entered
+        /// figure belongs to the line's SELECTED unit (C_UOM_ID) and Qty is that figure
+        /// converted to the product's BASE unit. The conversion is applied here as well
+        /// so the amount the panel shows before saving is the amount the row will hold.
         /// </summary>
-        private MOrderLine BuildCalcLine(Ctx ctx, OrderLineCalcRequest req, out MOrder order)
+        private MRequisitionLine BuildCalcLine(Ctx ctx, RequisitionLineCalcRequest req, out MRequisition parent)
         {
-            order = new MOrder(ctx, req.C_Order_ID, null);
-            if (order.Get_ID() <= 0) return null;
+            parent = new MRequisition(ctx, req.M_Requisition_ID, null);
+            if (parent.Get_ID() <= 0) return null;
 
-            MOrderLine line = new MOrderLine(order);
+            MRequisitionLine line = new MRequisitionLine(parent);
             if (req.M_Product_ID > 0)
             {
-                line.SetM_Product_ID(req.M_Product_ID, true);
+                line.SetM_Product_ID(req.M_Product_ID);
                 if (req.M_AttributeSetInstance_ID > 0)
                     line.SetM_AttributeSetInstance_ID(req.M_AttributeSetInstance_ID);
-
-                // On a sales order, when the client has not yet supplied a UOM (fresh product
-                // selection), prefer the product's Sales UOM (VAS_SalesUOM_Id) over the primary
-                // unit set by SetM_Product_ID. A UOM already on the line (req.C_UOM_ID > 0)
-                // means the user changed it deliberately — that is preserved below.
-                if (req.C_UOM_ID <= 0 && order.IsSOTrx())
+                // The product's own stocking unit, unless the client sent one (below).
+                if (req.C_UOM_ID <= 0)
                 {
-                    int salesUomId = GetProductSalesUomId(ctx, req.M_Product_ID);
-                    if (salesUomId > 0)
-                        line.SetC_UOM_ID(salesUomId);
+                    int uom = GetProductUomId(ctx, req.M_Product_ID);
+                    if (uom > 0) SetLineUom(line, uom);
                 }
             }
             else if (req.C_Charge_ID > 0)
@@ -1589,107 +1442,131 @@ namespace VASLogic.Models
                 return line;
             }
 
-            // Prefer QtyEntered (the user-visible quantity in the entered UOM). Fall back to
-            // QtyOrdered when QtyEntered was not supplied by the client (older callers).
-            decimal qty = req.QtyEntered > 0 ? req.QtyEntered : (req.QtyOrdered > 0 ? req.QtyOrdered : 1);
-            line.SetQty(qty);
-
             if (req.C_UOM_ID > 0)
-                line.SetC_UOM_ID(req.C_UOM_ID);
+                SetLineUom(line, req.C_UOM_ID);
 
-            // MOrderLine.SetC_Charge_ID does not auto-set a UOM (unlike MInvoiceLine).
-            // Apply the system default so C_UOM_ID is never 0 on a charge line.
-            if (req.C_Charge_ID > 0 && line.GetC_UOM_ID() <= 0)
-                line.SetC_UOM_ID(GetDefaultUomId(ctx));
+            // A charge line has no product to take a unit from; use the system default so
+            // C_UOM_ID is never 0 (MRequisitionLine does not set one for a charge).
+            if (req.C_Charge_ID > 0 && LineUomId(line) <= 0)
+                SetLineUom(line, GetDefaultUomId(ctx));
 
-            if (req.PriceOverride)
-            {
-                line.SetPriceEntered(req.PriceEntered);
-                line.SetPriceActual(req.PriceEntered);
-            }
-            else if (req.M_Product_ID > 0)
-            {
-                SetLinePriceWithAttribute(line, order, req.M_AttributeSetInstance_ID);
-            }
+            decimal entered = req.QtyEntered > 0 ? req.QtyEntered : (req.Qty > 0 ? req.Qty : 1);
+            SetLineQty(ctx, line, entered);
+
+            if (req.PriceOverride || req.M_Product_ID <= 0)
+                line.SetPriceActual(req.PriceActual);
             else
-            {
-                line.SetPriceEntered(req.PriceEntered);
-                line.SetPriceActual(req.PriceEntered);
-            }
+                SetLinePriceWithAttribute(line, parent, req.M_AttributeSetInstance_ID);
 
             ApplyDiscount(line, req.Discount);
 
-            if (req.C_Tax_ID > 0)
-                line.SetC_Tax_ID(req.C_Tax_ID);
-            else
-                line.SetTax();
-
+            // MRequisitionLine.BeforeSave only recomputes LineNetAmt when it is still
+            // zero, so the panel states it here from the values it just applied.
             line.SetLineNetAmt();
-            if (line.GetC_Tax_ID() > 0)
-                line.SetTaxAmt();
-
             return line;
         }
 
         /// <summary>
-        /// Prices a product line from the price list using the actual attribute-set-instance.
+        /// Writes the line's selected unit. C_UOM_ID is an optional column on
+        /// M_RequisitionLine (only the requisition window maintains it), so it is set
+        /// through Set_Value under a column guard rather than through a typed setter
+        /// that a schema without the column would not carry.
         /// </summary>
-        private void SetLinePriceWithAttribute(MOrderLine line, MOrder order, int asi)
+        private void SetLineUom(MRequisitionLine line, int C_UOM_ID)
+        {
+            if (C_UOM_ID <= 0) return;
+            if (line.Get_ColumnIndex("C_UOM_ID") < 0) return;
+            line.Set_Value("C_UOM_ID", C_UOM_ID);
+        }
+
+        /// <summary>
+        /// The line's selected unit, read the same way MRequisitionLine reads it —
+        /// through Get_Value, because C_UOM_ID is not part of every generated
+        /// X_M_RequisitionLine. Returns 0 when the schema has no such column.
+        /// </summary>
+        private static int LineUomId(MRequisitionLine line)
+        {
+            if (line == null || line.Get_ColumnIndex("C_UOM_ID") < 0) return 0;
+            return Util.GetValueOfInt(line.Get_Value("C_UOM_ID"));
+        }
+
+        /// <summary>
+        /// Applies a quantity keyed in the line's SELECTED unit: QtyEntered holds it as
+        /// keyed (where the schema has that column) and Qty holds the same quantity in
+        /// the product's BASE unit — the identical pair MRequisitionLine.BeforeSave
+        /// maintains. Where there is no conversion to make (a charge line, a product
+        /// held in the selected unit, a schema without QtyEntered) the two are equal.
+        /// </summary>
+        private void SetLineQty(Ctx ctx, MRequisitionLine line, decimal entered)
+        {
+            decimal baseQty = entered;
+            int uom = LineUomId(line);
+            if (line.GetM_Product_ID() > 0 && uom > 0)
+            {
+                int productUom = GetProductUomId(ctx, line.GetM_Product_ID());
+                if (productUom > 0 && productUom != uom)
+                {
+                    decimal? conv = MUOMConversion.ConvertProductFrom(ctx, line.GetM_Product_ID(), uom, entered);
+                    // A product with no conversion defined for the selected unit returns
+                    // null; the entered figure then stands as the base figure rather than
+                    // the line silently collapsing to zero.
+                    if (conv != null && conv.Value != 0) baseQty = conv.Value;
+                }
+            }
+            if (line.Get_ColumnIndex("QtyEntered") >= 0)
+                line.Set_Value("QtyEntered", entered);
+            line.SetQty(baseQty);
+        }
+
+        /// <summary>
+        /// Prices a product line from the requisition's price list using the actual
+        /// attribute-set instance. PriceActual is the price per SELECTED unit — the
+        /// figure the requisition window shows in Unit Price — so the quantity handed
+        /// to the pricing engine is the entered one and no base-unit rescaling follows.
+        /// </summary>
+        private void SetLinePriceWithAttribute(MRequisitionLine line, MRequisition parent, int asi)
         {
             if (line.GetM_Product_ID() == 0) return;
+            // A requisition is always bought, never sold: IsSOTrx = false.
             MProductPricing pp = new MProductPricing(line.GetAD_Client_ID(), line.GetAD_Org_ID(),
-                line.GetM_Product_ID(), order.GetC_BPartner_ID(), line.GetQtyOrdered(), order.IsSOTrx());
-            pp.SetM_PriceList_ID(order.GetM_PriceList_ID());
-            pp.SetPriceDate(order.GetDateOrdered());
+                line.GetM_Product_ID(), Util.GetValueOfInt(parent.Get_Value("C_BPartner_ID")), line.GetQty(), false);
+            pp.SetM_PriceList_ID(parent.GetM_PriceList_ID());
+            pp.SetPriceDate(parent.GetDateDoc());
             pp.SetM_AttributeSetInstance_ID(asi);
+            // Mirrors MRequisitionLine.SetPrice: the line is priced off its own unit only
+            // where ED011 (multi-UOM pricing) is installed.
             if (Env.IsModuleInstalled("ED011_"))
-                pp.SetC_UOM_ID(line.GetC_UOM_ID());
+                pp.SetC_UOM_ID(LineUomId(line));
             line.SetPriceActual(pp.GetPriceStd());
-            line.SetPriceList(pp.GetPriceList());
-            line.SetPriceLimit(pp.GetPriceLimit());
-            if (decimal.Compare(line.GetQtyEntered(), line.GetQtyOrdered()) == 0)
-                line.SetPriceEntered(line.GetPriceActual());
-            else
-                line.SetPriceEntered(decimal.Multiply(line.GetPriceActual(),
-                    decimal.Round(decimal.Divide(line.GetQtyOrdered(), line.GetQtyEntered()), 6)));
-            if (line.GetC_UOM_ID() == 0)
-                line.SetC_UOM_ID(pp.GetC_UOM_ID());
+            if (LineUomId(line) == 0)
+                SetLineUom(line, pp.GetC_UOM_ID());
         }
 
         /// <summary>
         /// Reads the AD_Column.Callout for the changed column and executes the equivalent
         /// server-side callout logic, returning the changed columns as a patch object.
         /// </summary>
-        public OrderCalloutResult RunColumnCallout(Ctx ctx, OrderLineCalcRequest req)
+        public RequisitionCalloutResult RunColumnCallout(Ctx ctx, RequisitionLineCalcRequest req)
         {
-            OrderCalloutResult res = new OrderCalloutResult();
-            if (req == null || req.C_Order_ID <= 0) return res;
+            RequisitionCalloutResult res = new RequisitionCalloutResult();
+            if (req == null || req.M_Requisition_ID <= 0) return res;
 
             string column = MapTriggerToColumn(req.TriggerColumn);
             res.Column = column;
-            res.Callout = ReadColumnCallout(ctx, "C_OrderLine", column);
+            res.Callout = ReadColumnCallout(ctx, "M_RequisitionLine", column);
 
-            MOrder order;
-            MOrderLine line = BuildCalcLine(ctx, req, out order);
+            MRequisition parent;
+            MRequisitionLine line = BuildCalcLine(ctx, req, out parent);
             if (line == null || (req.M_Product_ID <= 0 && req.C_Charge_ID <= 0)) return res;
 
-            int taxId = line.GetC_Tax_ID();
-            decimal net = line.GetLineNetAmt();
-            decimal taxAmt = line.GetTaxAmt();
-
-            res.Values["C_UOM_ID"] = line.GetC_UOM_ID();
-            res.Values["PriceEntered"] = line.GetPriceEntered();
+            res.Values["C_UOM_ID"] = LineUomId(line);
             res.Values["PriceActual"] = line.GetPriceActual();
-            res.Values["PriceList"] = line.GetPriceList();
-            res.Values["C_Tax_ID"] = taxId;
-            res.Values["TaxAmt"] = taxAmt;
-            res.Values["LineNetAmt"] = net;
-            res.Values["LineTotalAmt"] = decimal.Add(net, taxAmt);
+            res.Values["Qty"] = line.GetQty();
+            res.Values["LineNetAmt"] = line.GetLineNetAmt();
             if (req.M_Product_ID > 0) res.Values["C_Charge_ID"] = 0;
             else if (req.C_Charge_ID > 0) { res.Values["M_Product_ID"] = 0; res.Values["M_AttributeSetInstance_ID"] = 0; }
 
-            res.Display["uomName"] = GetUomLabel(ctx, line.GetC_UOM_ID());
-            res.Display["taxName"] = taxId > 0 ? MTax.Get(ctx, taxId).GetName() : "";
+            res.Display["uomName"] = GetUomLabel(ctx, LineUomId(line));
             return res;
         }
 
@@ -1715,9 +1592,9 @@ namespace VASLogic.Models
                 case "charge": return "C_Charge_ID";
                 case "M_Product_ID":
                 case "C_Charge_ID":
-                case "QtyOrdered":
-                case "PriceEntered":
-                case "C_Tax_ID":
+                case "Qty":
+                case "QtyEntered":
+                case "PriceActual":
                 case "C_UOM_ID":
                 case "M_AttributeSetInstance_ID":
                     return trigger;
@@ -1725,7 +1602,7 @@ namespace VASLogic.Models
             }
         }
 
-        private void ApplyDiscount(MOrderLine line, decimal discountPct)
+        private void ApplyDiscount(MRequisitionLine line, decimal discountPct)
         {
             if (discountPct <= 0) return;
             if (discountPct > 100) discountPct = 100;
@@ -1735,23 +1612,23 @@ namespace VASLogic.Models
 
         private static readonly HashSet<string> CORE_OR_SYSTEM_COLUMNS = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "C_OrderLine_ID", "C_Order_ID", "AD_Client_ID", "AD_Org_ID",
+            "M_RequisitionLine_ID", "M_Requisition_ID", "AD_Client_ID", "AD_Org_ID",
             "Created", "CreatedBy", "Updated", "UpdatedBy", "IsActive",
             "M_Product_ID", "C_Charge_ID", "M_AttributeSetInstance_ID",
-            // QtyEntered must be blocked alongside QtyOrdered: SetQty() sets both, and
+            // QtyEntered is blocked alongside Qty: SaveLines writes the pair itself, and
             // ApplyExtraColumns must not overwrite QtyEntered with the stale client value
-            // (which carries the old DB qty), otherwise the framework's beforeSave uses the
-            // stale QtyEntered to recalculate QtyOrdered — reverting the user's qty change.
-            "QtyOrdered", "QtyEntered", "C_UOM_ID", "PriceEntered", "PriceActual",
-            "C_Tax_ID", "Line", "Description"
+            // (which carries the old DB qty), otherwise MRequisitionLine.BeforeSave uses
+            // the stale QtyEntered to recalculate Qty — reverting the user's qty change.
+            "Qty", "QtyEntered", "C_UOM_ID", "PriceActual", "LineNetAmt",
+            "Line", "Description"
         };
 
         private HashSet<string> _updateableColumns;
         private HashSet<string> _yesNoColumns;
         private HashSet<string> _referenceColumns;
 
-        /// <summary>Persists every non-core, updateable C_OrderLine column through PO.Set_Value.</summary>
-        private void ApplyExtraColumns(MOrderLine line, Dictionary<string, object> values, HashSet<string> touched)
+        /// <summary>Persists every non-core, updateable M_RequisitionLine column through PO.Set_Value.</summary>
+        private void ApplyExtraColumns(MRequisitionLine line, Dictionary<string, object> values, HashSet<string> touched)
         {
             if (values == null || values.Count == 0) return;
             HashSet<string> updateable = GetUpdateableColumns();
@@ -1775,7 +1652,7 @@ namespace VASLogic.Models
                     }
                     line.Set_Value(col, val);
                 }
-                catch (Exception ex) { log.Warning("VAS_107 SaveLines: skip column " + col + " - " + ex.Message); }
+                catch (Exception ex) { log.Warning("VAS_240 SaveLines: skip column " + col + " - " + ex.Message); }
             }
         }
 
@@ -1808,7 +1685,7 @@ namespace VASLogic.Models
                 @"SELECT c.ColumnName, c.AD_Reference_ID
                   FROM AD_Column c
                   INNER JOIN AD_Table t ON (c.AD_Table_ID = t.AD_Table_ID)
-                  WHERE t.TableName = 'C_OrderLine'
+                  WHERE t.TableName = 'M_RequisitionLine'
                     AND c.IsActive = 'Y'
                     AND COALESCE(c.IsUpdateable, 'Y') = 'Y'");
             if (ds != null && ds.Tables.Count > 0)
@@ -1847,8 +1724,7 @@ namespace VASLogic.Models
         /// <summary>
         /// Returns the system-default UOM ID ("Each") by delegating to the framework's
         /// MUOM.GetDefault_UOM_ID — the same call that MInvoiceLine.SetC_Charge_ID makes
-        /// internally, which is why VAS_074 charge lines always have a UOM. MOrderLine does
-        /// not make this call, so we mirror it here.
+        /// internally. A requisition line gets no UOM for a charge, so we mirror it here.
         /// </summary>
         /// <param name="ctx">session context</param>
         /// <returns>default C_UOM_ID from the framework, or 0 if not found</returns>
@@ -1857,20 +1733,27 @@ namespace VASLogic.Models
             return MUOM.GetDefault_UOM_ID(ctx);
         }
 
+        private Dictionary<int, int> _productUom;
+
         /// <summary>
-        /// Returns the Sales UOM (VAS_SalesUOM_Id) configured on the product master for sales orders.
-        /// Returns 0 when no Sales UOM is defined or the product does not exist.
+        /// The product's own stocking unit (M_Product.C_UOM_ID) — the BASE unit every
+        /// quantity on the line is converted to. Cached per instance.
         /// </summary>
         /// <param name="ctx">session context</param>
         /// <param name="productId">M_Product_ID to look up</param>
-        /// <returns>VAS_SalesUOM_Id from M_Product, or 0 if not set</returns>
-        private int GetProductSalesUomId(Ctx ctx, int productId)
+        /// <returns>C_UOM_ID from M_Product, or 0 when the product does not exist</returns>
+        private int GetProductUomId(Ctx ctx, int productId)
         {
             if (productId <= 0) return 0;
-            string sql = "SELECT p.VAS_SalesUOM_Id FROM M_Product p WHERE p.M_Product_ID = @M_Product_ID AND p.IsActive = 'Y'";
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            object val = DB.ExecuteScalar(sql, new SqlParameter[] { new SqlParameter("@M_Product_ID", productId) }, null);
-            return Util.GetValueOfInt(val);
+            if (_productUom == null) _productUom = new Dictionary<int, int>();
+            int cached;
+            if (_productUom.TryGetValue(productId, out cached)) return cached;
+            object val = DB.ExecuteScalar(
+                "SELECT p.C_UOM_ID FROM M_Product p WHERE p.M_Product_ID = @M_Product_ID AND p.IsActive = 'Y'",
+                new SqlParameter[] { new SqlParameter("@M_Product_ID", productId) }, null);
+            int uom = Util.GetValueOfInt(val);
+            _productUom[productId] = uom;
+            return uom;
         }
 
         #endregion
@@ -1885,9 +1768,9 @@ namespace VASLogic.Models
         /// <param name="ctx">session context</param>
         /// <param name="M_Product_ID">product whose attribute set is read</param>
         /// <returns>attribute-set definition; empty object when no set is configured</returns>
-        public OrderAttributeSetInfo GetProductAttributes(Ctx ctx, int M_Product_ID)
+        public RequisitionAttributeSetInfo GetProductAttributes(Ctx ctx, int M_Product_ID)
         {
-            OrderAttributeSetInfo info = new OrderAttributeSetInfo();
+            RequisitionAttributeSetInfo info = new RequisitionAttributeSetInfo();
             if (M_Product_ID <= 0) return info;
 
             MProduct product = MProduct.Get(ctx, M_Product_ID);
@@ -1940,27 +1823,27 @@ namespace VASLogic.Models
                 new SqlParameter[] { new SqlParameter("@setId", M_AttributeSet_ID) }, null);
             if (ds == null || ds.Tables.Count == 0) return info;
 
-            Dictionary<int, OrderAttributeDef> map = new Dictionary<int, OrderAttributeDef>();
+            Dictionary<int, RequisitionAttributeDef> map = new Dictionary<int, RequisitionAttributeDef>();
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 int attrId = Util.GetValueOfInt(r["M_Attribute_ID"]);
-                OrderAttributeDef def;
+                RequisitionAttributeDef def;
                 if (!map.TryGetValue(attrId, out def))
                 {
-                    def = new OrderAttributeDef();
+                    def = new RequisitionAttributeDef();
                     def.M_Attribute_ID = attrId;
                     def.Name = Util.GetValueOfString(r["AttributeName"]);
                     def.ValueType = Util.GetValueOfString(r["AttributeValueType"]);
                     def.IsInstanceAttribute = Util.GetValueOfString(r["IsInstanceAttribute"]) == "Y";
                     def.IsMandatory = Util.GetValueOfString(r["IsMandatory"]) == "Y";
-                    def.Values = new List<OrderAttributeValueDef>();
+                    def.Values = new List<RequisitionAttributeValueDef>();
                     map[attrId] = def;
                     info.Attributes.Add(def);
                 }
                 int valId = Util.GetValueOfInt(r["M_AttributeValue_ID"]);
                 if (valId > 0)
                 {
-                    OrderAttributeValueDef v = new OrderAttributeValueDef();
+                    RequisitionAttributeValueDef v = new RequisitionAttributeValueDef();
                     v.M_AttributeValue_ID = valId;
                     v.Code = Util.GetValueOfString(r["ValueCode"]);
                     v.Name = Util.GetValueOfString(r["ValueName"]);
@@ -1977,9 +1860,9 @@ namespace VASLogic.Models
         /// <param name="ctx">session context</param>
         /// <param name="M_AttributeSetInstance_ID">instance whose values are read</param>
         /// <returns>list of typed attribute values; empty list when the instance does not exist</returns>
-        public List<OrderAttributeInstanceValue> GetInstanceValues(Ctx ctx, int M_AttributeSetInstance_ID)
+        public List<RequisitionAttributeInstanceValue> GetInstanceValues(Ctx ctx, int M_AttributeSetInstance_ID)
         {
-            List<OrderAttributeInstanceValue> list = new List<OrderAttributeInstanceValue>();
+            List<RequisitionAttributeInstanceValue> list = new List<RequisitionAttributeInstanceValue>();
             if (M_AttributeSetInstance_ID <= 0) return list;
             string sql = @"SELECT ai.M_Attribute_ID, a.AttributeValueType,
                                   ai.M_AttributeValue_ID, COALESCE(ai.Value, N'') AS StringValue, ai.ValueNumber
@@ -1991,7 +1874,7 @@ namespace VASLogic.Models
             if (ds == null || ds.Tables.Count == 0) return list;
             foreach (DataRow r in ds.Tables[0].Rows)
             {
-                OrderAttributeInstanceValue v = new OrderAttributeInstanceValue();
+                RequisitionAttributeInstanceValue v = new RequisitionAttributeInstanceValue();
                 v.M_Attribute_ID = Util.GetValueOfInt(r["M_Attribute_ID"]);
                 v.ValueType = Util.GetValueOfString(r["AttributeValueType"]);
                 v.M_AttributeValue_ID = Util.GetValueOfInt(r["M_AttributeValue_ID"]);
@@ -2012,9 +1895,9 @@ namespace VASLogic.Models
         /// <param name="ctx">session context</param>
         /// <param name="req">attribute instance create / update request</param>
         /// <returns>new instance id + description, or Error text on failure</returns>
-        public OrderAttributeSaveResult SaveAttribute(Ctx ctx, OrderAttributeSaveRequest req)
+        public RequisitionAttributeSaveResult SaveAttribute(Ctx ctx, RequisitionAttributeSaveRequest req)
         {
-            OrderAttributeSaveResult res = new OrderAttributeSaveResult();
+            RequisitionAttributeSaveResult res = new RequisitionAttributeSaveResult();
             if (req == null) return res;
 
             MProduct product = req.M_Product_ID > 0 ? MProduct.Get(ctx, req.M_Product_ID) : null;
@@ -2054,15 +1937,15 @@ namespace VASLogic.Models
         /// <param name="aset">attribute set definition for the product</param>
         /// <param name="selections">values entered by the user in the picker</param>
         /// <returns>positionally-aligned value list for PAttributesModel.SaveAttribute</returns>
-        private List<KeyNamePair> BuildAttributeValueList(MAttributeSet aset, List<OrderAttributeValueSelection> selections)
+        private List<KeyNamePair> BuildAttributeValueList(MAttributeSet aset, List<RequisitionAttributeValueSelection> selections)
         {
             List<KeyNamePair> values = new List<KeyNamePair>();
             if (aset == null) return values;
 
-            Dictionary<int, OrderAttributeValueSelection> byAttr = new Dictionary<int, OrderAttributeValueSelection>();
+            Dictionary<int, RequisitionAttributeValueSelection> byAttr = new Dictionary<int, RequisitionAttributeValueSelection>();
             if (selections != null)
             {
-                foreach (OrderAttributeValueSelection sel in selections)
+                foreach (RequisitionAttributeValueSelection sel in selections)
                 {
                     if (sel != null && sel.M_Attribute_ID > 0)
                         byAttr[sel.M_Attribute_ID] = sel;
@@ -2072,7 +1955,7 @@ namespace VASLogic.Models
             MAttribute[] attributes = aset.GetMAttributes(true);
             foreach (MAttribute attr in attributes)
             {
-                OrderAttributeValueSelection sel;
+                RequisitionAttributeValueSelection sel;
                 byAttr.TryGetValue(attr.Get_ID(), out sel);
 
                 if (MAttribute.ATTRIBUTEVALUETYPE_List.Equals(attr.GetAttributeValueType()))
@@ -2099,56 +1982,56 @@ namespace VASLogic.Models
 
         #endregion
 
-        #region Write actions (insert / update / delete C_OrderLine)
+        #region Write actions (insert / update / delete M_RequisitionLine)
 
         /// <summary>
-        /// Inserts or updates the supplied order lines through MOrderLine.
+        /// Inserts or updates the supplied requisition lines through MRequisitionLine.
         /// All lines share a single transaction so a failure rolls the whole batch back.
         /// </summary>
-        public OrderSaveResult SaveLines(Ctx ctx, int C_Order_ID, int AD_Window_ID, List<OrderLineInput> rows, int page = 0)
+        public RequisitionSaveResult SaveLines(Ctx ctx, int M_Requisition_ID, int AD_Window_ID, List<RequisitionLineInput> rows, int page = 0)
         {
-            OrderSaveResult res = new OrderSaveResult();
-            if (C_Order_ID <= 0 || rows == null || rows.Count == 0)
+            RequisitionSaveResult res = new RequisitionSaveResult();
+            if (M_Requisition_ID <= 0 || rows == null || rows.Count == 0)
             {
-                res.ErrorKey = "VAS_107_NothingToSave";
+                res.ErrorKey = "VAS_240_NothingToSave";
                 return res;
             }
 
-            CreateOrderPanelData ctxData = new CreateOrderPanelData();
-            LoadParentContext(ctx, C_Order_ID, ctxData);
-            if (ctxData.C_Order_ID <= 0)
+            RequisitionPanelData ctxData = new RequisitionPanelData();
+            LoadParentContext(ctx, M_Requisition_ID, ctxData);
+            if (ctxData.M_Requisition_ID <= 0)
             {
-                res.ErrorKey = "VAS_107_NoAccess";
+                res.ErrorKey = "VAS_240_NoAccess";
                 return res;
             }
             if (!ctxData.IsEditable)
             {
-                res.ErrorKey = "VAS_107_OrderNotEditable";
+                res.ErrorKey = "VAS_240_NotEditable";
                 return res;
             }
 
-            Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS107Save_" + C_Order_ID));
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS240Save_" + M_Requisition_ID));
             try
             {
-                MOrder order = new MOrder(ctx, C_Order_ID, trx);
-                foreach (OrderLineInput input in rows)
+                MRequisition parent = new MRequisition(ctx, M_Requisition_ID, trx);
+                foreach (RequisitionLineInput input in rows)
                 {
                     if (input.M_Product_ID <= 0 && input.C_Charge_ID <= 0)
                         continue;
 
-                    MOrderLine line = input.C_OrderLine_ID > 0
-                        ? new MOrderLine(ctx, input.C_OrderLine_ID, trx)
-                        : new MOrderLine(order);
+                    MRequisitionLine line = input.M_RequisitionLine_ID > 0
+                        ? new MRequisitionLine(ctx, input.M_RequisitionLine_ID, trx)
+                        : new MRequisitionLine(parent);
 
-                    if (input.C_OrderLine_ID <= 0)
-                        line.SetOrder(order);
+                    if (input.M_RequisitionLine_ID <= 0)
+                        line.SetM_Requisition_ID(M_Requisition_ID);
 
                     if (input.M_Product_ID > 0)
                     {
-                        line.SetM_Product_ID(input.M_Product_ID, true);
+                        line.SetM_Product_ID(input.M_Product_ID);
                         line.SetC_Charge_ID(0);
-                        if (input.M_AttributeSetInstance_ID > 0)
-                            line.SetM_AttributeSetInstance_ID(input.M_AttributeSetInstance_ID);
+                        // BeforeSave blanks the instance on a charge line; set it only for a product.
+                        line.SetM_AttributeSetInstance_ID(input.M_AttributeSetInstance_ID);
                     }
                     else
                     {
@@ -2156,27 +2039,27 @@ namespace VASLogic.Models
                         line.SetM_Product_ID(0);
                     }
 
-                    // Prefer QtyEntered (the user-visible quantity in the entered UOM). Fall back to
-                    // QtyOrdered when QtyEntered was not supplied by the client (older callers).
-                    decimal qty = input.QtyEntered > 0 ? input.QtyEntered : (input.QtyOrdered > 0 ? input.QtyOrdered : 1);
-                    line.SetQty(qty);
-
+                    // The unit first, then the quantity: SetLineQty converts the entered
+                    // figure into the product's base unit against the unit now on the line.
                     if (input.C_UOM_ID > 0)
-                        line.SetC_UOM_ID(input.C_UOM_ID);
+                        SetLineUom(line, input.C_UOM_ID);
+                    else if (input.M_Product_ID > 0 && LineUomId(line) <= 0)
+                        SetLineUom(line, GetProductUomId(ctx, input.M_Product_ID));
 
-                    // Charge lines: MOrderLine.SetC_Charge_ID does not auto-set a UOM.
-                    // Guard against a missing UOM which would cause MOrderLine.Save to fail.
-                    if (input.C_Charge_ID > 0 && line.GetC_UOM_ID() <= 0)
-                        line.SetC_UOM_ID(GetDefaultUomId(ctx));
+                    // A charge line has no product to take a unit from; the framework does
+                    // not set one either, and a line without a unit fails to save.
+                    if (input.C_Charge_ID > 0 && LineUomId(line) <= 0)
+                        SetLineUom(line, GetDefaultUomId(ctx));
 
-                    // The panel prices every line via CalcLine, so persist the client-sent price exactly.
-                    line.SetPriceEntered(input.PriceEntered);
-                    line.SetPriceActual(input.PriceEntered);
+                    decimal entered = input.QtyEntered > 0 ? input.QtyEntered : (input.Qty > 0 ? input.Qty : 1);
+                    SetLineQty(ctx, line, entered);
 
-                    if (input.C_Tax_ID > 0)
-                        line.SetC_Tax_ID(input.C_Tax_ID);
-                    else
-                        line.SetTax();
+                    // The panel prices every line via CalcLine, so persist the client-sent price
+                    // exactly, then state the amount from the pair just written — BeforeSave only
+                    // recomputes LineNetAmt while it is still zero, so an edited price or quantity
+                    // would otherwise keep the amount the row was first saved with.
+                    line.SetPriceActual(input.PriceActual);
+                    line.SetLineNetAmt();
 
                     if (input.Line > 0)
                         line.SetLine(input.Line);
@@ -2199,11 +2082,11 @@ namespace VASLogic.Models
                                 val = Msg.GetMsg(ctx, pp.GetValue());
                             err = val;
                         }
-                        log.Warning("VAS_107 SaveLines: line save failed (Line " + input.Line + ") - " + err);
-                        res.LineErrors.Add(new OrderLineSaveError
+                        log.Warning("VAS_240 SaveLines: line save failed (Line " + input.Line + ") - " + err);
+                        res.LineErrors.Add(new RequisitionLineSaveError
                         {
                             RowKey = input.RowKey,
-                            C_OrderLine_ID = input.C_OrderLine_ID,
+                            M_RequisitionLine_ID = input.M_RequisitionLine_ID,
                             Line = input.Line,
                             Message = err
                         });
@@ -2213,7 +2096,7 @@ namespace VASLogic.Models
                 if (res.LineErrors.Count > 0)
                 {
                     trx.Rollback();
-                    res.ErrorKey = "VAS_107_SaveFailed";
+                    res.ErrorKey = "VAS_240_SaveFailed";
                     res.ErrorDetail = res.LineErrors[0].Message;
                     return res;
                 }
@@ -2223,8 +2106,8 @@ namespace VASLogic.Models
             catch (Exception ex)
             {
                 trx.Rollback();
-                log.Log(Level.SEVERE, "VAS_107 SaveLines failed", ex);
-                res.ErrorKey = "VAS_107_SaveFailed";
+                log.Log(Level.SEVERE, "VAS_240 SaveLines failed", ex);
+                res.ErrorKey = "VAS_240_SaveFailed";
                 res.ErrorDetail = ex.Message;
                 return res;
             }
@@ -2237,40 +2120,38 @@ namespace VASLogic.Models
             res.Success = true;
             if (page < 0) page = 0;
             int total;
-            res.Lines = LoadLines(ctx, C_Order_ID, ResolveOrderLineTabs(AD_Window_ID), page, out total);
+            res.Lines = LoadLines(ctx, M_Requisition_ID, ResolveRequisitionLineTabs(AD_Window_ID), page, out total);
             res.LinesTotal = total;
             res.LinePage = page;
             res.LinePageSize = LINE_PAGE_SIZE;
-            decimal soNet, soTax, soTcs;
-            ComputeOtherPageTotals(ctx, C_Order_ID, res.Lines, ctxData.IsTaxIncluded, out soNet, out soTax, out soTcs);
-            res.OtherPagesSubtotal = soNet; res.OtherPagesTax = soTax; res.OtherPagesTcs = soTcs;
+            res.OtherPagesSubtotal = ComputeOtherPageTotal(ctx, M_Requisition_ID, res.Lines);
             return res;
         }
 
-        /// <summary>Soft-deletes the supplied saved order lines through MOrderLine.</summary>
-        public OrderSaveResult DeleteLines(Ctx ctx, int C_Order_ID, int AD_Window_ID, List<int> lineIds, int page = 0)
+        /// <summary>Soft-deletes the supplied saved requisition lines through MRequisitionLine.</summary>
+        public RequisitionSaveResult DeleteLines(Ctx ctx, int M_Requisition_ID, int AD_Window_ID, List<int> lineIds, int page = 0)
         {
-            OrderSaveResult res = new OrderSaveResult();
-            if (C_Order_ID <= 0 || lineIds == null || lineIds.Count == 0)
+            RequisitionSaveResult res = new RequisitionSaveResult();
+            if (M_Requisition_ID <= 0 || lineIds == null || lineIds.Count == 0)
             {
-                res.ErrorKey = "VAS_107_NothingToSave";
+                res.ErrorKey = "VAS_240_NothingToSave";
                 return res;
             }
 
-            CreateOrderPanelData ctxData = new CreateOrderPanelData();
-            LoadParentContext(ctx, C_Order_ID, ctxData);
-            if (ctxData.C_Order_ID <= 0) { res.ErrorKey = "VAS_107_NoAccess"; return res; }
-            if (!ctxData.IsEditable) { res.ErrorKey = "VAS_107_OrderNotEditable"; return res; }
+            RequisitionPanelData ctxData = new RequisitionPanelData();
+            LoadParentContext(ctx, M_Requisition_ID, ctxData);
+            if (ctxData.M_Requisition_ID <= 0) { res.ErrorKey = "VAS_240_NoAccess"; return res; }
+            if (!ctxData.IsEditable) { res.ErrorKey = "VAS_240_NotEditable"; return res; }
 
-            Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS107Delete_" + C_Order_ID));
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS240Delete_" + M_Requisition_ID));
             try
             {
                 foreach (int id in lineIds)
                 {
                     if (id <= 0) continue;
-                    MOrderLine line = new MOrderLine(ctx, id, trx);
+                    MRequisitionLine line = new MRequisitionLine(ctx, id, trx);
                     if (line.Get_ID() != id) continue;
-                    if (line.GetC_Order_ID() != C_Order_ID) continue;
+                    if (line.GetM_Requisition_ID() != M_Requisition_ID) continue;
                     if (!line.Delete(true, trx))
                     {
                         trx.Rollback();
@@ -2282,11 +2163,11 @@ namespace VASLogic.Models
                             if (String.IsNullOrEmpty(val))
                                 val = Msg.GetMsg(ctx, pp.GetValue());
                             if (String.IsNullOrEmpty(val))
-                                err = Msg.GetMsg(ctx, "VAS_107_DeleteFailed");
+                                err = Msg.GetMsg(ctx, "VAS_240_DeleteFailed");
                             else
                                 err = val;
                         }
-                        log.Warning("VAS_107 DeleteLines: delete failed for line " + id);
+                        log.Warning("VAS_240 DeleteLines: delete failed for line " + id);
                         res.ErrorKey = err;
                         return res;
                     }
@@ -2296,8 +2177,8 @@ namespace VASLogic.Models
             catch (Exception ex)
             {
                 trx.Rollback();
-                log.Log(Level.SEVERE, "VAS_107 DeleteLines failed", ex);
-                res.ErrorKey = "VAS_107_DeleteFailed";
+                log.Log(Level.SEVERE, "VAS_240 DeleteLines failed", ex);
+                res.ErrorKey = "VAS_240_DeleteFailed";
                 res.ErrorDetail = ex.Message;
                 return res;
             }
@@ -2310,87 +2191,72 @@ namespace VASLogic.Models
             res.Success = true;
             if (page < 0) page = 0;
             int total;
-            res.Lines = LoadLines(ctx, C_Order_ID, ResolveOrderLineTabs(AD_Window_ID), page, out total);
+            res.Lines = LoadLines(ctx, M_Requisition_ID, ResolveRequisitionLineTabs(AD_Window_ID), page, out total);
             int pageCount = System.Math.Max(1, (int)System.Math.Ceiling(total / (double)LINE_PAGE_SIZE));
             if (page > pageCount - 1)
             {
                 page = pageCount - 1;
-                res.Lines = LoadLines(ctx, C_Order_ID, ResolveOrderLineTabs(AD_Window_ID), page, out total);
+                res.Lines = LoadLines(ctx, M_Requisition_ID, ResolveRequisitionLineTabs(AD_Window_ID), page, out total);
             }
             res.LinesTotal = total;
             res.LinePage = page;
             res.LinePageSize = LINE_PAGE_SIZE;
-            decimal doNet, doTax, doTcs;
-            ComputeOtherPageTotals(ctx, C_Order_ID, res.Lines, ctxData.IsTaxIncluded, out doNet, out doTax, out doTcs);
-            res.OtherPagesSubtotal = doNet; res.OtherPagesTax = doTax; res.OtherPagesTcs = doTcs;
+            res.OtherPagesSubtotal = ComputeOtherPageTotal(ctx, M_Requisition_ID, res.Lines);
             return res;
         }
 
         #endregion
     }
 
-    #region Data contracts — VAS_107 specific
+    #region Data contracts — VAS_240 specific
 
-    /// <summary>Parent order context + saved lines returned to the panel on load.</summary>
-    public class CreateOrderPanelData
+    /// <summary>Parent requisition context + saved lines returned to the panel on load.</summary>
+    public class RequisitionPanelData
     {
-        public int C_Order_ID { get; set; }
+        public int M_Requisition_ID { get; set; }
         public int AD_Client_ID { get; set; }
         public int AD_Org_ID { get; set; }
+        /// <summary>M_Requisition.DocumentNo — shown in the panel heading.</summary>
+        public string DocumentNo { get; set; }
+        /// <summary>M_Requisition.C_BPartner_ID — the requester (not a vendor).</summary>
         public int C_BPartner_ID { get; set; }
-        public int C_BPartner_Location_ID { get; set; }
+        /// <summary>M_Requisition.M_Warehouse_ID — the warehouse the goods are requested for.</summary>
+        public int M_Warehouse_ID { get; set; }
         public int M_PriceList_ID { get; set; }
+        /// <summary>Currency of the requisition's PRICE LIST — a requisition has none of its own.</summary>
         public int C_Currency_ID { get; set; }
-        public DateTime? DateOrdered { get; set; }
-        public DateTime? DateAcct { get; set; }
-        public bool IsSOTrx { get; set; }
-        /// <summary>C_Order.IsSalesQuotation — the sales document is a quotation, not an order.</summary>
-        public bool IsSalesQuotation { get; set; }
+        public DateTime? DateDoc { get; set; }
         /// <summary>
-        /// Header values that C_OrderLine field DisplayLogic / ReadOnlyLogic name as
-        /// tokens (@C_Order_Blanket@, @BlanketOrderType@, @Ref_C_Order_ID@,
-        /// @VAS_OrderType@). A column that is NULL on the order is simply ABSENT from this
-        /// bag, which the client resolves to "" — so "@token@=null" matches and
-        /// "@token@&gt;0" does not.
+        /// Header values that M_RequisitionLine field DisplayLogic / ReadOnlyLogic name as
+        /// tokens (@M_Warehouse_ID@, @DateRequired@, ...). A column that is NULL on the
+        /// requisition is simply ABSENT from this bag, which the client resolves to "" —
+        /// so "@token@=null" matches and "@token@&gt;0" does not.
         /// </summary>
         public Dictionary<string, string> LogicContext { get; set; }
-        /// <summary>C_Order.IsBlanketTrx — a blanket order, not a release document.</summary>
-        public bool IsBlanketTrx { get; set; }
-        /// <summary>C_Order.IsReturnTrx — a return (customer return / return to vendor).</summary>
-        public bool IsReturnTrx { get; set; }
-        /// <summary>
-        /// C_Order.IsDropShip — the HEADER drop-shipment flag. The line-level Drop Shipment
-        /// field in Additional Info is shown only when this is set.
-        /// </summary>
-        public bool IsDropShip { get; set; }
-        public bool IsTaxIncluded { get; set; }
         public string DocStatus { get; set; }
         public bool Processed { get; set; }
         public bool IsEditable { get; set; }
         public int LinesTotal { get; set; }
         public int LinePage { get; set; }
         public int LinePageSize { get; set; }
+        /// <summary>Sum of LineNetAmt for the saved lines NOT on the loaded page.</summary>
         public decimal OtherPagesSubtotal { get; set; }
-        public decimal OtherPagesTax { get; set; }
-        public decimal OtherPagesTcs { get; set; }
         public int StdPrecision { get; set; }
         public string CurSymbol { get; set; }
         public string CurISO { get; set; }
         public int AD_Window_ID { get; set; }
         public int AD_Tab_ID { get; set; }
         public List<int> AD_Tab_IDs { get; set; }
-        public List<OrderLineRow> Lines { get; set; }
-        public List<OrderUomItem> UomList { get; set; }
-        public List<OrderTaxItem> TaxList { get; set; }
-        public List<OrderColumnMeta> Columns { get; set; }
+        public List<RequisitionLineRow> Lines { get; set; }
+        public List<RequisitionUomItem> UomList { get; set; }
+        public List<RequisitionColumnMeta> Columns { get; set; }
         public Dictionary<string, string> LoginContext { get; set; }
 
-        public CreateOrderPanelData()
+        public RequisitionPanelData()
         {
-            Lines = new List<OrderLineRow>();
-            UomList = new List<OrderUomItem>();
-            TaxList = new List<OrderTaxItem>();
-            Columns = new List<OrderColumnMeta>();
+            Lines = new List<RequisitionLineRow>();
+            UomList = new List<RequisitionUomItem>();
+            Columns = new List<RequisitionColumnMeta>();
             AD_Tab_IDs = new List<int>();
             LoginContext = new Dictionary<string, string>();
             LogicContext = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -2398,72 +2264,69 @@ namespace VASLogic.Models
         }
     }
 
-    /// <summary>Request for the per-row UOM/tax lookup re-filter.</summary>
-    public class OrderLookupRequest
+    /// <summary>Request for the per-row UOM lookup re-filter.</summary>
+    public class RequisitionLookupRequest
     {
-        public int C_Order_ID { get; set; }
+        public int M_Requisition_ID { get; set; }
         public string ColumnName { get; set; }
         public Dictionary<string, object> RowValues { get; set; }
-        public OrderLookupRequest() { RowValues = new Dictionary<string, object>(); }
+        public RequisitionLookupRequest() { RowValues = new Dictionary<string, object>(); }
     }
 
-    /// <summary>Per-row filtered lookup lists (UOM + tax) for one order line.</summary>
-    public class OrderLookupData
+    /// <summary>Per-row filtered UOM list for one requisition line.</summary>
+    public class RequisitionLookupData
     {
-        public int C_Order_ID { get; set; }
-        public List<OrderUomItem> UomList { get; set; }
-        public List<OrderTaxItem> TaxList { get; set; }
-        public OrderLookupData() { UomList = new List<OrderUomItem>(); TaxList = new List<OrderTaxItem>(); }
+        public int M_Requisition_ID { get; set; }
+        public List<RequisitionUomItem> UomList { get; set; }
+        public RequisitionLookupData() { UomList = new List<RequisitionUomItem>(); }
     }
 
-    /// <summary>Request for the generic FK lookup of a dynamic C_OrderLine field.</summary>
-    public class OrderRefLookupRequest
+    /// <summary>Request for the generic FK lookup of a dynamic M_RequisitionLine field.</summary>
+    public class RequisitionRefLookupRequest
     {
-        public int C_Order_ID { get; set; }
+        public int M_Requisition_ID { get; set; }
         public string ColumnName { get; set; }
         public string Query { get; set; }
         public int Id { get; set; }
         public int PageSize { get; set; }
         public int Offset { get; set; }
         public Dictionary<string, object> RowValues { get; set; }
-        public OrderRefLookupRequest() { RowValues = new Dictionary<string, object>(); }
+        public RequisitionRefLookupRequest() { RowValues = new Dictionary<string, object>(); }
     }
 
-    /// <summary>Inbound callout / calc request from the order panel.</summary>
-    public class OrderLineCalcRequest
+    /// <summary>Inbound callout / calc request from the requisition panel.</summary>
+    public class RequisitionLineCalcRequest
     {
-        public int C_Order_ID { get; set; }
+        public int M_Requisition_ID { get; set; }
         public string TriggerColumn { get; set; }
         public int M_Product_ID { get; set; }
         public int C_Charge_ID { get; set; }
         public int M_AttributeSetInstance_ID { get; set; }
+        /// <summary>Quantity as keyed, in the line's SELECTED unit (C_UOM_ID).</summary>
         public decimal QtyEntered { get; set; }
-        public decimal QtyOrdered { get; set; }
+        /// <summary>Quantity in the product's BASE unit; fallback when QtyEntered is absent.</summary>
+        public decimal Qty { get; set; }
         public int C_UOM_ID { get; set; }
-        public decimal PriceEntered { get; set; }
+        public decimal PriceActual { get; set; }
+        /// <summary>True when the user typed the price: keep it instead of re-pricing.</summary>
         public bool PriceOverride { get; set; }
-        public int C_Tax_ID { get; set; }
         public decimal Discount { get; set; }
     }
 
-    /// <summary>Recomputed values returned by the order-line callout.</summary>
-    public class OrderLineCalcResult
+    /// <summary>Recomputed values returned by the requisition-line callout.</summary>
+    public class RequisitionLineCalcResult
     {
         public int C_UOM_ID { get; set; }
         public string UOMName { get; set; }
-        public decimal QtyOrdered { get; set; }
-        public decimal PriceEntered { get; set; }
-        public int C_Tax_ID { get; set; }
-        public string TaxName { get; set; }
-        public decimal TaxAmt { get; set; }
+        public decimal Qty { get; set; }
+        public decimal PriceActual { get; set; }
         public decimal LineNetAmt { get; set; }
-        public decimal LineTotalAmt { get; set; }
     }
 
-    /// <summary>A saved order line shown in the panel grid.</summary>
-    public class OrderLineRow
+    /// <summary>A saved requisition line shown in the panel grid.</summary>
+    public class RequisitionLineRow
     {
-        public int C_OrderLine_ID { get; set; }
+        public int M_RequisitionLine_ID { get; set; }
         public int Line { get; set; }
         public int M_Product_ID { get; set; }
         public string ProductName { get; set; }
@@ -2471,37 +2334,32 @@ namespace VASLogic.Models
         public string ChargeName { get; set; }
         public string Description { get; set; }
         public decimal QtyEntered { get; set; }
-        public decimal QtyOrdered { get; set; }
+        public decimal Qty { get; set; }
         public int C_UOM_ID { get; set; }
         public string UOMName { get; set; }
-        public decimal PriceEntered { get; set; }
-        public int C_Tax_ID { get; set; }
-        public string TaxName { get; set; }
-        public decimal TaxAmt { get; set; }
-        public decimal TaxableAmt { get; set; }
+        public decimal PriceActual { get; set; }
         public decimal LineNetAmt { get; set; }
-        public decimal LineTotalAmt { get; set; }
         public int M_AttributeSetInstance_ID { get; set; }
         public string AttrName { get; set; }
         public bool HasAttributeSet { get; set; }
         public string ProductType { get; set; }
         public Dictionary<string, object> Values { get; set; }
-        public OrderLineRow() { Values = new Dictionary<string, object>(); }
+        public RequisitionLineRow() { Values = new Dictionary<string, object>(); }
     }
 
-    /// <summary>Attribute-instance create/update request from the order panel.</summary>
-    public class OrderAttributeSaveRequest
+    /// <summary>Attribute-instance create/update request from the requisition panel.</summary>
+    public class RequisitionAttributeSaveRequest
     {
         public int M_Product_ID { get; set; }
         public int M_AttributeSetInstance_ID { get; set; }
         public string Lot { get; set; }
         public string SerNo { get; set; }
         public string GuaranteeDate { get; set; }
-        public List<OrderAttributeValueSelection> Values { get; set; }
+        public List<RequisitionAttributeValueSelection> Values { get; set; }
     }
 
-    /// <summary>One entered attribute value in an order-panel attribute save request.</summary>
-    public class OrderAttributeValueSelection
+    /// <summary>One entered attribute value in an requisition-panel attribute save request.</summary>
+    public class RequisitionAttributeValueSelection
     {
         public int M_Attribute_ID { get; set; }
         public string ValueType { get; set; }
@@ -2511,71 +2369,68 @@ namespace VASLogic.Models
         public string DisplayValue { get; set; }
     }
 
-    /// <summary>One inbound order line to insert / update.</summary>
-    public class OrderLineInput
+    /// <summary>One inbound requisition line to insert / update.</summary>
+    public class RequisitionLineInput
     {
-        public int C_OrderLine_ID { get; set; }
+        public int M_RequisitionLine_ID { get; set; }
         public string RowKey { get; set; }
         public int Line { get; set; }
         public int M_Product_ID { get; set; }
         public int C_Charge_ID { get; set; }
         public int M_AttributeSetInstance_ID { get; set; }
         public decimal QtyEntered { get; set; }
-        public decimal QtyOrdered { get; set; }
+        public decimal Qty { get; set; }
         public int C_UOM_ID { get; set; }
-        public decimal PriceEntered { get; set; }
-        public int C_Tax_ID { get; set; }
+        public decimal PriceActual { get; set; }
         public decimal Discount { get; set; }
         public string Description { get; set; }
         public Dictionary<string, object> Values { get; set; }
         public List<string> TouchedCols { get; set; }
-        public OrderLineInput() { Values = new Dictionary<string, object>(); TouchedCols = new List<string>(); }
+        public RequisitionLineInput() { Values = new Dictionary<string, object>(); TouchedCols = new List<string>(); }
     }
 
-    /// <summary>POST body for the batch order-line save.</summary>
-    public class OrderSaveLinesRequest
+    /// <summary>POST body for the batch requisition-line save.</summary>
+    public class RequisitionSaveLinesRequest
     {
-        public int C_Order_ID { get; set; }
+        public int M_Requisition_ID { get; set; }
         public int AD_Window_ID { get; set; }
         public int Page { get; set; }
-        public List<OrderLineInput> Lines { get; set; }
-        public OrderSaveLinesRequest() { Lines = new List<OrderLineInput>(); }
+        public List<RequisitionLineInput> Lines { get; set; }
+        public RequisitionSaveLinesRequest() { Lines = new List<RequisitionLineInput>(); }
     }
 
-    /// <summary>POST body for the batch order-line delete.</summary>
-    public class OrderDeleteLinesRequest
+    /// <summary>POST body for the batch requisition-line delete.</summary>
+    public class RequisitionDeleteLinesRequest
     {
-        public int C_Order_ID { get; set; }
+        public int M_Requisition_ID { get; set; }
         public int AD_Window_ID { get; set; }
         public int Page { get; set; }
         public List<int> LineIds { get; set; }
-        public OrderDeleteLinesRequest() { LineIds = new List<int>(); }
+        public RequisitionDeleteLinesRequest() { LineIds = new List<int>(); }
     }
 
-    /// <summary>A save failure for one specific order line.</summary>
-    public class OrderLineSaveError
+    /// <summary>A save failure for one specific requisition line.</summary>
+    public class RequisitionLineSaveError
     {
         public string RowKey { get; set; }
-        public int C_OrderLine_ID { get; set; }
+        public int M_RequisitionLine_ID { get; set; }
         public int Line { get; set; }
         public string Message { get; set; }
     }
 
-    /// <summary>Result of a save / delete batch for order lines.</summary>
-    public class OrderSaveResult
+    /// <summary>Result of a save / delete batch for requisition lines.</summary>
+    public class RequisitionSaveResult
     {
         public bool Success { get; set; }
         public string ErrorKey { get; set; }
         public string ErrorDetail { get; set; }
-        public List<OrderLineSaveError> LineErrors { get; set; }
-        public List<OrderLineRow> Lines { get; set; }
+        public List<RequisitionLineSaveError> LineErrors { get; set; }
+        public List<RequisitionLineRow> Lines { get; set; }
         public int LinesTotal { get; set; }
         public int LinePage { get; set; }
         public int LinePageSize { get; set; }
         public decimal OtherPagesSubtotal { get; set; }
-        public decimal OtherPagesTax { get; set; }
-        public decimal OtherPagesTcs { get; set; }
-        public OrderSaveResult() { Lines = new List<OrderLineRow>(); LineErrors = new List<OrderLineSaveError>(); }
+        public RequisitionSaveResult() { Lines = new List<RequisitionLineRow>(); LineErrors = new List<RequisitionLineSaveError>(); }
     }
 
     /// <summary>
@@ -2583,7 +2438,7 @@ namespace VASLogic.Models
     /// Carries the set-level flags (Lot / SerNo / GuaranteeDate / Mandatory)
     /// plus the ordered list of attributes and their selectable values.
     /// </summary>
-    public class OrderAttributeSetInfo
+    public class RequisitionAttributeSetInfo
     {
         public int M_AttributeSet_ID { get; set; }
         public int M_Product_ID { get; set; }
@@ -2596,12 +2451,12 @@ namespace VASLogic.Models
         public bool IsMandatory { get; set; }
         public bool IsCanCreate { get; set; }
         public bool IsCanEdit { get; set; }
-        public List<OrderAttributeDef> Attributes { get; set; }
-        public OrderAttributeSetInfo() { Attributes = new List<OrderAttributeDef>(); }
+        public List<RequisitionAttributeDef> Attributes { get; set; }
+        public RequisitionAttributeSetInfo() { Attributes = new List<RequisitionAttributeDef>(); }
     }
 
-    /// <summary>One attribute within an order-panel attribute set (with its list values).</summary>
-    public class OrderAttributeDef
+    /// <summary>One attribute within an requisition-panel attribute set (with its list values).</summary>
+    public class RequisitionAttributeDef
     {
         public int M_Attribute_ID { get; set; }
         public string Name { get; set; }
@@ -2609,11 +2464,11 @@ namespace VASLogic.Models
         public string ValueType { get; set; }
         public bool IsInstanceAttribute { get; set; }
         public bool IsMandatory { get; set; }
-        public List<OrderAttributeValueDef> Values { get; set; }
+        public List<RequisitionAttributeValueDef> Values { get; set; }
     }
 
-    /// <summary>A selectable list value for an order-panel attribute.</summary>
-    public class OrderAttributeValueDef
+    /// <summary>A selectable list value for an requisition-panel attribute.</summary>
+    public class RequisitionAttributeValueDef
     {
         public int M_AttributeValue_ID { get; set; }
         public string Code { get; set; }
@@ -2624,7 +2479,7 @@ namespace VASLogic.Models
     /// One stored attribute value on an existing instance, returned by GetInstanceValues
     /// to pre-populate the edit form when the user opens an already-assigned ASI.
     /// </summary>
-    public class OrderAttributeInstanceValue
+    public class RequisitionAttributeInstanceValue
     {
         public int M_Attribute_ID { get; set; }
         /// <summary>'L' list, 'N' number, 'S' string.</summary>
@@ -2635,7 +2490,7 @@ namespace VASLogic.Models
     }
 
     /// <summary>Result of creating or updating an attribute-set instance via SaveAttribute.</summary>
-    public class OrderAttributeSaveResult
+    public class RequisitionAttributeSaveResult
     {
         public int M_AttributeSetInstance_ID { get; set; }
         public string Description { get; set; }
@@ -2644,11 +2499,11 @@ namespace VASLogic.Models
     }
 
     /// <summary>
-    /// Metadata for one C_OrderLine column: reference type, callout, val-rule, display/
+    /// Metadata for one M_RequisitionLine column: reference type, callout, val-rule, display/
     /// read-only logic and optional inline list values. Used by the panel to drive
     /// FK lookups, callout chains and field visibility without extra round-trips.
     /// </summary>
-    public class OrderColumnMeta
+    public class RequisitionColumnMeta
     {
         public string ColumnName { get; set; }
         public int AD_Column_ID { get; set; }
@@ -2673,41 +2528,33 @@ namespace VASLogic.Models
         /// <summary>Icon-font class name (takes priority over ImageUrl when non-empty).</summary>
         public string IconFont { get; set; }
         public string ImageUrl { get; set; }
-        public List<OrderRefListItem> RefListValues { get; set; }
-        public OrderColumnMeta() { RefListValues = new List<OrderRefListItem>(); }
+        public List<RequisitionRefListItem> RefListValues { get; set; }
+        public RequisitionColumnMeta() { RefListValues = new List<RequisitionRefListItem>(); }
     }
 
     /// <summary>One value of a List (AD_Reference 17) field, sourced from AD_Ref_List.</summary>
-    public class OrderRefListItem
+    public class RequisitionRefListItem
     {
         public string Value { get; set; }
         public string Name { get; set; }
     }
 
     /// <summary>One row of a generic FK lookup (id + display label), returned by GetRefLookup.</summary>
-    public class OrderRefItem
+    public class RequisitionRefItem
     {
         public int Id { get; set; }
         public string Name { get; set; }
     }
 
-    /// <summary>A unit of measure for the UOM dropdown in the order panel grid.</summary>
-    public class OrderUomItem
+    /// <summary>A unit of measure for the UOM dropdown in the panel grid.</summary>
+    public class RequisitionUomItem
     {
         public int C_UOM_ID { get; set; }
         public string Name { get; set; }
     }
 
-    /// <summary>A tax entry (with rate) for the tax dropdown in the order panel grid.</summary>
-    public class OrderTaxItem
-    {
-        public int C_Tax_ID { get; set; }
-        public string Name { get; set; }
-        public decimal Rate { get; set; }
-    }
-
-    /// <summary>One Product or Charge row in the catalog autocomplete for the order panel.</summary>
-    public class OrderCatalogItem
+    /// <summary>One Product or Charge row in the catalog autocomplete for the panel.</summary>
+    public class RequisitionCatalogItem
     {
         public int RecordId { get; set; }
         /// <summary>"P" = product, "C" = charge.</summary>
@@ -2721,17 +2568,17 @@ namespace VASLogic.Models
     }
 
     /// <summary>
-    /// Result of running a C_OrderLine column's AD_Column.Callout server-side:
+    /// Result of running a M_RequisitionLine column's AD_Column.Callout server-side:
     /// the changed column values the client patches back into the line, the display
     /// labels and the callout reference that was read (for traceability).
     /// </summary>
-    public class OrderCalloutResult
+    public class RequisitionCalloutResult
     {
         public string Column { get; set; }
         public string Callout { get; set; }
         public Dictionary<string, object> Values { get; set; }
         public Dictionary<string, string> Display { get; set; }
-        public OrderCalloutResult()
+        public RequisitionCalloutResult()
         {
             Values = new Dictionary<string, object>();
             Display = new Dictionary<string, string>();
@@ -2739,26 +2586,4 @@ namespace VASLogic.Models
     }
 
     #endregion
-
-    /// <summary>
-    /// One row returned by LoadOrderTaxBreakdown — a per-tax summary from C_OrderTax
-    /// covering ALL order lines (not just the current page). Used by the JS totals footer.
-    /// </summary>
-    public class OrderTaxBreakdownItem
-    {
-        public string TaxName { get; set; }
-        public decimal TaxAmt { get; set; }
-        public decimal TaxBaseAmt { get; set; }
-        public decimal TotalLines { get; set; }
-        public decimal GrandTotal { get; set; }
-        public string CurSymbol { get; set; }
-        public int StdPrecision { get; set; }
-        public decimal TCSAmount { get; set; }
-        /// <summary>
-        /// Total surcharge across all order lines (SUM of C_OrderLine.SurchargeAmt).
-        /// Only populated on the first item (index 0). The client renders it as a
-        /// separate "Surcharge" row so it is not bundled with the base tax amounts.
-        /// </summary>
-        public decimal TotalSurcharge { get; set; }
-    }
 }

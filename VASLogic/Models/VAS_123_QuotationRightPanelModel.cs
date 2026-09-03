@@ -918,19 +918,19 @@ namespace VAS.Models
                 string promisedExpr  = ColumnExists("C_OrderLineHistory", "DatePromised")
                     ? "TO_CHAR(olh.DatePromised, 'YYYY-MM-DD')" : "NULL";
                 string deliveredExpr = ColumnExists("C_OrderLineHistory", "QtyDelivered")
-                    ? "NVL(olh.QtyDelivered, 0)" : "0";
+                    ? "COALESCE(olh.QtyDelivered, 0)" : "0";
 
                 var sb = new StringBuilder();
                 sb.Append("SELECT olh.C_OrderLine_ID AS C_OrderLine_ID,");
                 sb.Append("       TO_CHAR(olh.Updated, 'YYYY-MM-DD HH24:MI') AS ChangedOn,");
                 sb.Append("       olh.PriceActual AS PriceActual,");
-                sb.Append("       NVL(olh.QtyEntered, olh.QtyOrdered) AS QtyEntered,");
+                sb.Append("       COALESCE(olh.QtyEntered, olh.QtyOrdered) AS QtyEntered,");
                 sb.Append("       olh.QtyOrdered AS QtyOrdered,");
                 sb.Append("       olh.LineNetAmt AS LineNetAmt,");
                 sb.Append("       " + deliveredExpr + " AS QtyDelivered,");
                 sb.Append("       " + promisedExpr + " AS DatePromised,");
                 sb.Append("       u.UOMSymbol AS UOMSymbol,");
-                sb.Append("       NVL(u.StdPrecision, 0) AS UOMPrecision,");
+                sb.Append("       COALESCE(u.StdPrecision, 0) AS UOMPrecision,");
                 sb.Append("       cur.StdPrecision AS CurrencyPrecision");
                 sb.Append("  FROM C_OrderLineHistory olh");
                 sb.Append("  INNER JOIN C_Order o ON (o.C_Order_ID = olh.C_Order_ID)");

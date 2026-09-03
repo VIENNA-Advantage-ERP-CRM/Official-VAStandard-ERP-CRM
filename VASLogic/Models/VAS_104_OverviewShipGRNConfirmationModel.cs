@@ -68,6 +68,17 @@
 ///                        The body (TextMsg, flattened) travels with the row so
 ///                        the panel reveals it on click. Read in one query for
 ///                        the whole feed through VAS_ActivitySourcesModel.
+///   VAI163   2026-09-02  Activity timestamps render in the VIEWER's zone on
+///                        PostgreSQL too. Every date and timestamp handed to
+///                        the client now goes through Stamp(), which drops the
+///                        DateTimeKind the provider tagged the value with -
+///                        Oracle says Unspecified, Npgsql says Utc or Local,
+///                        and Newtonsoft writes a zone designator for the
+///                        latter two but not the first. The panel parses the
+///                        bare Oracle form, so the designator made it read the
+///                        value as already-zoned and skip its own conversion,
+///                        printing the stored clock. Same JSON on either engine
+///                        now. No-op on Oracle.
 /// </summary>
 
 using System;
@@ -113,7 +124,7 @@ namespace VASLogic.Models
                 ? "CASE WHEN il.VA010_QualityPlan_ID IS NOT NULL THEN 'Y' ELSE 'N' END"
                 : "'N'";
             string qualCountExpr = hasQualPlan
-                ? "NVL(SUM(CASE WHEN il.VA010_QualityPlan_ID IS NOT NULL THEN 1 ELSE 0 END), 0)"
+                ? "COALESCE(SUM(CASE WHEN il.VA010_QualityPlan_ID IS NOT NULL THEN 1 ELSE 0 END), 0)"
                 : "0";
 
             string sql = @"SELECT
@@ -134,23 +145,23 @@ namespace VASLogic.Models
                                  FROM M_InOutLineConfirm lc
                                 WHERE lc.M_InOutConfirm_ID = c.M_InOutConfirm_ID
                                   AND lc.IsActive          = 'Y')              AS LineCount,
-                              (SELECT NVL(SUM(NVL(lc.TargetQty, 0)), 0)
+                              (SELECT COALESCE(SUM(COALESCE(lc.TargetQty, 0)), 0)
                                  FROM M_InOutLineConfirm lc
                                 WHERE lc.M_InOutConfirm_ID = c.M_InOutConfirm_ID
                                   AND lc.IsActive          = 'Y')              AS TargetQty,
-                              (SELECT NVL(SUM(NVL(lc.ConfirmedQty, 0)), 0)
+                              (SELECT COALESCE(SUM(COALESCE(lc.ConfirmedQty, 0)), 0)
                                  FROM M_InOutLineConfirm lc
                                 WHERE lc.M_InOutConfirm_ID = c.M_InOutConfirm_ID
                                   AND lc.IsActive          = 'Y')              AS ConfirmedQty,
-                              (SELECT NVL(SUM(NVL(lc.DifferenceQty, 0)), 0)
+                              (SELECT COALESCE(SUM(COALESCE(lc.DifferenceQty, 0)), 0)
                                  FROM M_InOutLineConfirm lc
                                 WHERE lc.M_InOutConfirm_ID = c.M_InOutConfirm_ID
                                   AND lc.IsActive          = 'Y')              AS DifferenceQty,
-                              (SELECT NVL(SUM(NVL(lc.ScrappedQty, 0)), 0)
+                              (SELECT COALESCE(SUM(COALESCE(lc.ScrappedQty, 0)), 0)
                                  FROM M_InOutLineConfirm lc
                                 WHERE lc.M_InOutConfirm_ID = c.M_InOutConfirm_ID
                                   AND lc.IsActive          = 'Y')              AS ScrappedQty,
-                              (SELECT NVL(SUM(CASE WHEN " + qcMarkExpr + @" = 'Y' THEN 1 ELSE 0 END), 0)
+                              (SELECT COALESCE(SUM(CASE WHEN " + qcMarkExpr + @" = 'Y' THEN 1 ELSE 0 END), 0)
                                  FROM M_InOutLineConfirm lc
                                 WHERE lc.M_InOutConfirm_ID = c.M_InOutConfirm_ID
                                   AND lc.IsActive          = 'Y')              AS QcPassCount,
@@ -198,7 +209,7 @@ namespace VASLogic.Models
             result.SourceDocumentNo  = Util.GetValueOfString(r["SourceDocumentNo"]);
             // Sales trx => outbound Shipment; else inbound Goods Receipt.
             result.SourceTypeCode    = Util.GetValueOfString(r["SourceIsSales"]) == "Y" ? "SHP" : "GRN";
-            result.MovementDate      = Util.GetValueOfDateTime(r["MovementDate"]);
+            result.MovementDate      = Stamp(r["MovementDate"]);
             result.PartyName         = Util.GetValueOfString(r["PartyName"]);
             result.WarehouseName     = Util.GetValueOfString(r["WarehouseName"]);
 
@@ -362,11 +373,11 @@ namespace VASLogic.Models
                               loc.Value         AS LocatorCode,
                               COALESCE(loc.LocatorCombination, loc.Bin, loc.Value) AS LocatorName,
                               u.Name            AS UOMName,
-                              NVL(u.StdPrecision, 0) AS UOMPrecision,
-                              NVL(lc.TargetQty, 0)     AS TargetQty,
-                              NVL(lc.ConfirmedQty, 0)  AS ConfirmedQty,
-                              NVL(lc.DifferenceQty, 0) AS DifferenceQty,
-                              NVL(lc.ScrappedQty, 0)   AS ScrappedQty,
+                              COALESCE(u.StdPrecision, 0) AS UOMPrecision,
+                              COALESCE(lc.TargetQty, 0)     AS TargetQty,
+                              COALESCE(lc.ConfirmedQty, 0)  AS ConfirmedQty,
+                              COALESCE(lc.DifferenceQty, 0) AS DifferenceQty,
+                              COALESCE(lc.ScrappedQty, 0)   AS ScrappedQty,
                               " + qcMarkExpr + @"      AS QcMark,
                               " + qualFlagExpr + @"    AS QualityApplicable
                            FROM M_InOutLineConfirm lc
@@ -549,7 +560,7 @@ namespace VASLogic.Models
                 string sql = @"SELECT
                                   qp.M_InOutLineConfirm_ID,
                                   " + paramNameExpr + @"  AS ParameterName,
-                                  NVL(qp.VA010_QuantityToVerify, 0) AS QuantityToVerify,
+                                  COALESCE(qp.VA010_QuantityToVerify, 0) AS QuantityToVerify,
                                   qp.VA010_TestPrmtrList_ID AS AcceptableValueId,
                                   " + acceptExpr + @"     AS AcceptableValue,
                                   qp.VA010_ActualValue  AS ActualValueRaw,
@@ -581,7 +592,7 @@ namespace VASLogic.Models
                     q.QuantityToVerify  = Util.GetValueOfDecimal(r["QuantityToVerify"]);
                     q.AcceptableValueId = Util.GetValueOfInt(r["AcceptableValueId"]);
                     q.AcceptableValue   = Util.GetValueOfString(r["AcceptableValue"]);
-                    q.QAQCDate          = Util.GetValueOfDateTime(r["QAQCDate"]);
+                    q.QAQCDate          = Stamp(r["QAQCDate"]);
                     q.Remark            = Util.GetValueOfString(r["Remark"]);
 
                     // Reference into VA010_TestPrmtrList; anything unparseable is
@@ -809,9 +820,15 @@ namespace VASLogic.Models
                                 INNER JOIN CM_Chat ch ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
                                  LEFT OUTER JOIN AD_User u
                                         ON (u.AD_User_ID = COALESCE(ce.AD_User_ID, ce.CreatedBy))
-                                WHERE ch.AD_Table_ID =
+                                -- IN + UPPER: a scalar sub-select RAISES on Oracle
+                                -- where AD_Table holds more than one row named
+                                -- M_InOutConfirm, and the case-sensitive name
+                                -- matched nothing at all in a dictionary that
+                                -- spells it any other way. Either way every note
+                                -- vanished from the feed.
+                                WHERE ch.AD_Table_ID IN
                                       (SELECT t.AD_Table_ID FROM AD_Table t
-                                        WHERE t.TableName = 'M_InOutConfirm')
+                                        WHERE UPPER(t.TableName) = 'M_INOUTCONFIRM')
                                   AND ch.Record_ID = @M_InOutConfirm_ID
                                   AND ce.IsActive  = 'Y'";
                 DataSet ds = DB.ExecuteDataset(sql, ConfirmParam(M_InOutConfirm_ID), null);
@@ -823,7 +840,7 @@ namespace VASLogic.Models
                         EventType = "Note",
                         Title     = Util.GetValueOfString(r["CharacterData"]),
                         ActorName = Util.GetValueOfString(r["UserName"]),
-                        EventTime = Util.GetValueOfDateTime(r["Created"])
+                        EventTime = Stamp(r["Created"])
                     });
                 }
             }
@@ -852,7 +869,7 @@ namespace VASLogic.Models
                     EventType = "Created",
                     Title     = Util.GetValueOfString(r["DocumentNo"]),
                     ActorName = Util.GetValueOfString(r["CreatedByName"]),
-                    EventTime = Util.GetValueOfDateTime(r["Created"])
+                    EventTime = Stamp(r["Created"])
                 });
 
                 string docStatus = Util.GetValueOfString(r["DocStatus"]);
@@ -863,7 +880,7 @@ namespace VASLogic.Models
                         EventType = "Completed",
                         Title     = Util.GetValueOfString(r["DocumentNo"]),
                         ActorName = Util.GetValueOfString(r["UpdatedByName"]),
-                        EventTime = Util.GetValueOfDateTime(r["Updated"])
+                        EventTime = Stamp(r["Updated"])
                     });
                 }
             }
@@ -991,6 +1008,21 @@ namespace VASLogic.Models
         /// <summary>Reads the appointment / task / call / letter / mail sources
         /// every overview panel shares (VAS_ActivitySourcesModel).</summary>
         private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
+        /// <summary>
+        /// Every date and timestamp this panel hands the client is read through
+        /// here rather than through Util.GetValueOfDateTime directly, so the
+        /// DateTimeKind the PROVIDER tagged the value with cannot reach the JSON.
+        /// Oracle tags Unspecified and Npgsql tags Utc or Local; Newtonsoft writes
+        /// a zone designator for the latter two and none for the first, and the
+        /// panel's parseDbDate reads the two shapes differently - which is why the
+        /// Activity feed's times were hours out on PostgreSQL. A no-op for a value
+        /// that is already Unspecified, so the Oracle path is untouched. See
+        /// VAS_ActivitySourcesModel.Stamp for the full account.
+        /// </summary>
+        private static DateTime? Stamp(object value)
+        {
+            return VAS_ActivitySourcesModel.Stamp(value);
+        }
 
         /// <summary>
         /// The correspondence and engagement sources shared with every other
@@ -1060,7 +1092,7 @@ namespace VASLogic.Models
                                   column, refType, refValueId),
                 ChangeScope = scope,
                 ActorName   = Util.GetValueOfString(r["UserName"]),
-                EventTime   = Util.GetValueOfDateTime(r["Created"])
+                EventTime   = Stamp(r["Created"])
             });
         }
 
