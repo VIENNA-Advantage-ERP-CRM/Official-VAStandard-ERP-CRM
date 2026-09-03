@@ -96,6 +96,7 @@
         var lines  = [];        // array of line objects for the current page
         var adWindowId = 0;
         var adTabId    = 0;
+        var curTab     = null;  // hosting GridTab — used by tabHasUnsavedChanges()
 
         var linePage        = 1;
         var totalLineCount  = 0;
@@ -104,12 +105,18 @@
         var columnMeta      = null; // AD_Column metadata array
         var colMetaByName   = {};   // column metadata indexed by ColumnName
 
+        // Maximum numeric value the server-side Int32/Decimal columns can hold (mirrors VAS_107)
+        var AMOUNT_MAX_VALUE = 2147483647;
+
         // Lookup caches
         var uomCache        = {};   // C_UOM_ID → name
 
         // Edit state
         var activeCell      = null; // { lineIdx, role }
         var editing         = null; // { rowId: string, field: string } — which cell is in edit mode
+        // Set true by refreshPanelData when header is in edit mode (selectedRow == null,
+        // recordID > 0). Used as a fallback when curTab is unavailable.
+        var _headerEditMode = false;
         // Catalog search state — matches VAS_107 shape for paged scroll-loading
         var catalog         = { results: [], highlight: 0, seq: 0, offset: 0, hasMore: true, loading: false, term: "", debounce: null, $pop: null, $inp: null };
         var attrState       = null; // attribute dialog state
@@ -216,7 +223,9 @@
          */
         function fmtMoney(n) {
             if (n == null || isNaN(n)) return "0.00";
-            return parseFloat(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            var v = parseFloat(n);
+            if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
+            return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
         }
 
         /**
@@ -228,10 +237,23 @@
          */
         function fmtQty(n) {
             if (n == null || isNaN(n)) return "0.00";
-            var s = parseFloat(n).toFixed(6);
+            var v = parseFloat(n);
+            if (Math.abs(v) > AMOUNT_MAX_VALUE) v = AMOUNT_MAX_VALUE;
+            var s = v.toFixed(6);
             // Strip trailing zeros but always keep at least 2 decimal places
             s = s.replace(/(\.\d{2})(\d*?)0+$/, "$1$2").replace(/(\.\d{2,}?)0+$/, "$1");
             return s;
+        }
+
+        /**
+         * Returns AD_Column.FieldLength for the named column, or 0 if not found.
+         * Used to set maxlength on numeric/text inputs (mirrors VAS_107's colFieldLength).
+         * @param {string} col - ColumnName (Pascal case).
+         * @returns {number}
+         */
+        function colFieldLength(col) {
+            var m = colMetaByName[col];
+            return (m && +m.FieldLength) || 0;
         }
 
         /**
@@ -566,6 +588,8 @@
             var vals = patch.Values || {};
             for (var k in vals) {
                 if (vals.hasOwnProperty(k)) {
+                    // Don't let the server callout overwrite a price the user manually typed.
+                    if (k === "PlannedPrice" && line._priceOverride) continue;
                     fieldSet(line, k, vals[k]);
                 }
             }
@@ -872,12 +896,22 @@
 
             $pager.find("[data-act='lp-prev']").on("click", function () {
                 if (linePage <= 1) return;
-                if (hasDirtyLines() && !confirm(msg("VAS_218_UnsavedChanges"))) return;
+                if (hasDirtyLines()) {
+                    showConfirmDialog(msg("VAS_218_UnsavedChanges"), function () {
+                        fetchData(parent && parent.VAS_Opportunity_ID, linePage - 1);
+                    });
+                    return;
+                }
                 fetchData(parent && parent.VAS_Opportunity_ID, linePage - 1);
             });
             $pager.find("[data-act='lp-next']").on("click", function () {
                 if (linePage >= totalPages) return;
-                if (hasDirtyLines() && !confirm(msg("VAS_218_UnsavedChanges"))) return;
+                if (hasDirtyLines()) {
+                    showConfirmDialog(msg("VAS_218_UnsavedChanges"), function () {
+                        fetchData(parent && parent.VAS_Opportunity_ID, linePage + 1);
+                    });
+                    return;
+                }
                 fetchData(parent && parent.VAS_Opportunity_ID, linePage + 1);
             });
         }
@@ -890,11 +924,72 @@
          * @param {boolean} isError - Renders in error styling when true.
          */
         function showToast(message, isError) {
-            if (!$self || !$self.length) return;
-            var $t = $('<div class="vas-ol-toast' + (isError ? ' vas-ol-toast-error' : '') + '">' +
-                       esc(message) + '</div>');
-            $self.append($t);
-            setTimeout(function () { $t.fadeOut(300, function () { $t.remove(); }); }, 3000);
+            // Prefer the shared VIS.ADD.Notification path used by VAS_107 / VAS_PanelUtil
+            if (VAS.PanelUtil && typeof VAS.PanelUtil.showToast === "function") {
+                VAS.PanelUtil.showToast(message);
+                return;
+            }
+            // Fallback: CSS-transition toast on body (correct show/hide sequence)
+            var cls = "vas-ol-toast" + (isError ? " vas-ol-toast-error" : "");
+            var $t = $('<div class="' + cls + '"></div>').text(message);
+            $("body").append($t);
+            setTimeout(function () { $t.addClass("vas-ol-toast--show"); }, 10);
+            setTimeout(function () {
+                $t.removeClass("vas-ol-toast--show");
+                setTimeout(function () { $t.remove(); }, 300);
+            }, 2600);
+        }
+
+        // ── Confirm dialog ───────────────────────────────────────────────────
+
+        /**
+         * Shows a centered custom confirm dialog instead of the browser's native confirm().
+         * The dialog is appended to <body> and uses the panel's existing .vas-ol-dialog-backdrop
+         * and .vas-ol-dialog CSS so it appears centered on screen without any browser chrome link.
+         * @param {string}   message    - Message text to display.
+         * @param {Function} onConfirm  - Callback executed when the user clicks the OK button.
+         * @param {string}   [okLabel]  - Label for the OK button (defaults to "OK").
+         * @param {boolean}  [isDanger] - When true the OK button uses danger (red) styling.
+         */
+        function showConfirmDialog(message, onConfirm, okLabel, isDanger) {
+            // Dismiss any previous confirm dialog
+            $("#vasOlConfirm").remove();
+            $(document).off("keydown.vasol-confirm");
+
+            var btnClass = isDanger ? "vas-ol-btn vas-ol-btn--danger" : "vas-ol-btn vas-ol-btn--primary";
+            var okText   = okLabel || msg("VAS_218_Ok", "OK");
+
+            var $dlg = $(
+                '<div class="vas-ol-dialog-backdrop" id="vasOlConfirm">' +
+                    '<div class="vas-ol-dialog vas-ol-confirm-dialog">' +
+                        '<div class="vas-ol-confirm-body">' +
+                            '<p class="vas-ol-confirm-msg">' + esc(message) + '</p>' +
+                        '</div>' +
+                        '<div class="vas-ol-dialog__footer vas-ol-dialog__footer--end">' +
+                            '<button type="button" class="vas-ol-btn vas-ol-btn--outline" id="vasOlConfirmCancel">' + esc(msg("VAS_218_Cancel", "Cancel")) + '</button>' +
+                            '<button type="button" class="' + btnClass + '" id="vasOlConfirmOk">' + esc(okText) + '</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>'
+            );
+
+            $("body").append($dlg);
+
+            function close() {
+                $("#vasOlConfirm").remove();
+                $(document).off("keydown.vasol-confirm");
+            }
+
+            $dlg.find("#vasOlConfirmOk").on("click", function () {
+                close();
+                if (typeof onConfirm === "function") onConfirm();
+            });
+            $dlg.find("#vasOlConfirmCancel").on("click", close);
+
+            // Escape key cancels the dialog
+            $(document).on("keydown.vasol-confirm", function (e) {
+                if (e.keyCode === 27) close();
+            });
         }
 
         // ── Grid busy state ──────────────────────────────────────────────────
@@ -929,7 +1024,22 @@
          * @param {string} glyph - Optional fallback glyph character.
          * @returns {string} HTML string.
          */
+        // Lucide SVG paths for each toolbar icon.
+        // stroke="currentColor" means the icon inherits the button's CSS color (#fff on primary).
+        var ICON_SVG = {
+            "plus":       '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+            "trash":      '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+            "refresh-cw": '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>'
+        };
+
         function icon(name, glyph) {
+            var paths = ICON_SVG[name];
+            if (paths) {
+                return '<svg class="vas-ol-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"' +
+                       ' fill="none" stroke="currentColor" stroke-width="2"' +
+                       ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                       paths + '</svg>';
+            }
             return '<span class="vas-ol-icon" data-icon="' + esc(name) + '">' + (glyph || "") + "</span>";
         }
 
@@ -962,6 +1072,27 @@
             return false;
         }
 
+        // ── Tab visibility ───────────────────────────────────────────────────
+
+        /**
+         * Shows or hides the entire panel tab (root element + framework title bar).
+         * Uses a CSS class with !important so the framework's own .show()/.hide()
+         * cannot override it and flash an empty panel on new/unsaved records.
+         * @param {boolean} show
+         */
+        function applyTabVisibility(show) {
+            if (!$self || !$self.length) return;
+            $self.toggleClass("vas-ol-tab-hidden", !show);
+            // Hide the framework title bar (immediate previous sibling) permanently —
+            // the panel has its own "Opportunity Lines" header.
+            var $head = $self.prev(".vis-ad-w-p-ap-tp-body-head");
+            if (!$head.length) {
+                var $host = $self.closest(".vis-ad-w-p-ap-tp-outerwrap");
+                if ($host.length) $head = $host.find(".vis-ad-w-p-ap-tp-o-b-head");
+            }
+            $head.addClass("vas-ol-tab-hidden");
+        }
+
         // ── Full render ──────────────────────────────────────────────────────
 
         /**
@@ -969,6 +1100,7 @@
          */
         function renderAll() {
             if (!$grid) return;
+            applyTabVisibility(true);   // reveal panel once a real record is loaded
             $grid.empty();
             $grid.append(buildHeadRow());
             $linesBody = $('<div class="vas-ol-tbody"></div>');
@@ -1038,6 +1170,7 @@
          * @param {string} field - Field being edited.
          */
         function startEdit(line, field) {
+            if (blockedByTabChanges()) return;        // unsaved header edit — save the tab first
             // Row is locked during an in-flight save or delete — reject the edit attempt.
             if (line._saving || line._busy) return;
             editing = { rowId: line.rowId, field: field };
@@ -1155,8 +1288,10 @@
             catalog.term = term || ""; catalog.offset = 0; catalog.hasMore = true;
             catalog.results = []; catalog.seq++; catalog.highlight = 0;
             catalog.$inp = $inp;
-            inner.find(".vas-ol-catalog-popover").remove();
-            catalog.$pop = $('<div class="vas-ol-catalog-popover"></div>');
+            // Remove any previously opened popup from the body (fixed-position, appended to body
+            // so it escapes the panel's overflow:auto clip boundary).
+            $("body").find(".vas-ol-catalog-popover[data-vasol]").remove();
+            catalog.$pop = $('<div class="vas-ol-catalog-popover" data-vasol="218"></div>');
             // Scroll-paging: load next page when the user scrolls near the bottom
             catalog.$pop.on("scroll", function () {
                 var el = this;
@@ -1173,8 +1308,14 @@
             catalog.$pop.on("mouseenter", ".vas-ol-catalog-popover__item", function () {
                 setHighlight(+$(this).attr("data-idx"));
             });
-            inner.append(catalog.$pop);
-            positionCatalog();
+            // Append to body so the popup is never clipped by the panel's overflow:auto.
+            // position:fixed (CSS) lets positionCatalog() place it relative to the viewport.
+            $("body").append(catalog.$pop);
+            // Defer positioning: the row may not be in the DOM yet (buildRow is called as
+            // part of renderAll before $linesBody.append). setTimeout(0) fires after the
+            // synchronous DOM operations complete so getBoundingClientRect() returns real
+            // viewport coordinates. The guard in positionCatalog() handles early close.
+            setTimeout(positionCatalog, 0);
             catalog.$pop.html('<div class="vas-ol-catalog__hint">' + esc(msg("VAS_218_Loading")) + "</div>");
             loadCatalogPage(inner, line, $inp, true);
         }
@@ -1188,15 +1329,13 @@
             var $inp = catalog.$inp;
             if (!$inp || !$inp.length || !$inp[0].getBoundingClientRect) return;
             var r = $inp[0].getBoundingClientRect();
-            var clipTop = 0, clipBottom = window.innerHeight;
-            if ($self && $self.length && $self[0].getBoundingClientRect) {
-                var rr = $self[0].getBoundingClientRect();
-                clipTop    = Math.max(clipTop,    rr.top);
-                clipBottom = Math.min(clipBottom, rr.bottom);
-            }
-            var GAP        = 4;
-            var spaceBelow = clipBottom - r.bottom - GAP;
-            var spaceAbove = r.top - clipTop - GAP;
+            // Guard: element not rendered (still detached from the DOM).
+            if (r.width === 0 && r.height === 0) return;
+            // The popup is fixed-position on <body>, so clip boundaries are the full viewport.
+            var vh  = window.innerHeight;
+            var GAP = 4;
+            var spaceBelow = vh - r.bottom - GAP;
+            var spaceAbove = r.top - GAP;
             var natural    = (catalog.$pop[0].scrollHeight || CATALOG_MAX_PX) + 2;
             var above;
             if      (natural <= spaceBelow) above = false;
@@ -1204,7 +1343,12 @@
             else                            above = spaceAbove > spaceBelow;
             var avail = above ? spaceAbove : spaceBelow;
             var maxH  = Math.min(CATALOG_MAX_PX, Math.max(avail, 0));
-            catalog.$pop.css("max-height", maxH > 0 ? (maxH + "px") : "");
+            catalog.$pop.css({
+                "max-height": maxH > 0 ? (maxH + "px") : "",
+                "left":       Math.round(r.left) + "px",
+                "top":        above ? "auto" : (Math.round(r.bottom) + "px"),
+                "bottom":     above ? (Math.round(vh - r.top) + "px") : "auto"
+            });
             catalog.$pop.toggleClass("vas-ol-catalog-popover--above", above);
         }
 
@@ -1420,7 +1564,7 @@
                     var attrTxt = disp.attrName || msg("VAS_218_SetAttribute");
                     var $attr   = $('<span class="vas-ol-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
                     if (!disp.attrName) $attr.addClass("vas-ol-attr-link--empty");
-                    $attr.on("click", (function (ln) { return function (e) { e.stopPropagation(); openAttrDialog(ln); }; })(line));
+                    $attr.on("click", (function (ln) { return function (e) { e.stopPropagation(); if (blockedByTabChanges()) return; openAttrDialog(ln); }; })(line));
                     wrap.append($attr);
                 }
             }
@@ -1442,6 +1586,8 @@
 
             if (isEditingThis) {
                 var $inp = $('<input type="text" class="vas-ol-cell-edit__input" />').val(line.values.Description || "");
+                var dLen = colFieldLength("Description");
+                if (dLen > 0) $inp.attr("maxlength", dLen);
                 $inp.on("blur", function () {
                     fieldSet(line, "Description", $inp.val());
                     // Guard: Tab navigation already moved editing forward — don't reset it
@@ -1479,7 +1625,7 @@
         function renderQtyUomCell(line, idx) {
             var v         = line.values;
             var isEditQty = editing && editing.rowId === line.rowId && editing.field === "quantity";
-            var uomRO     = !line._isNew;   // UOM is read-only on saved lines
+            var uomRO     = !line._isNew || (parseInt(v.C_Charge_ID, 10) > 0);   // UOM is read-only on saved lines and charge lines
             var isEditUom = editing && editing.rowId === line.rowId && editing.field === "uom" && !uomRO;
             var cell = $('<div class="vas-ol-cell vas-ol-cell--right" role="cell"></div>');
             var wrap = $('<div class="vas-ol-cell-edit"></div>');
@@ -1490,6 +1636,8 @@
             if (isEditQty) {
                 var $q = $('<input type="text" class="vas-ol-cell-edit__input vas-ol-qtyval" inputmode="decimal" />');
                 $q.val(v.PlannedQty ? fmtQty(v.PlannedQty) : "").css("text-align", "right");
+                var qLen = colFieldLength("PlannedQty");
+                if (qLen > 0) $q.attr("maxlength", qLen);
                 $q.on("blur", function () {
                     var n = parseNum($q.val());
                     fieldSet(line, "PlannedQty", n);
@@ -1542,6 +1690,10 @@
                     if (!line.display) line.display = {};
                     line.display.uomName = selName;
                     if (selId) uomCache[selId] = selName;
+                    // Keep PlannedAmt in sync when UOM changes (qty and price stay the same).
+                    var qty   = parseNum(line.values.PlannedQty);
+                    var price = parseNum(line.values.PlannedPrice);
+                    fieldSet(line, "PlannedAmt", parseFloat((qty * price).toFixed(10)));
                 });
                 $sel.on("blur", function () {
                     // Guard: Tab navigation already moved editing forward — don't reset it
@@ -1586,8 +1738,12 @@
             if (isEditingThis) {
                 var $inp = $('<input type="text" class="vas-ol-cell-edit__input" inputmode="decimal" />');
                 $inp.val(fmtMoney(line.values.PlannedPrice || 0)).css("text-align", "right");
+                var pLen = colFieldLength("PlannedPrice");
+                if (pLen > 0) $inp.attr("maxlength", pLen);
                 $inp.on("blur", function () {
                     var n = parseNum($inp.val());
+                    // Mark price as manually set so server callouts don't overwrite it.
+                    line._priceOverride = true;
                     fieldSet(line, "PlannedPrice", n);
                     fieldSet(line, "PlannedAmt", parseFloat((parseNum(line.values.PlannedQty) * n).toFixed(10)));
                     // Guard: Tab navigation already moved editing forward — don't reset it
@@ -1644,6 +1800,23 @@
             $row.append($('<div class="vas-ol-cell vas-ol-cell--check" role="cell"></div>').append($cb));
             $cb.on("change", function () {
                 $row.toggleClass("is-selected", this.checked);
+                if ($selectAll && $linesBody) {
+                    var total   = $linesBody.find('.vas-ol-row--line input[type="checkbox"]').length;
+                    var checked = $linesBody.find('.vas-ol-row--line input[type="checkbox"]:checked').length;
+                    $selectAll.prop("indeterminate", checked > 0 && checked < total);
+                    $selectAll.prop("checked", total > 0 && checked === total);
+                }
+                updateToolbarState();
+            });
+
+            // Clicking anywhere on the row toggles selection — mirrors VAS_107 pattern.
+            // Clicks on interactive controls (inputs, selects, buttons, links, attr-link)
+            // keep their own behaviour and must NOT also toggle selection.
+            $row.on("click", function (e) {
+                if ($(e.target).closest("input, select, textarea, button, a, [role=button], .vas-ol-attr-link").length) return;
+                var nowChecked = !$cb.prop("checked");
+                $cb.prop("checked", nowChecked);
+                $row.toggleClass("is-selected", nowChecked);
                 if ($selectAll && $linesBody) {
                     var total   = $linesBody.find('.vas-ol-row--line input[type="checkbox"]').length;
                     var checked = $linesBody.find('.vas-ol-row--line input[type="checkbox"]:checked').length;
@@ -1888,6 +2061,7 @@
          */
         function openAttrDialog(line) {
             if (!line) return;
+            if (blockedByTabChanges()) return;        // unsaved header edit — save the tab first
             var idx   = lines.indexOf(line);
             var v     = line.values;
             var d     = line.display || (line.display = {});
@@ -1913,7 +2087,15 @@
                     IsSOTrx:                   true,
                     newAttribute:              false,
                     showAll:                   false,
-                    lbl:       msg,
+                    lbl: function (key, def) {
+                        // VAS_218 msg() ignores the second argument; use this wrapper so that
+                        // AttributeControl's built-in column keys (GuaranteeDate, QtyOnHand …)
+                        // fall back to the caller-supplied default when the AD_Message row is
+                        // missing — otherwise VIS.Msg.getMsg returns "[key]" with brackets.
+                        var m = VIS.Msg.getMsg ? VIS.Msg.getMsg(key) : null;
+                        if (m && m.charAt(0) !== "[") return m;
+                        return def != null ? def : key;
+                    },
                     esc:       esc,
                     icon:      icon,
                     showBusy:  showBusy,
@@ -1929,8 +2111,23 @@
                         markDirty(line);
                         attrState = null;
                         editing = { rowId: line.rowId, field: "description" };
-                        if (asi > 0) runCallout(line, "M_AttributeSetInstance_ID", function () { renderAll(); });
-                        else renderAll();
+                        if (asi > 0) {
+                            // Run callout first so UOM is updated, then force price/amount
+                            // to 0 AFTER applyPatch runs so the server's recalculated values
+                            // do not overwrite the reset. _priceOverride is cleared so the
+                            // user can enter a fresh price after attribute selection.
+                            runCallout(line, "M_AttributeSetInstance_ID", function () {
+                                line._priceOverride = false;
+                                fieldSet(line, "PlannedPrice", 0);
+                                fieldSet(line, "PlannedAmt", 0);
+                                renderAll();
+                            });
+                        } else {
+                            line._priceOverride = false;
+                            fieldSet(line, "PlannedPrice", 0);
+                            fieldSet(line, "PlannedAmt", 0);
+                            renderAll();
+                        }
                     },
                     onClose: function () {
                         attrState = null;
@@ -1953,8 +2150,19 @@
                         markDirty(line);
                         attrState = null;
                         editing = { rowId: line.rowId, field: "description" };
-                        if (asi > 0) runCallout(line, "M_AttributeSetInstance_ID", function () { renderAll(); });
-                        else renderAll();
+                        if (asi > 0) {
+                            runCallout(line, "M_AttributeSetInstance_ID", function () {
+                                line._priceOverride = false;
+                                fieldSet(line, "PlannedPrice", 0);
+                                fieldSet(line, "PlannedAmt", 0);
+                                renderAll();
+                            });
+                        } else {
+                            line._priceOverride = false;
+                            fieldSet(line, "PlannedPrice", 0);
+                            fieldSet(line, "PlannedAmt", 0);
+                            renderAll();
+                        }
                     },
                     onCancel: function () {
                         attrState = null;
@@ -2048,8 +2256,8 @@
          * Closes all open dialogs and popovers.
          */
         function closeDialogs() {
-            $("#vasOlAttr, #vasOlScan, #vasOlMore").remove();
-            $(document).off("mousedown.vasol-more");
+            $("#vasOlAttr, #vasOlScan, #vasOlMore, #vasOlConfirm").remove();
+            $(document).off("mousedown.vasol-more").off("keydown.vasol-confirm");
             if (morePopoverFor !== null) {
                 commitMorePopover();
                 morePopoverFor = null;
@@ -2175,6 +2383,7 @@
          * Appends a new blank line to the grid.
          */
         function addLine() {
+            if (blockedByTabChanges()) return;        // unsaved header edit — save the tab first
             var maxLine = 0;
             for (var i = 0; i < lines.length; i++) {
                 var ln = lineVal(lines[i], "Line") || 0;
@@ -2208,12 +2417,10 @@
                 _lk:     {}
             };
 
-            lines.push(newLine);
+            lines.unshift(newLine);   // prepend so the new row appears at the top (mirrors VAS_107)
             totalLineCount++;
-            renderAll();
-
-            // Set editing state to auto-open product editor on the new row, then re-render
-            var newLine  = lines[lines.length - 1];
+            // Set editing before the single render so the product cell opens immediately,
+            // matching VAS_107's single-render pattern (no double-rebuild overhead).
             editing = { rowId: newLine.rowId, field: "product" };
             renderAll();
         }
@@ -2225,6 +2432,7 @@
          * saved lines are deleted via a server call.
          */
         function deleteSelected() {
+            if (blockedByTabChanges()) return;        // unsaved header edit — save the tab first
             var toDelete    = [];   // line objects with a saved DB ID
             var toDeleteNew = [];   // indexes of new (never-saved) lines to remove immediately
 
@@ -2305,6 +2513,39 @@
         // ── Toolbar state ────────────────────────────────────────────────────
 
         /**
+         * Returns true when the hosting GridTab has a pending header edit that has not been saved.
+         * Mirrors VAS_107's isHeaderDirty() pattern: checks gridTable.rowChanged >= 0.
+         * NOTE: rowChanged is -1 when nothing is changed, and -1 is truthy in JS, so a plain
+         * !!rowChanged check gives false positives — the >= 0 comparison is required.
+         * getIsInserting() covers the new-record case where no row index is assigned yet.
+         */
+        function tabHasUnsavedChanges() {
+            try {
+                // Try curTab from closure first, then from instance (mirrors VAS_107 $self.curTab pattern)
+                var tab = curTab || (self && self.curTab);
+                var gt = tab && tab.gridTable;
+                if (gt) {
+                    return (gt.rowChanged >= 0) || (typeof gt.getIsInserting === "function" && !!gt.getIsInserting());
+                }
+            } catch (e) { if (window.console) console.log(e); }
+            // Fallback: framework sets _headerEditMode=true via refreshPanelData when selectedRow is null
+            return _headerEditMode;
+        }
+
+        /**
+         * Gate called before every panel mutation (edit, add, save, delete).
+         * When the hosting tab has unsaved changes the user must save or discard the
+         * header edit first — otherwise line saves would be computed against a stale header.
+         * Returns true when the action must be blocked (toast already shown).
+         * Mirrors VAS_074's blockedByTabChanges().
+         */
+        function blockedByTabChanges() {
+            if (!tabHasUnsavedChanges()) return false;
+            showToast(msg("VAS_218_SaveTabChangesFirst"));
+            return true;
+        }
+
+        /**
          * Updates toolbar button states and labels after any data or selection change.
          * Mirrors VAS_107's renderHeaderButtons pattern:
          *  - Save uses a CSS disabled class (not HTML disabled) so mousedown still fires
@@ -2323,12 +2564,13 @@
             }
             var selCount = $grid ? $grid.find(".vas-ol-row--line.is-selected").length : 0;
 
-            // Save button: visual-disabled via CSS class only so mousedown still fires
-            // while a cell editor is active (HTML disabled swallows the event).
-            var savePlural  = dirtyCount > 1 ? lbl("VAS_218_PluralS", "s") : "";
-            var saveCount   = dirtyCount > 0 ? " (" + dirtyCount + ")" : "";
-            $saveBtn.html(icon("hard-drive", "💾") + "<span>" +
-                esc(lbl("VAS_218_Save", "Save")) + savePlural + saveCount + "</span>");
+            // Save button: update only the label text — icon was built once at creation.
+            // Visual-disabled via CSS class only so mousedown still fires while a cell
+            // editor is active (HTML disabled swallows the event). Mirrors VAS_074 pattern.
+            var saveLbl = lbl("VAS_218_Save", "Save row");
+            if (dirtyCount > 1) saveLbl += lbl("VAS_218_PluralS", "s");
+            if (dirtyCount > 0) saveLbl += " (" + dirtyCount + ")";
+            $saveBtn.find(".vas-ol-save-lbl").text(saveLbl);
             $saveBtn.prop("disabled", locked)
                     .toggleClass("vas-ol-is-disabled", locked || dirtyCount === 0);
 
@@ -2355,9 +2597,23 @@
         // ── Save rows ────────────────────────────────────────────────────────
 
         /**
+         * Triggers blur on the currently focused cell editor (input/textarea/select) inside
+         * the panel so its value is committed to line.values before the save runs.
+         * Without this, e.preventDefault() on the Save mousedown keeps focus on the input
+         * and blur never fires, leaving line._dirty = false and the value uncommitted.
+         */
+        function commitActiveEditor() {
+            var $a = $(document.activeElement);
+            if ($a.is("input, textarea, select") && $a.closest($self).length) {
+                $a.trigger("blur");
+            }
+        }
+
+        /**
          * Saves all dirty lines to the server.
          */
         function saveRows() {
+            if (blockedByTabChanges()) return;        // unsaved header edit — save the tab first
             if (!parent || !parent.VAS_Opportunity_ID) {
                 showToast(msg("VAS_218_NoOpportunity"), true);
                 return;
@@ -2716,8 +2972,7 @@
                         showToast(msg("VAS_218_SelectRowToDelete"));
                         return;
                     }
-                    if (!confirm(msg("VAS_218_ConfirmDelete"))) return;
-                    deleteSelected();
+                    showConfirmDialog(msg("VAS_218_ConfirmDelete"), deleteSelected, msg("VAS_218_Delete", "Delete"), true);
                 },
                 /**
                  * Alt+Ctrl+Z — discard the focused or first new/dirty line.
@@ -2793,9 +3048,9 @@
             var $header  = $('<header class="vas-ol-panel__header"></header>');
             var $title   = $('<div><h2 class="vas-ol-panel__title">' + esc(lbl("VAS_218_OppLinesSummary", "Opportunity Lines")) + '</h2></div>');
             var $actions = $('<div class="vas-ol-panel__actions"></div>');
-            $addBtn    = $('<button type="button" class="vas-ol-btn vas-ol-btn--outline" title="' + esc(lbl("VAS_218_Add", "Add")) + ' (Ctrl+Alt+N)">' + icon("plus", "+") + '<span>' + esc(lbl("VAS_218_Add", "Add")) + '</span></button>');
-            $saveBtn   = $('<button type="button" class="vas-ol-btn vas-ol-btn--save vas-ol-is-disabled" title="' + esc(lbl("VAS_218_Save", "Save")) + ' (Ctrl+Alt+S)"></button>');
-            $deleteBtn = $('<button type="button" class="vas-ol-btn vas-ol-btn--danger vas-ol-is-disabled" title="' + esc(lbl("VAS_218_Delete", "Delete")) + ' (Ctrl+Alt+D)" disabled>' + icon("trash", "🗑") + '<span>' + esc(lbl("VAS_218_Delete", "Delete")) + ' <span class="vas-ol-sel-count"></span></span></button>');
+            $addBtn    = $('<button type="button" class="vas-ol-btn vas-ol-btn--outline" title="' + esc(lbl("VAS_218_Add", "Add line")) + ' (Ctrl+Alt+N)">' + icon("plus", "+") + '<span>' + esc(lbl("VAS_218_Add", "Add line")) + '</span></button>');
+            $saveBtn   = $('<button type="button" class="vas-ol-btn vas-ol-btn--primary vas-ol-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_218_Save", "Save row")) + ' (Ctrl+Alt+S)">' + icon("hard-drive", "💾") + '<span class="vas-ol-save-lbl"></span></button>');
+            $deleteBtn = $('<button type="button" class="vas-ol-btn vas-ol-btn--danger vas-ol-is-disabled" title="' + esc(lbl("VAS_218_Delete", "Delete record")) + ' (Ctrl+Alt+D)" disabled>' + icon("trash", "🗑") + '<span>' + esc(lbl("VAS_218_Delete", "Delete record")) + ' <span class="vas-ol-sel-count"></span></span></button>');
             $refreshBtn = $('<button type="button" class="vas-ol-btn vas-ol-btn--outline" title="' + esc(lbl("VAS_218_Refresh", "Refresh")) + ' (Ctrl+Alt+Q)">' + icon("refresh-cw", "↺") + '<span>' + esc(lbl("VAS_218_Refresh", "Refresh")) + '</span></button>');
             $actions.append($addBtn, $saveBtn, $deleteBtn, $refreshBtn);
             $header.append($title, $actions);
@@ -2814,15 +3069,19 @@
             // Toolbar events
             $addBtn.on("click", function () { addLine(); });
 
-            // mousedown fires before blur so the active editor commits its value first
+            // e.preventDefault() keeps focus on the active cell editor so blur does NOT fire
+            // automatically. commitActiveEditor() triggers blur explicitly so the value is
+            // written to line.values and _dirty is set BEFORE the disabled-state check below.
             $saveBtn.on("mousedown", function (e) {
                 e.preventDefault();
+                commitActiveEditor();
                 if ($saveBtn.hasClass("vas-ol-is-disabled")) return;
                 saveRows();
             });
             // Keyboard activation (Enter / Space) — detail 0 means keyboard, not mouse
             $saveBtn.on("click", function (e) {
                 if (e.detail === 0) {
+                    commitActiveEditor();
                     if ($saveBtn.hasClass("vas-ol-is-disabled")) return;
                     saveRows();
                 }
@@ -2830,8 +3089,7 @@
 
             $deleteBtn.on("click", function () {
                 if (!$grid.find(".is-selected").length) return;
-                if (!confirm(msg("VAS_218_ConfirmDelete"))) return;
-                deleteSelected();
+                showConfirmDialog(msg("VAS_218_ConfirmDelete"), deleteSelected, msg("VAS_218_Delete", "Delete"), true);
             });
 
             $refreshBtn.on("click", function () {
@@ -2867,6 +3125,7 @@
             if (parent && parent.VAS_Opportunity_ID) {
                 self.fetchData(parent.VAS_Opportunity_ID, linePage);
             } else {
+                applyTabVisibility(false);
                 if ($grid)      $grid.empty();
                 if ($totalsRow) $totalsRow.empty();
                 if ($pager)     $pager.empty();
@@ -2957,8 +3216,8 @@
                 // Remove capture-phase shortcut listener registered during init
                 if (self._shortcuts) { self._shortcuts.dispose(); self._shortcuts = null; }
 
-                // Remove keyboard and outside-click handlers
-                $(document).off("mousedown.vasol").off("keydown.vasol");
+                // Remove keyboard and outside-click handlers (including confirm dialog ESC binding)
+                $(document).off("mousedown.vasol").off("keydown.vasol").off("keydown.vasol-confirm");
 
                 // Remove any open dialogs and the busy overlay
                 if ($busy) { $busy.remove(); $busy = null; }
@@ -3006,9 +3265,9 @@
                 var $header  = $('<header class="vas-ol-panel__header"></header>');
                 var $title   = $('<div><h2 class="vas-ol-panel__title">' + esc(lbl("VAS_218_OppLinesSummary", "Opportunity Lines")) + '</h2></div>');
                 var $actions = $('<div class="vas-ol-panel__actions"></div>');
-                $addBtn    = $('<button type="button" class="vas-ol-btn vas-ol-btn--outline" title="' + esc(lbl("VAS_218_Add", "Add")) + ' (Ctrl+Alt+N)">' + icon("plus", "+") + '<span>' + esc(lbl("VAS_218_Add", "Add")) + '</span></button>');
-                $saveBtn   = $('<button type="button" class="vas-ol-btn vas-ol-btn--save vas-ol-is-disabled" title="' + esc(lbl("VAS_218_Save", "Save")) + ' (Ctrl+Alt+S)"></button>');
-                $deleteBtn = $('<button type="button" class="vas-ol-btn vas-ol-btn--danger vas-ol-is-disabled" title="' + esc(lbl("VAS_218_Delete", "Delete")) + ' (Ctrl+Alt+D)" disabled>' + icon("trash", "🗑") + '<span>' + esc(lbl("VAS_218_Delete", "Delete")) + ' <span class="vas-ol-sel-count"></span></span></button>');
+                $addBtn    = $('<button type="button" class="vas-ol-btn vas-ol-btn--outline" title="' + esc(lbl("VAS_218_Add", "Add line")) + ' (Ctrl+Alt+N)">' + icon("plus", "+") + '<span>' + esc(lbl("VAS_218_Add", "Add line")) + '</span></button>');
+                $saveBtn   = $('<button type="button" class="vas-ol-btn vas-ol-btn--primary vas-ol-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_218_Save", "Save row")) + ' (Ctrl+Alt+S)">' + icon("hard-drive", "💾") + '<span class="vas-ol-save-lbl"></span></button>');
+                $deleteBtn = $('<button type="button" class="vas-ol-btn vas-ol-btn--danger vas-ol-is-disabled" title="' + esc(lbl("VAS_218_Delete", "Delete record")) + ' (Ctrl+Alt+D)" disabled>' + icon("trash", "🗑") + '<span>' + esc(lbl("VAS_218_Delete", "Delete record")) + ' <span class="vas-ol-sel-count"></span></span></button>');
                 $refreshBtn = $('<button type="button" class="vas-ol-btn vas-ol-btn--outline" title="' + esc(lbl("VAS_218_Refresh", "Refresh")) + ' (Ctrl+Alt+Q)">' + icon("refresh-cw", "↺") + '<span>' + esc(lbl("VAS_218_Refresh", "Refresh")) + '</span></button>');
                 $actions.append($addBtn, $saveBtn, $deleteBtn, $refreshBtn);
                 $header.append($title, $actions);
@@ -3028,25 +3287,29 @@
                 $addBtn.on("click", function () { addLine(); });
                 $saveBtn.on("mousedown", function (e) {
                     e.preventDefault();
+                    commitActiveEditor();
                     if ($saveBtn.hasClass("vas-ol-is-disabled")) return;
                     saveRows();
                 });
                 $saveBtn.on("click", function (e) {
                     if (e.detail === 0) {
+                        commitActiveEditor();
                         if ($saveBtn.hasClass("vas-ol-is-disabled")) return;
                         saveRows();
                     }
                 });
                 $deleteBtn.on("click", function () {
                     if (!$grid.find(".is-selected").length) return;
-                    if (!confirm(msg("VAS_218_ConfirmDelete"))) return;
-                    deleteSelected();
+                    showConfirmDialog(msg("VAS_218_ConfirmDelete"), deleteSelected, msg("VAS_218_Delete", "Delete"), true);
                 });
                 $refreshBtn.on("click", function () {
                     if (parent && parent.VAS_Opportunity_ID) fetchData(parent.VAS_Opportunity_ID, linePage);
                 });
                 bindKeyboard();
                 bindOutsideClick();
+                // Start hidden: panel only appears once refreshPanelData loads a saved opportunity.
+                // A new/unsaved parent never flashes the empty grid.
+                applyTabVisibility(false);
             },
 
             /** Returns the root jQuery element; the framework appends it to the tab container. */
@@ -3056,10 +3319,12 @@
              * Called by the VIS framework when the tab panel is first attached to a window.
              * Stores the window context then builds the panel DOM shell.
              */
-            startPanel: function (windowNo, curTab) {
+            startPanel: function (windowNo, tab) {
                 self = this;
-                if (curTab && typeof curTab.getAD_Window_ID === "function")
-                    adWindowId = curTab.getAD_Window_ID();
+                curTab = tab || null;
+                this.curTab = curTab;   // also on the instance — mirrors VAS_107 / VAS_074 pattern
+                if (tab && typeof tab.getAD_Window_ID === "function")
+                    adWindowId = tab.getAD_Window_ID();
                 this.init();
             },
 
@@ -3068,7 +3333,22 @@
              * Triggers a server round-trip to load lines for the new record.
              */
             refreshPanelData: function (recordID, selectedRow) {
-                if (selectedRow === undefined || recordID <= 0) { this.clear(selectedRow !== undefined && recordID <= 0); return; }
+                // When selectedRow is null/undefined the framework signals either header edit
+                // mode or no record selected.  Use loose equality to handle both null and
+                // undefined (VAS_074 / VAS_107 pattern).
+                if (selectedRow == undefined || recordID <= 0) {
+                    // Keep panel visible when an existing record is already loaded and
+                    // show the warning toast immediately so the user knows why editing is blocked.
+                    if (recordID > 0 && parent) {
+                        _headerEditMode = true;
+                        showToast(msg("VAS_218_SaveTabChangesFirst"));
+                        return;
+                    }
+                    this.clear();
+                    return;
+                }
+                // Normal record navigation — clear the edit-mode flag before loading fresh data
+                _headerEditMode = false;
                 self = this;
                 fetchData(recordID, 1);
             },
@@ -3076,9 +3356,14 @@
             /** Called by the framework when the panel container is resized. */
             sizeChanged: function () { /* panel uses CSS fluid width */ },
 
-            /** Clears all state and empties the grid without destroying the DOM shell. */
-            clear: function (isNewRecord) {
+            /**
+             * Clears all line state and hides the panel.  Mirrors VAS_074's clear() —
+             * always hides; the early return in refreshPanelData handles the case where
+             * an existing record's header is in edit mode (panel stays visible).
+             */
+            clear: function () {
                 lines = []; parent = null; activeCell = null; editing = null;
+                _headerEditMode = false;
                 closeCatalog();
                 attrState = null; scanState = null; morePopoverFor = null;
                 columnMeta = []; colMetaByName = {};
@@ -3087,6 +3372,7 @@
                 if ($pager)     $pager.empty().hide();
                 $linesBody = null;
                 $selectAll = null;
+                applyTabVisibility(false);
             }
 
         }; // end return (prototype)

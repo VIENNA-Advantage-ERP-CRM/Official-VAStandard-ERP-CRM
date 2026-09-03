@@ -111,6 +111,11 @@
     color: #0C5D38;
 }
 
+.vas_105_acct-tag--vendor {
+    background: #FFF0D9;
+    color: #854D0E;
+}
+
 .vas_105_acct-tag--prospect {
     background: #D9ECFF;
     color: #0E5DA8;
@@ -242,6 +247,20 @@
 .vas_105_acct-seccount {
     font-size: 0.75em;
     color: var(--acct-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+}
+
+/* Countries badge shown in Locations header when sites span multiple countries */
+.vas_105_acct-ctrbadge {
+    display: inline-block;
+    font-size: 1em;
+    color: var(--acct-muted);
+    border: 1px solid currentColor;
+    border-radius: 0.875em;
+    padding: 0.1em 0.5625em;
+    line-height: 1.5;
 }
 
 /* ===== Company info grid ===== */
@@ -724,6 +743,39 @@
 .vas_105_acct-odstatus--cancelled {
     background: #E1E1E1;
     color: #505050;
+}
+
+/* ── Truncated-text hover tooltip (order/invoice description cells) ─── */
+.vas_105_acct-tip {
+    position: relative;
+    cursor: default;
+    min-width: 0;
+}
+
+.vas_105_acct-tip[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 0;
+    top: calc(100% + 0.3em);
+    z-index: 9999;
+    background: rgba(15, 44, 63, 0.94);
+    color: #FFFFFF;
+    font-size: 0.8125em;
+    font-weight: 400;
+    line-height: 1.5;
+    padding: 0.4em 0.7em;
+    border-radius: 0.375em;
+    white-space: normal;
+    word-break: break-word;
+    min-width: 10em;
+    max-width: 24em;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
+}
+
+html[dir="rtl"] .vas_105_acct-tip[data-tip]:hover::after {
+    left: auto;
+    right: 0;
 }
 
 .vas_105_acct-ivstatus {

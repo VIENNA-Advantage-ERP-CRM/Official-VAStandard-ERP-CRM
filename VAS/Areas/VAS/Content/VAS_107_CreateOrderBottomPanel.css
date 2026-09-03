@@ -111,8 +111,10 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 0.875em;
-    height: 0.875em;
+    width: 1.125em;
+    height: 1.125em;
+    flex-shrink: 0;
+    color: inherit;
 }
 
 .vas-obl-is-hidden {

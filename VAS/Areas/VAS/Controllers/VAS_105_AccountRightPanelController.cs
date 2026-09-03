@@ -252,6 +252,29 @@ namespace VAS.Controllers
         }
 
         // ─────────────────────────────────────────────────────────
+        // §9b  GetProjectPhases
+        // ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns the ordered phase list for a given project.
+        /// Called by the project detail view when ProjectLineLevel is not 'P'.
+        /// </summary>
+        /// <param name="projectId">C_Project_ID of the project.</param>
+        /// <returns>Double-serialized JSON with a phases list.</returns>
+        [HttpPost]
+        public ActionResult GetProjectPhases(int projectId)
+        {
+            int safeId = Util.GetValueOfInt(projectId);
+            if (safeId <= 0)
+                return Json(JsonConvert.SerializeObject(new { error = "Invalid project ID" }), JsonRequestBehavior.AllowGet);
+
+            Ctx ctx    = (Ctx)Session["ctx"];
+            var model  = new VAS_105_AccountRightPanelModel();
+            var result = model.GetProjectPhases(ctx, safeId);
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+        // ─────────────────────────────────────────────────────────
         // §10  Timeline  (paged, best-effort)
         // ─────────────────────────────────────────────────────────
 
