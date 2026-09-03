@@ -1110,6 +1110,9 @@
     <Compile Include="Areas\VAS\Controllers\VAS_233_BankChargesWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_233_BankChargesWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_233_BankChargesWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_234_AccountBalanceWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_234_AccountBalanceWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_234_AccountBalanceWidget.js" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>
