@@ -37,6 +37,15 @@
 ///                        anchored on AppointmentsInfo — the panel's own table
 ///                        holds the correspondence about the DOCUMENT, which is
 ///                        a different set of mails and already loaded.
+///   VAI163   2026-09-01  Appointments showed at the WRONG HOUR on PostgreSQL.
+///                        Every timestamp the loader emits now goes through
+///                        Stamp(), which drops the DateTimeKind the provider tagged
+///                        it with — Oracle says Unspecified, Npgsql says Utc or
+///                        Local, and Newtonsoft writes a zone designator for the
+///                        latter two but not the first. The panels parse the bare
+///                        Oracle form, so the designator made them read the value
+///                        as already-zoned and skip their own conversion. Same
+///                        JSON on either engine now.
 /// </summary>
 
 using System;
@@ -172,6 +181,40 @@ namespace VASLogic.Models
             return rows;
         }
 
+        /// <summary>
+        /// A timestamp read out of the database, stripped of the DateTimeKind the
+        /// PROVIDER tagged it with.
+        ///
+        /// This matters because the kind leaks all the way to the browser. The
+        /// panels serialize with Newtonsoft's default DateTimeZoneHandling
+        /// (RoundtripKind), which writes a zone designator for a value tagged Utc
+        /// ("...T10:00:00Z") or Local ("...T10:00:00+05:30") and NOTHING for one
+        /// tagged Unspecified. Oracle's provider returns Unspecified, so the feed
+        /// was built — and the panels' date parsing written — around the bare
+        /// form: no designator, tag it UTC in the browser, render it in the
+        /// viewer's zone. Npgsql tags the same column Utc or Local, so on
+        /// PostgreSQL the designator appeared, the browser took the string at face
+        /// value and every appointment showed at the wrong hour.
+        ///
+        /// A Local value is moved onto the UTC clock first (its wall-clock reading
+        /// is in the server's zone, and the stored moment is what the feed is
+        /// dated by); a Utc one already reads correctly and only loses its tag.
+        /// The result is the same JSON on either engine.
+        ///
+        /// Public because the leak is not this loader's alone: any panel reading
+        /// its own timestamps needs the same normalization, and one shared
+        /// implementation beats a copy per model. VAS_098 reads it for the whole
+        /// of its payload.
+        /// </summary>
+        public static DateTime? Stamp(object value)
+        {
+            DateTime? dt = Util.GetValueOfDateTime(value);
+            if (!dt.HasValue) return null;
+            DateTime v = dt.Value;
+            if (v.Kind == DateTimeKind.Local) v = v.ToUniversalTime();
+            return DateTime.SpecifyKind(v, DateTimeKind.Unspecified);
+        }
+
         /// <summary>AD_Table_ID for a table name, or 0. Cached for the app's life
         /// — the dictionary does not change under a running instance.</summary>
         private int TableId(string tableName)
@@ -257,7 +300,7 @@ namespace VASLogic.Models
 
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
-                    DateTime? start = Util.GetValueOfDateTime(r["StartDate"]);
+                    DateTime? start = Stamp(r["StartDate"]);
                     string subject  = Util.GetValueOfString(r["Subject"]);
                     int apptId      = Util.GetValueOfInt(r["AppointmentsInfo_ID"]);
                     string key = (start.HasValue ? start.Value.ToString("yyyyMMddHHmm") : "")
@@ -283,7 +326,7 @@ namespace VASLogic.Models
                         Body        = Util.GetValueOfString(r["Description"]),
                         Location    = Util.GetValueOfString(r["Location"]),
                         StartDate   = start,
-                        EndDate     = Util.GetValueOfDateTime(r["EndDate"]),
+                        EndDate     = Stamp(r["EndDate"]),
                         IsClosed    = Util.GetValueOfString(r["IsClosed"]) == "Y",
                         IsCancelled = Util.GetValueOfString(r["IsCancelled"]) == "Y",
                         ActorName   = Util.GetValueOfString(r["ActorName"]),
@@ -291,7 +334,7 @@ namespace VASLogic.Models
                         // Dated by when it is SCHEDULED, which is what a reader
                         // scanning a timeline for a meeting is looking for; the
                         // create stamp only stands in where there is no start.
-                        EventTime   = start ?? Util.GetValueOfDateTime(r["Created"])
+                        EventTime   = start ?? Stamp(r["Created"])
                     };
 
                     rows.Add(row);
@@ -421,7 +464,7 @@ namespace VASLogic.Models
                                     WHERE ma.AD_Table_ID = " + apptTableId + @"
                                       AND ma.Record_ID IN (" + idList + @")
                                       AND COALESCE(ma.IsActive, 'Y') = 'Y'
-                                      AND COALESCE(ma.AttachmentType, 'M') <> 'I'
+                                      AND COALESCE(TO_CHAR(ma.AttachmentType), 'M') <> 'I'
                                     ORDER BY ma.Created DESC,
                                              ma.MailAttachment1_ID DESC";
                     DataSet ds = DB.ExecuteDataset(sql, null, null);
@@ -445,7 +488,7 @@ namespace VASLogic.Models
                             Body    = MailBodyToText(Util.GetValueOfString(r["TextMsg"])),
                             MailTo  = Util.GetValueOfString(r["MailAddress"]),
                             SentBy  = Util.GetValueOfString(r["ActorName"]),
-                            SentOn  = Util.GetValueOfDateTime(r["Created"])
+                            SentOn  = Stamp(r["Created"])
                         });
                     }
                 }
@@ -518,7 +561,7 @@ namespace VASLogic.Models
                         Body      = note,
                         MailTo    = to,
                         ActorName = Util.GetValueOfString(r["ActorName"]),
-                        EventTime = Util.GetValueOfDateTime(r["Created"])
+                        EventTime = Stamp(r["Created"])
                     });
                 }
             }
@@ -555,7 +598,7 @@ namespace VASLogic.Models
             // of its own.
             string kindFilter = includeMail
                 ? ""
-                : " AND COALESCE(ma.AttachmentType, 'M') = 'I'";
+                : " AND COALESCE(TO_CHAR(ma.AttachmentType), 'M') = 'I'";
 
             try
             {
@@ -585,8 +628,8 @@ namespace VASLogic.Models
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
                     bool isLetter = Util.GetValueOfString(r["AttachmentType"]) == "I";
-                    DateTime? received = Util.GetValueOfDateTime(r["DateMailReceived"]);
-                    DateTime? created  = Util.GetValueOfDateTime(r["Created"]);
+                    DateTime? received = Stamp(r["DateMailReceived"]);
+                    DateTime? created  = Stamp(r["Created"]);
 
                     rows.Add(new VAS_ActivitySourceRow
                     {

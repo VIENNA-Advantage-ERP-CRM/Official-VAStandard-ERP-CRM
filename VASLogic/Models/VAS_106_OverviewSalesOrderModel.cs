@@ -1,4 +1,4 @@
-/// <summary>
+﻿/// <summary>
 /// Module Name : VASLogic
 /// Purpose     : Sales Order Overview tab panel data (read side) + two write
 ///               actions (Complete Sales Order, Create Contract from a line).
@@ -289,6 +289,30 @@
 ///                          document merely EXISTING before, so a drafted invoice
 ///                          reported an invoiced order. Read for each set in ONE
 ///                          statement (LoadCompletionStamps), not per document.
+///   VAI163   2026-09-01  CustomerEmail came back BLANK on PostgreSQL, so Send
+///                        Invoice fell through to the server recipient lookup,
+///                        which failed the same way and left the user on the
+///                        screen instead of the Preview and Share Document form.
+///                        Cause: "EMail IS NOT NULL" is an Oracle-only test for
+///                        "has an address" — on PostgreSQL an empty string is a
+///                        real value that passes it, and since '' sorts first the
+///                        MIN() picked the blank. Both the sub-select and the
+///                        chosen address are now length-tested after TRIM, which
+///                        reads the same on either engine. Same fix as VAS_092.
+///   VAI163   2026-09-01  Times were wrong on PostgreSQL — appointments first, but
+///                        every stamp the panel prints had the same defect. The
+///                        DateTimeKind the PROVIDER tags a value with reached the
+///                        JSON: Oracle says Unspecified and Npgsql says Utc or
+///                        Local, Newtonsoft writes a zone designator for the latter
+///                        two and none for the first, and the panel's parseDbDate
+///                        reads the two shapes differently. EVERY date and
+///                        timestamp this model emits now goes through Stamp() — the
+///                        header dates, the delivery / invoice / payment stamps,
+///                        the history and completion dates, the change log's
+///                        EventOn and every activity EventTime — as do the shared
+///                        appointment / task / call / letter sources in
+///                        VAS_ActivitySourcesModel, where the helper lives. A no-op
+///                        on Oracle.
 /// </summary>
 
 using System;
@@ -357,11 +381,22 @@ namespace VASLogic.Models
                               -- customer can carry several contacts and a scalar
                               -- sub-select that returns more than one row raises on
                               -- Oracle instead of answering.
+                              --   IS NOT NULL alone is an ORACLE-ONLY filter: there
+                              -- an empty string IS null, on PostgreSQL it is a real
+                              -- value that survives the test — and because '' sorts
+                              -- before every address, MIN then returns the BLANK for
+                              -- any customer carrying one contact with no e-mail.
+                              -- That is what left the Send Invoice recipient empty on
+                              -- PostgreSQL. LENGTH(TRIM(..)) > 0 drops blank and
+                              -- whitespace-only addresses on both engines (on Oracle
+                              -- TRIM of a blank is null, so the row fails the test
+                              -- there too).
                               (SELECT MIN(bpu.EMail)
                                  FROM AD_User bpu
                                 WHERE bpu.C_BPartner_ID = o.C_BPartner_ID
                                   AND bpu.IsActive      = 'Y'
-                                  AND bpu.EMail IS NOT NULL) AS CustomerEMail,
+                                  AND bpu.EMail IS NOT NULL
+                                  AND LENGTH(TRIM(bpu.EMail)) > 0) AS CustomerEMail,
                               sr.Name                    AS SalesRepName,
                               pt.Name                    AS PaymentTermName,
                               pl.Name                    AS PriceListName,
@@ -394,12 +429,12 @@ namespace VASLogic.Models
             result.C_Order_ID   = Util.GetValueOfInt(r["C_Order_ID"]);
             result.DocumentNo   = Util.GetValueOfString(r["DocumentNo"]);
             result.POReference  = Util.GetValueOfString(r["POReference"]);
-            result.DateOrdered  = Util.GetValueOfDateTime(r["DateOrdered"]);
-            result.DatePromised = Util.GetValueOfDateTime(r["DatePromised"]);
+            result.DateOrdered  = Stamp(r["DateOrdered"]);
+            result.DatePromised = Stamp(r["DatePromised"]);
             result.DocStatus    = Util.GetValueOfString(r["DocStatus"]);
             result.Posted       = Util.GetValueOfString(r["Posted"]);
             result.PriorityRule = Util.GetValueOfString(r["PriorityRule"]);
-            result.Created      = Util.GetValueOfDateTime(r["Created"]);
+            result.Created      = Stamp(r["Created"]);
 
             result.GrandTotal   = Util.GetValueOfDecimal(r["GrandTotal"]);
             result.TotalLines   = Util.GetValueOfDecimal(r["TotalLines"]);
@@ -420,9 +455,14 @@ namespace VASLogic.Models
             // own contact address is preferred — that is the person this sales order
             // was placed with — and any active contact of the customer stands in
             // when the order names none.
+            //   Both candidates are TRIMMED before they are weighed: on PostgreSQL a
+            // contact row can hold an empty (or whitespace-only) address where Oracle
+            // would hold a null, and an all-blank string is not a recipient. What
+            // survives is a real address or nothing at all, which is what the panel's
+            // Send Invoice button needs to decide whether to seed the share form.
             result.CustomerEmail  = result.ContactEmail.Trim().Length > 0
-                                    ? result.ContactEmail
-                                    : Util.GetValueOfString(r["CustomerEMail"]);
+                                    ? result.ContactEmail.Trim()
+                                    : Util.GetValueOfString(r["CustomerEMail"]).Trim();
             result.SalesRepName   = Util.GetValueOfString(r["SalesRepName"]);
             result.PaymentTermName = Util.GetValueOfString(r["PaymentTermName"]);
             result.PriceListName  = Util.GetValueOfString(r["PriceListName"]);
@@ -612,7 +652,7 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
-                    DateTime? d = Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["CompletedDate"]);
+                    DateTime? d = Stamp(ds.Tables[0].Rows[0]["CompletedDate"]);
                     if (d.HasValue) return d;
                 }
 
@@ -624,7 +664,7 @@ namespace VASLogic.Models
                                        AND o.DocStatus IN ('CO', 'CL')";
                 ds = DB.ExecuteDataset(fallback, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
-                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["Updated"]);
+                return Stamp(ds.Tables[0].Rows[0]["Updated"]);
             }
             catch (Exception ex)
             {
@@ -1257,7 +1297,7 @@ namespace VASLogic.Models
                     LineHistoryData h = new LineHistoryData();
                     h.C_OrderLine_ID = Util.GetValueOfInt(r["C_OrderLine_ID"]);
                     h.LineNo         = Util.GetValueOfInt(r["LineNo"]);
-                    h.ChangedOn      = Util.GetValueOfDateTime(r["ChangedOn"]);
+                    h.ChangedOn      = Stamp(r["ChangedOn"]);
                     h.UpdatedByName  = Util.GetValueOfString(r["UpdatedByName"]);
                     h.QtyEntered     = Util.GetValueOfDecimal(r["QtyEntered"]);
                     h.PriceEntered   = Util.GetValueOfDecimal(r["PriceEntered"]);
@@ -1608,7 +1648,7 @@ namespace VASLogic.Models
                     dv.M_InOut_ID    = Util.GetValueOfInt(r["M_InOut_ID"]);
                     dv.DocumentNo    = Util.GetValueOfString(r["DocumentNo"]);
                     dv.DocStatus     = Util.GetValueOfString(r["DocStatus"]);
-                    dv.MovementDate  = Util.GetValueOfDateTime(r["MovementDate"]);
+                    dv.MovementDate  = Stamp(r["MovementDate"]);
                     dv.TrackingNo    = Util.GetValueOfString(r["TrackingNo"]);
                     dv.WarehouseName = Util.GetValueOfString(r["WarehouseName"]);
                     dv.DeliveredQty  = Util.GetValueOfDecimal(r["DeliveredQty"]);
@@ -1617,12 +1657,12 @@ namespace VASLogic.Models
                     // and Delivered stages. MovementDate is a document field a user
                     // can back-date or set forward, so the stage could report a day
                     // on which nothing had yet been entered. Follows VAS_092.
-                    dv.Created       = Util.GetValueOfDateTime(r["Created"]);
+                    dv.Created       = Stamp(r["Created"]);
                     dv.DeliveredValue = Util.GetValueOfDecimal(r["DeliveredValue"]);
                     // Null until the shipment is completed — the Delivered stage
                     // dates itself with this, and an open shipment has no such date.
                     dv.CompletedDate = CompletedOn(stamps, dv.M_InOut_ID, dv.DocStatus,
-                                                   Util.GetValueOfDateTime(r["Updated"]));
+                                                   Stamp(r["Updated"]));
                     rows.Add(dv);
                 }
             }
@@ -1672,12 +1712,12 @@ namespace VASLogic.Models
                     iv.C_Invoice_ID = Util.GetValueOfInt(r["C_Invoice_ID"]);
                     iv.DocumentNo   = Util.GetValueOfString(r["DocumentNo"]);
                     iv.DocStatus    = Util.GetValueOfString(r["DocStatus"]);
-                    iv.DateInvoiced = Util.GetValueOfDateTime(r["DateInvoiced"]);
-                    iv.Created      = Util.GetValueOfDateTime(r["Created"]);
+                    iv.DateInvoiced = Stamp(r["DateInvoiced"]);
+                    iv.Created      = Stamp(r["Created"]);
                     iv.GrandTotal   = Util.GetValueOfDecimal(r["GrandTotal"]);
                     iv.IsPaid       = Util.GetValueOfString(r["IsPaid"]) == "Y";
                     iv.CompletedDate = CompletedOn(stamps, iv.C_Invoice_ID, iv.DocStatus,
-                                                   Util.GetValueOfDateTime(r["Updated"]));
+                                                   Stamp(r["Updated"]));
                     rows.Add(iv);
                 }
             }
@@ -1815,9 +1855,9 @@ namespace VASLogic.Models
                         RecordId    = paymentId,
                         DocumentNo  = Util.GetValueOfString(r["DocumentNo"]),
                         DocStatus   = status,
-                        DocDate     = Util.GetValueOfDateTime(r["DateTrx"]),
+                        DocDate     = Stamp(r["DateTrx"]),
                         CompletedDate = CompletedOn(stamps, paymentId, status,
-                                                    Util.GetValueOfDateTime(r["Updated"])),
+                                                    Stamp(r["Updated"])),
                         Amount      = Util.GetValueOfDecimal(r["PayAmt"]),
                         DiscountAmt = Util.GetValueOfDecimal(r["DiscountAmt"])
                     });
@@ -1878,13 +1918,24 @@ namespace VASLogic.Models
                 // CreatedBy: a note logged by the platform itself leaves AD_User_ID
                 // null, and those notes appeared in the feed with no name against
                 // them. Follows VAS_092.
+                //
+                // The table id is looked up with IN + UPPER, like the e-mail and
+                // partner-mail loaders below and like VAS_100's own note loader.
+                // It used to be a case-sensitive SCALAR sub-select, which failed two
+                // ways: AD_Table can carry more than one row named C_Order (a
+                // duplicated or differently-cased dictionary entry) and a scalar
+                // sub-select returning several rows RAISES on Oracle, taking every
+                // note into the catch below; and a dictionary that spells the name
+                // any other way matched nothing at all. Either way the notes simply
+                // vanished from the feed.
                 string sql = @"SELECT ce.CharacterData, ce.Created, u.Name AS UserName
                                  FROM CM_ChatEntry ce
                                  INNER JOIN CM_Chat ch     ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
                                  LEFT OUTER JOIN AD_User u
                                         ON (u.AD_User_ID = COALESCE(ce.AD_User_ID, ce.CreatedBy))
-                                WHERE ch.AD_Table_ID =
-                                      (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'C_Order')
+                                WHERE ch.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'C_ORDER')
                                   AND ch.Record_ID = @C_Order_ID
                                   AND ce.IsActive  = 'Y'";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
@@ -1896,7 +1947,7 @@ namespace VASLogic.Models
                         EventType   = "Note",
                         Title       = Util.GetValueOfString(r["CharacterData"]),
                         ActorName   = Util.GetValueOfString(r["UserName"]),
-                        EventTime   = Util.GetValueOfDateTime(r["Created"])
+                        EventTime   = Stamp(r["Created"])
                     });
                 }
             }
@@ -1958,7 +2009,7 @@ namespace VASLogic.Models
                                         WHERE UPPER(t.TableName) = 'C_ORDER')
                                   AND ma.Record_ID = @C_Order_ID
                                   AND COALESCE(ma.IsActive, 'Y')        = 'Y'
-                                  AND COALESCE(ma.AttachmentType, 'M') <> 'I'
+                                  AND COALESCE(to_char(ma.AttachmentType), 'M') <> 'I'
                                 ORDER BY ma.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
@@ -1980,7 +2031,7 @@ namespace VASLogic.Models
                         MailFrom   = Util.GetValueOfString(r["MailAddressFrom"]),
                         IsMailSent = Util.GetValueOfString(r["IsMailSent"]) == "Y",
                         ActorName  = Util.GetValueOfString(r["UserName"]),
-                        EventTime  = Util.GetValueOfDateTime(r["Created"])
+                        EventTime  = Stamp(r["Created"])
                     });
                 }
             }
@@ -2046,7 +2097,7 @@ namespace VASLogic.Models
                                         WHERE UPPER(t.TableName) = 'C_BPARTNER')
                                   AND ma.Record_ID = @C_BPartner_ID
                                   AND COALESCE(ma.IsActive, 'Y')        = 'Y'
-                                  AND COALESCE(ma.AttachmentType, 'M') <> 'I'
+                                  AND COALESCE(TO_CHAR(ma.AttachmentType), 'M') <> 'I'
                                 ORDER BY ma.Created DESC";
                 SqlParameter[] param = new SqlParameter[]
                 {
@@ -2075,7 +2126,7 @@ namespace VASLogic.Models
                         MailFrom      = Util.GetValueOfString(r["MailAddressFrom"]),
                         IsMailSent    = Util.GetValueOfString(r["IsMailSent"]) == "Y",
                         ActorName     = Util.GetValueOfString(r["UserName"]),
-                        EventTime     = Util.GetValueOfDateTime(r["Created"])
+                        EventTime     = Stamp(r["Created"])
                     });
                 }
             }
@@ -2176,7 +2227,7 @@ namespace VASLogic.Models
                         EventType  = "Delivery",
                         Title      = Util.GetValueOfString(r["DocumentNo"]),
                         ActorName  = Util.GetValueOfString(r["UserName"]),
-                        EventTime  = Util.GetValueOfDateTime(r["Updated"])
+                        EventTime  = Stamp(r["Updated"])
                     });
                 }
             }
@@ -2208,7 +2259,7 @@ namespace VASLogic.Models
                         Title      = Util.GetValueOfString(r["DocumentNo"]),
                         Amount     = Util.GetValueOfDecimal(r["GrandTotal"]),
                         ActorName  = Util.GetValueOfString(r["UserName"]),
-                        EventTime  = Util.GetValueOfDateTime(r["Updated"])
+                        EventTime  = Stamp(r["Updated"])
                     });
                 }
             }
@@ -2237,7 +2288,7 @@ namespace VASLogic.Models
                     EventType = "Created",
                     Title     = Util.GetValueOfString(r["DocumentNo"]),
                     ActorName = Util.GetValueOfString(r["CreatedByName"]),
-                    EventTime = Util.GetValueOfDateTime(r["Created"])
+                    EventTime = Stamp(r["Created"])
                 });
 
                 string docStatus = Util.GetValueOfString(r["DocStatus"]);
@@ -2254,7 +2305,7 @@ namespace VASLogic.Models
                         Title     = Util.GetValueOfString(r["DocumentNo"]),
                         ActorName = Util.GetValueOfString(r["UpdatedByName"]),
                         EventTime = GetOrderCompletedDate(C_Order_ID)
-                                    ?? Util.GetValueOfDateTime(r["Updated"])
+                                    ?? Stamp(r["Updated"])
                     });
                 }
             }
@@ -2380,7 +2431,7 @@ namespace VASLogic.Models
                         NewValue    = _changeValues.Display(newValue, column, refType, refValueId),
                         ChangeScope = scope,
                         ActorName   = Util.GetValueOfString(r["UserName"]),
-                        EventTime   = Util.GetValueOfDateTime(r["EventOn"])
+                        EventTime   = Stamp(r["EventOn"])
                     });
                 }
             }
@@ -2792,6 +2843,22 @@ namespace VASLogic.Models
         private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
 
         /// <summary>
+        /// Every date and timestamp this panel hands the client is read through
+        /// here rather than through Util.GetValueOfDateTime directly, so the
+        /// DateTimeKind the PROVIDER tagged the value with cannot reach the JSON.
+        /// Oracle tags Unspecified and Npgsql tags Utc or Local; Newtonsoft writes
+        /// a zone designator for the latter two and none for the first, and the
+        /// panel's parseDbDate reads the two shapes differently — which is why
+        /// times were hours out on PostgreSQL. A no-op for a value that is already
+        /// Unspecified, so the Oracle path is untouched. See
+        /// VAS_ActivitySourcesModel.Stamp for the full account.
+        /// </summary>
+        private static DateTime? Stamp(object value)
+        {
+            return VAS_ActivitySourcesModel.Stamp(value);
+        }
+
+        /// <summary>
         /// The correspondence and engagement sources shared with every other
         /// overview panel: appointments and tasks (AppointmentsInfo, split on
         /// IsTask), calls (VA048_CallDetails) and letters (MailAttachment1,
@@ -2980,7 +3047,7 @@ namespace VASLogic.Models
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
                     int id = Util.GetValueOfInt(r["Record_ID"]);
-                    DateTime? on = Util.GetValueOfDateTime(r["CompletedOn"]);
+                    DateTime? on = Stamp(r["CompletedOn"]);
                     if (id > 0 && on.HasValue) map[id] = on.Value;
                 }
             }

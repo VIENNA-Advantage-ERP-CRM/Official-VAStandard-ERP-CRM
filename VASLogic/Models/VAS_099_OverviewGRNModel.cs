@@ -105,7 +105,7 @@
 ///                          receipt was completed, not with the movement date it
 ///                          was entered for.
 ///                        - Chat notes resolve their author from
-///                          NVL(CM_ChatEntry.AD_User_ID, CreatedBy). An entry
+///                          COALESCE(CM_ChatEntry.AD_User_ID, CreatedBy). An entry
 ///                          written through the platform's chat plumbing leaves
 ///                          AD_User_ID null, so comments were showing a timestamp
 ///                          with nobody's name against them.
@@ -281,6 +281,17 @@
 ///                        the M_InOut caller of it. Every one of these stages falls
 ///                        back to the document's own Updated stamp when it was
 ///                        completed outside the workflow engine.
+///   VAI163   2026-09-02  Activity timestamps render in the VIEWER's zone on
+///                        PostgreSQL too. Every date and timestamp handed to
+///                        the client now goes through Stamp(), which drops the
+///                        DateTimeKind the provider tagged the value with -
+///                        Oracle says Unspecified, Npgsql says Utc or Local,
+///                        and Newtonsoft writes a zone designator for the
+///                        latter two but not the first. The panel parses the
+///                        bare Oracle form, so the designator made it read the
+///                        value as already-zoned and skip its own conversion,
+///                        printing the stored clock. Same JSON on either engine
+///                        now. No-op on Oracle.
 /// </summary>
 
 using System;
@@ -358,7 +369,7 @@ namespace VASLogic.Models
             // Difference Quantity card reports. Guarded like everything else here so
             // an older confirmation schema degrades to zero rather than failing.
             string differenceQtyExpr = ColumnExists("M_InOutLineConfirm", "DifferenceQty")
-                ? @"(SELECT NVL(SUM(NVL(lc.DifferenceQty, 0)), 0)
+                ? @"(SELECT COALESCE(SUM(COALESCE(lc.DifferenceQty, 0)), 0)
                        FROM M_InOutLineConfirm lc
                       INNER JOIN M_InOutLine cl ON (cl.M_InOutLine_ID = lc.M_InOutLine_ID
                                                     AND cl.IsActive    = 'Y')
@@ -482,13 +493,13 @@ namespace VASLogic.Models
                                  scope is already right without the mark, and the
                                  pair now reconciles against the same set of
                                  confirmation lines. */
-                              (SELECT NVL(SUM(NVL(lc.ConfirmedQty, 0)), 0)
+                              (SELECT COALESCE(SUM(COALESCE(lc.ConfirmedQty, 0)), 0)
                                  FROM M_InOutLineConfirm lc
                                 INNER JOIN M_InOutLine cl ON (cl.M_InOutLine_ID = lc.M_InOutLine_ID
                                                               AND cl.IsActive    = 'Y')
                                 WHERE cl.M_InOut_ID = io.M_InOut_ID
                                   AND lc.IsActive   = 'Y')                      AS AcceptedQty,
-                              (SELECT NVL(SUM(NVL(lc.ScrappedQty, 0)), 0)
+                              (SELECT COALESCE(SUM(COALESCE(lc.ScrappedQty, 0)), 0)
                                  FROM M_InOutLineConfirm lc
                                 INNER JOIN M_InOutLine cl ON (cl.M_InOutLine_ID = lc.M_InOutLine_ID
                                                               AND cl.IsActive    = 'Y')
@@ -502,16 +513,16 @@ namespace VASLogic.Models
                                  the reader sees below the card. (Mixed uoms across
                                  lines make any total approximate either way, but it
                                  must at least agree with the figures on screen.) */
-                              (SELECT NVL(SUM(NVL(NULLIF(l.QtyEntered, 0), NVL(l.MovementQty, 0))), 0)
+                              (SELECT COALESCE(SUM(COALESCE(NULLIF(l.QtyEntered, 0), COALESCE(l.MovementQty, 0))), 0)
                                  FROM M_InOutLine l
                                 WHERE l.M_InOut_ID = io.M_InOut_ID
                                   AND l.IsActive   = 'Y')                       AS ReceivedQty,
-                              (SELECT NVL(SUM(" + qcCountExpr + @"), 0)
+                              (SELECT COALESCE(SUM(" + qcCountExpr + @"), 0)
                                  FROM M_InOutLine l
                                  " + qcPlanJoin + @"
                                 WHERE l.M_InOut_ID = io.M_InOut_ID
                                   AND l.IsActive   = 'Y')                       AS QcLineCount,
-                              (SELECT NVL(SUM(NVL(l.MovementQty, 0) * " + rateExpr + @"), 0)
+                              (SELECT COALESCE(SUM(COALESCE(l.MovementQty, 0) * " + rateExpr + @"), 0)
                                  FROM M_InOutLine l
                                  LEFT OUTER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = l.C_OrderLine_ID)
                                 WHERE l.M_InOut_ID = io.M_InOut_ID
@@ -557,19 +568,19 @@ namespace VASLogic.Models
             result.StatusCode       = Util.GetValueOfString(r["DocStatus"]);
             result.Processed        = Util.GetValueOfString(r["Processed"]) == "Y";
             result.Posted           = Util.GetValueOfString(r["Posted"]) == "Y";
-            result.MovementDate     = Util.GetValueOfDateTime(r["MovementDate"]);
-            result.PostingDate      = Util.GetValueOfDateTime(r["DateAcct"]);
+            result.MovementDate     = Stamp(r["MovementDate"]);
+            result.PostingDate      = Stamp(r["DateAcct"]);
             result.PriorityCode     = Util.GetValueOfString(r["PriorityRule"]);
             result.IsDropShip       = Util.GetValueOfString(r["IsDropShip"]) == "Y";
             result.Description      = Util.GetValueOfString(r["HeaderDescription"]);
-            result.Created          = Util.GetValueOfDateTime(r["Created"]);
-            result.Updated          = Util.GetValueOfDateTime(r["Updated"]);
+            result.Created          = Stamp(r["Created"]);
+            result.Updated          = Stamp(r["Updated"]);
             result.C_Order_ID       = Util.GetValueOfInt(r["C_Order_ID"]);
             result.C_Invoice_ID     = Util.GetValueOfInt(r["C_Invoice_ID"]);
             result.PurchaseOrderId  = Util.GetValueOfInt(r["PO_Order_ID"]);
             result.PONo             = Util.GetValueOfString(r["PO_DocumentNo"]);
-            result.PODate           = Util.GetValueOfDateTime(r["PODate"]);
-            result.ExpectedDate     = Util.GetValueOfDateTime(r["ExpectedDate"]);
+            result.PODate           = Stamp(r["PODate"]);
+            result.ExpectedDate     = Stamp(r["ExpectedDate"]);
             result.POReference      = Util.GetValueOfString(r["PO_Reference"]);
             result.RefOrderDocNo    = Util.GetValueOfString(r["RefOrderDocNo"]);
             result.RefOrderId       = Util.GetValueOfInt(r["RefOrder_ID"]);
@@ -868,8 +879,8 @@ namespace VASLogic.Models
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
                     DataRow row = ds.Tables[0].Rows[0];
-                    dateInvoiced        = Util.GetValueOfDateTime(row["DateInvoiced"]);
-                    _lastInvoiceCreated = Util.GetValueOfDateTime(row["Created"]);
+                    dateInvoiced        = Stamp(row["DateInvoiced"]);
+                    _lastInvoiceCreated = Stamp(row["Created"]);
                     invoiceId           = Util.GetValueOfInt(row["C_Invoice_ID"]);
                     return Util.GetValueOfString(row["DocumentNo"]);
                 }
@@ -909,8 +920,8 @@ namespace VASLogic.Models
                     return "";
 
                 DataRow row = ds.Tables[0].Rows[0];
-                dateInvoiced        = Util.GetValueOfDateTime(row["DateInvoiced"]);
-                _lastInvoiceCreated = Util.GetValueOfDateTime(row["Created"]);
+                dateInvoiced        = Stamp(row["DateInvoiced"]);
+                _lastInvoiceCreated = Stamp(row["Created"]);
                 return Util.GetValueOfString(row["DocumentNo"]);
             }
             catch (Exception ex)
@@ -955,8 +966,8 @@ namespace VASLogic.Models
                     return "";
 
                 DataRow row = ds.Tables[0].Rows[0];
-                dateInvoiced        = Util.GetValueOfDateTime(row["DateInvoiced"]);
-                _lastInvoiceCreated = Util.GetValueOfDateTime(row["Created"]);
+                dateInvoiced        = Stamp(row["DateInvoiced"]);
+                _lastInvoiceCreated = Stamp(row["Created"]);
                 invoiceId           = Util.GetValueOfInt(row["C_Invoice_ID"]);
                 return Util.GetValueOfString(row["DocumentNo"]);
             }
@@ -1077,29 +1088,29 @@ namespace VASLogic.Models
                                  beside the entered unit name: 12 Box. The base
                                  figure is still what the amount is computed from,
                                  which is unchanged. */
-                              NVL(NULLIF(l.QtyEntered, 0), NVL(l.MovementQty, 0)) AS ReceivedQty,
-                              NVL(l.MovementQty, 0) AS ReceivedQtyBase,
+                              COALESCE(NULLIF(l.QtyEntered, 0), COALESCE(l.MovementQty, 0)) AS ReceivedQty,
+                              COALESCE(l.MovementQty, 0) AS ReceivedQtyBase,
                               p.Value           AS ProductCode,
                               p.Name            AS ProductName,
                               loc.Value         AS LocatorCode,
                               COALESCE(loc.LocatorCombination, loc.Bin, loc.Value) AS LocatorName,
                               u.Name            AS UOMName,
-                              NVL(u.StdPrecision, 0) AS UOMPrecision,
+                              COALESCE(u.StdPrecision, 0) AS UOMPrecision,
                               /* Ordered in the same (entered) scale as Received, so
                                  the two columns are comparable down the row. The
                                  order's own entered figure is only on that scale
                                  while the two documents share a unit, so the
                                  base-unit figure travels with it and the caller
                                  converts when they do not. */
-                              NVL(NULLIF(ol.QtyEntered, 0), NVL(ol.QtyOrdered, 0)) AS OrderedQty,
-                              NVL(ol.QtyOrdered, 0) AS OrderedQtyBase,
-                              NVL(ol.C_UOM_ID, 0)   AS OrderUOM,
-                              NVL(l.C_UOM_ID, 0)    AS LineUOM,
+                              COALESCE(NULLIF(ol.QtyEntered, 0), COALESCE(ol.QtyOrdered, 0)) AS OrderedQty,
+                              COALESCE(ol.QtyOrdered, 0) AS OrderedQtyBase,
+                              COALESCE(ol.C_UOM_ID, 0)   AS OrderUOM,
+                              COALESCE(l.C_UOM_ID, 0)    AS LineUOM,
                               " + enteredRateExpr + @" AS EnteredRate,
                               asi.Description   AS AttributeSetInstance,
                               " + taxRateExpr + @"                    AS TaxRate,
                               " + rateExpr + @"                       AS UnitRate,
-                              NVL(l.MovementQty, 0) * " + rateExpr + @" AS LineValue,
+                              COALESCE(l.MovementQty, 0) * " + rateExpr + @" AS LineValue,
                               " + qcCase + @"                          AS QualityApplicable
                            FROM M_InOutLine l
                            LEFT OUTER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = l.C_OrderLine_ID)
@@ -1306,7 +1317,7 @@ namespace VASLogic.Models
                                   COALESCE(qpp.Value, lp.Value) AS ProductCode,
                                   COALESCE(qpp.Name,  lp.Name)  AS ProductName,
                                   " + paramNameExpr + @"  AS ParameterName,
-                                  NVL(qp.VA010_QuantityToVerify, 0) AS QuantityToVerify,
+                                  COALESCE(qp.VA010_QuantityToVerify, 0) AS QuantityToVerify,
                                   qp.VA010_TestPrmtrList_ID AS AcceptableValueId,
                                   " + acceptExpr + @"     AS AcceptableValue,
                                   qp.VA010_ActualValue  AS ActualValueRaw,
@@ -1346,7 +1357,7 @@ namespace VASLogic.Models
                     q.QuantityToVerify  = Util.GetValueOfDecimal(r["QuantityToVerify"]);
                     q.AcceptableValueId = Util.GetValueOfInt(r["AcceptableValueId"]);
                     q.AcceptableValue   = Util.GetValueOfString(r["AcceptableValue"]);
-                    q.QAQCDate          = Util.GetValueOfDateTime(r["QAQCDate"]);
+                    q.QAQCDate          = Stamp(r["QAQCDate"]);
                     q.Remark            = Util.GetValueOfString(r["Remark"]);
 
                     // Reference into VA010_TestPrmtrList; anything unparseable is
@@ -1511,7 +1522,7 @@ namespace VASLogic.Models
                                   l.M_Product_ID,
                                   p.Value         AS ProductCode,
                                   p.Name          AS ProductName,
-                                  NVL(NULLIF(l.QtyEntered, 0), NVL(l.MovementQty, 0)) AS Qty,
+                                  COALESCE(NULLIF(l.QtyEntered, 0), COALESCE(l.MovementQty, 0)) AS Qty,
                                   " + planExpr + @" AS QualityPlanId
                              FROM M_InOutLine l
                              LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = l.M_Product_ID)
@@ -1612,9 +1623,9 @@ namespace VASLogic.Models
             try
             {
                 string sql = @"SELECT VA010_QualityPlan_ID            AS QualityPlanId,
-                                      NVL(VA010_PercentQtyToVerify,0) AS Pct,
-                                      NVL(VA010_ReceiptQtyFrom,0)     AS QtyFrom,
-                                      NVL(VA010_ReceiptQtyTo,0)       AS QtyTo
+                                      COALESCE(VA010_PercentQtyToVerify,0) AS Pct,
+                                      COALESCE(VA010_ReceiptQtyFrom,0)     AS QtyFrom,
+                                      COALESCE(VA010_ReceiptQtyTo,0)       AS QtyTo
                                  FROM VA010_CheckingQty
                                 WHERE IsActive = 'Y'
                                   AND VA010_QualityPlan_ID IN (" + JoinIds(planIds) + ")";
@@ -1796,7 +1807,7 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     return null;
-                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["PostedDate"]);
+                return Stamp(ds.Tables[0].Rows[0]["PostedDate"]);
             }
             catch (Exception ex)
             {
@@ -1950,8 +1961,8 @@ namespace VASLogic.Models
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
 
                 DataRow r = ds.Tables[0].Rows[0];
-                DateTime? created = Util.GetValueOfDateTime(r["Created"]);
-                DateTime? updated = Util.GetValueOfDateTime(r["Updated"]);
+                DateTime? created = Stamp(r["Created"]);
+                DateTime? updated = Stamp(r["Updated"]);
                 string updatedBy  = Util.GetValueOfString(r["UpdatedByName"]);
 
                 bool isCompleted = (docStatus == "CO" || docStatus == "CL");
@@ -2058,7 +2069,7 @@ namespace VASLogic.Models
                                         ON (u.AD_User_ID = cl.CreatedBy)
                                 WHERE cl.Record_ID = @M_InOut_ID
                                   AND adt.TableName = 'M_InOut'
-                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
                                 ORDER BY cl.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
                 if (ds != null && ds.Tables.Count > 0)
@@ -2109,7 +2120,7 @@ namespace VASLogic.Models
                                  LEFT OUTER JOIN AD_User u
                                         ON (u.AD_User_ID = cl.CreatedBy)
                                 WHERE adt.TableName = 'M_InOutLine'
-                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
                                   AND l.M_InOut_ID = @M_InOut_ID
                                 ORDER BY cl.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
@@ -2152,7 +2163,7 @@ namespace VASLogic.Models
         /// <returns>True when an entry was added.</returns>
         private bool AddChangeRow(DataRow r, string scope, List<GRNActivityData> list)
         {
-            DateTime? at = Util.GetValueOfDateTime(r["Created"]);
+            DateTime? at = Stamp(r["Created"]);
             if (!at.HasValue) return false;
             if (IsSameMoment(at, _lastCompletedAt)) return false;   // completion save
 
@@ -2201,6 +2212,21 @@ namespace VASLogic.Models
         /// <summary>Reads the appointment / task / call / letter sources every
         /// overview panel shares (VAS_ActivitySourcesModel).</summary>
         private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
+        /// <summary>
+        /// Every date and timestamp this panel hands the client is read through
+        /// here rather than through Util.GetValueOfDateTime directly, so the
+        /// DateTimeKind the PROVIDER tagged the value with cannot reach the JSON.
+        /// Oracle tags Unspecified and Npgsql tags Utc or Local; Newtonsoft writes
+        /// a zone designator for the latter two and none for the first, and the
+        /// panel's parseDbDate reads the two shapes differently - which is why the
+        /// Activity feed's times were hours out on PostgreSQL. A no-op for a value
+        /// that is already Unspecified, so the Oracle path is untouched. See
+        /// VAS_ActivitySourcesModel.Stamp for the full account.
+        /// </summary>
+        private static DateTime? Stamp(object value)
+        {
+            return VAS_ActivitySourcesModel.Stamp(value);
+        }
 
         /// <summary>
         /// The correspondence and engagement sources shared with every other
@@ -2276,14 +2302,14 @@ namespace VASLogic.Models
                                  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = cl.CreatedBy)
                                 WHERE cl.Record_ID = @M_InOut_ID
                                   AND adt.TableName = 'M_InOut'
-                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
                                 ORDER BY cl.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return null;
 
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
-                    DateTime? at = Util.GetValueOfDateTime(r["Created"]);
+                    DateTime? at = Stamp(r["Created"]);
                     if (!at.HasValue) continue;
                     if (IsSameMoment(at, completedAt)) continue;   // the completion save
                     userName = Util.GetValueOfString(r["UserName"]);
@@ -2395,7 +2421,7 @@ namespace VASLogic.Models
 
                 DataRow r = ds.Tables[0].Rows[0];
                 _lastCompletedByName = Util.GetValueOfString(r["UserName"]);
-                return Util.GetValueOfDateTime(r["Created"]);
+                return Stamp(r["Created"]);
             }
             catch (Exception ex)
             {
@@ -2442,7 +2468,7 @@ namespace VASLogic.Models
 
                 int confirmId = Util.GetValueOfInt(r["M_InOutConfirm_ID"]);
                 result.ConfirmCompletedDate = GetWorkflowCompletedDate("M_InOutConfirm", confirmId)
-                                              ?? Util.GetValueOfDateTime(r["Updated"]);
+                                              ?? Stamp(r["Updated"]);
             }
             catch (Exception ex)
             {
@@ -2500,7 +2526,7 @@ namespace VASLogic.Models
 
                 int invoiceId = Util.GetValueOfInt(r["C_Invoice_ID"]);
                 result.InvoiceCompletedDate = GetWorkflowCompletedDate("C_Invoice", invoiceId)
-                                              ?? Util.GetValueOfDateTime(r["Updated"]);
+                                              ?? Stamp(r["Updated"]);
                 result.InvoiceStatus = status;
                 return;
             }
@@ -2566,7 +2592,7 @@ namespace VASLogic.Models
                 {
                     Type     = "posted",
                     UserName = Util.GetValueOfString(r["UserName"]),
-                    Created  = Util.GetValueOfDateTime(r["Created"])
+                    Created  = Stamp(r["Created"])
                 });
             }
             catch (Exception ex)
@@ -2598,7 +2624,7 @@ namespace VASLogic.Models
                         Type       = "confirmation",
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         UserName   = Util.GetValueOfString(r["UserName"]),
-                        Created    = Util.GetValueOfDateTime(r["Created"])
+                        Created    = Stamp(r["Created"])
                     });
                 }
             }
@@ -2639,7 +2665,7 @@ namespace VASLogic.Models
                         Type       = "invoice",
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         UserName   = Util.GetValueOfString(r["UserName"]),
-                        Created    = Util.GetValueOfDateTime(r["Created"])
+                        Created    = Stamp(r["Created"])
                     });
                 }
             }
@@ -2665,13 +2691,20 @@ namespace VASLogic.Models
             {
                 string sql = @"SELECT ce.CharacterData,
                                       ce.Created,
-                                      NVL(u.Name, cu.Name) AS UserName
+                                      COALESCE(u.Name, cu.Name) AS UserName
                                  FROM CM_ChatEntry ce
                                 INNER JOIN CM_Chat ch      ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
                                  LEFT OUTER JOIN AD_User u  ON (ce.AD_User_ID = u.AD_User_ID)
                                  LEFT OUTER JOIN AD_User cu ON (ce.CreatedBy  = cu.AD_User_ID)
-                                WHERE ch.AD_Table_ID =
-                                      (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'M_InOut')
+                                -- IN + UPPER, like the mail loader below: a scalar
+                                -- sub-select RAISES on Oracle where AD_Table holds
+                                -- more than one row named M_InOut, and the
+                                -- case-sensitive name matched nothing at all in a
+                                -- dictionary that spells it any other way. Either
+                                -- way every note vanished from the feed.
+                                WHERE ch.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'M_INOUT')
                                   AND ch.Record_ID = @M_InOut_ID
                                   AND ce.IsActive  = 'Y'";
                 DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
@@ -2684,7 +2717,7 @@ namespace VASLogic.Models
                         Type     = "note",
                         Text     = Util.GetValueOfString(r["CharacterData"]),
                         UserName = Util.GetValueOfString(r["UserName"]),
-                        Created  = Util.GetValueOfDateTime(r["Created"])
+                        Created  = Stamp(r["Created"])
                     });
                 }
             }
@@ -2716,7 +2749,7 @@ namespace VASLogic.Models
                 //
                 // The test is IS NOT NULL, never a comparison against ''. On
                 // Oracle the empty string IS NULL, so the earlier
-                // "NVL(TRIM(ma.MailAddress), '') <> ''" compared every address
+                // "COALESCE(TRIM(ma.MailAddress), '') <> ''" compared every address
                 // against NULL and evaluated to UNKNOWN for EVERY row, recipient
                 // or not — the filter excluded the whole table and no e-mail has
                 // ever reached the panel's activity trail on an Oracle database.
@@ -2739,14 +2772,14 @@ namespace VASLogic.Models
                                       (SELECT t.AD_Table_ID FROM AD_Table t
                                         WHERE UPPER(t.TableName) = 'M_INOUT')
                                   AND ma.Record_ID          = @M_InOut_ID
-                                  AND NVL(ma.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(ma.IsActive, 'Y') = 'Y'
                                   -- Letters ('I') ARE filtered out, and only
                                   -- letters: they are a kind of their own now and
                                   -- LoadSharedSourceActivity reads them, so leaving
                                   -- them here would report each one twice. Every
                                   -- other AttachmentType still counts as a mail,
                                   -- for the reason above.
-                                  AND COALESCE(ma.AttachmentType, 'M') <> 'I'
+                                  AND COALESCE(TO_CHAR(ma.AttachmentType), 'M') <> 'I'
                                   AND (ma.MailAddress    IS NOT NULL
                                     OR ma.MailAddressCc  IS NOT NULL
                                     OR ma.MailAddressBcc IS NOT NULL)
@@ -2771,7 +2804,7 @@ namespace VASLogic.Models
                         MailFrom   = Util.GetValueOfString(r["MailAddressFrom"]),
                         IsMailSent = Util.GetValueOfString(r["IsMailSent"]) == "Y",
                         UserName   = Util.GetValueOfString(r["UserName"]),
-                        Created    = Util.GetValueOfDateTime(r["Created"])
+                        Created    = Stamp(r["Created"])
                     });
                 }
             }
@@ -2900,7 +2933,7 @@ namespace VASLogic.Models
                                       inv.DocumentNo,
                                       inv.DocStatus,
                                       inv.DateInvoiced,
-                                      NVL(inv.GrandTotal, 0) AS GrandTotal,
+                                      COALESCE(inv.GrandTotal, 0) AS GrandTotal,
                                       inv.IsPaid
                                  FROM C_Invoice inv
                                 WHERE inv.IsActive   = 'Y'
@@ -2925,7 +2958,7 @@ namespace VASLogic.Models
                         RecordId   = Util.GetValueOfInt(r["C_Invoice_ID"]),
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
-                        DocDate    = Util.GetValueOfDateTime(r["DateInvoiced"]),
+                        DocDate    = Stamp(r["DateInvoiced"]),
                         Amount     = Util.GetValueOfDecimal(r["GrandTotal"]),
                         IsPaid     = Util.GetValueOfString(r["IsPaid"]) == "Y"
                     });
@@ -2970,7 +3003,7 @@ namespace VASLogic.Models
                         RecordId   = Util.GetValueOfInt(r["M_InOutConfirm_ID"]),
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
-                        DocDate    = Util.GetValueOfDateTime(r["Created"]),
+                        DocDate    = Stamp(r["Created"]),
                         LineCount  = Util.GetValueOfInt(r["LineCnt"])
                     });
                 }
@@ -2994,8 +3027,8 @@ namespace VASLogic.Models
                                                p.DocumentNo,
                                                p.DocStatus,
                                                p.DateTrx,
-                                               NVL(p.PayAmt, 0)      AS PayAmt,
-                                               NVL(p.DiscountAmt, 0) AS DiscountAmt
+                                               COALESCE(p.PayAmt, 0)      AS PayAmt,
+                                               COALESCE(p.DiscountAmt, 0) AS DiscountAmt
                                  FROM C_Payment p
                                 INNER JOIN C_AllocationLine al ON (al.C_Payment_ID = p.C_Payment_ID)
                                 INNER JOIN C_Invoice ci        ON (al.C_Invoice_ID = ci.C_Invoice_ID)
@@ -3021,7 +3054,7 @@ namespace VASLogic.Models
                         RecordId    = Util.GetValueOfInt(r["C_Payment_ID"]),
                         DocumentNo  = Util.GetValueOfString(r["DocumentNo"]),
                         DocStatus   = Util.GetValueOfString(r["DocStatus"]),
-                        DocDate     = Util.GetValueOfDateTime(r["DateTrx"]),
+                        DocDate     = Stamp(r["DateTrx"]),
                         Amount      = Util.GetValueOfDecimal(r["PayAmt"]),
                         DiscountAmt = Util.GetValueOfDecimal(r["DiscountAmt"])
                     });

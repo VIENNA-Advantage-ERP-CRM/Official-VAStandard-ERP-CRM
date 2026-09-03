@@ -5,13 +5,13 @@
  * Date           : 09-Jun-2026
  *
  * Chronological development:
- *   VAI163   2026-08-06  The Engagement timeline paginates at 15 touches a page
+ *   VAI163   2026-08-06  The Engagement timeline paginates at 10 touches a page
  *                        (ENGAGEMENT_PER_PAGE), reusing the of-lu-pager shell the
  *                        Orders / Invoices panels use. Unlike those it pages
  *                        client-side — the whole timeline already arrives in one
  *                        payload — so prev/next re-enter renderEngagement rather
  *                        than re-fetching. The stat strip above the rail still
- *                        counts every touch, and an account with 15 or fewer shows
+ *                        counts every touch, and an account with 10 or fewer shows
  *                        no controls at all.
  ******************************************************/
 ; VAS = window.VAS || {};
@@ -49,8 +49,8 @@
         var _ordersOffset     = 0;
         var _invoicesOffset   = 0;
 
-        // Engagement timeline client-side pagination (15 touches per page)
-        var ENGAGEMENT_PER_PAGE = 15;
+        // Engagement timeline client-side pagination (10 touches per page)
+        var ENGAGEMENT_PER_PAGE = 10;
         var _engPage            = 0;
 
 
@@ -59,6 +59,24 @@
         var CT_PAGE_SIZE   = 5;
         var _oppsPage      = 0;
         var _contractsPage = 0;
+
+        // Contacts / locations client-side pagination (10 rows per page)
+        var CONTACT_PAGE_SIZE  = 10;
+        var LOC_PAGE_SIZE      = 5;
+        var _contactsPage      = 0;
+        var _locationsPage     = 0;
+
+        // Projects client-side pagination (5 rows per page)
+        var PROJ_PAGE_SIZE  = 5;
+        var _projectsPage   = 0;
+
+        // Tasks client-side pagination (5 rows per page)
+        var TASK_PAGE_SIZE = 5;
+        var _tasksPage     = 0;
+
+        // Tickets server-side pagination (5 rows per page; open state only)
+        var TICKET_PAGE_SIZE = 5;
+        var _ticketsOffset   = 0;
 
 
         // ── Helpers ──────────────────────────────────────────────────────────
@@ -69,7 +87,13 @@
                 .replace(/'/g,'&#039;');
         }
         function toNum(v) { var n = Number(v); return isFinite(n) ? n : 0; }
-        function msg(k)   { return (VIS && VIS.Msg && VIS.Msg.getMsg) ? (VIS.Msg.getMsg(k) || k) : k; }
+        function msg(k) {
+            var v = (VIS && VIS.Msg && VIS.Msg.getMsg) ? VIS.Msg.getMsg(k) : '';
+            // VIS.Msg.getMsg returns '[KeyName]' (truthy) when the AD_Message row is missing,
+            // so the normal || fallback never fires. Detect the bracket pattern and fall back to k.
+            if (!v || (v.charAt(0) === '[' && v.charAt(v.length - 1) === ']')) return k;
+            return v;
+        }
 
         function getSym()  { var d = sectionState.overview.data; return (d && d.currencySymbol) ? String(d.currencySymbol) : ''; }
         function getPrec() { var d = sectionState.overview.data; return (d && d.precision != null) ? Math.max(0, parseInt(d.precision, 10) || 0) : 2; }
@@ -389,7 +413,7 @@
                 case 'opps':       renderOpps(el, s.data);       break;
                 case 'contracts':  renderContracts(el, s.data);  break;
                 case 'tickets':    renderTickets(el, s.data);    break;
-                case 'tasks':      el.innerHTML = renderTasks(s.data); break;
+                case 'tasks':      renderTasks(el, s.data); break;
                 case 'orders':     renderOrders(el, s.data);     break;
                 case 'invoices':   renderInvoices(el, s.data);   break;
                 case 'projects':   renderProjects(el, s.data);   break;
@@ -431,6 +455,7 @@
                     '<div style="display:flex;align-items:center;gap:0.625em;flex-wrap:wrap;">' +
                       '<span style="font-size:1.5em;font-weight:700;color:var(--acct-text);">' + esc(data.name || '') + '</span>' +
                       '<span class="vas_105_acct-tag vas_105_acct-tag--customer">' + esc(msg('Customer')) + '</span>' +
+                      (data.isVendor ? '<span class="vas_105_acct-tag vas_105_acct-tag--vendor">' + esc(msg('Vendor')) + '</span>' : '') +
                       '<span class="vas_105_acct-tag ' + tierCls + '" style="letter-spacing:0.1em;">' + tierHtml + '</span>' +
                     '</div>' +
                     '<div class="vas_105_acct-id-sub">' + esc(subParts.join(' · ')) + '</div>' +
@@ -448,7 +473,7 @@
                   '<div><div class="vas_105_acct-kpi__lbl">' + esc(msg('VAS_105_HealthScore')) + '</div>' +
                        '<div class="vas_105_acct-kpi__val" style="line-height:1;">' + ratingStars(data.tier) + '</div></div>' +
                   '<div><div class="vas_105_acct-kpi__lbl">' + esc(msg('VAS_105_OpenOpps')) + '</div>' +
-                       '<div class="vas_105_acct-kpi__val">' + esc(String(data.openOpportunities || 0)) + '</div></div>' +
+                       '<div class="vas_105_acct-kpi__val" id="vas_105_opp_kpi_' + widgetID + '">' + esc(String(data.openOpportunities || 0)) + '</div></div>' +
                   (renewalStr
                       ? '<div><div class="vas_105_acct-kpi__lbl">' + esc(msg('VAS_105_RenewalIn')) + '</div>' +
                              '<div class="vas_105_acct-kpi__val" style="' + renewalStyle + '">' + esc(renewalStr) + '</div></div>'
@@ -476,18 +501,27 @@
 
         // ── renderContacts ────────────────────────────────────────────────────
         function renderContacts(el, data) {
-            var items = (data && data.items) ? data.items : [];
+            var allItems = (data && data.items) ? data.items : [];
 
             // Update count badge
             var cntEl = document.getElementById(secId('contacts') + '_cnt');
-            if (cntEl) cntEl.textContent = items.length > 0 ? String(items.length) : '';
+            if (cntEl) cntEl.textContent = allItems.length > 0 ? String(allItems.length) : '';
 
-            if (!items.length) { el.innerHTML = emptyState('VAS_105_NoContacts'); return; }
+            if (!allItems.length) { el.innerHTML = emptyState('VAS_105_NoContacts'); return; }
+
+            // Client-side pagination — slice the current page
+            var total     = allItems.length;
+            var pageStart = _contactsPage * CONTACT_PAGE_SIZE;
+            var items     = allItems.slice(pageStart, pageStart + CONTACT_PAGE_SIZE);
 
             // Inline SVG icons (stroke="currentColor", colour set via parent style — mirrors Latest Updates pattern)
             var SVG_PHONE =
                 '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
                 '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.99 12 19.79 19.79 0 0 1 1.95 3.18 2 2 0 0 1 3.93 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>' +
+                '</svg>';
+            var SVG_MOBILE =
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+                '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>' +
                 '</svg>';
             var SVG_MAIL =
                 '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
@@ -519,6 +553,12 @@
                               esc(c.phone) +
                             '</div>'
                           : '') +
+                        (c.mobile
+                          ? '<div class="vas_105_acct-contact__phone" style="color:var(--acct-text);">' +
+                              '<span style="color:var(--acct-muted);">' + SVG_MOBILE + '</span>' +
+                              esc(c.mobile) +
+                            '</div>'
+                          : '') +
                       '</div>' +
                       (c.email
                         ? '<button type="button" class="vas_105_acct-contact__mailbtn" data-action="contactEmail" data-email="' + esc(c.email) + '" aria-label="' + esc(msg('VAS_Email') + ' ' + (c.name || '')) + '" title="' + esc(c.email) + '">' +
@@ -528,17 +568,56 @@
                     '</div>';
             }
             html += '</div>';
+            html += buildSectionPager('contacts', total, _contactsPage, CONTACT_PAGE_SIZE);
             el.innerHTML = html;
+
+            // Wire pagination buttons
+            if (total > CONTACT_PAGE_SIZE) {
+                var prevBtn = document.getElementById('vas_105_contactsprev_' + widgetID);
+                var nextBtn = document.getElementById('vas_105_contactsnext_' + widgetID);
+                var maxPage = Math.ceil(total / CONTACT_PAGE_SIZE) - 1;
+                if (prevBtn) prevBtn.onclick = function () {
+                    _contactsPage = Math.max(0, _contactsPage - 1);
+                    renderContacts(el, data);
+                };
+                if (nextBtn) nextBtn.onclick = function () {
+                    _contactsPage = Math.min(maxPage, _contactsPage + 1);
+                    renderContacts(el, data);
+                };
+            }
         }
 
         // ── renderLocations ───────────────────────────────────────────────────
         function renderLocations(el, data) {
-            var items = (data && data.items) ? data.items : [];
+            var allItems = (data && data.items) ? data.items : [];
 
             var cntEl = document.getElementById(secId('locations') + '_cnt');
-            if (cntEl) cntEl.textContent = items.length > 0 ? (String(items.length) + ' ' + msg('VAS_105_Sites')) : '';
+            if (cntEl) {
+                if (allItems.length > 0) {
+                    // Count distinct non-empty countries across all locations
+                    var countrySet = {}, distinctCountries = 0;
+                    for (var ci = 0; ci < allItems.length; ci++) {
+                        var cname = allItems[ci].country;
+                        if (cname && !countrySet[cname]) { countrySet[cname] = true; distinctCountries++; }
+                    }
+                    var cntHtml = esc(String(allItems.length) + ' ' + msg('VAS_105_Sites'));
+                    if (distinctCountries > 1) {
+                        cntHtml += '<span class="vas_105_acct-ctrbadge">' +
+                                       esc(String(distinctCountries) + ' ' + msg('VAS_105_Countries')) +
+                                   '</span>';
+                    }
+                    cntEl.innerHTML = cntHtml;
+                } else {
+                    cntEl.innerHTML = '';
+                }
+            }
 
-            if (!items.length) { el.innerHTML = emptyState('VAS_105_NoLocations'); return; }
+            if (!allItems.length) { el.innerHTML = emptyState('VAS_105_NoLocations'); return; }
+
+            // Client-side pagination — slice the current page
+            var total     = allItems.length;
+            var pageStart = _locationsPage * LOC_PAGE_SIZE;
+            var items     = allItems.slice(pageStart, pageStart + LOC_PAGE_SIZE);
 
             var html = '<div class="vas_105_acct-locgrid">';
             for (var i = 0; i < items.length; i++) {
@@ -554,15 +633,26 @@
                         '<i class="ti ti-map-pin" style="font-size:0.8125em;color:var(--acct-muted);vertical-align:-0.125em;margin-right:0.25em;"></i>' +
                         esc(addrParts.join(', ')) +
                       '</div>' +
-                      (l.primaryContact
-                        ? '<div class="vas_105_acct-loccard__meta">' +
-                          '<span><i class="ti ti-user" style="font-size:0.8125em;vertical-align:-0.125em;margin-right:0.1875em;"></i>' + esc(l.primaryContact) + '</span>' +
-                          '</div>'
-                        : '') +
                     '</div>';
             }
             html += '</div>';
+            html += buildSectionPager('locations', total, _locationsPage, LOC_PAGE_SIZE);
             el.innerHTML = html;
+
+            // Wire pagination buttons
+            if (total > LOC_PAGE_SIZE) {
+                var prevBtn = document.getElementById('vas_105_locationsprev_' + widgetID);
+                var nextBtn = document.getElementById('vas_105_locationsnext_' + widgetID);
+                var maxPage = Math.ceil(total / LOC_PAGE_SIZE) - 1;
+                if (prevBtn) prevBtn.onclick = function () {
+                    _locationsPage = Math.max(0, _locationsPage - 1);
+                    renderLocations(el, data);
+                };
+                if (nextBtn) nextBtn.onclick = function () {
+                    _locationsPage = Math.min(maxPage, _locationsPage + 1);
+                    renderLocations(el, data);
+                };
+            }
         }
 
         // ── Section pagination bar (Opps / Contracts) ────────────────────────
@@ -637,18 +727,23 @@
             var sym      = (data && data.currencySymbol) || getSym();
             var prec     = (data && data.precision != null) ? parseInt(data.precision,10) : getPrec();
 
+            // Compute open-opp count using the same terminal-stage exclusion rules as the header KPI.
+            // Updating both elements from one calculation keeps them permanently in sync.
+            var CLOSED_CODES = { 'CO': 1, 'CL': 1, 'VO': 1, 'RE': 1 };
+            var CLOSED_WORDS = /lost|archived|won|closed|reversed/i;
+            var open = allItems.filter(function(o) {
+                if (CLOSED_CODES[o.stageCode]) return false;
+                var name = o.stageName || o.stageCode || '';
+                return !CLOSED_WORDS.test(name);
+            }).length;
+
             var cntEl = document.getElementById(secId('opps') + '_cnt');
             if (cntEl) {
-                // Exclude closed/lost/won/archived stages by both stage code and stage name keywords
-                var CLOSED_CODES = { 'CO': 1, 'CL': 1, 'VO': 1, 'RE': 1 };
-                var CLOSED_WORDS = /lost|archived|won|closed|reversed/i;
-                var open = allItems.filter(function(o) {
-                    if (CLOSED_CODES[o.stageCode]) return false;
-                    var name = o.stageName || o.stageCode || '';
-                    return !CLOSED_WORDS.test(name);
-                }).length;
                 cntEl.textContent = open > 0 ? (String(open) + ' ' + msg('Open')) : '';
             }
+            // Overwrite the server-supplied KPI value so the header always matches the section badge
+            var kpiEl = document.getElementById('vas_105_opp_kpi_' + widgetID);
+            if (kpiEl) kpiEl.textContent = String(open);
 
             if (!allItems.length) { el.innerHTML = emptyState('VAS_105_NoOpps'); return; }
 
@@ -829,6 +924,7 @@
 
         function renderTickets(el, data) {
             var items = (data && data.items) ? data.items : [];
+            var total = (data && data.total != null) ? data.total : items.length;
 
             if (!items.length) { el.innerHTML = emptyState('VAS_105_NoTickets'); return; }
 
@@ -842,11 +938,16 @@
                     '<div class="vas_105_acct-tickrow' + (isAlert ? ' vas_105_acct-tickrow--alert' : '') + '" data-tick-idx="' + i + '">' +
                       '<span class="vas_105_acct-dot" style="background:' + dotColor + ';"></span>' +
                       '<span style="font-size:0.8125em;color:var(--acct-muted);width:4.875em;flex-shrink:0;">' + esc(t.ticketNo || '') + '</span>' +
-                      '<span style="flex:1;min-width:0;font-size:0.8125em;color:var(--acct-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(t.subject || '') + '</span>' +
+                      // Outer span hosts the ::after tooltip (no overflow clip); inner span truncates visible text
+                      '<span class="vas_105_acct-tip" data-tip="' + esc(t.subject || '') + '" style="flex:1;min-width:0;">' +
+                        '<span style="display:block;font-size:0.8125em;color:var(--acct-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(t.subject || '') + '</span>' +
+                      '</span>' +
                       '<span class="vas_105_acct-prio ' + prioClass(t.priorityCode) + '">' + esc(t.priorityName || prioLabel(t.priorityCode)) + '</span>' +
                       '<span style="font-size:0.75em;color:var(--acct-text-2);width:4.375em;text-align:right;flex-shrink:0;">' + esc(age) + '</span>' +
                     '</div>';
             }
+
+            html += buildSectionPager('tickets', total, Math.floor(_ticketsOffset / TICKET_PAGE_SIZE), TICKET_PAGE_SIZE);
             el.innerHTML = html;
 
             var rows = el.querySelectorAll('.vas_105_acct-tickrow');
@@ -854,6 +955,19 @@
                 (function(row, t) {
                     row.onclick = function () { openTicketDetail(t); };
                 })(rows[ri], items[ri]);
+            }
+
+            if (total > TICKET_PAGE_SIZE) {
+                var prevBtn = document.getElementById('vas_105_ticketsprev_' + widgetID);
+                var nextBtn = document.getElementById('vas_105_ticketsnext_' + widgetID);
+                if (prevBtn) prevBtn.onclick = function () {
+                    _ticketsOffset = Math.max(0, _ticketsOffset - TICKET_PAGE_SIZE);
+                    fetchSection('tickets', 'GetTickets', { state: 'open', pageOffset: _ticketsOffset, pageSize: TICKET_PAGE_SIZE }, null);
+                };
+                if (nextBtn) nextBtn.onclick = function () {
+                    _ticketsOffset = _ticketsOffset + TICKET_PAGE_SIZE;
+                    fetchSection('tickets', 'GetTickets', { state: 'open', pageOffset: _ticketsOffset, pageSize: TICKET_PAGE_SIZE }, null);
+                };
             }
         }
 
@@ -898,7 +1012,11 @@
                         '<span style="font-size:0.8125em;font-weight:700;color:var(--acct-text);">' + esc(o.orderNo || '') + '</span>' +
                         '<span style="font-size:0.75em;color:var(--acct-text-2);">' + esc(fmtDate(o.orderDate)) + '</span>' +
                       '</div>' +
-                      '<span style="font-size:0.8125em;color:var(--acct-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(o.items || '') + '</span>' +
+                      // Outer span hosts the ::after tooltip (no overflow so the popup isn't clipped);
+                      // inner span truncates the visible text with ellipsis.
+                      '<span class="vas_105_acct-tip" data-tip="' + esc(o.items || '') + '">' +
+                        '<span style="display:block;font-size:0.8125em;color:var(--acct-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(o.items || '') + '</span>' +
+                      '</span>' +
                       '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(o.amount), sym, prec)) + '</span>' +
                       '<span style="text-align:right;"><span class="vas_105_acct-odstatus ' + orderStatusClass(o.statusCode) + '">' + esc(orderStatusLabel(o.statusCode)) + '</span></span>' +
                     '</div>';
@@ -946,10 +1064,11 @@
 
             var SVG_INVOICE = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>';
             var html =
-                '<div class="vas_105_acct-tablehead" style="grid-template-columns:2.25em 1fr 0.9fr 1fr 0.8fr;gap:0.75em;margin-top:0.5em;">' +
+                '<div class="vas_105_acct-tablehead" style="grid-template-columns:2.25em 1fr 0.9fr 0.9fr 1fr 0.8fr;gap:0.75em;margin-top:0.5em;">' +
                   '<span></span>' +
                   '<span>' + esc(msg('InvoiceNo')) + '</span>' +
                   '<span style="text-align:right;">' + esc(msg('Amount'))  + '</span>' +
+                  '<span style="text-align:right;">' + esc(msg('VAS_105_Paid')) + '</span>' +
                   '<span style="text-align:right;">' + esc(msg('DueDate')) + '</span>' +
                   '<span style="text-align:right;">' + esc(msg('Status'))  + '</span>' +
                 '</div>';
@@ -957,13 +1076,16 @@
             for (var i = 0; i < items.length; i++) {
                 var inv = items[i];
                 html +=
-                    '<div class="vas_105_acct-clickrow" style="grid-template-columns:2.25em 1fr 0.9fr 1fr 0.8fr;gap:0.75em;" data-inv-idx="' + i + '">' +
+                    '<div class="vas_105_acct-clickrow" style="grid-template-columns:2.25em 1fr 0.9fr 0.9fr 1fr 0.8fr;gap:0.75em;" data-inv-idx="' + i + '">' +
                       '<span class="vas_105_acct-wicon vas_105_acct-wicon--amber">' + SVG_INVOICE + '</span>' +
                       '<div style="display:flex;flex-direction:column;gap:0.1em;">' +
                         '<span style="font-size:0.8125em;font-weight:700;color:var(--acct-text);">' + esc(inv.invoiceNo || '') + '</span>' +
                         '<span style="font-size:0.75em;color:var(--acct-text-2);">' + esc(fmtDate(inv.invoiceDate)) + '</span>' +
                       '</div>' +
                       '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);text-align:right;">' + esc(fmtFull(toNum(inv.amount), sym, prec)) + '</span>' +
+                      '<span style="font-size:0.875em;color:var(--acct-text-2);text-align:right;">' +
+                        esc((inv.payStatus === 'Paid' || inv.payStatus === 'Partial') ? fmtFull(toNum(inv.paid), sym, prec) : '—') +
+                      '</span>' +
                       '<span style="font-size:0.8125em;color:var(--acct-text-2);text-align:right;">' + esc(fmtDate(inv.dueDate)) + '</span>' +
                       '<span style="text-align:right;"><span class="vas_105_acct-ivstatus ' + ivStatusClass(inv.payStatus) + '">' + esc(inv.payStatus || 'Open') + '</span></span>' +
                     '</div>';
@@ -996,21 +1118,31 @@
 
         // ── renderProjects ────────────────────────────────────────────────────
         function projStatusClass(code) {
-            if (code === 'OP' || code === 'AC') return 'vas_105_acct-projstatus--active';
-            if (code === 'PL')                  return 'vas_105_acct-projstatus--planning';
-            if (code === 'OH')                  return 'vas_105_acct-projstatus--hold';
-            if (code === 'CL' || code === 'CO') return 'vas_105_acct-projstatus--complete';
+            if (code === 'OP' || code === 'AC' || code === 'IP') return 'vas_105_acct-projstatus--active';
+            if (code === 'PL' || code === 'DR')                  return 'vas_105_acct-projstatus--planning';
+            if (code === 'OH')                                   return 'vas_105_acct-projstatus--hold';
+            if (code === 'CL' || code === 'CO')                  return 'vas_105_acct-projstatus--complete';
             return 'vas_105_acct-projstatus--planning';
         }
-        function projStatusLabel(code) {
-            var map = {'OP':'Active','AC':'Active','PL':'Planning','OH':'On Hold','CL':'Closed','CO':'Complete'};
-            return map[code] || code || '—';
+        // Display name comes from AD_Ref_List via the server (p.statusName).
+        // Fall back to the raw code if the ref list lookup returned nothing.
+        function projStatusLabel(p) {
+            return (p && p.statusName) ? p.statusName : ((p && p.statusCode) ? p.statusCode : '—');
         }
 
         function renderProjects(el, data) {
-            var items = (data && data.items) ? data.items : [];
+            var allItems = (data && data.items) ? data.items : [];
+            // Main panel shows only Draft, In Progress, and Complete — Hold (OH) and Closed (CL) are
+            // accessible via the "View All" button which fetches the full unfiltered list.
+            var HIDDEN_PROJ_CODES = { 'OH': 1, 'CL': 1 };
+            allItems = allItems.filter(function (p) { return !HIDDEN_PROJ_CODES[p.statusCode]; });
 
-            if (!items.length) { el.innerHTML = emptyState('VAS_105_NoProjects'); return; }
+            if (!allItems.length) { el.innerHTML = emptyState('VAS_105_NoProjects'); return; }
+
+            // Client-side pagination — slice the current page
+            var total     = allItems.length;
+            var pageStart = _projectsPage * PROJ_PAGE_SIZE;
+            var items     = allItems.slice(pageStart, pageStart + PROJ_PAGE_SIZE);
 
             var SVG_PROJECT = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>';
             var html =
@@ -1027,15 +1159,33 @@
                     '<div class="vas_105_acct-projrow" style="grid-template-columns:2.25em 2fr 1fr 0.8fr;gap:0.75em;" data-proj-idx="' + i + '">' +
                       '<span class="vas_105_acct-wicon vas_105_acct-wicon--violet">' + SVG_PROJECT + '</span>' +
                       '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);">' + esc(p.name || '') + '</span>' +
-                      '<span><span class="vas_105_acct-projstatus ' + projStatusClass(p.statusCode) + '">' + esc(projStatusLabel(p.statusCode)) + '</span></span>' +
+                      '<span><span class="vas_105_acct-projstatus ' + projStatusClass(p.statusCode) + '">' + esc(projStatusLabel(p)) + '</span></span>' +
                       '<span style="font-size:0.8125em;color:var(--acct-text-2);text-align:right;">' + esc(fmtDate(p.due)) + '</span>' +
                     '</div>';
             }
+
+            html += buildSectionPager('projects', total, _projectsPage, PROJ_PAGE_SIZE);
             el.innerHTML = html;
 
+            // Wire row clicks (items is the current-page slice)
             var rows = el.querySelectorAll('.vas_105_acct-projrow');
             for (var ri = 0; ri < rows.length; ri++) {
                 (function(row, p) { row.onclick = function () { openProjectDetail(p); }; })(rows[ri], items[ri]);
+            }
+
+            // Wire pagination buttons
+            if (total > PROJ_PAGE_SIZE) {
+                var prevBtn = document.getElementById('vas_105_projectsprev_' + widgetID);
+                var nextBtn = document.getElementById('vas_105_projectsnext_' + widgetID);
+                var maxPage = Math.ceil(total / PROJ_PAGE_SIZE) - 1;
+                if (prevBtn) prevBtn.onclick = function () {
+                    _projectsPage = Math.max(0, _projectsPage - 1);
+                    renderProjects(el, data);
+                };
+                if (nextBtn) nextBtn.onclick = function () {
+                    _projectsPage = Math.min(maxPage, _projectsPage + 1);
+                    renderProjects(el, data);
+                };
             }
         }
 
@@ -1125,7 +1275,7 @@
             return html;
         }
 
-        function renderTasks(data) {
+        function renderTasks(el, data) {
             var items    = (data && data.items) ? data.items : [];
             var upcoming = items.filter(function (t) { return !(t.isClosed === true || t.isClosed === 'true'); });
             var previous = items.filter(function (t) { return   t.isClosed === true || t.isClosed === 'true';  });
@@ -1133,7 +1283,35 @@
             if (cntEl) cntEl.textContent = upcoming.length > 0 ? (String(upcoming.length) + ' ' + msg('Open')) : '';
             _bpSectionCounts['tasks'] = items.length;
             applyAddBtnState();
-            return renderTaskList(taskFilter === 'previous' ? previous : upcoming);
+
+            var allTasks = taskFilter === 'previous' ? previous : upcoming;
+            var total    = allTasks.length;
+
+            // Guard page index
+            var maxPage = Math.max(0, Math.ceil(total / TASK_PAGE_SIZE) - 1);
+            if (_tasksPage > maxPage) _tasksPage = maxPage;
+            if (_tasksPage < 0)       _tasksPage = 0;
+
+            var pageStart = _tasksPage * TASK_PAGE_SIZE;
+            var pageTasks = allTasks.slice(pageStart, pageStart + TASK_PAGE_SIZE);
+
+            var html = renderTaskList(pageTasks);
+            html += buildSectionPager('tasks', total, _tasksPage, TASK_PAGE_SIZE);
+            el.innerHTML = html;
+
+            // Wire pagination buttons
+            if (total > TASK_PAGE_SIZE) {
+                var prevBtn = document.getElementById('vas_105_tasksprev_' + widgetID);
+                var nextBtn = document.getElementById('vas_105_tasksnext_' + widgetID);
+                if (prevBtn) prevBtn.onclick = function () {
+                    _tasksPage = Math.max(0, _tasksPage - 1);
+                    renderTasks(el, data);
+                };
+                if (nextBtn) nextBtn.onclick = function () {
+                    _tasksPage = Math.min(maxPage, _tasksPage + 1);
+                    renderTasks(el, data);
+                };
+            }
         }
 
         function loadTasks() {
@@ -1261,7 +1439,7 @@
                 var titleText = item.title || '';
                 if (item.touchType === 'NOTE') {
                     titleText = (item.title || msg('Notes')) + (item.who ? ' · ' + item.who : '');
-                } else if (item.touchType === 'EMAIL') {
+                } else if (item.touchType === 'EMAIL' || item.touchType === 'LETTER') {
                     var emailPrefix = item.direction === 'in' ? msg('From') : msg('To');
                     titleText = (item.title || '') + (item.who ? ' · ' + emailPrefix + ' ' + item.who : '');
                 } else if (item.touchType === 'CHAT') {
@@ -1287,7 +1465,7 @@
                     if (item.who) mtParts.push(esc(item.who));
                     if (item.hasTranscript) mtParts.push('<span class="vas_105_eng-meta-badge">' + SVG_TRANSCRIPT + ' ' + esc(msg('Transcript')) + '</span>');
                     metaHtml = mtParts.join('&nbsp;&nbsp;');
-                } else if (item.touchType === 'EMAIL') {
+                } else if (item.touchType === 'EMAIL' || item.touchType === 'LETTER') {
                     var emParts = [];
                     if (item.who) emParts.push(esc(item.who));
                     if (item.direction === 'in')  emParts.push('<span class="vas_105_eng-meta-badge">' + SVG_REPLY + ' ' + esc(msg('VAS_105_ReplyReceived')) + '</span>');
@@ -1328,6 +1506,7 @@
                     '      <span class="vas_105_eng-ts">', esc(fmtEngTs(item.whenTs)), '</span>',
                     '    </div>',
                     '    <div class="vas_105_eng-tl-title">', esc(titleText), '</div>',
+                    (isMeeting && item.description) ? '<div class="vas_105_eng-tl-preview">' + esc(item.description) + '</div>' : '',
                     item.preview ? '<div class="vas_105_eng-tl-preview">' + (item.touchType === 'CHAT' ? '&ldquo;' + esc(item.preview) + '&rdquo;' : esc(item.preview)) + '</div>' : '',
                     metaHtml ? '<div class="vas_105_eng-tl-meta">' + metaHtml + '</div>' : '',
                     '  </div>',
@@ -1336,39 +1515,23 @@
             }
             html += '</div>';
 
-            // Pager — same shell the Orders / Invoices panels use, but the pages
-            // are cut from the payload already in hand rather than re-fetched.
-            if (engPageCount > 1) {
-                var engChevL = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#586575" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
-                var engChevR = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#586575" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
-                html +=
-                    '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.625em;">' +
-                      '<span class="of-lu-count" style="font-size:0.8125em;color:var(--acct-text-2);">' +
-                        esc(msg('VAS_040_Showing')) + ' <b>' + (engStart + 1) + '&ndash;' + engEnd + '</b> ' +
-                        esc(msg('of')) + ' <b>' + items.length + '</b>' +
-                      '</span>' +
-                      '<nav class="of-lu-pager-controls" role="navigation">' +
-                        '<button type="button" class="of-lu-pager-btn of-lu-prev-btn" data-eng-page="' + (_engPage - 1) + '"' +
-                          (_engPage <= 0 ? ' disabled' : '') + '>' + engChevL + '</button>' +
-                        '<button type="button" class="of-lu-pager-btn of-lu-next-btn" data-eng-page="' + (_engPage + 1) + '"' +
-                          (_engPage >= engPageCount - 1 ? ' disabled' : '') + '>' + engChevR + '</button>' +
-                      '</nav>' +
-                    '</div>';
-            }
+            // Pager — uses the same buildSectionPager shell as Opps / Contracts / Projects.
+            html += buildSectionPager('eng', items.length, _engPage, ENGAGEMENT_PER_PAGE);
 
             el.innerHTML = html;
 
-            // Bound here rather than delegated on $root: the pager has to re-enter
-            // this same function with the same el / data to repaint the rail.
+            // Wire prev/next by ID, same pattern as renderOpps / renderContracts.
             if (engPageCount > 1) {
-                $(el).find('[data-eng-page]').on('click', function (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    var p = parseInt(this.getAttribute('data-eng-page'), 10);
-                    if (isNaN(p) || p < 0 || p > engPageCount - 1) return;
-                    _engPage = p;
+                var engPrevBtn = document.getElementById('vas_105_engprev_' + widgetID);
+                var engNextBtn = document.getElementById('vas_105_engnext_' + widgetID);
+                if (engPrevBtn) engPrevBtn.onclick = function () {
+                    _engPage = Math.max(0, _engPage - 1);
                     renderEngagement(el, data);
-                });
+                };
+                if (engNextBtn) engNextBtn.onclick = function () {
+                    _engPage = Math.min(engPageCount - 1, _engPage + 1);
+                    renderEngagement(el, data);
+                };
             }
         }
 
@@ -1438,46 +1601,368 @@
                    '<span style="font-size:1em;color:#102C3F;">' + esc(value) + '</span></div>';
         }
 
+        // Standard two-button footer for all record detail modals.
+        // The "Open record" button onclick is wired by each caller after showModal().
+        function detailFoot() {
+            var closeHtml = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" ' +
+                            'onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' +
+                            esc(msg('VIS_Close')) + '</button>';
+            var openHtml  = '<button class="vas_105_acct-btn vas_105_acct-btn--primary" id="vas_105_openrec_' + widgetID + '">' +
+                            esc(msg('VAS_105_OpenRecord')) + '</button>';
+            return '<div style="display:flex;gap:0.5em;justify-content:flex-end;">' + closeHtml + openHtml + '</div>';
+        }
+
+        // Footer for the contract detail modal — "Open contract" with document icon.
+        function contractFoot() {
+            var SVG_DOC   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+            var closeHtml = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" ' +
+                            'onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' +
+                            esc(msg('VIS_Close')) + '</button>';
+            var openHtml  = '<button class="vas_105_acct-btn vas_105_acct-btn--primary" id="vas_105_openrec_' + widgetID + '" ' +
+                            'style="display:inline-flex;align-items:center;gap:0.375em;">' +
+                            SVG_DOC + '<span>' + esc(msg('VAS_105_OpenContract')) + '</span></button>';
+            return '<div style="display:flex;gap:0.5em;justify-content:flex-end;">' + closeHtml + openHtml + '</div>';
+        }
+
+        // Footer for the opportunity detail modal — "Open opportunity" button.
+        function oppFoot() {
+            var SVG_OPP   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>';
+            var closeHtml = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" ' +
+                            'onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' +
+                            esc(msg('VIS_Close')) + '</button>';
+            var openHtml  = '<button class="vas_105_acct-btn vas_105_acct-btn--primary" id="vas_105_openrec_' + widgetID + '" ' +
+                            'style="display:inline-flex;align-items:center;gap:0.375em;">' +
+                            SVG_OPP + '<span>' + esc(msg('VAS_105_OpenOpportunity')) + '</span></button>';
+            return '<div style="display:flex;gap:0.5em;justify-content:flex-end;">' + closeHtml + openHtml + '</div>';
+        }
+
         function openOppDetail(o) {
-            var sym  = getSym(); var prec = getPrec();
-            var body = detailRow(msg('VAS_105_Stage'), o.stageName || stageLabel(o.stageCode)) +
-                       detailRow(msg('VAS_Value'), fmtFull(toNum(o.value), sym, prec)) +
-                       detailRow(msg('VAS_105_CloseDate'), fmtDate(o.closeDate)) +
-                       detailRow(msg('VAS_105_Probability'), o.probability ? (String(o.probability) + '%') : '') +
-                       detailRow(msg('VAS_105_Owner'), o.owner) +
-                       detailRow(msg('VAS_105_OppCode'), o.oppCode);
-            var foot = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' + esc(msg('VIS_Close')) + '</button>';
-            showModal(o.name || msg('Opportunity'), msg('VAS_105_OpportunityDetail'), body, foot, false);
+            var sym    = getSym(); var prec = getPrec();
+            var bpName = (sectionState.overview && sectionState.overview.data && sectionState.overview.data.name)
+                       ? sectionState.overview.data.name : '';
+
+            var stageCls = stageClass(o.stageCode, o.stageName);
+            var sLabel   = o.stageName || stageLabel(o.stageCode);
+
+            // Helper: a row inside the 2-column section — label left, value right
+            function oRow(lbl, val) {
+                if (val === null || val === undefined || val === '') return '';
+                return '<div style="display:flex;justify-content:space-between;align-items:baseline;' +
+                       'gap:0.75em;padding:0.5625em 0;border-bottom:0.0625em solid #EDF2F6;">' +
+                       '<span style="font-size:0.875em;color:#5F7283;white-space:nowrap;">' + esc(lbl) + '</span>' +
+                       '<span style="font-size:0.875em;color:#102C3F;text-align:right;">' + esc(String(val)) + '</span>' +
+                       '</div>';
+            }
+
+            var descHtml = o.description
+                ? '<p style="margin-top:1.25em;margin-bottom:0;font-size:0.875em;line-height:1.65;' +
+                  'color:#5F7283;padding:0.875em 1em;background:#F8FAFC;' +
+                  'border:0.0625em solid #E4EDF4;border-radius:0.5em;">' + esc(o.description) + '</p>'
+                : '';
+
+            var ageStr = (o.ageInStage != null) ? (String(o.ageInStage) + ' ' + msg('VIS_Days')) : '';
+
+            var body =
+                // ── Opp code (small) + Opp name + Stage badge ───────────────────
+                (o.oppCode ? '<div style="font-size:0.75em;color:#5F7283;margin-bottom:0.25em;">' + esc(o.oppCode) + '</div>' : '') +
+                '<div style="display:flex;align-items:center;gap:0.625em;flex-wrap:wrap;' +
+                'padding-bottom:1em;margin-bottom:1.25em;border-bottom:0.0625em solid #EDF2F6;">' +
+                  '<span style="font-size:1.25em;font-weight:700;color:var(--acct-text);">' + esc(o.name || '') + '</span>' +
+                  '<span class="vas_105_acct-stage ' + stageCls + '">' + esc(sLabel) + '</span>' +
+                '</div>' +
+                // ── 3-column KPI: Value · Probability · Close date ───────────────
+                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5em 1em;' +
+                'padding-bottom:1.25em;margin-bottom:1em;border-bottom:0.0625em solid #EDF2F6;">' +
+                  '<div>' +
+                    '<div style="font-size:0.75em;color:#5F7283;margin-bottom:0.25em;">' + esc(msg('VAS_Value')) + '</div>' +
+                    '<div style="font-size:1.125em;font-weight:700;color:var(--acct-text);">' + esc(fmtFull(toNum(o.value), sym, prec)) + '</div>' +
+                  '</div>' +
+                  '<div>' +
+                    '<div style="font-size:0.75em;color:#5F7283;margin-bottom:0.25em;">' + esc(msg('VAS_105_Probability')) + '</div>' +
+                    '<div style="font-size:1.125em;font-weight:700;color:var(--acct-text);">' + esc(o.probability ? (String(o.probability) + '%') : '—') + '</div>' +
+                  '</div>' +
+                  '<div>' +
+                    '<div style="font-size:0.75em;color:#5F7283;margin-bottom:0.25em;">' + esc(msg('VAS_105_CloseDate')) + '</div>' +
+                    '<div style="font-size:1.125em;font-weight:700;color:var(--acct-text);">' + esc(fmtDate(o.closeDate) || '—') + '</div>' +
+                  '</div>' +
+                '</div>' +
+                // ── 2-column detail rows: Owner/Contact + AgeInStage/NextStep ────
+                '<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:2.5em;">' +
+                  '<div>' +
+                    oRow(msg('VAS_105_Owner'),      o.owner) +
+                    oRow(msg('VAS_105_AgeInStage'), ageStr) +
+                  '</div>' +
+                  '<div>' +
+                    oRow(msg('VAS_105_PrimaryContact'), o.primaryContact) +
+                    oRow(msg('VAS_105_NextStep'),        o.nextStep) +
+                  '</div>' +
+                '</div>' +
+                descHtml;
+
+            var metaStr = [o.name, bpName].filter(Boolean).join(' · ');
+            showModal(msg('VAS_105_OpportunityDetails'), metaStr, body, oppFoot(), false);
+
+            var btn = document.getElementById('vas_105_openrec_' + widgetID);
+            if (btn) btn.onclick = function () { openInWindow('VAS_Opportunity', 'VAS_Opportunity_ID', o.id); };
         }
 
         function openContractDetail(c) {
-            var sym  = getSym(); var prec = getPrec();
+            var sym     = getSym(); var prec = getPrec();
+            var today   = new Date().toISOString().split('T')[0];
+            var bpName  = (sectionState.overview && sectionState.overview.data && sectionState.overview.data.name)
+                        ? sectionState.overview.data.name : '';
+            var isOverdue   = (c.statusCode === 'Y' || c.statusCode === 'ARD') && c.endDate && c.endDate < today;
+            var statusCls   = isOverdue ? 'vas_105_acct-ctstatus--expired' : contractStatusClass(c.statusCode);
+            var statusLabel = isOverdue ? msg('VIS_OverDue') : contractStatusLabel(c.statusCode);
+            var isCC        = c.source === 'CC';
+
+            // Shared row: label left, value right, separator bottom
+            function ctRow(lbl, val) {
+                if (val === null || val === undefined || val === '') return '';
+                return '<div style="display:flex;justify-content:space-between;align-items:baseline;' +
+                       'gap:0.75em;padding:0.5625em 0;border-bottom:0.0625em solid #EDF2F6;">' +
+                       '<span style="font-size:0.875em;color:#5F7283;white-space:nowrap;">' + esc(lbl) + '</span>' +
+                       '<span style="font-size:0.875em;color:#102C3F;text-align:right;">' + esc(String(val)) + '</span>' +
+                       '</div>';
+            }
+
+            // Product label: first product + "+N more" chip when multiple lines exist
+            var productCount = (c.productCount != null) ? parseInt(c.productCount, 10) : 0;
+            var chipId       = 'vas_105_prodchip_' + widgetID;
+            var productStr   = '';
+            if (c.productName) {
+                productStr = esc(c.productName);
+                if (productCount > 1)
+                    productStr += ' <span id="' + chipId + '" style="display:inline-block;font-size:0.75em;font-weight:700;' +
+                        'background:#EFF6FF;color:#1D4ED8;border-radius:0.375em;padding:0.1em 0.5em;' +
+                        'margin-left:0.25em;vertical-align:middle;cursor:default;">+' + (productCount - 1) + '</span>';
+            }
+
             var descHtml = c.description
-                ? '<div style="margin-top:1em;padding:0.875em;background:#F8FAFC;border:0.0625em solid #E4EDF4;border-radius:0.5em;font-size:0.875em;line-height:1.65;color:#102C3F;">' + esc(c.description) + '</div>'
+                ? '<p style="margin-top:1.25em;margin-bottom:0;font-size:0.875em;line-height:1.65;' +
+                  'color:#5F7283;padding:0.875em 1em;background:#F8FAFC;' +
+                  'border:0.0625em solid #E4EDF4;border-radius:0.5em;">' + esc(c.description) + '</p>'
                 : '';
-            var body = detailRow(msg('VAS_105_ContractNo'), c.contractNo) +
-                       detailRow(msg('Type'), c.typeCode) +
-                       detailRow(msg('Status'), contractStatusLabel(c.statusCode)) +
-                       detailRow(msg('StartDate'), fmtDate(c.startDate)) +
-                       detailRow(msg('EndDate'), c.endDate ? fmtDate(c.endDate) : 'Perpetual') +
-                       detailRow(msg('VAS_Value'), fmtFull(toNum(c.value), sym, prec)) +
-                       detailRow(msg('VAS_105_RenewalType'), c.renewalName || c.renewalCode) +
-                       (c.productName ? detailRow(msg('Product'), c.productName) : '') +
-                       descHtml;
-            var foot = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' + esc(msg('VIS_Close')) + '</button>';
-            showModal(c.name || c.contractNo || msg('VAS_105_Contract'), msg('VAS_105_ContractDetail'), body, foot, false);
+
+            // Date label varies by source: service contract = Bill Date; contract master = Contract Date
+            var dateLbl = isCC ? msg('VAS_105_BillDate') : msg('VAS_105_ContractDate');
+            var endHtml = c.endDate ? esc(fmtDate(c.endDate)) : '<em style="color:var(--acct-muted);">Perpetual</em>';
+
+            var body =
+                // ── Heading: document no + status badge + source badge ─────────
+                '<div style="display:flex;align-items:center;gap:0.625em;flex-wrap:wrap;' +
+                'padding-bottom:1em;margin-bottom:1.125em;border-bottom:0.0625em solid #EDF2F6;">' +
+                  '<span style="font-size:1.125em;font-weight:700;color:var(--acct-text);">' +
+                    esc(c.contractNo || msg('VAS_105_Contract')) +
+                  '</span>' +
+                  '<span class="vas_105_acct-ctstatus ' + statusCls + '">' + esc(statusLabel) + '</span>' +
+                  '<span class="vas_105_acct-ctsource">' +
+                    esc(isCC ? msg('VAS_105_ServiceContract') : msg('VAS_105_Contract')) +
+                  '</span>' +
+                '</div>' +
+                // ── 3-column KPI: Value | Bill/Contract Date | Owner ───────────
+                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5em 1em;' +
+                'padding-bottom:1.25em;margin-bottom:1em;border-bottom:0.0625em solid #EDF2F6;">' +
+                  '<div>' +
+                    '<div style="font-size:0.75em;color:#5F7283;margin-bottom:0.25em;">' + esc(msg('VAS_Value')) + '</div>' +
+                    '<div style="font-size:1.125em;font-weight:700;color:var(--acct-text);">' + esc(fmtFull(toNum(c.value), sym, prec)) + '</div>' +
+                  '</div>' +
+                  '<div>' +
+                    '<div style="font-size:0.75em;color:#5F7283;margin-bottom:0.25em;">' + esc(dateLbl) + '</div>' +
+                    '<div style="font-size:1em;font-weight:600;color:var(--acct-text);">' + esc(fmtDate(c.startDate) || '—') + '</div>' +
+                  '</div>' +
+                  '<div>' +
+                    '<div style="font-size:0.75em;color:#5F7283;margin-bottom:0.25em;">' + esc(msg('VAS_105_Owner')) + '</div>' +
+                    '<div style="font-size:0.875em;color:var(--acct-text);">' + esc(c.ownerName || '—') + '</div>' +
+                  '</div>' +
+                '</div>' +
+                // ── 2-column detail rows ──────────────────────────────────────
+                '<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:2.5em;">' +
+                  '<div>' +
+                    ctRow(msg('Type'), c.typeName || c.typeCode) +
+                    '<div style="display:flex;justify-content:space-between;align-items:baseline;' +
+                    'gap:0.75em;padding:0.5625em 0;border-bottom:0.0625em solid #EDF2F6;">' +
+                    '<span style="font-size:0.875em;color:#5F7283;white-space:nowrap;">' + esc(msg('VAS_105_Term')) + '</span>' +
+                    '<span style="font-size:0.875em;color:#102C3F;text-align:right;">' + esc(fmtDate(c.startDate)) + ' – ' + endHtml + '</span>' +
+                    '</div>' +
+                  '</div>' +
+                  '<div>' +
+                    ctRow(msg('VAS_105_RenewalType'), c.renewalName || c.renewalCode) +
+                    (productStr
+                        ? '<div style="display:flex;justify-content:space-between;align-items:baseline;' +
+                          'gap:0.75em;padding:0.5625em 0;border-bottom:0.0625em solid #EDF2F6;">' +
+                          '<span style="font-size:0.875em;color:#5F7283;white-space:nowrap;">' + esc(msg('Product')) + '</span>' +
+                          '<span style="font-size:0.875em;color:#102C3F;text-align:right;">' + productStr + '</span>' +
+                          '</div>'
+                        : '') +
+                    ctRow(msg('VAS_105_AttrDesc'), c.attributeDesc) +
+                  '</div>' +
+                '</div>' +
+                descHtml;
+
+            var metaStr = [c.contractNo, bpName].filter(Boolean).join(' · ');
+            showModal(msg('VAS_105_ContractDetails'), metaStr, body, contractFoot(), false);
+
+            // Open record button
+            var btn = document.getElementById('vas_105_openrec_' + widgetID);
+            if (btn) btn.onclick = function () {
+                if (isCC) {
+                    // C_Contract is shared by purchasing + service contract windows;
+                    // look up by VAS_ServiceContract window name to open the correct one.
+                    closeModal();
+                    $.ajax({
+                        url:  VIS.Application.contextUrl + 'VAS/VAS_105_AccountRightPanel/GetWindowId',
+                        type: 'POST',
+                        data: { windowName: 'VAS_ServiceContract' },
+                        async: true,
+                        success: function(raw) {
+                            var parsed = null;
+                            try { parsed = (typeof raw === 'string') ? jQuery.parseJSON(raw) : raw; } catch(e) {}
+                            var wid = (parsed && parsed.windowId) ? parsed.windowId : 0;
+                            if (wid > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
+                                var q = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
+                                    ? VIS.Query.prototype.getEqualQuery('C_Contract_ID', c.id)
+                                    : null;
+                                VIS.viewManager.startWindow(wid, q);
+                            }
+                        }
+                    });
+                } else {
+                    openInWindow('VAS_ContractMaster', 'VAS_ContractMaster_ID', c.id);
+                }
+            };
+
+            // Product chip tooltip — hover shows all product names when there are multiple
+            var tipId = 'vas_105_ptip_' + widgetID;
+            var oldTip = document.getElementById(tipId);
+            if (oldTip) oldTip.parentNode.removeChild(oldTip);
+            if (productCount > 1 && c.productNames) {
+                var chip = document.getElementById(chipId);
+                if (chip) {
+                    var names = String(c.productNames).split('\n').filter(Boolean);
+                    var tip = document.createElement('div');
+                    tip.id = tipId;
+                    tip.style.cssText = 'position:fixed;z-index:99999;background:#1E2836;color:#F5F8FA;' +
+                        'font-size:0.8125em;line-height:1.7;border-radius:0.375em;padding:0.5em 0.75em;' +
+                        'pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:none;' +
+                        'max-width:22em;word-break:break-word;';
+                    tip.innerHTML = names.map(function(n) { return '• ' + esc(n); }).join('<br>');
+                    document.body.appendChild(tip);
+                    chip.addEventListener('mouseenter', function() {
+                        var r = chip.getBoundingClientRect();
+                        // Position below the chip; flip above if too close to bottom of viewport
+                        tip.style.display = 'block';
+                        var th = tip.offsetHeight;
+                        var top = r.bottom + 6;
+                        if (top + th > window.innerHeight - 8) top = r.top - th - 6;
+                        tip.style.left = r.left + 'px';
+                        tip.style.top  = top + 'px';
+                    });
+                    chip.addEventListener('mouseleave', function() {
+                        tip.style.display = 'none';
+                    });
+                }
+            }
         }
 
         function openTicketDetail(t) {
-            var body = detailRow(msg('VAS_105_TicketNo'), t.ticketNo) +
-                       detailRow(msg('Subject'), t.subject) +
-                       detailRow(msg('Priority'), t.priorityName || prioLabel(t.priorityCode)) +
-                       detailRow(msg('Status'), t.status) +
-                       detailRow(msg('VAS_105_Opened'), fmtDate(t.opened)) +
-                       detailRow(msg('VAS_105_AgeDays'), t.ageDays != null ? (String(t.ageDays) + ' ' + msg('VIS_Days')) : '') +
-                       detailRow(msg('Contact'), t.contact);
-            var foot = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' + esc(msg('VIS_Close')) + '</button>';
-            showModal(t.ticketNo || msg('VAS_105_Ticket'), t.subject || '', body, foot, false);
+            // Priority badge — colored pill using semantic tone palette
+            function prioBadge(code, name) {
+                var c = String(code || '').toLowerCase();
+                var n = String(name || '').toLowerCase();
+                var bg, color, border;
+                if (c === '1' || n.indexOf('urgent') >= 0) {
+                    bg = '#FCEFEF'; color = '#A33F3F'; border = '#EDC8C8';
+                } else if (c === '3' || n.indexOf('high') >= 0) {
+                    bg = '#FFF8E8'; color = '#9A6500'; border = '#EBD7A6';
+                } else if (c === '5' || c === '2' || n.indexOf('medium') >= 0) {
+                    bg = '#EEF8FF'; color = '#005FA3'; border = '#CFE0ED';
+                } else if (n.indexOf('low') >= 0 || n.indexOf('minor') >= 0) {
+                    bg = '#EFF8F0'; color = '#0B6B45'; border = '#CFEAD9';
+                } else {
+                    bg = '#F1F4F8'; color = '#5F7283'; border = '#D9E2EB';
+                }
+                var label = name || prioLabel(code) || code;
+                return '<span style="display:inline-block;border-radius:999px;padding:0.1875em 0.625em;' +
+                       'font-size:0.75em;font-weight:700;background:' + bg + ';color:' + color +
+                       ';border:1px solid ' + border + ';">' + esc(label) + '</span>';
+            }
+
+            // SLA cell — red/amber text if breached or due today
+            function slaHtml() {
+                if (!t.dateNextAction) return '—';
+                var d;
+                try { d = new Date(t.dateNextAction); } catch (e) { return '—'; }
+                if (isNaN(d.getTime())) return '—';
+                d.setHours(0, 0, 0, 0);
+                var today = new Date(); today.setHours(0, 0, 0, 0);
+                var diff = Math.round((d - today) / 86400000);
+                if (diff < 0) {
+                    return '<span style="color:#D14545;font-weight:700;">' +
+                           esc(fmtDate(t.dateNextAction)) + ' (' + String(-diff) + 'd ' + esc(msg('VIS_OverDue')) + ')</span>';
+                }
+                if (diff === 0) {
+                    return '<span style="color:#9A6500;font-weight:700;">' +
+                           esc(fmtDate(t.dateNextAction)) + ' (' + esc(msg('VAS_105_DueToday')) + ')</span>';
+                }
+                return esc(fmtDate(t.dateNextAction)) + ' (' + diff + 'd)';
+            }
+
+            var lStyle = 'font-size:0.75em;color:#5F7283;font-weight:400;white-space:nowrap;align-self:center;';
+            var vStyle = 'font-size:0.8125em;color:#102C3F;font-weight:700;';
+
+            // 4-column info grid: label | value | label | value (3 rows)
+            var infoHtml =
+                '<div style="display:grid;grid-template-columns:auto 1fr auto 1fr;gap:0.625em 0.75em;' +
+                'padding:0.875em 0;margin-bottom:0.875em;' +
+                'border-top:0.0625em solid #EDF2F6;border-bottom:0.0625em solid #EDF2F6;">' +
+                  '<span style="' + lStyle + '">' + esc(msg('Priority')) + '</span>' +
+                  '<span style="' + vStyle + '">' + prioBadge(t.priorityCode, t.priorityName) + '</span>' +
+                  '<span style="' + lStyle + '">' + esc(msg('Status')) + '</span>' +
+                  '<span style="' + vStyle + '">' + esc(t.status || '—') +
+                      (t.ageDays ? ' &middot;&nbsp;' + String(t.ageDays) + 'd' : '') + '</span>' +
+
+                  '<span style="' + lStyle + '">' + esc(msg('VAS_105_ReportedBy')) + '</span>' +
+                  '<span style="' + vStyle + '">' + esc(t.contact || '—') + '</span>' +
+                  '<span style="' + lStyle + '">' + esc(msg('VAS_105_AssignedTo')) + '</span>' +
+                  '<span style="' + vStyle + '">' + esc(t.assignedTo || '—') + '</span>' +
+
+                  '<span style="' + lStyle + '">' + esc(msg('VAS_105_Opened')) + '</span>' +
+                  '<span style="' + vStyle + '">' + esc(fmtDate(t.opened) || '—') + '</span>' +
+                  '<span style="' + lStyle + '">' + esc(msg('VAS_105_SLA')) + '</span>' +
+                  '<span style="' + vStyle + '">' + slaHtml() + '</span>' +
+                '</div>';
+
+            var descHtml = t.description
+                ? '<p style="margin:0 0 0.875em;font-size:0.875em;line-height:1.65;color:#5F7283;' +
+                  'padding:0.875em 1em;background:#F8FAFC;border:0.0625em solid #E4EDF4;' +
+                  'border-radius:0.5em;white-space:pre-wrap;">' + esc(t.description) + '</p>'
+                : '';
+
+            var bodyHtml =
+                '<div style="font-size:1.125em;font-weight:700;color:#102C3F;margin-bottom:0.125em;">' +
+                esc(t.subject || '') + '</div>' +
+                infoHtml + descHtml;
+
+            // Ticket footer — external-link icon on "Open record" button
+            var SVG_EXT = '<svg style="width:0.875em;height:0.875em;flex-shrink:0;" viewBox="0 0 16 16" fill="none" ' +
+                'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M7 3H3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9"/>' +
+                '<polyline points="10 1 15 1 15 6"/><line x1="15" y1="1" x2="7" y2="9"/></svg>';
+            var closeBtn = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" ' +
+                'onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID +
+                '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' +
+                esc(msg('VIS_Close')) + '</button>';
+            var openBtn = '<button class="vas_105_acct-btn vas_105_acct-btn--primary" ' +
+                'id="vas_105_openrec_' + widgetID + '" style="display:inline-flex;align-items:center;gap:0.375em;">' +
+                SVG_EXT + '<span>' + esc(msg('VAS_105_OpenRecord')) + '</span></button>';
+            var footHtml = '<div style="display:flex;gap:0.5em;justify-content:flex-end;">' + closeBtn + openBtn + '</div>';
+
+            var meta = (t.ticketNo || '') + (t.customerName ? ' · ' + t.customerName : '');
+            showModal(msg('VAS_105_TicketDetails'), meta, bodyHtml, footHtml, false);
+
+            var btn = document.getElementById('vas_105_openrec_' + widgetID);
+            if (btn) btn.onclick = function () { openInWindow('R_Request', 'R_Request_ID', t.id); };
         }
 
         function openOrderDetail(o) {
@@ -1487,8 +1972,9 @@
                        detailRow(msg('VAS_105_Items'), o.items) +
                        detailRow(msg('Amount'), fmtFull(toNum(o.amount), sym, prec)) +
                        detailRow(msg('Status'), orderStatusLabel(o.statusCode));
-            var foot = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' + esc(msg('VIS_Close')) + '</button>';
-            showModal(o.orderNo || msg('Order'), msg('VAS_OrderDetails'), body, foot, false);
+            showModal(o.orderNo || msg('Order'), msg('VAS_OrderDetails'), body, detailFoot(), false);
+            var btn = document.getElementById('vas_105_openrec_' + widgetID);
+            if (btn) btn.onclick = function () { closeModal(); openOrderInWindow(o.id); };
         }
 
         function openInvoiceDetail(inv) {
@@ -1499,21 +1985,139 @@
                        detailRow(msg('Amount'), fmtFull(toNum(inv.amount), sym, prec)) +
                        detailRow(msg('VAS_105_Paid'), fmtFull(toNum(inv.paid), sym, prec)) +
                        detailRow(msg('VAS_105_PayStatus'), inv.payStatus);
-            var foot = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' + esc(msg('VIS_Close')) + '</button>';
-            showModal(inv.invoiceNo || msg('Invoice'), msg('VAS_105_InvoiceDetail'), body, foot, false);
+            showModal(inv.invoiceNo || msg('Invoice'), msg('VAS_105_InvoiceDetail'), body, detailFoot(), false);
+            var btn = document.getElementById('vas_105_openrec_' + widgetID);
+            if (btn) btn.onclick = function () { openInWindow('C_Invoice', 'C_Invoice_ID', inv.id); };
         }
 
         function openProjectDetail(p) {
-            var sym  = getSym(); var prec = getPrec();
-            var body = detailRow(msg('Project'), p.name) +
-                       detailRow(msg('Status'), projStatusLabel(p.statusCode)) +
-                       detailRow(msg('VAS_105_Due'), fmtDate(p.due)) +
-                       detailRow(msg('StartDate'), fmtDate(p.startDate)) +
-                       detailRow(msg('Lead'), p.lead) +
-                       detailRow(msg('Budget'), fmtFull(toNum(p.budget), sym, prec)) +
-                       (p.description ? '<div style="margin-top:0.625em;font-size:0.8125em;color:#102C3F;line-height:1.5;">' + esc(p.description) + '</div>' : '');
-            var foot = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' + esc(msg('VIS_Close')) + '</button>';
-            showModal(p.name || msg('Project'), msg('VAS_105_ProjectDetail'), body, foot, false);
+            var sym    = getSym(); var prec = getPrec();
+            var bpName = (sectionState.overview && sectionState.overview.data && sectionState.overview.data.name)
+                       ? sectionState.overview.data.name : '';
+
+            // ── Heading: project name + inline status badge ───────────────────
+            var headHtml =
+                '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.5em;' +
+                'padding-bottom:1.125em;margin-bottom:1em;border-bottom:0.0625em solid #EDF2F6;">' +
+                  '<span style="font-size:1.125em;font-weight:700;color:#102C3F;">' + esc(p.name || '') + '</span>' +
+                  '<span class="vas_105_acct-projstatus ' + projStatusClass(p.statusCode) + '">' +
+                    esc(projStatusLabel(p)) +
+                  '</span>' +
+                '</div>';
+
+            // ── 2-column info grid: label left, value right within each column ─
+            function iCell(lbl, val) {
+                return '<div style="display:flex;justify-content:space-between;align-items:baseline;' +
+                       'gap:0.5em;padding:0.5625em 0;border-bottom:0.0625em solid #EDF2F6;">' +
+                       '<span style="font-size:0.875em;color:#5F7283;white-space:nowrap;">' + esc(lbl) + '</span>' +
+                       '<span style="font-size:0.875em;font-weight:600;color:#102C3F;text-align:right;">' +
+                         esc(String(val || '—')) +
+                       '</span></div>';
+            }
+            var gridHtml =
+                '<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:2.5em;margin-bottom:1em;">' +
+                  '<div>' +
+                    iCell(msg('Lead'), p.lead) +
+                    iCell(msg('StartDate'), fmtDate(p.startDate) || '—') +
+                  '</div>' +
+                  '<div>' +
+                    iCell(msg('Budget'), p.budget ? fmtFull(toNum(p.budget), sym, prec) : '—') +
+                    iCell(msg('VAS_105_Due'), fmtDate(p.due) || '—') +
+                  '</div>' +
+                '</div>';
+
+            // ── Description: plain text, no background box ────────────────────
+            var descHtml = p.description
+                ? '<p style="margin:0 0 0.875em;font-size:0.875em;line-height:1.65;color:#5F7283;">' +
+                  esc(p.description) + '</p>'
+                : '';
+
+            // ── Phase list placeholder (filled by AJAX below) ─────────────────
+            // ProjectLineLevel 'P' = direct project lines (no phases); anything else = phase/task level.
+            var hasPhases = p.projectLineLevel && p.projectLineLevel !== 'P';
+            var phaseBlock = hasPhases
+                ? '<div id="vas_105_phaselist_' + widgetID + '" style="margin-top:1em;">' +
+                    '<span style="font-size:0.8125em;color:var(--acct-muted);">' + esc(msg('VAS_105_LoadingPhases')) + '</span>' +
+                  '</div>'
+                : '';
+
+            var body = headHtml + gridHtml + descHtml + phaseBlock;
+
+            // ── Footer: Close + "Open project" with external-link icon ────────
+            var SVG_EXT   = '<svg style="width:0.875em;height:0.875em;flex-shrink:0;" viewBox="0 0 16 16" fill="none" ' +
+                            'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                            '<path d="M7 3H3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9"/>' +
+                            '<polyline points="10 1 15 1 15 6"/><line x1="15" y1="1" x2="7" y2="9"/></svg>';
+            var closeHtml = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" ' +
+                            'onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' +
+                            esc(msg('VIS_Close')) + '</button>';
+            var openHtml  = '<button class="vas_105_acct-btn vas_105_acct-btn--primary" id="vas_105_openrec_' + widgetID + '" ' +
+                            'style="display:inline-flex;align-items:center;gap:0.375em;">' +
+                            SVG_EXT + '<span>' + esc(msg('VAS_105_OpenProject')) + '</span></button>';
+            var foot = '<div style="display:flex;gap:0.5em;justify-content:flex-end;">' + closeHtml + openHtml + '</div>';
+
+            var metaStr = [p.name, bpName].filter(Boolean).join(' · ');
+            showModal(msg('VAS_105_ProjectDetails'), metaStr, body, foot, false);
+
+            var btn = document.getElementById('vas_105_openrec_' + widgetID);
+            if (btn) btn.onclick = function () {
+                // C_Project may resolve the wrong window via table lookup; look up VAS_Project by name.
+                closeModal();
+                $.ajax({
+                    url:  VIS.Application.contextUrl + 'VAS/VAS_105_AccountRightPanel/GetWindowId',
+                    type: 'POST',
+                    data: { windowName: 'VAS_Project' },
+                    async: true,
+                    success: function(raw) {
+                        var parsed = null;
+                        try { parsed = (typeof raw === 'string') ? jQuery.parseJSON(raw) : raw; } catch(e) {}
+                        var wid = (parsed && parsed.windowId) ? parsed.windowId : 0;
+                        if (wid > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
+                            var q = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
+                                ? VIS.Query.prototype.getEqualQuery('C_Project_ID', p.id)
+                                : null;
+                            VIS.viewManager.startWindow(wid, q);
+                        }
+                    }
+                });
+            };
+
+            // Fetch and render the phase list for phase-organised projects
+            if (hasPhases) {
+                $.post(
+                    VIS.Application.contextUrl + 'VAS/VAS_105_AccountRightPanel/GetProjectPhases',
+                    { projectId: p.id },
+                    function (raw) {
+                        var phaseEl = document.getElementById('vas_105_phaselist_' + widgetID);
+                        if (!phaseEl) return;
+                        try {
+                            var res    = JSON.parse(JSON.parse(raw));
+                            var phases = (res && res.phases) ? res.phases : [];
+                            if (!phases.length) { phaseEl.innerHTML = ''; return; }
+                            var SVG_DONE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+                            var SVG_PEND = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>';
+                            var ph = '<div style="margin-top:0.75em;margin-bottom:0.25em;">' +
+                                     '<span style="font-size:0.75em;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--acct-muted);">' +
+                                     esc(msg('VAS_105_Phases')) + '</span></div>';
+                            for (var i = 0; i < phases.length; i++) {
+                                var phase = phases[i];
+                                ph += '<div style="display:flex;align-items:flex-start;gap:0.625em;padding:0.5em 0;border-bottom:0.0625em solid #F1F5F9;">' +
+                                        '<span style="margin-top:0.125em;flex-shrink:0;">' + (phase.isComplete ? SVG_DONE : SVG_PEND) + '</span>' +
+                                        '<div style="flex:1;min-width:0;">' +
+                                          '<span style="font-size:0.8125em;font-weight:600;color:var(--acct-text);">' + esc(phase.name || '') + '</span>' +
+                                          (phase.endDate
+                                            ? '<span style="font-size:0.75em;color:var(--acct-muted);margin-left:0.5em;">' + esc(fmtDate(phase.endDate)) + '</span>'
+                                            : '') +
+                                        '</div>' +
+                                      '</div>';
+                            }
+                            phaseEl.innerHTML = ph;
+                        } catch (e) {
+                            phaseEl.innerHTML = '';
+                        }
+                    }
+                );
+            }
         }
 
         // ── Past tickets modal (paged list) ───────────────────────────────────
@@ -1553,6 +2157,54 @@
             });
         }
 
+        // ── Shared navigation helper — closes modal then opens the window for a table ─
+        // tableName: AD_Table.TableName
+        // keyField:  Primary-key column name used in the getEqualQuery filter
+        // keyValue:  Record ID (must be > 0)
+        //
+        // Resolution order (mirrors VAS_106):
+        // 1. Backend GetWindowIdByTable — reads AD_Table.AD_Window_ID, the canonical
+        //    zoom target. Bypasses VIS.ZoomTarget which resolves the wrong window for
+        //    tables with multiple windows (e.g. C_Contract has both a purchasing
+        //    window and a service-contract window; ZoomTarget may pick either and the
+        //    user gets "cannot view this information" for the wrong one).
+        // 2. VIS.ZoomTarget — fallback when the backend returns 0 (table has no
+        //    AD_Window_ID set) so existing single-window tables keep working.
+        function openInWindow(tableName, keyField, keyValue) {
+            closeModal();
+            if (!keyValue || keyValue <= 0 || !window.VIS) return;
+
+            function startWindow(windowId) {
+                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
+                    var q = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
+                        ? VIS.Query.prototype.getEqualQuery(keyField, keyValue)
+                        : null;
+                    VIS.viewManager.startWindow(windowId, q);
+                }
+            }
+
+            function zoomFallback() {
+                var wid = 0;
+                if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === 'function') {
+                    try { wid = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, false) || 0; } catch (e) {}
+                }
+                startWindow(wid);
+            }
+
+            $.ajax({
+                url:  VIS.Application.contextUrl + 'VAS/VAS_105_AccountRightPanel/GetWindowIdByTable',
+                type: 'POST',
+                data: { fields: tableName },
+                async: true,
+                success: function (raw) {
+                    var id = 0;
+                    try { id = parseInt(typeof raw === 'string' ? JSON.parse(raw) : raw, 10); } catch (e) {}
+                    if (id > 0) { startWindow(id); } else { zoomFallback(); }
+                },
+                error: function () { zoomFallback(); }
+            });
+        }
+
         // ── Open Sales Order window for a specific C_Order_ID ────────────────
         function openOrderInWindow(orderId) {
             if (!orderId || !window.VIS) return;
@@ -1578,9 +2230,12 @@
         // ── View all Orders modal (paged) ────────────────────────────────────
         function openAllOrders() {
             var sym = getSym(); var prec = getPrec();
+            // Customer name shown immediately as modal meta; count is appended after AJAX resolves
+            var bpName = (sectionState.overview && sectionState.overview.data && sectionState.overview.data.name)
+                       ? sectionState.overview.data.name : '';
             var body = '<div id="vas_105_all_ord_list_' + widgetID + '">' + skelLines(4) + '</div>';
             var foot = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' + esc(msg('VIS_Close')) + '</button>';
-            showModal(msg('Orders'), '', body, foot, true);
+            showModal(msg('Orders'), bpName, body, foot, true);
 
             $.ajax({
                 url:  VIS.Application.contextUrl + 'VAS/VAS_105_AccountRightPanel/GetOrders',
@@ -1593,17 +2248,31 @@
                     var listEl = document.getElementById('vas_105_all_ord_list_' + widgetID);
                     if (!listEl) return;
                     var items = (parsed && parsed.items) ? parsed.items : [];
+                    var total = (parsed && parsed.total != null) ? parsed.total : items.length;
+                    // Append order count to the modal meta once data is available
+                    var metaEl = document.getElementById('vas_105_mmeta_' + widgetID);
+                    if (metaEl && bpName && total > 0) {
+                        metaEl.textContent = bpName + ' · ' + total + ' ' + msg('Orders');
+                    }
                     if (!items.length) { listEl.innerHTML = emptyState('VAS_105_NoOrders'); return; }
-                    var h = '<div class="vas_105_acct-tablehead" style="grid-template-columns:1fr 1.2fr 1fr 0.8fr;margin-bottom:0.25em;">' +
+                    // Grid: OrderNo+Date stacked | Description | Amount | Status
+                    var h = '<div class="vas_105_acct-tablehead" style="grid-template-columns:1.3fr 1.2fr 1fr 0.8fr;margin-bottom:0.25em;">' +
                             '<span>' + esc(msg('VAS_105_OrderNo'))  + '</span>' +
-                            '<span>' + esc(msg('Date'))     + '</span>' +
+                            '<span>' + esc(msg('VAS_105_Items'))    + '</span>' +
                             '<span style="text-align:right;">' + esc(msg('Amount')) + '</span>' +
                             '<span style="text-align:right;">' + esc(msg('Status')) + '</span></div>';
                     for (var i = 0; i < items.length; i++) {
                         var o = items[i];
-                        h += '<div class="vas_105_acct-clickrow" data-order-id="' + esc(String(o.id || 0)) + '" style="grid-template-columns:1fr 1.2fr 1fr 0.8fr;">' +
-                             '<span style="font-size:0.8125em;font-weight:700;color:var(--acct-text);">' + esc(o.orderNo||'') + '</span>' +
-                             '<span style="font-size:0.8125em;color:var(--acct-text-2);">' + esc(fmtDate(o.orderDate)) + '</span>' +
+                        h += '<div class="vas_105_acct-clickrow" data-order-id="' + esc(String(o.id || 0)) + '" style="grid-template-columns:1.3fr 1.2fr 1fr 0.8fr;">' +
+                             // OrderNo with date stacked beneath it
+                             '<div style="display:flex;flex-direction:column;gap:0.1em;">' +
+                               '<span style="font-size:0.8125em;font-weight:700;color:var(--acct-text);">' + esc(o.orderNo||'') + '</span>' +
+                               '<span style="font-size:0.75em;color:var(--acct-text-2);">' + esc(fmtDate(o.orderDate)) + '</span>' +
+                             '</div>' +
+                             // Description with tooltip for long text
+                             '<span class="vas_105_acct-tip" data-tip="' + esc(o.items||'') + '">' +
+                               '<span style="display:block;font-size:0.8125em;color:var(--acct-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(o.items||'') + '</span>' +
+                             '</span>' +
                              '<span style="font-size:0.875em;font-weight:700;text-align:right;">' + esc(fmtFull(toNum(o.amount), sym, prec)) + '</span>' +
                              '<span style="text-align:right;"><span class="vas_105_acct-odstatus ' + orderStatusClass(o.statusCode) + '">' + esc(orderStatusLabel(o.statusCode)) + '</span></span>' +
                              '</div>';
@@ -1700,6 +2369,56 @@
                 },
                 error: function () {
                     var listEl = document.getElementById('vas_105_all_inv_list_' + widgetID);
+                    if (listEl) listEl.innerHTML = '<div class="vas_105_acct-errtxt">' + esc(msg('VAS_105_LoadError')) + '</div>';
+                }
+            });
+        }
+
+        // ── View all Projects modal (all statuses, including Hold and Closed) ──
+        function openAllProjects() {
+            var sym = getSym(); var prec = getPrec();
+            var body = '<div id="vas_105_all_proj_list_' + widgetID + '">' + skelLines(4) + '</div>';
+            var foot = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' + esc(msg('VIS_Close')) + '</button>';
+            showModal(msg('VAS_105_Projects'), '', body, foot, true);
+
+            $.ajax({
+                url:  VIS.Application.contextUrl + 'VAS/VAS_105_AccountRightPanel/GetProjects',
+                type: 'POST',
+                data: { bPartnerId: currentBpId },
+                async: true,
+                success: function (raw) {
+                    var parsed = null;
+                    try { parsed = (typeof raw === 'string') ? jQuery.parseJSON(raw) : raw; } catch (e) {}
+                    var listEl = document.getElementById('vas_105_all_proj_list_' + widgetID);
+                    if (!listEl) return;
+                    var items = (parsed && parsed.items) ? parsed.items : [];
+                    if (!items.length) { listEl.innerHTML = emptyState('VAS_105_NoProjects'); return; }
+                    var h = '<div class="vas_105_acct-tablehead" style="grid-template-columns:2fr 1fr 0.8fr;margin-bottom:0.25em;">' +
+                            '<span>' + esc(msg('Project')) + '</span>' +
+                            '<span>' + esc(msg('Status'))  + '</span>' +
+                            '<span style="text-align:right;">' + esc(msg('VAS_105_Due')) + '</span></div>';
+                    for (var i = 0; i < items.length; i++) {
+                        var p = items[i];
+                        h += '<div class="vas_105_acct-clickrow" data-proj-idx="' + i + '" style="grid-template-columns:2fr 1fr 0.8fr;">' +
+                             '<span style="font-size:0.875em;font-weight:700;color:var(--acct-text);">' + esc(p.name||'') + '</span>' +
+                             '<span><span class="vas_105_acct-projstatus ' + projStatusClass(p.statusCode) + '">' + esc(projStatusLabel(p)) + '</span></span>' +
+                             '<span style="font-size:0.8125em;color:var(--acct-text-2);text-align:right;">' + esc(fmtDate(p.due)) + '</span>' +
+                             '</div>';
+                    }
+                    listEl.innerHTML = h;
+                    // Wire row clicks → open project detail modal
+                    var rows = listEl.querySelectorAll('.vas_105_acct-clickrow[data-proj-idx]');
+                    for (var ri = 0; ri < rows.length; ri++) {
+                        (function (row, proj) {
+                            row.onclick = function (e) {
+                                e.stopPropagation();
+                                openProjectDetail(proj);
+                            };
+                        })(rows[ri], items[ri]);
+                    }
+                },
+                error: function () {
+                    var listEl = document.getElementById('vas_105_all_proj_list_' + widgetID);
                     if (listEl) listEl.innerHTML = '<div class="vas_105_acct-errtxt">' + esc(msg('VAS_105_LoadError')) + '</div>';
                 }
             });
@@ -2031,13 +2750,40 @@
 
                 document.getElementById('vas_105_mmeta_' + widgetID).textContent = data.whenTs ? fmtEngTs(data.whenTs) : '';
 
-                var dirLabel   = data.direction === 'in' ? msg('VAS_105_Incoming') : msg('VAS_105_Outgoing');
-                var detailAddr = data.direction === 'in' ? (data.fromEmail || '') : (data.toEmail || '');
+                var dirLabel = data.direction === 'in' ? msg('VAS_105_Incoming') : msg('VAS_105_Outgoing');
 
-                var tmpDiv = document.createElement('div');
-                tmpDiv.innerHTML = data.body || '';
-                var plainBody = (tmpDiv.textContent || tmpDiv.innerText || '').replace(/\s+/g, ' ').trim();
-                var quoteText = plainBody ? plainBody.substring(0, 200) + (plainBody.length > 200 ? '…' : '') : '';
+                // Split a semicolon/comma-delimited address string into a clean array.
+                function splitAddrs(s) {
+                    if (!s) return [];
+                    return s.split(/[;,]/).map(function(v){ return v.trim(); }).filter(function(v){ return v.length > 0; });
+                }
+                // Render up to `limit` items with a "+N more" count chip for the overflow.
+                function renderAddrList(items, limit) {
+                    if (!items || items.length === 0) return '';
+                    var shown = items.slice(0, limit);
+                    var rest  = items.length - limit;
+                    var html  = esc(shown.join(', '));
+                    if (rest > 0)
+                        html += ' <span style="display:inline-block;font-size:0.75em;font-weight:700;' +
+                                'background:#EFF6FF;color:#1D4ED8;border-radius:0.375em;padding:0.1em 0.5em;' +
+                                'margin-left:0.25em;vertical-align:middle;">+' + rest + '</span>';
+                    return html;
+                }
+
+                // Details: direction-based primary address + any CC addresses, deduplicated, up to 5.
+                var primaryAddr = data.direction === 'in' ? (data.fromEmail || '') : (data.toEmail || '');
+                var detailAddrs = splitAddrs(primaryAddr).concat(splitAddrs(data.ccEmail || ''));
+                var seenD = {};
+                detailAddrs = detailAddrs.filter(function(a) {
+                    var k = a.toLowerCase();
+                    if (seenD[k]) return false; seenD[k] = true; return true;
+                });
+                var detailHtml = renderAddrList(detailAddrs, 5);
+
+                // People: server-resolved recipient names (To + CC); fall back to who field.
+                var peopleItems = splitAddrs(data.peopleNames || '');
+                if (peopleItems.length === 0 && data.who) peopleItems = [data.who];
+                var peopleHtml  = renderAddrList(peopleItems, 5);
 
                 var bodyHtml = [
                     '<div class="vas_105_emd-top">',
@@ -2046,7 +2792,6 @@
                     '  </span>',
                     '  <span class="vas_105_emd-heading">', esc(data.subject || msg('EMail')), '</span>',
                     '</div>',
-                    quoteText ? '<div class="vas_105_emd-quote">' + esc(quoteText) + '</div>' : '',
                     '<table class="vas_105_emd-meta">',
                     '  <tr>',
                     '    <td class="vas_105_emd-meta-label">', esc(msg('Type')), '</td>',
@@ -2058,12 +2803,12 @@
                     '    <td class="vas_105_emd-meta-label">', esc(msg('VAS_105_When')), '</td>',
                     '    <td class="vas_105_emd-meta-value">', esc(fmtEngTs(data.whenTs || '')), '</td>',
                     '    <td class="vas_105_emd-meta-label">', esc(msg('Details')), '</td>',
-                    '    <td class="vas_105_emd-meta-value">', esc(detailAddr), '</td>',
+                    '    <td class="vas_105_emd-meta-value">', detailHtml, '</td>',
                     '  </tr>',
-                    data.who ? [
+                    peopleItems.length > 0 ? [
                         '  <tr>',
                         '    <td class="vas_105_emd-meta-label">', esc(msg('VAS_105_People')), '</td>',
-                        '    <td class="vas_105_emd-meta-value" colspan="3">', esc(data.who), '</td>',
+                        '    <td class="vas_105_emd-meta-value" colspan="3">', peopleHtml, '</td>',
                         '  </tr>'
                     ].join('') : '',
                     '</table>',
@@ -2099,6 +2844,10 @@
                     c.setContent(email);
                     c.show();
                     email.initializeComponent();
+                    // email.js hard-codes "Contacts" in the title when called outside a window frame;
+                    // patch it to show the Customer Master window name instead.
+                    email.getRoot().find('.vis-awindow-header p').first()
+                        .text(VIS.Msg.getMsg('EMail') + ' (' + msg('VAS_105_CustomerMaster') + ')');
                 });
             });
         }
@@ -2293,6 +3042,8 @@
             c.setContent(email);
             c.show();
             email.initializeComponent();
+            email.getRoot().find('.vis-awindow-header p').first()
+                .text(VIS.Msg.getMsg('EMail') + ' (' + msg('VAS_105_CustomerMaster') + ')');
         }
 
         // Opens the standard VIS Email compose window pre-addressed to a contact
@@ -2307,6 +3058,8 @@
             c.setContent(email);
             c.show();
             email.initializeComponent();
+            email.getRoot().find('.vis-awindow-header p').first()
+                .text(VIS.Msg.getMsg('EMail') + ' (' + msg('VAS_105_CustomerMaster') + ')');
         }
 
         function openEngagementEmailReply(emailId) {
@@ -2325,6 +3078,8 @@
                 c.setContent(email);
                 c.show();
                 email.initializeComponent();
+                email.getRoot().find('.vis-awindow-header p').first()
+                    .text(VIS.Msg.getMsg('EMail') + ' (' + msg('VAS_105_CustomerMaster') + ')');
             });
         }
 
@@ -2440,6 +3195,11 @@
             _invoicesOffset  = 0;
             _oppsPage        = 0;
             _contractsPage   = 0;
+            _contactsPage    = 0;
+            _locationsPage   = 0;
+            _projectsPage    = 0;
+            _tasksPage       = 0;
+            _ticketsOffset   = 0;
 
             // Rebuild section shells — renderNoSelectionState() replaces the whole
             // body with a single div, so we must restore shells before AJAX callbacks
@@ -2464,7 +3224,8 @@
                 e.stopPropagation(); e.stopImmediatePropagation();
                 var f = $(this).data('tk-filter');
                 if (f === taskFilter) return;
-                taskFilter = f;
+                taskFilter  = f;
+                _tasksPage  = 0;
                 $(this).closest('.vas_105_seg').find('.vas_105_segbtn').removeClass('active');
                 $(this).addClass('active');
                 loadTasks();
@@ -2573,6 +3334,7 @@
                     _cleanup();
                     if (taskCreated) {
                         taskFilter = 'upcoming';
+                        _tasksPage = 0;
                         loadTasks();
                     }
                 }
@@ -2698,7 +3460,7 @@
             }, 100);
 
             window.setTimeout(function () {
-                fetchSection('tickets', 'GetTickets', { state: 'open', pageOffset: 0, pageSize: 5 }, null);
+                fetchSection('tickets', 'GetTickets', { state: 'open', pageOffset: 0, pageSize: TICKET_PAGE_SIZE }, null);
             }, 150);
 
             window.setTimeout(function () {
@@ -2805,6 +3567,9 @@
                 '<div class="vas_105_acct-sec" id="vas_105_wrap_projects_' + wid + '">' +
                   '<div class="vas_105_acct-sechead">' +
                     '<span class="vas_105_acct-sectitle" id="vas_105_lbl_projects_' + wid + '"></span>' +
+                    '<button class="vas_105_acct-btn--link" id="vas_105_btn_all_proj_' + wid + '" type="button">' +
+                      '<i class="ti ti-folders" style="font-size:0.875em;"></i>' +
+                    '</button>' +
                   '</div>' +
                   '<div id="' + secId('projects') + '"></div>' +
                 '</div>' +
@@ -2891,6 +3656,14 @@
                     document.createTextNode(msg('VAS_105_ViewAllInvoices'))
                 );
                 $btnAllInv.off('click').on('click', function () { openAllInvoices(); });
+            }
+            var $btnAllProj = $root.find('#vas_105_btn_all_proj_' + wid);
+            if ($btnAllProj.length) {
+                $btnAllProj.text('').append(
+                    $('<i class="ti ti-folders" style="font-size:0.875em;"></i>'),
+                    document.createTextNode(msg('VAS_105_ViewAllProjects'))
+                );
+                $btnAllProj.off('click').on('click', function () { openAllProjects(); });
             }
 
             // ── Task section labels & controls ──

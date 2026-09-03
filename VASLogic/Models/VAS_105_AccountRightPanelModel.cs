@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Dynamic;
+using System.Linq;
 using System.Text;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -23,6 +24,11 @@ namespace VAS.Models
     /// Chronological development:
     ///   VAI154  09-Jun-2026
     ///   VAI154  10-Jul-2026  Added product details to Contracts section
+    ///   VAI154  02-Sep-2026  Invoice paid_amount + Partial status; open-opp count excludes Won/Lost
+///   VAI154  02-Sep-2026  Project phase list; open-ticket server-side pagination; ticket subject tooltip
+///   VAI154  02-Sep-2026  Contract detail: owner, type display name, product first+count
+///   VAI154  02-Sep-2026  Ticket detail: assignedTo, description, customerName, dateNextAction added to GetTickets
+///   VAI154  02-Sep-2026  GetWindowIdByTable added; openInWindow JS uses it so C_Contract opens correct window
     /// </summary>
     public class VAS_105_AccountRightPanelModel
     {
@@ -160,7 +166,8 @@ namespace VAS.Models
                 sb.Append("       u.Title AS contact_title,");
                 sb.Append("       u.EMail AS contact_email,");
                 sb.Append("       u.Phone AS contact_phone,");
-                sb.Append("       sr.Name AS region");
+                sb.Append("       sr.Name AS region,");
+                sb.Append("       bp.IsVendor AS is_vendor");
                 sb.Append("  FROM C_BPartner bp");
                 sb.Append("  LEFT OUTER JOIN C_BP_Group g    ON (g.C_BP_Group_ID    = bp.C_BP_Group_ID    AND g.IsActive  = 'Y')");
                 sb.Append("  LEFT OUTER JOIN C_SalesRegion sr ON (sr.C_SalesRegion_ID = bp.C_SalesRegion_ID AND sr.IsActive = 'Y')");
@@ -200,12 +207,36 @@ namespace VAS.Models
                 response.contactTitle = Util.GetValueOfString(row["contact_title"]);
                 response.contactEmail = Util.GetValueOfString(row["contact_email"]);
                 response.contactPhone = Util.GetValueOfString(row["contact_phone"]);
+                response.isVendor = Util.GetValueOfString(row["is_vendor"]) == "Y";
             }
             catch (Exception ex)
             {
                 _log.SaveError("VAS_105_AccountRightPanelModel.GetOverview.Main", ex.Message);
                 response.error = "not_found";
                 return response;
+            }
+
+            // ── Extension: industry name via C_BPartner.C_IndustryCode_ID → C_IndustryCode ──
+            try
+            {
+                var sbInd = new StringBuilder();
+                sbInd.Append("SELECT ic.Name AS industry_name");
+                sbInd.Append("  FROM C_BPartner bp");
+                sbInd.Append("  INNER JOIN C_IndustryCode ic ON (ic.C_IndustryCode_ID = bp.C_IndustryCode_ID");
+                sbInd.Append("                                    AND ic.IsActive = 'Y')");
+                sbInd.Append(" WHERE bp.C_BPartner_ID = @bpInd");
+
+                string indAccess = MRole.GetDefault(ctx).AddAccessSQL(
+                    sbInd.ToString(), "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+                var indParams = new SqlParameter[] { new SqlParameter("@bpInd", bPartnerId) };
+                object indObj = DB.ExecuteScalar(indAccess, indParams, null);
+                if (indObj != null && indObj != DBNull.Value)
+                    response.industry = Util.GetValueOfString(indObj);
+            }
+            catch (Exception ex)
+            {
+                _log.SaveError("VAS_105_AccountRightPanelModel.GetOverview.Industry", ex.Message);
             }
 
             // ── KPI: annual revenue (3-yr avg from invoices, base-currency converted) ────
@@ -264,6 +295,9 @@ namespace VAS.Models
                 sbOpp.Append("  FROM VAS_Opportunity op");
                 sbOpp.Append(" WHERE op.IsActive = 'Y'");
                 sbOpp.Append("   AND (op.C_BPartner_ID = @bpOpp OR op.Ref_BPartner_ID = @bpOpp2)");
+                // VAI154 02-Sep-2026: Exclude terminal stage codes so the KPI matches the
+                // section badge: Won ('CO'), Lost ('VO'), Closed ('CL'), Reversed ('RE').
+                sbOpp.Append("   AND op.VAS_OppStage NOT IN ('CO', 'VO', 'CL', 'RE')");
 
                 string oppAccess = MRole.GetDefault(ctx).AddAccessSQL(
                     sbOpp.ToString(), "op", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -282,28 +316,64 @@ namespace VAS.Models
                 _log.SaveError("VAS_105_AccountRightPanelModel.GetOverview.OpenOpps", ex.Message);
             }
 
-            // ── KPI: renewal in days (from C_Contract) ────────────────────────
+            // ── KPI: renewal in days (nearest EndDate across C_Contract and VAS_ContractMaster) ──
             response.renewalInDays = null;
             try
             {
-                var sbRen = new StringBuilder();
-                sbRen.Append("SELECT TO_CHAR(MIN(ct.EndDate),'YYYY-MM-DD') AS next_end");
-                sbRen.Append("  FROM C_Contract ct");
-                sbRen.Append(" WHERE ct.IsActive = 'Y' AND ct.C_BPartner_ID = @bpRen");
-                sbRen.Append("   AND ct.DocStatus IN ('CO','CL')");
-                sbRen.Append("   AND ct.EndDate >= CURRENT_DATE");
+                DateTime? nearestEnd = null;
 
-                string renAccess = MRole.GetDefault(ctx).AddAccessSQL(
-                    sbRen.ToString(), "ct", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-                var renParams = new SqlParameter[] { new SqlParameter("@bpRen", bPartnerId) };
-                object renObj = DB.ExecuteScalar(renAccess, renParams, null);
-                if (renObj != null && renObj != DBNull.Value)
+                // Part A: C_Contract — DocStatus CO = active in-force contract
+                try
                 {
-                    DateTime endDt;
-                    if (DateTime.TryParse(renObj.ToString(), out endDt))
-                        response.renewalInDays = (int)(endDt.Date - DateTime.Today).TotalDays;
+                    var sbCC = new StringBuilder();
+                    sbCC.Append("SELECT TO_CHAR(MIN(ct.EndDate),'YYYY-MM-DD') AS next_end");
+                    sbCC.Append("  FROM C_Contract ct");
+                    sbCC.Append(" WHERE ct.IsActive = 'Y' AND ct.C_BPartner_ID = @bpRenCC");
+                    sbCC.Append("   AND ct.DocStatus IN ('CO','CL')");
+                    sbCC.Append("   AND ct.EndDate >= CURRENT_DATE");
+                    string ccRenAccess = MRole.GetDefault(ctx).AddAccessSQL(
+                        sbCC.ToString(), "ct", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                    object ccObj = DB.ExecuteScalar(ccRenAccess,
+                        new SqlParameter[] { new SqlParameter("@bpRenCC", bPartnerId) }, null);
+                    if (ccObj != null && ccObj != DBNull.Value)
+                    {
+                        DateTime dt;
+                        if (DateTime.TryParse(ccObj.ToString(), out dt))
+                            nearestEnd = (nearestEnd == null || dt.Date < nearestEnd.Value.Date) ? dt : nearestEnd;
+                    }
                 }
+                catch (Exception exCC)
+                {
+                    _log.SaveError("VAS_105_AccountRightPanelModel.GetOverview.RenewalDays.CC", exCC.Message);
+                }
+
+                // Part B: VAS_ContractMaster — VAS_Status ARD = Approved (active)
+                try
+                {
+                    var sbVM = new StringBuilder();
+                    sbVM.Append("SELECT TO_CHAR(MIN(vm.EndDate),'YYYY-MM-DD') AS next_end");
+                    sbVM.Append("  FROM VAS_ContractMaster vm");
+                    sbVM.Append(" WHERE vm.IsActive = 'Y' AND vm.C_BPartner_ID = @bpRenVM");
+                    sbVM.Append("   AND vm.VAS_Status = 'ARD'");
+                    sbVM.Append("   AND vm.EndDate >= CURRENT_DATE");
+                    string vmRenAccess = MRole.GetDefault(ctx).AddAccessSQL(
+                        sbVM.ToString(), "vm", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                    object vmObj = DB.ExecuteScalar(vmRenAccess,
+                        new SqlParameter[] { new SqlParameter("@bpRenVM", bPartnerId) }, null);
+                    if (vmObj != null && vmObj != DBNull.Value)
+                    {
+                        DateTime dt;
+                        if (DateTime.TryParse(vmObj.ToString(), out dt))
+                            nearestEnd = (nearestEnd == null || dt.Date < nearestEnd.Value.Date) ? dt : nearestEnd;
+                    }
+                }
+                catch (Exception exVM)
+                {
+                    _log.SaveError("VAS_105_AccountRightPanelModel.GetOverview.RenewalDays.VM", exVM.Message);
+                }
+
+                if (nearestEnd != null)
+                    response.renewalInDays = (int)(nearestEnd.Value.Date - DateTime.Today).TotalDays;
             }
             catch (Exception ex)
             {
@@ -324,7 +394,7 @@ namespace VAS.Models
         /// <param name="bPartnerId">C_BPartner_ID of the customer account.</param>
         /// <returns>
         /// Dynamic object with <c>items</c> (list of contacts) and <c>total</c> (int).
-        /// Each item exposes: <c>id</c>, <c>name</c>, <c>title</c>, <c>email</c>, <c>phone</c>.
+        /// Each item exposes: <c>id</c>, <c>name</c>, <c>title</c>, <c>email</c>, <c>phone</c>, <c>mobile</c>.
         /// </returns>
         public dynamic GetContacts(Ctx ctx, int bPartnerId)
         {
@@ -341,7 +411,8 @@ namespace VAS.Models
                 // LEFT OUTER JOIN so contacts without a job entry are still included
                 sb.Append("       COALESCE(j.Name, u.Title, N'') AS title,");
                 sb.Append("       u.EMail AS email,");
-                sb.Append("       u.Phone AS phone");
+                sb.Append("       u.Phone AS phone,");
+                sb.Append("       u.Mobile AS mobile");
                 sb.Append("  FROM AD_User u");
                 sb.Append("  LEFT OUTER JOIN C_Job j ON (j.C_Job_ID = u.C_Job_ID AND j.IsActive = 'Y')");
                 sb.Append(" WHERE u.IsActive = 'Y' AND u.C_BPartner_ID = @bPartnerId");
@@ -370,6 +441,7 @@ namespace VAS.Models
                         item.title = Util.GetValueOfString(row["title"]);
                         item.email = Util.GetValueOfString(row["email"]);
                         item.phone = Util.GetValueOfString(row["phone"]);
+                        item.mobile = Util.GetValueOfString(row["mobile"]);
                         items.Add(item);
                     }
                     response.total = items.Count;
@@ -415,7 +487,8 @@ namespace VAS.Models
                 sb.Append("       l.Postal AS postal,");
                 sb.Append("       l.RegionName AS region_name,");
                 sb.Append("       co.Name AS country,");
-                sb.Append("       CASE WHEN bpl.IsShipTo = 'Y' THEN 'VAS_105_ShipTo'");
+                sb.Append("       CASE WHEN bpl.IsShipTo = 'Y' AND bpl.IsBillTo = 'Y' THEN 'VAS_105_ShipBillTo'");
+                sb.Append("            WHEN bpl.IsShipTo = 'Y' THEN 'VAS_105_ShipTo'");
                 sb.Append("            WHEN bpl.IsBillTo = 'Y' THEN 'VAS_105_BillTo'");
                 sb.Append("            ELSE 'VAS_105_Site' END AS loc_type,");
                 // Scalar subquery for primary contact — avoids duplicate rows from a JOIN
@@ -530,9 +603,15 @@ namespace VAS.Models
                 sb.Append("       rep.Name AS owner,");
                 sb.Append("       CURRENCYCONVERT(vo.PlannedAmt, vo.C_Currency_ID, cs.C_Currency_ID,");
                 sb.Append("           COALESCE(vo.VAS_DecisionDate, CURRENT_DATE), NULL,");
-                sb.Append("           vo.AD_Client_ID, vo.AD_Org_ID) AS value");
+                sb.Append("           vo.AD_Client_ID, vo.AD_Org_ID) AS value,");
+                sb.Append("       COALESCE(vo.Description, N'') AS description,");
+                sb.Append("       pc.Name AS primary_contact,");
+                sb.Append("       ns.Name AS next_step,");
+                sb.Append("       TO_CHAR(vo.Updated,'YYYY-MM-DD') AS stage_updated");
                 sb.Append("  FROM VAS_Opportunity vo");
                 sb.Append("  LEFT OUTER JOIN AD_User rep ON (rep.AD_User_ID = vo.SalesRep_ID AND rep.IsActive = 'Y')");
+                sb.Append("  LEFT OUTER JOIN AD_User pc ON (pc.AD_User_ID = vo.AD_User_ID AND pc.IsActive = 'Y')");
+                sb.Append("  LEFT OUTER JOIN VAS_LeadNextStep ns ON (ns.VAS_LeadNextStep_ID = vo.VAS_LeadNextStep_ID AND ns.IsActive = 'Y')");
                 sb.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = vo.AD_Client_ID)");
                 sb.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
                 sb.Append(" WHERE vo.IsActive = 'Y'");
@@ -568,9 +647,20 @@ namespace VAS.Models
                         item.probability = row["probability"] != DBNull.Value
                             ? Convert.ToDecimal(row["probability"]) : 0m;
                         item.closeDate = Util.GetValueOfString(row["close_date"]);
-                        item.owner = Util.GetValueOfString(row["owner"]);
-                        item.value = row["value"] != DBNull.Value
-                            ? Convert.ToDecimal(row["value"]) : 0m;
+                        item.owner          = Util.GetValueOfString(row["owner"]);
+                        item.value          = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                        item.description    = Util.GetValueOfString(row["description"]);
+                        item.primaryContact = Util.GetValueOfString(row["primary_contact"]);
+                        item.nextStep       = Util.GetValueOfString(row["next_step"]);
+                        // Age in stage: days since the opportunity record was last updated
+                        item.ageInStage = null;
+                        string stageUpdated = Util.GetValueOfString(row["stage_updated"]);
+                        if (!string.IsNullOrEmpty(stageUpdated))
+                        {
+                            DateTime updatedDate;
+                            if (DateTime.TryParse(stageUpdated, out updatedDate))
+                                item.ageInStage = (int)(DateTime.Today - updatedDate.Date).TotalDays;
+                        }
                         items.Add(item);
                     }
                     response.total = items.Count;
@@ -632,6 +722,20 @@ namespace VAS.Models
                     sbCC.Append("       ct.DocumentNo AS contract_no,");
                     sbCC.Append("       ct.Description AS ct_description,");
                     sbCC.Append("       ct.ContractType AS type_code,");
+                    // Resolve ContractType code to translated display name via AD_Ref_List
+                    sbCC.Append("       (SELECT COALESCE(tCt.Name, rCt.Name)");
+                    sbCC.Append("          FROM AD_Ref_List rCt");
+                    sbCC.Append("          LEFT OUTER JOIN AD_Ref_List_Trl tCt ON (tCt.AD_Ref_List_ID = rCt.AD_Ref_List_ID");
+                    sbCC.Append("               AND tCt.IsActive = 'Y' AND tCt.AD_Language = @ctLang)");
+                    sbCC.Append("         WHERE rCt.IsActive = 'Y'");
+                    sbCC.Append("           AND rCt.Value = ct.ContractType");
+                    sbCC.Append("           AND rCt.AD_Reference_ID IN (SELECT cCt.AD_Reference_Value_ID");
+                    sbCC.Append("                                          FROM AD_Column cCt");
+                    sbCC.Append("                                         INNER JOIN AD_Table tblCt ON (tblCt.AD_Table_ID = cCt.AD_Table_ID");
+                    sbCC.Append("                                               AND tblCt.TableName = 'C_Contract'");
+                    sbCC.Append("                                               AND tblCt.IsActive = 'Y')");
+                    sbCC.Append("                                         WHERE cCt.ColumnName = 'ContractType'");
+                    sbCC.Append("                                           AND cCt.IsActive = 'Y')) AS type_name,");
                     sbCC.Append("       TO_CHAR(ct.StartDate,'YYYY-MM-DD') AS start_date,");
                     sbCC.Append("       TO_CHAR(ct.EndDate,'YYYY-MM-DD') AS end_date,");
                     sbCC.Append("       ct.Processed AS status_code,");
@@ -653,11 +757,13 @@ namespace VAS.Models
                     sbCC.Append("       COALESCE(CURRENCYCONVERT(ct.GrandTotal, ct.C_Currency_ID, cs.C_Currency_ID,");
                     sbCC.Append("           COALESCE(ct.StartDate, CURRENT_DATE), NULL,");
                     sbCC.Append("           ct.AD_Client_ID, ct.AD_Org_ID), ct.GrandTotal) AS value,");
+                    sbCC.Append("       salesrep.Name AS owner_name,");
                     sbCC.Append("       p.Name AS product_name,");
                     sbCC.Append("       COALESCE(asi.Description, N'') AS attribute_desc");
                     sbCC.Append("  FROM C_Contract ct");
                     sbCC.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = ct.AD_Client_ID)");
                     sbCC.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
+                    sbCC.Append("  LEFT OUTER JOIN AD_User salesrep ON (salesrep.AD_User_ID = ct.SalesRep_ID)");
                     sbCC.Append("  LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = ct.M_Product_ID)");
                     sbCC.Append("  LEFT OUTER JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = ct.M_AttributeSetInstance_ID AND ct.M_AttributeSetInstance_ID > 0)");
                     sbCC.Append(" WHERE ct.IsActive = 'Y' AND ct.C_BPartner_ID = @bPartnerIdCC");
@@ -681,13 +787,17 @@ namespace VAS.Models
                             item.name        = "";  // C_Contract: DocumentNo is the display title; use fallback in JS
                             item.description = Util.GetValueOfString(row["ct_description"]);
                             item.typeCode    = Util.GetValueOfString(row["type_code"]);
+                            item.typeName    = row["type_name"] != DBNull.Value ? Util.GetValueOfString(row["type_name"]) : "";
                             item.startDate   = Util.GetValueOfString(row["start_date"]);
                             item.endDate     = Util.GetValueOfString(row["end_date"]);
                             item.statusCode  = Util.GetValueOfString(row["status_code"]);
                             item.renewalCode = Util.GetValueOfString(row["renewal_code"]);
                             item.renewalName = row["renewal_name"] != DBNull.Value ? Util.GetValueOfString(row["renewal_name"]) : "";
                             item.value         = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                            item.ownerName     = row["owner_name"] != DBNull.Value ? Util.GetValueOfString(row["owner_name"]) : "";
                             item.productName   = Util.GetValueOfString(row["product_name"]);
+                            item.productCount  = 0;  // set in enrichment pass
+                            item.productNames  = ""; // set in enrichment pass — newline-separated full list
                             item.attributeDesc = Util.GetValueOfString(row["attribute_desc"]);
                             item.source        = "CC";
                             items.Add(item);
@@ -699,6 +809,90 @@ namespace VAS.Models
                     _log.SaveError("VAS_105_AccountRightPanelModel.GetContracts.C_Contract", exCC.Message);
                 }
 
+                // ── Part 1b: Enrich C_Contract items with products, charges, and ASI from C_ContractLine ──
+                try
+                {
+                    var ccIds = new List<int>();
+                    foreach (dynamic it in items)
+                    {
+                        var dict = (IDictionary<string, object>)it;
+                        if ((string)dict["source"] == "CC")
+                            ccIds.Add((int)dict["id"]);
+                    }
+
+                    if (ccIds.Count > 0)
+                    {
+                        // Build a comma-separated integer IN list — these are internal DB IDs, not user input
+                        var sbCCIds = new StringBuilder();
+                        for (int k = 0; k < ccIds.Count; k++)
+                        {
+                            if (k > 0) sbCCIds.Append(", ");
+                            sbCCIds.Append(ccIds[k]);
+                        }
+
+                        var sbCCProd = new StringBuilder();
+                        sbCCProd.Append("SELECT cl.C_Contract_ID AS contract_id,");
+                        sbCCProd.Append("       COALESCE(p.Name, ch.Name) AS product_name,");
+                        sbCCProd.Append("       COALESCE(asi.Description, N'') AS attribute_desc");
+                        sbCCProd.Append("  FROM C_ContractLine cl");
+                        sbCCProd.Append("  LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = cl.M_Product_ID AND cl.M_Product_ID > 0)");
+                        sbCCProd.Append("  LEFT OUTER JOIN C_Charge ch ON (ch.C_Charge_ID = cl.C_Charge_ID AND cl.C_Charge_ID > 0)");
+                        sbCCProd.Append("  LEFT OUTER JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = cl.M_AttributeSetInstance_ID AND cl.M_AttributeSetInstance_ID > 0)");
+                        sbCCProd.Append(" WHERE cl.IsActive = 'Y' AND (cl.M_Product_ID > 0 OR cl.C_Charge_ID > 0)");
+                        sbCCProd.Append("   AND cl.C_Contract_ID IN (");
+                        sbCCProd.Append(sbCCIds);
+                        sbCCProd.Append(") ORDER BY cl.C_Contract_ID, COALESCE(p.Name, ch.Name)");
+
+                        string ccProdAccess = MRole.GetDefault(ctx).AddAccessSQL(
+                            sbCCProd.ToString(), "cl", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                        DataSet dsCCProd = DB.ExecuteDataset(ccProdAccess, null, null);
+
+                        // Aggregate product/charge names and collect first attribute description per C_Contract
+                        var ccProductMap   = new Dictionary<int, List<string>>();
+                        var ccAttributeMap = new Dictionary<int, string>();
+                        if (dsCCProd != null && dsCCProd.Tables.Count > 0)
+                        {
+                            foreach (DataRow row in dsCCProd.Tables[0].Rows)
+                            {
+                                int contractId  = Util.GetValueOfInt(row["contract_id"]);
+                                string pName    = Util.GetValueOfString(row["product_name"]);
+                                string attrDesc = Util.GetValueOfString(row["attribute_desc"]);
+                                if (!ccProductMap.ContainsKey(contractId))
+                                    ccProductMap[contractId] = new List<string>();
+                                if (!string.IsNullOrEmpty(pName) && !ccProductMap[contractId].Contains(pName))
+                                    ccProductMap[contractId].Add(pName);
+                                // Keep first non-empty attribute description for this contract
+                                if (!ccAttributeMap.ContainsKey(contractId) && !string.IsNullOrEmpty(attrDesc))
+                                    ccAttributeMap[contractId] = attrDesc;
+                            }
+                        }
+
+                        // Override header-level product/ASI with line-level data where available.
+                        // Show only the first product name; expose the total distinct count for the "+N more" UI chip.
+                        foreach (dynamic it in items)
+                        {
+                            var dict = (IDictionary<string, object>)it;
+                            if ((string)dict["source"] == "CC")
+                            {
+                                int contractId = (int)dict["id"];
+                                if (ccProductMap.ContainsKey(contractId))
+                                {
+                                    var pList       = ccProductMap[contractId];
+                                    it.productName  = pList.Count > 0 ? pList[0] : "";
+                                    it.productCount = pList.Count;
+                                    it.productNames = string.Join("\n", pList);
+                                }
+                                if (ccAttributeMap.ContainsKey(contractId))
+                                    it.attributeDesc = ccAttributeMap[contractId];
+                            }
+                        }
+                    }
+                }
+                catch (Exception exCCProd)
+                {
+                    _log.SaveError("VAS_105_AccountRightPanelModel.GetContracts.C_ContractLine", exCCProd.Message);
+                }
+
                 // ── Part 2: VAS_ContractMaster ────────────────────────────────────
                 try
                 {
@@ -707,6 +901,20 @@ namespace VAS.Models
                     sbVM.Append("       vm.DocumentNo AS contract_no,");
                     sbVM.Append("       vm.VAS_ContractSummary AS name,");
                     sbVM.Append("       vm.ContractType AS type_code,");
+                    // Resolve ContractType code to translated display name via AD_Ref_List
+                    sbVM.Append("       (SELECT COALESCE(tCt.Name, rCt.Name)");
+                    sbVM.Append("          FROM AD_Ref_List rCt");
+                    sbVM.Append("          LEFT OUTER JOIN AD_Ref_List_Trl tCt ON (tCt.AD_Ref_List_ID = rCt.AD_Ref_List_ID");
+                    sbVM.Append("               AND tCt.IsActive = 'Y' AND tCt.AD_Language = @vmLang)");
+                    sbVM.Append("         WHERE rCt.IsActive = 'Y'");
+                    sbVM.Append("           AND rCt.Value = vm.ContractType");
+                    sbVM.Append("           AND rCt.AD_Reference_ID IN (SELECT cCt.AD_Reference_Value_ID");
+                    sbVM.Append("                                          FROM AD_Column cCt");
+                    sbVM.Append("                                         INNER JOIN AD_Table tblCt ON (tblCt.AD_Table_ID = cCt.AD_Table_ID");
+                    sbVM.Append("                                               AND tblCt.TableName = 'VAS_ContractMaster'");
+                    sbVM.Append("                                               AND tblCt.IsActive = 'Y')");
+                    sbVM.Append("                                         WHERE cCt.ColumnName = 'ContractType'");
+                    sbVM.Append("                                           AND cCt.IsActive = 'Y')) AS type_name,");
                     sbVM.Append("       TO_CHAR(vm.StartDate,'YYYY-MM-DD') AS start_date,");
                     sbVM.Append("       TO_CHAR(vm.EndDate,'YYYY-MM-DD') AS end_date,");
                     sbVM.Append("       vm.VAS_Status AS status_code,");
@@ -749,16 +957,20 @@ namespace VAS.Models
                             dynamic item = new ExpandoObject();
                             item.id          = Util.GetValueOfInt(row["id"]);
                             item.contractNo  = Util.GetValueOfString(row["contract_no"]);
-                            item.name        = Util.GetValueOfString(row["name"]);
-                            item.description = "";  // VAS_ContractMaster has no Description column; VAS_ContractSummary is used as name
+                            item.name        = "";  // DocumentNo is used as the card title via contractNo fallback
+                            item.description = Util.GetValueOfString(row["name"]);  // VAS_ContractSummary shown as description sub-line
                             item.typeCode    = Util.GetValueOfString(row["type_code"]);
+                            item.typeName    = row["type_name"] != DBNull.Value ? Util.GetValueOfString(row["type_name"]) : "";
                             item.startDate   = Util.GetValueOfString(row["start_date"]);
                             item.endDate     = Util.GetValueOfString(row["end_date"]);
                             item.statusCode  = Util.GetValueOfString(row["status_code"]);
                             item.renewalCode = Util.GetValueOfString(row["renewal_code"]);
                             item.renewalName = row["renewal_name"] != DBNull.Value ? Util.GetValueOfString(row["renewal_name"]) : "";
                             item.value         = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                            item.ownerName     = ""; // VAS_ContractMaster has no SalesRep_ID column
                             item.productName   = "";
+                            item.productCount  = 0;  // set in enrichment pass
+                            item.productNames  = ""; // set in enrichment pass — newline-separated full list
                             item.attributeDesc = "";
                             item.source        = "VM";
                             items.Add(item);
@@ -770,7 +982,7 @@ namespace VAS.Models
                     _log.SaveError("VAS_105_AccountRightPanelModel.GetContracts.VAS_ContractMaster", exVM.Message);
                 }
 
-                // ── Part 2b: Enrich VAS_ContractMaster items with product names from VAS_ContractLine ──
+                // ── Part 2b: Enrich VAS_ContractMaster items with products, charges, and ASI from VAS_ContractLine ──
                 try
                 {
                     // Collect VAS_ContractMaster IDs from the items already fetched
@@ -794,17 +1006,20 @@ namespace VAS.Models
 
                         var sbProd = new StringBuilder();
                         sbProd.Append("SELECT vl.VAS_ContractMaster_ID AS master_id,");
-                        sbProd.Append("       p.Name AS product_name,");
+                        sbProd.Append("       COALESCE(p.Name, ch.Name) AS product_name,");
                         sbProd.Append("       COALESCE(asi.Description, N'') AS attribute_desc");
                         sbProd.Append("  FROM VAS_ContractLine vl");
-                        sbProd.Append("  INNER JOIN M_Product p ON (p.M_Product_ID = vl.M_Product_ID)");
+                        sbProd.Append("  LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = vl.M_Product_ID AND vl.M_Product_ID > 0)");
+                        sbProd.Append("  LEFT OUTER JOIN C_Charge ch ON (ch.C_Charge_ID = vl.C_Charge_ID AND vl.C_Charge_ID > 0)");
                         sbProd.Append("  LEFT OUTER JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = vl.M_AttributeSetInstance_ID AND vl.M_AttributeSetInstance_ID > 0)");
-                        sbProd.Append(" WHERE vl.IsActive = 'Y' AND vl.M_Product_ID > 0");
+                        sbProd.Append(" WHERE vl.IsActive = 'Y' AND (vl.M_Product_ID > 0 OR vl.C_Charge_ID > 0)");
                         sbProd.Append("   AND vl.VAS_ContractMaster_ID IN (");
                         sbProd.Append(sbIds);
-                        sbProd.Append(") ORDER BY vl.VAS_ContractMaster_ID, p.Name");
+                        sbProd.Append(") ORDER BY vl.VAS_ContractMaster_ID, COALESCE(p.Name, ch.Name)");
 
-                        DataSet dsProd = DB.ExecuteDataset(sbProd.ToString(), null, null);
+                        string prodAccess = MRole.GetDefault(ctx).AddAccessSQL(
+                            sbProd.ToString(), "vl", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                        DataSet dsProd = DB.ExecuteDataset(prodAccess, null, null);
 
                         // Aggregate product names and collect first attribute description per contract master
                         var productMap   = new Dictionary<int, List<string>>();
@@ -826,7 +1041,8 @@ namespace VAS.Models
                             }
                         }
 
-                        // Apply aggregated product names and attribute descriptions back to the VM items
+                        // Apply aggregated product names and attribute descriptions back to the VM items.
+                        // Show only the first product name; expose the total distinct count for the "+N more" UI chip.
                         foreach (dynamic it in items)
                         {
                             var dict = (IDictionary<string, object>)it;
@@ -834,7 +1050,12 @@ namespace VAS.Models
                             {
                                 int masterId = (int)dict["id"];
                                 if (productMap.ContainsKey(masterId))
-                                    it.productName = string.Join(", ", productMap[masterId]);
+                                {
+                                    var pList       = productMap[masterId];
+                                    it.productName  = pList.Count > 0 ? pList[0] : "";
+                                    it.productCount = pList.Count;
+                                    it.productNames = string.Join("\n", pList);
+                                }
                                 if (attributeMap.ContainsKey(masterId))
                                     it.attributeDesc = attributeMap[masterId];
                             }
@@ -877,8 +1098,9 @@ namespace VAS.Models
         /// Dynamic object with <c>items</c>, <c>total</c> (count of past tickets only),
         /// and <c>state</c>.
         /// Each item exposes: <c>id</c>, <c>ticketNo</c>, <c>subject</c>,
-        /// <c>priorityCode</c>, <c>ticketType</c>, <c>status</c>, <c>opened</c>,
-        /// <c>ageDays</c>, <c>contact</c>.
+        /// <c>priorityCode</c>, <c>priorityName</c>, <c>status</c>, <c>opened</c>,
+        /// <c>ageDays</c>, <c>contact</c>, <c>assignedTo</c>, <c>description</c>,
+        /// <c>customerName</c>, <c>dateNextAction</c>, <c>isOverdue</c>, <c>isInactive</c>.
         /// </returns>
         public dynamic GetTickets(Ctx ctx, int bPartnerId, string state, int pageOffset, int pageSize)
         {
@@ -901,13 +1123,18 @@ namespace VAS.Models
                 sb.Append("       r.Priority AS priority_code,");
                 sb.Append("       rs.Name AS status,");
                 sb.Append("       TO_CHAR(r.Created,'YYYY-MM-DD') AS opened,");
-                sb.Append("       CAST(DAYSBETWEEN( CURRENT_DATE,r.Created) AS INTEGER) AS age_days,");
+                sb.Append("       CAST(DAYSBETWEEN(CURRENT_DATE, r.Created) AS INTEGER) AS age_days,");
                 sb.Append("       u.Name AS contact,");
                 sb.Append("       r.DateNextAction AS date_next_action,");
-                sb.Append("       CAST(DAYSBETWEEN(r.Updated, CURRENT_DATE) AS INTEGER) AS inactive_days");
+                sb.Append("       CAST(DAYSBETWEEN(r.Updated, CURRENT_DATE) AS INTEGER) AS inactive_days,");
+                sb.Append("       COALESCE(r.Result, N'') AS description,");
+                sb.Append("       COALESCE(sr.Name, N'') AS assigned_to,");
+                sb.Append("       COALESCE(bp.Name, N'') AS customer_name");
                 sb.Append("  FROM R_Request r");
                 sb.Append("  LEFT OUTER JOIN R_Status rs ON (rs.R_Status_ID = r.R_Status_ID)");
                 sb.Append("  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = r.CreatedBy)");
+                sb.Append("  LEFT OUTER JOIN AD_User sr ON (sr.AD_User_ID = r.SalesRep_ID AND sr.AD_Client_ID = r.AD_Client_ID AND sr.IsActive = 'Y')");
+                sb.Append("  LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID = r.C_BPartner_ID AND bp.AD_Client_ID = r.AD_Client_ID AND bp.IsActive = 'Y')");
                 sb.Append(" WHERE r.IsActive = 'Y' AND r.C_BPartner_ID = @bPartnerId");
 
                 if (isPast)
@@ -920,38 +1147,30 @@ namespace VAS.Models
                     baseSql, "r", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
                 // ORDER BY / pagination appended after AddAccessSQL (RULE 5)
-                // Open tickets: top 5 by priority (High=1 first), then oldest first.
+                // VAI154 02-Sep-2026: open tickets now use proper OFFSET/FETCH pagination
+                // (previously used FETCH FIRST 5 ROWS ONLY which ignored pageOffset/pageSize)
                 if (isPast)
                     accessSql += " ORDER BY r.Updated DESC OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY";
                 else
-                    accessSql += " ORDER BY r.Priority ASC, r.Created ASC FETCH FIRST 5 ROWS ONLY";
+                    accessSql += " ORDER BY r.Priority ASC, r.Created ASC OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY";
 
-                SqlParameter[] sqlParams;
-                if (isPast)
+                var sqlParams = new SqlParameter[]
                 {
-                    sqlParams = new SqlParameter[]
-                    {
-                        new SqlParameter("@bPartnerId", bPartnerId),
-                        new SqlParameter("@pageOffset", pageOffset),
-                        new SqlParameter("@pageSize",   pageSize)
-                    };
-                }
-                else
-                {
-                    sqlParams = new SqlParameter[]
-                    {
-                        new SqlParameter("@bPartnerId", bPartnerId)
-                    };
-                }
+                    new SqlParameter("@bPartnerId", bPartnerId),
+                    new SqlParameter("@pageOffset", pageOffset),
+                    new SqlParameter("@pageSize",   pageSize)
+                };
 
-                // For past tickets also fetch total count
-                if (isPast)
+                // Fetch total count for pager (applies to both open and past states)
                 {
                     var countSb = new StringBuilder();
                     countSb.Append("SELECT COUNT(*)");
                     countSb.Append("  FROM R_Request r");
                     countSb.Append(" WHERE r.IsActive = 'Y' AND r.C_BPartner_ID = @bpIdCount");
-                    countSb.Append("   AND r.Processed = 'Y'");
+                    if (isPast)
+                        countSb.Append("   AND r.Processed = 'Y'");
+                    else
+                        countSb.Append("   AND COALESCE(r.Processed,'N') = 'N'");
 
                     string countBase = countSb.ToString();
                     string countAccess = MRole.GetDefault(ctx).AddAccessSQL(
@@ -1002,12 +1221,23 @@ namespace VAS.Models
                             ? Util.GetValueOfInt(row["inactive_days"]) : 0;
                         item.isInactive = !isPast && inactiveDays >= 7;
 
+                        // dateNextAction as ISO string for SLA display in the detail modal
+                        // (dnaRaw already read above for isOverdue computation)
+                        string dnaIso = string.Empty;
+                        try
+                        {
+                            if (dnaRaw != null && dnaRaw != DBNull.Value)
+                                dnaIso = Convert.ToDateTime(dnaRaw).ToString("yyyy-MM-dd");
+                        }
+                        catch { /* leave empty — unparseable date */ }
+                        item.dateNextAction = dnaIso;
+
+                        item.description  = Util.GetValueOfString(row["description"]);
+                        item.assignedTo   = Util.GetValueOfString(row["assigned_to"]);
+                        item.customerName = Util.GetValueOfString(row["customer_name"]);
+
                         items.Add(item);
                     }
-
-                    // For open tickets, total = count of items returned
-                    if (!isPast)
-                        response.total = items.Count;
                 }
             }
             catch (Exception ex)
@@ -1164,6 +1394,67 @@ namespace VAS.Models
         }
 
         // ─────────────────────────────────────────────────────────
+        // §7c  GetWindowIdByTable — table-name-based window fallback
+        // ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Resolves the window a TABLE's records open in: checks AD_Table.AD_Window_ID
+        /// first, then falls back to the first window whose first tab is on that table.
+        /// Ported from VAS_106_OverviewSalesOrderModel.GetWindowIdByTable.
+        ///
+        /// Required because C_Contract has two windows (purchasing and service contract)
+        /// and VIS.ZoomTarget may resolve the wrong one, producing a role-access error.
+        /// Reading AD_Table directly returns the canonical zoom target for the table.
+        /// </summary>
+        /// <param name="ctx">User context.</param>
+        /// <param name="tableName">Physical table name, e.g. "C_Contract".</param>
+        /// <returns>The window id, or 0 when no window is found.</returns>
+        public int GetWindowIdByTable(Ctx ctx, string tableName)
+        {
+            if (string.IsNullOrEmpty(tableName)) return 0;
+            string name = tableName.Trim();
+            try
+            {
+                // Primary: use AD_Table.AD_Window_ID (the zoom target the framework itself uses)
+                string sql = @"SELECT t.AD_Window_ID
+                                 FROM AD_Table t
+                                WHERE UPPER(t.TableName) = UPPER(@TableName)
+                                  AND t.IsActive         = 'Y'
+                                  AND COALESCE(t.AD_Window_ID, 0) > 0";
+                DataSet ds = DB.ExecuteDataset(
+                    sql, new SqlParameter[] { new SqlParameter("@TableName", name) }, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    int id = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+                    if (id > 0) return id;
+                }
+
+                // Fallback: first window whose primary tab maintains this table
+                sql = @"SELECT tb.AD_Window_ID
+                          FROM AD_Tab tb
+                         INNER JOIN AD_Table t ON (t.AD_Table_ID = tb.AD_Table_ID)
+                         WHERE UPPER(t.TableName) = UPPER(@TableName)
+                           AND tb.IsActive        = 'Y'
+                           AND t.IsActive         = 'Y'
+                           AND tb.SeqNo = (SELECT MIN(tb2.SeqNo)
+                                             FROM AD_Tab tb2
+                                            WHERE tb2.AD_Window_ID = tb.AD_Window_ID
+                                              AND tb2.IsActive     = 'Y')
+                         ORDER BY tb.SeqNo, tb.AD_Tab_ID";
+                ds = DB.ExecuteDataset(
+                    sql, new SqlParameter[] { new SqlParameter("@TableName", name) }, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return 0;
+                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Window_ID"]);
+            }
+            catch (Exception ex)
+            {
+                _log.SaveError("VAS_105_AccountRightPanelModel.GetWindowIdByTable (" + name + ")", ex.Message);
+                return 0;
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────
         // §8  Invoices  (paged)
         // ─────────────────────────────────────────────────────────
 
@@ -1222,7 +1513,26 @@ namespace VAS.Models
                 sb.Append("           N'') AS due_date,");
                 sb.Append("       CURRENCYCONVERT(i.GrandTotal, i.C_Currency_ID, cs.C_Currency_ID,");
                 sb.Append("           i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID) AS amount,");
+                // VAI154 02-Sep-2026: Compute paid_amount — full GrandTotal when invoice is marked
+                // paid, otherwise sum of each allocation line converted to the client base currency.
+                sb.Append("       CASE WHEN i.IsPaid = 'Y'");
+                sb.Append("            THEN CURRENCYCONVERT(i.GrandTotal, i.C_Currency_ID, cs.C_Currency_ID,");
+                sb.Append("                     i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID)");
+                sb.Append("            ELSE COALESCE(");
+                sb.Append("                     (SELECT SUM(CURRENCYCONVERT(al.Amount, ah.C_Currency_ID, cs.C_Currency_ID,");
+                sb.Append("                                                  ah.DateTrx, ah.C_ConversionType_ID, ah.AD_Client_ID, ah.AD_Org_ID))");
+                sb.Append("                        FROM C_AllocationLine al");
+                sb.Append("                        INNER JOIN C_AllocationHdr ah ON (ah.C_AllocationHdr_ID = al.C_AllocationHdr_ID)");
+                sb.Append("                       WHERE al.C_Invoice_ID = i.C_Invoice_ID");
+                sb.Append("                         AND al.IsActive = 'Y' AND ah.IsActive = 'Y' AND ah.DocStatus = 'CO'), 0)");
+                sb.Append("            END AS paid_amount,");
+                // VAI154 02-Sep-2026: Added 'Partial' status — detected via EXISTS on confirmed
+                // allocation lines so a single pass identifies partially-paid invoices.
                 sb.Append("       CASE WHEN i.IsPaid = 'Y' THEN 'Paid'");
+                sb.Append("            WHEN EXISTS (SELECT 1 FROM C_AllocationLine al");
+                sb.Append("                          INNER JOIN C_AllocationHdr ah ON (ah.C_AllocationHdr_ID = al.C_AllocationHdr_ID)");
+                sb.Append("                         WHERE al.C_Invoice_ID = i.C_Invoice_ID");
+                sb.Append("                           AND al.IsActive = 'Y' AND ah.IsActive = 'Y' AND ah.DocStatus = 'CO') THEN 'Partial'");
                 sb.Append("            WHEN (SELECT MIN(ps.DueDate) FROM C_InvoicePaySchedule ps");
                 sb.Append("                   WHERE ps.C_Invoice_ID = i.C_Invoice_ID AND ps.IsActive = 'Y') < CURRENT_DATE THEN 'Overdue'");
                 sb.Append("            ELSE 'Open' END AS pay_status");
@@ -1258,6 +1568,8 @@ namespace VAS.Models
                         item.dueDate = Util.GetValueOfString(row["due_date"]);
                         item.amount = row["amount"] != DBNull.Value
                             ? Convert.ToDecimal(row["amount"]) : 0m;
+                        item.paid = row["paid_amount"] != DBNull.Value
+                            ? Convert.ToDecimal(row["paid_amount"]) : 0m;
                         item.payStatus = Util.GetValueOfString(row["pay_status"]);
                         items.Add(item);
                     }
@@ -1309,7 +1621,17 @@ namespace VAS.Models
                 var sb = new StringBuilder();
                 sb.Append("SELECT p.C_Project_ID AS id,");
                 sb.Append("       p.Name AS name,");
-                sb.Append("       NULL AS status_code,");
+                sb.Append("       COALESCE(p.VAS_ProjectStatus, N'') AS status_code,");
+                // Resolve VAS_ProjectStatus code to display name via AD_Ref_List.
+                // AD_Reference_ID is looked up from AD_Column so no hard-coded reference ID is needed.
+                sb.Append("       (SELECT rl.Name FROM AD_Ref_List rl");
+                sb.Append("         WHERE rl.AD_Reference_ID = (SELECT c.AD_Reference_Value_ID");
+                sb.Append("                                       FROM AD_Column c");
+                sb.Append("                                      INNER JOIN AD_Table t ON (t.AD_Table_ID = c.AD_Table_ID)");
+                sb.Append("                                      WHERE c.ColumnName = 'VAS_ProjectStatus'");
+                sb.Append("                                        AND t.TableName = 'C_Project'");
+                sb.Append("                                        AND c.IsActive = 'Y')");
+                sb.Append("           AND rl.Value = p.VAS_ProjectStatus AND rl.IsActive = 'Y') AS status_name,");
                 sb.Append("       TO_CHAR(p.DateFinish,'YYYY-MM-DD') AS due,");
                 sb.Append("       lead.Name AS lead,");
                 // Budget source depends on the project's line level:
@@ -1322,6 +1644,7 @@ namespace VAS.Models
                 sb.Append("           END,");
                 sb.Append("           p.C_Currency_ID, cs.C_Currency_ID, p.DateContract, NULL, p.AD_Client_ID, p.AD_Org_ID) AS budget,");
                 sb.Append("       TO_CHAR(p.DateContract,'YYYY-MM-DD') AS start_date,");
+                sb.Append("       p.ProjectLineLevel AS project_line_level,");
                 sb.Append("       p.Description");
                 sb.Append("  FROM C_Project p");
                 sb.Append("  LEFT OUTER JOIN AD_User lead ON (lead.AD_User_ID = p.SalesRep_ID)");
@@ -1351,11 +1674,13 @@ namespace VAS.Models
                         item.id = Util.GetValueOfInt(row["id"]);
                         item.name = Util.GetValueOfString(row["name"]);
                         item.statusCode = Util.GetValueOfString(row["status_code"]);
+                        item.statusName = Util.GetValueOfString(row["status_name"]);
                         item.due = Util.GetValueOfString(row["due"]);
                         item.lead = Util.GetValueOfString(row["lead"]);
                         item.budget = row["budget"] != DBNull.Value
                             ? Convert.ToDecimal(row["budget"]) : 0m;
                         item.startDate = Util.GetValueOfString(row["start_date"]);
+                        item.projectLineLevel = Util.GetValueOfString(row["project_line_level"]);
                         item.description = Util.GetValueOfString(row["Description"]);
                         items.Add(item);
                     }
@@ -1364,6 +1689,77 @@ namespace VAS.Models
             catch (Exception ex)
             {
                 _log.SaveError("VAS_105_AccountRightPanelModel.GetProjects", ex.Message);
+            }
+
+            return response;
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // §9b  Project Phases
+        // ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns the ordered phase list for a given project.
+        /// Called by the project detail view when ProjectLineLevel is not 'P' (Project-level),
+        /// i.e. the project is organised into phases (Phase / Task / TaskLine level).
+        /// </summary>
+        /// <param name="ctx">Current session context.</param>
+        /// <param name="projectId">C_Project_ID of the project whose phases to retrieve.</param>
+        /// <returns>
+        /// Dynamic object with a <c>phases</c> list. Each item exposes:
+        /// <c>seqNo</c>, <c>name</c>, <c>isComplete</c>, <c>plannedAmt</c>,
+        /// <c>startDate</c>, <c>endDate</c>, <c>description</c>.
+        /// </returns>
+        public dynamic GetProjectPhases(Ctx ctx, int projectId)
+        {
+            dynamic response = new ExpandoObject();
+            response.phases = new List<dynamic>();
+
+            try
+            {
+                var sb = new StringBuilder();
+                sb.Append("SELECT ph.SeqNo,");
+                sb.Append("       ph.Name,");
+                sb.Append("       ph.IsComplete,");
+                sb.Append("       ph.PlannedAmt,");
+                sb.Append("       TO_CHAR(ph.DateStartSchedule,'YYYY-MM-DD') AS start_date,");
+                sb.Append("       TO_CHAR(ph.DateFinishSchedule,'YYYY-MM-DD') AS end_date,");
+                sb.Append("       COALESCE(ph.Description, N'') AS description");
+                sb.Append("  FROM C_ProjectPhase ph");
+                sb.Append(" WHERE ph.IsActive = 'Y' AND ph.C_Project_ID = @projectId");
+
+                string baseSql = sb.ToString();
+                string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    baseSql, "ph", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+                accessSql += " ORDER BY ph.SeqNo ASC";
+
+                var sqlParams = new SqlParameter[]
+                {
+                    new SqlParameter("@projectId", projectId)
+                };
+
+                var phases = (List<dynamic>)response.phases;
+                DataSet ds = DB.ExecuteDataset(accessSql, sqlParams, null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow row in ds.Tables[0].Rows)
+                    {
+                        dynamic phase = new ExpandoObject();
+                        phase.seqNo       = Util.GetValueOfInt(row["SeqNo"]);
+                        phase.name        = Util.GetValueOfString(row["Name"]);
+                        phase.isComplete  = Util.GetValueOfString(row["IsComplete"]) == "Y";
+                        phase.plannedAmt  = row["PlannedAmt"] != DBNull.Value ? Convert.ToDecimal(row["PlannedAmt"]) : 0m;
+                        phase.startDate   = Util.GetValueOfString(row["start_date"]);
+                        phase.endDate     = Util.GetValueOfString(row["end_date"]);
+                        phase.description = Util.GetValueOfString(row["description"]);
+                        phases.Add(phase);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.SaveError("VAS_105_AccountRightPanelModel.GetProjectPhases", ex.Message);
             }
 
             return response;
@@ -1395,12 +1791,14 @@ namespace VAS.Models
             int bPartnerTableId = GetTableId("C_BPartner");
 
             // ── Helper: add a single timeline item ────────────────
+            // Subject/title fields are stored HTML-encoded by the VIS platform (& → &amp;).
+            // HtmlDecode restores them to plain text so the JS esc() call does not double-encode.
             Action<DataRow, string> addItem = (row, touchType) =>
             {
                 dynamic item = new ExpandoObject();
                 item.touchType = touchType;
                 item.whenTs = Util.GetValueOfString(row["when_ts"]);
-                item.title = Util.GetValueOfString(row["title"]);
+                item.title = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["title"]));
                 item.who = Util.GetValueOfString(row["who"]);
                 allItems.Add(item);
             };
@@ -1441,6 +1839,7 @@ namespace VAS.Models
                 var sb = new StringBuilder();
                 sb.Append("SELECT TO_CHAR(ai.StartDate,'YYYY-MM-DD HH24:MI') AS when_ts,");
                 sb.Append("       ai.Subject AS title,");
+                sb.Append("       COALESCE(ai.Description, N'') AS description,");
                 sb.Append("       u.Name AS who");
                 sb.Append("  FROM AppointmentsInfo ai");
                 sb.Append("  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ai.CreatedBy)");
@@ -1455,7 +1854,16 @@ namespace VAS.Models
                 if (ds != null && ds.Tables.Count > 0)
                 {
                     meetingCnt = ds.Tables[0].Rows.Count;
-                    foreach (DataRow row in ds.Tables[0].Rows) addItem(row, "MEETING");
+                    foreach (DataRow row in ds.Tables[0].Rows)
+                    {
+                        dynamic apptItem = new ExpandoObject();
+                        apptItem.touchType   = "MEETING";
+                        apptItem.whenTs      = Util.GetValueOfString(row["when_ts"]);
+                        apptItem.title       = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["title"]));
+                        apptItem.description = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["description"]));
+                        apptItem.who         = Util.GetValueOfString(row["who"]);
+                        allItems.Add(apptItem);
+                    }
                 }
             }
             catch (Exception ex) { _log.SaveError("GetTimeline.Appointments", ex.Message); }
@@ -1510,9 +1918,11 @@ namespace VAS.Models
             catch (Exception ex) { _log.SaveError("GetTimeline.Notes", ex.Message); }
 
             // ── 5. Emails & Letters — MailAttachment1 ────────────
-            // AttachmentType 'M' = email sent/received, 'I' = inbound letter.
-            // Timestamp: DateMailReceived for letters, Created for emails (mirrors LatestUpdates block 6).
-            // Title: ma.Title (not ma.Subject) per platform convention.
+            // AttachmentType 'M' = outgoing email, 'I' = inbound letter.
+            // direction: 'out' for sent mail (show MailAddress = recipient),
+            //            'in'  for received mail (show MailAddressFrom = sender).
+            // The AD_User join is not used here because the relevant person (recipient/sender)
+            // is an external contact whose name is not guaranteed to be in AD_User.
             try
             {
                 var sb = new StringBuilder();
@@ -1520,10 +1930,12 @@ namespace VAS.Models
                 sb.Append("            THEN TO_CHAR(ma.DateMailReceived,'YYYY-MM-DD HH24:MI')");
                 sb.Append("            ELSE TO_CHAR(ma.Created,'YYYY-MM-DD HH24:MI') END AS when_ts,");
                 sb.Append("       ma.Title AS title,");
-                sb.Append("       u.Name AS who,");
+                sb.Append("       CASE WHEN ma.AttachmentType = 'I'");
+                sb.Append("            THEN COALESCE(ma.MailAddressFrom, N'')");
+                sb.Append("            ELSE COALESCE(ma.MailAddress, N'') END AS who,");
+                sb.Append("       CASE WHEN ma.AttachmentType = 'I' THEN 'in' ELSE 'out' END AS direction,");
                 sb.Append("       ma.AttachmentType AS attachment_type");
                 sb.Append("  FROM MailAttachment1 ma");
-                sb.Append("  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy)");
                 sb.Append(" WHERE ma.IsActive = 'Y' AND ma.Record_ID = @bpId AND ma.AD_Table_ID = " + bPartnerTableId);
                 sb.Append("   AND ma.AttachmentType IN ('M', 'I')");
 
@@ -1537,8 +1949,15 @@ namespace VAS.Models
                     foreach (DataRow row in ds.Tables[0].Rows)
                     {
                         string aType = Util.GetValueOfString(row["attachment_type"]);
-                        if (aType == "I") { letterCnt++; addItem(row, "LETTER"); }
-                        else { emailCnt++; addItem(row, "EMAIL"); }
+                        bool isLetter = aType == "I";
+                        dynamic mailItem = new ExpandoObject();
+                        mailItem.touchType = isLetter ? "LETTER" : "EMAIL";
+                        mailItem.whenTs    = Util.GetValueOfString(row["when_ts"]);
+                        mailItem.title     = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["title"]));
+                        mailItem.who       = Util.GetValueOfString(row["who"]);
+                        mailItem.direction = Util.GetValueOfString(row["direction"]); // 'in' or 'out'
+                        if (isLetter) letterCnt++; else emailCnt++;
+                        allItems.Add(mailItem);
                     }
                 }
             }
@@ -2091,14 +2510,16 @@ namespace VAS.Models
         public dynamic GetEmailDetail(Ctx ctx, int emailId)
         {
             dynamic response = new ExpandoObject();
-            response.id        = emailId;
-            response.subject   = "";
-            response.body      = "";
-            response.whenTs    = "";
-            response.direction = "";
-            response.fromEmail = "";
-            response.toEmail   = "";
-            response.who       = "";
+            response.id          = emailId;
+            response.subject     = "";
+            response.body        = "";
+            response.whenTs      = "";
+            response.direction   = "";
+            response.fromEmail   = "";
+            response.toEmail     = "";
+            response.ccEmail     = "";
+            response.who         = "";
+            response.peopleNames = "";
             try
             {
                 if (emailId <= 0) { response.id = 0; return response; }
@@ -2113,6 +2534,7 @@ namespace VAS.Models
                 sb.Append("       CASE WHEN ma.AttachmentType = 'I' THEN 'in' ELSE 'out' END AS Direction,");
                 sb.Append("       ma.MailAddressFrom AS FromEmail,");
                 sb.Append("       ma.MailAddress AS ToEmail,");
+                sb.Append("       COALESCE(ma.MailAddressCc, N'') AS CcEmail,");
                 sb.Append("       u.Name AS Who");
                 sb.Append("  FROM MailAttachment1 ma");
                 sb.Append("  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy AND u.IsActive = 'Y')");
@@ -2124,14 +2546,81 @@ namespace VAS.Models
 
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
-                    DataRow row = ds.Tables[0].Rows[0];
+                    DataRow row    = ds.Tables[0].Rows[0];
                     response.subject   = Util.GetValueOfString(row["Subject"]);
                     response.body      = Util.GetValueOfString(row["Body"]);
                     response.whenTs    = Util.GetValueOfString(row["WhenTs"]);
                     response.direction = Util.GetValueOfString(row["Direction"]);
                     response.fromEmail = Util.GetValueOfString(row["FromEmail"]);
-                    response.toEmail   = Util.GetValueOfString(row["ToEmail"]);
                     response.who       = Util.GetValueOfString(row["Who"]);
+
+                    string toAddr = Util.GetValueOfString(row["ToEmail"]);
+                    string ccAddr = Util.GetValueOfString(row["CcEmail"]);
+                    response.toEmail = toAddr;
+                    response.ccEmail = ccAddr;
+
+                    // Collect all To + CC addresses, look up AD_User names, return as
+                    // semicolon-separated peopleNames for the JS People field.
+                    var allAddrs = new List<string>();
+                    foreach (var part in new[] { toAddr, ccAddr })
+                    {
+                        if (!string.IsNullOrWhiteSpace(part))
+                            allAddrs.AddRange(part.Split(new char[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries));
+                    }
+                    var uniqueAddrs = allAddrs
+                        .Select(e => e.Trim().ToLowerInvariant())
+                        .Where(e => !string.IsNullOrEmpty(e))
+                        .Distinct()
+                        .Take(20)
+                        .ToList();
+
+                    if (uniqueAddrs.Count > 0)
+                    {
+                        try
+                        {
+                            var snb        = new StringBuilder();
+                            var nameParams = new List<SqlParameter>();
+                            var holders    = new List<string>();
+                            for (int i = 0; i < uniqueAddrs.Count; i++)
+                            {
+                                holders.Add("@em" + i);
+                                nameParams.Add(new SqlParameter("@em" + i, uniqueAddrs[i]));
+                            }
+                            snb.Append("SELECT LOWER(TRIM(u.EMail)) AS Email, u.Name AS UName");
+                            snb.Append("  FROM AD_User u");
+                            snb.Append(" WHERE u.IsActive = 'Y'");
+                            snb.Append("   AND LOWER(TRIM(u.EMail)) IN (");
+                            snb.Append(string.Join(", ", holders));
+                            snb.Append(")");
+
+                            DataSet nameDs  = DB.ExecuteDataset(snb.ToString(), nameParams.ToArray(), null);
+                            var nameMap     = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                            if (nameDs != null && nameDs.Tables.Count > 0)
+                            {
+                                foreach (DataRow nr in nameDs.Tables[0].Rows)
+                                {
+                                    string eml  = Util.GetValueOfString(nr["Email"]);
+                                    string unam = Util.GetValueOfString(nr["UName"]);
+                                    if (!string.IsNullOrEmpty(eml) && !nameMap.ContainsKey(eml))
+                                        nameMap[eml] = unam;
+                                }
+                            }
+
+                            // Build people list: use name if found in AD_User, otherwise fall back to the email address.
+                            var peopleList = new List<string>();
+                            foreach (var addr in uniqueAddrs)
+                            {
+                                string nm = nameMap.ContainsKey(addr) ? nameMap[addr] : addr;
+                                if (!string.IsNullOrEmpty(nm)) peopleList.Add(nm);
+                            }
+                            response.peopleNames = string.Join(";", peopleList);
+                        }
+                        catch (Exception exNames)
+                        {
+                            _log.SaveError("VAS_105.GetEmailDetail.PeopleNames", exNames.Message);
+                            // peopleNames stays empty; JS falls back to data.who
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -2184,12 +2673,12 @@ namespace VAS.Models
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
                     var row = ds.Tables[0].Rows[0];
-                    response.subject    = Util.GetValueOfString(row["Subject"]);
+                    response.subject    = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Subject"]));
                     response.startDate  = Util.GetValueOfString(row["StartDate"]);
                     response.endDate    = Util.GetValueOfString(row["EndDate"]);
-                    response.location   = Util.GetValueOfString(row["Location"]);
+                    response.location   = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Location"]));
                     response.meetingUrl = Util.GetValueOfString(row["MeetingUrl"]);
-                    response.comments   = Util.GetValueOfString(row["Comments"]);
+                    response.comments   = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Comments"]));
                     response.transcript = Util.GetValueOfString(row["Transcript"]);
 
                     try
@@ -2368,9 +2857,9 @@ namespace VAS.Models
                             item.touchType = "MEETING";
                             item.meetingId = Util.GetValueOfInt(row["MeetingId"]);
                             item.whenTs    = Util.GetValueOfString(row["when_ts"]);
-                            item.title     = Util.GetValueOfString(row["title"]);
-                            item.location  = Util.GetValueOfString(row["location"]);
-                            item.preview   = Util.GetValueOfString(row["preview"]);
+                            item.title     = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["title"]));
+                            item.location  = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["location"]));
+                            item.preview   = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["preview"]));
                             item.hasTranscript = Util.GetValueOfString(row["has_transcript"]) == "Y";
                             item.who       = Util.GetValueOfString(row["who"]);
                             item.direction = "";
@@ -2802,7 +3291,7 @@ namespace VAS.Models
                 sb.Append("       cat.Name AS Category,");
                 sb.Append("       TO_CHAR(a.EndDate,'YYYY-MM-DD') AS DueDate,");
                 sb.Append("       a.PriorityKey AS PriorityCode,");
-                sb.Append("       a.TaskStatus AS CompletionPct,");
+                sb.Append("       a.TaskStatus * 10 AS CompletionPct,"); // TaskStatus is 0–10 scale; multiply to get 0–100 percent
                 sb.Append("       a.ExecuteBy AS ExecuteByCode,");
                 sb.Append("       COALESCE(SUBSTR(a.IsClosed,1,1),'N') AS IsClosed,");
                 sb.Append("       u.AD_User_ID AS AssigneeId,");
@@ -2834,9 +3323,9 @@ namespace VAS.Models
                         dynamic item = new ExpandoObject();
                         string rawPriority = Util.GetValueOfString(row["PriorityCode"]);
                         item.id            = Util.GetValueOfInt(row["Id"]);
-                        item.title         = Util.GetValueOfString(row["Title"]);
-                        item.detail        = Util.GetValueOfString(row["Detail"]);
-                        item.result        = Util.GetValueOfString(row["Result"]);
+                        item.title         = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Title"]));
+                        item.detail        = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Detail"]));
+                        item.result        = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Result"]));
                         item.categoryId    = Util.GetValueOfInt(row["CategoryId"]);
                         item.category      = Util.GetValueOfString(row["Category"]);
                         item.dueDate       = Util.GetValueOfString(row["DueDate"]);

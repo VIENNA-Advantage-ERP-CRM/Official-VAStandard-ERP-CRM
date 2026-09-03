@@ -1,38 +1,23 @@
 /* ============================================================
- * Module Name    : CRM Extension VAS_218
- * Purpose        : Create Opp Lines Bottom Panel — styles
+ * Module Name    : CRM Extension VAS_240
+ * Purpose        : Create Order Bottom Panel — styles
  * Employee Code  : VAI154
- * Date           : 21-Aug-2026
- * VAS_218_CreateOppLines — editable Invoice Lines grid
+ * Date           : 09-Jul-2026
+ * VAS_240_RequisitionBottomPanel — editable Invoice Lines grid
  * Port of the Onfinity "Invoice Lines & Summary" prototype:
  *   - editable lines table with selection + unsaved cue
  *   - catalog autocomplete popover (keyboard nav)
  *   - attribute picker dialog (list + create form)
  *   - scan barcode dialog
  *   - more-options popover (Discount + Notes, underline fields)
- * All sizing in em (no px), classes namespaced vas-ol-* so nothing
+ * All sizing in em (no px), classes namespaced vas-rbl-* so nothing
  * leaks into the host page. Tokens are shared with the body-level
- * dialogs / toast (which mount outside .vas-ol-root).
+ * dialogs / toast (which mount outside .vas-rbl-root).
  * ============================================================ */
 
-/* Applied to the root element and framework title bar when no saved opportunity is
-   selected (new record or record_ID <= 0). !important overrides the framework's
-   inline .show()/.setSize() so it cannot flash the empty panel back. */
-.vas-ol-tab-hidden {
-    display: none !important;
-}
-
-/* Permanently hide the framework title bar that sits immediately before our root —
-   the panel has its own "Opportunity Lines" header. :has() fallback for older browsers
-   is handled via JS in applyTabVisibility(). */
-.vis-ad-w-p-ap-tp-body-head:has(+ .vas-ol-root) {
-    display: none !important;
-}
-
-.vas-ol-root,
-.vas-ol-dialog-backdrop,
-.vas-ol-toast,
-.vas-ol-catalog-popover {
+.vas-rbl-root,
+.vas-rbl-dialog-backdrop,
+.vas-rbl-toast {
     --cil-action-blue: #0083da;
     --cil-action-blue-hover: #0069ae;
     --cil-link-deep: #005fa3;
@@ -68,7 +53,7 @@
     --cil-font: "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
 }
 
-.vas-ol-root {
+.vas-rbl-root {
     position: relative;
     height: 100%;
     width: 100%;
@@ -106,15 +91,15 @@
 }
 /* Same guard down the wrapper chain in case the host stretches an inner block as the
    flex item rather than the root itself. */
-.vas-ol-body, .vas-ol-panel, .vas-ol-table, .vas-ol-tbody {
+.vas-rbl-body, .vas-rbl-panel, .vas-rbl-table, .vas-rbl-tbody {
     min-width: 0;
 }
 
-.vas-ol-root * {
+.vas-rbl-root * {
     box-sizing: border-box;
 }
 
-.vas-ol-empty {
+.vas-rbl-empty {
     display: flex;
     height: 100%;
     align-items: center;
@@ -122,19 +107,15 @@
     color: var(--cil-text-muted);
 }
 
-.vas-ol-icon {
+.vas-rbl-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    /* 1.125em matches the visual footprint of VAS_074's emoji icon at the same button font-size.
-       The Lucide SVG viewBox has internal padding that makes 0.875em appear smaller than an emoji. */
-    width: 1.125em;
-    height: 1.125em;
-    flex-shrink: 0;
-    color: inherit;
+    width: 0.875em;
+    height: 0.875em;
 }
 
-.vas-ol-is-hidden {
+.vas-rbl-is-hidden {
     display: none !important;
 }
 
@@ -143,7 +124,7 @@
    Plain block container — no flex layout — so the panel grows with its content and the
    root's overflow-y:auto scrolls the whole panel (header + lines + totals) as one unit.
    Mirrors VAS_074 which also has no flex / overflow on the panel wrapper. */
-.vas-ol-panel {
+.vas-rbl-panel {
     background: #FFFFFF;
     /*border: 1px solid #D9E2EB;*/
     border-radius: 16px;
@@ -151,7 +132,7 @@
 }
 
 /* Panel Foundation Rule 2 — header chrome (windows-and-panels.md § Panel Foundation) */
-.vas-ol-panel__header {
+.vas-rbl-panel__header {
     min-height: 56px;
     padding: 0 16px;
     /*border-bottom: 1px solid #D9E2EB;*/
@@ -162,7 +143,7 @@
     gap: 0.75em;
 }
 
-.vas-ol-panel__title {
+.vas-rbl-panel__title {
     margin: 0;
     font-size: 1.1em;
     font-weight: 700;
@@ -170,13 +151,13 @@
     color: var(--cil-text-strong);
 }
 
-.vas-ol-panel__subtitle {
+.vas-rbl-panel__subtitle {
     margin: 0.125em 0 0;
     font-size: 0.8125em;
     color: var(--cil-text-muted);
 }
 
-.vas-ol-panel__actions {
+.vas-rbl-panel__actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -184,45 +165,45 @@
 }
 
 /* ---------- buttons ---------- */
-.vas-ol-btn {
+.vas-rbl-btn {
     display: inline-flex;
     align-items: center;
     gap: 0.375em;
     padding: 0.5em 0.875em;
-    border: 0.0625em solid transparent;
+    border: 1px solid transparent;
     border-radius: var(--cil-r-pill);
     background: transparent;
     font-family: inherit;
-    font-size: 0.8125em;
+    font-size: 0.85em;
     line-height: 1.2;
     cursor: pointer;
     transition: background .12s, color .12s, border-color .12s;
 }
 
-.vas-ol-btn--outline {
+.vas-rbl-btn--outline {
     background: var(--cil-surface);
     border-color: var(--cil-action-blue);
     color: var(--cil-action-blue);
 }
 
-    .vas-ol-btn--outline:hover {
+    .vas-rbl-btn--outline:hover {
         background: var(--cil-blue-soft);
     }
 
-.vas-ol-btn--outline-pill {
+.vas-rbl-btn--outline-pill {
     background: var(--cil-surface);
     border-color: var(--cil-action-blue);
     color: var(--cil-action-blue);
-    font-size: 0.8125em;
+    font-size: 0.75em;
     font-weight: 600;
     padding: 0.375em 0.75em;
 }
 
-    .vas-ol-btn--outline-pill:hover {
+    .vas-rbl-btn--outline-pill:hover {
         background: var(--cil-blue-soft);
     }
 
-.vas-ol-btn--primary {
+.vas-rbl-btn--primary {
     background: var(--cil-action-blue);
     border-color: var(--cil-action-blue);
     color: #fff;
@@ -230,17 +211,17 @@
     padding: 0.5em 1.125em;
 }
 
-    .vas-ol-btn--primary:hover {
+    .vas-rbl-btn--primary:hover {
         background: var(--cil-action-blue-hover);
     }
 
-    .vas-ol-btn--primary:disabled {
+    .vas-rbl-btn--primary:disabled {
         background: #9fcdec;
         border-color: #9fcdec;
         cursor: not-allowed;
     }
 
-.vas-ol-btn--ghost {
+.vas-rbl-btn--ghost {
     background: var(--cil-surface);
     border-color: var(--cil-border-default);
     color: var(--cil-text-secondary);
@@ -248,47 +229,49 @@
     padding: 0.5em 1.125em;
 }
 
-    .vas-ol-btn--ghost:hover {
+    .vas-rbl-btn--ghost:hover {
         background: var(--cil-surface-muted);
     }
 
-.vas-ol-btn--danger {
+.vas-rbl-btn--save {
+    background: var(--cil-surface);
+    border-color: var(--cil-purple);
+    color: var(--cil-purple);
+}
+
+    .vas-rbl-btn--save:hover {
+        background: var(--cil-purple-bg);
+    }
+
+    .vas-rbl-btn--save.vas-rbl-is-disabled,
+    .vas-rbl-btn--save:disabled {
+        cursor: not-allowed;
+        border-color: #dbe6ee;
+        color: var(--cil-text-disabled);
+        background: var(--cil-surface);
+    }
+
+.vas-rbl-btn--danger {
     background: var(--cil-surface);
     border-color: var(--cil-danger-text);
     color: var(--cil-danger-text);
 }
 
-    .vas-ol-btn--danger:hover {
+    .vas-rbl-btn--danger:hover {
         background: #fbe6e6;
     }
 
-.vas-ol-btn.vas-ol-is-disabled, .vas-ol-btn:disabled {
+.vas-rbl-btn.vas-rbl-is-disabled, .vas-rbl-btn:disabled {
     cursor: not-allowed;
     border-color: #dbe6ee;
     color: var(--cil-text-disabled);
     background: var(--cil-surface);
 }
 
-/* Faded blue for the primary (save) button when disabled — no dirty rows.
-   Uses CSS class so mousedown still fires before blur commits the active editor.
-   Mirrors VAS_074's pattern exactly. */
-.vas-ol-btn--primary.vas-ol-is-disabled {
-    background: #9fcdec;
-    border-color: #9fcdec;
-    color: #fff;
-    cursor: not-allowed;
-}
-
-/* selection count badge inside the Delete button */
-.vas-ol-sel-count {
-    font-size: 0.85em;
-    opacity: 0.75;
-}
-
 /* ---------- table (panel body) ---------- */
-/* Panel Foundation Rule 3 — the font-size anchor lives on .vas-ol-root (mirrors VAS_074).
+/* Panel Foundation Rule 3 — the font-size anchor lives on .vas-rbl-root (mirrors VAS_074).
    The table is a plain flex column that grows with its content; the root scrolls it. */
-.vas-ol-table {
+.vas-rbl-table {
     overflow-x: hidden;
     padding: 0.5em 1.25em 1.125em;
     display: flex;
@@ -300,20 +283,25 @@
    Scoped to the root + body-level dialogs (mirrors VAS_074 :where(.vas-cil-root,...))
    so every button/input/select inside the panel inherits the root's font-size anchor
    instead of falling back to the UA default (~13.33px in Chrome). */
-:where(.vas-ol-root, .vas-ol-dialog-backdrop) button,
-:where(.vas-ol-root, .vas-ol-dialog-backdrop) input,
-:where(.vas-ol-root, .vas-ol-dialog-backdrop) select,
-:where(.vas-ol-root, .vas-ol-dialog-backdrop) textarea,
-:where(.vas-ol-root, .vas-ol-dialog-backdrop) optgroup {
+:where(.vas-rbl-root, .vas-rbl-dialog-backdrop) button,
+:where(.vas-rbl-root, .vas-rbl-dialog-backdrop) input,
+:where(.vas-rbl-root, .vas-rbl-dialog-backdrop) select,
+:where(.vas-rbl-root, .vas-rbl-dialog-backdrop) textarea,
+:where(.vas-rbl-root, .vas-rbl-dialog-backdrop) optgroup {
     font-family: inherit;
     font-size: inherit;
     line-height: inherit;
     color: inherit;
 }
 
-.vas-ol-row {
+/* Seven tracks, in the order renderRow builds them: select, product / charge,
+   description, quantity + UOM, unit price, line amount, "...". (VAS_107 has an
+   eighth for Tax, which a requisition line does not carry.) Every flexible track
+   is minmax(0, Nfr) so a long value shrinks its own cell instead of pushing the
+   next column over its neighbour at an odd zoom level. */
+.vas-rbl-row {
     display: grid;
-    grid-template-columns: 1.75em minmax(0, 1.9fr) minmax(0, 2fr) minmax(7em, 1fr) minmax(6em, 0.7fr) minmax(6.75em, 0.85fr) 3.5em;
+    grid-template-columns: 1.75em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.8fr) minmax(6.75em, 0.9fr) 3.5em;
     gap: 0.75em;
     align-items: center;
     padding: 0.75em 0;
@@ -321,13 +309,13 @@
     transition: background .12s;
 }
 
-.vas-ol-row--head {
+.vas-rbl-row--head {
     padding: 0.625em 0;
     border-bottom-color: var(--cil-divider-strong);
     align-items: start;
 }
 
-    .vas-ol-row--head .vas-ol-cell {
+    .vas-rbl-row--head .vas-rbl-cell {
         /*font-size: 0.8125em;
         font-weight: 400;
         color: var(--cil-text-secondary);*/
@@ -336,26 +324,23 @@
         font-size: 0.9125em;
         font-weight: 400;
         color: var(--cil-text);
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
     }
 
 
-.vas-ol-row--line {
+.vas-rbl-row--line {
     position: relative;
 }
 
-    .vas-ol-row--line.is-selected {
+    .vas-rbl-row--line.is-selected {
         background: var(--cil-blue-soft);
     }
 
-    .vas-ol-row--line.is-busy {
+    .vas-rbl-row--line.is-busy {
         opacity: 0.55;
         pointer-events: none;
     }
 
-.vas-ol-row-spin {
+.vas-rbl-row-spin {
     position: absolute;
     top: 50%;
     right: 1.25em;
@@ -365,33 +350,33 @@
     border: 2px solid var(--cil-border-default);
     border-top-color: var(--cil-action-blue);
     border-radius: 50%;
-    animation: vasOlSpin 0.7s linear infinite;
+    animation: vasRblSpin 0.7s linear infinite;
     pointer-events: none;
 }
 
-@keyframes vasOlSpin {
+@keyframes vasRblSpin {
     to {
         transform: rotate(360deg);
     }
 }
 
-.vas-ol-row--line.is-unsaved {
+.vas-rbl-row--line.is-unsaved {
     background: var(--cil-surface-amber);
     box-shadow: inset 3px 0 0 var(--cil-warning);
 }
 
-    .vas-ol-row--line.is-unsaved.is-selected {
+    .vas-rbl-row--line.is-unsaved.is-selected {
         background: var(--cil-blue-soft);
     }
 
-.vas-ol-row--line.is-invalid {
+.vas-rbl-row--line.is-invalid {
     background: var(--cil-danger-bg);
     box-shadow: inset 3px 0 0 var(--cil-danger);
 }
 
 /* Per-row inline validation message (replaces the global toast on Save). Spans the
        whole grid row on its own line, red, under the offending line's cells. */
-.vas-ol-row--line .vas-ol-row-error {
+.vas-rbl-row--line .vas-rbl-row-error {
     grid-column: 1 / -1;
     margin: 0.125em 0 0 2.5em;
     font-size: 0.75em;
@@ -406,7 +391,7 @@
    this forces all labels into one column track and all values into the
    other, so label right-edges align regardless of per-cell font-size.
    justify-content:end right-aligns the whole grid within the table. */
-.vas-ol-totals-block {
+.vas-rbl-totals-block {
     display: grid;
     grid-template-columns: auto auto;
     column-gap: 1.25em;
@@ -418,18 +403,18 @@
 
 /* display:contents makes the row div transparent to grid layout;
    its label and value children become direct grid items. */
-.vas-ol-totals-row {
+.vas-rbl-totals-row {
     display: contents;
 }
 
-.vas-ol-totals-row__label {
+.vas-rbl-totals-row__label {
     font-size: 0.875em;
     color: var(--cil-text-muted);
     white-space: nowrap;
     text-align: right;
 }
 
-.vas-ol-totals-row__value {
+.vas-rbl-totals-row__value {
     font-size: 1.1em;
     font-weight: 400;
     font-variant-numeric: tabular-nums;
@@ -440,28 +425,28 @@
 }
 
 /* Grand Total: divider on both cells so it spans both column tracks. */
-.vas-ol-totals-row--grand .vas-ol-totals-row__label,
-.vas-ol-totals-row--grand .vas-ol-totals-row__value {
+.vas-rbl-totals-row--grand .vas-rbl-totals-row__label,
+.vas-rbl-totals-row--grand .vas-rbl-totals-row__value {
     /*border-top: 1px solid var(--cil-divider);*/
     padding-top: 0.4em;
     margin-top: 0.1em;
 }
 
-    .vas-ol-totals-row--grand .vas-ol-totals-row__label {
+    .vas-rbl-totals-row--grand .vas-rbl-totals-row__label {
         font-size: 0.9375em;
         font-weight: 700;
         color: var(--cil-text-strong);
     }
 
-.vas-ol-totals-row--grand .vas-ol-totals-row__value {
+.vas-rbl-totals-row--grand .vas-rbl-totals-row__value {
     font-size: 1.1875em;
     font-weight: 700;
     color: var(--cil-text-strong);
     letter-spacing: -0.02em;
-    /*border-top: 1px solid var(--cil-divider);*/
+    border-top: 1px solid var(--cil-divider);
 }
 
-.vas-ol-cell {
+.vas-rbl-cell {
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -469,75 +454,75 @@
     color: var(--cil-text);
 }
 
-.vas-ol-cell--check {
+.vas-rbl-cell--check {
     align-items: center;
     justify-content: center;
 }
 
-.vas-ol-cell--right {
+.vas-rbl-cell--right {
     text-align: right;
     align-items: flex-end;
 }
 
-.vas-ol-cell--more {
+.vas-rbl-cell--more {
     flex-direction: row;
     align-items: center;
     justify-content: center;
     gap: 0.25em;
 }
 
-.vas-ol-cell input[type="checkbox"] {
+.vas-rbl-cell input[type="checkbox"] {
     width: 1em;
     height: 1em;
     accent-color: var(--cil-action-blue);
     cursor: pointer;
 }
-/* Read-only invoice (.vas-ol-locked): the selection / select-all checkbox and the
+/* Read-only invoice (.vas-rbl-locked): the selection / select-all checkbox and the
    "..." button are disabled -> not-allowed. A disabled control IGNORES its own `cursor`
    in Chromium, so put the cursor on the (enabled) parent cell and let the disabled
    control pass pointer events through to it (pointer-events:none). */
-.vas-ol-locked .vas-ol-cell--check,
-.vas-ol-locked .vas-ol-cell--more {
+.vas-rbl-locked .vas-rbl-cell--check,
+.vas-rbl-locked .vas-rbl-cell--more {
     cursor: not-allowed;
 }
 
-    .vas-ol-locked .vas-ol-cell--check input[type="checkbox"]:disabled,
-    .vas-ol-locked .vas-ol-more-btn:disabled {
+    .vas-rbl-locked .vas-rbl-cell--check input[type="checkbox"]:disabled,
+    .vas-rbl-locked .vas-rbl-more-btn:disabled {
         cursor: not-allowed;
         pointer-events: none;
     }
 
-.vas-ol-emptyrow {
+.vas-rbl-emptyrow {
     padding: 1.5em;
     text-align: center;
     color: var(--cil-text-muted);
     border-bottom: 1px solid var(--cil-divider);
 }
 
-.vas-ol-total-item {
+.vas-rbl-total-item {
     display: inline-flex;
     align-items: baseline;
     gap: 0.5em;
 }
 
-.vas-ol-total-item__label {
+.vas-rbl-total-item__label {
     font-size: 0.8125em;
     color: var(--cil-text-muted);
 }
 
-.vas-ol-total-item__value {
+.vas-rbl-total-item__value {
     font-variant-numeric: tabular-nums;
     font-weight: 600;
 }
 
-.vas-ol-total-item--grand .vas-ol-total-item__value {
+.vas-rbl-total-item--grand .vas-rbl-total-item__value {
     font-weight: 700;
     color: var(--cil-text-strong);
     font-size: 1em;
 }
 
 /* ---------- editable cell (underline affordance, never a box-in-box) ---------- */
-.vas-ol-cell-edit {
+.vas-rbl-cell-edit {
     min-height: 2.2em;
     display: flex;
     flex-direction: column;
@@ -548,11 +533,11 @@
 }
     /* The cell value is always an <input>; the wrapper never carries a border (the
    input shows an underline only while focused), so a blurred cell shows none. */
-    .vas-ol-cell-edit.is-editing {
+    .vas-rbl-cell-edit.is-editing {
         border-bottom-color: transparent;
     }
 
-.vas-ol-cell-edit__primary {
+.vas-rbl-cell-edit__primary {
     font-weight: 600;
     font-size: 0.875em;
     color: var(--cil-text-strong);
@@ -562,7 +547,7 @@
     letter-spacing: -0.005em;
 }
 
-.vas-ol-cell-edit__sub {
+.vas-rbl-cell-edit__sub {
     margin-top: 0.125em;
     font-size: 0.75em;
     color: var(--cil-text-muted);
@@ -572,12 +557,12 @@
     cursor: pointer;
 }
 
-    .vas-ol-cell-edit__sub:hover {
+    .vas-rbl-cell-edit__sub:hover {
         color: var(--cil-action-blue);
     }
 /* Attribute-set-instance description shown under the product, click to open the
    attribute control. Coloured like a link (e.g. "ALMOND | IP | LARGE | 2023"). */
-.vas-ol-attr-link {
+.vas-rbl-attr-link {
     display: block;
     margin-top: 0.125em;
     font-size: 0.85em;
@@ -589,22 +574,22 @@
     cursor: pointer;
 }
 
-    .vas-ol-attr-link:hover {
+    .vas-rbl-attr-link:hover {
         text-decoration: underline;
     }
 
-.vas-ol-attr-link--empty {
+.vas-rbl-attr-link--empty {
     font-weight: 400;
     font-style: italic;
     color: var(--cil-text-muted);
 }
 /* Read-only invoice: attribute is informational text, not an interactive link. */
-.vas-ol-attr-link--disabled {
+.vas-rbl-attr-link--disabled {
     color: var(--cil-text-secondary);
     cursor: default;
 }
 
-    .vas-ol-attr-link--disabled:hover {
+    .vas-rbl-attr-link--disabled:hover {
         text-decoration: none;
     }
 /* Editing / resting cell controls. These MUST out-specify the framework
@@ -612,8 +597,8 @@
    scope by wrapper + element tag so the control stays flush and TRANSPARENT,
    inheriting the row/div background (e.g. the cream tint of an unsaved row)
    instead of showing a white box. Underline only on focus -> none when blurred. */
-.vas-ol-cell-edit input.vas-ol-cell-edit__input,
-.vas-ol-cell-edit select.vas-ol-cell-edit__select {
+.vas-rbl-cell-edit input.vas-rbl-cell-edit__input,
+.vas-rbl-cell-edit select.vas-rbl-cell-edit__select {
     width: 100%;
     min-width: 0;
     flex: none;
@@ -636,25 +621,25 @@
     font-weight: 500;
 }
 
-    .vas-ol-cell-edit input.vas-ol-cell-edit__input:not([readonly]):focus,
-    .vas-ol-cell-edit select.vas-ol-cell-edit__select:focus {
+    .vas-rbl-cell-edit input.vas-rbl-cell-edit__input:not([readonly]):focus,
+    .vas-rbl-cell-edit select.vas-rbl-cell-edit__select:focus {
         border-bottom-color: var(--cil-action-blue);
     }
 
-.vas-ol-cell-edit input.vas-ol-cell-edit__input {
+.vas-rbl-cell-edit input.vas-rbl-cell-edit__input {
     font-weight: 500;
     color: var(--cil-text);
 }
 
-.vas-ol-cell-edit select.vas-ol-cell-edit__select {
+.vas-rbl-cell-edit select.vas-rbl-cell-edit__select {
     color: var(--cil-text-secondary);
 }
 
-.vas-ol-cell-edit input.vas-ol-cell-edit__input::placeholder {
+.vas-rbl-cell-edit input.vas-rbl-cell-edit__input::placeholder {
     color: var(--cil-text-disabled);
 }
 
-.vas-ol-cell-disp {
+.vas-rbl-cell-disp {
     /* Resting cells are click-to-edit, never drag targets - block text selection so a
        press-and-move doesn't start a drag. */
     -webkit-user-select: none;
@@ -664,20 +649,20 @@
 }
 /* Cursor: the resting cell is a readonly <input>, so the framework's input reset forces
    `cursor: not-allowed` on it (higher specificity than a bare class). Override with a
-   tag+class selector (scoped under .vas-ol-cell-edit) AND !important so it always wins:
+   tag+class selector (scoped under .vas-rbl-cell-edit) AND !important so it always wins:
    an editable cell is click-to-edit -> pointer; a locked/read-only cell -> not-allowed. */
-.vas-ol-cell-edit input.vas-ol-cell-disp {
+.vas-rbl-cell-edit input.vas-rbl-cell-disp {
     cursor: pointer !important;
 }
 /* read-only invoice or read-only column */
-.vas-ol-cell-edit input.vas-ol-cell-disp--ro {
+.vas-rbl-cell-edit input.vas-rbl-cell-disp--ro {
     cursor: not-allowed !important;
 }
 /* Column read-only field rendered DISABLED (e.g. C_UOM_ID ReadOnlyLogic true): grey the
    text but keep the borderless transparent look (override the browser's disabled styling).
    Chromium ignores `cursor` on a disabled control, so pass pointer events through to the
    cell wrapper, which shows the not-allowed cursor. */
-.vas-ol-cell-edit input.vas-ol-cell-disp:disabled {
+.vas-rbl-cell-edit input.vas-rbl-cell-disp:disabled {
     color: var(--cil-text-disabled);
     -webkit-text-fill-color: var(--cil-text-disabled);
     background: transparent;
@@ -686,33 +671,33 @@
     cursor: not-allowed;
 }
 
-.vas-ol-cell-edit:has(input.vas-ol-cell-disp:disabled) {
+.vas-rbl-cell-edit:has(input.vas-rbl-cell-disp:disabled) {
     cursor: not-allowed;
 }
-.vas-ol-cell-edit input.vas-ol-cell-disp--sub {
+.vas-rbl-cell-edit input.vas-rbl-cell-disp--sub {
     font-size: 0.85em;
     font-weight: 500;
     color: var(--cil-text-muted);
 }
 
-.vas-ol-cell-edit input.vas-ol-qtyval {
+.vas-rbl-cell-edit input.vas-rbl-qtyval {
     text-align: right;
     font-weight: 400;
     font-size: 1em;
 }
 
-.vas-ol-cell-edit input.vas-ol-uomsub {
+.vas-rbl-cell-edit input.vas-rbl-uomsub {
     text-align: right;
     margin-top: 0.125em;
 }
 
-.vas-ol-cell-edit input.vas-ol-taxval {
+.vas-rbl-cell-edit input.vas-rbl-taxval {
     font-size: 0.975em;
     font-weight: 400;
     color: var(--cil-text-secondary);
 }
 
-.vas-ol-amt {
+.vas-rbl-amt {
     font-weight: 400;
     font-size: 1em;
     color: var(--cil-text);
@@ -721,14 +706,15 @@
 }
 
 /* ---------- catalog popover ---------- */
-/* Appended to <body> via JS and positioned with position:fixed so it is never clipped
-   by the panel's overflow-y:auto or any intermediate overflow ancestor. top/bottom/left
-   are written by positionCatalog() based on the input's getBoundingClientRect(). */
-.vas-ol-catalog-popover {
-    position: fixed;
-    z-index: 9999;
-    font-family: var(--cil-font);
-    font-size: 16px;
+.vas-rbl-catalog-popover {
+    /* Attaches flush under the input (no top gap / no top border) so the input underline
+       and the dropdown read as ONE element - not two stacked border lines. Opaque fill. */
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 0;
+    z-index: 30;
     min-width: 22.5em;
     background: #ffffff;
     border: 1px solid var(--cil-divider-strong);
@@ -741,20 +727,26 @@
     overscroll-behavior: contain;
 }
 
-/* Flipped state: not enough room below → open UPWARD. */
-.vas-ol-catalog-popover--above {
+/* Flipped state: not enough room below the input, so open UPWARD. Attaches flush ABOVE
+   the input (no bottom gap / no bottom border) so the two read as one element, mirroring
+   the default downward attachment. */
+.vas-rbl-catalog-popover--above {
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    margin-bottom: 0;
     border-top: 1px solid var(--cil-divider-strong);
     border-bottom: none;
     border-radius: var(--cil-r-md) var(--cil-r-md) 0 0;
 }
 
-.vas-ol-catalog__hint {
+.vas-rbl-catalog__hint {
     padding: 0.55em 0.75em;
     font-size: 0.75em;
     color: var(--cil-text-muted);
 }
 
-.vas-ol-catalog-popover__item {
+.vas-rbl-catalog-popover__item {
     display: flex;
     width: 100%;
     align-items: center;
@@ -768,19 +760,19 @@
     cursor: pointer;
 }
 
-    .vas-ol-catalog-popover__item:last-child {
+    .vas-rbl-catalog-popover__item:last-child {
         border-bottom: none;
     }
 
-    .vas-ol-catalog-popover__item:hover {
+    .vas-rbl-catalog-popover__item:hover {
         background: #f1f8ff;
     }
 
-    .vas-ol-catalog-popover__item.is-highlighted {
+    .vas-rbl-catalog-popover__item.is-highlighted {
         background: var(--cil-blue-soft);
     }
 
-.vas-ol-catalog-popover__name {
+.vas-rbl-catalog-popover__name {
     flex: 1;
     min-width: 0;
     font-weight: 600;
@@ -792,7 +784,7 @@
 }
 
 /* ---------- badges ---------- */
-.vas-ol-badge {
+.vas-rbl-badge {
     display: inline-block;
     border-radius: var(--cil-r-pill);
     padding: 0.125em 0.5em;
@@ -803,23 +795,23 @@
     flex-shrink: 0;
 }
 
-.vas-ol-badge--product {
+.vas-rbl-badge--product {
     background: var(--cil-blue-soft);
     color: var(--cil-link-deep);
 }
 
-.vas-ol-badge--charge {
+.vas-rbl-badge--charge {
     background: var(--cil-purple-bg);
     color: var(--cil-purple);
 }
 
-.vas-ol-badge--danger {
+.vas-rbl-badge--danger {
     background: var(--cil-danger-bg);
     color: var(--cil-danger-text);
 }
 
 /* ---------- more popover ---------- */
-.vas-ol-more-btn {
+.vas-rbl-more-btn {
     width: 1.5em;
     height: 1.5em;
     display: inline-flex;
@@ -833,31 +825,35 @@
     transition: background .12s, color .12s;
 }
 
-    .vas-ol-more-btn:hover {
+    .vas-rbl-more-btn:hover {
         background: #f1f8ff;
         color: var(--cil-action-blue);
     }
 
-    .vas-ol-more-btn.is-open {
+    .vas-rbl-more-btn.is-open {
         background: var(--cil-blue-soft);
         color: var(--cil-action-blue);
     }
-    .vas-ol-more-btn.has-values:hover {
+    .vas-rbl-more-btn.has-values {
+        background: var(--cil-blue-soft);
+        color: var(--cil-action-blue);
+    }
+    .vas-rbl-more-btn.has-values:hover {
         background: #d9eeff;
     }
     /* Read-only invoice: the "..." button is disabled -> not-allowed (no hover tint). */
-    .vas-ol-more-btn:disabled {
+    .vas-rbl-more-btn:disabled {
         cursor: not-allowed !important;
         color: var(--cil-text-disabled);
     }
 
-        .vas-ol-more-btn:disabled:hover {
+        .vas-rbl-more-btn:disabled:hover {
             background: transparent;
             color: var(--cil-text-disabled);
         }
 /* Row Undo: only shown on a saved row with unsaved edits; reverts to last snapshot.
    Amber to read as "discard pending change" against the unsaved-row tint. */
-.vas-ol-undo-btn {
+.vas-rbl-undo-btn {
     width: 1.5em;
     height: 1.5em;
     display: inline-flex;
@@ -871,12 +867,12 @@
     transition: background .12s, color .12s;
 }
 
-    .vas-ol-undo-btn:hover {
+    .vas-rbl-undo-btn:hover {
         background: var(--cil-surface-amber);
         color: var(--cil-danger-text);
     }
 
-.vas-ol-more-popover {
+.vas-rbl-more-popover {
     position: absolute;
     right: 0;
     bottom: 100%;
@@ -890,24 +886,24 @@
     overflow: hidden;
 }
 
-.vas-ol-more-popover__head {
+.vas-rbl-more-popover__head {
     padding: 0.5em 0.75em;
     border-bottom: 1px solid var(--cil-divider);
 }
 
-    .vas-ol-more-popover__head .vas-ol-label {
+    .vas-rbl-more-popover__head .vas-rbl-label {
         font-size: 0.75em;
         color: var(--cil-text-muted);
     }
 
-.vas-ol-more-popover__body {
+.vas-rbl-more-popover__body {
     display: flex;
     flex-direction: column;
     gap: 0.625em;
     padding: 0.625em 0.75em;
 }
 
-.vas-ol-more-popover__foot {
+.vas-rbl-more-popover__foot {
     display: flex;
     justify-content: flex-end;
     gap: 0.5em;
@@ -916,13 +912,13 @@
 }
 
 /* ---------- canonical underline form field ---------- */
-.vas-ol-field {
+.vas-rbl-field {
     display: flex;
     flex-direction: column;
     gap: 0.25em;
 }
 
-.vas-ol-field--full {
+.vas-rbl-field--full {
     grid-column: 1 / -1;
 }
 /* Additional-Info modal: 2-column grid of FRAMEWORK fields (input-group vis-input-wrap).
@@ -930,14 +926,14 @@
    floating label + value + trailing button); we only lay them out 2-up + prevent
    horizontal overflow - no control styling of our own. */
 /* Body fills whatever height remains inside the dialog (dialog height is set on
-   #vasOlMore .vas-ol-dialog below; flex: 1 on .vas-ol-dialog__body does the rest).
+   #vasRblMore .vas-rbl-dialog below; flex: 1 on .vas-rbl-dialog__body does the rest).
    min-height: 0 is required so a flex child can shrink below its content size. */
-.vas-ol-more-body {
+.vas-rbl-more-body {
     height: auto;
     min-height: 0;
 }
 
-.vas-ol-more-grid {
+.vas-rbl-more-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.25em 2em;
@@ -948,23 +944,23 @@
     align-content: start;
 }
 
-    .vas-ol-more-grid > .input-group,
-    .vas-ol-more-grid > .vis-control-wrap {
+    .vas-rbl-more-grid > .input-group,
+    .vas-rbl-more-grid > .vis-control-wrap {
         min-width: 0;
     }
 
-    .vas-ol-more-grid > .input-group {
+    .vas-rbl-more-grid > .input-group {
         flex-wrap: nowrap;
     }
 
 /* A curated "..." field hidden by its AD_Field.DisplayLogic. The field is still BUILT
    (control + lookup preserved) and only toggled off, so it drops out of the grid layout
    without being re-created when the logic flips back to visible. */
-.vas-ol-dyn-hidden {
+.vas-rbl-dyn-hidden {
     display: none !important;
 }
 /* FK dropdown must not force the (narrow) grid cell wider -> no horizontal scroll. */
-.vas-ol-fk-popover {
+.vas-rbl-fk-popover {
     min-width: 0;
     left: 0;
     right: 0;
@@ -974,10 +970,10 @@
    CSS - no custom image rule needed here.
 
    Single-window edit-view look ported from the framework's .vis-ad-w-p-vc-editview rules
-   to our .vas-ol-dialog (we don't carry that class). Scoped to .vis-input-wrap
+   to our .vas-rbl-dialog (we don't carry that class). Scoped to .vis-input-wrap
    .vis-control-wrap so ONLY framework dictionary controls go borderless - our own scan /
    search / attribute inputs keep their borders. */
-.vas-ol-dialog .vis-input-wrap .vis-control-wrap input:not([type=button]):not([type="checkbox"]):not([type="radio"]), .vas-ol-dialog .vis-input-wrap .vis-control-wrap select, .vas-ol-dialog .vis-input-wrap .vis-control-wrap textarea {
+.vas-rbl-dialog .vis-input-wrap .vis-control-wrap input:not([type=button]):not([type="checkbox"]):not([type="radio"]), .vas-rbl-dialog .vis-input-wrap .vis-control-wrap select, .vas-rbl-dialog .vis-input-wrap .vis-control-wrap textarea {
     border: 0px solid rgba(var(--v-c-on-secondary), .2);
     border-radius: 0;
     color: rgba(var(--v-c-on-common), 1);
@@ -985,74 +981,74 @@
     transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
 }
 
-.vas-ol-dialog .vis-input-wrap {
+.vas-rbl-dialog .vis-input-wrap {
     position: relative;
     flex-wrap: nowrap;
     border-bottom: 1px solid #d2d2d2;
 }
 
-    .vas-ol-dialog .vis-input-wrap .vis-ev-ctrlinfowrap {
+    .vas-rbl-dialog .vis-input-wrap .vis-ev-ctrlinfowrap {
         display: none !important;
     }
 
-    .vas-ol-dialog .vis-input-wrap:hover, .vas-ol-dialog .vis-input-wrap.focus, .vas-ol-dialog .vis-input-wrap.vis-ev-col-error, .vas-ol-dialog .vis-input-wrap:has(:focus) {
+    .vas-rbl-dialog .vis-input-wrap:hover, .vas-rbl-dialog .vis-input-wrap.focus, .vas-rbl-dialog .vis-input-wrap.vis-ev-col-error, .vas-rbl-dialog .vis-input-wrap:has(:focus) {
         border-bottom: 1px solid rgba(var(--v-c-primary), 1);
     }
 
-    .vas-ol-dialog .vis-input-wrap.vis-ev-col-error {
+    .vas-rbl-dialog .vis-input-wrap.vis-ev-col-error {
         border-bottom: 1px solid #F5A0AD !important;
     }
 
-    .vas-ol-dialog .vis-input-wrap:has(.vis-ec-col-lblchkbox):hover, .vas-ol-dialog .vis-input-wrap:has(label:first-child), .vas-ol-dialog .vis-input-wrap:has(label:first-child):hover, .vas-ol-dialog .vis-input-wrap:has(.vis-ec-col-lblchkbox), .vas-ol-dialog .vis-input-wrap:has(.vis-progressCtrlWrap) {
+    .vas-rbl-dialog .vis-input-wrap:has(.vis-ec-col-lblchkbox):hover, .vas-rbl-dialog .vis-input-wrap:has(label:first-child), .vas-rbl-dialog .vis-input-wrap:has(label:first-child):hover, .vas-rbl-dialog .vis-input-wrap:has(.vis-ec-col-lblchkbox), .vas-rbl-dialog .vis-input-wrap:has(.vis-progressCtrlWrap) {
         border-bottom: 1px solid transparent !important;
     }
 
-    .vas-ol-dialog .vis-input-wrap:has(.vis-ev-col-readonly) .input-group-text .fa-handshake-o, .vas-ol-dialog .vis-input-wrap:has(.vis-ev-col-readonly) .input-group-text .fa-caret-down {
+    .vas-rbl-dialog .vis-input-wrap:has(.vis-ev-col-readonly) .input-group-text .fa-handshake-o, .vas-rbl-dialog .vis-input-wrap:has(.vis-ev-col-readonly) .input-group-text .fa-caret-down {
         color: rgba(var(--v-c-on-secondary), .9);
     }
 
-    .vas-ol-dialog .vis-input-wrap:has(.vis-ev-col-readonly) {
+    .vas-rbl-dialog .vis-input-wrap:has(.vis-ev-col-readonly) {
         border-bottom: 1px solid #f3f3f3 !important;
     }
 
-    .vas-ol-dialog .vis-input-wrap:has(input:focus), .vas-ol-dialog .vis-input-wrap:has(select:focus), .vas-ol-dialog .vis-input-wrap:has(textarea:focus) {
+    .vas-rbl-dialog .vis-input-wrap:has(input:focus), .vas-rbl-dialog .vis-input-wrap:has(select:focus), .vas-rbl-dialog .vis-input-wrap:has(textarea:focus) {
         border-bottom: 1px solid rgba(var(--v-c-primary), 1);
     }
 
-    .vas-ol-dialog .vis-input-wrap:has(.vis-ev-col-wrap-button) {
+    .vas-rbl-dialog .vis-input-wrap:has(.vis-ev-col-wrap-button) {
         border-bottom: 1px solid transparent;
     }
 
-    .vas-ol-dialog .vis-input-wrap:has(.vis-ev-col-mandatory) .vis-ev-col-msign {
+    .vas-rbl-dialog .vis-input-wrap:has(.vis-ev-col-mandatory) .vis-ev-col-msign {
         display: none;
     }
 
-    .vas-ol-dialog .vis-input-wrap.focus {
+    .vas-rbl-dialog .vis-input-wrap.focus {
         border-color: rgba(var(--v-c-primary), 1);
     }
 
-    .vas-ol-dialog .vis-input-wrap .input-group-append {
+    .vas-rbl-dialog .vis-input-wrap .input-group-append {
         opacity: 0;
         pointer-events: none;
     }
 
-    .vas-ol-dialog .vis-input-wrap input[type="date"]::-webkit-calendar-picker-indicator {
+    .vas-rbl-dialog .vis-input-wrap input[type="date"]::-webkit-calendar-picker-indicator {
         opacity: 0
     }
 
-    .vas-ol-dialog .vis-input-wrap:hover input[type="date"]::-webkit-calendar-picker-indicator, .vas-ol-dialog .vis-input-wrap.focus input[type="date"]::-webkit-calendar-picker-indicator {
+    .vas-rbl-dialog .vis-input-wrap:hover input[type="date"]::-webkit-calendar-picker-indicator, .vas-rbl-dialog .vis-input-wrap.focus input[type="date"]::-webkit-calendar-picker-indicator {
         opacity: 1
     }
 
-    .vas-ol-dialog .vis-input-wrap select {
+    .vas-rbl-dialog .vis-input-wrap select {
         background-image: none;
     }
 
-    .vas-ol-dialog .vis-input-wrap:hover select, .vas-ol-dialog .vis-input-wrap.focus select {
+    .vas-rbl-dialog .vis-input-wrap:hover select, .vas-rbl-dialog .vis-input-wrap.focus select {
         background-image: linear-gradient(45deg, transparent 50%, rgba(var(--v-c-primary),1) 50%), linear-gradient(135deg, rgba(var(--v-c-primary),1) 50%, transparent 50%);
     }
 
-    .vas-ol-dialog .vis-input-wrap:hover .input-group-append, .vas-ol-dialog .vis-input-wrap.focus .input-group-append, .vas-ol-dialog .vis-input-wrap:has(:focus) .input-group-append {
+    .vas-rbl-dialog .vis-input-wrap:hover .input-group-append, .vas-rbl-dialog .vis-input-wrap.focus .input-group-append, .vas-rbl-dialog .vis-input-wrap:has(:focus) .input-group-append {
         opacity: 1;
         pointer-events: auto;
     }
@@ -1063,18 +1059,18 @@
        are needed to beat the framework's VIS.all.min.css rules
        (.input-group:focus-within .input-group-append .input-group-text {border:primary}
        and .vis-input-wrap .input-group-text:focus {border-left-color:...!important}). */
-    .vas-ol-dialog .vis-input-wrap .input-group-append .input-group-text,
-    .vas-ol-dialog .vis-input-wrap .input-group-append .input-group-text:hover,
-    .vas-ol-dialog .vis-input-wrap .input-group-append .input-group-text:focus,
-    .vas-ol-dialog .vis-input-wrap .input-group-append .input-group-text:active,
-    .vas-ol-dialog .vis-input-wrap .input-group-append .input-group-text:focus-visible,
-    .vas-ol-dialog .input-group:focus-within .input-group-append .input-group-text {
+    .vas-rbl-dialog .vis-input-wrap .input-group-append .input-group-text,
+    .vas-rbl-dialog .vis-input-wrap .input-group-append .input-group-text:hover,
+    .vas-rbl-dialog .vis-input-wrap .input-group-append .input-group-text:focus,
+    .vas-rbl-dialog .vis-input-wrap .input-group-append .input-group-text:active,
+    .vas-rbl-dialog .vis-input-wrap .input-group-append .input-group-text:focus-visible,
+    .vas-rbl-dialog .input-group:focus-within .input-group-append .input-group-text {
         border: 0 !important;
         outline: 0 !important;
         box-shadow: none !important;
     }
 
-.vas-ol-dialog .input-group-prepend .input-group-text i {
+.vas-rbl-dialog .input-group-prepend .input-group-text i {
     color: rgba(var(--v-c-on-secondary),.7);
     cursor: default;
 }
@@ -1082,12 +1078,12 @@
 /* (1) The prepended icon must NOT be a bordered box - its border/background drew a
    second line over the field underline. Strip them so only the .vis-input-wrap
    underline shows and the icon sits inline. */
-.vas-ol-dialog .vis-input-wrap .input-group-prepend .input-group-text {
+.vas-rbl-dialog .vis-input-wrap .input-group-prepend .input-group-text {
     border: 0;
     background: none;
 }
 
-.vas-ol-dialog .vis-input-wrap .input-group-prepend .input-group-text {
+.vas-rbl-dialog .vis-input-wrap .input-group-prepend .input-group-text {
     background-color: transparent;
     border: 1px solid #f0f0f0 !important;
     border-radius: 0;
@@ -1095,11 +1091,11 @@
     top: -8px;
 }
 
-.vas-ol-dialog .input-group-text i {
+.vas-rbl-dialog .input-group-text i {
     color: rgba(var(--v-c-primary),1);
 }
 
-.vas-ol-dialog .vis-input-wrap .input-group-text {
+.vas-rbl-dialog .vis-input-wrap .input-group-text {
     background-color: transparent;
     border: 1px solid transparent;
     border-radius: 0;
@@ -1107,12 +1103,12 @@
 }
 
 /* (3) "..." modal only: float the field label a touch higher (top: -11px). */
-.vas-ol-more-body .vis-input-wrap input:focus ~ label, .vas-ol-more-body .vis-input-wrap input:not(:placeholder-shown) ~ label, .vas-ol-more-body .vis-input-wrap textarea:not(:placeholder-shown) ~ label, .vas-ol-more-body .vis-input-wrap select:focus ~ label, .vas-ol-more-body .vis-input-wrap textarea:focus ~ label, .vas-ol-more-body .vis-input-wrap select ~ label {
+.vas-rbl-more-body .vis-input-wrap input:focus ~ label, .vas-rbl-more-body .vis-input-wrap input:not(:placeholder-shown) ~ label, .vas-rbl-more-body .vis-input-wrap textarea:not(:placeholder-shown) ~ label, .vas-rbl-more-body .vis-input-wrap select:focus ~ label, .vas-rbl-more-body .vis-input-wrap textarea:focus ~ label, .vas-rbl-more-body .vis-input-wrap select ~ label {
     top: -11px;
 }
 /* "..." modal only: the checkbox's own caption (the static first-child label, not a
    floating label) stays at top: 0 so it sits inline with the checkbox. */
-.vas-ol-more-body .vis-control-wrap > label:first-child {
+.vas-rbl-more-body .vis-control-wrap > label:first-child {
     top: 0;
 }
 /* Keep the control borderless even on focus. The framework adds a 1px border (with
@@ -1120,17 +1116,17 @@
    click; here the focus cue is the .vis-input-wrap underline turning primary, so suppress
    the per-control border. The .vis-ev-col variants out-specify the framework's !important
    focus rule (.vis-ev-col .vis-input-wrap .vis-control-wrap input:focus). */
-.vas-ol-dialog .vis-input-wrap .vis-control-wrap input:focus,
-.vas-ol-dialog .vis-input-wrap .vis-control-wrap select:focus,
-.vas-ol-dialog .vis-input-wrap .vis-control-wrap textarea:focus,
-.vas-ol-dialog .vis-ev-col .vis-input-wrap .vis-control-wrap input:focus,
-.vas-ol-dialog .vis-ev-col .vis-input-wrap .vis-control-wrap select:focus,
-.vas-ol-dialog .vis-ev-col .vis-input-wrap .vis-control-wrap textarea:focus {
+.vas-rbl-dialog .vis-input-wrap .vis-control-wrap input:focus,
+.vas-rbl-dialog .vis-input-wrap .vis-control-wrap select:focus,
+.vas-rbl-dialog .vis-input-wrap .vis-control-wrap textarea:focus,
+.vas-rbl-dialog .vis-ev-col .vis-input-wrap .vis-control-wrap input:focus,
+.vas-rbl-dialog .vis-ev-col .vis-input-wrap .vis-control-wrap select:focus,
+.vas-rbl-dialog .vis-ev-col .vis-input-wrap .vis-control-wrap textarea:focus {
     border: 0 !important;
 }
 
 
-.vas-ol-field__label {
+.vas-rbl-field__label {
     font-size: 0.6875em;
     font-weight: 600;
     text-transform: uppercase;
@@ -1138,12 +1134,12 @@
     color: var(--cil-text-muted);
 }
 
-    .vas-ol-field__label em {
+    .vas-rbl-field__label em {
         font-style: normal;
         color: var(--cil-danger);
     }
 
-.vas-ol-field__input, .vas-ol-field__textarea {
+.vas-rbl-field__input, .vas-rbl-field__textarea {
     display: block;
     width: 100%;
     border: none;
@@ -1157,27 +1153,27 @@
     transition: border-color .12s;
 }
 
-    .vas-ol-field__input:hover, .vas-ol-field__textarea:hover, .vas-ol-field__input:focus, .vas-ol-field__textarea:focus {
+    .vas-rbl-field__input:hover, .vas-rbl-field__textarea:hover, .vas-rbl-field__input:focus, .vas-rbl-field__textarea:focus {
         border-bottom-color: var(--cil-action-blue);
     }
 
-    .vas-ol-field__input::placeholder, .vas-ol-field__textarea::placeholder {
+    .vas-rbl-field__input::placeholder, .vas-rbl-field__textarea::placeholder {
         color: var(--cil-text-faint);
     }
 
-.vas-ol-field__textarea {
+.vas-rbl-field__textarea {
     resize: vertical;
     min-height: 3.75em;
 }
 
 /* Attribute create form: reuses the framework vis-input-wrap fields (2-up via
-   .vas-ol-more-grid). Mandatory marker + the Lot/SerNo trailing utility action. */
-.vas-ol-req {
+   .vas-rbl-more-grid). Mandatory marker + the Lot/SerNo trailing utility action. */
+.vas-rbl-req {
     font-style: normal;
     color: var(--cil-danger);
 }
 
-.vas-ol-attr-fieldbtn {
+.vas-rbl-attr-fieldbtn {
     border: 1px solid var(--cil-action-blue);
     background: var(--cil-surface);
     padding: 0.4em 0.85em;
@@ -1190,18 +1186,18 @@
     white-space: nowrap;
 }
 
-    .vas-ol-attr-fieldbtn:hover {
+    .vas-rbl-attr-fieldbtn:hover {
         background: var(--cil-blue-soft);
     }
 /* Create-mode footer: keep a gap between Cancel and the primary action. */
-#vasOlAttrCreateFoot {
+#vasRblAttrCreateFoot {
     display: flex;
     align-items: center;
     gap: 0.5em;
 }
 
 /* ---------- search + scan inputs ---------- */
-.vas-ol-search-input {
+.vas-rbl-search-input {
     display: flex;
     align-items: center;
     gap: 0.5em;
@@ -1213,16 +1209,16 @@
     transition: border-color .12s;
 }
 
-    .vas-ol-search-input:focus-within {
+    .vas-rbl-search-input:focus-within {
         border-color: var(--cil-action-blue);
     }
 
-    .vas-ol-search-input .vas-ol-icon {
+    .vas-rbl-search-input .vas-rbl-icon {
         color: var(--cil-text-muted);
         flex-shrink: 0;
     }
 
-    .vas-ol-search-input input {
+    .vas-rbl-search-input input {
         flex: 1;
         border: none;
         outline: none;
@@ -1234,7 +1230,7 @@
 
 /* Attribute instance-list controls: search (left, grows) + "Show All" toggle (right)
    share one row. */
-.vas-ol-attr-listctrls {
+.vas-rbl-attr-listctrls {
     display: flex;
     align-items: center;
     gap: 0.75em;
@@ -1243,14 +1239,14 @@
 
     /* The search box provides its own top margin when standalone; inside the row the
        wrapper owns the spacing, so zero it out and let the box take the free width. */
-    .vas-ol-attr-listctrls .vas-ol-search-input {
+    .vas-rbl-attr-listctrls .vas-rbl-search-input {
         flex: 1 1 auto;
         min-width: 0;
         margin-top: 0;
     }
 
 /* "Show All (include zero and (-ve) qty)" toggle, pinned to the right of the row. */
-.vas-ol-attr-showall {
+.vas-rbl-attr-showall {
     display: flex;
     align-items: center;
     gap: 0.4375em;
@@ -1262,12 +1258,12 @@
     user-select: none;
 }
 
-    .vas-ol-attr-showall input {
+    .vas-rbl-attr-showall input {
         cursor: pointer;
         accent-color: var(--cil-action-blue);
     }
 
-.vas-ol-scan-input {
+.vas-rbl-scan-input {
     display: flex;
     align-items: center;
     gap: 0.5em;
@@ -1278,11 +1274,11 @@
     margin-top: 0.75em;
 }
 
-    .vas-ol-scan-input:focus-within {
+    .vas-rbl-scan-input:focus-within {
         background: var(--cil-surface);
     }
 
-.vas-ol-scan-input__icon {
+.vas-rbl-scan-input__icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1296,11 +1292,11 @@
     cursor: pointer;
 }
 
-    .vas-ol-scan-input__icon:hover {
+    .vas-rbl-scan-input__icon:hover {
         background: var(--cil-blue-soft);
     }
 
-.vas-ol-scan-input input {
+.vas-rbl-scan-input input {
     flex: 1;
     border: none;
     outline: none;
@@ -1311,7 +1307,7 @@
 }
 
 /* ---------- dialog ---------- */
-.vas-ol-dialog-backdrop {
+.vas-rbl-dialog-backdrop {
     position: fixed;
     inset: 0;
     background: rgba(15, 27, 45, 0.42);
@@ -1324,23 +1320,23 @@
     color: var(--cil-text);
 }
 
-    .vas-ol-dialog-backdrop * {
+    .vas-rbl-dialog-backdrop * {
         box-sizing: border-box;
     }
 /* The Additional-Info modal sits BELOW the framework window layer so a Search field's
    lookup/info window (opened by its button) appears ON TOP, not behind the modal.
    (It only needs to be above the invoice panel.) */
-#vasOlMore.vas-ol-dialog-backdrop {
+#vasRblMore.vas-rbl-dialog-backdrop {
     z-index: 99;
 }
 
 /* Additional Info dialog — fill most of the viewport (matches design mockup). */
-#vasOlMore .vas-ol-dialog {
+#vasRblMore .vas-rbl-dialog {
     width: min(68em, 92vw);
     height: min(35em, 90vh);
 }
 
-.vas-ol-dialog {
+.vas-rbl-dialog {
     background: var(--cil-surface);
     border-radius: 14px;
     box-shadow: var(--cil-shadow-dialog);
@@ -1352,31 +1348,31 @@
     flex-direction: column;
 }
 
-.vas-ol-dialog--wide {
+.vas-rbl-dialog--wide {
     width: 56em;
     height: 30em;
 }
 
-.vas-ol-dialog__header {
+.vas-rbl-dialog__header {
     padding: 0.875em 1.25em 0.75em;
     border-bottom: 1px solid var(--cil-divider);
 }
 
-.vas-ol-dialog__header-row {
+.vas-rbl-dialog__header-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75em;
 }
 
-.vas-ol-dialog__title-block {
+.vas-rbl-dialog__title-block {
     display: flex;
     align-items: center;
     gap: 0.5em;
 }
 
 /* Header close (✕) - dismisses the whole attribute picker (create/edit mode). */
-.vas-ol-dialog__close {
+.vas-rbl-dialog__close {
     flex: 0 0 auto;
     margin-left: auto;
     display: inline-flex;
@@ -1395,38 +1391,38 @@
     transition: background-color .12s, color .12s;
 }
 
-    .vas-ol-dialog__close:hover {
+    .vas-rbl-dialog__close:hover {
         background: var(--cil-divider);
         color: var(--cil-text);
     }
 
-.vas-ol-dialog__title {
+.vas-rbl-dialog__title {
     margin: 0;
     font-size: 1em;
     font-weight: 700;
     color: var(--cil-text);
 }
 
-.vas-ol-dialog__hint {
+.vas-rbl-dialog__hint {
     margin: 0;
     font-size: 0.75em;
     color: var(--cil-text-muted);
 }
 
-.vas-ol-dialog__sub {
+.vas-rbl-dialog__sub {
     margin: 0.25em 0 0;
     font-size: 0.75em;
     color: var(--cil-text-muted);
 }
 
-.vas-ol-dialog__type {
+.vas-rbl-dialog__type {
     display: flex;
     align-items: center;
     gap: 0.5em;
     margin-top: 0.375em;
 }
 
-.vas-ol-dialog__primary-name {
+.vas-rbl-dialog__primary-name {
     margin: 0;
     font-size: 0.8125em;
     font-weight: 600;
@@ -1436,49 +1432,49 @@
     text-overflow: ellipsis;
 }
 
-.vas-ol-dialog__error {
+.vas-rbl-dialog__error {
     margin: 0.5em 0 0;
     font-size: 0.75em;
     color: var(--cil-danger);
 }
 
-.vas-ol-dialog__body {
+.vas-rbl-dialog__body {
     flex: 1;
     overflow-y: auto;
     margin-top: 1em;
 }
 
-.vas-ol-dialog__body--fixed {
+.vas-rbl-dialog__body--fixed {
     display: flex;
     flex-direction: column;
     height: 22.5em;
 }
 
-.vas-ol-dialog__body--loading {
+.vas-rbl-dialog__body--loading {
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 8em;
 }
 
-.vas-ol-dialog-loading {
+.vas-rbl-dialog-loading {
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 2em;
 }
 
-.vas-ol-dialog-spin {
+.vas-rbl-dialog-spin {
     display: inline-block;
     width: 2em;
     height: 2em;
     border: 3px solid var(--cil-border-default);
     border-top-color: var(--cil-action-blue);
     border-radius: 50%;
-    animation: vasOlSpin 0.7s linear infinite;
+    animation: vasRblSpin 0.7s linear infinite;
 }
 
-.vas-ol-dialog__footer {
+.vas-rbl-dialog__footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1487,42 +1483,23 @@
     border-top: 1px solid var(--cil-divider);
 }
 
-.vas-ol-dialog__footer--end {
+.vas-rbl-dialog__footer--end {
     justify-content: flex-end;
 }
 
-/* ---------- confirm dialog ---------- */
-/* Compact dialog used for delete and unsaved-changes confirmations.
-   Replaces the browser's native confirm() so it appears centered on screen
-   without the browser chrome / URL link at the top. */
-.vas-ol-confirm-dialog {
-    width: 26em;
-}
-
-.vas-ol-confirm-body {
-    padding: 1.5em 1.25em 0.75em;
-}
-
-.vas-ol-confirm-msg {
-    margin: 0;
-    font-size: 0.9375em;
-    line-height: 1.5;
-    color: var(--cil-text);
-}
-
-.vas-ol-dialog__summary {
+.vas-rbl-dialog__summary {
     margin: 0;
     font-size: 0.75em;
     color: var(--cil-text-muted);
 }
 
-.vas-ol-dialog__actions {
+.vas-rbl-dialog__actions {
     display: flex;
     gap: 0.5em;
 }
 
 /* ---------- scan dialog body ---------- */
-.vas-ol-scan-empty {
+.vas-rbl-scan-empty {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -1532,7 +1509,7 @@
     text-align: center;
 }
 
-.vas-ol-scan-empty__badge {
+.vas-rbl-scan-empty__badge {
     width: 3.5em;
     height: 3.5em;
     border-radius: 50%;
@@ -1543,26 +1520,26 @@
     justify-content: center;
 }
 
-.vas-ol-scan-empty__title {
+.vas-rbl-scan-empty__title {
     margin: 0.875em 0 0;
     font-size: 0.875em;
     font-weight: 600;
     color: var(--cil-text);
 }
 
-.vas-ol-scan-empty__hint {
+.vas-rbl-scan-empty__hint {
     margin: 0.25em 0 0;
     font-size: 0.75em;
     color: var(--cil-text-muted);
 }
 
-.vas-ol-scan-grid {
+.vas-rbl-scan-grid {
     flex: 1;
     display: flex;
     flex-direction: column;
 }
 
-.vas-ol-scan-grid__head, .vas-ol-scan-grid__row {
+.vas-rbl-scan-grid__head, .vas-rbl-scan-grid__row {
     display: grid;
     grid-template-columns: minmax(6.75em, auto) minmax(8.75em, 1.4fr) minmax(6em, auto) minmax(6em, auto) 1.75em;
     gap: 0.75em;
@@ -1570,7 +1547,7 @@
     padding: 0.5em 1.25em;
 }
 
-.vas-ol-scan-grid__head {
+.vas-rbl-scan-grid__head {
     flex-shrink: 0;
     background: var(--cil-surface-muted);
     border-bottom: 1px solid var(--cil-divider-strong);
@@ -1581,22 +1558,22 @@
     color: var(--cil-text-muted);
 }
 
-.vas-ol-scan-grid__body {
+.vas-rbl-scan-grid__body {
     flex: 1;
     overflow-y: auto;
 }
 
-.vas-ol-scan-grid__row {
+.vas-rbl-scan-grid__row {
     padding-top: 0.625em;
     padding-bottom: 0.625em;
     border-bottom: 1px solid var(--cil-divider-soft);
 }
 
-    .vas-ol-scan-grid__row.is-unknown {
+    .vas-rbl-scan-grid__row.is-unknown {
         background: #fff7f7;
     }
 
-.vas-ol-scan-grid__code {
+.vas-rbl-scan-grid__code {
     font-weight: 600;
     font-size: 0.8125em;
     white-space: nowrap;
@@ -1604,20 +1581,20 @@
     text-overflow: ellipsis;
 }
 
-.vas-ol-scan-grid__name {
+.vas-rbl-scan-grid__name {
     font-size: 0.8125em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.vas-ol-qty-stepper {
+.vas-rbl-qty-stepper {
     display: flex;
     align-items: center;
     gap: 0.25em;
 }
 
-    .vas-ol-qty-stepper button {
+    .vas-rbl-qty-stepper button {
         width: 1.5em;
         height: 1.5em;
         display: inline-flex;
@@ -1631,16 +1608,16 @@
         cursor: pointer;
     }
 
-        .vas-ol-qty-stepper button:hover {
+        .vas-rbl-qty-stepper button:hover {
             background: #f7fbff;
         }
 
-        .vas-ol-qty-stepper button:disabled {
+        .vas-rbl-qty-stepper button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
 
-    .vas-ol-qty-stepper input {
+    .vas-rbl-qty-stepper input {
         width: 2.5em;
         height: 1.5em;
         text-align: center;
@@ -1654,11 +1631,11 @@
         outline: none;
     }
 
-        .vas-ol-qty-stepper input:focus {
+        .vas-rbl-qty-stepper input:focus {
             border-color: var(--cil-action-blue);
         }
 
-.vas-ol-icon-btn--danger {
+.vas-rbl-icon-btn--danger {
     width: 1.5em;
     height: 1.5em;
     display: inline-flex;
@@ -1671,7 +1648,7 @@
     cursor: pointer;
 }
 
-    .vas-ol-icon-btn--danger:hover {
+    .vas-rbl-icon-btn--danger:hover {
         background: #fbe6e6;
     }
 
@@ -1683,14 +1660,14 @@
    rows (__body) scroll while the column header (__head, flex-shrink:0) stays pinned.
    min-height:0 lets this flex item shrink below its content and hand the overflow to
    __body; without it the whole list grows and the outer body scrolls the header away. */
-#vasOlAttrList {
+#vasRblAttrList {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
 }
 
-.vas-ol-attr-grid__head, .vas-ol-attr-grid__row {
+.vas-rbl-attr-grid__head, .vas-rbl-attr-grid__row {
     display: grid;
     grid-template-columns: 1.25em 6.5em minmax(0, 2fr) 7em minmax(0, 1.3fr) 5.5em;
     gap: 0.75em;
@@ -1701,30 +1678,30 @@
    against the container's font-size, so a smaller head font would make the header tracks
    narrower than the rows' and they'd drift out of alignment. Keep the container font
    equal to the rows (inherited) and shrink only the header TEXT via the cells. */
-.vas-ol-attr-grid__head {
+.vas-rbl-attr-grid__head {
     flex-shrink: 0;
     background: var(--cil-surface-muted);
     border-bottom: 1px solid var(--cil-divider-strong);
     color: var(--cil-text-muted);
 }
 
-    .vas-ol-attr-grid__head > div {
+    .vas-rbl-attr-grid__head > div {
         font-size: 0.625em;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.04em;
     }
 
-        .vas-ol-attr-grid__head > div.vas-ol-attr-h-right {
+        .vas-rbl-attr-grid__head > div.vas-rbl-attr-h-right {
             text-align: right;
         }
 
-.vas-ol-attr-grid__body {
+.vas-rbl-attr-grid__body {
     flex: 1;
     overflow-y: auto;
 }
 
-.vas-ol-attr-grid__row {
+.vas-rbl-attr-grid__row {
     width: 100%;
     border: none;
     background: transparent;
@@ -1734,15 +1711,15 @@
     transition: background .12s;
 }
 
-    .vas-ol-attr-grid__row:hover {
+    .vas-rbl-attr-grid__row:hover {
         background: #f7fbff;
     }
 
-    .vas-ol-attr-grid__row.is-selected {
+    .vas-rbl-attr-grid__row.is-selected {
         background: var(--cil-blue-soft);
     }
 
-.vas-ol-attr-radio {
+.vas-rbl-attr-radio {
     width: 1em;
     height: 1em;
     border-radius: 50%;
@@ -1753,18 +1730,18 @@
     justify-content: center;
 }
 
-.vas-ol-attr-grid__row.is-selected .vas-ol-attr-radio {
+.vas-rbl-attr-grid__row.is-selected .vas-rbl-attr-radio {
     border-color: var(--cil-action-blue);
 }
 
-.vas-ol-attr-radio__dot {
+.vas-rbl-attr-radio__dot {
     width: 0.5em;
     height: 0.5em;
     border-radius: 50%;
     background: var(--cil-action-blue);
 }
 
-.vas-ol-attr-code {
+.vas-rbl-attr-code {
     font-weight: 600;
     font-size: 0.8125em;
     color: var(--cil-text);
@@ -1773,7 +1750,7 @@
     text-overflow: ellipsis;
 }
 
-.vas-ol-attr-label {
+.vas-rbl-attr-label {
     font-size: 0.8125em;
     color: var(--cil-text);
     white-space: nowrap;
@@ -1781,7 +1758,7 @@
     text-overflow: ellipsis;
 }
 
-.vas-ol-attr-spec {
+.vas-rbl-attr-spec {
     font-size: 0.75em;
     color: var(--cil-text-secondary);
     white-space: nowrap;
@@ -1789,7 +1766,7 @@
     text-overflow: ellipsis;
 }
 
-.vas-ol-attr-delta {
+.vas-rbl-attr-delta {
     font-weight: 600;
     font-size: 0.75em;
     color: var(--cil-text-muted);
@@ -1798,7 +1775,7 @@
     text-overflow: ellipsis;
 }
 
-.vas-ol-attr-avail {
+.vas-rbl-attr-avail {
     font-size: 0.75em;
     color: var(--cil-text-secondary);
     white-space: nowrap;
@@ -1806,18 +1783,18 @@
     text-overflow: ellipsis;
     text-align: right;
 }
-/* Role-gated Edit column (added only when #vasOlAttrList has --editable). */
-#vasOlAttrList.vas-ol-attr-grid--editable .vas-ol-attr-grid__head,
-#vasOlAttrList.vas-ol-attr-grid--editable .vas-ol-attr-grid__row {
+/* Role-gated Edit column (added only when #vasRblAttrList has --editable). */
+#vasRblAttrList.vas-rbl-attr-grid--editable .vas-rbl-attr-grid__head,
+#vasRblAttrList.vas-rbl-attr-grid--editable .vas-rbl-attr-grid__row {
     grid-template-columns: 1.25em 6.5em minmax(0, 2fr) 7em minmax(0, 1.3fr) 5.5em 2.5em;
 }
 
-.vas-ol-attr-edit {
+.vas-rbl-attr-edit {
     display: flex;
     justify-content: center;
 }
 
-.vas-ol-attr-editbtn {
+.vas-rbl-attr-editbtn {
     border: none;
     background: transparent;
     cursor: pointer;
@@ -1828,11 +1805,11 @@
     border-radius: 4px;
 }
 
-    .vas-ol-attr-editbtn:hover {
+    .vas-rbl-attr-editbtn:hover {
         background: var(--cil-blue-soft);
     }
 /* List footer: pager on the left, OK on the right. */
-#vasOlAttrListFoot, #vasOlAttrCreateFoot {
+#vasRblAttrListFoot, #vasRblAttrCreateFoot {
     display: flex;
     align-items: center;
     width: 100%;
@@ -1841,8 +1818,8 @@
 
     /* Save/validation error: left side, red, fills the middle so the Cancel + OK /
        Cancel + Add attribute buttons stay grouped together on the right (aligned). */
-    #vasOlAttrListFoot .vas-ol-foot-error,
-    #vasOlAttrCreateFoot .vas-ol-foot-error {
+    #vasRblAttrListFoot .vas-rbl-foot-error,
+    #vasRblAttrCreateFoot .vas-rbl-foot-error {
         flex: 1 1 auto;
         min-width: 0;
         font-size: 0.75em;
@@ -1852,24 +1829,24 @@
         overflow-wrap: anywhere;
     }
 
-    #vasOlAttrListFoot .vas-ol-dialog__actions,
-    #vasOlAttrCreateFoot .vas-ol-dialog__actions {
+    #vasRblAttrListFoot .vas-rbl-dialog__actions,
+    #vasRblAttrCreateFoot .vas-rbl-dialog__actions {
         flex: 0 0 auto;
     }
 
-.vas-ol-attr-pager {
+.vas-rbl-attr-pager {
     display: flex;
     align-items: center;
     gap: 0.5em;
 }
 
-.vas-ol-attr-pageinfo {
+.vas-rbl-attr-pageinfo {
     font-size: 0.75em;
     color: var(--cil-text-muted);
     white-space: nowrap;
 }
 
-.vas-ol-attr-pagebtn {
+.vas-rbl-attr-pagebtn {
     border: 1px solid var(--cil-border-default);
     background: var(--cil-surface);
     color: var(--cil-text);
@@ -1883,19 +1860,19 @@
     justify-content: center;
 }
 
-    .vas-ol-attr-pagebtn:hover:not(:disabled) {
+    .vas-rbl-attr-pagebtn:hover:not(:disabled) {
         border-color: var(--cil-action-blue);
         color: var(--cil-action-blue);
     }
 
-    .vas-ol-attr-pagebtn:disabled {
+    .vas-rbl-attr-pagebtn:disabled {
         opacity: 0.4;
         cursor: default;
     }
 
 /* Server-side line pager (20/page) below the lines table:
    "Showing X-Y of N" on the left, "‹ P of Q ›" nav on the right. */
-.vas-ol-linepager {
+.vas-rbl-linepager {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1903,32 +1880,32 @@
     padding: 0.5em 0.75em;
 }
 
-.vas-ol-linepager__showing {
+.vas-rbl-linepager__showing {
     font-size: 0.8125em;
     color: var(--cil-text-muted);
     white-space: nowrap;
 }
 
-.vas-ol-linepager__nav {
+.vas-rbl-linepager__nav {
     display: flex;
     align-items: center;
     gap: 0.5em;
 }
 
-.vas-ol-linepager__info {
+.vas-rbl-linepager__info {
     font-size: 0.8125em;
     color: var(--cil-text-muted);
     white-space: nowrap;
 }
 
-.vas-ol-empty-message {
+.vas-rbl-empty-message {
     padding: 1.25em;
     text-align: center;
     font-size: 0.75em;
     color: var(--cil-text-muted);
 }
 
-.vas-ol-form-grid {
+.vas-rbl-form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     column-gap: 0.75em;
@@ -1936,14 +1913,14 @@
     padding: 1em 1.25em;
 }
 
-.vas-ol-form-error {
+.vas-rbl-form-error {
     margin: 0 1.25em 0.75em;
     font-size: 0.75em;
     color: var(--cil-danger);
 }
 
 /* ---------- toast ---------- */
-.vas-ol-toast {
+.vas-rbl-toast {
     position: fixed;
     bottom: 2em;
     left: 50%;
@@ -1960,19 +1937,20 @@
     z-index: 10002;
 }
 
-.vas-ol-toast--show {
+.vas-rbl-toast--show {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }
 
 /* ---------- responsive ---------- */
 @media (max-width: 60em) {
-    .vas-ol-row {
+    /* Narrow layout: five tracks + the "..." cell. Description (3rd cell) is the
+       one column dropped — every other cell carries a figure the row is read for. */
+    .vas-rbl-row {
         grid-template-columns: 1.75em minmax(0, 1.6fr) 7em 6em 6em 3.5em;
     }
 
-    .vas-ol-row--head .vas-ol-cell:nth-child(3), .vas-ol-row--line .vas-ol-cell:nth-child(3),
-    .vas-ol-row--head .vas-ol-cell:nth-child(6), .vas-ol-row--line .vas-ol-cell:nth-child(6) {
+    .vas-rbl-row--head .vas-rbl-cell:nth-child(3), .vas-rbl-row--line .vas-rbl-cell:nth-child(3) {
         display: none;
     }
 }
@@ -1980,7 +1958,7 @@
 /* ---------- collapsible field groups (Additional Info modal) ----------
    Full-row section headers injected before each group's anchor field.
    The Show More/Less toggle collapses/expands the fields that follow. */
-.vas-ol-more-grid > .vas-ol-fldgrp {
+.vas-rbl-more-grid > .vas-rbl-fldgrp {
     grid-column: 1 / -1;
     display: flex;
     align-items: center;
@@ -1993,17 +1971,17 @@
     background: linear-gradient(90deg, #cfe8ff 0%, #eaf6ff 55%, var(--cil-surface) 100%);
 }
 
-    .vas-ol-more-grid > .vas-ol-fldgrp:first-child {
+    .vas-rbl-more-grid > .vas-rbl-fldgrp:first-child {
         margin-top: 0;
     }
 
-.vas-ol-fldgrp-name {
+.vas-rbl-fldgrp-name {
     font-size: 0.875em;
     font-weight: 600;
     color: var(--cil-text);
 }
 
-.vas-ol-fldgrp-toggle {
+.vas-rbl-fldgrp-toggle {
     display: inline-flex;
     align-items: center;
     gap: 0.375em;
@@ -2017,11 +1995,11 @@
     padding: 0.125em 0.25em;
 }
 
-    .vas-ol-fldgrp-toggle:hover {
+    .vas-rbl-fldgrp-toggle:hover {
         text-decoration: underline;
     }
 
-.vas-ol-fldgrp-chev {
+.vas-rbl-fldgrp-chev {
     width: 1em;
     height: 1em;
     flex-shrink: 0;
@@ -2029,65 +2007,36 @@
 }
 
 /* Expanded -> chevron up; collapsed -> flip to point down. */
-.vas-ol-fldgrp[data-collapsed="1"] .vas-ol-fldgrp-chev {
+.vas-rbl-fldgrp[data-collapsed="1"] .vas-rbl-fldgrp-chev {
     transform: rotate(180deg);
 }
 
 /* Member field hidden while its group is collapsed (independent of DisplayLogic). */
-.vas-ol-more-grid > .vas-ol-grp-collapsed {
+.vas-rbl-more-grid > .vas-rbl-grp-collapsed {
     display: none !important;
 }
 
 /* Section header all of whose fields are DisplayLogic-hidden — must not show. */
-.vas-ol-more-grid > .vas-ol-fldgrp-empty {
+.vas-rbl-more-grid > .vas-rbl-fldgrp-empty {
     display: none !important;
 }
 
 /* Hide the framework-rendered tab title ("Quotation Lines") and its coloured header bar.
    The framework places .vis-ad-w-p-ap-tp-body-head immediately before our root
-   (.vas-ol-root), so this adjacency :has() targets ONLY this panel's head — never
+   (.vas-rbl-root), so this adjacency :has() targets ONLY this panel's head — never
    sibling panels'. Mirrors the identical rule in VAS_074_CreateInvoiceLinePanel.css. */
-.vis-ad-w-p-ap-tp-body-head:has(+ .vas-ol-root) {
+.vis-ad-w-p-ap-tp-body-head:has(+ .vas-rbl-root) {
     display: none !important;
 }
 
 /* "(Incl. Tax)" second line under the Price column header — shown when the order's
    price list has IsTaxIncluded = Y. Smaller + muted, stacks below "Price" and
    right-aligns with it. Mirrors .vas-cil-hdr-price-sub in VAS_074. */
-.vas-ol-hdr-price-sub {
+.vas-rbl-hdr-price-sub {
     display: block;
     font-size: 0.75em;
     font-weight: 400;
     line-height: 1.1;
     margin-top: 0.05em;
-    color: var(--ol-text-subtle, #5F7283);
+    color: var(--obl-text-subtle, #5F7283);
 }
-
-/* ---------- full-panel busy overlay (shown during delete / save) ---------- */
-.vas-ol-busy-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(255, 255, 255, 0.55);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.vas-ol-busy-overlay::after {
-    content: '';
-    width: 36px;
-    height: 36px;
-    border: 4px solid #d0dce8;
-    border-top-color: var(--cil-action-blue, #0083da);
-    border-radius: 50%;
-    animation: vas-ol-spin 0.7s linear infinite;
-}
-
-@keyframes vas-ol-spin {
-    to { transform: rotate(360deg); }
-}
-

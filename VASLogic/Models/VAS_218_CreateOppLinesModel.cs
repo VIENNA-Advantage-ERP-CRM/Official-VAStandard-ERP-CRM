@@ -1153,13 +1153,13 @@ namespace VASLogic.Models
             return " LIMIT " + pageSize + " OFFSET " + offset;
         }
 
-        #region Line callout (server-side UOM default resolution)
+        #region Line callout (server-side UOM and price default resolution)
 
         /// <summary>
-        /// Reads the changed column's AD_Column.Callout and returns the default UOM +
-        /// display name for the selected product or charge. No pricing or tax recalculation
-        /// is performed — VAS_OppLines carries PlannedQty / PlannedPrice without framework
-        /// pricing dependencies.
+        /// Reads the changed column's AD_Column.Callout and returns the default UOM,
+        /// display name, PlannedPrice (from price list or charge), and PlannedAmt
+        /// for the selected product or charge.
+        /// PlannedPrice is skipped when req.PriceOverride is true (user manually entered it).
         /// </summary>
         public OppCalloutResult RunColumnCallout(Ctx ctx, OppLineCalcRequest req)
         {
@@ -1171,6 +1171,11 @@ namespace VASLogic.Models
             res.Callout = ReadColumnCallout(ctx, "VAS_OppLines", column);
 
             int uomId = req.C_UOM_ID;
+            decimal plannedPrice = req.PlannedPrice;
+
+            // Load price list version from parent opportunity so we can resolve the default price.
+            int M_PriceList_Version_ID = GetOpportunityPriceListVersion(ctx, req.VAS_Opportunity_ID);
+
             // On product change, attempt to use the product's Sales UOM first, then the primary UOM.
             if (req.M_Product_ID > 0)
             {
@@ -1187,6 +1192,15 @@ namespace VASLogic.Models
                 }
                 res.Values["M_Product_ID"] = req.M_Product_ID;
                 res.Values["C_Charge_ID"] = 0;
+
+                // Look up PriceStd from the opportunity's price list version unless the user
+                // has already manually overridden the price on this line.
+                if (!req.PriceOverride && M_PriceList_Version_ID > 0)
+                {
+                    decimal listPrice = GetProductPriceFromList(ctx, req.M_Product_ID, M_PriceList_Version_ID);
+                    if (listPrice > 0)
+                        plannedPrice = listPrice;
+                }
             }
             else if (req.C_Charge_ID > 0)
             {
@@ -1195,10 +1209,24 @@ namespace VASLogic.Models
                 res.Values["M_Product_ID"] = 0;
                 res.Values["C_Charge_ID"] = req.C_Charge_ID;
                 res.Values["M_AttributeSetInstance_ID"] = 0;
+
+                // Use the charge's configured amount as the default price unless overridden.
+                if (!req.PriceOverride)
+                {
+                    decimal chargeAmt = GetChargeAmt(ctx, req.C_Charge_ID);
+                    if (chargeAmt > 0)
+                        plannedPrice = chargeAmt;
+                }
             }
 
             if (uomId > 0)
                 res.Values["C_UOM_ID"] = uomId;
+
+            // Return computed price and amount — client guards against overwriting a
+            // manually entered price via the _priceOverride flag on the line object.
+            if (!req.PriceOverride)
+                res.Values["PlannedPrice"] = plannedPrice;
+            res.Values["PlannedAmt"] = req.PlannedQty * plannedPrice;
 
             res.Display["uomName"] = GetUomLabel(ctx, uomId);
             return res;
@@ -1255,6 +1283,65 @@ namespace VASLogic.Models
             string sql = "SELECT p.VAS_SalesUOM_Id FROM M_Product p WHERE p.M_Product_ID = @M_Product_ID AND p.IsActive = 'Y'";
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             object val = DB.ExecuteScalar(sql, new SqlParameter[] { new SqlParameter("@M_Product_ID", productId) }, null);
+            return Util.GetValueOfInt(val);
+        }
+
+        /// <summary>
+        /// Returns the standard price (PriceStd) from M_ProductPrice for the given product
+        /// and price list version. Returns 0 when no price entry exists.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="M_Product_ID">product to price</param>
+        /// <param name="M_PriceList_Version_ID">price list version from the parent opportunity</param>
+        /// <returns>PriceStd, or 0 if not found</returns>
+        private decimal GetProductPriceFromList(Ctx ctx, int M_Product_ID, int M_PriceList_Version_ID)
+        {
+            if (M_Product_ID <= 0 || M_PriceList_Version_ID <= 0) return 0;
+            string sql = @"SELECT pp.PriceStd
+                           FROM M_ProductPrice pp
+                           WHERE pp.M_Product_ID = @M_Product_ID
+                             AND pp.M_PriceList_Version_ID = @M_PriceList_Version_ID
+                             AND pp.IsActive = 'Y'";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "pp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            object val = DB.ExecuteScalar(sql,
+                new SqlParameter[]
+                {
+                    new SqlParameter("@M_Product_ID", M_Product_ID),
+                    new SqlParameter("@M_PriceList_Version_ID", M_PriceList_Version_ID)
+                }, null);
+            return Util.GetValueOfDecimal(val);
+        }
+
+        /// <summary>
+        /// Returns the standard charge amount (ChargeAmt) from C_Charge. Returns 0 if not found.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="C_Charge_ID">charge record to read</param>
+        /// <returns>ChargeAmt, or 0 if not found</returns>
+        private decimal GetChargeAmt(Ctx ctx, int C_Charge_ID)
+        {
+            if (C_Charge_ID <= 0) return 0;
+            string sql = @"SELECT ch.ChargeAmt FROM C_Charge ch WHERE ch.C_Charge_ID = @C_Charge_ID AND ch.IsActive = 'Y'";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ch", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            object val = DB.ExecuteScalar(sql,
+                new SqlParameter[] { new SqlParameter("@C_Charge_ID", C_Charge_ID) }, null);
+            return Util.GetValueOfDecimal(val);
+        }
+
+        /// <summary>
+        /// Returns the M_PriceList_Version_ID stored on the parent VAS_Opportunity.
+        /// Returns 0 when the opportunity is not found or has no price list version.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="VAS_Opportunity_ID">parent opportunity</param>
+        /// <returns>M_PriceList_Version_ID, or 0 if not set</returns>
+        private int GetOpportunityPriceListVersion(Ctx ctx, int VAS_Opportunity_ID)
+        {
+            if (VAS_Opportunity_ID <= 0) return 0;
+            string sql = @"SELECT o.M_PriceList_Version_ID FROM VAS_Opportunity o WHERE o.VAS_Opportunity_ID = @VAS_Opportunity_ID AND o.IsActive = 'Y'";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            object val = DB.ExecuteScalar(sql,
+                new SqlParameter[] { new SqlParameter("@VAS_Opportunity_ID", VAS_Opportunity_ID) }, null);
             return Util.GetValueOfInt(val);
         }
 
@@ -1623,7 +1710,15 @@ namespace VASLogic.Models
                     PO line = MTable.GetPO(ctx, "VAS_OppLines", input.VAS_OppLines_ID, trx);
 
                     if (input.VAS_OppLines_ID <= 0)
+                    {
                         line.Set_Value("VAS_Opportunity_ID", VAS_Opportunity_ID);
+                        // Inherit the header's client and org — mirrors VAS_107's SetOrder(order)
+                        // which calls SetAD_Org_ID(). The typed PO setter uses Set_ValueNoCheck
+                        // internally, bypassing column-level restrictions that Set_Value is subject
+                        // to for standard identity columns like AD_Org_ID.
+                        line.SetAD_Client_ID(ctxData.AD_Client_ID);
+                        line.SetAD_Org_ID(ctxData.AD_Org_ID);
+                    }
 
                     if (input.M_Product_ID > 0)
                     {
@@ -1653,7 +1748,7 @@ namespace VASLogic.Models
                     line.Set_Value("PlannedAmt", decimal.Multiply(qty, input.PlannedPrice));
 
                     if (input.Line > 0)
-                        line.Set_Value("Line", input.Line);
+                        line.Set_Value("VAS_LineNo", input.Line);
 
                     line.Set_Value("Description", input.Description ?? "");
 

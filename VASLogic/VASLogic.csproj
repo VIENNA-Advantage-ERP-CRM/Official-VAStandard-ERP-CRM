@@ -151,6 +151,7 @@
     <Compile Include="Models\VAS_189_ARInvoiceDetailPanelModel.Recurring.cs" />
     <Compile Include="Models\VAS_074_CreateInvoiceLinePanelModel.cs" />
     <Compile Include="Models\VAS_107_CreateOrderBottomPanelModel.cs" />
+    <Compile Include="Models\VAS_240_RequisitionBottomPanelModel.cs" />
     <Compile Include="Models\VAS_218_CreateOppLinesModel.cs" />
     <Compile Include="Models\VAS_ActivitySourcesModel.cs" />
     <Compile Include="Models\VAS_ChangeLogValueModel.cs" />

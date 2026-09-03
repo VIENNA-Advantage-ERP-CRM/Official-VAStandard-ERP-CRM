@@ -101,7 +101,7 @@
 ///                          used to be written into WorkOrderNo, which made the
 ///                          panel label a production order "Work Order".
 ///   VAI163   2026-08-11  - The e-mail lookup's "has a recipient" filter tested
-///                          NVL(TRIM(addr), '') &lt;&gt; '', which on Oracle compares
+///                          COALESCE(TRIM(addr), '') &lt;&gt; '', which on Oracle compares
 ///                          against NULL (the empty string IS NULL there) and is
 ///                          UNKNOWN for every row — so the Activity feed showed
 ///                          no e-mails at all on an Oracle deployment. It now
@@ -215,6 +215,17 @@
 ///                        The body (TextMsg, flattened) travels with the row so
 ///                        the panel reveals it on click. Read in one query for
 ///                        the whole feed through VAS_ActivitySourcesModel.
+///   VAI163   2026-09-02  Activity timestamps render in the VIEWER's zone on
+///                        PostgreSQL too. Every date and timestamp handed to
+///                        the client now goes through Stamp(), which drops the
+///                        DateTimeKind the provider tagged the value with -
+///                        Oracle says Unspecified, Npgsql says Utc or Local,
+///                        and Newtonsoft writes a zone designator for the
+///                        latter two but not the first. The panel parses the
+///                        bare Oracle form, so the designator made it read the
+///                        value as already-zoned and skip its own conversion,
+///                        printing the stored clock. Same JSON on either engine
+///                        now. No-op on Oracle.
 /// </summary>
 
 using System;
@@ -283,7 +294,7 @@ namespace VASLogic.Models
             // requisition (manual issue) keep QtyEntered.
             const string REQ_JOIN =
                 "LEFT OUTER JOIN M_RequisitionLine rql ON (rql.M_RequisitionLine_ID = l.M_RequisitionLine_ID)";
-            const string REQ_QTY = "NVL(rql.Qty, NVL(l.QtyEntered, 0))";
+            const string REQ_QTY = "COALESCE(rql.Qty, COALESCE(l.QtyEntered, 0))";
 
             string sql = @"SELECT
                               inv.M_Inventory_ID,
@@ -305,25 +316,25 @@ namespace VASLogic.Models
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS LineCount,
-                              (SELECT NVL(SUM(" + REQ_QTY + @"), 0)
+                              (SELECT COALESCE(SUM(" + REQ_QTY + @"), 0)
                                  FROM M_InventoryLine l " + REQ_JOIN + @"
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS RequestedQty,
-                              (SELECT NVL(SUM(NVL(l.QtyInternalUse, 0)), 0)
+                              (SELECT COALESCE(SUM(COALESCE(l.QtyInternalUse, 0)), 0)
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS IssuedQty,
-                              (SELECT NVL(SUM(NVL(l.QtyInternalUse, 0) * " + rateExpr + @"), 0)
+                              (SELECT COALESCE(SUM(COALESCE(l.QtyInternalUse, 0) * " + rateExpr + @"), 0)
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS TotalValue,
-                              (SELECT NVL(SUM(CASE WHEN NVL(l.QtyInternalUse, 0) < " + REQ_QTY + @"
+                              (SELECT COALESCE(SUM(CASE WHEN COALESCE(l.QtyInternalUse, 0) < " + REQ_QTY + @"
                                                    THEN 1 ELSE 0 END), 0)
                                  FROM M_InventoryLine l " + REQ_JOIN + @"
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS NotFullCount,
-                              (SELECT NVL(SUM(CASE WHEN " + REQ_QTY + @" > NVL(l.QtyInternalUse, 0)
-                                                   THEN " + REQ_QTY + @" - NVL(l.QtyInternalUse, 0)
+                              (SELECT COALESCE(SUM(CASE WHEN " + REQ_QTY + @" > COALESCE(l.QtyInternalUse, 0)
+                                                   THEN " + REQ_QTY + @" - COALESCE(l.QtyInternalUse, 0)
                                                    ELSE 0 END), 0)
                                  FROM M_InventoryLine l " + REQ_JOIN + @"
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
@@ -365,12 +376,12 @@ namespace VASLogic.Models
             result.StatusCode     = Util.GetValueOfString(r["DocStatus"]);
             result.Processed      = Util.GetValueOfString(r["Processed"]) == "Y";
             result.Posted         = Util.GetValueOfString(r["Posted"]) == "Y";
-            result.MovementDate   = Util.GetValueOfDateTime(r["MovementDate"]);
+            result.MovementDate   = Stamp(r["MovementDate"]);
             result.Description    = Util.GetValueOfString(r["Description"]);
             result.WarehouseName  = Util.GetValueOfString(r["WarehouseName"]);
             result.IssuedBy       = Util.GetValueOfString(r["IssuedBy"]);
-            result.CreatedDate    = Util.GetValueOfDateTime(r["CreatedDate"]);
-            result.UpdatedDate    = Util.GetValueOfDateTime(r["UpdatedDate"]);
+            result.CreatedDate    = Stamp(r["CreatedDate"]);
+            result.UpdatedDate    = Stamp(r["UpdatedDate"]);
             int M_Warehouse_ID    = Util.GetValueOfInt(r["M_Warehouse_ID"]);
 
             // ----- KPI aggregates -----
@@ -734,22 +745,22 @@ namespace VASLogic.Models
                               -- requisition's Qty and M_Storage's on-hand are all
                               -- in the product's BASE UOM.
                               rql.Qty                  AS ReqQtyBase,
-                              NVL(l.QtyEntered, 0)     AS QtyEnteredUOM,
-                              NVL(l.QtyInternalUse, 0) AS QtyBase,
-                              NVL(st.AvailableQty, 0)  AS AvailableQtyBase,
+                              COALESCE(l.QtyEntered, 0)     AS QtyEnteredUOM,
+                              COALESCE(l.QtyInternalUse, 0) AS QtyBase,
+                              COALESCE(st.AvailableQty, 0)  AS AvailableQtyBase,
                               p.Value           AS ProductCode,
                               p.Name            AS ProductName,
                               loc.Value         AS LocatorCode,
                               COALESCE(loc.LocatorCombination, loc.Bin, loc.Value) AS LocatorName,
                               u.Name            AS UOMName,
-                              NVL(u.StdPrecision, 0) AS UOMPrecision,
+                              COALESCE(u.StdPrecision, 0) AS UOMPrecision,
                               -- The PRODUCT's own unit. On-hand is stored in it
                               -- (M_Storage.QtyOnHand) and is reported in it, so
                               -- the column has to be able to name it.
                               bu.Name           AS BaseUOMName,
-                              NVL(bu.StdPrecision, 0) AS BaseUOMPrecision,
+                              COALESCE(bu.StdPrecision, 0) AS BaseUOMPrecision,
                               " + rateExpr + @"                        AS UnitRate,
-                              NVL(l.QtyInternalUse, 0) * " + rateExpr + @" AS LineValue,
+                              COALESCE(l.QtyInternalUse, 0) * " + rateExpr + @" AS LineValue,
                               l.M_RequisitionLine_ID AS RequisitionLineID,
                               rq.DocumentNo     AS RequisitionNo,
                               " + asiExpr + @"  AS AttributeSetInstance,
@@ -764,7 +775,7 @@ namespace VASLogic.Models
                            " + asiJoin + @"
                            LEFT OUTER JOIN (SELECT s.M_Product_ID,
                                                    s.M_Locator_ID,
-                                                   NVL(SUM(NVL(s.QtyOnHand, 0)), 0) AS AvailableQty
+                                                   COALESCE(SUM(COALESCE(s.QtyOnHand, 0)), 0) AS AvailableQty
                                               FROM M_Storage s
                                              WHERE s.IsActive = 'Y'
                                              GROUP BY s.M_Product_ID, s.M_Locator_ID) st
@@ -937,8 +948,8 @@ namespace VASLogic.Models
                 RequisitionRefData rf = new RequisitionRefData();
                 rf.M_Requisition_ID = Util.GetValueOfInt(r["M_Requisition_ID"]);
                 rf.DocumentNo       = Util.GetValueOfString(r["DocumentNo"]);
-                rf.DateDoc          = Util.GetValueOfDateTime(r["DateDoc"]);
-                rf.DateRequired     = Util.GetValueOfDateTime(r["DateRequired"]);
+                rf.DateDoc          = Stamp(r["DateDoc"]);
+                rf.DateRequired     = Stamp(r["DateRequired"]);
                 rf.Description      = Util.GetValueOfString(r["Description"]);
                 rf.PreparerName     = Util.GetValueOfString(r["PreparerName"]);
                 refs.Add(rf);
@@ -1168,13 +1179,13 @@ namespace VASLogic.Models
             try
             {
                 string sql = @"SELECT l.M_InventoryLine_ID,
-                                      NVL(c.Quantity, 0) AS ReqQty
+                                      COALESCE(c.Quantity, 0) AS ReqQty
                                  FROM M_InventoryLine l
                                 INNER JOIN VA075_WorkOrderComponent c
                                         ON (c.VA075_WorkOrderComponent_ID = l.VA075_WorkOrderComponent_ID)
                                 WHERE l.M_Inventory_ID = @M_Inventory_ID
                                   AND l.IsActive       = 'Y'
-                                  AND NVL(l.VA075_WorkOrderComponent_ID, 0) > 0";
+                                  AND COALESCE(l.VA075_WorkOrderComponent_ID, 0) > 0";
                 DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return qtys;
 
@@ -1237,7 +1248,7 @@ namespace VASLogic.Models
                                         WHERE l2.M_Inventory_ID = @M_Inventory_ID
                                           AND l2.IsActive       = 'Y'
                                           AND cd2.IsActive      = 'Y'
-                                          AND NVL(cd2.Qty, 0)  <> 0
+                                          AND COALESCE(cd2.Qty, 0)  <> 0
                                         GROUP BY cd2.M_InventoryLine_ID)";
 
                 DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
@@ -1283,7 +1294,7 @@ namespace VASLogic.Models
                                       (SELECT MAX(cd2.M_CostDetail_ID)
                                          FROM M_CostDetail cd2
                                         WHERE cd2.IsActive        = 'Y'
-                                          AND NVL(cd2.Qty, 0)    <> 0
+                                          AND COALESCE(cd2.Qty, 0)    <> 0
                                           AND cd2.M_Warehouse_ID  = @M_Warehouse_ID
                                           AND cd2.M_Product_ID IN
                                               (SELECT l.M_Product_ID
@@ -1366,7 +1377,7 @@ namespace VASLogic.Models
 
                 DataRow r = ds.Tables[0].Rows[0];
                 _lastCompletedByName = Util.GetValueOfString(r["UserName"]);
-                return Util.GetValueOfDateTime(r["Created"]);
+                return Stamp(r["Created"]);
             }
             catch (Exception ex)
             {
@@ -1422,9 +1433,9 @@ namespace VASLogic.Models
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
                     DataRow r = ds.Tables[0].Rows[0];
-                    DateTime? postedOn = Util.GetValueOfDateTime(r["PostedOn"]);
+                    DateTime? postedOn = Stamp(r["PostedOn"]);
                     if (postedOn.HasValue) return postedOn;
-                    DateTime? postedAcct = Util.GetValueOfDateTime(r["PostedAcct"]);
+                    DateTime? postedAcct = Stamp(r["PostedAcct"]);
                     if (postedAcct.HasValue) return postedAcct;
                 }
             }
@@ -1448,7 +1459,7 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     return null;
-                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["Updated"]);
+                return Stamp(ds.Tables[0].Rows[0]["Updated"]);
             }
             catch (Exception ex)
             {
@@ -1646,7 +1657,7 @@ namespace VASLogic.Models
         /// <returns>True when an entry was added.</returns>
         private bool AddChangeRow(DataRow r, string scope, List<InternalUseActivityData> list)
         {
-            DateTime? at = Util.GetValueOfDateTime(r["Created"]);
+            DateTime? at = Stamp(r["Created"]);
             if (!at.HasValue) return false;
 
             string field = Util.GetValueOfString(r["FieldLabel"]);
@@ -1694,6 +1705,21 @@ namespace VASLogic.Models
         /// <summary>Reads the appointment / task / call / letter sources every
         /// overview panel shares (VAS_ActivitySourcesModel).</summary>
         private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
+        /// <summary>
+        /// Every date and timestamp this panel hands the client is read through
+        /// here rather than through Util.GetValueOfDateTime directly, so the
+        /// DateTimeKind the PROVIDER tagged the value with cannot reach the JSON.
+        /// Oracle tags Unspecified and Npgsql tags Utc or Local; Newtonsoft writes
+        /// a zone designator for the latter two and none for the first, and the
+        /// panel's parseDbDate reads the two shapes differently - which is why the
+        /// Activity feed's times were hours out on PostgreSQL. A no-op for a value
+        /// that is already Unspecified, so the Oracle path is untouched. See
+        /// VAS_ActivitySourcesModel.Stamp for the full account.
+        /// </summary>
+        private static DateTime? Stamp(object value)
+        {
+            return VAS_ActivitySourcesModel.Stamp(value);
+        }
 
         /// <summary>
         /// The correspondence and engagement sources shared with every other
@@ -1768,8 +1794,8 @@ namespace VASLogic.Models
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
 
                 DataRow r = ds.Tables[0].Rows[0];
-                DateTime? created = Util.GetValueOfDateTime(r["Created"]);
-                DateTime? updated = Util.GetValueOfDateTime(r["Updated"]);
+                DateTime? created = Stamp(r["Created"]);
+                DateTime? updated = Stamp(r["Updated"]);
                 string updatedBy  = Util.GetValueOfString(r["UpdatedByName"]);
 
                 list.Add(new InternalUseActivityData
@@ -1840,7 +1866,7 @@ namespace VASLogic.Models
                 {
                     Type     = "posted",
                     UserName = Util.GetValueOfString(r["UserName"]),
-                    Created  = Util.GetValueOfDateTime(r["Created"])
+                    Created  = Stamp(r["Created"])
                 });
             }
             catch (Exception ex)
@@ -1865,13 +1891,20 @@ namespace VASLogic.Models
             {
                 string sql = @"SELECT ce.CharacterData,
                                       ce.Created,
-                                      NVL(u.Name, cu.Name) AS UserName
+                                      COALESCE(u.Name, cu.Name) AS UserName
                                  FROM CM_ChatEntry ce
                                 INNER JOIN CM_Chat ch      ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
                                  LEFT OUTER JOIN AD_User u  ON (ce.AD_User_ID = u.AD_User_ID)
                                  LEFT OUTER JOIN AD_User cu ON (ce.CreatedBy  = cu.AD_User_ID)
-                                WHERE ch.AD_Table_ID =
-                                      (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'M_Inventory')
+                                -- IN + UPPER, like the mail loader below: a scalar
+                                -- sub-select RAISES on Oracle where AD_Table holds
+                                -- more than one row named M_Inventory, and the
+                                -- case-sensitive name matched nothing at all in a
+                                -- dictionary that spells it any other way. Either
+                                -- way every note vanished from the feed.
+                                WHERE ch.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'M_INVENTORY')
                                   AND ch.Record_ID = @M_Inventory_ID
                                   AND ce.IsActive  = 'Y'";
                 DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
@@ -1884,7 +1917,7 @@ namespace VASLogic.Models
                         Type     = "note",
                         Text     = Util.GetValueOfString(r["CharacterData"]),
                         UserName = Util.GetValueOfString(r["UserName"]),
-                        Created  = Util.GetValueOfDateTime(r["Created"])
+                        Created  = Stamp(r["Created"])
                     });
                 }
             }
@@ -1915,7 +1948,7 @@ namespace VASLogic.Models
                 // document) are the ones this leaves out.
                 //
                 // "Has an address" is tested against a SPACE, not against ''.
-                // Oracle stores the empty string as NULL, so NVL(TRIM(x), '')
+                // Oracle stores the empty string as NULL, so COALESCE(TRIM(x), '')
                 // yields NULL and `<> ''` compares against NULL — the predicate
                 // is UNKNOWN for every row, including the ones that DO carry an
                 // address, and the query returned no mails at all. Comparing to
@@ -1940,16 +1973,16 @@ namespace VASLogic.Models
                                       (SELECT t.AD_Table_ID FROM AD_Table t
                                         WHERE UPPER(t.TableName) = 'M_INVENTORY')
                                   AND ma.Record_ID          = @M_Inventory_ID
-                                  AND NVL(ma.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(ma.IsActive, 'Y') = 'Y'
                                   -- Letters ('I') and only letters are filtered
                                   -- out: they are a kind of their own now and
                                   -- LoadSharedSourceActivity reads them, so leaving
                                   -- them here would report each one twice. Every
                                   -- other AttachmentType still counts as a mail.
-                                  AND COALESCE(ma.AttachmentType, 'M') <> 'I'
-                                  AND (NVL(TRIM(ma.MailAddress), ' ')     <> ' '
-                                    OR NVL(TRIM(ma.MailAddressCc), ' ')   <> ' '
-                                    OR NVL(TRIM(ma.MailAddressBcc), ' ')  <> ' ')
+                                  AND COALESCE(TO_CHAR(ma.AttachmentType), 'M') <> 'I'
+                                  AND (COALESCE(TRIM(ma.MailAddress), ' ')     <> ' '
+                                    OR COALESCE(TRIM(ma.MailAddressCc), ' ')   <> ' '
+                                    OR COALESCE(TRIM(ma.MailAddressBcc), ' ')  <> ' ')
                                 ORDER BY ma.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
@@ -1971,7 +2004,7 @@ namespace VASLogic.Models
                         MailFrom   = Util.GetValueOfString(r["MailAddressFrom"]),
                         IsMailSent = Util.GetValueOfString(r["IsMailSent"]) == "Y",
                         UserName   = Util.GetValueOfString(r["UserName"]),
-                        Created    = Util.GetValueOfDateTime(r["Created"])
+                        Created    = Stamp(r["Created"])
                     });
                 }
             }

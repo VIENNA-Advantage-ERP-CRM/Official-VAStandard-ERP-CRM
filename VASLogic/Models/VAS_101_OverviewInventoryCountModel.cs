@@ -124,6 +124,17 @@
 ///                        The body (TextMsg, flattened) travels with the row so
 ///                        the panel reveals it on click. Read in one query for
 ///                        the whole feed through VAS_ActivitySourcesModel.
+///   VAI163   2026-09-02  Activity timestamps render in the VIEWER's zone on
+///                        PostgreSQL too. Every date and timestamp handed to
+///                        the client now goes through Stamp(), which drops the
+///                        DateTimeKind the provider tagged the value with -
+///                        Oracle says Unspecified, Npgsql says Utc or Local,
+///                        and Newtonsoft writes a zone designator for the
+///                        latter two but not the first. The panel parses the
+///                        bare Oracle form, so the designator made it read the
+///                        value as already-zoned and skip its own conversion,
+///                        printing the stored clock. Same JSON on either engine
+///                        now. No-op on Oracle.
 /// </summary>
 
 using System;
@@ -217,11 +228,11 @@ namespace VASLogic.Models
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS LineCount,
-                              (SELECT NVL(SUM(NVL(l.QtyCount, 0) * " + rateExpr + @"), 0)
+                              (SELECT COALESCE(SUM(COALESCE(l.QtyCount, 0) * " + rateExpr + @"), 0)
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS TotalValue,
-                              (SELECT NVL(SUM(" + varExpr + @"), 0)
+                              (SELECT COALESCE(SUM(" + varExpr + @"), 0)
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS NetVarianceQty,
@@ -230,19 +241,19 @@ namespace VASLogic.Models
                               -- DIRECTION it varies in (see BuildRateExpr). Signed
                               -- like the quantity, so stock the count could not
                               -- find reads negative.
-                              (SELECT NVL(SUM(" + varExpr + @" * " + rateExpr + @"), 0)
+                              (SELECT COALESCE(SUM(" + varExpr + @" * " + rateExpr + @"), 0)
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS VarianceValue,
-                              (SELECT NVL(SUM(CASE WHEN " + varExpr + @" = 0 THEN 1 ELSE 0 END), 0)
+                              (SELECT COALESCE(SUM(CASE WHEN " + varExpr + @" = 0 THEN 1 ELSE 0 END), 0)
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS MatchedCount,
-                              (SELECT NVL(SUM(CASE WHEN " + varExpr + @" < 0 THEN 1 ELSE 0 END), 0)
+                              (SELECT COALESCE(SUM(CASE WHEN " + varExpr + @" < 0 THEN 1 ELSE 0 END), 0)
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS ShortCount,
-                              (SELECT NVL(SUM(CASE WHEN " + varExpr + @" > 0 THEN 1 ELSE 0 END), 0)
+                              (SELECT COALESCE(SUM(CASE WHEN " + varExpr + @" > 0 THEN 1 ELSE 0 END), 0)
                                  FROM M_InventoryLine l
                                 WHERE l.M_Inventory_ID = inv.M_Inventory_ID
                                   AND l.IsActive       = 'Y')                   AS ExcessCount
@@ -275,7 +286,7 @@ namespace VASLogic.Models
             result.StatusCode     = Util.GetValueOfString(r["DocStatus"]);
             result.Processed      = Util.GetValueOfString(r["Processed"]) == "Y";
             result.Posted         = Util.GetValueOfString(r["Posted"]) == "Y";
-            result.CountDate      = Util.GetValueOfDateTime(r["MovementDate"]);
+            result.CountDate      = Stamp(r["MovementDate"]);
             result.Description    = Util.GetValueOfString(r["Description"]);
             result.WarehouseName  = Util.GetValueOfString(r["WarehouseName"]);
             result.CountedBy      = Util.GetValueOfString(r["CountedBy"]);
@@ -606,8 +617,8 @@ namespace VASLogic.Models
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
 
                 DataRow r = ds.Tables[0].Rows[0];
-                DateTime? created = Util.GetValueOfDateTime(r["Created"]);
-                DateTime? updated = Util.GetValueOfDateTime(r["Updated"]);
+                DateTime? created = Stamp(r["Created"]);
+                DateTime? updated = Stamp(r["Updated"]);
                 string updatedBy  = Util.GetValueOfString(r["UpdatedByName"]);
 
                 list.Add(new ActivityData
@@ -700,7 +711,7 @@ namespace VASLogic.Models
                         Type     = type,
                         Text     = Util.GetValueOfString(r["NodeName"]),
                         UserName = Util.GetValueOfString(r["UserName"]),
-                        Created  = Util.GetValueOfDateTime(r["EventOn"])
+                        Created  = Stamp(r["EventOn"])
                     });
                     added++;
                 }
@@ -849,6 +860,21 @@ namespace VASLogic.Models
         /// <summary>Reads the appointment / task / call / letter sources every
         /// overview panel shares (VAS_ActivitySourcesModel).</summary>
         private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
+        /// <summary>
+        /// Every date and timestamp this panel hands the client is read through
+        /// here rather than through Util.GetValueOfDateTime directly, so the
+        /// DateTimeKind the PROVIDER tagged the value with cannot reach the JSON.
+        /// Oracle tags Unspecified and Npgsql tags Utc or Local; Newtonsoft writes
+        /// a zone designator for the latter two and none for the first, and the
+        /// panel's parseDbDate reads the two shapes differently - which is why the
+        /// Activity feed's times were hours out on PostgreSQL. A no-op for a value
+        /// that is already Unspecified, so the Oracle path is untouched. See
+        /// VAS_ActivitySourcesModel.Stamp for the full account.
+        /// </summary>
+        private static DateTime? Stamp(object value)
+        {
+            return VAS_ActivitySourcesModel.Stamp(value);
+        }
 
         /// <summary>
         /// The correspondence and engagement sources shared with every other
@@ -928,7 +954,7 @@ namespace VASLogic.Models
                                   column, refType, refValueId),
                 ChangeScope = scope,
                 UserName    = Util.GetValueOfString(r["UserName"]),
-                Created     = Util.GetValueOfDateTime(r["Created"])
+                Created     = Stamp(r["Created"])
             });
         }
 
@@ -971,7 +997,7 @@ namespace VASLogic.Models
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
 
                 _lastCompletedByName = Util.GetValueOfString(ds.Tables[0].Rows[0]["CompletedBy"]);
-                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["CompletedOn"]);
+                return Stamp(ds.Tables[0].Rows[0]["CompletedOn"]);
             }
             catch (Exception ex)
             {
@@ -1003,7 +1029,7 @@ namespace VASLogic.Models
                 {
                     Type     = "posted",
                     UserName = Util.GetValueOfString(r["UserName"]),
-                    Created  = Util.GetValueOfDateTime(r["Created"])
+                    Created  = Stamp(r["Created"])
                 });
             }
             catch (Exception ex)
@@ -1047,7 +1073,7 @@ namespace VASLogic.Models
                         Type     = "note",
                         Text     = Util.GetValueOfString(r["CharacterData"]),
                         UserName = Util.GetValueOfString(r["UserName"]),
-                        Created  = Util.GetValueOfDateTime(r["Created"])
+                        Created  = Stamp(r["Created"])
                     });
                 }
             }
@@ -1077,7 +1103,7 @@ namespace VASLogic.Models
                 // that carries an address is a mail whatever the column says.
                 //
                 // "Has an address" is tested against a SPACE, not against ''.
-                // Oracle stores the empty string as NULL, so NVL(TRIM(x), '')
+                // Oracle stores the empty string as NULL, so COALESCE(TRIM(x), '')
                 // yields NULL and `<> ''` compares against NULL — UNKNOWN for every
                 // row, including the ones that DO carry an address, and the query
                 // returned no mails at all. Comparing to ' ' keeps the fallback
@@ -1102,16 +1128,16 @@ namespace VASLogic.Models
                                       (SELECT t.AD_Table_ID FROM AD_Table t
                                         WHERE UPPER(t.TableName) = 'M_INVENTORY')
                                   AND ma.Record_ID          = @M_Inventory_ID
-                                  AND NVL(ma.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(ma.IsActive, 'Y') = 'Y'
                                   -- Letters ('I') and only letters are filtered
                                   -- out: they are a kind of their own now and
                                   -- LoadSharedSourceActivity reads them, so leaving
                                   -- them here would report each one twice. Every
                                   -- other AttachmentType still counts as a mail.
-                                  AND COALESCE(ma.AttachmentType, 'M') <> 'I'
-                                  AND (NVL(TRIM(ma.MailAddress), ' ')    <> ' '
-                                    OR NVL(TRIM(ma.MailAddressCc), ' ')  <> ' '
-                                    OR NVL(TRIM(ma.MailAddressBcc), ' ') <> ' ')
+                                  AND COALESCE(TO_CHAR(ma.AttachmentType), 'M') <> 'I'
+                                  AND (COALESCE(TRIM(ma.MailAddress), ' ')    <> ' '
+                                    OR COALESCE(TRIM(ma.MailAddressCc), ' ')  <> ' '
+                                    OR COALESCE(TRIM(ma.MailAddressBcc), ' ') <> ' ')
                                 ORDER BY ma.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, InventoryParam(M_Inventory_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
@@ -1133,7 +1159,7 @@ namespace VASLogic.Models
                         MailFrom   = Util.GetValueOfString(r["MailAddressFrom"]),
                         IsMailSent = Util.GetValueOfString(r["IsMailSent"]) == "Y",
                         UserName   = Util.GetValueOfString(r["UserName"]),
-                        Created    = Util.GetValueOfDateTime(r["Created"])
+                        Created    = Stamp(r["Created"])
                     });
                 }
             }
@@ -1383,8 +1409,8 @@ namespace VASLogic.Models
                               l.Line,
                               l.Description     AS LineDescription,
                               l.M_Product_ID,
-                              NVL(l.QtyBook, 0)  AS SystemQty,
-                              NVL(l.QtyCount, 0) AS CountedQty,
+                              COALESCE(l.QtyBook, 0)  AS SystemQty,
+                              COALESCE(l.QtyCount, 0) AS CountedQty,
                               " + varExpr + @"                       AS VarianceQty,
                               p.Value           AS ProductCode,
                               p.Name            AS ProductName,
@@ -1392,16 +1418,16 @@ namespace VASLogic.Models
                               loc.Value         AS LocatorCode,
                               COALESCE(loc.LocatorCombination, loc.Bin, loc.Value) AS LocatorName,
                               u.Name            AS UOMName,
-                              NVL(u.StdPrecision, 0) AS UOMPrecision,
+                              COALESCE(u.StdPrecision, 0) AS UOMPrecision,
                               -- The PRODUCT's own unit. QtyBook is written straight
                               -- from M_Storage.QtyOnHand (MInventoryLine.SetQtyBook),
                               -- so the On Hand figure is always in THIS unit — never
                               -- in the line's C_UOM_ID, which the table used to label
                               -- it with. The panel names it beside the figure.
                               bu.Name           AS BaseUOMName,
-                              NVL(bu.StdPrecision, 0) AS BaseUOMPrecision,
+                              COALESCE(bu.StdPrecision, 0) AS BaseUOMPrecision,
                               " + rateExpr + @"                       AS UnitRate,
-                              NVL(l.QtyCount, 0) * " + rateExpr + @"   AS LineValue
+                              COALESCE(l.QtyCount, 0) * " + rateExpr + @"   AS LineValue
                            FROM M_InventoryLine l
                            LEFT OUTER JOIN M_Product p   ON (p.M_Product_ID   = l.M_Product_ID)
                            LEFT OUTER JOIN C_UOM     u   ON (u.C_UOM_ID        = l.C_UOM_ID)
