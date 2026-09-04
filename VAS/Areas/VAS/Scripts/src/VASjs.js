@@ -368,3 +368,4 @@ import "../app/widgets/BankingJournal/VAS_234_AccountBalanceWidget.js";
 import "../app/widgets/BankingJournal/VAS_235_AgingUnreconciledWidget.js";
 import "../app/widgets/BankingJournal/VAS_236_ReceiptvsPaymentWidget.js";
 import "../app/widgets/BankingJournal/VAS_238_UnreconciledBankLineWidget.js";
+import "../app/widgets/BankingJournal/VAS_239_CurrencyWiseBalanceWidget.js";

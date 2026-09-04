@@ -1118,6 +1118,9 @@
     <Compile Include="Areas\VAS\Controllers\VAS_235_AgingUnreconciledWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_235_AgingUnreconciledWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_235_AgingUnreconciledWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_239_CurrencyWiseBalanceWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_239_CurrencyWiseBalanceWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_239_CurrencyWiseBalanceWidget.js" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>
