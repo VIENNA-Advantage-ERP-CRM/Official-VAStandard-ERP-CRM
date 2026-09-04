@@ -1,0 +1,472 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_231_NetMovementWidget.css
+ * Net Movement (Banking dashboard, 2x1 KPI).
+ *
+ * Design source: design.md -> dashboard-widgets.md (Glass Widget, Widget Header,
+ * KPI And Summary Widget, Widget Stat Values, Content Fit Budget, No Inner
+ * Scrollbars). All internal sizing is em-driven off the widget root anchor;
+ * borders, radii and shadows stay in px ("Not Scaled With em"). No native tag
+ * selector is styled - every rule is scoped to a vas-231- class.
+ *
+ * The card surface is the STANDARD glass gradient in every state. §KPI And
+ * Summary Widget: "Do not use full tinted or semantic gradient backgrounds just
+ * to indicate success, warning, loss, or status" - semantic meaning comes from
+ * the text, so a negative net is carried by the value colour alone and the
+ * widget surface stays consistent with every other card on the dashboard.
+ *
+ * Fit budget (§Content Fit Budget, 1280px laptop floor): a 2x1 cell is ~124px,
+ * ~96px of content after 14px padding. Header 32px well + 12px gap + KPI 28px +
+ * 4px gap + meta ~14px = ~90px. It fits at the floor, which is the case that
+ * clips - not the wide-dashboard case.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-231-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container (mirrors the sibling widgets) so a narrow or zoomed-in
+       cell can step the card base font below its 16px clamp floor. */
+    container: vas-231 / inline-size;
+}
+
+    .vas-231-root,
+    .vas-231-root * {
+        box-sizing: border-box;
+    }
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Everything inside is em against this. */
+.vas-231-card {
+    /* VAS_220's anchor, character for character - and the ORDER of the two
+       variables is the whole point:
+         --widget-inline-size   this widget's OWN width, written by its resize
+                                observer (see setupResizeObserver in the JS)
+         --dash-inline-size     the dashboard's width, the shared fallback
+       A 2x1 cell is ~330px, so 330 x 0.012 = ~4px and the clamp lands on its
+       16px FLOOR: KPI value 1.75em = 28px, padding 0.85em = 13.6px - the same
+       numbers every sibling KPI card resolves to.
+       Reading --dash-inline-size first instead (~1524px x 0.012 = 18.3px) is
+       what made this card render a 32px value and ~15.6px padding while its
+       neighbours sat at 28px / 13.6px. */
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    /* The CARD distributes its three blocks - header, value, meta - exactly as
+       VAS_220 does. space-between spreads them over the cell height; the gap is
+       the floor that keeps them off one another when the cell is short. */
+    justify-content: space-between;
+    gap: .25em;
+    min-height: 0;
+    padding: .85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+}
+
+/* ---- Header: icon well + title + period pill ----
+   Well and glyph are driven off the same --dash-inline-size lever as the title so
+   the header stays balanced at every width. */
+.vas-231-header {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    min-width: 0;
+    flex: 0 0 auto;
+    /* No margin-bottom: the card's own gap + space-between own the rhythm now. */
+}
+
+/* Icon well: VAS_220's, value for value - 1.75em on the card's em lever (NOT the
+   32-40px --dash-inline-size clamp this card used to carry). The big well was
+   eating ~14px of a header that also has to hold a title, a subtitle and the
+   period chip, which is why the title truncated to "Net ...". Flat #EAF8FF tile,
+   9px radius, no inset ring. */
+.vas-231-icon {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+    /* .95em of the well's own em lever - VAS_220's glyph size, so the two cards'
+       icons read identically side by side. */
+    .vas-231-icon svg {
+        width: .95em;
+        height: .95em;
+        display: block;
+    }
+
+.vas-231-head-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* The stat label IS the widget title (§KPI And Summary Widget), so it uses the
+   shared Widget Header title style verbatim: the --dash-inline-size clamp,
+   Roboto Regular (400) - not Medium, not Bold - and #102C3F. No subtitle on a
+   stat card: the meta line under the value plays the explainer role. */
+.vas-231-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    /* Medium 500 / line-height 1.2 - VAS_220's title, so the two cards' headings
+       match on a shared row. */
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Subtitle: the §Widget Header pattern verbatim - Roboto Regular, #717182,
+   line-height 1.3, and a FIXED 2px top margin (it pairs the two lines at every
+   width, so it is one of the few values here that is not em).
+
+   Single line with an ellipsis, never wrapping: a second line would cost ~16px
+   of a ~96px content budget at the laptop floor and push the meta row out of the
+   cell. The full sentence is on the element's title attribute, so nothing is
+   lost - on a 2x1 cell sharing its row with the period pill this WILL truncate
+   at 1280px and read in full from ~1440px up. */
+.vas-231-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-231-subtitle:empty {
+    display: none;
+}
+
+/* ---- Period pill (interactive tier: 0.8125em, per the two-tier chip system) ---- */
+/* Sized at the CHIP tier (0.6875em), not the interactive-pill tier (0.8125em):
+   an empty chip is small, but a real period name ("September-26") makes it the
+   widest thing in the header and it starts competing with the widget title. It
+   is a filter label that happens to be clickable, not a primary control - so it
+   takes the smaller of the two-tier chip system's two sizes, with the padding,
+   gap and glyph brought down to match. max-width + ellipsis cap it whatever the
+   calendar names its periods. */
+.vas-231-periodchip {
+    flex: 0 0 auto;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: .25em;
+    max-width: 45%;
+    font-family: inherit;
+    /* An absolute clamp, like the title and subtitle above - NOT an em. The card
+       base drops to 13px in a 2x1 cell (see the @container rules), and an em chip
+       would follow it down to ~9px and stop being readable. This keeps it small
+       and steady at 11-12px whatever the base does. */
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008), 12px);
+    font-weight: 500;
+    line-height: 1.3;
+    color: #41576A;
+    background: rgba(255, 255, 255, .66);
+    border: 1px solid #D9E2EB;
+    border-radius: 999px;
+    padding: .2em .5em;
+    box-shadow: 0 4px 10px rgba(16, 47, 74, .05);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+    .vas-231-periodchip:hover {
+        background: #FFFFFF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-231-periodchip:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 1px;
+    }
+
+    .vas-231-periodchip svg {
+        /* Under 1em so the chevron reads as an affordance beside the label
+           rather than a second glyph competing with it. */
+        width: .85em;
+        height: .85em;
+        flex: 0 0 auto;
+        color: #0083DA;
+    }
+
+.vas-231-periodchip-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* No .vas-231-body wrapper any more: header, value and meta are direct children
+   of the card, and the card's own space-between distributes them - the VAS_220
+   shape. */
+
+/* KPI value: §Widget Stat Values - 1.75em, Roboto SemiBold (600), line-height
+   1.05. On the widget root clamp that resolves 28px at the 1280 laptop floor and
+   35px at 2K; SemiBold carries the headline on glass without going full Bold,
+   which would compete with row primaries elsewhere on the board. */
+.vas-231-value {
+    font-size: 1.75em;
+    font-weight: 600;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    display: block;
+    flex: 0 0 auto;
+    letter-spacing: -0.01em;
+    padding-left: .3125em;
+    color: #0B6B45;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: opacity 160ms ease;
+}
+
+    /* A negative net is not an error state - it is the other half of the metric.
+       This colour, plus the leading sign, is the ONLY thing that carries the tone:
+       the card surface stays the standard glass in both directions. */
+    .vas-231-value.vas-231-value--neg {
+        color: #A33F3F;
+    }
+
+    /* Sign + currency symbol lead the number at a smaller weight so the digits stay
+       the thing the eye lands on. */
+    .vas-231-value .vas-231-cur {
+        font-size: .55em;
+        font-weight: 500;
+        margin-right: .15em;
+    }
+
+    /* Between two loads the figure fades rather than disappearing - the card keeps
+       its shape and nothing jumps. */
+    .vas-231-value.vas-231-is-loading {
+        opacity: .35;
+    }
+
+/* ---- Gross in / out: the KPI meta line ----
+   §KPI And Summary Widget: the meta below the value is the xs token (0.6875em),
+   one step smaller than the label above the number, line-height 1.3 - the line
+   above anchors the metric, the line below explains it. Semantic dots rather
+   than boxed pills: boxes crowd a 2x1 cell and read as inline KPI tiles. */
+.vas-231-split {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .25em .75em;
+    font-size: .6875em;
+    line-height: 1.35;
+    min-width: 0;
+    flex: 0 0 auto;
+}
+
+.vas-231-pos,
+.vas-231-neg {
+    display: inline-flex;
+    align-items: center;
+    gap: .35em;
+    font-weight: 700;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.vas-231-pos {
+    color: #20A464;
+}
+
+.vas-231-neg {
+    color: #D14545;
+}
+
+.vas-231-dot {
+    width: .5em;
+    height: .5em;
+    border-radius: 50%;
+    flex: 0 0 auto;
+}
+
+.vas-231-dot--pos {
+    background: #20A464;
+}
+
+.vas-231-dot--neg {
+    background: #D14545;
+}
+
+/* The "in" / "out" word is the explainer: Regular and muted, the same size as
+   the figure beside it - the meta line is already at the xs floor and must not
+   be stepped down again. Muted tier is #5F7283 (post-2K colour calibration). */
+.vas-231-lbl {
+    font-weight: 400;
+    color: #5F7283;
+}
+
+/* ---- State takeover: reserved for a load failure or a missing calendar ---- */
+.vas-231-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    font-size: .8125em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.35;
+}
+
+.vas-231-hidden {
+    display: none !important;
+}
+
+/* ---- Period picker (body-mounted, so it is NOT scoped under .vas-231-root) ----
+   Fixed-position panel anchored to the chip by script. rem-based, not em: it lives
+   on <body> and has no widget root anchor to scale against. */
+.vas-231-pp {
+    position: fixed;
+    /* Same narrow band the sibling Period Control popovers use: above the glass
+       cards, below every framework layer (jQuery UI .ui-front = 100, dialogs 101+). */
+    z-index: 95;
+    box-sizing: border-box;
+    min-width: 190px;
+    max-width: calc(100vw - 16px);
+    max-height: 60vh;
+    overflow: auto;
+    padding: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(8, 24, 38, .22);
+    color: #102C3F;
+}
+
+    .vas-231-pp * {
+        box-sizing: border-box;
+    }
+
+.vas-231-pp-h {
+    font-size: .6875rem;
+    font-weight: 700;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 8px 10px 4px;
+}
+
+.vas-231-pp-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .875rem;
+    color: #102C3F;
+    padding: 9px 10px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+    .vas-231-pp-opt:hover {
+        background: #EAF8FF;
+    }
+
+    .vas-231-pp-opt[aria-selected="true"] {
+        background: #EAF8FF;
+        font-weight: 700;
+        color: #0083DA;
+    }
+
+.vas-231-pp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-231-pp-meta {
+    flex: 0 0 auto;
+    font-size: .75rem;
+    font-weight: 400;
+    color: #748494;
+}
+
+.vas-231-pp-tick {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+    color: #0083DA;
+    opacity: 0;
+}
+
+.vas-231-pp-opt[aria-selected="true"] .vas-231-pp-tick {
+    opacity: 1;
+}
+
+.vas-231-pp-tick svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ---- Narrow cells: step the card base font down so the em scale follows ----
+ *
+ * VAS_220's breakpoints and VAS_220's values, deliberately. A 2x1 cell is only
+ * ~260px wide at the 1280px laptop floor, so the 300px query DOES match a normal
+ * 2x1 - that is the point. It is what puts the whole card on a 13px base, which
+ * is how VAS_220 fits an icon well, a two-line heading, a 1.75em value and a meta
+ * row into ~102px of content. This card carries exactly the same stack (plus the
+ * period chip), so it needs exactly the same base.
+ *
+ * The overrides are ABSOLUTE px, never a relative `em`. An em override here would
+ * resolve against the inherited page font rather than the clamp, which collapses
+ * the anchor unpredictably - that bug is what made the value render smaller than
+ * the neighbouring KPI cards, and it is also why the taller stack then clipped. */
+@container vas-231 (max-width: 300px) {
+    .vas-231-card {
+        font-size: 13px;
+    }
+}
+
+@container vas-231 (max-width: 220px) {
+    .vas-231-card {
+        font-size: 11px;
+    }
+
+    /* The period name carries the filter on its own; give the chip more of the
+       header rather than truncating it to nothing. */
+    .vas-231-periodchip {
+        max-width: 55%;
+    }
+}
+
+@container vas-231 (max-width: 170px) {
+    /* Last resort, below anything the 9-column grid produces for a 2x1: the two
+       gross figures stack rather than truncate, so both stay readable. The type
+       itself is already handled by the 11px base above - §Widget Internal Sizing
+       wants ONE lever, so nothing here re-sizes the value or the meta. */
+    .vas-231-split {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .15em;
+    }
+}

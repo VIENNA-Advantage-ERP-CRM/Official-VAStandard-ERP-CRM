@@ -265,3 +265,12 @@
 @import "../VAS_225_SetupsExpiringSoonWidget.css";
 @import "../VAS_226_NewRecurringWidget.css";
 @import "../VAS_227_SearchRecurringWidget.css";
+@import "../VAS_229_NewBankJournalWidget.css";
+@import "../VAS_230_BankBalanceWidget.css";
+@import "../VAS_231_NetMovementWidget.css";
+@import "../VAS_233_BankChargesWidget.css";
+@import "../VAS_234_AccountBalanceWidget.css";
+@import "../VAS_235_AgingUnreconciledWidget.css";
+@import "../VAS_236_ReceiptvsPaymentWidget.css";
+@import "../VAS_238_UnreconciledBankLineWidget.css";
+@import "../VAS_239_CurrencyWiseBalanceWidget.css";

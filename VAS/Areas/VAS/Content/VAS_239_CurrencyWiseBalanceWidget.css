@@ -1,0 +1,475 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_239_CurrencyWiseBalanceWidget.css
+ * Currency-wise Balance (Banking dashboard, 4x2 grid widget with a total row).
+ *
+ * TWO SOURCES, EACH FOR WHAT IT OWNS.
+ *   design.md -> dashboard-widgets.md owns the SHELL and the ROWS: the glass card,
+ *   the icon well, the title clamp, §Grid Data Widget (transparent header, #C5D2DD
+ *   head divider, #E2EAF1 row divider, last:border-b-0, hover rgba(234,248,255,.5)),
+ *   §Row And Header Separators, §Widget Footer Pager, §No Inner Scrollbars and the
+ *   widget-root em anchor. That is what makes this card sit correctly beside
+ *   VAS_231 / VAS_233 / VAS_234 / VAS_235 / VAS_236 / VAS_238.
+ *   The supplied widget.html owns the COLUMNS and the TOTAL ROW: three tracks with the
+ *   currency identity on the left and two right-aligned money columns, closed by a
+ *   Total row separated from the body by its own rule.
+ *
+ * All internal sizing is em-driven off the widget root anchor; borders, radii and
+ * shadows stay in px ("Not Scaled With em"). No native tag selector is styled -
+ * every rule is scoped to a vas-239- class.
+ *
+ * THE ROW GRID is one constant shared by the header row, every body row AND the total
+ * row, so a column label, a figure and the total below it all sit in one column:
+ *
+ *   1fr        1.1fr     1.1fr
+ *   Currency   Native    In <BASE> (base)
+ *
+ * The two money columns are equal and wider than the identity column: a currency code
+ * is three characters and never needs the room, while a compact amount plus a symbol
+ * can run long in either column.
+ *
+ * ALIGNMENT IS LOGICAL, NOT PHYSICAL. The money columns use `text-align: end` rather
+ * than `right`, so the card mirrors correctly under an RTL locale instead of stranding
+ * its figures on the wrong edge.
+ *
+ * THE SYMBOL CHIP IS ONE SHARED STYLE for every row. The reference mock used a
+ * hard-coded flag colour per currency; a colour per currency is not data this system
+ * holds, and design.md forbids a different badge style per row in the same widget. The
+ * chip carries C_Currency's own symbol instead, which is real data and needs no palette.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-239-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so the row grid and the base font can both step with the
+       CELL, not the viewport. Also the positioning context for the busy overlay. */
+    container: vas-239 / inline-size;
+}
+
+    .vas-239-root,
+    .vas-239-root * {
+        box-sizing: border-box;
+    }
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Everything inside is em against this.
+
+   Width only - the page size is MEASURED from the list height (see syncCapacity in
+   the JS), so a short cell shows fewer rows rather than smaller type. */
+.vas-239-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: .85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    /* §No Inner Scrollbars - a page always fits, so nothing here ever scrolls. */
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Header: icon well + title / subtitle ----
+   No header pill: on a 4x2 cell every element in the header is a row the body cannot
+   show at the 1280px laptop floor (§Content Fit Budget), and the two text lines earn
+   that space where a metric chip would not.
+
+   flex-start, not center - the well aligns to the TITLE's line box, so it does not
+   drift downward as the subtitle lengthens the head-text block. */
+.vas-239-header {
+    display: flex;
+    align-items: flex-start;
+    gap: .5em;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: .6em;
+}
+
+/* Icon well: 1.75em on the card's em lever - the sibling widgets' well, so the icons
+   read identically side by side. Flat #EAF8FF tile, 9px radius, no inset ring. */
+.vas-239-icon {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+    .vas-239-icon svg {
+        width: .95em;
+        height: .95em;
+        display: block;
+    }
+
+.vas-239-head-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* §Widget Header title verbatim: the --dash-inline-size clamp, Medium (500),
+   line-height 1.2, #102C3F - the sibling cards' title, so the headings match on a
+   shared row. */
+.vas-239-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Subtitle: the §Widget Header pattern verbatim - Roboto REGULAR (400), #717182,
+   line-height 1.3, FIXED 2px top margin. Explicitly not bold and not Medium: it is the
+   explainer under the title, and matching the title's weight would give the card two
+   headings instead of a heading and a caption. */
+.vas-239-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-239-subtitle:empty {
+    display: none;
+}
+
+/* ---- Body ---- */
+.vas-239-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* THE shared row grid - header row, body rows and the total row alike. */
+.vas-239-row {
+    display: grid;
+    grid-template-columns: 1fr 1.1fr 1.1fr;
+    gap: .625em;
+    align-items: center;
+}
+
+/* §Grid Data Rows header: 0.6875em Medium, TRANSPARENT background (never a tinted
+   band - it reads inconsistently against different glass gradients), #41576A, with a
+   #C5D2DD divider under it.
+
+   THE TYPE SCALE GOES ON THE CELLS, NOT ON THE ROW - and that is load-bearing, not
+   style. .vas-239-row sizes nothing in em here, but the CELLS do, and a font-size on
+   the row would also cascade into the grid's own gap. Keeping the row at 1em keeps
+   its tracks identical to the body's, which is what puts each label over its column. */
+.vas-239-ghead {
+    flex: 0 0 auto;
+    background: transparent;
+    padding: 0 2px 8px 2px;
+    border-bottom: 1px solid #C5D2DD;
+}
+
+    .vas-239-ghead > span {
+        font-size: .6875em;
+        font-weight: 500;
+        color: #41576A;
+        line-height: 1.25;
+        text-transform: capitalize;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+/* The list holds exactly ONE page and never scrolls - the page size is measured from
+   this element's height (see syncCapacity in the JS), so overflow:hidden here is what
+   makes the measurement meaningful rather than a fallback. */
+.vas-239-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* §Grid Data Rows body row: 1px #E2EAF1 divider, none on the last, hover
+   rgba(234,248,255,0.5). Vertical padding is a shade tighter than the sibling list
+   cards': this card carries a total row as well as a pager, and §Content Fit Budget is
+   spent on rows before it is spent on air. */
+.vas-239-brow {
+    padding: 10px 2px;
+    border-bottom: 1px solid #E2EAF1;
+    color: #102C3F;
+    font-size: .8125em;
+}
+
+    .vas-239-brow:last-child {
+        border-bottom: 0;
+    }
+
+    .vas-239-brow:hover {
+        background: rgba(234, 248, 255, .5);
+    }
+
+.vas-239-brow > div {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- The currency identity cell ---- */
+.vas-239-cur {
+    display: flex;
+    align-items: center;
+    gap: .45em;
+    min-width: 0;
+}
+
+/* One shared chip for every row - see the file header. Fixed inline size so the codes
+   beside it line up in a column however wide the symbols are. */
+.vas-239-sym {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.7em;
+    height: 1.45em;
+    padding: 0 .3em;
+    border-radius: 6px;
+    background: #EAF8FF;
+    color: #0083DA;
+    font-size: .8461em; /* 0.6875em of the card, from the row's 0.8125em */
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* The ISO code is the row's identity, so it carries the row's weight (§Cell Types,
+   primary row title cell). */
+.vas-239-code {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 400;
+    color: #102C3F;
+}
+
+/* Logical end alignment, so the figures follow the writing direction instead of being
+   pinned to the physical right edge. */
+.vas-239-num {
+    text-align: end;
+}
+
+.vas-239-amt {
+    font-weight: 400;
+}
+
+/* Only an overdrawn balance is tinted - the printed minus carries the same meaning as
+   text, so the reading never rests on colour alone. */
+.vas-239-neg {
+    color: #D14545;
+}
+
+/* An unconvertible amount, and the withheld total: a dash, muted, never a zero. */
+.vas-239-nil {
+    color: #9F9F9F;
+    font-weight: 400;
+}
+
+/* ---- Total row ----
+   Separated from the body by the FOOTER tone (#D9E2EB), one step stronger than the
+   row dividers above it and one step softer than the header's - the three-tone
+   hierarchy of §Row And Header Separators, with no fourth tone introduced. */
+.vas-239-totalwrap {
+    flex: 0 0 auto;
+}
+
+.vas-239-trow {
+    padding: 10px 2px 2px 2px;
+    margin-top: 2px;
+    border-top: 1px solid #D9E2EB;
+    font-size: .8125em;
+}
+
+    .vas-239-trow > span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.vas-239-tlabel {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+/* The one figure on the card that answers "how much, in total, in our own money" -
+   primary blue, the same accent the reference mock gives it. */
+.vas-239-tvalue {
+    font-weight: 700;
+    color: #0083DA;
+}
+
+/* No balance lines at all. Said inside the list so the header and the column labels
+   stay put; only a load failure or a missing accounting schema takes the whole card
+   over (.vas-239-state below). */
+.vas-239-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: .8125em;
+    color: #5F7283;
+    text-align: center;
+}
+
+/* ---- Footer pager (design.md §Widget Footer Pager) ----
+   NO RESERVED HEIGHT. The sibling list cards hold a pager-sized band open on every page
+   so their measured list height never changes, but this card ends in a Total row and
+   that row is what has to sit on the card's bottom edge: an empty reserved band would
+   float the total half an inch above the floor on the common single-page case.
+
+   So the band collapses to nothing when there is no pager - the Total row becomes the
+   footer - and takes its own height when the pager appears, which steps the Total up
+   above it. The adaptive row-fit still converges: showing the pager only ever shrinks
+   the list, which can only lower the capacity, which cannot then re-hide the pager. */
+.vas-239-pagerwrap {
+    flex-shrink: 0;
+}
+
+.vas-239-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    margin-top: .4em;
+    padding-top: .35em;
+}
+
+.vas-239-pager-info {
+    font-size: .6875em;
+    color: #748494;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vas-239-pager-nav {
+    display: flex;
+    align-items: center;
+    gap: .35em;
+    flex-shrink: 0;
+}
+
+.vas-239-pager-label {
+    font-size: .75em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas-239-pgbtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    border-radius: 6px;
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+
+    .vas-239-pgbtn:hover:not(:disabled) {
+        background: #EAF4FC;
+        border-color: #C6D6E4;
+    }
+
+    /* A disabled control is visibly inert as well as programmatically disabled - it
+       keeps its box and reports its state, it is never hidden. */
+    .vas-239-pgbtn:disabled {
+        color: #B8C6D2;
+        border-color: #E2EAF1;
+        cursor: default;
+    }
+
+    .vas-239-pgbtn:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 2px;
+    }
+
+/* ---- State takeover: a load failure, or no accounting schema to report in ---- */
+.vas-239-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 .5em;
+    font-size: .8125em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.35;
+    text-align: center;
+}
+
+.vas-239-hidden {
+    display: none !important;
+}
+
+/* ---- Narrow cells ----
+ *
+ * Nothing folds away here. All three columns are load-bearing - the currency, what is
+ * held in it, and what that is worth in the tenant's own money - and dropping either
+ * money column would leave a card that cannot answer its own title. The identity
+ * column gives up width first instead, and no horizontal scrollbar is ever introduced. */
+@container vas-239 (max-width: 380px) {
+    .vas-239-row {
+        grid-template-columns: 0.8fr 1.15fr 1.15fr;
+        gap: .45em;
+    }
+
+    /* Below this width the chip and a three-letter code no longer fit side by side, and
+       the code is the half that identifies the row. */
+    .vas-239-sym {
+        display: none;
+    }
+}
+
+/* ---- Narrow cells: step the card base font down so the em scale follows ----
+ *
+ * The sibling widgets' breakpoints and values. The overrides are ABSOLUTE px, never a
+ * relative `em` - an em override here would resolve against the inherited page font
+ * rather than the clamp and collapse the anchor unpredictably. */
+@container vas-239 (max-width: 300px) {
+    .vas-239-card {
+        font-size: 13px;
+    }
+}
+
+@container vas-239 (max-width: 220px) {
+    .vas-239-card {
+        font-size: 11px;
+    }
+}

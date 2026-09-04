@@ -217,6 +217,8 @@
     <Compile Include="Areas\VAS\Controllers\VAS_139_HighValuePipelineWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_140_ContractsExpiringWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_141_CustomersBySegmentWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_236_ReceiptvsPaymentWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_238_UnreconciledBankLineWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_AttributeControlController.cs" />
     <Compile Include="Areas\VAS\Controllers\BouncedChequesController.cs" />
     <Compile Include="Areas\VAS\Controllers\AvgDaysToPayController.cs" />
@@ -415,7 +417,6 @@
     <Compile Include="Areas\VAS\Controllers\VAS_172_PendingTransferConfirmationWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_173_TransfersByWarehouseWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_174_TransferQueueWidgetController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_LeadController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_RequestController.cs" />
@@ -444,6 +445,8 @@
     <Content Include="Areas\VAS\Content\VAS_106_OverviewSalesOrder.css" />
     <Content Include="Areas\VAS\Content\VAS_120_CustomerSearchWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_121_NewCustomerWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_236_ReceiptvsPaymentWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_238_UnreconciledBankLineWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_218_CreateOppLines.css" />
     <Content Include="Areas\VAS\Content\VAS_KpiDrillThrough.css" />
     <Content Include="Areas\VAS\Content\VAS_122_TotalCustomersWidget.css" />
@@ -464,6 +467,8 @@
     <Content Include="Areas\VAS\Content\VAS_172_PendingTransferConfirmationWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_173_TransfersByWarehouseWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_174_TransferQueueWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_236_ReceiptvsPaymentWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_238_UnreconciledBankLineWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_218_CreateOppLines.js" />
     <Content Include="Areas\VAS\Scripts\app\util\VAS_PanelShortcuts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_167_NewTransferQuickActionWidget.js" />
@@ -474,7 +479,6 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_172_PendingTransferConfirmationWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_173_TransfersByWarehouseWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_174_TransferQueueWidget.js" />
-
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_092_OverviewPurchaseOrder.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_167_PurchaseOrderLandedCost.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_098_PurchaseRequisition.js" />
@@ -956,7 +960,6 @@
     <Compile Include="Areas\VAS\Controllers\VAS_172_PendingTransferConfirmationWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_173_TransfersByWarehouseWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_174_TransferQueueWidgetController.cs" />
-
     <Content Include="Areas\VAS\Content\VAS_156_CountedMTDWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_156_CountedMTDWidget.js" />
     <Content Include="Areas\VAS\Content\VAS_157_VarianceLinesWidget.css" />
@@ -1037,8 +1040,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_172_PendingTransferConfirmationWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_173_TransfersByWarehouseWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_174_TransferQueueWidget.js" />
-
-      <Compile Include="Areas\VAS\Controllers\VAS_203_POGlobalSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_203_POGlobalSearchWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_203_POGlobalSearchWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_203_POGlobalSearchWidget.js" />
     <Compile Include="Areas\VAS\Controllers\VAS_204_NewPurchaseOrderWidgetController.cs" />
@@ -1109,6 +1111,26 @@
     <Compile Include="Areas\VAS\Controllers\VAS_227_SearchRecurringWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_227_SearchRecurringWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\Recurring\VAS_227_SearchRecurringWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_229_NewBankJournalWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_229_NewBankJournalWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_231_NetMovementWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_231_NetMovementWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_231_NetMovementWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_233_BankChargesWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_233_BankChargesWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_233_BankChargesWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_234_AccountBalanceWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_234_AccountBalanceWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_234_AccountBalanceWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_235_AgingUnreconciledWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_235_AgingUnreconciledWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_235_AgingUnreconciledWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_230_BankBalanceWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_230_BankBalanceWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_230_BankBalanceWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_239_CurrencyWiseBalanceWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_239_CurrencyWiseBalanceWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_239_CurrencyWiseBalanceWidget.js" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>

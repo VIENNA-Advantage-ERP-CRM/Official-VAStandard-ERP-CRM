@@ -1,0 +1,1018 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_235_AgingUnreconciledWidget.css
+ * Aging of Unreconciled Items (Banking dashboard, row-based aging report + modal).
+ *
+ * TWO SOURCES, EACH FOR WHAT IT OWNS.
+ *   design.md -> dashboard-widgets.md owns the SHELL and the ROWS: the glass card,
+ *   the icon well, the title / subtitle clamps, §Grid Data Rows (transparent header,
+ *   #C5D2DD head divider, #E2EAF1 row divider, hover rgba(234,248,255,.5)),
+ *   §No Inner Scrollbars and the widget-root em anchor. That is what makes this card
+ *   sit correctly beside VAS_231 / VAS_233 / VAS_234 on the same dashboard.
+ *   The widget specification owns the TRACK and the MODAL: the segmented measure
+ *   toggle, the split track, the dashed policy line, and the seven-column detail grid.
+ *
+ * All internal sizing is em-driven off the widget root anchor; borders, radii and
+ * shadows stay in px ("Not Scaled With em"). No native tag selector is styled -
+ * every rule is scoped to a vas-235- class.
+ *
+ * AGING READS TOP TO BOTTOM, OLDEST LAST, the way an ERP aging report prints. Each
+ * row's track is that BUCKET'S OWN MIX - the two segments are shares of the row's own
+ * total, so every track fills completely and its division is the receipts / payments
+ * split inside that bucket. Comparing one bucket with another is the Value column's
+ * job. HUE ENCODES DIRECTION ONLY. Severity is carried by the dashed policy line,
+ * because "past 30 days" is a rule the business set, not something a colour ramp can
+ * imply - which is why there are no warn/danger bar variants here.
+ *
+ * The row grid is one constant shared by the header row and every body row:
+ *   5.125em  minmax(7.5em, 1fr)  4.625em  3.625em
+ *   Age      track + legend      Value    Count
+ * (the specification's 82 / 120 / 74 / 58px on the 16px anchor, so they scale with
+ * the widget instead of pinning it to one dashboard width).
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-235-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so the row grid and the base font can both step with the
+       CELL, not the viewport. Also the positioning context for the busy overlay. */
+    container: vas-235 / inline-size;
+}
+
+    .vas-235-root,
+    .vas-235-root * {
+        box-sizing: border-box;
+    }
+
+/* Widget root anchor - the ONE lever everything inside is em against.
+ *
+ * The WIDTH clamp is the sibling widgets' verbatim: clamp(16px, 1.2cqi, 20px) against
+ * this widget's own measured width, then the shared --dash-inline-size contract, then
+ * the viewport. It is the baseline, and it is why this card reads at the same size as
+ * VAS_231 / VAS_233 / VAS_234 beside it. Note that the 0.012 term resolves BELOW 16px
+ * for any normal cell - the 16px FLOOR is what the card actually runs at, so the floor
+ * is load-bearing and must not be lowered.
+ *
+ * The HEIGHT term then only ever CAPS that baseline, never sets it. This card has a
+ * fixed amount to show - five buckets and a policy divider, none of which may be paged
+ * or scrolled away - and width alone cannot tell whether they fit. A wide but SHORT
+ * cell would sit at the full 16px and push the oldest bucket out of the bottom, which
+ * §No Inner Scrollbars forbids and which loses the row an aging report is most about.
+ * The divisor is the card's content budget in em: header ~2.9 + column row ~1.5 + five
+ * rows ~11 + divider ~1 + padding 1.7 + header margin 0.6 = ~18.7, so 19.5 leaves a
+ * little headroom.
+ *
+ * min(baseline, heightTerm) therefore reads: run at the family size, and step down only
+ * when the cell is genuinely too short for the content. The outer clamp's 11px floor
+ * stops that step-down from going unreadable.
+ *
+ * Both variables are written by the widget's own ResizeObserver, so a drag, a dashboard
+ * re-layout and a browser zoom all re-resolve this identically. */
+.vas-235-card {
+    font-size: clamp(11px,
+        min(clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px),
+            calc(var(--widget-block-size, 100vh) / 19.5)),
+        20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: .85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    /* §No Inner Scrollbars - the height term above plus the flexing rows below mean five
+       buckets and a divider fit whatever cell the dashboard gives this card. */
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Header: icon well + title/subtitle + measure toggle ---- */
+.vas-235-header {
+    display: flex;
+    align-items: flex-start;
+    gap: .5em;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: .6em;
+}
+
+/* Icon well: 1.75em on the card's em lever - the sibling widgets' well, so the icons
+   read identically side by side. Flat #EAF8FF tile, 9px radius, no inset ring. */
+.vas-235-icon {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+    .vas-235-icon svg {
+        width: .95em;
+        height: .95em;
+        display: block;
+    }
+
+.vas-235-head-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* §Widget Header title verbatim: the --dash-inline-size clamp, Medium (500),
+   line-height 1.2, #102C3F - the sibling cards' title, so the headings match on a
+   shared row. */
+.vas-235-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Subtitle: the §Widget Header pattern verbatim - Roboto Regular, #717182,
+   line-height 1.3, FIXED 2px top margin. It carries the whole book and then the part
+   of it that has broken the policy, which is the sentence an aging report exists to
+   say. */
+.vas-235-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-235-subtitle:empty {
+    display: none;
+}
+
+/* Bank account filter - the card's only control, at the interactive pill tier of the
+   two-tier chip system (never a third tier). Absolute clamp rather than an em, like
+   the title: the card base drops in a short cell and an em control would follow it
+   down and stop being readable. max-width + ellipsis cap it whatever the tenant names
+   its accounts. */
+.vas-235-acct {
+    flex: 0 0 auto;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: .3em;
+    max-width: 42%;
+    font-family: inherit;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008125), 13px);
+    font-weight: 500;
+    line-height: 1.3;
+    color: #41576A;
+    background: rgba(255, 255, 255, .66);
+    border: 1px solid #D9E2EB;
+    border-radius: 999px;
+    padding: .3em .7em;
+    box-shadow: 0 4px 10px rgba(16, 47, 74, .05);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+    .vas-235-acct:hover {
+        background: #FFFFFF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-235-acct:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 1px;
+    }
+
+    .vas-235-acct svg {
+        width: .85em;
+        height: .85em;
+        flex: 0 0 auto;
+        color: #0083DA;
+    }
+
+.vas-235-acct-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Body ---- */
+.vas-235-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* THE shared row grid - header and body rows both. */
+.vas-235-row {
+    display: grid;
+    grid-template-columns: 5.125em minmax(7.5em, 1fr) 4.625em 3.625em;
+    gap: .625em;
+    align-items: center;
+}
+
+/* §Grid Data Rows header: 0.6875em Medium, TRANSPARENT background (never a tinted
+   band - it reads inconsistently against different glass gradients), muted, with a
+   #C5D2DD divider under it.
+
+   The type scale goes on the CELLS, not on the row: .vas-235-row sizes its tracks in
+   em, and an em resolves against the element's OWN font-size - putting .6875em here
+   would compute the header's columns smaller than the body's and every label would
+   sit over the wrong column. */
+.vas-235-ghead {
+    flex: 0 0 auto;
+    background: transparent;
+    padding: 0 2px 8px 2px;
+    border-bottom: 1px solid #C5D2DD;
+}
+
+    .vas-235-ghead > span {
+        font-size: .6875em;
+        font-weight: 500;
+        color: #41576A;
+        line-height: 1.25;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.vas-235-h-val,
+.vas-235-h-cnt {
+    text-align: right;
+}
+
+/* The legend sits in the TRACK column, directly over the colours it names - so no row
+   has to repeat them and the chart itself stays free of text it does not need. */
+.vas-235-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: .75em;
+}
+
+.vas-235-lg {
+    display: inline-flex;
+    align-items: center;
+    gap: .4em;
+    white-space: nowrap;
+}
+
+/* The legend swatches are the FLAT base tones, not the gradients: a 9px square of a
+   gradient reads as a muddled colour, and the legend's job is to name the hue. */
+.vas-235-sw {
+    width: .8em;
+    height: .8em;
+    border-radius: 3px;
+    flex: 0 0 auto;
+}
+
+.vas-235-sw-r {
+    background: #20A464;
+}
+
+.vas-235-sw-p {
+    background: #D14545;
+}
+
+/* The list distributes whatever height is left after the header and the column row. It
+   is never centred and never scrolls: the ROWS take up the slack, so all five buckets
+   are on screen at every cell size. */
+.vas-235-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    /* §No Inner Scrollbars. With the rows flexing below this only ever catches a
+       rounding pixel - it is a backstop, not the fit strategy. */
+    overflow: hidden;
+}
+
+/* §Grid Data Rows body row, with the specification's rounded hover block.
+   flex: 1 1 auto with min-height: 0 is what lets the five rows SHARE the available
+   height rather than the fifth falling out of the cell: they spread out in a tall cell
+   and compress in a short one, and the em padding shrinks with the base font. */
+.vas-235-brow {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: .4em .375em;
+    border-radius: 8px;
+    color: #102C3F;
+}
+
+    .vas-235-brow:hover {
+        background: #EEF6FF;
+    }
+
+.vas-235-bucket {
+    min-width: 0;
+    font-size: .84375em;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-235-trackcell {
+    min-width: 0;
+}
+
+/* The track shows ONE BUCKET'S MIX: the two segments are shares of that row's own
+   total, so a full track is always a full track and its division is the receipts /
+   payments split inside the bucket. Comparing bucket with bucket is the Value column's
+   job. The groove shows only where a bucket holds nothing at all. */
+.vas-235-track {
+    display: flex;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(31, 131, 255, .10);
+    overflow: hidden;
+    min-width: 0;
+}
+
+.vas-235-track > i {
+    display: block;
+    height: 100%;
+    min-width: 0;
+}
+
+/* Receipts first, then payments - a hairline of the card's own white between them so
+   the split stays legible even when one side is a sliver. */
+.vas-235-r {
+    background: linear-gradient(90deg, #5FCB97, #20A464);
+    border-right: 1.5px solid rgba(255, 255, 255, .9);
+}
+
+.vas-235-p {
+    background: linear-gradient(90deg, #E98A8A, #D14545);
+}
+
+.vas-235-val {
+    min-width: 0;
+    text-align: right;
+    font-size: .84375em;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-235-cnt {
+    min-width: 0;
+    text-align: right;
+    line-height: 1.2;
+}
+
+/* The count OPENS the detail modal, so it is a button - it does not navigate - styled
+   as a link. A bucket holding nothing renders as plain text instead (.count-nil), so
+   there is never a control that opens an empty dialog. */
+.vas-235-count {
+    font-family: inherit;
+    font-size: .84375em;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: #106AB0;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-thickness: 1px;
+    text-decoration-color: rgba(16, 106, 176, .4);
+}
+
+    .vas-235-count:hover {
+        color: #0083DA;
+        text-decoration-color: currentColor;
+    }
+
+    .vas-235-count:focus-visible {
+        outline: 2px solid #0083DA;
+        outline-offset: 2px;
+        border-radius: 3px;
+    }
+
+.vas-235-count-nil {
+    font-size: .84375em;
+    font-weight: 500;
+    color: #9F9F9F;
+}
+
+/* The policy line - the threshold an aging report is really about. A dashed rule in
+   the warning-deep tone, drawn between the routine buckets and the overdue ones. This
+   is where severity lives; the bars stay direction-coloured. */
+.vas-235-threshold {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    margin: .1875em 0 .0625em;
+    flex: 0 0 auto;
+}
+
+    .vas-235-threshold::before,
+    .vas-235-threshold::after {
+        content: "";
+        flex: 1 1 auto;
+        border-top: 1px dashed #E4BC72;
+    }
+
+    .vas-235-threshold span {
+        font-size: .65625em;
+        font-weight: 500;
+        color: #9A6500;
+        white-space: nowrap;
+    }
+
+/* Nothing unreconciled is GOOD news, not an error - it is said across the list and
+   the header keeps its (zero) totals above it. Only a load failure takes the whole
+   card over (.vas-235-state below). */
+.vas-235-empty {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .8125em;
+    color: #5F7283;
+    text-align: center;
+}
+
+/* ---- State takeover: reserved for a load failure ---- */
+.vas-235-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .8125em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.35;
+}
+
+.vas-235-hidden {
+    display: none !important;
+}
+
+/* ---- Bank account picker (body-mounted, so it is NOT scoped under .vas-235-root) ----
+   Fixed-position panel anchored to the pill by script. rem-based, not em: it lives on
+   <body> and has no widget root anchor to scale against. Identical in shape to the
+   sibling Banking cards' period and sort popovers. */
+.vas-235-pp {
+    position: fixed;
+    /* Above the glass cards, below the framework layers - and below this widget's own
+       modal, which sits at 99. */
+    z-index: 95;
+    box-sizing: border-box;
+    min-width: 220px;
+    max-width: calc(100vw - 16px);
+    max-height: 60vh;
+    overflow: auto;
+    padding: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(8, 24, 38, .22);
+    color: #102C3F;
+}
+
+    .vas-235-pp * {
+        box-sizing: border-box;
+    }
+
+.vas-235-pp-h {
+    font-size: .6875rem;
+    font-weight: 700;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 8px 10px 4px;
+}
+
+.vas-235-pp-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .875rem;
+    color: #102C3F;
+    padding: 9px 10px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+    .vas-235-pp-opt:hover {
+        background: #EAF8FF;
+    }
+
+    .vas-235-pp-opt[aria-selected="true"] {
+        background: #EAF8FF;
+        font-weight: 700;
+        color: #0083DA;
+    }
+
+    .vas-235-pp-opt:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: -2px;
+    }
+
+.vas-235-pp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-235-pp-tick {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+    color: #0083DA;
+    opacity: 0;
+}
+
+.vas-235-pp-opt[aria-selected="true"] .vas-235-pp-tick {
+    opacity: 1;
+}
+
+.vas-235-pp-tick svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+ * Detail modal (body-mounted, so it is NOT scoped under .vas-235-root)
+ *
+ * A div-based dialog rather than <dialog>: the framework already layers its own
+ * modals, and a native dialog's top-layer would sit above them. rem-based, not em -
+ * it lives on <body> and has no widget root anchor to scale against.
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+.vas-235-dlg-wrap {
+    position: fixed;
+    inset: 0;
+    /* Above the glass cards and the widget popovers, still below the framework's own
+       dialog layer (jQuery UI .ui-front = 100, dialogs 101+). */
+    z-index: 99;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+    .vas-235-dlg-wrap * {
+        box-sizing: border-box;
+    }
+
+.vas-235-dlg-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 44, 63, .45);
+}
+
+.vas-235-dlg {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    /* Widened for the eighth column - eight columns at the widths below need ~790px of
+       content, and the dialog carries 40px of its own padding. */
+    width: min(960px, calc(100vw - 32px));
+
+    /* FIXED height, not max-height. A full page is ten rows; a bucket holding three
+       would otherwise open a short dialog and then jump taller on the next page, moving
+       the pager out from under the cursor mid-click. 600px holds a full page with the
+       header, column row and footer, and still yields to a short viewport. The body
+       below takes up the slack and scrolls only when it has to. */
+    height: min(600px, calc(100vh - 64px));
+    overflow: hidden;
+    background: #FFFFFF;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(15, 61, 97, .22);
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-235-dlg-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+/* The card's own icon well, repeated on the modal so the dialog reads as this widget's
+   rather than as a generic one. Same tile, same tone - only the size is fixed here,
+   because the dialog is rem-based and has no widget root anchor to scale against. */
+.vas-235-dlg-icon {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+    .vas-235-dlg-icon svg {
+        width: 18px;
+        height: 18px;
+        display: block;
+    }
+
+.vas-235-dlg-titles {
+    min-width: 0;
+}
+
+.vas-235-dlg-title {
+    font-size: 1.0625rem;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-235-dlg-sub {
+    margin-top: 3px;
+    font-size: .75rem;
+    color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-235-x {
+    margin-left: auto;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid #D9E2EB;
+    background: rgba(255, 255, 255, .7);
+    color: #41576A;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-235-x:hover {
+        background: #EEF6FF;
+        color: #102C3F;
+    }
+
+    .vas-235-x:focus-visible {
+        outline: 2px solid #0083DA;
+        outline-offset: 2px;
+    }
+
+    .vas-235-x svg {
+        width: 15px;
+        height: 15px;
+    }
+
+/* The positioned wrapper the busy overlay is measured against. The overlay lives here
+   rather than inside the scrolling body, so it covers the list from a fixed position
+   instead of scrolling away with the rows underneath it. */
+.vas-235-dlg-bodywrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+}
+
+/* The dialog body is the ONE place a scrollbar is allowed - §No Inner Scrollbars is a
+   rule about widgets in a dashboard cell, not about a modal the user opened. The
+   dialog's own fixed height caps it. */
+.vas-235-dlg-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: auto;
+    padding: 2px 20px 8px;
+}
+
+/* The framework's own widget loader, over the modal's list - the SAME indicator the
+   card raises, so a page turn here and a refresh there look like one another. Opaque
+   rather than translucent: the rows are cleared before it appears, so there is nothing
+   underneath worth showing through, and a solid ground keeps the spinner legible. */
+.vas-235-dlg-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: #FFFFFF;
+}
+
+/* Eight columns, in this exact order:
+   Account Date | Document Type | Payment No. | Vendor | Bank Account | Currency |
+   Days | Amount
+   Vendor takes the 1fr because it is the only one with no natural width - a partner
+   name can be anything, and every other column is a date, a code or a figure. */
+.vas-235-drow {
+    display: grid;
+    grid-template-columns: 86px 104px 96px minmax(120px, 1fr) 140px 58px 42px 100px;
+    gap: 10px;
+    align-items: center;
+}
+
+/* The detail header sticks so the column names stay put while the page scrolls. */
+.vas-235-dhead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #FFFFFF;
+    padding: 12px 2px 8px;
+    border-bottom: 1px solid #C5D2DD;
+}
+
+    .vas-235-dhead > span {
+        font-size: .6875rem;
+        font-weight: 500;
+        color: #41576A;
+        line-height: 1.25;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.vas-235-ditem {
+    padding: 9px 2px;
+    border-bottom: 1px solid #E2EAF1;
+    font-size: .8125rem;
+}
+
+    .vas-235-ditem:last-child {
+        border-bottom: 0;
+    }
+
+    .vas-235-ditem:hover {
+        background: rgba(234, 248, 255, .5);
+    }
+
+.vas-235-ditem > div {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-235-ddate {
+    color: #41576A;
+}
+
+.vas-235-ddoctype {
+    font-size: .78125rem;
+    color: #41576A;
+}
+
+.vas-235-dno {
+    font-size: .78125rem;
+    color: #41576A;
+}
+
+/* The document number opens the payment - the AR Receipt window for a receipt, the AP
+   Payment window for a payment. Accent and an underline on hover mark it; the size and
+   weight stay the cell's, so a linked number and a plain one (a row whose window could
+   not be resolved) still line up as the same field. */
+.vas-235-dnolink {
+    color: #106AB0;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+    .vas-235-dnolink:hover,
+    .vas-235-dnolink:focus {
+        color: #0083DA;
+        text-decoration: underline;
+    }
+
+    .vas-235-dnolink:focus-visible {
+        outline: 2px solid rgba(0, 131, 218, .45);
+        outline-offset: 2px;
+        border-radius: 2px;
+    }
+
+/* Regular weight, like every other text cell. The vendor is the widest column, not the
+   row's conclusion - the Amount is - so bolding it made the list read as a column of
+   headings rather than of data. */
+.vas-235-dvendor {
+    font-weight: 400;
+}
+
+.vas-235-dacct {
+    font-size: .78125rem;
+    color: #5F7283;
+}
+
+.vas-235-dcur {
+    font-size: .78125rem;
+    color: #41576A;
+}
+
+/* Days and Amount are the numeric columns - right-aligned, per the specification. */
+.vas-235-dnum {
+    text-align: right;
+}
+
+/* Direction tones. The explicit + / − printed with the figure carries the same
+   meaning as text, so the reading never rests on colour alone. */
+.vas-235-pos {
+    color: #20A464;
+    font-weight: 700;
+}
+
+.vas-235-neg {
+    color: #D14545;
+    font-weight: 700;
+}
+
+.vas-235-dempty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    padding: 24px 12px;
+    font-size: .8125rem;
+    color: #5F7283;
+    text-align: center;
+}
+
+/* ---- Dialog footer: count left, paging + primary action right ---- */
+.vas-235-dlg-foot {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px 20px 16px;
+    border-top: 1px solid #E2EAF1;
+    background: #FBFDFF;
+}
+
+.vas-235-dlg-note {
+    font-size: .75rem;
+    color: #5F7283;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-235-dpager {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.vas-235-dpage {
+    font-size: .75rem;
+    font-weight: 500;
+    color: #41576A;
+    white-space: nowrap;
+}
+
+.vas-235-dpg {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: #102C3F;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+
+    .vas-235-dpg:hover:not(:disabled) {
+        background: #EEF6FF;
+        border-color: #C6D6E4;
+    }
+
+    /* A disabled control is visibly inert as well as programmatically disabled - it
+       keeps its box and reports its state, it is never hidden. */
+    .vas-235-dpg:disabled {
+        color: #B8C6D2;
+        border-color: #E2EAF1;
+        cursor: default;
+    }
+
+    .vas-235-dpg:focus-visible {
+        outline: 2px solid #0083DA;
+        outline-offset: 2px;
+    }
+
+    .vas-235-dpg svg {
+        width: 14px;
+        height: 14px;
+    }
+
+/* ---- Narrow dialog: the least load-bearing columns fold away, widest first ----
+ * Account Date, Payment No., Vendor, Days and Amount always survive - between them
+ * they say what a row IS and what it is worth. Bank Account and Currency go first
+ * (both are on the row's own tooltip and in the amount's symbol), then Document Type.
+ * The nth-child indices below track the header's own eight spans. */
+@media (max-width: 860px) {
+    .vas-235-drow {
+        grid-template-columns: 86px 104px 96px minmax(110px, 1fr) 42px 100px;
+        gap: 9px;
+    }
+
+    /* 5 = Bank Account, 6 = Currency */
+    .vas-235-dhead > span:nth-child(5),
+    .vas-235-dhead > span:nth-child(6),
+    .vas-235-ditem > .vas-235-dacct,
+    .vas-235-ditem > .vas-235-dcur {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .vas-235-drow {
+        grid-template-columns: 82px 92px minmax(100px, 1fr) 40px 96px;
+        gap: 8px;
+    }
+
+    /* 2 = Document Type */
+    .vas-235-dhead > span:nth-child(2),
+    .vas-235-ditem > .vas-235-ddoctype {
+        display: none;
+    }
+}
+
+/* ---- Narrow cells: step the card base font down so the em scale follows ----
+ *
+ * The sibling widgets' breakpoints and values. The overrides are ABSOLUTE px, never a
+ * relative `em` - an em override here would resolve against the inherited page font
+ * rather than the clamp and collapse the anchor unpredictably. */
+@container vas-235 (max-width: 380px) {
+    .vas-235-row {
+        gap: .5em;
+    }
+}
+
+@container vas-235 (max-width: 300px) {
+    /* Still min()'d against the height term. A flat 13px here would out-rank the anchor
+       above and let a narrow AND short cell clip its last bucket again - the two levers
+       have to agree, not compete. */
+    .vas-235-card {
+        font-size: min(13px, calc(var(--widget-block-size, 100vh) / 19.5));
+    }
+}
+
+@container vas-235 (max-width: 220px) {
+    .vas-235-card {
+        font-size: min(11px, calc(var(--widget-block-size, 100vh) / 19.5));
+    }
+
+    /* Last resort, below anything the 9-column grid produces: the track stops earning
+       its column and the row falls back to Age / Value / Count, which is still a
+       readable aging report. */
+    .vas-235-row {
+        grid-template-columns: 5.125em 4.625em 3.625em;
+    }
+
+    .vas-235-legend,
+    .vas-235-trackcell {
+        display: none;
+    }
+}
