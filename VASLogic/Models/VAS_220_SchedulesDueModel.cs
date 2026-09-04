@@ -137,6 +137,23 @@ namespace VASLogic.Models
                shared unit across rows that may not share one. */
             const string amountExpression = "COALESCE(inv.GrandTotal,ord.GrandTotal,pay.PayAmt,0)";
 
+            /* JOIN ORDER IS LOAD-BEARING - do not "tidy" the two COALESCE joins to the
+               end of the FROM clause.
+
+               MRole.AddAccessSQL parses this FROM clause with AccessSqlParser, which
+               strips each ON condition by looking for its closing parenthesis. For every
+               ON but the LAST one it takes the last ')' before the next " ON ", which
+               survives a nested function call. For the LAST ON there is no next " ON ",
+               so it falls back to the FIRST ')' in the whole clause - and with a
+               COALESCE(...) in that condition, that paren is COALESCE's, not the ON's.
+               The parser then leaves a stray ')' behind, reads the trailing table as
+               alias "doccur)", and MRole emits access predicates against that alias:
+               the statement fails at the database.
+
+               So the last join's ON must contain no parentheses of its own. GL_Journal
+               and GL_JournalBatch join r directly and nothing references them, so they
+               sit last and keep a function-free ON at the end of the clause. Any new
+               join with a function in its ON belongs BEFORE them. */
             StringBuilder sql = new StringBuilder();
             sql.Append(@"
                 SELECT r.C_Recurring_ID AS C_Recurring_ID,
@@ -157,10 +174,10 @@ namespace VASLogic.Models
                 LEFT OUTER JOIN C_Order ord ON (ord.C_Order_ID=r.C_Order_ID)
                 LEFT OUTER JOIN C_Payment pay ON (pay.C_Payment_ID=r.C_Payment_ID)
                 LEFT OUTER JOIN C_Project prj ON (prj.C_Project_ID=r.C_Project_ID)
-                LEFT OUTER JOIN GL_Journal glj ON (glj.GL_Journal_ID=r.GL_Journal_ID)
-                LEFT OUTER JOIN GL_JournalBatch glb ON (glb.GL_JournalBatch_ID=r.GL_JournalBatch_ID)
                 LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=COALESCE(inv.C_BPartner_ID,ord.C_BPartner_ID,pay.C_BPartner_ID,prj.C_BPartner_ID))
                 LEFT OUTER JOIN C_Currency doccur ON (doccur.C_Currency_ID=COALESCE(inv.C_Currency_ID,ord.C_Currency_ID,pay.C_Currency_ID))
+                LEFT OUTER JOIN GL_Journal glj ON (glj.GL_Journal_ID=r.GL_Journal_ID)
+                LEFT OUTER JOIN GL_JournalBatch glb ON (glb.GL_JournalBatch_ID=r.GL_JournalBatch_ID)
                 WHERE r.IsActive='Y'
                   AND r.AD_Client_ID IN (@AD_Client_ID)
                   AND COALESCE(r.RunsRemaining,0)>0

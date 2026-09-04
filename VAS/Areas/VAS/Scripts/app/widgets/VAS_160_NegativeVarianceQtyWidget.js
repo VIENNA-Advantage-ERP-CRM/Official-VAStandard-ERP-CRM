@@ -13,19 +13,24 @@
  *  4  | lines contributing shortage units                | VAS_160_LinesContributingShortage
  *  5  | Document No                                      | VAS_160_DocumentNo
  *  6  | Item / Product                                   | VAS_160_ItemProduct
- *  7  | Warehouse                                        | VAS_160_Warehouse
- *  8  | Locator                                          | VAS_160_Locator
- *  9  | Qty Counted                                      | VAS_160_QtyCounted
- * 10  | Shortage Qty                                     | VAS_160_ShortageQty
- * 11  | Page                                             | VAS_160_Page
- * 12  | of                                               | VAS_160_Of
- * 13  | Close                                            | VAS_160_Close
- * 14  | No negative variance records available           | VAS_160_NoNegativeVarianceRecords
- * 15  | Unable to load negative variance data            | VAS_160_UnableToLoadNegativeVariance
+ *  7  | Attribute                                        | VAS_160_Attribute
+ *  8  | Warehouse                                        | VAS_160_Warehouse
+ *  9  | Locator                                          | VAS_160_Locator
+ * 10  | Qty Counted                                      | VAS_160_QtyCounted
+ * 11  | Shortage Qty                                     | VAS_160_ShortageQty
+ * 12  | Page                                             | VAS_160_Page
+ * 13  | of                                               | VAS_160_Of
+ * 14  | Close                                            | VAS_160_Close
+ * 15  | No negative variance records available           | VAS_160_NoNegativeVarianceRecords
+ * 16  | Unable to load negative variance data            | VAS_160_UnableToLoadNegativeVariance
  */
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    // Window name / search key for the Inventory Count (Physical Inventory) screen. Window IDs
+    // differ per installation, so the screen is resolved by NAME - never by a hardcoded id.
+    var COUNT_WINDOW_NAME = "VAS_PhysicalInventory";
 
     function ensureDashInlineSizeVar($el) {
         var container = $el.closest('.vis-widget-container, [data-dashboard-container], .vis-widget-body, body')[0] || document.documentElement;
@@ -248,7 +253,8 @@
                 '    <div class="vas-neg-var-modal-grid-header">' +
                 '      <span>' + escapeHtml(lbl("VAS_160_DocNo", "Document No.")) + '</span>' +
                 '      <span>' + escapeHtml(lbl("VAS_160_Product", "Product")) + '</span>' +
-                '      <span>' + escapeHtml(lbl("VAS_160_WH", "WH")) + '</span>' +
+                '      <span>' + escapeHtml(lbl("VAS_160_Attribute", "Attribute")) + '</span>' +
+                '      <span>' + escapeHtml(lbl("VAS_160_Warehouse", "Warehouse")) + '</span>' +
                 '      <span>' + escapeHtml(lbl("VAS_160_Locator", "Locator")) + '</span>' +
                 '      <span class="vas-neg-var-tr">' + escapeHtml(lbl("VAS_160_Qty", "Qty")) + '</span>' +
                 '      <span class="vas-neg-var-tr">' + escapeHtml(lbl("VAS_160_Diff", "Diff")) + '</span>' +
@@ -369,11 +375,14 @@
                 var item = rows[i];
                 var productTooltip = item.productCode ? (item.productCode + ' - ' + item.productName) : item.productName;
                 var locatorDisplay = item.locator || '—';
+                // Lines carrying no attribute set instance come back empty - show a dash, not a gap.
+                var attributeDisplay = item.attributeValue || '—';
 
                 var $row = $(
                     '<div class="vas-neg-var-row" role="button" tabindex="0" data-inv-id="' + item.mInventoryId + '" data-line-id="' + item.mInventoryLineId + '">' +
-                    '  <span class="vas-neg-var-cell-doc" title="' + escapeHtml(item.documentNo) + '">' + escapeHtml(item.documentNo) + '</span>' +
+                    '  <span class="vas-neg-var-cell-doc vas-neg-var-doclink" role="link" tabindex="0" title="' + escapeHtml(item.documentNo) + '">' + escapeHtml(item.documentNo) + '</span>' +
                     '  <span class="vas-neg-var-cell" title="' + escapeHtml(productTooltip) + '">' + escapeHtml(item.productName) + '</span>' +
+                    '  <span class="vas-neg-var-cell" title="' + escapeHtml(attributeDisplay) + '">' + escapeHtml(attributeDisplay) + '</span>' +
                     '  <span class="vas-neg-var-cell" title="' + escapeHtml(item.warehouse) + '">' + escapeHtml(item.warehouse) + '</span>' +
                     '  <span class="vas-neg-var-cell" title="' + escapeHtml(locatorDisplay) + '">' + escapeHtml(locatorDisplay) + '</span>' +
                     '  <span class="vas-neg-var-cell vas-neg-var-tr" title="' + item.qtyCount + '">' + Number(item.qtyCount).toLocaleString() + '</span>' +
@@ -385,7 +394,17 @@
                     $r.on('click keydown', function (e) {
                         if (e.type === 'click' || e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
-                            navigateToRecord(record.mInventoryId, record.mInventoryLineId);
+                            navigateToRecord(record.mInventoryId);
+                        }
+                    });
+
+                    // The document number is the explicit link to the Inventory Count record.
+                    // stopPropagation keeps the row handler from firing the same navigation twice.
+                    $r.find('.vas-neg-var-doclink').on('click keydown', function (e) {
+                        if (e.type === 'click' || e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            navigateToRecord(record.mInventoryId);
                         }
                     });
                 })($row, item);
@@ -418,15 +437,48 @@
             $modalFooterHelper.text("Error");
         }
 
-        function navigateToRecord(mInventoryId, mInventoryLineId) {
+        // The framework navigates IN-PLACE only when the payload's ActionName equals the name of
+        // the window currently HOSTING this widget; otherwise VIS.dynamicWidget resolves ActionName
+        // through UserPreference/GetWindowID and opens that window. Resolve the host name from the
+        // listener chain. Established pattern - VAS_158_OpenCountSheetsWidget.js hostWindowName().
+        function hostWindowName() {
+            try {
+                var l = $self.listener;
+                for (var i = 0; i < 6 && l; i++) {
+                    if (l.apanel && l.apanel.gridWindow && l.apanel.gridWindow.getName) {
+                        return l.apanel.gridWindow.getName();
+                    }
+                    if (l.gridWindow && l.gridWindow.getName) {
+                        return l.gridWindow.getName();
+                    }
+                    l = l.listener;
+                }
+            } catch (e) { }
+            return '';
+        }
+
+        /* Open the Inventory Count (Physical Inventory) screen on the clicked document.
+
+           The previous implementation hardcoded AD_Window_ID 168 and handed it to
+           VIS.viewManager.startWindow. Window IDs differ per installation - on this one the
+           Inventory Count screen is VAS_PhysicalInventory - so 168 resolved to a window the
+           signed-in role has no access to, and the framework answered with
+           "With your current role and settings, you cannot view this information."
+
+           Resolving by NAME through the widget channel is instance independent and goes through
+           the role's own window access, exactly as VAS_158_OpenCountSheetsWidget does. */
+        function navigateToRecord(mInventoryId) {
+            if (!mInventoryId) { return; }
+
             closeModal();
 
-            if (VIS && VIS.viewManager) {
-                var windowId = 168; // Physical Inventory window
-                var query = new VIS.Query();
-                query.addRestriction("M_Inventory_ID", "==", mInventoryId);
-                VIS.viewManager.startWindow(windowId, query);
-            }
+            $self.widgetFirevalueChanged({
+                "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(mInventoryId),
+                "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                "TabIndex": "0",
+                "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
+                "ActionType": "W"
+            });
         }
 
         this.refreshData = function () {
@@ -447,6 +499,17 @@
             }
             $wrapper.remove();
         };
+    };
+
+    // Required for the navigation channel: widgetFirevalueChanged is what the widget calls, and
+    // addChangeListener is how the host registers itself. VAS_160 had neither, so even a correct
+    // payload had nowhere to go.
+    VAS.VAS_160_NegativeVarianceQtyWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) { this.listener.widgetFirevalueChanged(value); }
+    };
+
+    VAS.VAS_160_NegativeVarianceQtyWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
     };
 
     VAS.VAS_160_NegativeVarianceQtyWidget.prototype.init = function (windowNo, frame) {

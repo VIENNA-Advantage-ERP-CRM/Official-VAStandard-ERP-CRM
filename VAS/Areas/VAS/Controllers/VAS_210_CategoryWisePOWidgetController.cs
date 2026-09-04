@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Widget 08 - Category Wise PO Widget Controller
  *                  Supplies monthly converted Purchase Order line values grouped by
@@ -76,7 +76,7 @@ namespace VAS.Areas.VAS.Controllers
                         o.AD_Client_ID,
                         o.AD_Org_ID,
                         COALESCE(pc.M_Product_Category_ID, 0) AS M_Product_Category_ID,
-                        COALESCE(pc.Name, 'Uncategorised') AS CategoryName,
+                        COALESCE(pc.Name, N'Uncategorised') AS CategoryName,
                         SUM(COALESCE(ol.LineNetAmt, 0)) AS CategoryLineNetAmt
                     FROM C_Order o
                     INNER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y')
@@ -312,7 +312,15 @@ namespace VAS.Areas.VAS.Controllers
                         o.C_Order_ID,
                         o.DocumentNo,
                         o.DateOrdered,
-                        bp.Name AS VendorName,
+                        b                        -- A charge line, or a product that is not of Item type, carries no
+                        -- stock movement: the widget shows its name, UOM, ordered, rate and
+                        -- amount, and dashes for received / pending / line status.
+CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
+     THEN COALESCE(ch.Name, N'')
+     ELSE p.Name END AS VendorName,
+CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
+     WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
+     ELSE 'N' END AS IsNonStock,
                         wh.Name AS WarehouseName,
                         sr.Name AS RepName,
                         o.DocStatus,
@@ -322,10 +330,15 @@ namespace VAS.Areas.VAS.Controllers
                         o.AD_Org_ID,
                         SUM(COALESCE(ol.LineNetAmt, 0)) AS CategoryLineNetAmt,
                         SUM(COALESCE(ol.QtyOrdered, 0)) AS TotalQtyOrdered,
+                        -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
+                        -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
+                        -- widget shows the selected UOM, so quantities are scaled to it.
+COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         SUM(COALESCE(ol.QtyDelivered, 0)) AS TotalQtyDelivered
                     FROM C_Order o
                     INNER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y')
                     LEFT JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
+                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN M_Product_Category pc ON (pc.M_Product_Category_ID = p.M_Product_Category_ID)
                     LEFT JOIN C_BPartner bp ON (bp.C_BPartner_ID = o.C_BPartner_ID)
                     LEFT JOIN M_Warehouse wh ON (wh.M_Warehouse_ID = o.M_Warehouse_ID)
@@ -588,7 +601,9 @@ namespace VAS.Areas.VAS.Controllers
                         ol.C_OrderLine_ID,
                         ol.Line,
                         p.Name AS ProductName,
-                        asi.Description AS Attribute,
+                        CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
+                             THEN COALESCE(asi.Description, N'')
+                             ELSE N'' END AS Attribute,
                         COALESCE(uom.UOMSymbol, uom.Name) AS UomName,
                         COALESCE(ol.QtyOrdered, 0) AS QtyOrdered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
@@ -664,6 +679,9 @@ namespace VAS.Areas.VAS.Controllers
                             QtyPending = qtyPending,
                             Rate = rate,
                             Amount = amount,
+                            // Charge / non-Item lines are never received - the client renders dashes
+                            // for received, pending and line status.
+                            IsNonStock = Util.GetValueOfString(dr["IsNonStock"]) == "Y",
                             LineStatus = lineStatus,
                             LineStatusChip = lineStatusChip
                         });
@@ -839,6 +857,7 @@ namespace VAS.Areas.VAS.Controllers
 
         public class POLineRecord
         {
+            public bool IsNonStock { get; set; }
             public int LineNo { get; set; }
             public string ProductName { get; set; }
             public string Attribute { get; set; }

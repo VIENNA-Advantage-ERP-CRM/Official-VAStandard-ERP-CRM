@@ -197,7 +197,7 @@
 
 .vas-pos-var-modal-grid-header {
     display: grid;
-    grid-template-columns: minmax(0,1.3fr) minmax(0,2fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,0.7fr);
+    grid-template-columns: minmax(0,1.2fr) minmax(0,1.8fr) minmax(0,1.1fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,0.7fr);
     gap: 12px;
     padding: 0.5em 1em;
     background: transparent;
@@ -222,7 +222,7 @@
 
 .vas-pos-var-row {
     display: grid;
-    grid-template-columns: minmax(0,1.3fr) minmax(0,2fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,0.7fr);
+    grid-template-columns: minmax(0,1.2fr) minmax(0,1.8fr) minmax(0,1.1fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,0.7fr);
     gap: 12px;
     align-items: center;
     padding: 0.625em 0;
@@ -253,6 +253,21 @@
     text-overflow: ellipsis;
 }
 
+
+/* The document number opens the Inventory Count record - give it a visible link affordance. */
+.vas-pos-var-doclink {
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    text-decoration-color: rgba(31, 131, 255, 0.45);
+}
+
+.vas-pos-var-doclink:hover,
+.vas-pos-var-doclink:focus-visible {
+    color: #1F83FF;
+    text-decoration-color: #1F83FF;
+    outline: none;
+}
 
 .vas-pos-var-cell {
     font-family: 'Roboto', sans-serif;

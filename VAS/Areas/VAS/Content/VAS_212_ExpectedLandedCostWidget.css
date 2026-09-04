@@ -75,6 +75,11 @@
 }
 
 .vas-elc-select {
+    /* Shared filter control size across every PO widget: one type scale, one padding,
+       and month / year min-widths wide enough for the longest values ("September",
+       4-digit years). Values are in em so the control tracks the widget's scale. */
+    /* The closed control keeps the centred house style; only the values in the open
+       dropdown list are left-aligned (see the option rule below). */
     appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
@@ -82,9 +87,9 @@
     background-color: #FFFFFF;
     border: 1px solid #D9E2EB;
     border-radius: 8px;
-    padding: 0.35em 0.75em;
+    padding: 0.45em 0.85em;
     font-family: inherit;
-    font-size: 0.6875em;
+    font-size: 0.8125em;
     font-weight: 500;
     color: #41576A;
     text-align: center;
@@ -96,17 +101,22 @@
     transition: background-color 0.15s, border-color 0.15s;
 }
 
+.vas-elc-select option {
+    text-align: left;
+}
+
+
 .vas-elc-select:hover {
     background-color: #EEF8FF;
     border-color: #0083DA;
 }
 
 .vas-elc-select-month {
-    min-width: 7.5em;
+    min-width: 8.5em;
 }
 
 .vas-elc-select-year {
-    min-width: 5.2em;
+    min-width: 6em;
 }
 
 /* Top Summary Block */
@@ -152,7 +162,7 @@
 }
 
 .vas-elc-row {
-    padding: 0.12em 0;
+    padding: 0.24em 0;
     display: flex;
     flex-direction: column;
     gap: 0.2em;
@@ -290,3 +300,229 @@
 .vas-elc-hidden {
     display: none !important;
 }
+
+/* ============================================================================
+   Cost element drill-down modal.
+   Follows the same contract as the other PO widget dialogs: the type scale
+   lives on the dialog (so header, body and footer scale together), the table
+   body is a fixed viewport of --vas-elc-rows rows sized in em, and rows stack
+   from the top rather than stretching.
+   ============================================================================ */
+
+.vas-elc-row-click {
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background-color 0.15s ease;
+}
+
+    .vas-elc-row-click:hover {
+        background-color: #EEF8FF;
+    }
+
+    .vas-elc-row-click:focus-visible {
+        outline: 2px solid #1F83FF;
+        outline-offset: 2px;
+    }
+
+.vas-elc-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(0, 38, 64, 0.34);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: min(4vh, 28px) min(3vw, 28px);
+    box-sizing: border-box;
+}
+
+    .vas-elc-mask.vas-elc-mask-open {
+        display: flex;
+    }
+
+.vas-elc-modal {
+    /* Type scale on the dialog, so the chrome scales with the content. */
+    --panel-anchor: clamp(15px, 1.15vw, 26px);
+    font-size: var(--panel-anchor);
+    --vas-elc-rows: 6;
+    --vas-elc-row-h: 2.4em;
+
+    width: min(1100px, 94vw);
+    max-height: min(880px, 90dvh);
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 16px;
+    box-shadow: 0 28px 64px rgba(15, 61, 97, 0.26);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+    font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #102C3F;
+}
+
+    .vas-elc-modal *,
+    .vas-elc-modal *::before,
+    .vas-elc-modal *::after {
+        box-sizing: border-box;
+    }
+
+.vas-elc-modal-header {
+    height: 3.2em;
+    flex: none;
+    padding: 0 0.8em;
+    border-bottom: 1px solid #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6em;
+}
+
+.vas-elc-mhead-txt {
+    min-width: 0;
+}
+
+.vas-elc-mtitle {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 500;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-elc-msub {
+    font-size: 0.8125em;
+    color: #5F7283;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-elc-mclose {
+    width: 1.9em;
+    height: 1.9em;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    color: #41576A;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+    .vas-elc-mclose:hover {
+        background: #EEF8FF;
+        border-color: #0083DA;
+        color: #0083DA;
+    }
+
+    .vas-elc-mclose svg {
+        width: 1em;
+        height: 1em;
+        display: block;
+    }
+
+.vas-elc-modal-body {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+}
+
+.vas-elc-mrow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.75em;
+    align-items: center;
+    padding: 0 0.5em;
+}
+
+.vas-elc-mhead {
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    padding: 0.5em 0.5em;
+    border-bottom: 1px solid #C5D2DD;
+    flex: none;
+}
+
+.vas-elc-mbody {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+    justify-content: flex-start;
+    min-height: 0;
+    overflow: hidden;
+    /* Exactly --vas-elc-rows rows tall, whatever the page holds. */
+    height: calc(var(--vas-elc-rows, 6) * var(--vas-elc-row-h, 2.4em));
+}
+
+    .vas-elc-mbody .vas-elc-mrow {
+        flex: 0 0 calc(100% / var(--vas-elc-rows, 6));
+        min-height: 0;
+        font-size: 0.75em;
+        padding: 0.4em 0.5em;
+        border-bottom: 1px solid #E2EAF1;
+    }
+
+    .vas-elc-mbody .vas-elc-mrow:last-child {
+        border-bottom: 0;
+    }
+
+.vas-elc-mcell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-elc-mright {
+    text-align: right;
+}
+
+.vas-elc-mempty {
+    padding: 2em 0.5em;
+    text-align: center;
+    font-size: 0.8125em;
+    color: #5F7283;
+}
+
+.vas-elc-modal-foot {
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding: 0.6em 0.8em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6em;
+}
+
+.vas-elc-mnote {
+    font-size: 0.75em;
+    color: #748494;
+}
+
+.vas-elc-mbtn {
+    background: #FFFFFF;
+    border: 1px solid #0083DA;
+    color: #0083DA;
+    border-radius: 999px;
+    padding: 0.5em 0.875em;
+    font-size: 0.8125em;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+    .vas-elc-mbtn:hover {
+        background: #EEF8FF;
+    }
