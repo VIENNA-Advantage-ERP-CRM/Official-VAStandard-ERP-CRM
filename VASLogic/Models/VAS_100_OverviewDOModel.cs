@@ -1,4 +1,4 @@
-/// <summary>
+﻿/// <summary>
 /// Module Name : VASLogic
 /// Purpose     : Delivery Order (DO) Overview tab panel data (read side).
 ///               Returns header identity, customer, linked sales order, KPI
@@ -96,6 +96,65 @@
 ///                        is not an edit, and the platform logs plenty of those.
 ///                        The trail said WHICH field moved but never what it moved
 ///                        from or to. Follows VAS_101 / VAS_104.
+///   VAI163   2026-08-20  Added PostedDate (GetPostedDate: the earliest Fact_Acct
+///                        row written for the delivery), which dates the timeline's
+///                        new Posted stage. M_InOut.Posted says WHETHER it posted;
+///                        this says when. Ported from VAS_098.
+///   VAI163   2026-08-21  Activity: an appointment or task now carries the
+///                        e-mails sent against IT - MailAttachment1 keyed on
+///                        AppointmentsInfo rather than on this panel's own
+///                        table - with the recipient (MailAddress), subject
+///                        (Title), when (Created) and who sent it (CreatedBy).
+///                        The body (TextMsg, flattened) travels with the row so
+///                        the panel reveals it on click. Read in one query for
+///                        the whole feed through VAS_ActivitySourcesModel.
+///   VAI163   2026-08-26  The timeline reports the LINKED DOCUMENTS' own progress,
+///                        which the payload could not answer before:
+///                        - CompletedDate / CompletedBy: the delivery's workflow
+///                          DocComplete stamp, falling back to its last change. The
+///                          Completed stage captioned itself with the MOVEMENT date,
+///                          which is the day the goods moved and is typed on the
+///                          document — a delivery entered for last month and
+///                          completed today reported last month.
+///                        - IsShipConfirmTarget: IsShipConfirm on the TARGET
+///                          document type (C_DocTypeTarget_ID), which is the type
+///                          the delivery is being processed as. C_DocType_ID only
+///                          catches up at completion, so the existing
+///                          IsShipConfirmDocType said "no confirmation" on exactly
+///                          the deliveries whose confirmation is still ahead of
+///                          them. It still feeds the snapshot cards, unchanged.
+///                        - HasConfirmation / ConfirmStatus / ConfirmCompletedDate
+///                          (LoadConfirmationState): the shipment confirmation that
+///                          speaks for the delivery — a completed one where there is
+///                          one, else the newest open one — and when it completed.
+///                        - HasInvoice / InvoiceStatus / InvoiceCompletedDate
+///                          (LoadInvoiceState): the AR invoices billing THIS
+///                          delivery's lines (C_InvoiceLine.M_InOutLine_ID, the same
+///                          delivery-scoped link LoadInvoiceDocuments uses), and the
+///                          completion moment of the LATEST COMPLETED one.
+///                        The workflow DocComplete lookup is written once for any
+///                        table (GetWorkflowCompletedDate). Every one of these
+///                        stages falls back to the document's own Updated stamp when
+///                        it was completed outside the workflow engine.
+///   VAI163   2026-09-01  Times were wrong on PostgreSQL — an activity row's moment,
+///                        the e-mails' included. The DateTimeKind the PROVIDER tags
+///                        a value with reached the JSON: Oracle says Unspecified and
+///                        Npgsql says Utc or Local, Newtonsoft writes a zone
+///                        designator for the latter two and none for the first, and
+///                        the panel's date parsing reads the two shapes differently.
+///                        EVERY date and timestamp this model emits now goes through
+///                        Stamp() — the header dates, the completion / posting
+///                        stamps, the activity and mail rows, the change log's
+///                        EventOn and the linked documents' DocDate — as do the
+///                        shared appointment / task / call / letter sources in
+///                        VAS_ActivitySourcesModel, where the helper lives. A no-op
+///                        on Oracle.
+///                        Every NVL in this model is COALESCE now, which is what
+///                        VAS_092 / VAS_098 / VAS_106 already write and what the
+///                        SQL standard defines. All 22 were the two-argument form,
+///                        so the two are the same function and no statement changes
+///                        meaning; NVL only ever worked here because the deployment
+///                        defines one, which is not a thing to keep depending on.
 /// </summary>
 
 using System;
@@ -156,6 +215,21 @@ namespace VASLogic.Models
             bool hasShipConfirm = ColumnExists("C_DocType", "IsShipConfirm");
             string shipConfirmExpr = hasShipConfirm ? "COALESCE(dt.IsShipConfirm, 'N')" : "'N'";
 
+            // The timeline's Confirmed stage reads the same flag off the TARGET
+            // document type (M_InOut.C_DocTypeTarget_ID) — the type the delivery is
+            // being processed AS, which is what the user picks on the record and
+            // what decides whether a confirmation is raised at all. C_DocType_ID
+            // only catches up with it at completion, so asking that column alone
+            // hid the stage on exactly the deliveries whose confirmation is still
+            // ahead of them. The completed type stays as the fallback.
+            bool hasTargetDocType = ColumnExists("M_InOut", "C_DocTypeTarget_ID");
+            string targetDocJoin = hasTargetDocType
+                ? "LEFT OUTER JOIN C_DocType dtt ON (io.C_DocTypeTarget_ID = dtt.C_DocType_ID)"
+                : "";
+            string shipConfirmTargetExpr = !hasShipConfirm ? "'N'"
+                : (hasTargetDocType ? "COALESCE(dtt.IsShipConfirm, dt.IsShipConfirm, 'N')"
+                                    : shipConfirmExpr);
+
             // The confirmation quantities: what was accepted, the gap against the
             // target, and what was scrapped. Each is guarded on its own column so a
             // schema missing one still reports the others.
@@ -186,6 +260,7 @@ namespace VASLogic.Models
                               io.Processed,
                               io.Posted,
                               io.Created,
+                              io.Updated,
                               io.MovementDate,
                               io.PriorityRule,
                               io.POReference,
@@ -233,21 +308,23 @@ namespace VASLogic.Models
                                  FROM M_InOutLine l
                                 WHERE l.M_InOut_ID = io.M_InOut_ID
                                   AND l.IsActive   = 'Y')                       AS LineCount,
-                              (SELECT NVL(SUM(NVL(l.MovementQty, 0)), 0)
+                              (SELECT COALESCE(SUM(COALESCE(l.MovementQty, 0)), 0)
                                  FROM M_InOutLine l
                                 WHERE l.M_InOut_ID = io.M_InOut_ID
                                   AND l.IsActive   = 'Y')                       AS DeliveredQty,
-                              (SELECT NVL(SUM(NVL(l.MovementQty, 0) * " + rateExpr + @"), 0)
+                              (SELECT COALESCE(SUM(COALESCE(l.MovementQty, 0) * " + rateExpr + @"), 0)
                                  FROM M_InOutLine l
                                  LEFT OUTER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = l.C_OrderLine_ID)
                                 WHERE l.M_InOut_ID = io.M_InOut_ID
                                   AND l.IsActive   = 'Y')                       AS LineDeliveryValue,
                               " + shipConfirmExpr  + @"                         AS IsShipConfirmDocType,
+                              " + shipConfirmTargetExpr + @"                    AS IsShipConfirmTarget,
                               " + confirmedQtySel  + @"                         AS AcceptedQty,
                               " + differenceQtySel + @"                         AS DifferenceQty,
                               " + scrappedQtySel   + @"                         AS ScrappedQty
                             FROM M_InOut io
                             LEFT OUTER JOIN C_DocType dt     ON (io.C_DocType_ID         = dt.C_DocType_ID)
+                            " + targetDocJoin + @"
                             INNER JOIN C_BPartner bp        ON (io.C_BPartner_ID          = bp.C_BPartner_ID)
                             LEFT OUTER JOIN C_Order so       ON (io.C_Order_ID            = so.C_Order_ID)
                             LEFT OUTER JOIN C_BPartner_Location bpl ON (io.C_BPartner_Location_ID = bpl.C_BPartner_Location_ID)
@@ -289,8 +366,8 @@ namespace VASLogic.Models
             result.StatusCode     = Util.GetValueOfString(r["DocStatus"]);
             result.Processed      = Util.GetValueOfString(r["Processed"]) == "Y";
             result.Posted         = Util.GetValueOfString(r["Posted"]) == "Y";
-            result.Created        = Util.GetValueOfDateTime(r["Created"]);
-            result.MovementDate   = Util.GetValueOfDateTime(r["MovementDate"]);
+            result.Created        = Stamp(r["Created"]);
+            result.MovementDate   = Stamp(r["MovementDate"]);
             result.PriorityCode   = Util.GetValueOfString(r["PriorityRule"]);
             result.OrderReference = Util.GetValueOfString(r["POReference"]);
             result.Description    = Util.GetValueOfString(r["HeaderDescription"]);
@@ -311,8 +388,8 @@ namespace VASLogic.Models
             // ----- Linked sales order -----
             result.C_Order_ID    = Util.GetValueOfInt(r["C_Order_ID"]);
             result.SONo          = Util.GetValueOfString(r["SO_DocumentNo"]);
-            result.SODateOrdered = Util.GetValueOfDateTime(r["SO_DateOrdered"]);
-            result.SODatePromised = Util.GetValueOfDateTime(r["SO_DatePromised"]);
+            result.SODateOrdered = Stamp(r["SO_DateOrdered"]);
+            result.SODatePromised = Stamp(r["SO_DatePromised"]);
 
             // ----- Reference / origins (the documents this DO came from) -----
             result.C_Project_ID   = Util.GetValueOfInt(r["C_Project_ID"]);
@@ -390,6 +467,8 @@ namespace VASLogic.Models
             // ----- Quality confirmation -----
             result.IsShipConfirmDocType =
                 Util.GetValueOfString(r["IsShipConfirmDocType"]) == "Y";
+            result.IsShipConfirmTarget  =
+                Util.GetValueOfString(r["IsShipConfirmTarget"]) == "Y";
             result.AcceptedQty   = Util.GetValueOfDecimal(r["AcceptedQty"]);
             result.DifferenceQty = Util.GetValueOfDecimal(r["DifferenceQty"]);
             result.ScrappedQty   = Util.GetValueOfDecimal(r["ScrappedQty"]);
@@ -406,6 +485,32 @@ namespace VASLogic.Models
             // (planned-vs-recorded fallback, checking bands, display-column
             // probing) duplicated and kept in step by hand.
             LoadQualityParams(M_InOut_ID, result);
+
+            // When posting actually ran. The timeline no longer carries a Posted
+            // stage, but the header's Posted pill and the activity trail still
+            // report the moment, so it is still read.
+            result.PostedDate = GetPostedDate(M_InOut_ID);
+
+            // ----- Timeline state -----
+            // When the delivery itself completed: the workflow's own DocComplete
+            // stamp. NOT the movement date, which is the day the goods moved, typed
+            // on the document — a delivery entered for last month and completed
+            // today would caption its Completed stage with last month.
+            if (result.StatusCode == "CO" || result.StatusCode == "CL")
+            {
+                result.CompletedDate = GetWorkflowCompletedDate("M_InOut", M_InOut_ID);
+                result.CompletedBy   = _lastCompletedByName;
+                // Completed outside the workflow engine — the last change is the
+                // closest stamp there is.
+                if (!result.CompletedDate.HasValue)
+                    result.CompletedDate = Stamp(r["Updated"]);
+            }
+
+            // The Confirmed and Invoiced stages report a LINKED document's own
+            // progress, not the delivery's, so each needs that document's status
+            // and — once it is completed — the moment it completed.
+            LoadConfirmationState(M_InOut_ID, result);
+            LoadInvoiceState(M_InOut_ID, result);
 
             // ----- Documents raised against this delivery -----
             result.Documents = LoadDocuments(M_InOut_ID);
@@ -425,7 +530,7 @@ namespace VASLogic.Models
         private string ConfirmQtyExpr(string columnName)
         {
             if (!ColumnExists("M_InOutLineConfirm", columnName)) return "0";
-            return @"(SELECT NVL(SUM(NVL(lc." + columnName + @", 0)), 0)
+            return @"(SELECT COALESCE(SUM(COALESCE(lc." + columnName + @", 0)), 0)
                         FROM M_InOutLineConfirm lc
                        INNER JOIN M_InOutLine cl ON (cl.M_InOutLine_ID = lc.M_InOutLine_ID
                                                      AND cl.IsActive    = 'Y')
@@ -493,7 +598,7 @@ namespace VASLogic.Models
                               l.Line,
                               l.Description     AS LineDescription,
                               l.M_Product_ID,
-                              NVL(l.MovementQty, 0) AS DeliveredQty,
+                              COALESCE(l.MovementQty, 0) AS DeliveredQty,
                               p.Value           AS ProductCode,
                               p.Name            AS ProductName,
                               loc.Value         AS LocatorCode,
@@ -501,10 +606,10 @@ namespace VASLogic.Models
                               u.Name            AS UOMName,
                               " + asiExpr + @"  AS AttributeName,
                               " + dropShipExpr + @" AS IsDropShip,
-                              NVL(u.StdPrecision, 0) AS UOMPrecision,
-                              NVL(ol.QtyOrdered, 0)  AS OrderedQty,
+                              COALESCE(u.StdPrecision, 0) AS UOMPrecision,
+                              COALESCE(ol.QtyOrdered, 0)  AS OrderedQty,
                               " + rateExpr + @"                       AS UnitRate,
-                              NVL(l.MovementQty, 0) * " + rateExpr + @" AS LineValue
+                              COALESCE(l.MovementQty, 0) * " + rateExpr + @" AS LineValue
                            FROM M_InOutLine l
                            LEFT OUTER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = l.C_OrderLine_ID)
                            LEFT OUTER JOIN M_Product   p  ON (p.M_Product_ID    = l.M_Product_ID)
@@ -754,10 +859,279 @@ namespace VASLogic.Models
             return string.Join(", ", parts);
         }
 
+        /// <summary>
+        /// Resolves a change-log value into the text the field shows — a reference
+        /// into the referenced record's identifier, a list code into its label, a
+        /// timestamp into the date alone. Shared with the other overview panels
+        /// (VAS_ChangeLogValueModel). One per request, so its caches last exactly
+        /// as long as the feed being built.
+        /// </summary>
+        private readonly VAS_ChangeLogValueModel _changeValues = new VAS_ChangeLogValueModel();
+
+        /// <summary>Reads the appointment / task / call / letter sources every
+        /// overview panel shares (VAS_ActivitySourcesModel).</summary>
+        private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
+
+        /// <summary>
+        /// Every date and timestamp this panel hands the client is read through
+        /// here rather than through Util.GetValueOfDateTime directly, so the
+        /// DateTimeKind the PROVIDER tagged the value with cannot reach the JSON.
+        /// Oracle tags Unspecified and Npgsql tags Utc or Local; Newtonsoft writes
+        /// a zone designator for the latter two and none for the first, and the
+        /// panel's date parsing reads the two shapes differently — which is why an
+        /// activity row's moment, an e-mail's included, was hours out on
+        /// PostgreSQL. A no-op for a value that is already Unspecified, so the
+        /// Oracle path is untouched. See VAS_ActivitySourcesModel.Stamp for the
+        /// full account.
+        /// </summary>
+        private static DateTime? Stamp(object value)
+        {
+            return VAS_ActivitySourcesModel.Stamp(value);
+        }
+
+        /// <summary>
+        /// The correspondence and engagement sources shared with every other
+        /// overview panel: appointments and tasks (AppointmentsInfo, split on
+        /// IsTask), calls (VA048_CallDetails) and letters (MailAttachment1,
+        /// AttachmentType 'I'), each pinned to the delivery by AD_Table_ID +
+        /// Record_ID.
+        ///
+        /// Mails stay with LoadEmailActivity, which carries the recipient and body
+        /// detail the mail drawer needs and now excludes letters so the two kinds
+        /// cannot both claim the same row.
+        /// </summary>
+        private void LoadSharedSourceActivity(int M_InOut_ID, List<DOActivityData> list)
+        {
+            List<VAS_ActivitySourceRow> rows =
+                _activitySources.Load("M_InOut", M_InOut_ID, false);
+            foreach (VAS_ActivitySourceRow s in rows)
+            {
+                list.Add(new DOActivityData
+                {
+                    Type        = s.Kind,      // appointment | task | call | letter
+                    Text        = s.Title,
+                    Body        = s.Body,
+                    Location    = s.Location,
+                    IsClosed    = s.IsClosed,
+                    IsCancelled = s.IsCancelled,
+                    MailTo      = s.MailTo,
+                    MailCc      = s.MailCc,
+                    MailBcc     = s.MailBcc,
+                    MailFrom    = s.MailFrom,
+                    IsMailSent  = s.IsMailSent,
+                    // An appointment or task brings the mails sent against it.
+                    Mails       = s.Mails,
+                    UserName    = s.ActorName,
+                    Created     = s.EventTime
+                });
+            }
+        }
+
         /// <summary>Single-parameter helper for the shipment-scoped queries.</summary>
         private SqlParameter[] InOutParam(int M_InOut_ID)
         {
             return new SqlParameter[] { new SqlParameter("@M_InOut_ID", M_InOut_ID) };
+        }
+
+        /// <summary>
+        /// Set by <see cref="GetWorkflowCompletedDate"/> alongside its return value,
+        /// so a caller gets both the moment and the actor from one query.
+        /// </summary>
+        private string _lastCompletedByName;
+
+        /// <summary>
+        /// The moment ANY document was completed: the Created stamp of the
+        /// DocComplete activity of the workflow run against it, or null when it has
+        /// no such node (completed outside the workflow engine, or never completed).
+        /// The completing user comes back in <see cref="_lastCompletedByName"/>.
+        ///
+        /// The delivery is not the only document the timeline reports on — its
+        /// shipment confirmation and its AR invoices have completion moments of
+        /// their own — so the lookup is written once and told which table to read.
+        ///
+        /// <paramref name="tableName"/> is written into the statement as a literal.
+        /// It is only ever one of this file's own constants, never user text, and
+        /// the record id stays the statement's SINGLE bind: the app's Oracle layer
+        /// binds by POSITION, so a second placeholder would have to be kept in step
+        /// with the parameter array for no gain.
+        /// </summary>
+        /// <param name="tableName">AD_Table.TableName of the document's table.</param>
+        /// <param name="recordId">The document's record id.</param>
+        private DateTime? GetWorkflowCompletedDate(string tableName, int recordId)
+        {
+            _lastCompletedByName = "";
+            if (recordId <= 0) return null;
+            try
+            {
+                string sql = @"SELECT wfa.Created, u.Name AS UserName
+                                 FROM AD_WF_Process wfp
+                                INNER JOIN AD_WF_Activity wfa
+                                        ON (wfa.AD_WF_Process_ID = wfp.AD_WF_Process_ID)
+                                INNER JOIN AD_WF_Node wfn
+                                        ON (wfn.AD_WF_Node_ID = wfa.AD_WF_Node_ID)
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = wfp.AD_Table_ID)
+                                 LEFT OUTER JOIN AD_User u ON (wfa.CreatedBy = u.AD_User_ID)
+                                WHERE wfp.Record_ID = @Record_ID
+                                  AND adt.TableName = '" + tableName + @"'
+                                  AND COALESCE(wfp.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(wfa.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(wfn.IsActive, 'Y') = 'Y'
+                                  AND wfa.WFState = 'CC'
+                                  AND UPPER(TRIM(wfn.Value)) IN ('DOCCOMPLETE', 'COMPLETE', '(DOCCOMPLETE)')
+                                ORDER BY wfa.Created DESC";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@Record_ID", recordId)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return null;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                _lastCompletedByName = Util.GetValueOfString(r["UserName"]);
+                return Stamp(r["Created"]);
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: every caller falls back to the document's own stamp.
+                _log.Severe("GetWorkflowCompletedDate (" + tableName + "=" + recordId + "): " + ex.Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Fills the timeline's Confirmed stage: whether a shipment confirmation
+        /// (M_InOutConfirm) has been raised for this delivery at all, the status of
+        /// the one that speaks for it, and — once it is completed — when that
+        /// happened.
+        ///
+        /// The confirmation that speaks for the delivery is a COMPLETED one where
+        /// there is one; only when none has completed does the newest open one
+        /// answer, which is what leaves the stage reading "In Process". Reversed and
+        /// voided confirmations are ignored, as they are everywhere else here.
+        ///
+        /// The completion moment is the confirmation's own workflow stamp, falling
+        /// back to its last-updated stamp for one completed outside the workflow
+        /// engine — the rule the delivery's own Completed stage follows.
+        /// </summary>
+        private void LoadConfirmationState(int M_InOut_ID, DOOverviewData result)
+        {
+            try
+            {
+                string sql = @"SELECT c.M_InOutConfirm_ID, c.DocStatus, c.Updated
+                                 FROM M_InOutConfirm c
+                                WHERE c.M_InOut_ID = @M_InOut_ID
+                                  AND COALESCE(c.IsActive, 'Y') = 'Y'
+                                  AND c.DocStatus NOT IN ('RE', 'VO')
+                                ORDER BY CASE WHEN c.DocStatus IN ('CO', 'CL') THEN 0 ELSE 1 END,
+                                         c.Updated DESC,
+                                         c.M_InOutConfirm_ID DESC";
+                DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                result.HasConfirmation = true;
+                result.ConfirmStatus   = Util.GetValueOfString(r["DocStatus"]);
+                if (result.ConfirmStatus != "CO" && result.ConfirmStatus != "CL") return;
+
+                int confirmId = Util.GetValueOfInt(r["M_InOutConfirm_ID"]);
+                result.ConfirmCompletedDate = GetWorkflowCompletedDate("M_InOutConfirm", confirmId)
+                                              ?? Stamp(r["Updated"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadConfirmationState (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Fills the timeline's Invoiced stage: whether an AR invoice exists for this
+        /// delivery at all, and the completion moment of the LATEST completed one
+        /// where several have been raised against it.
+        ///
+        /// Scoped to the DELIVERY's own lines (C_InvoiceLine.M_InOutLine_ID), the
+        /// same link <see cref="LoadInvoiceDocuments"/> uses — an invoice covering
+        /// another shipment of the same order has not invoiced this one.
+        /// </summary>
+        private void LoadInvoiceState(int M_InOut_ID, DOOverviewData result)
+        {
+            try
+            {
+                // Completed first, newest first within each group — so the first
+                // completed row is the latest completed invoice.
+                string sql = @"SELECT inv.C_Invoice_ID, inv.DocStatus, inv.Updated
+                                 FROM C_Invoice inv
+                                WHERE inv.IsActive   = 'Y'
+                                  AND inv.IsSOTrx    = 'Y'
+                                  AND inv.DocStatus NOT IN ('RE', 'VO')
+                                  AND EXISTS (SELECT 1
+                                                FROM C_InvoiceLine il
+                                               INNER JOIN M_InOutLine iol
+                                                       ON (iol.M_InOutLine_ID = il.M_InOutLine_ID)
+                                               WHERE il.C_Invoice_ID = inv.C_Invoice_ID
+                                                 AND il.IsActive     = 'Y'
+                                                 AND iol.M_InOut_ID  = @M_InOut_ID)
+                                ORDER BY CASE WHEN inv.DocStatus IN ('CO', 'CL') THEN 0 ELSE 1 END,
+                                         inv.Updated DESC,
+                                         inv.C_Invoice_ID DESC";
+                DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                result.HasInvoice = true;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    string status = Util.GetValueOfString(r["DocStatus"]);
+                    if (status != "CO" && status != "CL") continue;
+
+                    int invoiceId = Util.GetValueOfInt(r["C_Invoice_ID"]);
+                    result.InvoiceCompletedDate = GetWorkflowCompletedDate("C_Invoice", invoiceId)
+                                                  ?? Stamp(r["Updated"]);
+                    result.InvoiceStatus = status;
+                    return;
+                }
+
+                // Raised but not completed — the stage stays pending, captioned by
+                // the status the panel now knows.
+                result.InvoiceStatus = Util.GetValueOfString(ds.Tables[0].Rows[0]["DocStatus"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadInvoiceState (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// The moment the delivery was actually posted — the earliest Created stamp
+        /// across the Fact_Acct rows written for it — or null when it has never
+        /// been posted.
+        ///
+        /// M_InOut.Posted answers WHETHER it posted; this answers WHEN, which is
+        /// what the timeline's Posted stage is captioned with. Its own statement
+        /// rather than a join on the header query: a schema whose Fact_Acct differs
+        /// then costs this one figure instead of the whole overview. Ported from
+        /// VAS_098.
+        /// </summary>
+        /// <param name="M_InOut_ID">Selected delivery id.</param>
+        private DateTime? GetPostedDate(int M_InOut_ID)
+        {
+            try
+            {
+                string sql = @"SELECT MIN(fa.Created) AS PostedDate
+                                 FROM Fact_Acct fa
+                                INNER JOIN AD_Table adt ON (adt.AD_Table_ID = fa.AD_Table_ID)
+                                WHERE fa.Record_ID  = @M_InOut_ID
+                                  AND adt.TableName = 'M_InOut'";
+                DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return null;
+                return Stamp(ds.Tables[0].Rows[0]["PostedDate"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetPostedDate (M_InOut_ID=" + M_InOut_ID + "): " + ex.Message);
+                return null;
+            }
         }
 
         // ----------------------------------------------------------------- //
@@ -891,7 +1265,7 @@ namespace VASLogic.Models
                                       inv.DocumentNo,
                                       inv.DocStatus,
                                       inv.DateInvoiced,
-                                      NVL(inv.GrandTotal, 0) AS GrandTotal,
+                                      COALESCE(inv.GrandTotal, 0) AS GrandTotal,
                                       inv.IsPaid
                                  FROM C_Invoice inv
                                 WHERE inv.IsActive   = 'Y'
@@ -916,7 +1290,7 @@ namespace VASLogic.Models
                         RecordId   = Util.GetValueOfInt(r["C_Invoice_ID"]),
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
-                        DocDate    = Util.GetValueOfDateTime(r["DateInvoiced"]),
+                        DocDate    = Stamp(r["DateInvoiced"]),
                         Amount     = Util.GetValueOfDecimal(r["GrandTotal"]),
                         IsPaid     = Util.GetValueOfString(r["IsPaid"]) == "Y"
                     });
@@ -944,10 +1318,10 @@ namespace VASLogic.Models
                                       (SELECT COUNT(*)
                                          FROM M_InOutLineConfirm lc
                                         WHERE lc.M_InOutConfirm_ID = c.M_InOutConfirm_ID
-                                          AND NVL(lc.IsActive, 'Y') = 'Y') AS LineCount
+                                          AND COALESCE(lc.IsActive, 'Y') = 'Y') AS LineCount
                                  FROM M_InOutConfirm c
                                 WHERE c.M_InOut_ID  = @M_InOut_ID
-                                  AND NVL(c.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(c.IsActive, 'Y') = 'Y'
                                   AND c.DocStatus NOT IN ('RE', 'VO')";
                 DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
@@ -961,7 +1335,7 @@ namespace VASLogic.Models
                         RecordId   = Util.GetValueOfInt(r["M_InOutConfirm_ID"]),
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         DocStatus  = Util.GetValueOfString(r["DocStatus"]),
-                        DocDate    = Util.GetValueOfDateTime(r["Created"]),
+                        DocDate    = Stamp(r["Created"]),
                         LineCount  = Util.GetValueOfInt(r["LineCount"])
                     });
                 }
@@ -987,8 +1361,8 @@ namespace VASLogic.Models
                                       p.DocumentNo,
                                       p.DocStatus,
                                       p.DateTrx,
-                                      NVL(p.PayAmt, 0)      AS PayAmt,
-                                      NVL(p.DiscountAmt, 0) AS DiscountAmt
+                                      COALESCE(p.PayAmt, 0)      AS PayAmt,
+                                      COALESCE(p.DiscountAmt, 0) AS DiscountAmt
                                  FROM C_Payment p
                                 INNER JOIN C_AllocationLine al ON (al.C_Payment_ID = p.C_Payment_ID)
                                 INNER JOIN C_InvoiceLine il    ON (il.C_Invoice_ID = al.C_Invoice_ID)
@@ -1009,7 +1383,7 @@ namespace VASLogic.Models
                         RecordId    = Util.GetValueOfInt(r["C_Payment_ID"]),
                         DocumentNo  = Util.GetValueOfString(r["DocumentNo"]),
                         DocStatus   = Util.GetValueOfString(r["DocStatus"]),
-                        DocDate     = Util.GetValueOfDateTime(r["DateTrx"]),
+                        DocDate     = Stamp(r["DateTrx"]),
                         Amount      = Util.GetValueOfDecimal(r["PayAmt"]),
                         DiscountAmt = Util.GetValueOfDecimal(r["DiscountAmt"])
                     });
@@ -1053,6 +1427,8 @@ namespace VASLogic.Models
             LoadChangeActivity(M_InOut_ID, activity);
             LoadNoteActivity(M_InOut_ID, activity);
             LoadEmailActivity(M_InOut_ID, activity);
+            // Appointments, tasks, calls and letters filed against the delivery.
+            LoadSharedSourceActivity(M_InOut_ID, activity);
 
             // Newest first; entries with no timestamp sink to the bottom.
             activity.Sort(delegate (DOActivityData a, DOActivityData b)
@@ -1083,7 +1459,7 @@ namespace VASLogic.Models
                 {
                     Type     = "created",
                     UserName = Util.GetValueOfString(r["CreatedByName"]),
-                    Created  = Util.GetValueOfDateTime(r["Created"])
+                    Created  = Stamp(r["Created"])
                 });
             }
             catch (Exception ex)
@@ -1141,7 +1517,7 @@ namespace VASLogic.Models
                         Type     = type,
                         Text     = Util.GetValueOfString(r["NodeName"]),
                         UserName = Util.GetValueOfString(r["UserName"]),
-                        Created  = Util.GetValueOfDateTime(r["EventOn"])
+                        Created  = Stamp(r["EventOn"])
                     });
                 }
             }
@@ -1205,7 +1581,9 @@ namespace VASLogic.Models
                                       cl.NewValue     AS NewValue,
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
-                                      col.ColumnName  AS FieldColumn
+                                      col.ColumnName  AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId
                                  FROM AD_ChangeLog cl
                                 INNER JOIN AD_Table adt
                                         ON (adt.AD_Table_ID = cl.AD_Table_ID)
@@ -1215,7 +1593,7 @@ namespace VASLogic.Models
                                         ON (u.AD_User_ID = cl.CreatedBy)
                                 WHERE cl.Record_ID = @M_InOut_ID
                                   AND UPPER(adt.TableName) = 'M_INOUT'
-                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
                                 ORDER BY cl.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
                 if (ds != null && ds.Tables.Count > 0)
@@ -1242,6 +1620,8 @@ namespace VASLogic.Models
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
                                       col.ColumnName  AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId,
                                       l.Line          AS LineNo,
                                       p.Name          AS ProductName
                                  FROM AD_ChangeLog cl
@@ -1256,7 +1636,7 @@ namespace VASLogic.Models
                                  LEFT OUTER JOIN AD_User u
                                         ON (u.AD_User_ID = cl.CreatedBy)
                                 WHERE UPPER(adt.TableName) = 'M_INOUTLINE'
-                                  AND NVL(cl.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(cl.IsActive, 'Y') = 'Y'
                                   AND l.M_InOut_ID = @M_InOut_ID
                                 ORDER BY cl.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
@@ -1287,7 +1667,7 @@ namespace VASLogic.Models
         /// </summary>
         private void AddChangeRow(DataRow r, string scope, List<DOActivityData> list)
         {
-            DateTime? at = Util.GetValueOfDateTime(r["EventOn"]);
+            DateTime? at = Stamp(r["EventOn"]);
             if (!at.HasValue) return;
 
             string field = Util.GetValueOfString(r["FieldLabel"]);
@@ -1297,16 +1677,25 @@ namespace VASLogic.Models
 
             // The move itself. A save that rewrites a field with the value it
             // already had is not an edit, and the platform logs plenty of those.
+            // Compared on the RAW values, before either is resolved: two records
+            // can share a name, and dropping such a row would hide a real edit.
             string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
             string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
             if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) return;
+
+            // ... and then reported as the field SHOWS them, not as the log stored
+            // them: a reference reads as the referenced record's identifier, a list
+            // value as its label, a date as the date alone.
+            string column  = Util.GetValueOfString(r["FieldColumn"]);
+            int refType    = Util.GetValueOfInt(r["RefType"]);
+            int refValueId = Util.GetValueOfInt(r["RefValueId"]);
 
             list.Add(new DOActivityData
             {
                 Type        = "updated",
                 FieldName   = field,
-                OldValue    = oldValue,
-                NewValue    = newValue,
+                OldValue    = _changeValues.Display(oldValue, column, refType, refValueId),
+                NewValue    = _changeValues.Display(newValue, column, refType, refValueId),
                 ChangeScope = scope,
                 UserName    = Util.GetValueOfString(r["UserName"]),
                 Created     = at
@@ -1357,7 +1746,7 @@ namespace VASLogic.Models
                         Type     = "note",
                         Text     = Util.GetValueOfString(r["CharacterData"]),
                         UserName = Util.GetValueOfString(r["UserName"]),
-                        Created  = Util.GetValueOfDateTime(r["Created"])
+                        Created  = Stamp(r["Created"])
                     });
                 }
             }
@@ -1373,12 +1762,12 @@ namespace VASLogic.Models
         /// (Title), body (TextMsg), when and who sent it. The body travels with the
         /// row so the panel can reveal it on click without a second round trip.
         ///
-        /// "Has an address" is tested against a SPACE, not against ''. Oracle
-        /// stores the empty string as NULL, so NVL(TRIM(x), '') yields NULL and
-        /// `&lt;&gt; ''` compares against NULL — UNKNOWN for every row, including
-        /// the ones that DO carry an address. Comparing to ' ' keeps the fallback
-        /// non-null on Oracle, and SQL Server blank-pads the comparison so an empty
-        /// address still fails it.
+        /// A mail is NOT required to carry an address, which VAS_092 and VAS_106
+        /// do not require either: the recipient is resolved on the server at send
+        /// time and is not always written back to MailAddress, so demanding one
+        /// dropped real mails out of the feed. The drawer omits any address line
+        /// that is blank, so such a row still reads as its subject, moment,
+        /// sender and body.
         /// </summary>
         private void LoadEmailActivity(int M_InOut_ID, List<DOActivityData> list)
         {
@@ -1399,10 +1788,13 @@ namespace VASLogic.Models
                                       (SELECT t.AD_Table_ID FROM AD_Table t
                                         WHERE UPPER(t.TableName) = 'M_INOUT')
                                   AND ma.Record_ID          = @M_InOut_ID
-                                  AND NVL(ma.IsActive, 'Y') = 'Y'
-                                  AND (NVL(TRIM(ma.MailAddress), ' ')    <> ' '
-                                    OR NVL(TRIM(ma.MailAddressCc), ' ')  <> ' '
-                                    OR NVL(TRIM(ma.MailAddressBcc), ' ') <> ' ')
+                                  AND COALESCE(ma.IsActive, 'Y') = 'Y'
+                                  -- Letters ('I') and only letters are filtered
+                                  -- out: they are a kind of their own now and
+                                  -- LoadSharedSourceActivity reads them, so leaving
+                                  -- them here would report each one twice. Every
+                                  -- other AttachmentType still counts as a mail.
+                                  AND COALESCE(TO_CHAR(ma.AttachmentType), 'M') <> 'I'
                                 ORDER BY ma.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, InOutParam(M_InOut_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
@@ -1424,7 +1816,7 @@ namespace VASLogic.Models
                         MailFrom   = Util.GetValueOfString(r["MailAddressFrom"]),
                         IsMailSent = Util.GetValueOfString(r["IsMailSent"]) == "Y",
                         UserName   = Util.GetValueOfString(r["UserName"]),
-                        Created    = Util.GetValueOfDateTime(r["Created"])
+                        Created    = Stamp(r["Created"])
                     });
                 }
             }
@@ -1556,7 +1948,18 @@ namespace VASLogic.Models
             public string    StatusCode     { get; set; }   // DocStatus code
             public bool      Processed      { get; set; }
             public bool      Posted         { get; set; }
+            /// <summary>When posting actually ran — the earliest Fact_Acct row
+            /// written for the delivery. Posted says WHETHER, this says WHEN, and
+            /// the timeline's Posted stage is captioned with it.</summary>
+            public DateTime? PostedDate     { get; set; }
             public DateTime? Created        { get; set; }   // record creation stamp
+            /// <summary>When the delivery was COMPLETED — the workflow's DocComplete
+            /// stamp, falling back to the last change for one completed outside the
+            /// workflow engine. Null until it completes. The timeline's Completed
+            /// stage captions with this, NOT with the movement date, which is the day
+            /// the goods moved and is typed on the document.</summary>
+            public DateTime? CompletedDate  { get; set; }
+            public string    CompletedBy    { get; set; }   // who completed it
             public DateTime? MovementDate   { get; set; }
             public string    PriorityCode   { get; set; }   // PriorityRule code
             public string    OrderReference { get; set; }   // POReference
@@ -1628,12 +2031,36 @@ namespace VASLogic.Models
             /// shipment confirmation. Decides whether the panel shows the three
             /// confirmation cards at all.</summary>
             public bool      IsShipConfirmDocType { get; set; }
+            /// <summary>IsShipConfirm on the TARGET document type
+            /// (M_InOut.C_DocTypeTarget_ID, falling back to the completed type) —
+            /// whether this delivery is to be confirmed at all, which is what decides
+            /// that the timeline carries a Confirmed stage.</summary>
+            public bool      IsShipConfirmTarget  { get; set; }
             public decimal   AcceptedQty      { get; set; }   // Σ M_InOutLineConfirm.ConfirmedQty
             public decimal   DifferenceQty    { get; set; }   // Σ M_InOutLineConfirm.DifferenceQty
             public decimal   ScrappedQty      { get; set; }   // Σ M_InOutLineConfirm.ScrappedQty
             /// <summary>How many delivery lines carry a product with QA parameters
             /// defined — the Confirmation Check card's sub-label.</summary>
             public int       QaParamLineCount { get; set; }
+
+            // Timeline: linked-document state
+            /// <summary>A shipment confirmation (M_InOutConfirm) has been raised,
+            /// whatever state it is in.</summary>
+            public bool      HasConfirmation      { get; set; }
+            /// <summary>DocStatus of the confirmation that speaks for the delivery —
+            /// a completed one where there is one, else the newest open one.</summary>
+            public string    ConfirmStatus        { get; set; }
+            /// <summary>When that confirmation completed; null until it does.</summary>
+            public DateTime? ConfirmCompletedDate { get; set; }
+            /// <summary>An AR invoice exists against this delivery's lines, whatever
+            /// state it is in.</summary>
+            public bool      HasInvoice           { get; set; }
+            /// <summary>DocStatus of the invoice the stage reports — the latest
+            /// completed one where any has completed, else the newest.</summary>
+            public string    InvoiceStatus        { get; set; }
+            /// <summary>When the LATEST completed AR invoice completed; null while
+            /// none has.</summary>
+            public DateTime? InvoiceCompletedDate { get; set; }
 
             // Collections
             public List<DOLineData>         Lines         { get; set; }
@@ -1716,13 +2143,28 @@ namespace VASLogic.Models
             public string    OldValue    { get; set; }
             public string    NewValue    { get; set; }
 
-            // E-mail (MailAttachment1) — the body is revealed on click.
+            // Appointment / task rows (AppointmentsInfo): where the meeting is and
+            // whether it has been dealt with. Empty on every other type.
+            public string    Location    { get; set; }
+            public bool      IsClosed    { get; set; }
+            public bool      IsCancelled { get; set; }
+
+            // E-mail (MailAttachment1) — the body is revealed on click. A LETTER is
+            // the same record filed under AttachmentType 'I'.
             public string    Body       { get; set; }   // TextMsg (flattened to text)
             public string    MailTo     { get; set; }   // MailAddress
             public string    MailCc     { get; set; }   // MailAddressCc
             public string    MailBcc    { get; set; }   // MailAddressBcc
             public string    MailFrom   { get; set; }   // MailAddressFrom
             public bool      IsMailSent { get; set; }
+
+            /// <summary>The e-mails sent against an APPOINTMENT or TASK itself
+            /// (MailAttachment1 anchored on AppointmentsInfo): recipient, subject,
+            /// body, when and by whom. Distinct from the mail fields above, which
+            /// are correspondence about the DELIVERY. Empty on every other type;
+            /// the bodies travel with the row so the panel reveals them on click
+            /// without a second round trip.</summary>
+            public List<VAS_ActivityMailRow> Mails { get; set; }
         }
     }
 }

@@ -3,15 +3,31 @@
  * Purpose        : Delivery Order (DO) Overview tab panel. Renders a
  *                  review-oriented overview of the selected delivery order
  *                  (M_InOut, IsSOTrx = 'Y'): header identity + customer /
- *                  dispatch details card, a four-card KPI snapshot (delivery
- *                  value, lines, delivered qty, linked sales order), a compact
- *                  fulfilment lifecycle strip (Drafted -> Picked/Packed ->
- *                  In Transit -> Completed) driven by DocStatus + Processed,
- *                  the delivery line table and visual action buttons
+ *                  dispatch details card, a KPI snapshot (delivery value, lines,
+ *                  delivered qty, confirmation check), a fulfilment lifecycle
+ *                  strip (Drafted -> In Progress -> Completed -> Posted ->
+ *                  Invoiced), the delivery line table and visual action buttons
  *                  (Print / Complete Delivery Order / Raise Invoice — the last
  *                  disabled until the DO is completed). Data is fetched from
  *                  VAS_100_OverviewDO/GetDOOverview. All on-screen strings are
  *                  resolved through VIS.Msg.getMsg("VAS_100_...").
+ *
+ * ── Labels / Message Keys ──────────────────────────────────────────────
+ *  Added 2026-08-20 — these are the codes to seed. Each is read through
+ *  msg("VAS_100_<Key>", "<English>"), so an unseeded key falls back to the
+ *  English default rather than rendering raw.
+ *
+ *  #  | Current Text  | Message Key                | MsgText
+ * ----+---------------+----------------------------+---------------
+ *  1  | Movement Date | VAS_100_MovementDate       | Movement Date
+ *  2  | Invoiced      | VAS_100_StageInvoiced      | Invoiced
+ *  3  | Confirmed     | VAS_100_StageConfirmed     | Confirmed
+ *  4  | In Process    | VAS_100_InProcess          | In Process
+ *
+ *  VAS_100_StagePickedPacked, VAS_100_StageInTransit, VAS_100_NotLinked,
+ *  VAS_100_CustomerLocation, VAS_100_StageInProgress, VAS_100_StagePosted and
+ *  VAS_100_Current are no longer used by any string on the panel.
+ *
  * Chronological development:
  *   VAI163   2026-07-06  Created
  *   VAI163   2026-08-05  Class prefix renamed MPC-vasdo- -> vas_100- so the panel's
@@ -151,6 +167,92 @@
  *                        visibly cleared rather than looking like a rendering
  *                        gap. A row said WHICH field moved but never what it
  *                        moved from or to.
+ *   VAI163   2026-08-20  - An AR invoice row opens the AR Invoice window.
+ *                          C_Invoice was not in WINDOW_NAME_BY_TABLE, so the
+ *                          click fell through to the zoom target, which answers
+ *                          with the AP screen unless handed an IsSOTrx flag the
+ *                          Documents rows do not carry — every customer invoice
+ *                          opened on the vendor window.
+ *                        - The Quality column's heading is no longer cut off: its
+ *                          track floors at min-content (CSS), where it was the
+ *                          narrowest track in the row.
+ *                        - Line rows and the quality drawer print an em dash for
+ *                          a blank cell instead of "N/A" (dash(); na() stays for
+ *                          the header card, where a labelled empty field is worth
+ *                          saying out loud).
+ *                        - Removed the Sales Order summary card: a summary card
+ *                          is for a MEASURE, and it carried a document number.
+ *                          The order is already a Reference chip that opens it.
+ *                        - The lifecycle strip becomes Drafted > In Progress >
+ *                          Completed > Posted > Invoiced. Picked & Packed and In
+ *                          Transit were not states M_InOut records — both were
+ *                          inferred from the same DocStatus values and lit up
+ *                          together — while what actually follows completion,
+ *                          posting and invoicing, was missing. Each stage reports
+ *                          WHEN it happened; Posted and Invoiced stand outside
+ *                          the monotonic chain, since a delivery can be invoiced
+ *                          before it is posted, or posted and never invoiced.
+ *                        - New Record / Copy Record reliably empty the panel, by
+ *                          the mechanism VAS_092 needed for the same bug: the
+ *                          framework can call refreshPanelData BEFORE GridTable
+ *                          raises its insert flag, so the panel loaded the row
+ *                          just left (or, on a copy, the row copied FROM, whose
+ *                          key the unsaved record still carries); and a reply
+ *                          already on the wire landed after the clear and
+ *                          repainted it. refreshPanelData now goes through
+ *                          scheduleFetch (holds REFRESH_DELAY_MS and re-asks
+ *                          isTabInserting), every fetch carries a token a clear
+ *                          or newer fetch invalidates, shownRecordId tracks
+ *                          "showing or loading", and clear() drops the busy
+ *                          indicator a discarded reply used to strand.
+ *                        - The details card's right column is Warehouse /
+ *                          Shipping Method / Movement Date. The customer's
+ *                          Location came out — the customer block beside it
+ *                          already carries the ship-to address in full.
+ *                        - The Posted badge follows the status pill, so the strip
+ *                          reads in the order the document passes through.
+ *                        - The Delivery Value card is always drawn, zero
+ *                          included; it used to appear only once the delivery had
+ *                          lines (hasLines(), gone with it).
+ *   VAI163   2026-08-21  Activity: a Task or Appointment row now says how many
+ *                        e-mails were sent against it, and opens on click onto
+ *                        each one - who it went to, its subject, when it went
+ *                        and who sent it, then the message itself. The body is
+ *                        shown ONLY once the row is opened.
+ *   VAI163   2026-08-26  Delivery Order Timeline reworked to follow the delivery
+ *                        through its DOCUMENTS: Drafted -> Completed ->
+ *                        [Confirmed] -> Invoiced.
+ *                        - IN PROGRESS is gone. It restated the Completed stage's
+ *                          own "not yet" as a stage of its own and carried no date
+ *                          at all, so it told the reader nothing that stage did
+ *                          not.
+ *                        - POSTED is gone. It reports the accounting act rather
+ *                          than the delivery's progress, and the header already
+ *                          carries a Posted pill for it.
+ *                        - COMPLETED reads Pending while the delivery is drafted,
+ *                          In Process once it has moved but has not completed, and
+ *                          the WORKFLOW completion date once it has - not the
+ *                          movement date, which is the day the goods moved and is
+ *                          typed on the document.
+ *                        - CONFIRMED is new, and is drawn ONLY for a delivery whose
+ *                          TARGET document type asks for a confirmation
+ *                          (data.IsShipConfirmTarget). It reads In Process until
+ *                          the shipment confirmation completes - including when
+ *                          none has been raised - then captions with the moment it
+ *                          did.
+ *                        - INVOICED now waits for the AR invoice to COMPLETE: a
+ *                          drafted invoice leaves the stage Pending, where the
+ *                          stage previously went green on an invoice merely
+ *                          existing and captioned itself with DateInvoiced, a
+ *                          field a user can back-date. With several invoices it
+ *                          captions with the latest completed one (model side).
+ *                        - Each stage states its own case, so LIFECYCLE_CHAIN and
+ *                          the monotonic back-fill it drove are gone, along with
+ *                          isInvoiced / lastInvoiceDate.
+ *                        - Timeline captions fed by a TIMESTAMP read through the
+ *                          new formatStampDate, so the day lands in the viewer's
+ *                          zone rather than on the stored UTC clock. Drafted was
+ *                          already showing the raw stamp's day.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -223,14 +325,17 @@
             }
 
             if (inserting || rid <= 0) {
-                // New (unsaved) record — nothing to show against it.
-                if ($self.record_ID) {
+                // New (unsaved) record — nothing to show against it. Tested
+                // against what is on screen OR loading, not against record_ID: a
+                // fetch held behind scheduleFetch has not set record_ID yet, and
+                // its reply would land on the cleared panel.
+                if (shownRecordId || data) {
                     $self.record_ID = 0;
                     $self.clear();
                 }
                 return;
             }
-            if (rid !== $self.record_ID) {
+            if (rid !== shownRecordId) {
                 $self.record_ID = rid;
                 $self.fetchData(rid);
             }
@@ -244,6 +349,34 @@
         var $body;
         var $emptyState;
         var data = null;
+
+        // The M_InOut_ID the panel is currently showing OR loading. 0 = nothing on
+        // screen. It is what tells a real record change from the stream of
+        // data-status events the tab fires while a record is being edited, and it
+        // is claimed the moment a fetch is scheduled rather than when the reply
+        // lands — leaving it stale through the wait would let the data-status
+        // listener fire a second fetch for the same row.
+        var shownRecordId = 0;
+
+        // How long refreshPanelData holds before it actually fetches.
+        //
+        // On New Record / Copy Record the framework can call refreshPanelData
+        // BEFORE GridTable raises its insert flag, so isTabInserting() answers
+        // "no" at that instant and the panel loads the record the user has just
+        // moved off — or, on a copy, the record that was copied FROM, whose key
+        // the unsaved row still carries. Asking again after this pause gets the
+        // truth. It also collapses a burst of arrow-key row changes into one
+        // request instead of one per row.
+        var REFRESH_DELAY_MS = 150;
+
+        // Raised by every fetch, every scheduled fetch and every clear. A reply
+        // carrying a token that is no longer the current one belongs to a record
+        // the panel has already moved off, so it is dropped instead of painting.
+        // This is what stops a slow FIRST response from landing on top of the
+        // empty panel New Record had already cleared — the delay above cannot do
+        // it, because the response can arrive at any time.
+        var fetchToken = 0;
+        var pendingFetch = null;    // timer handle of a scheduled fetch, if any
 
         // The delivery lines page client-side (the whole set arrives in one
         // payload). 25 rows a page, matching the other overview panels: the pager
@@ -283,7 +416,47 @@
             $busy[0].style.visibility = show ? "visible" : "hidden";
         }
 
+        // Drops whatever the panel was loading: cancels a scheduled fetch before
+        // its delay and invalidates the token of one already on the wire, so
+        // neither can paint over what the caller is about to put on screen.
+        function invalidateFetch() {
+            fetchToken++;
+            if (pendingFetch) {
+                clearTimeout(pendingFetch);
+                pendingFetch = null;
+            }
+        }
+
+        // Same thing, reachable from dispose so a timer cannot outlive the panel.
+        this.abortPendingFetch = invalidateFetch;
+
+        // Waits REFRESH_DELAY_MS, re-asks the tab whether it is inserting, and only
+        // then fetches. See REFRESH_DELAY_MS for why the wait is needed.
+        this.scheduleFetch = function (recordID) {
+            invalidateFetch();
+            var token = fetchToken;
+            // Claim the record now, not when the timer fires — shownRecordId means
+            // "showing or loading".
+            shownRecordId = +recordID || 0;
+            // Feedback while we hold — clear() / fetchData() own it from here.
+            showBusy(true);
+            pendingFetch = setTimeout(function () {
+                pendingFetch = null;
+                if (token !== fetchToken) return;   // superseded while waiting
+                // The insert flag may only have been raised during the wait.
+                if (isTabInserting($self.curTab)) {
+                    $self.record_ID = 0;
+                    $self.clear();
+                    return;
+                }
+                $self.fetchData(recordID);
+            }, REFRESH_DELAY_MS);
+        };
+
         this.fetchData = function (recordID) {
+            invalidateFetch();
+            var token = fetchToken;
+            shownRecordId = +recordID || 0;
             // A different record starts at the top of its own line list and its
             // own activity feed, with every quality drawer shut.
             linesPage = 0;
@@ -296,12 +469,17 @@
                 dataType: "json",
                 data: { M_InOut_ID: recordID },
                 success: function (raw) {
+                    // Reply for a record the panel has already left (a New Record
+                    // cleared it, or a newer row was selected). Whoever superseded
+                    // us owns the busy indicator now, so leave it be.
+                    if (token !== fetchToken) return;
                     var parsed = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     data = parsed;
                     render();
                     showBusy(false);
                 },
                 error: function (err) {
+                    if (token !== fetchToken) return;
                     console.log(err);
                     showBusy(false);
                 }
@@ -309,11 +487,16 @@
         };
 
         this.clear = function () {
+            invalidateFetch();
             data = null;
+            shownRecordId = 0;
             linesPage = 0;
             activityPage = 0;
             lineQpOpen = {};
             render();
+            // A discarded reply used to strand the indicator spinning over an
+            // empty panel.
+            showBusy(false);
         };
 
         function render() {
@@ -372,9 +555,25 @@
         }
 
         // Returns "N/A" for blank values so the layout never shows an empty cell.
+        // For the HEADER card, where a labelled field with nothing in it is worth
+        // saying out loud.
         function na(value) {
             return (value === null || value === undefined || String(value).trim() === "")
                 ? VIS.Msg.getMsg("VAS_100_NA")
+                : value;
+        }
+
+        // The same thing for a TABLE cell: an em dash rather than the words.
+        //
+        // "N/A" is three characters of prose repeated down a column, and in a
+        // grid it reads as a value — a reader scanning the UOM column sees text
+        // where every other row has a unit. A dash is the conventional mark for
+        // "nothing here" and disappears into the column instead of competing with
+        // it. Used for the line rows and the quality drawer under them.
+        var DASH = "–";
+        function dash(value) {
+            return (value === null || value === undefined || String(value).trim() === "")
+                ? DASH
                 : value;
         }
 
@@ -383,13 +582,11 @@
             return (data && (data.CurSymbol || data.ISO_Code)) || "₹";
         }
 
-        // True once the delivery has lines entered against it. The delivery VALUE
-        // is derived from those lines, so everything that reports it is gated on
-        // this rather than on the amount being non-zero — a delivery can legitimately
-        // total zero, and that is a different statement from "not entered yet".
-        function hasLines() {
-            return !!(data && data.Lines && data.Lines.length);
-        }
+        // hasLines() is gone with the condition it served. It gated the Delivery
+        // Value card, which is now drawn on every record — a card that comes and
+        // goes leaves the reader unable to tell "nothing delivered" from "the card
+        // failed to draw", and zero is the honest answer to what an empty delivery
+        // has moved.
 
         // ---------- Status / priority maps (codes -> label + tone) ---------- //
 
@@ -472,15 +669,20 @@
 
             var $pills = $('<div class="vas_100-hdrPills"></div>');
             if (pm) $pills.append(headerPill(pm.label, pm.tone, "chevUp", false));
-            // Posted badge — shown ONLY once the document has actually been posted
-            // to the ledger (M_InOut.Posted = 'Y'). An unposted delivery carries no
-            // badge at all rather than one reading "Not Posted": the absence is the
-            // statement, and a permanent badge that flips its own wording makes the
-            // posted case harder to spot, not easier.
+            $pills.append(headerPill(st.label, st.tone, null, true));
+            // Posted badge — AFTER the status pill, because posting follows
+            // completion: the strip now reads left to right in the order the
+            // document actually passes through, priority · status · posted, rather
+            // than announcing the ledger before the document's own state.
+            //
+            // Shown ONLY once the document has actually been posted
+            // (M_InOut.Posted = 'Y'). An unposted delivery carries no badge at all
+            // rather than one reading "Not Posted": the absence is the statement,
+            // and a permanent badge that flips its own wording makes the posted
+            // case harder to spot, not easier.
             if (data.Posted) {
                 $pills.append(headerPill(VIS.Msg.getMsg("VAS_100_Posted"), "success", "check", false));
             }
-            $pills.append(headerPill(st.label, st.tone, null, true));
             $top.append($pills);
 
             $strip.append($top);
@@ -524,12 +726,22 @@
             // where they read together as one subject instead of crowding the
             // customer's card. The sales order lives in the Reference strip below,
             // where it is clickable.
+            //
+            // Warehouse, Shipping Method and Movement Date: where the goods left
+            // from, how they travel and when they moved — the three facts that
+            // describe the DISPATCH, which is what this column is for.
+            //
+            // The customer's Location came out. It is a customer fact, and the
+            // column beside it is already the customer block: the ship-to address
+            // there says where the goods went, in full, so the location name
+            // restated part of the same answer under a vaguer label. The movement
+            // date has no other home on the panel.
             var $right = $('<div class="vas_100-hdrColR"></div>');
             $right.append(headerField(VIS.Msg.getMsg("VAS_100_Warehouse"), na(data.WarehouseName), false));
             $right.append(headerField(msg("VAS_100_ShippingMethod", "Shipping Method"),
                 na(shippingMethodLabel(data.DeliveryViaRule)), false));
-            $right.append(headerField(msg("VAS_100_CustomerLocation", "Location"),
-                na(data.CustomerLocationName), false));
+            $right.append(headerField(msg("VAS_100_MovementDate", "Movement Date"),
+                na(formatDate(data.MovementDate)), false));
             $card.append($right);
 
             $body.append($card);
@@ -597,7 +809,7 @@
             // Order window (both live in C_Order).
             if (data.C_Order_ID > 0) {
                 $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_100_SalesOrder"),
-                    data.SONo || ("#" + data.C_Order_ID),
+                    data.SONo || "",
                     pill(msg("VAS_100_Origin", "Origin"), "info"),
                     "info", "C_Order", data.C_Order_ID, true));
                 any = true;
@@ -606,7 +818,7 @@
             // Project the delivery was made against.
             if (data.C_Project_ID > 0) {
                 $chips.append(originChip("doc", msg("VAS_100_Project", "Project"),
-                    data.ProjectNo || data.ProjectName || ("#" + data.C_Project_ID),
+                    data.ProjectNo || data.ProjectName || "",
                     null, "success", "C_Project", data.C_Project_ID));
                 any = true;
             }
@@ -614,7 +826,7 @@
             // The delivery order this one reverses / counters (Ref_InOut_ID).
             if (data.Ref_InOut_ID > 0) {
                 $chips.append(originChip("truck", msg("VAS_100_ReversalOf", "Reversal Of"),
-                    data.RefInOutDocNo || ("#" + data.Ref_InOut_ID),
+                    data.RefInOutDocNo || "",
                     null, "warning", "M_InOut", data.Ref_InOut_ID, true));
                 any = true;
             }
@@ -622,7 +834,7 @@
             // RMA — only ever non-zero where the returns module is installed.
             if (data.M_RMA_ID > 0) {
                 $chips.append(originChip("clipboardCheck", msg("VAS_100_Rma", "RMA"),
-                    data.RmaDocNo || ("#" + data.M_RMA_ID),
+                    data.RmaDocNo || "",
                     null, "purple", "M_RMA", data.M_RMA_ID));
                 any = true;
             }
@@ -680,16 +892,19 @@
             if (confirms) $snap.addClass("vas_100-has-qc");
             var cur = currencyToken();
 
-            // Delivery value — only once there are lines to derive it FROM. The
-            // figure is Σ (delivered qty x rate) over the lines (model side), so on
-            // a delivery with none it can only ever be zero, and "₹ 0.00" against
-            // an empty delivery reads as a priced document rather than as one not
-            // yet entered. The card returns the moment a line does.
-            if (hasLines()) {
-                $snap.append(metricCard("total", "coins", VIS.Msg.getMsg("VAS_100_DeliveryValue"),
-                    formatAmount(+data.DeliveryValue || 0, cur, data.StdPrecision),
-                    data.ISO_Code || ""));
-            }
+            // Delivery value — ALWAYS drawn, zero included.
+            //
+            // It used to appear only once the delivery had lines to derive the
+            // figure from, on the argument that a priced zero misrepresents a
+            // document nobody has entered yet. But a card that comes and goes is
+            // worse than a zero: the strip changes shape between records, the
+            // reader cannot tell "nothing delivered" from "the card failed to
+            // draw", and a value they looked at on the last record is simply
+            // missing on this one. Zero is the honest answer to "what has this
+            // delivery moved" while it is still empty.
+            $snap.append(metricCard("total", "coins", VIS.Msg.getMsg("VAS_100_DeliveryValue"),
+                formatAmount(+data.DeliveryValue || 0, cur, data.StdPrecision),
+                data.ISO_Code || ""));
 
             // Line count.
             $snap.append(metricCard("lines", "box", VIS.Msg.getMsg("VAS_100_Lines"),
@@ -701,10 +916,11 @@
                 formatNumber(+data.DeliveredQty || 0, 0),
                 VIS.Msg.getMsg("VAS_100_Units")));
 
-            // Linked sales order.
-            $snap.append(metricCard("order", "doc", VIS.Msg.getMsg("VAS_100_SalesOrder"),
-                data.SONo || VIS.Msg.getMsg("VAS_100_NotLinked"),
-                formatDate(data.SODateOrdered) || ""));
+            // The Sales Order card is gone. A summary card is for a MEASURE — a
+            // value, a count, a quantity — and this one carried a document number,
+            // which is not something to compare or watch move. The order is
+            // already on screen as a Reference chip that opens it, where a
+            // document number belongs.
 
             // Confirmation Check — whether this delivery's document type asks for a
             // shipment confirmation (C_DocType.IsShipConfirm), with the number of
@@ -773,61 +989,98 @@
 
         // ---------- Fulfilment lifecycle (horizontal stepper) ---------- //
 
-        // Four stages driven by DocStatus + Processed:
-        //   Completed/Closed        -> all four done (active = Completed)
-        //   Processed / IP / AP     -> Drafted + Picked done, In Transit active
-        //   Waiting confirmation/pay-> Drafted done, Picked/Packed active
-        //   otherwise (Drafted)     -> Drafted active
-        // Voided / Reversed collapse to Drafted (no forward progress).
-        function lifecycleReachedIndex() {
+        // The delivery's document lifecycle: Drafted -> Completed -> [Confirmed] ->
+        // Invoiced. Every stage past the first answers for a DOCUMENT and reports
+        // that document's own state — a date once it is reached, and where it has
+        // got to until then, which each stage states for itself.
+        //
+        //   Drafted   — the record exists, so always done, captioned with the day it
+        //               was created on.
+        //   Completed — Pending while the delivery is still drafted, In Process once
+        //               it has moved but has not completed, and the workflow's own
+        //               DocComplete stamp once it has. NOT the movement date: that is
+        //               the day the goods moved, typed on the document, so a delivery
+        //               entered for last month and completed today captioned this
+        //               stage with last month.
+        //   Confirmed — drawn ONLY for a delivery whose TARGET document type asks for
+        //               a shipment confirmation (IsShipConfirm on C_DocTypeTarget_ID).
+        //               Until the confirmation (M_InOutConfirm) completes — including
+        //               when none has been raised yet — it reads In Process; once it
+        //               completes it captions with the moment it did.
+        //   Invoiced  — Pending until an AR invoice against this delivery's lines
+        //               COMPLETES; a drafted invoice is not an invoiced delivery. With
+        //               several invoices it captions with the latest completed one.
+        //
+        // In Progress and Posted are gone. In Progress restated the Completed stage's
+        // own "not yet" as a stage of its own, and carried no date at all; Posted
+        // reports the accounting act rather than the delivery's progress through its
+        // documents, and the header's Posted pill already carries it. LIFECYCLE_CHAIN
+        // and the monotonic reach it drove go with them — with each stage stating its
+        // own case there is nothing left for a back-fill rule to decide.
+        function lifecycleStages() {
             var s = data.StatusCode;
-            if (s === "CO" || s === "CL") return 3;
-            if (s === "VO" || s === "RE" || s === "IN" || s === "NA") return 0;
-            if (data.Processed || s === "IP" || s === "AP") return 2;
-            if (s === "WC" || s === "WP") return 1;
-            return 0;
+            var completed = s === "CO" || s === "CL";
+            // Drafted is the one state nothing has been done to. Anything else short
+            // of completion is under way — in the workflow (IP/WC/WP), waiting on
+            // approval (AP), or handed back to the user (IN/NA). Voided and reversed
+            // land here too; the header's status pill reports that, not the timeline.
+            var drafted = !s || s === "DR";
+            var inProcess = msg("VAS_100_InProcess", "In Process");
+
+            var stages = [
+                { key: "VAS_100_StageDrafted", fallback: "Drafted",
+                  done: true, date: formatStampDate(data.Created) },
+                // The completion stamp is a timestamp and reads through
+                // formatStampDate; MovementDate, its fallback, is a date-only field
+                // and must be parsed as it stands or its calendar day can roll over.
+                { key: "VAS_100_StageCompleted", fallback: "Completed",
+                  done: completed,
+                  date: completed ? (formatStampDate(data.CompletedDate) ||
+                                     formatDate(data.MovementDate)) : "",
+                  pending: drafted ? null : inProcess, active: !drafted }
+            ];
+
+            // Only a delivery that is going to be confirmed carries the stage. On any
+            // other document type there is no confirmation to wait for, and a
+            // permanently In Process stage would read as an omission.
+            if (data.IsShipConfirmTarget) {
+                stages.push({
+                    key: "VAS_100_StageConfirmed", fallback: "Confirmed",
+                    done: !!data.ConfirmCompletedDate,
+                    date: formatStampDate(data.ConfirmCompletedDate),
+                    // Not raised yet, still drafted, or raised and not completed —
+                    // all of them are the confirmation being worked through.
+                    pending: inProcess, active: true
+                });
+            }
+
+            stages.push({
+                key: "VAS_100_StageInvoiced", fallback: "Invoiced",
+                done: !!data.InvoiceCompletedDate,
+                date: formatStampDate(data.InvoiceCompletedDate)
+            });
+
+            return stages;
         }
 
         function renderLifecycle() {
-            var stageKeys = [
-                "VAS_100_StageDrafted",
-                "VAS_100_StagePickedPacked",
-                "VAS_100_StageInTransit",
-                "VAS_100_StageCompleted"
-            ];
-            var reached = lifecycleReachedIndex();
-            var completed = data.StatusCode === "CO" || data.StatusCode === "CL";
+            var stages = lifecycleStages();
 
             var $sec = section(msg("VAS_100_Timeline", "Delivery Order Timeline"), null);
 
-            // The Drafted stage is dated with the record's creation stamp — the
-            // moment the delivery order came into being — rather than reading a
-            // bare "Done" / "Current" like the stages after it.
-            var createdOn = formatDate(data.Created);
-
             var $tl = $('<div class="vas_100-stepper"></div>');
-            for (var i = 0; i < stageKeys.length; i++) {
-                var stateCls, metaText, done;
-                if (i < reached) {
-                    stateCls = "vas_100-is-done"; done = true;
-                    metaText = VIS.Msg.getMsg("VAS_100_Done");
-                } else if (i === reached) {
-                    // The final stage, once reached on a completed DO, reads done.
-                    if (completed && i === stageKeys.length - 1) {
-                        stateCls = "vas_100-is-done"; done = true;
-                        metaText = formatDate(data.MovementDate) || VIS.Msg.getMsg("VAS_100_Done");
-                    } else {
-                        stateCls = "vas_100-is-active"; done = false;
-                        metaText = VIS.Msg.getMsg("VAS_100_Current");
-                    }
+            for (var k = 0; k < stages.length; k++) {
+                var stg = stages[k], stateCls, metaText;
+                if (stg.done) {
+                    stateCls = "vas_100-is-done";
+                    metaText = stg.date || msg("VAS_100_Done", "Done");
                 } else {
-                    stateCls = "is-pending"; done = false;
-                    metaText = VIS.Msg.getMsg("VAS_100_Pending");
+                    // A stage that is under way says so; one that has not started
+                    // falls back to Pending.
+                    stateCls = stg.active ? "vas_100-is-active" : "is-pending";
+                    metaText = stg.pending || msg("VAS_100_Pending", "Pending");
                 }
-                // Drafted always reports WHEN the record was created; the state
-                // wording above only stands in when there is no creation stamp.
-                if (i === 0 && createdOn) metaText = createdOn;
-                $tl.append(stepEntry(i + 1, VIS.Msg.getMsg(stageKeys[i]), metaText, done, stateCls));
+                $tl.append(stepEntry(k + 1, msg(stg.key, stg.fallback), metaText, stg.done, stateCls));
             }
             $sec.append($tl);
         }
@@ -1110,7 +1363,10 @@
             $item.append(svgIcon(meta.icon));
 
             var $txt = $('<span class="vas_100-docTxt"></span>');
-            var docNo = (d.DocumentNo || "").trim() || ("#" + d.RecordId);
+            // A dash, not the record's internal key: the row already names what
+            // kind of document it is on the sub-line beneath, and an id tells the
+            // reader nothing they can quote back to anyone.
+            var docNo = (d.DocumentNo || "").trim() || DASH;
             $txt.append($('<div class="vas_100-itName"></div>').attr("title", docNo).text(docNo));
 
             var subBits = [msg(meta.labelKey, meta.labelText)];
@@ -1185,7 +1441,17 @@
             // One row per FIELD that changed, not one per save.
             updated:     { tone: "info",    icon: "pencil", tagKey: "VAS_100_TagUpdated",     tagText: "Updated",      titleKey: "VAS_100_ActUpdated", titleText: "Delivery order updated" },
             note:        { tone: "neutral", icon: "note",   tagKey: "VAS_100_TagNote",        tagText: "Note",         titleKey: null, titleText: "" },
-            email:       { tone: "purple",  icon: "mail",   tagKey: "VAS_100_TagEmail",       tagText: "Email",        titleKey: null, titleText: "" }
+            email:       { tone: "purple",  icon: "mail",   tagKey: "VAS_100_TagEmail",       tagText: "Email",        titleKey: null, titleText: "" },
+            // The correspondence and engagement sources shared with every other
+            // overview panel (model side, VAS_ActivitySourcesModel): meetings and
+            // tasks from AppointmentsInfo, calls from VA048_CallDetails, and the
+            // inbound letters MailAttachment1 files under AttachmentType 'I'.
+            // titleKey null on all four: each headlines with its OWN subject, note
+            // or title, falling back to what its tag says it is.
+            appointment: { tone: "info",    icon: "clipboardCheck", tagKey: "VAS_100_TagAppointment", tagText: "Meeting", titleKey: null, titleText: "" },
+            task:        { tone: "warning", icon: "check",  tagKey: "VAS_100_TagTask",        tagText: "Task",         titleKey: null, titleText: "" },
+            call:        { tone: "success", icon: "phone",  tagKey: "VAS_100_TagCall",        tagText: "Call",         titleKey: null, titleText: "" },
+            letter:      { tone: "purple",  icon: "mail",   tagKey: "VAS_100_TagLetter",      tagText: "Letter",       titleKey: null, titleText: "" }
         };
 
         // Maximum activity rows shown per page; the feed paginates beyond this.
@@ -1270,7 +1536,30 @@
             // An e-mail names its recipients under the subject — every address on
             // the To, Cc and Bcc lists, in full. The line wraps, so a long list is
             // read on the row itself rather than hidden behind a count.
-            if (a.Type === "email") {
+            // A LETTER names its addresses here too — it is the same record in the
+            // same table, filed under a different attachment type.
+            if (a.Type === "call" && a.MailTo) {
+                $title.append($('<small class="vas_100-actSub"></small>')
+                    .text(a.MailTo).attr("title", a.MailTo));
+            }
+            if (a.Type === "appointment" || a.Type === "task") {
+                var apptBits = [];
+                if (a.Location) apptBits.push(a.Location);
+                if (a.IsCancelled) apptBits.push(msg("VAS_100_ActCancelled", "Cancelled"));
+                else if (a.IsClosed) apptBits.push(msg("VAS_100_ActDone", "Completed"));
+                // What was e-mailed about this meeting or task. The count only —
+                // the addresses, subjects and bodies are in the drawer, and a
+                // meeting that generated several notices would otherwise push
+                // everything else off the sub-line.
+                var apptMails = activityMails(a);
+                if (apptMails.length) apptBits.push(mailCountLabel(apptMails.length));
+                if (apptBits.length) {
+                    var apptSub = apptBits.join(" · ");
+                    $title.append($('<small class="vas_100-actSub"></small>')
+                        .text(apptSub).attr("title", apptSub));
+                }
+            }
+            if (a.Type === "email" || a.Type === "letter") {
                 var to = recipientSummary(a);
                 if (to) $title.append($('<small class="vas_100-actSub"></small>').text(to));
             }
@@ -1297,16 +1586,25 @@
 
             // Rows carrying a body are clickable; the caret shows the state.
             if (hasActivityBody(a)) {
+                // A meeting or task opens onto the e-mails sent about it; every
+                // other openable row onto its own message.
+                var isAppt = (a.Type === "appointment" || a.Type === "task");
+                var showHint = isAppt
+                    ? msg("VAS_100_ShowMails", "Click to read the e-mails")
+                    : msg("VAS_100_ShowMailBody", "Click to read the message");
+                var hideHint = isAppt
+                    ? msg("VAS_100_HideMails", "Click to hide the e-mails")
+                    : msg("VAS_100_HideMailBody", "Click to hide the message");
+
                 $row.addClass("vas_100-is-openable");
-                $row.attr("title", msg("VAS_100_ShowMailBody", "Click to read the message"));
+                $row.attr("title", showHint);
                 $row.append($('<span class="vas_100-actCaret"></span>').append(svgIcon("chevRight")));
                 $row.on("click", function () {
                     var $panel = $row.next(".vas_100-actBody");
                     if (!$panel.length) return;
                     var nowOpen = !$row.hasClass("vas_100-is-open");
                     $row.toggleClass("vas_100-is-open", nowOpen)
-                        .attr("title", nowOpen ? msg("VAS_100_HideMailBody", "Click to hide the message")
-                                               : msg("VAS_100_ShowMailBody", "Click to read the message"));
+                        .attr("title", nowOpen ? hideHint : showHint);
                     $panel.toggle(nowOpen);
                 });
             }
@@ -1316,8 +1614,13 @@
 
         // Follows VAS_092's rule exactly.
         function activityTitle(a, meta) {
-            if (a.Type === "email") {
+            if (a.Type === "email" || a.Type === "letter") {
                 return (a.Text || "").trim() || msg("VAS_100_NoSubject", "(no subject)");
+            }
+            // A meeting, task or call headlines with its own subject or note; with
+            // none, the KIND stands in rather than borrowing another type's words.
+            if (a.Type === "appointment" || a.Type === "task" || a.Type === "call") {
+                return (a.Text || "").trim() || msg(meta.tagKey, meta.tagText);
             }
             // Free-text types (note, and every workflow lifecycle row) headline
             // with their own text; an untitled one falls back to what its tag says.
@@ -1333,10 +1636,30 @@
             return msg(meta.titleKey, meta.titleText);
         }
 
-        // Only an e-mail carries a body worth opening; a mail stored without one
-        // stays a plain, non-clickable row.
+        // What opens on click. An e-mail or letter opens its OWN body, and a mail
+        // stored without one stays a plain, non-clickable row. An appointment or
+        // task opens the e-mails sent against it.
         function hasActivityBody(a) {
-            return !!(a && a.Type === "email" && a.Body && String(a.Body).trim());
+            if (!a) return false;
+            if (a.Type === "email" || a.Type === "letter") {
+                return !!(a.Body && String(a.Body).trim());
+            }
+            if (a.Type === "appointment" || a.Type === "task") {
+                return activityMails(a).length > 0;
+            }
+            return false;
+        }
+
+        // The e-mails sent against an appointment or task (MailAttachment1 keyed
+        // on AppointmentsInfo). Always an array, so callers can count and loop
+        // without guarding.
+        function activityMails(a) {
+            return (a && a.Mails && a.Mails.length) ? a.Mails : [];
+        }
+
+        function mailCountLabel(n) {
+            return n + " " + (n === 1 ? msg("VAS_100_Email", "email")
+                                      : msg("VAS_100_Emails", "emails"));
         }
 
         // The e-mail body, collapsed beneath its activity row. The full recipient
@@ -1346,12 +1669,53 @@
             if (!hasActivityBody(a)) return null;
 
             var $panel = $('<div class="vas_100-actBody" style="display:none;"></div>');
+
+            // An appointment or task opens onto the e-mails sent about it, each
+            // with its own recipient, subject, moment and sender. They are listed
+            // newest first (model order).
+            if (a.Type === "appointment" || a.Type === "task") {
+                var mails = activityMails(a);
+                for (var i = 0; i < mails.length; i++) {
+                    $panel.append(activityMailEntry(mails[i], i > 0));
+                }
+                return $panel;
+            }
+
             appendMailMeta($panel, "VAS_100_MailFrom", "From:", a.MailFrom);
             appendMailMeta($panel, "VAS_100_MailTo",   "To:",   a.MailTo);
             appendMailMeta($panel, "VAS_100_MailCc",   "Cc:",   a.MailCc);
             appendMailMeta($panel, "VAS_100_MailBcc",  "Bcc:",  a.MailBcc);
             $panel.append($('<p></p>').text(String(a.Body).trim()));
             return $panel;
+        }
+
+        // One e-mail inside an appointment's or task's drawer: who it went to and
+        // what it was about, then when and by whom, then the message. Separated
+        // from the one before it so several notices do not read as one.
+        function activityMailEntry(m, separated) {
+            var $wrap = $('<div class="vas_100-actMailItem"></div>');
+            if (separated) $wrap.addClass("vas_100-actMailSplit");
+
+            appendMailMeta($wrap, "VAS_100_MailTo", "To:", m.MailTo);
+            appendMailMeta($wrap, "VAS_100_MailSubject", "Subject:",
+                (m.Subject && String(m.Subject).trim())
+                    ? m.Subject : msg("VAS_100_NoSubject", "(no subject)"));
+
+            // "when · by whom", the same two parts in the same order as the row
+            // above it.
+            var when = formatDateTime(m.SentOn);
+            if (m.SentBy) {
+                when = when ? when + " · " + msg("VAS_100_By", "by") + " " + m.SentBy
+                            : msg("VAS_100_By", "by") + " " + m.SentBy;
+            }
+            if (when) $wrap.append($('<div class="vas_100-actMeta"></div>').text(when));
+
+            // The body is the thing the click was for; a mail filed without one
+            // still shows its envelope rather than an empty gap.
+            if (m.Body && String(m.Body).trim()) {
+                $wrap.append($('<p></p>').text(String(m.Body).trim()));
+            }
+            return $wrap;
         }
 
         function appendMailMeta($panel, key, fallback, value) {
@@ -1387,7 +1751,7 @@
             // Both the name and the locator clip to one line, so each carries its
             // own full text as a tooltip: hovering the product reads out the whole
             // product name, hovering the locator the whole locator.
-            var productName = na(ln.ProductName);
+            var productName = dash(ln.ProductName);
             var $name = $('<div class="vas_100-itName"></div>').attr("title", productName);
 
             // Expander, only on a product that actually has parameters to show — a
@@ -1453,23 +1817,22 @@
                     .attr("title", ln.Description).text(ln.Description));
             }
 
-            // 4 — drop shipment. Always drawn, Yes or No: "No" is as much of an
-            // answer as "Yes", and a line that reads nothing here would leave the
-            // reader unable to tell an ordinary line from one the panel simply
-            // failed to flag.
-            var dropYes = !!ln.IsDropShip;
-            var dropTxt = msg("VAS_100_DropShipment", "Drop Shipment") + ": " +
-                (dropYes ? msg("VAS_100_Yes", "Yes") : msg("VAS_100_No", "No"));
-            $item.append($('<div class="vas_100-itDrop"></div>')
-                .toggleClass("vas_100-is-drop", dropYes)
-                .attr("title", dropTxt).text(dropTxt));
+            // 4 — drop shipment, drawn ONLY for a line that IS one. It used to be
+            // stated on every line, Yes or No; the "No" is the ordinary case, so
+            // the flag now marks the exception and its presence is the answer.
+            if (ln.IsDropShip) {
+                var dropTxt = msg("VAS_100_DropShipment", "Drop Shipment") + ": " +
+                    msg("VAS_100_Yes", "Yes");
+                $item.append($('<div class="vas_100-itDrop"></div>')
+                    .attr("title", dropTxt).text(dropTxt));
+            }
 
             $tr.append($item);
 
             var prec = +ln.UOMPrecision || 0;
 
             // UOM
-            $tr.append($('<span></span>').text(na(ln.UOMName)));
+            $tr.append($('<span></span>').text(dash(ln.UOMName)));
 
             // Ordered
             $tr.append($('<span class="vas_100-ta-r"></span>').text(formatNumber(+ln.OrderedQty || 0, prec)));
@@ -1636,7 +1999,7 @@
             // Parameter (Colour / Size / Grade ...), with the QA remark beneath it
             // when one was entered.
             var $param = $('<span class="vas_100-itItem"></span>');
-            var paramName = na(q.ParameterName);
+            var paramName = dash(q.ParameterName);
             $param.append($('<div class="vas_100-qpName"></div>')
                 .text(paramName).attr("title", paramName));
             var remark = (q.Remark || "").trim();
@@ -1652,13 +2015,13 @@
                 .text(toVerify).attr("title", toVerify));
 
             // Acceptable / actual value.
-            $tr.append($('<span></span>')
-                .text(na(q.AcceptableValue)).attr("title", na(q.AcceptableValue)));
-            $tr.append($('<span></span>')
-                .text(na(q.ActualValue)).attr("title", na(q.ActualValue)));
+            var acceptable = dash(q.AcceptableValue);
+            var actual     = dash(q.ActualValue);
+            $tr.append($('<span></span>').text(acceptable).attr("title", acceptable));
+            $tr.append($('<span></span>').text(actual).attr("title", actual));
 
             // QA / QC date.
-            var qaDate = na(formatDate(q.QAQCDate));
+            var qaDate = dash(formatDate(q.QAQCDate));
             $tr.append($('<span></span>').text(qaDate).attr("title", qaDate));
 
             // Verdict.
@@ -1706,7 +2069,16 @@
             // client's zoom target, so both would end at the "cannot open"
             // fallback on every click.
             "M_InOutConfirm": "VAS_ShipReceiptConfirm",
-            "C_Payment":      "VAS_ARReceipt"
+            "C_Payment":      "VAS_ARReceipt",
+            // C_Invoice is dual-purpose, and every invoice this panel opens is a
+            // CUSTOMER invoice: the Documents section lists the invoices raised
+            // against this delivery's lines, and the model reads them with
+            // IsSOTrx = 'Y'. Unnamed, the click fell through to the zoom target,
+            // which answers with the AP Invoice window unless it is handed an
+            // IsSOTrx flag the Documents rows do not carry — so a customer invoice
+            // opened on the vendor screen. VAS_092 names its own C_Invoice the
+            // other way round, and for the same reason.
+            "C_Invoice":      "VAS_ARInvoice"
         };
 
         // The same map for records opened as a SALES transaction. C_Order and
@@ -1895,6 +2267,15 @@
             return isNaN(d.getTime()) ? null : d;
         }
 
+        // The DAY of a genuine timestamp, in the viewer's own zone — for the
+        // timeline, whose stages are captioned with moments (created, completed,
+        // confirmed, invoiced) rather than with document date fields. formatDate on
+        // its own reads a UTC stamp as local and can report the day before or after
+        // the one the reader would call it.
+        function formatStampDate(value) {
+            return formatDate(parseStamp(value));
+        }
+
         function formatDateTime(value) {
             var d = parseStamp(value);
             if (!d) return "";
@@ -1937,7 +2318,9 @@
         }
         this.record_ID = recordID;
         this.selectedRow = selectedRow;
-        this.fetchData(recordID);
+        // Held rather than fetched outright: the insert flag is not always up yet
+        // when we get here, so scheduleFetch asks once more before loading.
+        this.scheduleFetch(recordID);
     };
 
     /* Set width as per window width */
@@ -1947,6 +2330,11 @@
 
     /* Release variables from memory */
     VAS.VAS_100_OverviewDO.prototype.dispose = function () {
+        // Kill any held fetch first — its timer would otherwise fire against a
+        // panel whose curTab has just been nulled out below.
+        if (typeof this.abortPendingFetch === "function") {
+            try { this.abortPendingFetch(); } catch (e) { }
+        }
         if (this.curTab && typeof this.curTab.removeDataStatusListener === "function") {
             try { this.curTab.removeDataStatusListener(this.tabDataListener); } catch (e) { }
         }

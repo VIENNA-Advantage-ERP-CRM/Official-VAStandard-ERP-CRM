@@ -111,8 +111,10 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 0.875em;
-    height: 0.875em;
+    width: 1.125em;
+    height: 1.125em;
+    flex-shrink: 0;
+    color: inherit;
 }
 
 .vas-obl-is-hidden {
@@ -307,6 +309,7 @@
 .vas-obl-row--head {
     padding: 0.625em 0;
     border-bottom-color: var(--cil-divider-strong);
+    align-items: start;
 }
 
     .vas-obl-row--head .vas-obl-cell {
@@ -490,6 +493,7 @@
     padding: 1.5em;
     text-align: center;
     color: var(--cil-text-muted);
+    border-bottom: 1px solid var(--cil-divider);
 }
 
 .vas-obl-total-item {
@@ -827,22 +831,9 @@
         background: var(--cil-blue-soft);
         color: var(--cil-action-blue);
     }
-    /* Highlighted when the Additional Info modal has at least one value set. */
     .vas-obl-more-btn.has-values {
-        color: var(--cil-action-blue);
         background: var(--cil-blue-soft);
-        position: relative;
-    }
-    /* Small filled dot in the top-right corner as a data-present indicator. */
-    .vas-obl-more-btn.has-values::after {
-        content: '';
-        position: absolute;
-        top: 0.15em;
-        right: 0.15em;
-        width: 0.4em;
-        height: 0.4em;
-        border-radius: 50%;
-        background: var(--cil-action-blue);
+        color: var(--cil-action-blue);
     }
     .vas-obl-more-btn.has-values:hover {
         background: #d9eeff;

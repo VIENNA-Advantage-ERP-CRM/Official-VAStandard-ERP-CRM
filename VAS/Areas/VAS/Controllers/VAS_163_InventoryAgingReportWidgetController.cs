@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Web.Mvc;
@@ -15,7 +15,12 @@ namespace VAS.Controllers
      * - Storage / On-Hand: M_Storage (M_Product_ID, M_AttributeSetInstance_ID, M_Locator_ID, QtyOnHand, DateLastInventory, Created)
      * - Product Master: M_Product (M_Product_ID, Name)
      * - Attribute Instance: M_AttributeSetInstance (M_AttributeSetInstance_ID, Description)
-     * - Locator: M_Locator (M_Locator_ID, M_Warehouse_ID, Value)
+     * - Locator: M_Locator (M_Locator_ID, M_Warehouse_ID, Value, LocatorCombination)
+     *   Displayed as COALESCE(LocatorCombination, Value) - the prompt's own mapping says
+     *   "M_Locator.LocatorCombination: preferred locator display / M_Locator.Value: locator
+     *   display fallback". Value alone is a numeric surrogate on this data.
+     * - Movement history: M_Transaction (M_Product_ID, M_AttributeSetInstance_ID, M_Locator_ID,
+     *   MovementDate, MovementQty[, IsReversed]) - the aging basis.
      * - Warehouse: M_Warehouse (M_Warehouse_ID, Value, Name)
      * Cross-Database: Age calculation uses DB.IsPostgreSQL() vs Oracle DB.TO_DATE/SYSDATE and ANSI COALESCE.
      */
@@ -25,6 +30,72 @@ namespace VAS.Controllers
     public class VAS_163_InventoryAgingReportWidgetController : Controller
     {
         private static readonly VLogger _log = VLogger.GetVLogger(typeof(VAS_163_InventoryAgingReportWidgetController));
+
+        // M_Transaction.IsReversed exists on some deployments but not others; referencing a
+        // missing column fails the whole query. Same guard and cache as
+        // VAS_078_ProductSearchWidgetController.TransactionHasIsReversed().
+        private static bool? _transactionHasIsReversed;
+
+        private static bool TransactionHasIsReversed()
+        {
+            if (_transactionHasIsReversed.HasValue) { return _transactionHasIsReversed.Value; }
+
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Column ColumnInfo
+                INNER JOIN AD_Table TableInfo ON (TableInfo.AD_Table_ID=ColumnInfo.AD_Table_ID AND TableInfo.IsActive='Y')
+                WHERE ColumnInfo.IsActive='Y'
+                  AND UPPER(TableInfo.TableName)='M_TRANSACTION'
+                  AND UPPER(ColumnInfo.ColumnName)='ISREVERSED'";
+
+            _transactionHasIsReversed = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null)) > 0;
+            return _transactionHasIsReversed.Value;
+        }
+
+        /*
+         * AGING BASIS (user instruction 2026-08-29: "Fetch inventory aging details from the
+         * M_Transaction table and calculate the quantity under the slabs based on the MovementDate
+         * and MovementQty fields").
+         *
+         * The age of one stock position is the age of the OLDEST INBOUND MOVEMENT that put stock
+         * into it: MIN(M_Transaction.MovementDate) over rows with MovementQty > 0 for the same
+         * Product + AttributeSetInstance + Locator.
+         *
+         * This REPLACES COALESCE(s.DateLastInventory, s.Created), which is what the widget used
+         * before and is the reported "incorrect data": DateLastInventory is when the position was
+         * last COUNTED and Created is when the storage row was first written - neither is when the
+         * stock actually arrived, so a long-held item could look fresh and vice versa.
+         *
+         * The source prompt specifies a fuller FIFO/LIFO algorithm using M_TransactionAllocation
+         * remaining layers. That allocator does not exist: M_TransactionAllocation is referenced
+         * NOWHERE in this solution. The user chose the simple oldest-inbound-MovementDate basis on
+         * 2026-08-29 rather than have it built blind. Recorded so the prompt is not "restored"
+         * later by mistake.
+         *
+         * s.Created remains the fallback when a position has no inbound transaction at all, which
+         * is the fallback the prompt itself names.
+         */
+        private static string GetAgingJoin()
+        {
+            string reversedFilter = TransactionHasIsReversed()
+                ? " AND COALESCE(t.IsReversed, 'N') = 'N'"
+                : "";
+
+            return @"
+                LEFT JOIN (
+                    SELECT t.M_Product_ID,
+                           COALESCE(t.M_AttributeSetInstance_ID, 0) AS M_AttributeSetInstance_ID,
+                           t.M_Locator_ID,
+                           MIN(t.MovementDate) AS FirstInboundDate
+                    FROM M_Transaction t
+                    WHERE t.MovementQty > 0" + reversedFilter + @"
+                    GROUP BY t.M_Product_ID,
+                             COALESCE(t.M_AttributeSetInstance_ID, 0),
+                             t.M_Locator_ID
+                ) tx ON (tx.M_Product_ID = s.M_Product_ID
+                     AND tx.M_AttributeSetInstance_ID = COALESCE(s.M_AttributeSetInstance_ID, 0)
+                     AND tx.M_Locator_ID = s.M_Locator_ID)";
+        }
 
         private static string GetAgeDaysExpression(string dateCol)
         {
@@ -109,22 +180,39 @@ namespace VAS.Controllers
                     whFilter = " AND loc.M_Warehouse_ID = " + warehouseId.Value;
                 }
 
-                string ageExpr = GetAgeDaysExpression("s.DateLastInventory, s.Created");
+                string ageExpr = GetAgeDaysExpression("tx.FirstInboundDate, s.Created");
 
-                string sql = @"SELECT s.M_Product_ID, 
-                                      s.M_AttributeSetInstance_ID, 
-                                      MIN(" + ageExpr + @") AS AgeDays
+                /*
+                 * ONE ROW PER STOCK POSITION - Product + Attribute + Warehouse + Locator.
+                 *
+                 * This used to GROUP BY (M_Product_ID, M_AttributeSetInstance_ID) and take
+                 * MIN(age), i.e. it collapsed every locator of a product into ONE counted item,
+                 * while GetBucketDetail below lists one row per M_Storage row (which is per
+                 * locator). That is exactly the reported defect: the tile said "1 product" and the
+                 * popup then listed 2.
+                 *
+                 * The prompt settles the unit explicitly: "one displayed product count means one
+                 * Product + Attribute + Warehouse + Locator stock position", and "the same Product
+                 * + Attribute may be counted more than once when it exists in different warehouses
+                 * or locators".
+                 *
+                 * M_Storage is already keyed per product + attribute + locator, so counting its
+                 * rows IS that unit - and it makes the tile and the popup agree by construction
+                 * rather than by two queries happening to match.
+                 */
+                string sql = @"SELECT " + ageExpr + @" AS AgeDays
                                FROM M_Storage s
-                               JOIN M_Locator loc ON (s.M_Locator_ID = loc.M_Locator_ID)
+                               JOIN M_Locator loc ON (s.M_Locator_ID = loc.M_Locator_ID)" + GetAgingJoin() + @"
                                WHERE s.IsActive = 'Y' AND s.QtyOnHand > 0" + whFilter;
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "s", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                sql += " GROUP BY s.M_Product_ID, s.M_AttributeSetInstance_ID";
 
                 dr = DB.ExecuteReader(sql, null, null);
                 while (dr != null && dr.Read())
                 {
-                    int ageDays = Util.GetValueOfInt(dr["AgeDays"]);
+                    // Clamp a future aging date to 0 rather than letting it go negative -
+                    // the prompt requires it, and the previous code did not do it.
+                    int ageDays = Math.Max(0, Util.GetValueOfInt(dr["AgeDays"]));
                     if (ageDays <= 30)
                     {
                         b0_30++;
@@ -190,7 +278,7 @@ namespace VAS.Controllers
                     whFilter = " AND loc.M_Warehouse_ID = " + warehouseId.Value;
                 }
 
-                string ageExpr = GetAgeDaysExpression("s.DateLastInventory, s.Created");
+                string ageExpr = GetAgeDaysExpression("tx.FirstInboundDate, s.Created");
 
                 string ageClause = "";
                 if (bucketId == "0-30")
@@ -219,14 +307,14 @@ namespace VAS.Controllers
                 string sql = @"SELECT p.Name AS ProductName,
                                       asi.Description AS AttributeDesc,
                                       w.Name AS WarehouseName,
-                                      loc.Value AS LocatorValue, 
+                                      COALESCE(loc.LocatorCombination, loc.Value) AS LocatorValue, 
                                       s.QtyOnHand, 
                                       " + ageExpr + @" AS AgeDays
                                FROM M_Storage s
                                JOIN M_Product p ON (s.M_Product_ID = p.M_Product_ID)
                                JOIN M_Locator loc ON (s.M_Locator_ID = loc.M_Locator_ID)
                                JOIN M_Warehouse w ON (loc.M_Warehouse_ID = w.M_Warehouse_ID)
-                               LEFT JOIN M_AttributeSetInstance asi ON (s.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
+                               LEFT JOIN M_AttributeSetInstance asi ON (s.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)" + GetAgingJoin() + @"
                                WHERE s.IsActive = 'Y' AND s.QtyOnHand > 0" + whFilter + ageClause;
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "s", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -235,11 +323,12 @@ namespace VAS.Controllers
                 dr = DB.ExecuteReader(sql, null, null);
                 while (dr != null && dr.Read())
                 {
+                    // No attribute set instance -> BLANK, not a placeholder (user request
+                    // 2026-08-29). It used to fall back to
+                    // Msg.GetMsg(ctx, "VAS_Standard") ?? "Standard", which carried the usual
+                    // Msg.GetMsg trap too: that call returns "[VAS_Standard]" rather than null
+                    // when the AD_Message row is missing, so the "??" never fired.
                     string attribute = Util.GetValueOfString(dr["AttributeDesc"]);
-                    if (string.IsNullOrEmpty(attribute))
-                    {
-                        attribute = Msg.GetMsg(ctx, "VAS_Standard") ?? "Standard";
-                    }
 
                     lines.Add(new
                     {
@@ -248,7 +337,7 @@ namespace VAS.Controllers
                         warehouse = Util.GetValueOfString(dr["WarehouseName"]),
                         locator = Util.GetValueOfString(dr["LocatorValue"]),
                         qty = Util.GetValueOfDecimal(dr["QtyOnHand"]),
-                        ageDays = Util.GetValueOfInt(dr["AgeDays"])
+                        ageDays = Math.Max(0, Util.GetValueOfInt(dr["AgeDays"]))
                     });
                 }
             }

@@ -81,6 +81,25 @@
 ///                        is not an edit, and the platform logs plenty of those.
 ///                        The trail said WHICH field moved but never what it moved
 ///                        from or to. Follows VAS_101 / VAS_104.
+///   VAI163   2026-08-21  Activity: an appointment or task now carries the
+///                        e-mails sent against IT - MailAttachment1 keyed on
+///                        AppointmentsInfo rather than on this panel's own
+///                        table - with the recipient (MailAddress), subject
+///                        (Title), when (Created) and who sent it (CreatedBy).
+///                        The body (TextMsg, flattened) travels with the row so
+///                        the panel reveals it on click. Read in one query for
+///                        the whole feed through VAS_ActivitySourcesModel.
+///   VAI163   2026-09-02  Activity timestamps render in the VIEWER's zone on
+///                        PostgreSQL too. Every date and timestamp handed to
+///                        the client now goes through Stamp(), which drops the
+///                        DateTimeKind the provider tagged the value with -
+///                        Oracle says Unspecified, Npgsql says Utc or Local,
+///                        and Newtonsoft writes a zone designator for the
+///                        latter two but not the first. The panel parses the
+///                        bare Oracle form, so the designator made it read the
+///                        value as already-zoned and skip its own conversion,
+///                        printing the stored clock. Same JSON on either engine
+///                        now. No-op on Oracle.
 /// </summary>
 
 using System;
@@ -174,11 +193,11 @@ namespace VASLogic.Models
                                  FROM M_MovementLine l
                                 WHERE l.M_Movement_ID = m.M_Movement_ID
                                   AND l.IsActive      = 'Y')              AS LineCount,
-                              (SELECT NVL(SUM(NVL(l.MovementQty, 0)), 0)
+                              (SELECT COALESCE(SUM(COALESCE(l.MovementQty, 0)), 0)
                                  FROM M_MovementLine l
                                 WHERE l.M_Movement_ID = m.M_Movement_ID
                                   AND l.IsActive      = 'Y')              AS TransferQty,
-                              (SELECT NVL(SUM(NVL(l.MovementQty, 0) * " + rateExpr + @"), 0)
+                              (SELECT COALESCE(SUM(COALESCE(l.MovementQty, 0) * " + rateExpr + @"), 0)
                                  FROM M_MovementLine l
                                 WHERE l.M_Movement_ID = m.M_Movement_ID
                                   AND l.IsActive      = 'Y')              AS TransferValue,
@@ -221,8 +240,8 @@ namespace VASLogic.Models
             result.StatusCode       = Util.GetValueOfString(r["DocStatus"]);
             result.Processed        = Util.GetValueOfString(r["Processed"]) == "Y";
             result.Posted           = Util.GetValueOfString(r["Posted"]) == "Y";
-            result.MovementDate     = Util.GetValueOfDateTime(r["MovementDate"]);
-            result.CreatedOn        = Util.GetValueOfDateTime(r["CreatedOn"]);
+            result.MovementDate     = Stamp(r["MovementDate"]);
+            result.CreatedOn        = Stamp(r["CreatedOn"]);
             result.Description      = Util.GetValueOfString(r["Description"]);
             result.FromWarehouseName = Util.GetValueOfString(r["FromWarehouseName"]);
             result.ToWarehouseName   = Util.GetValueOfString(r["ToWarehouseName"]);
@@ -441,8 +460,8 @@ namespace VASLogic.Models
                         DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                         StatusCode = Util.GetValueOfString(r["DocStatus"]),
                         Processed  = Util.GetValueOfString(r["Processed"]) == "Y",
-                        Created    = Util.GetValueOfDateTime(r["Created"]),
-                        Updated    = Util.GetValueOfDateTime(r["Updated"])
+                        Created    = Stamp(r["Created"]),
+                        Updated    = Stamp(r["Updated"])
                     });
                 }
             }
@@ -558,7 +577,7 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(sql, MovementParam(M_Movement_ID), null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
-                    DateTime? d = Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["CompletedDate"]);
+                    DateTime? d = Stamp(ds.Tables[0].Rows[0]["CompletedDate"]);
                     if (d.HasValue) return d;
                 }
 
@@ -568,7 +587,7 @@ namespace VASLogic.Models
                                        AND m.DocStatus IN ('CO', 'CL')";
                 ds = DB.ExecuteDataset(fallback, MovementParam(M_Movement_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
-                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["Updated"]);
+                return Stamp(ds.Tables[0].Rows[0]["Updated"]);
             }
             catch (Exception ex)
             {
@@ -607,7 +626,7 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(sql, MovementParam(M_Movement_ID), null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
-                    DateTime? d = Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["ConfirmedDate"]);
+                    DateTime? d = Stamp(ds.Tables[0].Rows[0]["ConfirmedDate"]);
                     if (d.HasValue) return d;
                 }
 
@@ -620,7 +639,7 @@ namespace VASLogic.Models
                                        AND c.DocStatus IN ('CO', 'CL')";
                 ds = DB.ExecuteDataset(fallback, MovementParam(M_Movement_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
-                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["ConfirmedDate"]);
+                return Stamp(ds.Tables[0].Rows[0]["ConfirmedDate"]);
             }
             catch (Exception ex)
             {
@@ -645,7 +664,7 @@ namespace VASLogic.Models
                                   AND adt.TableName = 'M_Movement'";
                 DataSet ds = DB.ExecuteDataset(sql, MovementParam(M_Movement_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
-                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["PostedDate"]);
+                return Stamp(ds.Tables[0].Rows[0]["PostedDate"]);
             }
             catch (Exception ex)
             {
@@ -733,6 +752,11 @@ namespace VASLogic.Models
             // the nearest thing to an edit trail was one row carrying the LAST
             // save's timestamp and nothing about what it touched.
             LoadChangeActivity(M_Movement_ID, activity);
+            // Appointments, tasks, calls, letters AND mails filed against the
+            // transfer. Mails come from here too: this panel has no mail loader of
+            // its own, so without them the correspondence trail would carry the
+            // letters and silently drop the e-mails beside them.
+            LoadSharedSourceActivity(M_Movement_ID, activity);
 
             activity.Sort((a, b) =>
                 b.EventTime.GetValueOrDefault(DateTime.MinValue)
@@ -755,9 +779,15 @@ namespace VASLogic.Models
                                 INNER JOIN CM_Chat ch ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
                                  LEFT OUTER JOIN AD_User u
                                         ON (u.AD_User_ID = COALESCE(ce.AD_User_ID, ce.CreatedBy))
-                                WHERE ch.AD_Table_ID =
+                                -- IN + UPPER: a scalar sub-select RAISES on Oracle
+                                -- where AD_Table holds more than one row named
+                                -- M_Movement, and the case-sensitive name matched
+                                -- nothing at all in a dictionary that spells it any
+                                -- other way. Either way every note vanished from
+                                -- the feed.
+                                WHERE ch.AD_Table_ID IN
                                       (SELECT t.AD_Table_ID FROM AD_Table t
-                                        WHERE t.TableName = 'M_Movement')
+                                        WHERE UPPER(t.TableName) = 'M_MOVEMENT')
                                   AND ch.Record_ID = @M_Movement_ID
                                   AND ce.IsActive  = 'Y'";
                 DataSet ds = DB.ExecuteDataset(sql, MovementParam(M_Movement_ID), null);
@@ -769,7 +799,7 @@ namespace VASLogic.Models
                         EventType = "Note",
                         Title     = Util.GetValueOfString(r["CharacterData"]),
                         ActorName = Util.GetValueOfString(r["UserName"]),
-                        EventTime = Util.GetValueOfDateTime(r["Created"])
+                        EventTime = Stamp(r["Created"])
                     });
                 }
             }
@@ -815,7 +845,9 @@ namespace VASLogic.Models
                                       cl.NewValue     AS NewValue,
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
-                                      col.ColumnName  AS FieldColumn
+                                      col.ColumnName  AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId
                                  FROM AD_ChangeLog cl
                                 INNER JOIN AD_Table adt
                                         ON (adt.AD_Table_ID = cl.AD_Table_ID)
@@ -852,6 +884,8 @@ namespace VASLogic.Models
                                       u.Name          AS UserName,
                                       col.Name        AS FieldLabel,
                                       col.ColumnName  AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId,
                                       l.Line          AS LineNo,
                                       p.Name          AS ProductName
                                  FROM AD_ChangeLog cl
@@ -901,7 +935,7 @@ namespace VASLogic.Models
         /// <param name="list">Activity list being populated.</param>
         private void AddChangeRow(DataRow r, string scope, List<ActivityData> list)
         {
-            DateTime? at = Util.GetValueOfDateTime(r["EventOn"]);
+            DateTime? at = Stamp(r["EventOn"]);
             if (!at.HasValue) return;
 
             string field = Util.GetValueOfString(r["FieldLabel"]);
@@ -911,20 +945,95 @@ namespace VASLogic.Models
 
             // The move itself. A save that rewrites a field with the value it
             // already had is not an edit, and the platform logs plenty of those.
+            // Compared on the RAW values, before either is resolved: two records
+            // can share a name, and dropping such a row would hide a real edit.
             string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
             string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
             if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) return;
+
+            // ... and then reported as the field SHOWS them, not as the log stored
+            // them: a reference reads as the referenced record's identifier, a list
+            // value as its label, a date as the date alone.
+            string column  = Util.GetValueOfString(r["FieldColumn"]);
+            int refType    = Util.GetValueOfInt(r["RefType"]);
+            int refValueId = Util.GetValueOfInt(r["RefValueId"]);
 
             list.Add(new ActivityData
             {
                 EventType   = "Updated",
                 FieldName   = field,
-                OldValue    = oldValue,
-                NewValue    = newValue,
+                OldValue    = _changeValues.Display(oldValue, column, refType, refValueId),
+                NewValue    = _changeValues.Display(newValue, column, refType, refValueId),
                 ChangeScope = scope,
                 ActorName   = Util.GetValueOfString(r["UserName"]),
                 EventTime   = at
             });
+        }
+
+        /// <summary>
+        /// Resolves a change-log value into the text the field shows — a reference
+        /// into the referenced record's identifier, a list code into its label, a
+        /// timestamp into the date alone. Shared with the other overview panels
+        /// (VAS_ChangeLogValueModel). One per request, so its caches last exactly
+        /// as long as the feed being built.
+        /// </summary>
+        private readonly VAS_ChangeLogValueModel _changeValues = new VAS_ChangeLogValueModel();
+
+        /// <summary>Reads the appointment / task / call / letter / mail sources
+        /// every overview panel shares (VAS_ActivitySourcesModel).</summary>
+        private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
+        /// <summary>
+        /// Every date and timestamp this panel hands the client is read through
+        /// here rather than through Util.GetValueOfDateTime directly, so the
+        /// DateTimeKind the PROVIDER tagged the value with cannot reach the JSON.
+        /// Oracle tags Unspecified and Npgsql tags Utc or Local; Newtonsoft writes
+        /// a zone designator for the latter two and none for the first, and the
+        /// panel's parseDbDate reads the two shapes differently - which is why the
+        /// Activity feed's times were hours out on PostgreSQL. A no-op for a value
+        /// that is already Unspecified, so the Oracle path is untouched. See
+        /// VAS_ActivitySourcesModel.Stamp for the full account.
+        /// </summary>
+        private static DateTime? Stamp(object value)
+        {
+            return VAS_ActivitySourcesModel.Stamp(value);
+        }
+
+        /// <summary>
+        /// The correspondence and engagement sources shared with every other
+        /// overview panel: appointments and tasks (AppointmentsInfo, split on
+        /// IsTask), calls (VA048_CallDetails), and the letters and mails
+        /// MailAttachment1 holds, split on AttachmentType. Each is pinned to the
+        /// transfer by AD_Table_ID + Record_ID.
+        ///
+        /// Mails are read HERE rather than by a loader of this panel's own — it
+        /// never had one, so its trail reported no correspondence at all.
+        /// </summary>
+        private void LoadSharedSourceActivity(int M_Movement_ID, List<ActivityData> list)
+        {
+            List<VAS_ActivitySourceRow> rows =
+                _activitySources.Load("M_Movement", M_Movement_ID, true);
+            foreach (VAS_ActivitySourceRow s in rows)
+            {
+                list.Add(new ActivityData
+                {
+                    // appointment | task | call | letter | email
+                    EventType   = s.Kind,
+                    Title       = s.Title,
+                    Body        = s.Body,
+                    Location    = s.Location,
+                    IsClosed    = s.IsClosed,
+                    IsCancelled = s.IsCancelled,
+                    MailTo      = s.MailTo,
+                    MailCc      = s.MailCc,
+                    MailBcc     = s.MailBcc,
+                    MailFrom    = s.MailFrom,
+                    IsMailSent  = s.IsMailSent,
+                    // An appointment or task brings the mails sent against it.
+                    Mails       = s.Mails,
+                    ActorName   = s.ActorName,
+                    EventTime   = s.EventTime
+                });
+            }
         }
 
         /// <summary>
@@ -958,7 +1067,7 @@ namespace VASLogic.Models
                     EventType = "Created",
                     Title     = Util.GetValueOfString(r["DocumentNo"]),
                     ActorName = Util.GetValueOfString(r["CreatedByName"]),
-                    EventTime = Util.GetValueOfDateTime(r["Created"])
+                    EventTime = Stamp(r["Created"])
                 });
 
                 string docStatus = Util.GetValueOfString(r["DocStatus"]);
@@ -969,7 +1078,7 @@ namespace VASLogic.Models
                         EventType = "Completed",
                         Title     = Util.GetValueOfString(r["DocumentNo"]),
                         ActorName = Util.GetValueOfString(r["UpdatedByName"]),
-                        EventTime = Util.GetValueOfDateTime(r["Updated"])
+                        EventTime = Stamp(r["Updated"])
                     });
                 }
             }
@@ -1003,8 +1112,8 @@ namespace VASLogic.Models
                         Title     = Util.GetValueOfString(r["DocumentNo"]),
                         ActorName = Util.GetValueOfString(r["UpdatedByName"]),
                         EventTime = done
-                            ? Util.GetValueOfDateTime(r["Updated"])
-                            : Util.GetValueOfDateTime(r["Created"])
+                            ? Stamp(r["Updated"])
+                            : Stamp(r["Created"])
                     });
                 }
             }
@@ -1142,10 +1251,10 @@ namespace VASLogic.Models
                               to_loc.Value      AS ToLocatorCode,
                               COALESCE(to_loc.LocatorCombination, to_loc.Bin, to_loc.Value)       AS ToLocatorName,
                               u.Name            AS UOMName,
-                              NVL(u.StdPrecision, 0) AS UOMPrecision,
-                              NVL(l.MovementQty, 0) AS MovementQty,
+                              COALESCE(u.StdPrecision, 0) AS UOMPrecision,
+                              COALESCE(l.MovementQty, 0) AS MovementQty,
                               " + rateExpr + @"                        AS UnitRate,
-                              NVL(l.MovementQty, 0) * " + rateExpr + @" AS LineValue,
+                              COALESCE(l.MovementQty, 0) * " + rateExpr + @" AS LineValue,
                               l.M_RequisitionLine_ID AS RequisitionLineID,
                               " + woExpr + @"                          AS WorkOrderID
                            FROM M_MovementLine l
@@ -1308,6 +1417,33 @@ namespace VASLogic.Models
             // for the first time.
             public string    OldValue    { get; set; }
             public string    NewValue    { get; set; }
+
+            // The shared correspondence / engagement sources
+            // (VAS_ActivitySourcesModel). Empty on every other event type.
+            /// <summary>Appointment / task: where the meeting is.</summary>
+            public string    Location    { get; set; }
+            public bool      IsClosed    { get; set; }
+            public bool      IsCancelled { get; set; }
+            /// <summary>Who it reached: a mail's or letter's recipient, a call's
+            /// number.</summary>
+            public string    MailTo      { get; set; }
+            // The rest of a mail's / letter's envelope, and its body — carried
+            // with the row so the panel can reveal the message on click without a
+            // second round trip. The body arrives already flattened to text
+            // (VAS_ActivitySourcesModel), since a mail sent as HTML stores markup.
+            public string    MailCc      { get; set; }
+            public string    MailBcc     { get; set; }
+            public string    MailFrom    { get; set; }
+            public bool      IsMailSent  { get; set; }
+            public string    Body        { get; set; }
+
+            /// <summary>The e-mails sent against an APPOINTMENT or TASK itself
+            /// (MailAttachment1 anchored on AppointmentsInfo): recipient, subject,
+            /// body, when and by whom. Distinct from the mail fields above, which
+            /// are correspondence about the TRANSFER. Empty on every other event
+            /// type; the bodies travel with the row so the panel reveals them on
+            /// click without a second round trip.</summary>
+            public List<VAS_ActivityMailRow> Mails { get; set; }
         }
 
         public class MaterialTransferOverviewData

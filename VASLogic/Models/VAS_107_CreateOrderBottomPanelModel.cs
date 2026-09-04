@@ -273,6 +273,17 @@ namespace VASLogic.Models
 
         /// <summary>
         /// SELECT expression for ReadOnlyLogic giving AD_Field priority over AD_Column.
+        ///
+        /// The non-blank test is LENGTH(TRIM(x)) > 0, NOT "x &lt;&gt; ''". On Oracle the
+        /// empty string IS NULL, so "x &lt;&gt; ''" evaluates to UNKNOWN for every row and
+        /// the sub-select silently matched NOTHING — the AD_Field-level override was
+        /// therefore never seen on Oracle and every column fell through to
+        /// AD_Column.ReadOnlyLogic. The same trap sat on the DisplayLogic sub-select in
+        /// MergeAllColumns, where it meant the panel received NO display logic at all for
+        /// any column that is not a field on one of the window's own order-line tabs.
+        /// LENGTH(TRIM(x)) > 0 is correct on both engines: Oracle cannot store '' so a
+        /// non-null value always passes, and on PostgreSQL a genuinely blank logic string
+        /// is excluded as intended.
         /// </summary>
         private string ReadOnlyLogicSelectExpr(bool hasTabField)
         {
@@ -289,7 +300,7 @@ namespace VASLogic.Models
                                   AND f2.IsActive = 'Y'
                                   AND tt2.TableName = 'C_OrderLine'
                                   AND f2.ReadOnlyLogic IS NOT NULL
-                                  AND f2.ReadOnlyLogic <> ''), N''), ");
+                                  AND LENGTH(TRIM(f2.ReadOnlyLogic)) > 0), N''), ");
             sb.Append("c.ReadOnlyLogic, N'')");
             return sb.ToString();
         }
@@ -305,7 +316,13 @@ namespace VASLogic.Models
             // Core Application Dictionary / Compiere / ADempiere columns
             "AD_", "C_", "M_", "A_", "G_", "K_", "R_", "I_", "B_", "T_", "S_", "W_", "U_",
             // VAS / VIS platform-core columns
-            "VAS_", "VIS_", "VA_", "VB_"
+            "VAS_", "VIS_", "VA_", "VB_",
+            // Core columns whose prefix is a ROLE, not a module. The prefix rule takes
+            // everything up to the first underscore, so C_OrderLine.Ref_OrderLine_ID
+            // ("Original PO Line") yielded "Ref_" — read as an optional module, failed
+            // Env.IsModuleInstalled, and the column was stripped from the payload before
+            // the panel ever saw it. Link_ is the same shape (Link_OrderLine_ID).
+            "Ref_", "Link_"
         };
 
         /// <summary>
@@ -409,7 +426,7 @@ namespace VASLogic.Models
                                                   AND f2.IsActive = 'Y'
                                                   AND tt2.TableName = 'C_OrderLine'
                                                   AND f2.DisplayLogic IS NOT NULL
-                                              AND f2.DisplayLogic <> ''), N'') AS DisplayLogic
+                                                  AND LENGTH(TRIM(f2.DisplayLogic)) > 0), N'') AS DisplayLogic
                            FROM AD_Column c
                            INNER JOIN AD_Table t ON (c.AD_Table_ID = t.AD_Table_ID)
                            LEFT JOIN AD_Val_Rule vr ON (c.AD_Val_Rule_ID = vr.AD_Val_Rule_ID
@@ -615,8 +632,30 @@ namespace VASLogic.Models
         private static readonly Dictionary<string, string[]> TableDirOverrides =
             new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
             {
-                { "AD_OrgTrx_ID", new string[] { "AD_Org", "AD_Org_ID" } }
+                { "AD_OrgTrx_ID", new string[] { "AD_Org", "AD_Org_ID" } },
+                // Order-line self references: the TableDir convention would derive the
+                // non-existent tables "C_OrderLine_Blanket" / "C_Quotation_Line" / "Ref_OrderLine".
+                { "C_OrderLine_Blanket_ID", new string[] { "C_OrderLine", "C_OrderLine_ID" } },
+                { "C_Quotation_Line_ID",    new string[] { "C_OrderLine", "C_OrderLine_ID" } },
+                { "Ref_OrderLine_ID",       new string[] { "C_OrderLine", "C_OrderLine_ID" } },
+                // "Original PO Line" - the label belongs to this column, not to
+                // Ref_OrderLine_ID; both exist on C_OrderLine.
+                { "Ref_C_Orderline_ID",     new string[] { "C_OrderLine", "C_OrderLine_ID" } }
             };
+
+        /// <summary>
+        /// Display expression for a lookup that points at C_OrderLine (blanket order line,
+        /// quotation line). C_OrderLine has no identifier column, so the generic builder
+        /// would fall back to showing the raw id — name the line by its document instead:
+        /// "&lt;order DocumentNo&gt; - &lt;line no&gt;".
+        /// </summary>
+        private string OrderLineDisplayExpr()
+        {
+            const string docNo = "(SELECT o.DocumentNo FROM C_Order o WHERE o.C_Order_ID = {a}.C_Order_ID)";
+            if (DB.IsPostgreSQL() || DB.IsOracle())
+                return docNo + " || ' - ' || {a}.Line";
+            return "CONCAT(" + docNo + ", ' - ', {a}.Line)";
+        }
 
         private Dictionary<string, RefLookupDef> _refDefByColumn;
 
@@ -674,7 +713,11 @@ namespace VASLogic.Models
                 }
 
                 if (table != null && key != null && display != null)
+                {
+                    if ("C_OrderLine".Equals(table, StringComparison.OrdinalIgnoreCase))
+                        display = OrderLineDisplayExpr();
                     def = new RefLookupDef { TableName = table, KeyColumn = key, DisplayExpr = display, HasIsActive = true, HasClientId = true };
+                }
             }
 
             // Fallback for columns injected by InjectMissingVasColumns that are absent or
@@ -686,7 +729,9 @@ namespace VASLogic.Models
                 string tbl, kc;
                 if (TableDirOverrides.TryGetValue(columnName, out ov)) { tbl = ov[0]; kc = ov[1]; }
                 else { tbl = columnName.Substring(0, columnName.Length - 3); kc = columnName; }
-                def = new RefLookupDef { TableName = tbl, KeyColumn = kc, DisplayExpr = BuildIdentifierExpr(tbl), HasIsActive = true, HasClientId = true };
+                string dispExpr = "C_OrderLine".Equals(tbl, StringComparison.OrdinalIgnoreCase)
+                    ? OrderLineDisplayExpr() : BuildIdentifierExpr(tbl);
+                def = new RefLookupDef { TableName = tbl, KeyColumn = kc, DisplayExpr = dispExpr, HasIsActive = true, HasClientId = true };
             }
 
             _refDefByColumn[columnName] = def;
@@ -761,10 +806,77 @@ namespace VASLogic.Models
             public bool HasClientId;
         }
 
+        /// <summary>
+        /// SELECT-list item for one optional C_Order transaction-type flag: the column
+        /// itself where the dictionary has it, the literal 'N' where it does not, always
+        /// under its own name so the reader below is unconditional.
+        /// </summary>
+        /// <param name="column">C_Order flag column (IsSalesQuotation / IsBlanketTrx / IsReturnTrx).</param>
+        private string TrxFlagExpr(string column)
+        {
+            return ColumnExists("C_Order", column)
+                ? "COALESCE(o." + column + ", 'N') AS " + column + ","
+                : "'N' AS " + column + ",";
+        }
+
+        /// <summary>
+        /// SELECT-list item for one optional C_Order column that an order-line field's
+        /// DisplayLogic reads as a token (@C_Order_Blanket@, @VAS_OrderType@, ...). The
+        /// column where the dictionary has it, NULL where it does not, always under its own
+        /// name. NULL rather than a literal default on purpose: the logic distinguishes
+        /// "not set" from any real value, and the client resolves a null token to "" so
+        /// "@x@=null" matches and "@x@&gt;0" does not.
+        /// </summary>
+        /// <param name="column">C_Order column named by a DisplayLogic token.</param>
+        private string LogicTokenExpr(string column)
+        {
+            return ColumnExists("C_Order", column)
+                ? "o." + column + " AS " + column + ","
+                : "NULL AS " + column + ",";
+        }
+
+        /// <summary>
+        /// C_Order columns that C_OrderLine field DisplayLogic refers to by token, and that
+        /// the panel therefore has to carry on the header for the logic to evaluate at all.
+        /// Taken from the dictionary's own logic for the Additional Info columns:
+        ///   @C_Order_Blanket@   - IsDropShip ("=null"), C_OrderLine_Blanket_ID ("&gt;0")
+        ///   @BlanketOrderType@  - C_OrderLine_Blanket_ID (second variant)
+        ///   @Ref_C_Order_ID@    - Ref_C_Orderline_ID / Original PO Line
+        ///   @VAS_OrderType@     - Ref_C_Orderline_ID / Original PO Line
+        /// Without these the tokens resolved to "" and the fields were judged invisible,
+        /// which is why they never appeared however the panel's own gating was written.
+        /// </summary>
+        private static readonly string[] _logicTokenColumns =
+        {
+            "C_Order_Blanket", "BlanketOrderType", "Ref_C_Order_ID", "VAS_OrderType"
+        };
+
         /// <summary>Loads the parent order header values used as callout context.</summary>
         private void LoadParentContext(Ctx ctx, int C_Order_ID, CreateOrderPanelData data)
         {
+            // The three flags that, with IsSOTrx, say WHICH KIND of document this is:
+            // sales order / purchase order / quotation / blanket / return. One panel serves
+            // all of them, so its heading and its messages are named from these rather than
+            // from any one document's wording. All are core C_Order columns, but older
+            // dictionaries can lack them — each is selected under a guard, defaulting to 'N',
+            // so the panel still loads and simply reports the plainer kind where absent.
+            string quotationCol = TrxFlagExpr("IsSalesQuotation");
+            string blanketCol   = TrxFlagExpr("IsBlanketTrx");
+            string returnCol    = TrxFlagExpr("IsReturnTrx");
+            // C_Order.IsDropShip — the HEADER drop-shipment flag. The line-level IsDropShip
+            // field is only meaningful on an order the header marks as a drop shipment, so
+            // the panel carries the header flag to gate it. Guarded like the others: an
+            // older dictionary without the column reads as 'N'.
+            string dropShipCol  = TrxFlagExpr("IsDropShip");
+            // ...and the header columns the order line's own DisplayLogic reads by token.
+            StringBuilder logicCols = new StringBuilder();
+            foreach (string c in _logicTokenColumns) logicCols.Append(LogicTokenExpr(c)).Append(' ');
             string sql = @"SELECT
+                              " + logicCols + @"
+                              " + quotationCol + @"
+                              " + blanketCol + @"
+                              " + returnCol + @"
+                              " + dropShipCol + @"
                               o.C_Order_ID,
                               o.AD_Client_ID,
                               o.AD_Org_ID,
@@ -804,6 +916,15 @@ namespace VASLogic.Models
             data.DateOrdered = Util.GetValueOfDateTime(r["DateOrdered"]);
             data.DateAcct = Util.GetValueOfDateTime(r["DateAcct"]);
             data.IsSOTrx = Util.GetValueOfString(r["IsSOTrx"]) == "Y";
+            data.IsSalesQuotation = Util.GetValueOfString(r["IsSalesQuotation"]) == "Y";
+            data.IsBlanketTrx = Util.GetValueOfString(r["IsBlanketTrx"]) == "Y";
+            data.IsReturnTrx = Util.GetValueOfString(r["IsReturnTrx"]) == "Y";
+            data.IsDropShip = Util.GetValueOfString(r["IsDropShip"]) == "Y";
+            // Header values named by order-line DisplayLogic tokens. A DBNull stays absent
+            // from the bag rather than becoming "" or 0, so the client can tell "not set"
+            // from a real value and "@token@=null" evaluates the way the dictionary means.
+            foreach (string c in _logicTokenColumns)
+                if (r[c] != DBNull.Value) data.LogicContext[c] = Util.GetValueOfString(r[c]);
             data.IsTaxIncluded = Util.GetValueOfString(r["IsTaxIncluded"]) == "Y";
             data.DocStatus = Util.GetValueOfString(r["DocStatus"]);
             data.Processed = Util.GetValueOfString(r["Processed"]) == "Y";
@@ -829,7 +950,7 @@ namespace VASLogic.Models
             foreach (string cn in GetLineProjectionColumns(AD_Tab_IDs))
                 cols.Append("ol.").Append(cn).Append(", ");
             if (cols.Length == 0)
-                cols.Append("ol.C_OrderLine_ID, ol.Line, ol.M_Product_ID, ol.C_Charge_ID, ol.QtyOrdered, ol.C_UOM_ID, ol.PriceEntered, ol.C_Tax_ID, ol.TaxAmt, ol.TaxableAmt, ol.LineNetAmt, ol.LineTotalAmt, ol.M_AttributeSetInstance_ID, ol.Description, ");
+                cols.Append("ol.C_OrderLine_ID, ol.Line, ol.M_Product_ID, ol.C_Charge_ID, ol.QtyEntered, ol.QtyOrdered, ol.C_UOM_ID, ol.PriceEntered, ol.C_Tax_ID, ol.TaxAmt, ol.TaxableAmt, ol.LineNetAmt, ol.LineTotalAmt, ol.M_AttributeSetInstance_ID, ol.Description, ");
 
             string sql = "SELECT " + cols.ToString() +
                 @"COALESCE(p.Name, N'') AS VASOLDISP_ProductName,
@@ -862,7 +983,10 @@ namespace VASLogic.Models
                 OrderLineRow row = new OrderLineRow();
                 foreach (DataColumn dc in dt.Columns)
                 {
-                    if (dc.ColumnName.StartsWith("VASOLDISP_")) continue;
+                    // OrdinalIgnoreCase: PostgreSQL lowercases aliases (vasoldisp_*),
+                    // Oracle uppercases them (VASOLDISP_*) — both must be excluded from
+                    // the generic Values bag so only real C_OrderLine columns are sent.
+                    if (dc.ColumnName.StartsWith("VASOLDISP_", StringComparison.OrdinalIgnoreCase)) continue;
                     row.Values[dc.ColumnName] = (r[dc] == DBNull.Value) ? null : r[dc];
                 }
                 row.C_OrderLine_ID = Util.GetValueOfInt(r["C_OrderLine_ID"]);
@@ -873,6 +997,7 @@ namespace VASLogic.Models
                 row.ChargeName = Util.GetValueOfString(r["VASOLDISP_ChargeName"]);
                 row.Description = Util.GetValueOfString(r["Description"]);
                 row.QtyOrdered = Util.GetValueOfDecimal(r["QtyOrdered"]);
+                row.QtyEntered = dt.Columns.Contains("QtyEntered") ? Util.GetValueOfDecimal(r["QtyEntered"]) : row.QtyOrdered;
                 row.C_UOM_ID = Util.GetValueOfInt(r["C_UOM_ID"]);
                 row.UOMName = Util.GetValueOfString(r["VASOLDISP_UOMName"]);
                 row.PriceEntered = Util.GetValueOfDecimal(r["PriceEntered"]);
@@ -884,7 +1009,14 @@ namespace VASLogic.Models
                 row.LineTotalAmt = Util.GetValueOfDecimal(r["LineTotalAmt"]);
                 row.M_AttributeSetInstance_ID = Util.GetValueOfInt(r["M_AttributeSetInstance_ID"]);
                 row.AttrName = Util.GetValueOfString(r["VASOLDISP_AttrName"]);
-                row.HasAttributeSet = Util.GetValueOfInt(r["VASOLDISP_HasAttrSet"]) > 0;
+                int hasAttrSetRaw = Util.GetValueOfInt(r["VASOLDISP_HasAttrSet"]);
+                row.HasAttributeSet = hasAttrSetRaw > 0;
+                // Store under a canonical mixed-case key so the JS productHasAttributeSet()
+                // can read it via lineVal() on both PostgreSQL and Oracle without falling back
+                // to the display flag (which conflates AttrName with the actual attribute-set
+                // presence and would wrongly enable the attribute link when the product's
+                // attribute set was removed after the line was saved).
+                row.Values["VASOLDISP_HasAttrSet"] = hasAttrSetRaw;
                 row.ProductType = Util.GetValueOfString(r["VASOLDISP_ProductType"]);
                 rows.Add(row);
             }
@@ -986,8 +1118,15 @@ namespace VASLogic.Models
             // before the column migration runs, so the column may be absent on C_Order
             // even when the check returns true. TCS is read from C_OrderLine.VA106_TCSAmount
             // in the second query below where it is reliably present when VA106 is installed.
+            // Sub Total must be the taxable base (net of tax), not the gross LineNetAmt stored in
+            // C_Order.TotalLines. For a tax-inclusive price list, TotalLines = sum of LineNetAmt
+            // which embeds the tax, so it is LARGER than the taxable base. Using SUM(TaxableAmt)
+            // from C_OrderLine mirrors VAS_074's SUM(TaxBaseAmt) pattern and is correct for both
+            // tax-inclusive and tax-exclusive price lists.
             string sql = @"SELECT t.Name AS TaxName, ot.TaxAmt, ot.TaxBaseAmt,
-                                  co.TotalLines, co.GrandTotal, cy.CurSymbol, cy.StdPrecision
+                                  (SELECT COALESCE(SUM(ol2.TaxableAmt), 0) FROM C_OrderLine ol2
+                                   WHERE ol2.C_Order_ID = co.C_Order_ID AND ol2.IsActive = 'Y') AS TotalLines,
+                                  co.GrandTotal, cy.CurSymbol, cy.StdPrecision
                            FROM C_Order co
                            INNER JOIN C_OrderTax ot ON (ot.C_Order_ID = co.C_Order_ID)
                            INNER JOIN C_Tax t ON (t.C_Tax_ID = ot.C_Tax_ID)
@@ -1074,7 +1213,7 @@ namespace VASLogic.Models
         private static readonly string[] ESSENTIAL_LINE_COLUMNS = new string[]
         {
             "C_OrderLine_ID", "C_Order_ID", "Line", "M_Product_ID", "C_Charge_ID",
-            "QtyOrdered", "C_UOM_ID", "PriceEntered", "C_Tax_ID", "TaxAmt",
+            "QtyEntered", "QtyOrdered", "C_UOM_ID", "PriceEntered", "C_Tax_ID", "TaxAmt",
             "TaxableAmt", "LineNetAmt", "LineTotalAmt", "M_AttributeSetInstance_ID", "Description"
         };
 
@@ -1429,6 +1568,17 @@ namespace VASLogic.Models
                 line.SetM_Product_ID(req.M_Product_ID, true);
                 if (req.M_AttributeSetInstance_ID > 0)
                     line.SetM_AttributeSetInstance_ID(req.M_AttributeSetInstance_ID);
+
+                // On a sales order, when the client has not yet supplied a UOM (fresh product
+                // selection), prefer the product's Sales UOM (VAS_SalesUOM_Id) over the primary
+                // unit set by SetM_Product_ID. A UOM already on the line (req.C_UOM_ID > 0)
+                // means the user changed it deliberately — that is preserved below.
+                if (req.C_UOM_ID <= 0 && order.IsSOTrx())
+                {
+                    int salesUomId = GetProductSalesUomId(ctx, req.M_Product_ID);
+                    if (salesUomId > 0)
+                        line.SetC_UOM_ID(salesUomId);
+                }
             }
             else if (req.C_Charge_ID > 0)
             {
@@ -1439,7 +1589,9 @@ namespace VASLogic.Models
                 return line;
             }
 
-            decimal qty = req.QtyOrdered > 0 ? req.QtyOrdered : 1;
+            // Prefer QtyEntered (the user-visible quantity in the entered UOM). Fall back to
+            // QtyOrdered when QtyEntered was not supplied by the client (older callers).
+            decimal qty = req.QtyEntered > 0 ? req.QtyEntered : (req.QtyOrdered > 0 ? req.QtyOrdered : 1);
             line.SetQty(qty);
 
             if (req.C_UOM_ID > 0)
@@ -1703,6 +1855,22 @@ namespace VASLogic.Models
         private int GetDefaultUomId(Ctx ctx)
         {
             return MUOM.GetDefault_UOM_ID(ctx);
+        }
+
+        /// <summary>
+        /// Returns the Sales UOM (VAS_SalesUOM_Id) configured on the product master for sales orders.
+        /// Returns 0 when no Sales UOM is defined or the product does not exist.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="productId">M_Product_ID to look up</param>
+        /// <returns>VAS_SalesUOM_Id from M_Product, or 0 if not set</returns>
+        private int GetProductSalesUomId(Ctx ctx, int productId)
+        {
+            if (productId <= 0) return 0;
+            string sql = "SELECT p.VAS_SalesUOM_Id FROM M_Product p WHERE p.M_Product_ID = @M_Product_ID AND p.IsActive = 'Y'";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            object val = DB.ExecuteScalar(sql, new SqlParameter[] { new SqlParameter("@M_Product_ID", productId) }, null);
+            return Util.GetValueOfInt(val);
         }
 
         #endregion
@@ -1988,7 +2156,9 @@ namespace VASLogic.Models
                         line.SetM_Product_ID(0);
                     }
 
-                    decimal qty = input.QtyOrdered > 0 ? input.QtyOrdered : 1;
+                    // Prefer QtyEntered (the user-visible quantity in the entered UOM). Fall back to
+                    // QtyOrdered when QtyEntered was not supplied by the client (older callers).
+                    decimal qty = input.QtyEntered > 0 ? input.QtyEntered : (input.QtyOrdered > 0 ? input.QtyOrdered : 1);
                     line.SetQty(qty);
 
                     if (input.C_UOM_ID > 0)
@@ -2174,6 +2344,25 @@ namespace VASLogic.Models
         public DateTime? DateOrdered { get; set; }
         public DateTime? DateAcct { get; set; }
         public bool IsSOTrx { get; set; }
+        /// <summary>C_Order.IsSalesQuotation — the sales document is a quotation, not an order.</summary>
+        public bool IsSalesQuotation { get; set; }
+        /// <summary>
+        /// Header values that C_OrderLine field DisplayLogic / ReadOnlyLogic name as
+        /// tokens (@C_Order_Blanket@, @BlanketOrderType@, @Ref_C_Order_ID@,
+        /// @VAS_OrderType@). A column that is NULL on the order is simply ABSENT from this
+        /// bag, which the client resolves to "" — so "@token@=null" matches and
+        /// "@token@&gt;0" does not.
+        /// </summary>
+        public Dictionary<string, string> LogicContext { get; set; }
+        /// <summary>C_Order.IsBlanketTrx — a blanket order, not a release document.</summary>
+        public bool IsBlanketTrx { get; set; }
+        /// <summary>C_Order.IsReturnTrx — a return (customer return / return to vendor).</summary>
+        public bool IsReturnTrx { get; set; }
+        /// <summary>
+        /// C_Order.IsDropShip — the HEADER drop-shipment flag. The line-level Drop Shipment
+        /// field in Additional Info is shown only when this is set.
+        /// </summary>
+        public bool IsDropShip { get; set; }
         public bool IsTaxIncluded { get; set; }
         public string DocStatus { get; set; }
         public bool Processed { get; set; }
@@ -2204,6 +2393,7 @@ namespace VASLogic.Models
             Columns = new List<OrderColumnMeta>();
             AD_Tab_IDs = new List<int>();
             LoginContext = new Dictionary<string, string>();
+            LogicContext = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             StdPrecision = 2;
         }
     }
@@ -2247,6 +2437,7 @@ namespace VASLogic.Models
         public int M_Product_ID { get; set; }
         public int C_Charge_ID { get; set; }
         public int M_AttributeSetInstance_ID { get; set; }
+        public decimal QtyEntered { get; set; }
         public decimal QtyOrdered { get; set; }
         public int C_UOM_ID { get; set; }
         public decimal PriceEntered { get; set; }
@@ -2279,6 +2470,7 @@ namespace VASLogic.Models
         public int C_Charge_ID { get; set; }
         public string ChargeName { get; set; }
         public string Description { get; set; }
+        public decimal QtyEntered { get; set; }
         public decimal QtyOrdered { get; set; }
         public int C_UOM_ID { get; set; }
         public string UOMName { get; set; }
@@ -2328,6 +2520,7 @@ namespace VASLogic.Models
         public int M_Product_ID { get; set; }
         public int C_Charge_ID { get; set; }
         public int M_AttributeSetInstance_ID { get; set; }
+        public decimal QtyEntered { get; set; }
         public decimal QtyOrdered { get; set; }
         public int C_UOM_ID { get; set; }
         public decimal PriceEntered { get; set; }

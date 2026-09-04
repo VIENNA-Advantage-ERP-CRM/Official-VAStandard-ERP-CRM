@@ -320,6 +320,44 @@
  *                        answered in words to a reader who found the tooltip
  *                        or ran a screen reader. headerFlagField and the
  *                        "cross" icon went with it — nothing else drew one.
+ *   VAI163   2026-08-20  - The Order Total card leads with the NET amount
+ *                          (data.SubTotal, which is GrandTotal − Tax and so stays
+ *                          net on a tax-inclusive price list) over "<ISO> ·
+ *                          Exclusive Taxes". It led with the grand total under
+ *                          "Inclusive Taxes". The card's name, tone, shape and
+ *                          sub-line format are unchanged, so it still reads as one
+ *                          of the four. VAS_092_ExclTaxFreight is the new key;
+ *                          VAS_092_InclTaxFreight is no longer used.
+ *                        - An "updated" activity row shows the field's DISPLAY
+ *                          value rather than the raw one the change log stores:
+ *                          a reference reads as the record's name, a list value as
+ *                          its label, and a date as the date alone (model side,
+ *                          DisplayChangeValue). changeValueText renders a
+ *                          yyyy-MM-dd value in the reader's locale, building the
+ *                          Date from local parts so a bare ISO date cannot roll
+ *                          back a day west of Greenwich.
+ *   VAI163   2026-08-21  Activity: a Task or Appointment row now says how many
+ *                        e-mails were sent against it, and opens on click onto
+ *                        each one - who it went to, its subject, when it went
+ *                        and who sent it, then the message itself. The body is
+ *                        shown ONLY once the row is opened.
+ *   VAI163   2026-08-24  - A Send Invoice button in the header strip
+ *                          (.vas_092-actions) opens the Preview and Share
+ *                          Document form on this order through the shared
+ *                          VAS_SentEmailDoc form, with the recipient seeded from
+ *                          the VENDOR - its name and e-mail address. It runs off
+ *                          the tab's own print process, so it is disabled (not
+ *                          hidden) on a window that carries none; a blank address
+ *                          is not a failure, VAS_SentEmailDoc resolves the
+ *                          recipient on the server from AD_Table_ID + RecordID.
+ *                          Follows VAS_189_ARInvoiceDetailPanel.
+ *                        - Order Progress: the "With Vendor" stage reads
+ *                          "Email Sent" or "Pending" (C_Order.VAS_IsEmailSent)
+ *                          instead of repeating the completion date the Completed
+ *                          stage above it already carries - a date that said the
+ *                          order was finished, never that it had reached the
+ *                          vendor. A stage may now carry its own sub-line (meta),
+ *                          which holds in every state.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -365,6 +403,7 @@
         this.record_ID = 0;
         this.table_ID = 0;
         this.windowNo = 0;
+        this.AD_Window_ID = 0;
         this.curTab = null;
         this.selectedRow = null;
         this.panelWidth;
@@ -438,6 +477,9 @@
             VAS_092_FullyReceived: "Received",
             VAS_092_WithVendor: "With Vendor",
             VAS_092_Drafted: "Drafted",
+            // Header action bar
+            VAS_092_SendInvoice: "Send Invoice",
+            VAS_092_ActionFailed: "The action could not be completed.",
             // Generated From
             VAS_092_GeneratedFrom: "Generated From",
             VAS_092_Manual: "Manual",
@@ -452,7 +494,11 @@
             VAS_092_Plan: "Plan",
             VAS_092_More: "more",
             // Snapshot
+            // VAS_092_InclTaxFreight is unused: the Order Total card leads with
+            // the NET amount now, so its sub-line reads Exclusive Taxes. Kept as a
+            // default in case a tenant still has the key seeded.
             VAS_092_InclTaxFreight: "Inclusive Taxes",
+            VAS_092_ExclTaxFreight: "Exclusive Taxes",
             VAS_092_OrderTotal: "Order Total",
             VAS_092_ExpectedDelivery: "Expected Delivery",
             VAS_092_LineItems: "Line Items",
@@ -466,6 +512,7 @@
             VAS_092_Stage: "Stage",
             VAS_092_InProgress: "In progress",
             VAS_092_Pending: "Pending",
+            VAS_092_EmailSent: "Email Sent",
             VAS_092_Required: "Required",
             // Line items
             VAS_092_Items: "items",
@@ -579,6 +626,13 @@
             VAS_092_MailFrom: "From",
             VAS_092_ShowMailBody: "Show message",
             VAS_092_HideMailBody: "Hide message",
+            // E-mails sent against a meeting or task, opened from its row.
+            VAS_092_MailSubject: "Subject",
+            VAS_092_NoSubject: "(no subject)",
+            VAS_092_Email: "email",
+            VAS_092_Emails: "emails",
+            VAS_092_ShowMails: "Show e-mails",
+            VAS_092_HideMails: "Hide e-mails",
             VAS_092_TagGRN: "GRN",
             VAS_092_ActGRN: "Goods received",
             VAS_092_TagInvoice: "Invoice",
@@ -599,6 +653,13 @@
             VAS_092_TagClosed: "Closed",
             VAS_092_TagInvalidated: "Invalid",
             VAS_092_TagUpdated: "Updated",
+            // The shared correspondence / engagement sources.
+            VAS_092_TagAppointment: "Meeting",
+            VAS_092_TagTask: "Task",
+            VAS_092_TagCall: "Call",
+            VAS_092_TagLetter: "Letter",
+            VAS_092_ActCancelled: "Cancelled",
+            VAS_092_ActCompleted: "Completed",
             VAS_092_ActUpdated: "Order updated",
             VAS_092_ActFieldUpdated: "Updated",
             VAS_092_RecentActivity: "Activity",
@@ -910,6 +971,7 @@
             $top.append($pills);
 
             $strip.append($top);
+            renderActions($strip);
             $body.append($strip);
 
             // --- Details card: vendor identity (left) + terms fields (right) ---
@@ -949,17 +1011,86 @@
             var cur = (data.ISO_Code || "") + (data.CurSymbol ? " (" + data.CurSymbol + ")" : "");
             if (cur.trim())           $right.append(headerField(getMsg("VAS_092_Currency"), cur));
             if (data.WarehouseName) $right.append(headerField(getMsg("VAS_092_ShipTo"), data.WarehouseName));
-            // Drop Shipment (C_Order.IsDropShip) — always shown, Yes or No: "No"
-            // is as much of an answer as "Yes" here, and the reader is looking at
-            // a Warehouse right above it that a drop-shipped order never reaches.
-            // Reads as the WORD, like every other field in this column, so the
-            // answer needs no glyph to be decoded first.
-            $right.append(headerField(getMsg("VAS_092_DropShipment"),
-                data.IsDropShip ? getMsg("VAS_092_Yes") : getMsg("VAS_092_No")));
+            // Drop Shipment (C_Order.IsDropShip) — shown ONLY when the order IS a
+            // drop shipment. A "No" row said nothing the Warehouse line above it
+            // does not already say, so the field is now an exception flag: its
+            // presence is the message. Reads as the WORD, like every other field
+            // in this column, so the answer needs no glyph to be decoded first.
+            if (data.IsDropShip) {
+                $right.append(headerField(getMsg("VAS_092_DropShipment"),
+                    getMsg("VAS_092_Yes")));
+            }
             //if (data.OrgName) $right.append(headerField(getMsg("VAS_092_BillTo"), data.OrgName));
             if ($right.children().length) $card.append($right);
 
             $body.append($card);
+        }
+
+        // ---------- Header action bar ---------- //
+
+        // Send Invoice runs off the TAB's print process (the same one the
+        // framework's own print button uses), so the control is disabled — not
+        // hidden — when the window carries none: an absent button reads as a
+        // missing feature, a disabled one as a document that cannot be printed.
+        function renderActions($parent) {
+            var hasPrintProcess = $self.curTab
+                && typeof $self.curTab.getAD_Process_ID === "function"
+                && +$self.curTab.getAD_Process_ID() > 0;
+
+            var $a = $('<div class="vas_092-actions"></div>');
+            var $send = $('<button type="button" class="vas_092-btn"></button>');
+            $send.append(svgIcon("send"));
+            $send.append($('<span></span>').text(getMsg("VAS_092_SendInvoice")));
+            $send.prop("disabled", !hasPrintProcess);
+            $send.on("click", function () { if (hasPrintProcess) sendInvoiceEmail(); });
+            $a.append($send);
+            $parent.append($a);
+        }
+
+        // AD_Process_ID / AD_Table_ID / AD_Window_ID for the share flow, read off
+        // the current grid tab — the same values the framework's print button
+        // works from. Mirrors VAS_189_ARInvoiceDetailPanel.
+        function printContext() {
+            var tab = $self.curTab;
+            return {
+                AD_Process_ID: (tab && typeof tab.getAD_Process_ID === "function") ? tab.getAD_Process_ID() : 0,
+                AD_Table_ID: (tab && typeof tab.getAD_Table_ID === "function") ? tab.getAD_Table_ID() : ($self.table_ID || 0),
+                AD_Window_ID: (tab && typeof tab.getAD_Window_ID === "function") ? tab.getAD_Window_ID() : ($self.AD_Window_ID || 0),
+                RecordID: $self.record_ID,
+                ToName: (data && data.VendorName) ? data.VendorName : "",
+                ToEmail: (data && data.VendorEmail) ? data.VendorEmail : ""
+            };
+        }
+
+        // Open the Preview and Share Document form (the shared VA112 share/e-mail
+        // panel) on this purchase order, with the recipient seeded from the
+        // VENDOR — its name and e-mail address. When the address is blank
+        // VAS_SentEmailDoc resolves it on the server from AD_Table_ID + RecordID,
+        // so a vendor with no address on the order still reaches its contact.
+        function sendInvoiceEmail() {
+            if (!$self.record_ID || !$self.curTab) return;
+            if (!VAS.VAS_SentEmailDoc || typeof VAS.VAS_SentEmailDoc.sendEmail !== "function") {
+                toast(getMsg("VAS_092_ActionFailed"), true);
+                return;
+            }
+
+            var ctxRes = printContext();
+            if (!ctxRes.AD_Process_ID || !ctxRes.AD_Table_ID || !ctxRes.AD_Window_ID) {
+                toast(getMsg("VAS_092_ActionFailed"), true);
+                return;
+            }
+
+            // Called as a plain static, not with `new`: it returns nothing and
+            // instantiates the form itself.
+            VAS.VAS_SentEmailDoc.sendEmail({
+                windowNo: $self.windowNo,
+                AD_Process_ID: ctxRes.AD_Process_ID,
+                AD_Table_ID: ctxRes.AD_Table_ID,
+                RecordID: ctxRes.RecordID,
+                AD_Window_ID: ctxRes.AD_Window_ID,
+                Name: ctxRes.ToName,
+                EMailID: ctxRes.ToEmail
+            });
         }
 
         function headerPill(label, tone, icon, withDot) {
@@ -1029,7 +1160,11 @@
             // RFQ — the request for quotation the PO was raised from
             // (C_RfQResponse.C_Order_ID).
             if (data.RfqId > 0) {
-                var rfqVal = data.RfqNo || ("#" + data.RfqId);
+                // No "#id" fallback on any chip below: an internal key is not a
+                // document number, and printing one tells the reader nothing they
+                // can act on. Where the model could not resolve an identifier the
+                // chip carries its LABEL alone and still opens the record.
+                var rfqVal = data.RfqNo || "";
                 if (data.RfqCount > 1)
                     rfqVal += " +" + (data.RfqCount - 1) + " " + getMsg("VAS_092_More");
                 $chips.append(originChip("clipboardCheck", getMsg("VAS_092_Rfq"), rfqVal,
@@ -1040,7 +1175,7 @@
             // Project — the project line this PO was generated for
             // (C_ProjectLine.C_OrderPO_ID).
             if (data.ProjectId > 0) {
-                var projVal = data.ProjectNo || data.ProjectName || ("#" + data.ProjectId);
+                var projVal = data.ProjectNo || data.ProjectName || "";
                 if (data.ProjectCount > 1)
                     projVal += " +" + (data.ProjectCount - 1) + " " + getMsg("VAS_092_More");
                 $chips.append(originChip("doc", getMsg("VAS_092_Project"), projVal,
@@ -1052,7 +1187,7 @@
             // (C_Order.C_Order_Blanket). Opened on the purchase side: the blanket
             // is itself a C_Order, so isSOTrx stays false.
             if (data.BlanketOrderId > 0) {
-                var blanketVal = data.BlanketOrderNo || ("#" + data.BlanketOrderId);
+                var blanketVal = data.BlanketOrderNo || "";
                 // A release can draw on more than one blanket when the link is
                 // read from the lines; the first is named and the rest counted.
                 if (data.BlanketOrderCount > 1) {
@@ -1066,7 +1201,7 @@
             // Contract reference — C_Order.VAS_ContractMaster_ID.
             if (data.ContractMasterId > 0) {
                 $chips.append(originChip("doc", getMsg("VAS_092_Contract"),
-                    data.ContractMasterNo || ("#" + data.ContractMasterId),
+                    data.ContractMasterNo || "",
                     null, "purple", "VAS_ContractMaster", data.ContractMasterId));
                 any = true;
             }
@@ -1075,7 +1210,7 @@
             // (VAMRP_PlanRun_ID). A planned PO is not a manual one, and used to
             // fall through to the "Manual" chip because nothing read the plan.
             if (data.PlanRunId > 0) {
-                var planVal = data.PlanRunNo || ("#" + data.PlanRunId);
+                var planVal = data.PlanRunNo || "";
                 if (data.PlanRunCount > 1)
                     planVal += " +" + (data.PlanRunCount - 1) + " " + getMsg("VAS_092_More");
                 $chips.append(originChip("factory", getMsg("VAS_092_Plan"), planVal,
@@ -1122,12 +1257,23 @@
         function renderSnapshot() {
             var $snap = $('<section class="vas_092-snap"></section>');
 
-            // Order Total — grand total (tax inclusive).
+            // Order Total — the card keeps its name; the FIGURE is the NET amount,
+            // the order's subtotal before tax.
+            //
+            // SubTotal, not TotalLines: it is GrandTotal − TaxAmt (model side), so
+            // on a tax-INCLUSIVE price list — where C_Order.TotalLines carries the
+            // gross — it is still the net figure, and it is the same number the
+            // lines table foots with.
+            //
+            // The sub-line is what distinguishes the two totals, so it says
+            // outright which one this is rather than leaving the reader to infer it
+            // from the label. Same shape as before (ISO · basis), so the card sits
+            // beside the other three unchanged.
             var totalSub = (data.ISO_Code || "");
-            var incl = getMsg("VAS_092_InclTaxFreight");
-            totalSub = totalSub ? totalSub + " · " + incl : incl;
+            var excl = getMsg("VAS_092_ExclTaxFreight");
+            totalSub = totalSub ? totalSub + " · " + excl : excl;
             $snap.append(metricCard("total", "coins", getMsg("VAS_092_OrderTotal"),
-                formatAmount(+data.GrandTotal || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision),
+                formatAmount(+data.SubTotal || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision),
                 totalSub, null));
 
             // Expected Delivery — promised date + delivery-status caption.
@@ -1202,6 +1348,22 @@
             var paymentLabel = data.IsPaymentDone
                 ? getMsg("VAS_092_PaymentCompleted")
                 : getMsg("VAS_092_PendingAmount");
+            // With Vendor reports whether the order has actually gone OUT to the
+            // vendor (C_Order.VAS_IsEmailSent) — "Email Sent" or "Pending". It
+            // used to repeat the completion date the Completed stage above it
+            // already carries, which said nothing about the vendor having it.
+            var withVendorMeta = data.IsEmailSent
+                ? getMsg("VAS_092_EmailSent")
+                : getMsg("VAS_092_Pending");
+            // Some tenants have VAS_092_WithVendor seeded in AD_Message with the
+            // SAME text as VAS_092_Completed, which renders the timeline as two
+            // consecutive "Completed" stages and loses the distinction the stage
+            // exists to draw. A translation that collides with the stage above it
+            // is not a translation — fall back to the built-in wording.
+            var withVendorLabel = getMsg("VAS_092_WithVendor");
+            if (withVendorLabel === getMsg("VAS_092_Completed")) {
+                withVendorLabel = MSG_DEFAULTS.VAS_092_WithVendor;
+            }
             return [
                 // stamp: true marks a date that is a stored TIMESTAMP (UTC, no
                 // zone designator) rather than a document date field, so it is
@@ -1209,7 +1371,7 @@
                 // late in the local evening reports the following UTC day.
                 { key: "VAS_092_Drafted",          done: true,                     active: data.CurrentStage === 1, date: data.Created || data.DateOrdered, stamp: true },
                 { key: "VAS_092_Completed",        done: data.IsCompleted,         active: data.CurrentStage === 2, date: data.OrderCompletedDate || data.DateOrdered },
-                { key: "VAS_092_WithVendor",       done: data.IsWithVendor,        active: data.CurrentStage === 3, date: data.OrderCompletedDate || data.DateOrdered },
+                { key: "VAS_092_WithVendor",       label: withVendorLabel, done: data.IsWithVendor, active: data.CurrentStage === 3, date: data.OrderCompletedDate || data.DateOrdered, meta: withVendorMeta },
                 { key: "VAS_092_ExpectedDelivery", done: data.IsExpectedDelivery,  active: data.CurrentStage === 4, date: data.DatePromised, required: true },
                 // The receipt stage dates from when the GRN was CREATED (model
                 // side), which is a stamp — not the movement date it used to
@@ -1254,6 +1416,9 @@
                         ? getMsg("VAS_092_Required") + " " + dateText
                         : dateText;
                 }
+                // A stage that states its own sub-line (With Vendor) keeps it in
+                // every state — the sentence is the point, not the date.
+                if (s.meta) metaText = s.meta;
 
                 $tl.append(stepEntry(i + 1, s.label || getMsg(s.key), metaText, s.done, stateCls));
             }
@@ -2261,7 +2426,19 @@
             reversed:    { tone: "risk",    icon: "alert",  tagKey: "VAS_092_TagReversed",    titleKey: null },
             closed:      { tone: "neutral", icon: "check",  tagKey: "VAS_092_TagClosed",      titleKey: null },
             invalidated: { tone: "warning", icon: "alert",  tagKey: "VAS_092_TagInvalidated", titleKey: null },
-            updated:     { tone: "info",    icon: "pencil", tagKey: "VAS_092_TagUpdated",     titleKey: "VAS_092_ActUpdated" }
+            updated:     { tone: "info",    icon: "pencil", tagKey: "VAS_092_TagUpdated",     titleKey: "VAS_092_ActUpdated" },
+            // The correspondence and engagement sources shared with every other
+            // overview panel (model side, VAS_ActivitySourcesModel): meetings and
+            // tasks from AppointmentsInfo, calls from VA048_CallDetails, and the
+            // inbound letters MailAttachment1 files under AttachmentType 'I'.
+            //
+            // titleKey null on all four: each headlines with its OWN subject, note
+            // or title, falling back to what its tag says it is — a call with no
+            // note reads "Call".
+            appointment: { tone: "info",    icon: "calendar", tagKey: "VAS_092_TagAppointment", titleKey: null },
+            task:        { tone: "warning", icon: "check",    tagKey: "VAS_092_TagTask",        titleKey: null },
+            call:        { tone: "success", icon: "phone",    tagKey: "VAS_092_TagCall",        titleKey: null },
+            letter:      { tone: "purple",  icon: "mail",     tagKey: "VAS_092_TagLetter",      titleKey: null }
         };
 
         // Maximum activity rows shown per page; the feed paginates beyond this.
@@ -2350,13 +2527,36 @@
         // the log recorded as empty reads as an em dash rather than as a blank, so
         // a cleared field is visibly cleared instead of looking like a rendering
         // gap. Follows VAS_101 / VAS_104.
+        // A changed DATE arrives as yyyy-MM-dd (model side, which drops the time
+        // the change log stores against a date field). It is rendered in the
+        // reader's own locale here, like every other date on the panel.
+        //
+        // The parts are read out and handed to the Date constructor as LOCAL
+        // numbers rather than parsed from the string: JavaScript reads a bare
+        // "2026-08-20" as UTC midnight, which renders as the 19th anywhere west of
+        // Greenwich — the day-rollover this panel's date handling exists to avoid.
+        var ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+        function changeValueText(value) {
+            var s = (value === null || value === undefined) ? "" : String(value);
+            var m = ISO_DATE.exec(s);
+            if (!m) return s;
+            var d = new Date(+m[1], +m[2] - 1, +m[3]);
+            if (isNaN(d.getTime())) return s;
+            try {
+                return d.toLocaleDateString(window.navigator.language,
+                    { year: "numeric", month: "short", day: "2-digit" });
+            } catch (e) { return s; }
+        }
+
         function changeDelta(a) {
             var $d = $('<small class="vas_092-actSub vas_092-actDelta"></small>');
             var blank = "—";
-            $d.append($('<span class="vas_092-cvOld"></span>').text(a.OldValue || blank));
+            var oldTxt = changeValueText(a.OldValue) || blank;
+            var newTxt = changeValueText(a.NewValue) || blank;
+            $d.append($('<span class="vas_092-cvOld"></span>').text(oldTxt));
             $d.append($('<span class="vas_092-cvArrow"></span>').text("→"));
-            $d.append($('<span class="vas_092-cvNew"></span>').text(a.NewValue || blank));
-            $d.attr("title", (a.OldValue || blank) + " → " + (a.NewValue || blank));
+            $d.append($('<span class="vas_092-cvNew"></span>').text(newTxt));
+            $d.attr("title", oldTxt + " → " + newTxt);
             return $d;
         }
 
@@ -2377,10 +2577,39 @@
             // An e-mail names its recipients under the subject — every address on
             // the To, Cc and Bcc lists, in full. No tooltip: the line is no
             // longer an abridgement of something the reader has to hover to see.
-            if (a.Type === "email") {
+            // ... and so does a LETTER, which is the same record filed under a
+            // different attachment type.
+            if (a.Type === "email" || a.Type === "letter") {
                 var to = recipientSummary(a);
                 if (to) {
                     $title.append($('<small class="vas_092-actSub"></small>').text(to));
+                }
+            }
+
+            // A call names the number it reached, where one was recorded — the
+            // same slot answering the same question.
+            if (a.Type === "call" && a.MailTo) {
+                $title.append($('<small class="vas_092-actSub"></small>')
+                    .text(a.MailTo).attr("title", a.MailTo));
+            }
+
+            // A meeting or task names where it is and whether it has been dealt
+            // with; a cancelled one says so rather than reading as still open.
+            if (a.Type === "appointment" || a.Type === "task") {
+                var apptBits = [];
+                if (a.Location) apptBits.push(a.Location);
+                if (a.IsCancelled) apptBits.push(getMsg("VAS_092_ActCancelled"));
+                else if (a.IsClosed) apptBits.push(getMsg("VAS_092_ActCompleted"));
+                // What was e-mailed about this meeting or task. The count only —
+                // the addresses, subjects and bodies are in the drawer, and a
+                // meeting that generated several notices would otherwise push
+                // everything else off the sub-line.
+                var apptMails = activityMails(a);
+                if (apptMails.length) apptBits.push(mailCountLabel(apptMails.length));
+                if (apptBits.length) {
+                    var apptSub = apptBits.join(" · ");
+                    $title.append($('<small class="vas_092-actSub"></small>')
+                        .text(apptSub).attr("title", apptSub));
                 }
             }
 
@@ -2404,8 +2633,14 @@
 
             // Rows carrying a body are clickable; the caret shows the state.
             if (hasActivityBody(a)) {
+                // A meeting or task opens onto the e-mails sent about it; every
+                // other openable row onto its own message.
+                var isAppt = (a.Type === "appointment" || a.Type === "task");
+                var showHint = getMsg(isAppt ? "VAS_092_ShowMails" : "VAS_092_ShowMailBody");
+                var hideHint = getMsg(isAppt ? "VAS_092_HideMails" : "VAS_092_HideMailBody");
+
                 $row.addClass("vas_092-is-openable");
-                $row.attr("title", getMsg("VAS_092_ShowMailBody"));
+                $row.attr("title", showHint);
                 var $caret = $('<span class="vas_092-actCaret"></span>').append(svgIcon("chevRight"));
                 $row.append($caret);
                 $row.on("click", function () {
@@ -2413,16 +2648,38 @@
                     if (!$panel.length) return;
                     var nowOpen = !$row.hasClass("vas_092-is-open");
                     $row.toggleClass("vas_092-is-open", nowOpen)
-                        .attr("title", nowOpen ? getMsg("VAS_092_HideMailBody")
-                                               : getMsg("VAS_092_ShowMailBody"));
+                        .attr("title", nowOpen ? hideHint : showHint);
                     $panel.toggle(nowOpen);
                 });
             }
             return $row;
         }
 
+        // What opens on click. A letter opens like a mail: it is the same record
+        // in the same table, filed under a different attachment type, with the
+        // same body and the same addresses on it. A meeting or task opens onto
+        // the e-mails sent against it instead.
         function hasActivityBody(a) {
-            return a && a.Type === "email" && !!(a.Body && String(a.Body).trim());
+            if (!a) return false;
+            if (a.Type === "email" || a.Type === "letter") {
+                return !!(a.Body && String(a.Body).trim());
+            }
+            if (a.Type === "appointment" || a.Type === "task") {
+                return activityMails(a).length > 0;
+            }
+            return false;
+        }
+
+        // The e-mails sent against an appointment or task (MailAttachment1 keyed
+        // on AppointmentsInfo). Always an array, so callers can count and loop
+        // without guarding.
+        function activityMails(a) {
+            return (a && a.Mails && a.Mails.length) ? a.Mails : [];
+        }
+
+        function mailCountLabel(n) {
+            return n + " " + (n === 1 ? getMsg("VAS_092_Email")
+                                      : getMsg("VAS_092_Emails"));
         }
 
         // The e-mail body, collapsed beneath its activity row. The full recipient
@@ -2432,12 +2689,50 @@
             if (!hasActivityBody(a)) return null;
 
             var $panel = $('<div class="vas_092-actBody" style="display:none;"></div>');
+
+            // An appointment or task opens onto the e-mails sent about it, each
+            // with its own recipient, subject, moment and sender. They are listed
+            // newest first (model order).
+            if (a.Type === "appointment" || a.Type === "task") {
+                var mails = activityMails(a);
+                for (var i = 0; i < mails.length; i++) {
+                    $panel.append(activityMailEntry(mails[i], i > 0));
+                }
+                return $panel;
+            }
+
             appendMailMeta($panel, "VAS_092_MailFrom", a.MailFrom);
             appendMailMeta($panel, "VAS_092_MailTo",   a.MailTo);
             appendMailMeta($panel, "VAS_092_MailCc",   a.MailCc);
             appendMailMeta($panel, "VAS_092_MailBcc",  a.MailBcc);
             $panel.append($('<p></p>').text(String(a.Body).trim()));
             return $panel;
+        }
+
+        // One e-mail inside an appointment's or task's drawer: who it went to and
+        // what it was about, then when and by whom, then the message. Separated
+        // from the one before it so several notices do not read as one.
+        function activityMailEntry(m, separated) {
+            var $wrap = $('<div class="vas_092-actMailItem"></div>');
+            if (separated) $wrap.addClass("vas_092-actMailSplit");
+
+            appendMailMeta($wrap, "VAS_092_MailTo", m.MailTo);
+            appendMailMeta($wrap, "VAS_092_MailSubject",
+                (m.Subject && String(m.Subject).trim())
+                    ? m.Subject : getMsg("VAS_092_NoSubject"));
+
+            // "when · who", the same two parts in the same order as the row above
+            // it.
+            var when = formatDateTime(m.SentOn);
+            if (m.SentBy) when = when ? when + " · " + m.SentBy : m.SentBy;
+            if (when) $wrap.append($('<div class="vas_092-actMeta"></div>').text(when));
+
+            // The body is the thing the click was for; a mail filed without one
+            // still shows its envelope rather than an empty gap.
+            if (m.Body && String(m.Body).trim()) {
+                $wrap.append($('<p></p>').text(String(m.Body).trim()));
+            }
+            return $wrap;
         }
 
         function appendMailMeta($panel, key, value) {
@@ -2641,6 +2936,7 @@
             chevLeft: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
             chevRight: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
             alert: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+            send:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4Z"/></svg>',
             history: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>'
         };
 
@@ -2777,6 +3073,11 @@
         this.curTab = curTab;
         if (curTab && typeof curTab.getAD_Table_ID === "function") {
             this.table_ID = curTab.getAD_Table_ID();
+        }
+        // Cached for the share flow's fallback, so printContext() still resolves
+        // the window on a build whose tab does not expose the getter.
+        if (curTab && typeof curTab.getAD_Window_ID === "function") {
+            this.AD_Window_ID = curTab.getAD_Window_ID();
         }
         this.init();
         // Watch the tab itself so New Record (which never calls refreshPanelData)

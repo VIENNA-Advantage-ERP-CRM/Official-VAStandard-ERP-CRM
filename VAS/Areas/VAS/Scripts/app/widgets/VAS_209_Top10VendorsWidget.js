@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VAS_209_Top10VendorsWidget
  * Purchase Order Dashboard - Widget 07: Top 10 Vendors (3x2 Ranked Bar List)
  *
@@ -111,7 +111,9 @@
         var stdPrecision = 2;
 
         var currentPage = 0; // 0-indexed
-        var pageSize = 5;
+        // Rows per page in the modal table. The stylesheet sizes the table body to
+        // exactly this many rows (--vas-t10v-rows), so the two must stay in step.
+        var pageSize = 6;
         var totalPages = 1;
 
         // Modal Stack State
@@ -122,7 +124,10 @@
         function lbl(key, fallback) {
             if (window.VIS && VIS.Msg && VIS.Msg.getMsg) {
                 var msg = VIS.Msg.getMsg(key);
-                if (msg && msg !== key && msg.indexOf('**') === -1) {
+                // VIS.Msg.getMsg returns "[KEY]" when the AD_Message row is missing;
+                // that must fall through to the English fallback, not render as-is.
+                if (msg && msg !== key && msg !== '[' + key + ']' && msg.charAt(0) !== '['
+                    && msg.indexOf('**') === -1) {
                     return msg;
                 }
             }
@@ -838,14 +843,14 @@
                     var $row = $('<div class="vas-t10v-mrow" style="grid-template-columns: minmax(0, 0.4fr) minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 0.6fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.1fr);">' +
                         '<span class="vas-t10v-cell vas-t10v-right vas-t10v-c-std">' + (sIdx + i + 1) + '</span>' +
                         '<span class="vas-t10v-cell vas-t10v-c-prim" title="' + esc(l.name) + '">' + esc(l.name) + '</span>' +
-                        '<span class="vas-t10v-cell vas-t10v-c-std" title="' + esc(l.attr || '—') + '">' + esc(l.attr || '—') + '</span>' +
+                        '<span class="vas-t10v-cell vas-t10v-c-std" title="' + esc(l.attr || '') + '">' + esc(l.attr || '') + '</span>' +
                         '<span class="vas-t10v-cell vas-t10v-c-std" title="' + esc(l.uom || '') + '">' + esc(l.uom || '') + '</span>' +
                         '<span class="vas-t10v-cell vas-t10v-right" title="' + num(l.qty) + '">' + num(l.qty) + '</span>' +
-                        '<span class="vas-t10v-cell vas-t10v-right" title="' + num(l.recd) + '">' + num(l.recd) + '</span>' +
-                        '<span class="vas-t10v-cell vas-t10v-right vas-t10v-c-prim" title="' + num(l.pend) + '">' + num(l.pend) + '</span>' +
+                        '<span class="vas-t10v-cell vas-t10v-right" title="' + nsDash(l, num(l.recd)) + '">' + nsDash(l, num(l.recd)) + '</span>' +
+                        '<span class="vas-t10v-cell vas-t10v-right vas-t10v-c-prim" title="' + nsDash(l, num(l.pend)) + '">' + nsDash(l, num(l.pend)) + '</span>' +
                         '<span class="vas-t10v-cell vas-t10v-right" title="' + esc(rateFormatted) + '">' + esc(rateFormatted) + '</span>' +
                         '<span class="vas-t10v-cell vas-t10v-right vas-t10v-c-emph" title="' + esc(amtFormatted) + '">' + esc(amtFormatted) + '</span>' +
-                        '<span class="vas-t10v-cell"><span class="vas-t10v-chip ' + esc(l.statusChip) + '" title="' + esc(l.statusText) + '">' + esc(l.statusText) + '</span></span>' +
+                        '<span class="vas-t10v-cell"><span class="vas-t10v-chip ' + esc(l.statusChip) + '" title="' + esc(nsDash(l, l.statusText)) + '">' + esc(nsDash(l, l.statusText)) + '</span></span>' +
                         '</div>');
 
                     $tableBody.append($row);
@@ -978,5 +983,12 @@
         }
         this.frame = null;
     };
+
+
+    /* A charge line, or a product that is not of Item type, is never received:
+       received, pending and line status render as a dash instead of a figure. */
+    function nsDash(l, v) {
+        return (l && (l.IsNonStock || l.isNonStock)) ? '–' : v;
+    }
 
 })(VAS, jQuery);

@@ -323,6 +323,34 @@
  *                        visibly cleared rather than looking like a rendering
  *                        gap. A row said WHICH field moved but never what it
  *                        moved from or to.
+ *   VAI163   2026-08-21  Activity: a Task or Appointment row now says how many
+ *                        e-mails were sent against it, and opens on click onto
+ *                        each one - who it went to, its subject, when it went
+ *                        and who sent it, then the message itself. The body is
+ *                        shown ONLY once the row is opened.
+ *   VAI163   2026-08-26  Receipt Timeline reworked to follow the receipt through
+ *                        its DOCUMENTS: Drafted -> Completed -> [Confirmed] ->
+ *                        Invoiced.
+ *                        - In Progress is gone. It restated the Completed stage's
+ *                          own "not yet" as a stage of its own, and captioned it
+ *                          with the last-updated stamp, which says nothing about
+ *                          where the document stands.
+ *                        - Posted is gone. It reports the accounting act rather
+ *                          than the receipt's progress, and the header already
+ *                          carries a Posted pill for it.
+ *                        - Completed reads Pending while the receipt is drafted,
+ *                          In Process once it has moved but has not completed, and
+ *                          the workflow completion date once it has.
+ *                        - Confirmed is new, and is drawn ONLY for a receipt whose
+ *                          TARGET document type asks for a confirmation
+ *                          (IsShipConfirmTarget). It reads In Process until the
+ *                          receipt confirmation completes — including when none has
+ *                          been raised — then captions with the moment it did.
+ *                        - Invoiced now waits for the AP invoice to COMPLETE: a
+ *                          drafted invoice leaves the stage Pending, where the
+ *                          stage previously went green on an invoice merely
+ *                          existing. With several invoices it captions with the
+ *                          latest completed one (model side).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -930,9 +958,14 @@
             $right.append(headerField(msg("VAS_099_Warehouse", "Warehouse"), na(data.WarehouseName), false));
             $right.append(headerField(msg("VAS_099_ReceivedDate", "Received Date"),
                 na(formatDate(data.MovementDate)), false));
-            // Drop Shipment flag (M_InOut.IsDropShip).
-            $right.append(headerField(msg("VAS_099_DropShipment", "Drop Shipment"),
-                data.IsDropShip ? msg("VAS_099_Yes", "Yes") : msg("VAS_099_No", "No"), false));
+            // Drop Shipment flag (M_InOut.IsDropShip) — shown ONLY when the
+            // receipt IS a drop shipment. A "No" row states the ordinary case and
+            // earns no space; the field is an exception flag, so its presence is
+            // the message.
+            if (data.IsDropShip) {
+                $right.append(headerField(msg("VAS_099_DropShipment", "Drop Shipment"),
+                    msg("VAS_099_Yes", "Yes"), false));
+            }
             $card.append($right);
 
             $body.append($card);
@@ -963,7 +996,7 @@
             // both order kinds live in C_Order.
             if (data.PONo || data.PurchaseOrderId > 0) {
                 $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_099_AgainstPO"),
-                    data.PONo || ("#" + data.PurchaseOrderId),
+                    data.PONo || "",
                     null, "info", "C_Order", data.PurchaseOrderId, false));
                 any = true;
             }
@@ -978,7 +1011,7 @@
             // sales transaction so the framework resolves the Sales Order window.
             if (data.RefOrderDocNo || data.RefOrderId > 0) {
                 $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_099_ReferenceSalesOrder"),
-                    data.RefOrderDocNo || ("#" + data.RefOrderId),
+                    data.RefOrderDocNo || "",
                     null, "success", "C_Order", data.RefOrderId, true));
                 any = true;
             }
@@ -1144,44 +1177,84 @@
 
         // ---------- Receipt timeline (horizontal stepper) ---------- //
 
-        // The receipt's document lifecycle: Drafted -> In Progress -> Completed ->
-        // Posted -> Invoiced. Each stage is driven by document state, not by the
-        // presence of a date; the date is only the caption underneath.
-        //   Drafted     — the record exists, so always done (captioned with Created).
-        //   In Progress — the document has moved past draft (any of IP/AP/WC/WP)
-        //                 or reached a terminal state (CO/CL/VO/RE). Invalid (IN)
-        //                 and Not Approved (NA) do not count as progressed.
-        //   Completed   — DocStatus CO or CL, captioned with the movement date.
-        //   Posted      — M_InOut.Posted, captioned with the date posting actually
-        //                 ran (PostedDate, from the receipt's Fact_Acct rows). The
-        //                 accounting date is only a fallback: it is the date the
-        //                 posting was booked to and normally equals the movement
-        //                 date, which is not what this stage is reporting.
-        //   Invoiced    — an AP invoice exists for the receipt's purchase order.
-        var PROGRESSED_STATUS = ["IP", "AP", "WC", "WP", "CO", "CL", "VO", "RE"];
-
+        // The receipt's document lifecycle: Drafted -> Completed -> [Confirmed] ->
+        // Invoiced. Each stage is driven by document state, not by the presence of
+        // a date; the date is only the caption underneath, and a stage that has not
+        // been reached says where it stands instead.
+        //   Drafted   — the record exists, so always done, captioned with the date
+        //               it was created on.
+        //   Completed — Pending while the receipt is still drafted, In Process once
+        //               it has moved but has not completed, and the workflow's own
+        //               DocComplete stamp once it has. NOT the movement date: that
+        //               is when the goods moved, typed on the receipt, and a receipt
+        //               entered for last month but completed today captioned this
+        //               stage with last month. The movement date remains the
+        //               fallback for a receipt completed outside the workflow.
+        //   Confirmed — drawn ONLY for a receipt whose TARGET document type asks
+        //               for a receipt confirmation (IsShipConfirm on
+        //               C_DocTypeTarget_ID). Until the confirmation
+        //               (M_InOutConfirm) completes — including when none has been
+        //               raised yet — it reads In Process; once it completes it
+        //               captions with the moment it did.
+        //   Invoiced  — Pending until an AP invoice for the receipt COMPLETES; a
+        //               drafted invoice is not an invoiced receipt. With several
+        //               invoices it captions with the latest completed one.
+        //
+        // In Progress and Posted are gone. In Progress restated the Completed
+        // stage's own "not yet" in a stage of its own, and Posted reports the
+        // accounting act rather than the receipt's progress through its documents —
+        // the header's Posted pill already carries it.
         function timelineStages() {
             var st = data.StatusCode;
-            var progressed = PROGRESSED_STATUS.indexOf(st) >= 0;
-            var completed  = (st === "CO" || st === "CL");
+            var completed = (st === "CO" || st === "CL");
+            // Drafted is the one state that has not been worked on at all. Anything
+            // else short of completion is under way — in the workflow (IP/WC/WP),
+            // waiting on approval (AP), or handed back to the user (IN/NA). A
+            // voided or reversed receipt lands here too; the header's status pill
+            // is what reports that, not the timeline.
+            var drafted = !st || st === "DR";
 
             // `stamp` marks a caption fed by a real timestamp rather than a
             // date-only field: those are stored in UTC and have to be converted
             // before the day is read off them.
-            return [
-                { key: "VAS_099_Drafted",    fallback: "Drafted",     date: data.Created,             done: true,       stamp: true },
-                { key: "VAS_099_InProgress", fallback: "In Progress", date: progressed ? data.Updated : null, done: progressed, stamp: true },
-                // The date the record was completed on — the workflow's own stamp.
-                // NOT the movement date: that is when the goods moved, typed on the
-                // receipt, and a receipt entered for last month but completed today
-                // captioned this stage with last month.
-                { key: "VAS_099_Completed",  fallback: "Completed",   date: completed ? (data.CompletedDate || data.MovementDate) : null, done: completed, stamp: !!data.CompletedDate },
-                { key: "VAS_099_Posted",     fallback: "Posted",      date: data.Posted ? (data.PostedDate || data.PostingDate) : null, done: !!data.Posted, stamp: !!data.PostedDate },
-                // When the invoice was RAISED against this receipt, not the date
-                // typed on it: DateInvoiced says which period the invoice books
-                // to, and can be any date the enterer chose.
-                { key: "VAS_099_Invoiced",   fallback: "Invoiced",    date: data.ReferenceInvoiceCreated || data.ReferenceInvoiceDate, done: !!data.ReferenceInvoice, stamp: !!data.ReferenceInvoiceCreated }
+            var stages = [
+                {
+                    key: "VAS_099_Drafted", fallback: "Drafted",
+                    date: data.Created, done: true, stamp: true
+                },
+                {
+                    key: "VAS_099_Completed", fallback: "Completed",
+                    date: completed ? (data.CompletedDate || data.MovementDate) : null,
+                    done: completed, stamp: !!data.CompletedDate,
+                    pending: drafted ? null : inProcessText()
+                }
             ];
+
+            // Only a receipt that is going to be confirmed carries the stage. On
+            // any other document type there is no confirmation to wait for, and a
+            // permanently In Process stage would read as an omission.
+            if (data.IsShipConfirmTarget) {
+                stages.push({
+                    key: "VAS_099_Confirmed", fallback: "Confirmed",
+                    date: data.ConfirmCompletedDate,
+                    done: !!data.ConfirmCompletedDate, stamp: true,
+                    // Not raised yet, still drafted, or raised and not completed —
+                    // all of them are the confirmation being worked through.
+                    pending: inProcessText()
+                });
+            }
+
+            stages.push({
+                key: "VAS_099_Invoiced", fallback: "Invoiced",
+                date: data.InvoiceCompletedDate,
+                done: !!data.InvoiceCompletedDate, stamp: true
+            });
+
+            return stages;
+        }
+
+        function inProcessText() {
+            return msg("VAS_099_InProcess", "In Process");
         }
 
         function renderTimeline() {
@@ -1203,13 +1276,15 @@
                 var stateCls, metaText;
                 if (i === activeIdx) {
                     stateCls = "vas_099-is-active";
-                    metaText = stageDate || VIS.Msg.getMsg("VAS_099_Done");
+                    metaText = stageDate || msg("VAS_099_Done", "Done");
                 } else if (s.done) {
                     stateCls = "vas_099-is-done";
-                    metaText = stageDate || VIS.Msg.getMsg("VAS_099_Done");
+                    metaText = stageDate || msg("VAS_099_Done", "Done");
                 } else {
                     stateCls = "vas_099-is-pending";
-                    metaText = VIS.Msg.getMsg("VAS_099_Pending");
+                    // A stage that is under way says so; one that has not started
+                    // falls back to Pending.
+                    metaText = s.pending || msg("VAS_099_Pending", "Pending");
                 }
 
                 $tl.append(stepEntry(i + 1, msg(s.key, s.fallback), metaText, s.done, stateCls));
@@ -1784,7 +1859,17 @@
             confirmation: { tone: "warning", icon: "clipboardCheck", tagKey: "VAS_099_TagConfirmation", tagText: "Confirmation", titleKey: "VAS_099_ActConfirmation", titleText: "Receipt confirmation raised" },
             invoice:      { tone: "info",    icon: "doc",            tagKey: "VAS_099_TagInvoice",      tagText: "Invoice",      titleKey: "VAS_099_ActInvoice",      titleText: "Vendor invoice raised" },
             note:         { tone: "neutral", icon: "mail",           tagKey: "VAS_099_TagNote",         tagText: "Note",         titleKey: null,                      titleText: "" },
-            email:        { tone: "purple",  icon: "mail",           tagKey: "VAS_099_TagEmail",        tagText: "Email",        titleKey: null,                      titleText: "" }
+            email:        { tone: "purple",  icon: "mail",           tagKey: "VAS_099_TagEmail",        tagText: "Email",        titleKey: null,                      titleText: "" },
+            // The correspondence and engagement sources shared with every other
+            // overview panel (model side, VAS_ActivitySourcesModel): meetings and
+            // tasks from AppointmentsInfo, calls from VA048_CallDetails, and the
+            // inbound letters MailAttachment1 files under AttachmentType 'I'.
+            // titleKey null on all four: each headlines with its OWN subject, note
+            // or title, falling back to what its tag says it is.
+            appointment:  { tone: "info",    icon: "clipboardCheck", tagKey: "VAS_099_TagAppointment",  tagText: "Meeting",      titleKey: null,                      titleText: "" },
+            task:         { tone: "warning", icon: "check",          tagKey: "VAS_099_TagTask",         tagText: "Task",         titleKey: null,                      titleText: "" },
+            call:         { tone: "success", icon: "phone",          tagKey: "VAS_099_TagCall",         tagText: "Call",         titleKey: null,                      titleText: "" },
+            letter:       { tone: "purple",  icon: "mail",           tagKey: "VAS_099_TagLetter",       tagText: "Letter",       titleKey: null,                      titleText: "" }
         };
 
         // The receipt's audit trail, newest first: who created it, who changed it
@@ -1878,7 +1963,30 @@
             // An e-mail names its recipients under the subject — every address on
             // the To, Cc and Bcc lists, in full. No tooltip: the line is no
             // longer an abridgement of something the reader has to hover to see.
-            if (a.Type === "email") {
+            // A LETTER names its addresses here too — it is the same record in the
+            // same table, filed under a different attachment type.
+            if (a.Type === "call" && a.MailTo) {
+                $title.append($('<small class="vas_099-actSub"></small>')
+                    .text(a.MailTo).attr("title", a.MailTo));
+            }
+            if (a.Type === "appointment" || a.Type === "task") {
+                var apptBits = [];
+                if (a.Location) apptBits.push(a.Location);
+                if (a.IsCancelled) apptBits.push(msg("VAS_099_ActCancelled", "Cancelled"));
+                else if (a.IsClosed) apptBits.push(msg("VAS_099_ActCompleted2", "Completed"));
+                // What was e-mailed about this meeting or task. The count only —
+                // the addresses, subjects and bodies are in the drawer, and a
+                // meeting that generated several notices would otherwise push
+                // everything else off the sub-line.
+                var apptMails = activityMails(a);
+                if (apptMails.length) apptBits.push(mailCountLabel(apptMails.length));
+                if (apptBits.length) {
+                    var apptSub = apptBits.join(" · ");
+                    $title.append($('<small class="vas_099-actSub"></small>')
+                        .text(apptSub).attr("title", apptSub));
+                }
+            }
+            if (a.Type === "email" || a.Type === "letter") {
                 var to = recipientSummary(a);
                 if (to) {
                     $title.append($('<small class="vas_099-actSub"></small>').text(to));
@@ -1910,16 +2018,25 @@
 
             // Rows carrying a body are clickable; the caret shows the state.
             if (hasActivityBody(a)) {
+                // A meeting or task opens onto the e-mails sent about it; every
+                // other openable row onto its own message.
+                var isAppt = (a.Type === "appointment" || a.Type === "task");
+                var showHint = isAppt
+                    ? msg("VAS_099_ShowMails", "Click to read the e-mails")
+                    : msg("VAS_099_ShowMailBody", "Click to read the message");
+                var hideHint = isAppt
+                    ? msg("VAS_099_HideMails", "Click to hide the e-mails")
+                    : msg("VAS_099_HideMailBody", "Click to hide the message");
+
                 $row.addClass("vas_099-is-openable");
-                $row.attr("title", msg("VAS_099_ShowMailBody", "Click to read the message"));
+                $row.attr("title", showHint);
                 $row.append($('<span class="vas_099-actCaret"></span>').append(svgIcon("chevRight")));
                 $row.on("click", function () {
                     var $panel = $row.next(".vas_099-actBody");
                     if (!$panel.length) return;
                     var nowOpen = !$row.hasClass("vas_099-is-open");
                     $row.toggleClass("vas_099-is-open", nowOpen)
-                        .attr("title", nowOpen ? msg("VAS_099_HideMailBody", "Click to hide the message")
-                                               : msg("VAS_099_ShowMailBody", "Click to read the message"));
+                        .attr("title", nowOpen ? hideHint : showHint);
                     $panel.toggle(nowOpen);
                 });
             }
@@ -1929,8 +2046,13 @@
 
         function activityTitle(a, meta) {
             if (a.Type === "note") return (a.Text || "").trim();
-            if (a.Type === "email") {
+            if (a.Type === "email" || a.Type === "letter") {
                 return (a.Text || "").trim() || msg("VAS_099_NoSubject", "(no subject)");
+            }
+            // A meeting, task or call headlines with its own subject or note; with
+            // none, the KIND stands in rather than borrowing another type's words.
+            if (a.Type === "appointment" || a.Type === "task" || a.Type === "call") {
+                return (a.Text || "").trim() || msg(meta.tagKey, meta.tagText);
             }
             // A field-level edit headlines with the FIELD that changed — the row's
             // tag already says "Updated", and the field is what tells one edit
@@ -1944,10 +2066,30 @@
             return title;
         }
 
-        // Only an e-mail carries a body worth opening; a mail stored without one
-        // stays a plain, non-clickable row.
+        // What opens on click. An e-mail or letter opens its OWN body, and a mail
+        // stored without one stays a plain, non-clickable row. An appointment or
+        // task opens the e-mails sent against it.
         function hasActivityBody(a) {
-            return a && a.Type === "email" && !!(a.Body && String(a.Body).trim());
+            if (!a) return false;
+            if (a.Type === "email" || a.Type === "letter") {
+                return !!(a.Body && String(a.Body).trim());
+            }
+            if (a.Type === "appointment" || a.Type === "task") {
+                return activityMails(a).length > 0;
+            }
+            return false;
+        }
+
+        // The e-mails sent against an appointment or task (MailAttachment1 keyed
+        // on AppointmentsInfo). Always an array, so callers can count and loop
+        // without guarding.
+        function activityMails(a) {
+            return (a && a.Mails && a.Mails.length) ? a.Mails : [];
+        }
+
+        function mailCountLabel(n) {
+            return n + " " + (n === 1 ? msg("VAS_099_Email", "email")
+                                      : msg("VAS_099_Emails", "emails"));
         }
 
         // The e-mail body, collapsed beneath its activity row. The full recipient
@@ -1957,12 +2099,53 @@
             if (!hasActivityBody(a)) return null;
 
             var $panel = $('<div class="vas_099-actBody" style="display:none;"></div>');
+
+            // An appointment or task opens onto the e-mails sent about it, each
+            // with its own recipient, subject, moment and sender. They are listed
+            // newest first (model order).
+            if (a.Type === "appointment" || a.Type === "task") {
+                var mails = activityMails(a);
+                for (var i = 0; i < mails.length; i++) {
+                    $panel.append(activityMailEntry(mails[i], i > 0));
+                }
+                return $panel;
+            }
+
             appendMailMeta($panel, "VAS_099_MailFrom", "From:", a.MailFrom);
             appendMailMeta($panel, "VAS_099_MailTo",   "To:",   a.MailTo);
             appendMailMeta($panel, "VAS_099_MailCc",   "Cc:",   a.MailCc);
             appendMailMeta($panel, "VAS_099_MailBcc",  "Bcc:",  a.MailBcc);
             $panel.append($('<p></p>').text(String(a.Body).trim()));
             return $panel;
+        }
+
+        // One e-mail inside an appointment's or task's drawer: who it went to and
+        // what it was about, then when and by whom, then the message. Separated
+        // from the one before it so several notices do not read as one.
+        function activityMailEntry(m, separated) {
+            var $wrap = $('<div class="vas_099-actMailItem"></div>');
+            if (separated) $wrap.addClass("vas_099-actMailSplit");
+
+            appendMailMeta($wrap, "VAS_099_MailTo", "To:", m.MailTo);
+            appendMailMeta($wrap, "VAS_099_MailSubject", "Subject:",
+                (m.Subject && String(m.Subject).trim())
+                    ? m.Subject : msg("VAS_099_NoSubject", "(no subject)"));
+
+            // "when · by whom", the same two parts in the same order as the row
+            // above it.
+            var when = formatDateTime(m.SentOn);
+            if (m.SentBy) {
+                when = when ? when + " · " + msg("VAS_099_By", "by") + " " + m.SentBy
+                            : msg("VAS_099_By", "by") + " " + m.SentBy;
+            }
+            if (when) $wrap.append($('<div class="vas_099-actMeta"></div>').text(when));
+
+            // The body is the thing the click was for; a mail filed without one
+            // still shows its envelope rather than an empty gap.
+            if (m.Body && String(m.Body).trim()) {
+                $wrap.append($('<p></p>').text(String(m.Body).trim()));
+            }
+            return $wrap;
         }
 
         function appendMailMeta($panel, key, fallback, value) {

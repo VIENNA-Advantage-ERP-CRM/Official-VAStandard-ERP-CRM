@@ -49,7 +49,11 @@
         var SYSTEM_PREFIXES = {
             "AD_": 1, "C_": 1, "M_": 1, "A_": 1, "G_": 1, "K_": 1, "R_": 1, "I_": 1,
             "B_": 1, "T_": 1, "S_": 1, "W_": 1, "U_": 1,
-            "VAS_": 1, "VIS_": 1, "VA_": 1, "VB_": 1
+            "VAS_": 1, "VIS_": 1, "VA_": 1, "VB_": 1,
+            // Core columns whose prefix names a ROLE, not a module: Ref_OrderLine_ID
+            // ("Original PO Line") yields "Ref_", which was read as an uninstalled
+            // module and silently dropped the column. Link_ is the same shape.
+            "REF_": 1, "LINK_": 1
         };
         /* Non-system column prefixes (e.g. "VA106_") whose columns are present in columnMeta,
            meaning the corresponding module is installed. Populated from the server column list. */
@@ -66,6 +70,12 @@
            is true, the row IDs queued by the second call land in pendingSaveIds; once the
            in-flight POST completes, flushPendingSave() replays those rows automatically. */
         var saveInFlight = false, pendingSaveIds = {};
+        /* Callout-completion gate: both async callout paths (setTimeout + server AJAX) increment
+           calloutPending before going async and call calloutSettled() when done. afterCallouts()
+           defers Save until the count reaches zero so a qty/price typed and Saved without
+           tabbing out is persisted with the callout's recomputed price / tax / amounts. */
+        var calloutPending = 0, calloutWaiters = [];
+        var CALLOUT_WAIT_MS = 8000;
         /* client-side line rows + reactive UI state */
         var lines = [];
         var rowCounter = 0;
@@ -167,7 +177,20 @@
                 .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
         }
 
-        function icon(name, glyph) { return '<span class="vas-obl-icon" data-icon="' + name + '">' + (glyph || "") + "</span>"; }
+        // Inline SVG for icons that must render as vector (inherits CSS color).
+        // Other icons fall back to the span/emoji approach.
+        var ICON_SVG = {};
+
+        function icon(name, glyph) {
+            var paths = ICON_SVG[name];
+            if (paths) {
+                return '<svg class="vas-obl-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"' +
+                       ' fill="none" stroke="currentColor" stroke-width="2"' +
+                       ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                       paths + '</svg>';
+            }
+            return '<span class="vas-obl-icon" data-icon="' + name + '">' + (glyph || "") + "</span>";
+        }
 
         /* ---------- per-line calculation (mirrors the prototype formulas) ---------- */
         function taxRate(id) { return taxRateById[id] || 0; }
@@ -176,7 +199,7 @@
         function lineGross(line) {
             var v = line.values;
             var disc = (+v.Discount || 0) / 100;
-            return (+v.QtyOrdered || 0) * (+v.PriceEntered || 0) * (1 - disc);
+            return (+v.QtyEntered || 0) * (+v.PriceEntered || 0) * (1 - disc);
         }
         /* Line tax. Tax-inclusive: EXTRACT it from the gross (gross*r/(100+r)) - mirrors
            the framework MTax.CalculateTax(amount, taxIncluded=true). Tax-exclusive: add
@@ -241,7 +264,7 @@
             $root = $('<div class="vas-obl-root"></div>');
             $body = $('<div class="vas-obl-body"></div>');
             $emptyState = $('<div class="vas-obl-empty" style="display:none;"></div>');
-            $emptyState.text(lbl("VAS_107_NoOrder", "Select an order to add lines"));
+            $emptyState.text(lbl("VAS_107_NoOrder", "Select a record to add lines"));
             $root.append($body).append($emptyState);
             createBusyIndicator();
             buildShell();
@@ -333,7 +356,7 @@
             });
         };
 
-        this.clear = function () {
+        this.clear = function (isNewRecord) {
             // Bump fetchSeq so any in-flight GetPanelData response is discarded — the panel
             // is being cleared (e.g. user navigated away) and rendering stale data would
             // overwrite the blank state that clear() just set.
@@ -341,7 +364,18 @@
             // Also tear down any open dialog so a fixed backdrop isn't orphaned over the page.
             closeDialogs();
             try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
-            parent = null; lines = []; render();
+            parent = null; lines = [];
+            if (isNewRecord) {
+                // New unsaved record — show a blank panel (no message).
+                if ($body)       $body.hide();
+                if ($emptyState) $emptyState.hide();
+            } else {
+                if ($emptyState) $emptyState.text(lbl("VAS_107_NoOrder", "Select a record to add lines"));
+                // parent is already null here, so this reverts the heading to the neutral
+                // wording — the panel must not keep naming the document it has let go of.
+                updateDocTypeLabels();
+                render();
+            }
         };
 
         function fromServerRow(r) {
@@ -362,6 +396,7 @@
             vals.C_Charge_ID = r.C_Charge_ID || 0;
             vals.M_AttributeSetInstance_ID = r.M_AttributeSetInstance_ID || 0;
             vals.QtyOrdered = r.QtyOrdered || 0;
+            vals.QtyEntered = r.QtyEntered || 0;
             vals.C_UOM_ID = r.C_UOM_ID || 0;
             vals.PriceEntered = r.PriceEntered || 0;
             vals.C_Tax_ID = r.C_Tax_ID || 0;
@@ -432,25 +467,84 @@
             if (parent) v.C_Order_ID = parent.C_Order_ID;
         }
 
+        /* ---------- document kind ----------
+           One panel serves the Sales Order, Purchase Order, Quotation, Blanket and
+           Return windows, so nothing it prints may name any ONE of them. Every
+           document-flavoured string is built from the header's own transaction-type
+           flags — C_Order.IsSOTrx, IsSalesQuotation, IsBlanketTrx, IsReturnTrx — which
+           is exactly what the framework itself branches on. The heading used to be the
+           literal "Quotation Lines & Summary" (and the section's aria-label the literal
+           "Invoice Lines and Summary"), so a purchase order announced itself as a
+           quotation to every reader and as an invoice to a screen reader.
+
+           A QUOTATION names itself; every other kind reads simply as "Order". Sales and
+           purchase orders are deliberately NOT distinguished in the heading: the window
+           the user is already looking at says which one it is, so repeating it inside
+           the panel adds nothing — both read "Order Lines & Summary". Blanket and
+           return documents follow the same rule; the flags are still carried on the
+           header (and exposed as logic tokens) so a field's DisplayLogic can branch on
+           them even though the heading does not. */
+        function docKind() {
+            return docIsQuotation()
+                ? { key: "VAS_107_DocQuotation", def: "Quotation" }
+                : { key: "VAS_107_DocOrder",     def: "Order" };
+        }
+
+        /* The document's own name, for use inside a sentence. Falls back to the neutral
+           "Order" until the header has loaded — buildShell runs before fetchData
+           returns, and updateDocTypeLabels() rewrites everything once it has. */
+        function docNoun() {
+            if (!parent) return lbl("VAS_107_DocOrder", "Order");
+            var k = docKind();
+            return lbl(k.key, k.def);
+        }
+
+        /* Substitutes the document name into a message that carries a {0} placeholder.
+           A site that has customised the AD_Message without the placeholder simply keeps
+           its own wording — the replace is then a no-op rather than an error. */
+        function docMsg(key, def) {
+            return String(lbl(key, def)).replace(/\{0\}/g, docNoun());
+        }
+
+        /* The panel heading and the section's accessible name, e.g. "Purchase Order
+           Lines & Summary". Both come from ONE message so a translation can put the
+           document name wherever its language needs it. */
+        function docTitle() {
+            return docMsg("VAS_107_LinesSummaryFor", "{0} Lines & Summary");
+        }
+
+        /* Re-label everything that names the document. buildShell() builds the header
+           before the order data arrives (same reason updatePriceHeader exists), so
+           render() calls this once parent is known, and clear() calls it to go back to
+           the neutral wording. */
+        function updateDocTypeLabels() {
+            if (!$body) return;
+            var title = docTitle();
+            $body.find(".vas-obl-panel__title").text(title);
+            $body.find(".vas-obl-panel").attr("aria-label", title);
+            // The empty state is deliberately NOT document-flavoured: render() shows it
+            // precisely when there is no record selected, so there is no kind to name.
+        }
+
         /* ---------- shell ---------- */
         function buildShell() {
             $body.empty();
-            var $panel = $('<section class="vas-obl-panel" aria-label="Invoice Lines and Summary"></section>');
+            var $panel = $('<section class="vas-obl-panel" aria-label="' + esc(docTitle()) + '"></section>');
 
             var $header = $('<header class="vas-obl-panel__header"></header>');
-            $header.append('<div><h2 class="vas-obl-panel__title">' + esc(lbl("VAS_107_OrderLinesSummary", "Quotation Lines & Summary")) + '</h2></div>');
+            $header.append('<div><h2 class="vas-obl-panel__title">' + esc(docTitle()) + '</h2></div>');
 
             var $actions = $('<div class="vas-obl-panel__actions"></div>');
             // Scan hidden for now (handler/markup kept so it can be re-enabled by
             // dropping the vas-obl-is-hidden class).
             var $scanBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--outline vas-obl-is-hidden" data-action="open-scan">' + icon("scan-line", "▭") +
                 "<span>" + esc(lbl("VAS_107_Scan", "Scan")) + "</span></button>");
-            $addBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--outline" data-action="add-line">' + icon("plus", "+") +
+            $addBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--outline" data-action="add-line" title="' + esc(lbl("VAS_107_AddLine", "Add line")) + ' (Ctrl+Alt+N)">' + icon("plus", "+") +
                 "<span>" + esc(lbl("VAS_107_AddLine", "Add line")) + "</span></button>");
-            $saveBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--save vas-obl-is-disabled" data-action="save-rows"></button>');
-            $deleteBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--danger vas-obl-is-disabled" data-action="delete-selected" disabled>' +
+            $saveBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--primary vas-obl-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_107_SaveRow", "Save row")) + ' (Ctrl+Alt+S)"></button>');
+            $deleteBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--danger vas-obl-is-disabled" data-action="delete-selected" title="' + esc(lbl("VAS_107_DeleteRecord", "Delete record")) + ' (Ctrl+Alt+D)" disabled>' +
                 icon("trash", "🗑") + "<span>" + esc(lbl("VAS_107_DeleteRecord", "Delete record")) + ' <span class="vas-obl-sel-count"></span></span></button>');
-            $refreshBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--outline" data-action="refresh">' +
+            $refreshBtn = $('<button type="button" class="vas-obl-btn vas-obl-btn--outline" data-action="refresh" title="' + esc(lbl("VAS_107_Refresh", "Refresh")) + ' (Ctrl+Alt+Q)">' +
                 icon("refresh-cw", "↺") + "<span>" + esc(lbl("VAS_107_Refresh", "Refresh")) + "</span></button>");
             $actions.append($scanBtn, $addBtn, $saveBtn, $deleteBtn, $refreshBtn);
             $header.append($actions);
@@ -477,11 +571,11 @@
             // editor blurs, so we can flush that pending edit ourselves and the action
             // never gets lost to a blur/commit re-render happening between mousedown and
             // mouseup. preventDefault keeps focus from being stolen first.
-            $saveBtn.on("mousedown", function (e) { e.preventDefault(); flushActiveEdit(); saveRows(); });
+            $saveBtn.on("mousedown", function (e) { e.preventDefault(); flushAndSave(); });
             // Keyboard activation (Enter / Space) fires click with detail 0 and no
             // mousedown - handle that here so the button stays accessible, without
             // double-firing on a real mouse click (detail >= 1, already handled above).
-            $saveBtn.on("click", function (e) { if (e.detail === 0) { flushActiveEdit(); saveRows(); } });
+            $saveBtn.on("click", function (e) { if (e.detail === 0) { flushAndSave(); } });
             $deleteBtn.on("click", deleteSelected);
         }
 
@@ -529,8 +623,11 @@
             // control ignores its own `cursor` in Chromium, so the cell shows it instead.
             $body.toggleClass("vas-obl-locked", !panelEditable());
             // The head row was built before the order data arrived, so refresh the Price
-            // header now that parent.IsTaxIncluded (price-list tax mode) is known.
+            // header now that parent.IsTaxIncluded (price-list tax mode) is known...
             updatePriceHeader();
+            // ...and for the same reason the heading, which names the document kind and
+            // could not know it at build time.
+            updateDocTypeLabels();
 
             $linesBody.empty();
             if (!lines.length) {
@@ -628,7 +725,7 @@
             var sym = (parent && parent.CurSymbol) ? parent.CurSymbol + " " : "";
             function fmt(n) { return sym + fmtMoney(n); }
             $totalsRow.append(totalsRow(lbl("VAS_107_Subtotal", "Sub Total") + ":", fmt(sub), false));
-            if (tax) $totalsRow.append(totalsRow(lbl("Tax", "Tax") + ":", fmt(tax), false));
+            $totalsRow.append(totalsRow(lbl("Tax", "Tax") + ":", fmt(tax), false));
             if (tcs) $totalsRow.append(totalsRow(lbl("VA106_TaxCollectedAtSource", "TCS") + ":", fmt(tcs), false));
             $totalsRow.append(totalsRow(lbl("VAS_107_Total", "Grand Total") + ":", fmt(sub + tax + tcs), true));
         }
@@ -656,7 +753,13 @@
                     data: { C_Order_ID: id },
                     success: function (raw) {
                         var parsed = (typeof raw === "string") ? JSON.parse(raw) : raw;
-                        taxSummary = (parsed && parsed.length) ? parsed : null;
+                        // C_OrderTax rows can survive line deletion with all-zero amounts (stale
+                        // framework data). Treat the summary as empty when every row has a zero
+                        // GrandTotal and zero TaxAmt so the clean fallback (Sub Total / Tax /
+                        // Grand Total: 0.00) is shown instead of stale tax names at $0.000.
+                        var hasAmounts = parsed && parsed.length &&
+                            parsed.some(function (r) { return (r.GrandTotal || 0) > 0 || (r.TaxAmt || 0) > 0; });
+                        taxSummary = hasAmounts ? parsed : null;
                         renderTotals();
                     },
                     error: function () { taxSummary = null; renderTotals(); }
@@ -696,6 +799,15 @@
             return (gt.rowChanged >= 0) || (typeof gt.getIsInserting === "function" && !!gt.getIsInserting());
         }
 
+        /* Gate in front of every panel mutation (edit, add, save, delete, attribute, scan).
+           Returns true and shows a toast when the header has unsaved changes — mirrors the
+           VAS_074 / VAS_218 blockedByTabChanges() pattern. */
+        function blockedByDirtyHeader() {
+            if (!isHeaderDirty()) return false;
+            showToast(lbl("VAS_107_SaveHeaderFirst", "Please save the header record before adding lines."));
+            return true;
+        }
+
         function renderHeaderButtons() {
             var n = unsavedLines().length;
             var locked = !panelEditable();
@@ -707,9 +819,14 @@
             var sc = selectedCount();
             $deleteBtn.find(".vas-obl-sel-count").text(sc > 0 ? "(" + sc + ")" : "");
             if ($selectAll) $selectAll.prop("checked", lines.length > 0 && sc === lines.length).prop("disabled", locked);
+            // Save button: HTML-disable only when the document is locked (completed/void/etc)
+            // so that mousedown still fires when n===0 (the user is editing a field that hasn't
+            // been committed yet). Visual disabled state uses the CSS class only — matching
+            // the VAS_074 pattern. Without this, clicking Save while a field is in edit mode
+            // requires two clicks: the first click is swallowed by the disabled attribute.
+            $saveBtn.prop("disabled", locked).toggleClass("vas-obl-is-disabled", locked || n === 0);
             VAS.PanelUtil.applyButtonState([
                 { $el: $addBtn,     disabled: locked,              disabledCls: "vas-obl-is-disabled" },
-                { $el: $saveBtn,    disabled: locked || n === 0,   disabledCls: "vas-obl-is-disabled" },
                 { $el: $deleteBtn,  disabled: sc === 0 || locked,  disabledCls: "vas-obl-is-disabled" },
                 { $el: $refreshBtn, disabled: false,               disabledCls: "vas-obl-is-disabled" }
             ]);
@@ -903,8 +1020,8 @@
 
             // quantity (top)
             if (editQty) {
-                var $q = $('<input type="text" class="vas-obl-cell-edit__input" inputmode="decimal" />').val(fmtAmtInput(v.QtyOrdered, 2)).css("text-align", "right");
-                var qLen = colFieldLength("QtyOrdered"); if (qLen > 0) $q.attr("maxlength", qLen);   // AD_Column.FieldLength cap
+                var $q = $('<input type="text" class="vas-obl-cell-edit__input" inputmode="decimal" />').val(fmtAmtInput(v.QtyEntered, 2)).css("text-align", "right");
+                var qLen = colFieldLength("QtyEntered"); if (qLen > 0) $q.attr("maxlength", qLen);   // AD_Column.FieldLength cap
                 bindAmountInput($q);
                 $q.on("blur", function () { commitField(line, "quantity", parseNum($q.val())); editing = null; render(); });
                 $q.on("keydown", function (e) {
@@ -916,9 +1033,9 @@
                 wrap.append($q);
                 setTimeout(function () { $q.focus(); }, 0);
             } else {
-                var hasQ = v.QtyOrdered !== undefined && v.QtyOrdered !== "" && +v.QtyOrdered !== 0;
-                wrap.append(dispInput(line, "quantity", hasQ ? fmtAmtInput(v.QtyOrdered, 2) : "",
-                    { align: "right", placeholder: lbl("VAS_107_Qty", "Qty"), cls: "vas-obl-qtyval", readOnly: isColumnReadOnly(line, "QtyOrdered") }));
+                var hasQ = v.QtyEntered !== undefined && v.QtyEntered !== "" && +v.QtyEntered !== 0;
+                wrap.append(dispInput(line, "quantity", hasQ ? fmtAmtInput(v.QtyEntered, 2) : "",
+                    { align: "right", placeholder: lbl("VAS_107_Qty", "Qty"), cls: "vas-obl-qtyval", readOnly: isColumnReadOnly(line, "QtyEntered") }));
             }
 
             // UOM (bottom) — real editable C_UOM dropdown, options filtered to this
@@ -991,7 +1108,7 @@
             var canUndoEdits = line.status === "saved" && line.dirty && line._saved;
             var canDiscardNew = line.status === "new";
             if (editable && !line._saving && (canUndoEdits || canDiscardNew)) {
-                var undoTitle = canDiscardNew ? lbl("VAS_107_UndoNewLine", "Undo (remove line)") : lbl("VAS_107_UndoChanges", "Undo changes");
+                var undoTitle = (canDiscardNew ? lbl("VAS_107_UndoNewLine", "Undo (remove line)") : lbl("VAS_107_UndoChanges", "Undo changes")) + " (Ctrl+Alt+Z)";
                 var $undo = $('<button type="button" class="vas-obl-undo-btn" title="' + esc(undoTitle) + '">' + icon("rotate-ccw", "↺") + "</button>");
                 var undoAct = canDiscardNew ? discardNewLine : undoLine;
                 // Act on mousedown + preventDefault (like Save): a single click while a
@@ -1012,9 +1129,10 @@
             var $btn = $('<button type="button" class="vas-obl-more-btn" title="' + _btnTitle + '">' + icon("more-horizontal", "⋯") + "</button>");
             if (morePopoverFor === line.rowId) $btn.addClass("is-open");
             if (hasAdditionalValues(line, _addlCols)) $btn.addClass("has-values");
-            // Disable when read-only OR when no additional-info field is visible for this line
-            // (same DisplayLogic check the modal runs — would show "No additional info").
-            $btn.prop("disabled", !editable || !_hasVisible);
+            // Disable only when no additional-info field is visible for this line.
+            // A completed/locked order still allows the modal to open in read-only mode
+            // so the user can view dimension values without being able to edit them.
+            $btn.prop("disabled", !_hasVisible);
             // Open the additional-fields MODAL.
             $btn.on("click", function (e) { e.stopPropagation(); openMoreDialog(line); });
             // Keyboard: Tab continues the row's tab chain (forward -> save,
@@ -1034,6 +1152,10 @@
         function openMoreDialog(line) {
             closeDialogs();
             morePopoverFor = line.rowId;
+            // When the order is completed/void/reversed/closed the modal opens in
+            // read-only mode: all fields are built non-editable and only a Close button
+            // is shown (no Done/Cancel — nothing can be committed).
+            var isRO = !panelEditable();
             // Snapshot the line's editable state BEFORE any field is touched. Dynamic
             // fields commit live to line.values/display on change, so closing via the
             // cross (Cancel) must restore this snapshot to leave the record unchanged.
@@ -1050,14 +1172,18 @@
 
             var $backdrop = $('<div class="vas-obl-dialog-backdrop" id="vasOblMore"></div>');
             var $dialog   = $('<div class="vas-obl-dialog"></div>');
+            // Read-only mode: X header button and the footer Close button both just dismiss.
+            // Editable mode: X = Cancel (discard), Done footer button = commit.
+            var footerBtn = isRO
+                ? '<button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="close-more">' + esc(lbl("VAS_107_Close", "Close")) + "</button>"
+                : '<button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="close-more">' + esc(lbl("VAS_107_Done", "Done")) + "</button>";
             $dialog.html(
                 '<header class="vas-obl-dialog__header"><div class="vas-obl-dialog__header-row">' +
                 '<h3 class="vas-obl-dialog__title">' + esc(primaryName) + " - " + esc(lbl("VAS_107_AdditionalInfo", "Additional Info")) + "</h3>" +
                 '<button type="button" class="vas-obl-dialog__close" data-act="cancel-more" aria-label="' + esc(lbl("VAS_107_Close", "Close")) + '" title="' + esc(lbl("VAS_107_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
                 "</div></header>" +
                 '<div class="vas-obl-dialog__body vas-obl-more-body vas-obl-more-grid" id="vasOblMoreBody"></div>' +
-                '<footer class="vas-obl-dialog__footer vas-obl-dialog__footer--end">' +
-                '<button type="button" class="vas-obl-btn vas-obl-btn--primary" data-act="close-more">' + esc(lbl("VAS_107_Done", "Done")) + "</button></footer>"
+                '<footer class="vas-obl-dialog__footer vas-obl-dialog__footer--end">' + footerBtn + "</footer>"
             );
             $backdrop.append($dialog);
             $("body").append($backdrop);
@@ -1069,18 +1195,22 @@
             // lookup popup) must not close the modal and lose in-flight edits.
             // Both paths return focus to the row's "..." button so Tab continues.
             function done() {
-                commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line);
+                // Read-only mode: nothing to commit — just close.
+                if (!isRO) commitMorePopover();
+                closeDialogs(); render(); focusMoreBtn(line);
             }
-            // X = Cancel: discard everything changed in the modal and restore the line
-            // to its pre-open snapshot. No mandatory validation — edits are thrown away.
+            // X = Cancel: in editable mode discard changes and restore snapshot.
+            // In read-only mode nothing was changed, so just close.
             function cancel() {
-                var l = lineById(line.rowId);
-                if (l) {
-                    l.values        = moreSnapshot.values;
-                    l.display       = moreSnapshot.display;
-                    l.dirty         = moreSnapshot.dirty;
-                    l._priceOverride = moreSnapshot._priceOverride;
-                    l._error        = moreSnapshot._error;
+                if (!isRO) {
+                    var l = lineById(line.rowId);
+                    if (l) {
+                        l.values        = moreSnapshot.values;
+                        l.display       = moreSnapshot.display;
+                        l.dirty         = moreSnapshot.dirty;
+                        l._priceOverride = moreSnapshot._priceOverride;
+                        l._error        = moreSnapshot._error;
+                    }
                 }
                 closeDialogs(); render(); focusMoreBtn(line);
             }
@@ -1114,18 +1244,20 @@
                 if (morePopoverFor !== line.rowId || !$body.parent().length) return;
                 $body.removeClass("vas-obl-dialog__body--loading").addClass("vas-obl-more-grid").empty();
                 primeLineContext(line);
-                appendDynFields(line, $body);
+                appendDynFields(line, $body, isRO);
                 applyFieldGroups($body);
                 if (!$body.children("[data-col]:not(.vas-obl-dyn-hidden)").length)
                     $body.append('<p class="vas-obl-empty-message">' +
                                  esc(lbl("VAS_107_NoAdditionalInfo", "No additional info for this line")) + "</p>");
-                $body.find("[data-col]:not(.vas-obl-dyn-hidden)").find("input,select,textarea").first().focus();
+                // In read-only mode there is nothing to focus for editing.
+                if (!isRO) $body.find("[data-col]:not(.vas-obl-dyn-hidden)").find("input,select,textarea").first().focus();
             }, 0);
         }
 
         /* ---------- edit / commit ---------- */
         function startEdit(line, field) {
             if (!panelEditable()) return;             // completed/void/reversed/closed -> read-only
+            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             if (line._saving) return;                 // row is being saved - locked until it returns
             if (fieldReadOnly(line, field)) return;   // AD_Column.ReadOnlyLogic / IsReadOnly
             commitMorePopover(); morePopoverFor = null;
@@ -1146,12 +1278,12 @@
         function commitField(line, field, value) {
             var v = line.values, changed = false;
             if (field === "description") { if (!sameVal(v.Description, value)) { v.Description = value; changed = true; } }
-            else if (field === "quantity") { var nq = value > 0 ? value : 0; if (!sameVal(v.QtyOrdered, nq)) { v.QtyOrdered = nq; changed = true; } }
+            else if (field === "quantity") { var nq = value > 0 ? value : 0; if (!sameVal(v.QtyEntered, nq)) { v.QtyEntered = nq; changed = true; } }
             else if (field === "price") { if (!sameVal(v.PriceEntered, value)) { v.PriceEntered = value; line._priceOverride = true; changed = true; } }
             if (changed) markDirty(line);
             // A quantity change re-runs the line callout (quantity price-breaks + amounts,
             // attribute-aware) - same as UOM.
-            if (changed && field === "quantity" && v.M_Product_ID > 0) runCallout(line, "QtyOrdered");
+            if (changed && field === "quantity" && v.M_Product_ID > 0) runCallout(line, "QtyEntered");
             // A manual price change re-runs the line callout too (CalloutOrder.amt) so the
             // line net / tax amounts recompute from the entered price - same mechanism as a
             // product change. The PriceEntered branch of `amt` keeps the entered price
@@ -1321,13 +1453,13 @@
         /* ---------- line operations ---------- */
         function addLine() {
             if (!parent || !parent.IsEditable) { showToast(lbl("VAS_107_OrderNotEditable", "This order cannot take new lines")); return; }
-            if (isHeaderDirty()) { showToast(lbl("VAS_107_SaveHeaderFirst", "Please save the header record before adding lines.")); return; }
+            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             var maxLine = 0;
             for (var i = 0; i < lines.length; i++) maxLine = Math.max(maxLine, lines[i].values.Line || 0);
             var line = {
                 rowId: "r" + (++rowCounter), status: "new", dirty: true, _priceOverride: false,
                 values: { C_OrderLine_ID: 0, Line: maxLine + 10, M_Product_ID: 0, C_Charge_ID: 0, M_AttributeSetInstance_ID: 0,
-                    QtyOrdered: 0, C_UOM_ID: 0, PriceEntered: 0, C_Tax_ID: 0, Discount: 0, Notes: "", Description: "" },
+                    QtyOrdered: 0, QtyEntered: 0, C_UOM_ID: 0, PriceEntered: 0, C_Tax_ID: 0, Discount: 0, Notes: "", Description: "" },
                 display: { productName: "", chargeName: "", uomName: "", taxName: "", attrName: "", hasAttributeSet: false }
             };
             seedAllColumns(line.values);
@@ -1536,7 +1668,7 @@
          * code is read from cache, not re-queried each change. */
         var ID_COLS = { M_Product_ID: 1, C_Charge_ID: 1, C_UOM_ID: 1, C_Tax_ID: 1, M_AttributeSetInstance_ID: 1, C_Currency_ID: 1 };
         var PANEL_COLS = {
-            M_Product_ID: 1, C_Charge_ID: 1, M_AttributeSetInstance_ID: 1, QtyOrdered: 1, QtyOrdered: 1,
+            M_Product_ID: 1, C_Charge_ID: 1, M_AttributeSetInstance_ID: 1, QtyOrdered: 1, QtyEntered: 1,
             C_UOM_ID: 1, PriceEntered: 1, PriceActual: 1, PriceList: 1, PriceLimit: 1, C_Tax_ID: 1,
             C_Currency_ID: 1, Discount: 1, LineNetAmt: 1, Description: 1, PrintDescription: 1, C_Order_ID: 1
         };
@@ -1552,6 +1684,7 @@
         // of these, just set AD_Column.Callout on the column - no code change needed.
         var DEFAULT_CALLOUTS = {
             M_AttributeSetInstance_ID: "ViennaAdvantage.Model.CalloutOrder.Qty",
+            QtyEntered: "ViennaAdvantage.Model.CalloutOrder.Qty; ViennaAdvantage.Model.CalloutOrder.Amt",
             QtyOrdered: "ViennaAdvantage.Model.CalloutOrder.Qty; ViennaAdvantage.Model.CalloutOrder.Amt",
             C_UOM_ID: "VAdvantage.Model.CalloutOrder.qty; VAdvantage.Model.CalloutOrder.amt",
             C_Tax_ID: "VAdvantage.Model.CalloutOrder.amt;VAdvantage.Model.CalloutTax.SetTaxExemptReason",
@@ -1573,7 +1706,8 @@
             var v = line.values;
             if (v.M_Product_ID <= 0 && v.C_Charge_ID <= 0) { render(); if (done) done(); return; }
             // Default qty so pricing / discount-break logic has a quantity.
-            if (!(v.QtyOrdered > 0)) { v.QtyOrdered = 1; }
+            if (!(v.QtyEntered > 0)) { v.QtyEntered = 1; }
+            if (!(v.QtyOrdered > 0)) { v.QtyOrdered = v.QtyEntered; }
 
             // Product, charge and attribute-set-instance changes always use the server
             // RunColumnCallout path. BuildCalcLine builds a transient MOrderLine via MOrder
@@ -1586,7 +1720,12 @@
             // preserves them (BuildCalcLine keeps the existing tax when req.C_Tax_ID > 0).
             if (column === "M_Product_ID" || column === "C_Charge_ID" || column === "M_AttributeSetInstance_ID") {
                 setRowBusy(line, true);
-                runCalloutServer(line, column, function () { line._busy = false; render(); if (done) done(); });
+                calloutPending++;
+                runCalloutServer(line, column, function () {
+                    line._busy = false;
+                    render();
+                    try { if (done) done(); } finally { calloutSettled(); }
+                });
                 return;
             }
 
@@ -1598,7 +1737,10 @@
                 // The framework callout runs synchronously (blocking sync AJAX), so
                 // paint the row busy indicator first, then run on the next tick so
                 // the spinner is actually visible while the callout executes.
+                // Counted BEFORE going async so a Save in this same tick already sees the
+                // callout as pending and defers (see afterCallouts).
                 setRowBusy(line, true);
+                calloutPending++;
                 setTimeout(function () {
                     try {
                         runRealCallout(line, column, chain);
@@ -1607,14 +1749,22 @@
                     } finally {
                         line._busy = false;
                         render();
-                        if (done) done();
+                        // done() may chain another callout, so settle AFTER it has had the
+                        // chance to increment — otherwise the count could dip to zero and
+                        // release Save between two links of the chain.
+                        try { if (done) done(); } finally { calloutSettled(); }
                     }
                 }, 0);
                 return;
             }
             // Async server fallback - show the busy indicator until it returns.
             setRowBusy(line, true);
-            runCalloutServer(line, column, function () { line._busy = false; render(); if (done) done(); });
+            calloutPending++;
+            runCalloutServer(line, column, function () {
+                line._busy = false;
+                render();
+                try { if (done) done(); } finally { calloutSettled(); }
+            });
         }
 
         function rowSpinHtml(label) { return '<span class="vas-obl-row-spin" aria-label="' + esc(label || "") + '"></span>'; }
@@ -1682,11 +1832,7 @@
         function makeMTab(line) {
             return VAS.PanelUtil.makeMTabShim({
                 getVal:       function (col)      { return fieldGet(line, col); },
-                // Redirect QtyEntered writes to QtyOrdered: framework callouts (CalloutOrder.Qty)
-                // write the user-entered qty back to QtyEntered, but VAS_107 only carries
-                // QtyOrdered. Without this redirect, the callout result would be stored in an
-                // orphan QtyEntered key and the displayed qty cell would not update.
-                setVal:       function (col, val) { line.values[col === "QtyEntered" ? "QtyOrdered" : col] = val; },
+                setVal:       function (col, val) { line.values[col] = val; },
                 findColumn:   function (col)      { return (columnMeta[col] || PANEL_COLS[col]) ? 0 : -1; },
                 getField:     function (col) {
                     var fm = columnMeta[col];
@@ -1708,13 +1854,13 @@
 
         function fieldGet(line, col) {
             if (col === "C_Order_ID") return parent.C_Order_ID;
-            // QtyEntered is not a separate panel column — it is the same value as QtyOrdered
-            // here. Framework callouts (e.g. CalloutOrder.Qty / .Amt) read QtyEntered to know
-            // the user's entered quantity, so return QtyOrdered to prevent them from seeing
-            // null (which would make them write QtyOrdered = 0).
-            if (col === "QtyOrdered" || col === "QtyEntered") {
-                var qi = lineVal(line, "QtyOrdered");
-                return (qi == null || qi === "") ? 0 : qi;
+            if (col === "QtyEntered") {
+                var qe = lineVal(line, "QtyEntered");
+                return (qe == null || qe === "") ? 0 : qe;
+            }
+            if (col === "QtyOrdered") {
+                var qo = lineVal(line, "QtyOrdered");
+                return (qo == null || qo === "") ? 0 : qo;
             }
             // Case-insensitive read: a saved line's values are keyed in DB case
             // (PostgreSQL lowercases unquoted identifiers, Oracle uppercases), which can
@@ -1754,6 +1900,9 @@
                     case "M_Warehouse_ID": return parent.M_Warehouse_ID || 0;
                     case "DateOrdered": return dateStr(parent.DateOrdered);
                     case "IsSOTrx": return parent.IsSOTrx ? "Y" : "N";
+                    case "IsSalesQuotation": return parent.IsSalesQuotation ? "Y" : "N";
+                    case "IsBlanketTrx": return parent.IsBlanketTrx ? "Y" : "N";
+                    case "IsReturnTrx": return parent.IsReturnTrx ? "Y" : "N";
                     default: return (scratch[key] != null) ? scratch[key] : "";
                 }
             }
@@ -1779,13 +1928,10 @@
             var v = line.values;
             for (var col in ID_COLS) if (ID_COLS.hasOwnProperty(col)) v[col] = parseInt(v[col], 10) || 0;
             v.PriceEntered = parseNum(v.PriceEntered);
-            // The panel's Qty column IS QtyOrdered (user-entered, in the entered UOM). The
-            // framework callout ALSO writes QtyOrdered = QtyOrdered converted to the product
-            // base UOM (the purchasing-UOM multiply). Do NOT copy QtyOrdered back onto
-            // QtyOrdered: that replaced the user's qty, and because the next callout (e.g. an
-            // attribute change) reconverts, it compounded the multiplication. QtyOrdered is
-            // recomputed server-side on save (MOrderLine.beforeSave for PO), so keep it only
-            // as a numeric scratch value for any callout that reads it back.
+            if (v.QtyEntered != null && v.QtyEntered !== "") v.QtyEntered = parseNum(v.QtyEntered);
+            // QtyOrdered is the base-UOM quantity after UOM conversion. Callouts may write it
+            // as a converted value; keep it as a numeric scratch for callouts that read it back.
+            // The display column is QtyEntered (user-entered UOM quantity), not QtyOrdered.
             if (v.QtyOrdered != null && v.QtyOrdered !== "") v.QtyOrdered = parseNum(v.QtyOrdered);
         }
 
@@ -1812,7 +1958,7 @@
                     C_Order_ID: parent.C_Order_ID, TriggerColumn: trigger,
                     M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0,
                     M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0,
-                    QtyOrdered: v.QtyOrdered || 0, C_UOM_ID: v.C_UOM_ID || 0,
+                    QtyEntered: v.QtyEntered || 0, QtyOrdered: v.QtyOrdered || 0, C_UOM_ID: v.C_UOM_ID || 0,
                     PriceEntered: v.PriceEntered || 0, PriceOverride: !!line._priceOverride,
                     C_Tax_ID: v.C_Tax_ID || 0, Discount: v.Discount || 0
                 },
@@ -1862,23 +2008,30 @@
          * mirrors the framework Evaluator: comparison tuples "@token@<op>value"
          * (op = =, !, ^, <, >) joined by & (AND) / | (OR); @tokens@ resolve from the
          * line values first, then the order header / document context. */
+        /* Columns the panel always shows read-only, whatever the dictionary says: they are
+           stamped by the process that produced the line (drop-shipment flag set by
+           OrderPOCreate, MRP plan run stamped by the planning run), so editing them here
+           would break the link back to the document that created the line. */
+        var FORCED_READONLY_COLS = { IsDropShip: 1, VAMRP_PlanRun_ID: 1 };
+
         function isColumnReadOnly(line, col) {
+            if (FORCED_READONLY_COLS[col]) return true;
             // C_UOM_ID: always read-only for charge lines (default UOM is auto-assigned).
             // For product lines: editable until saved, then locked.
             if (col === "C_UOM_ID" && line && line.values) {
                 if ((line.values.C_Charge_ID || 0) > 0) return true;
                 return (line.values.C_OrderLine_ID || 0) > 0;
             }
-            // QtyOrdered must remain editable whenever the panel is editable; the
-            // DB ReadOnlyLogic (e.g. @Processed@=Y) is guarded at the header level
+            // QtyEntered/QtyOrdered must remain editable whenever the panel is editable;
+            // the DB ReadOnlyLogic (e.g. @Processed@=Y) is guarded at the header level
             // by panelEditable() in startEdit, so we skip column-level locking here.
-            if (col === "QtyOrdered") return false;
+            if (col === "QtyEntered" || col === "QtyOrdered") return false;
             var m = columnMeta[col];
             if (!m) return false;
             if (m.IsReadOnly) return true;
             return !!(m.ReadOnlyLogic && evalLogic(line, m.ReadOnlyLogic));
         }
-        var FIELD_COL = { uom: "C_UOM_ID", tax: "C_Tax_ID", quantity: "QtyOrdered", price: "PriceEntered", description: "Description" };
+        var FIELD_COL = { uom: "C_UOM_ID", tax: "C_Tax_ID", quantity: "QtyEntered", price: "PriceEntered", description: "Description" };
         function fieldReadOnly(line, field) {
             var col = FIELD_COL[field];
             return col ? isColumnReadOnly(line, col) : false;
@@ -1936,11 +2089,26 @@
                 case "AD_Org_ID": return String((parent && parent.AD_Org_ID) || 0);
                 case "AD_Client_ID": return String((parent && parent.AD_Client_ID) || 0);
                 case "IsSOTrx": return (parent && parent.IsSOTrx) ? "Y" : "N";
+                case "IsSalesQuotation": return (parent && parent.IsSalesQuotation) ? "Y" : "N";
+                case "IsBlanketTrx": return (parent && parent.IsBlanketTrx) ? "Y" : "N";
+                case "IsReturnTrx": return (parent && parent.IsReturnTrx) ? "Y" : "N";
                 case "IsTaxIncluded": return (parent && parent.IsTaxIncluded) ? "Y" : "N";
                 case "Processed": return (parent && parent.Processed) ? "Y" : "N";
                 case "DocStatus": return (parent && parent.DocStatus) || "";
-                default: return "";
+                default: break;
             }
+            // Header columns the order line's DisplayLogic names as tokens
+            // (@C_Order_Blanket@, @BlanketOrderType@, @Ref_C_Order_ID@, @VAS_OrderType@).
+            // The server omits a column that is NULL on the order, so an absent key
+            // resolves to "" - which the evaluator reads as null for "@x@=null" and as
+            // non-numeric (hence false) for "@x@>0". That is exactly the dictionary's
+            // intent, and it is why these fields could never be judged visible while the
+            // tokens were unresolvable.
+            var lg = (parent && parent.LogicContext) || {};
+            if (lg.hasOwnProperty(key)) return String(lg[key]);
+            var lc = String(key).toLowerCase();
+            for (var k in lg) if (lg.hasOwnProperty(k) && String(k).toLowerCase() === lc) return String(lg[k]);
+            return "";
         }
         function evalLogic(line, logic, dflt) {
             return VAS.PanelUtil.evalLogic(
@@ -1964,19 +2132,86 @@
             // --- Dimension group ---
             { col: "AD_OrgTrx_ID" },
             { col: "C_Project_ID" },
+            // Project Phase belongs with Project (it is scoped by the chosen project).
+            // On every real order, purchase as well as sales; not on a quotation.
+            { col: "C_ProjectPhase_ID", when: "order" },
             { col: "C_Campaign_ID" },
-            { col: "C_Activity_ID" },
+            // C_Activity_ID is NOT here: this dictionary labels it "Billing Code" and it
+            // is read as a billing reference rather than as an accounting dimension, so
+            // it lives under References on every order kind. See the entry there.
             { col: "VAS_Opportunity_ID" },
+            // --- Contract group (SALES ORDERS only: IsSOTrx = 'Y' and not a quotation).
+            // Contract billing is raised against the customer document, so these never
+            // belong on a purchase order or a quotation. Each field still carries its own
+            // AD_Field DisplayLogic, which applyDynDisplay runs after the control is
+            // built, so the dictionary can narrow this further. ---
+            { col: "IsContract",     when: "salesOrder" },
+            { col: "C_Frequency_ID", when: "salesOrder" },   // "Billing Frequency"
+            { col: "NoofCycle",      when: "salesOrder" },
+            { col: "QtyPerCycle",    when: "salesOrder" },
+            { col: "StartDate",      when: "salesOrder" },
+            { col: "EndDate",        when: "salesOrder" },
             // --- References group ---
-            // A_Asset_ID excluded per design. Only TCS shown under References.
+            // A_Asset_ID excluded per design.
             { col: "VA106_TaxCollectedAtSource_ID", when: "va106_" },
-            { col: "VA106_TCSAmount", when: "va106_" }
+            { col: "VA106_TCSAmount", when: "va106_" },
+            // Purchase-side origin references, both read-only: each is stamped by the
+            // process that raised the line, never entered by hand (see
+            // FORCED_READONLY_COLS). Plan Run belongs to the optional VAMRP module and
+            // is skipped silently wherever that module is not installed.
+            // Drop Shipment: only on a purchase order whose HEADER is itself flagged
+            // C_Order.IsDropShip. On any other order the line flag is meaningless, so the
+            // field is not offered at all.
+            { col: "IsDropShip",       when: "purchaseDropShip" },
+            { col: "VAMRP_PlanRun_ID", when: "purchase" },   // MRP plan run (VAMRP module)
+            // "Billing Code" — this dictionary's label for C_Activity_ID. It is read as a
+            // billing reference rather than as an accounting dimension, so it belongs
+            // here and not under Dimension, on purchase and sales orders alike. The
+            // caption the modal prints is the dictionary's own (AD_Field / AD_Column
+            // Name), so it reads "Billing Code" without the panel hard-coding the word.
+            // On a sales order it is always offered - see DISPLAY_LOGIC_ALWAYS_SHOW.
+            { col: "C_Activity_ID", when: "order" },
+            // Blanket release link — carried by both purchase and sales orders, and always
+            // offered on a sales order (DISPLAY_LOGIC_ALWAYS_SHOW).
+            { col: "C_OrderLine_Blanket_ID" },
+            // Original PO Line. The column is Ref_C_Orderline_ID, NOT Ref_OrderLine_ID -
+            // both exist on C_OrderLine and only this one carries that field label. Its
+            // own DisplayLogic (@Ref_C_Order_ID@>0 & @VAS_OrderType@='VO') restricts it
+            // further, so it appears on the documents the dictionary intends.
+            { col: "Ref_C_Orderline_ID", when: "purchase" },
+            // Quotation line the sales order line was converted from.
+            { col: "C_Quotation_Line_ID", when: "salesOrder" }
         ];
+
+        /* Document-kind helpers for the Additional-Info `when` conditions. The panel is
+           bound to one order, so these depend on the header only, not on the line. */
+        function docIsPurchase()   { return !(parent && parent.IsSOTrx); }
+        /* A quotation: IsSOTrx = 'Y' AND IsSalesQuotation = 'Y'. */
+        function docIsQuotation()  { return !!(parent && parent.IsSOTrx) && !!(parent && parent.IsSalesQuotation); }
+        /* A real sales ORDER: IsSOTrx = 'Y' AND IsSalesQuotation = 'N'. */
+        function docIsSalesOrder() { return !!(parent && parent.IsSOTrx) && !(parent && parent.IsSalesQuotation); }
+        /* Any real ORDER - sales OR purchase - but never a quotation. A purchase order
+           cannot be flagged IsSalesQuotation, so this is simply "not a quotation". */
+        function docIsOrder()      { return !docIsQuotation(); }
+        /* The ORDER HEADER is flagged as a drop shipment (C_Order.IsDropShip = 'Y'). */
+        function docIsDropShip()   { return !!(parent && parent.IsDropShip); }
 
         /* Whether a conditional group applies to this line. */
         function dynCondMet(line, when) {
             if (!when) return true;
+            // Purchase order (C_Order.IsSOTrx = 'N').
+            if (when === "purchase") return docIsPurchase();
+            // Purchase order whose header carries the drop-shipment flag.
+            if (when === "purchaseDropShip") return docIsPurchase() && docIsDropShip();
+            // Sales order that is not a quotation (IsSOTrx = 'Y' AND IsSalesQuotation = 'N').
+            if (when === "salesOrder") return docIsSalesOrder();
+            // Any real order, sales or purchase - excludes quotations only.
+            if (when === "order") return docIsOrder();
             if (when === "svcExpenseOrCharge") {
+                // groupCols asks about the DOCUMENT with no line in hand; a line-level
+                // condition cannot be decided there, so answer "may apply" and let the
+                // per-line pass in additionalInfoColumns settle it.
+                if (!line || !line.values) return true;
                 if (line.values.C_Charge_ID > 0) return true;          // charge line
                 var pt = line._productType || "";
                 return pt === "S" || pt === "E";                        // Service / Expense product
@@ -1997,6 +2232,7 @@
            English fallback, `collapsed` = initial collapsed state. */
         var MORE_FIELD_GROUPS = [
             { anchor: "AD_OrgTrx_ID",              key: "VAS_107_GrpDimension",  def: "Dimension",  collapsed: false },
+            { anchor: "IsContract",                key: "VAS_107_GrpContract",   def: "Contract",   collapsed: false },
             { anchor: "VA106_TaxCollectedAtSource_ID", key: "VAS_107_GrpReferences", def: "References", collapsed: false }
         ];
         // Per-anchor collapsed state; persists across modal re-opens in the same session.
@@ -2009,7 +2245,12 @@
             return -1;
         }
 
-        /* All ColumnNames owned by group gi (from its anchor to the next group's anchor). */
+        /* All ColumnNames owned by group gi (from its anchor to the next group's anchor).
+           Specs that do not apply to THIS document are skipped, so a group only ever
+           claims fields the modal actually built. That matters if a column is ever listed
+           under two groups with mutually exclusive `when` conditions: without the filter
+           the group it is NOT in would still claim it, and applyFieldGroups would anchor
+           that group's header on a field rendered somewhere else entirely. */
         function groupCols(gi) {
             var start = dynSpecIndex(MORE_FIELD_GROUPS[gi].anchor);
             if (start < 0) return [];
@@ -2019,7 +2260,10 @@
                 if (idx > start && idx < end) end = idx;
             }
             var out = [];
-            for (var k = start; k < end; k++) out.push(ADDITIONAL_INFO_FIELDS[k].col);
+            for (var k = start; k < end; k++) {
+                if (!dynCondMet(null, ADDITIONAL_INFO_FIELDS[k].when)) continue;
+                out.push(ADDITIONAL_INFO_FIELDS[k].col);
+            }
             return out;
         }
 
@@ -2115,13 +2359,23 @@
            column that appears in the Additional Info modal (module-guarded + applicable).
            Used to visually highlight the "..." button so the user can see at a glance
            that the modal contains data without opening it.
+           Uses dynFieldKind to classify each field — critical for YesNo columns whose
+           value is "N" (No): +("N") === NaN, and NaN !== 0 is true, so the naive
+           +val !== 0 check would wrongly highlight the button for an unset checkbox.
            Pass a pre-computed cols array to avoid calling additionalInfoColumns twice. */
         function hasAdditionalValues(line, cols) {
             if (!cols) cols = additionalInfoColumns(line);
             for (var i = 0; i < cols.length; i++) {
-                var val = line.values[cols[i].ColumnName];
-                // FK IDs are 0 when unset; amounts are 0 when unset; treat null/""/"0"/0 as empty.
-                if (val !== null && val !== undefined && val !== "" && +val !== 0) return true;
+                var m = cols[i], v = lineVal(line, m.ColumnName);
+                if (v == null) continue;
+                var s = String(v).trim();
+                if (!s) continue;
+                switch (dynFieldKind(m)) {
+                    case "fk": case "int": if (parseInt(s, 10) > 0) return true; break;
+                    case "number": if (parseFloat(s) !== 0) return true; break;
+                    case "yesno": if (s === "Y" || s === "true" || s === "1") return true; break;
+                    default: return true;   // string / memo / date / list with any text
+                }
             }
             return false;
         }
@@ -2131,7 +2385,10 @@
             for (var i = 0; i < ADDITIONAL_INFO_FIELDS.length; i++) {
                 var spec = ADDITIONAL_INFO_FIELDS[i];
                 if (!isModuleInstalled(spec.col)) continue;
-                var m = columnMeta[spec.col];
+                // Exact dictionary case first, then a case-insensitive fallback - the curated
+                // list above is hand-written and must not lose a field to a casing difference
+                // (e.g. NoofCycle vs NoOfCycle) between deployments.
+                var m = columnMeta[spec.col] || columnMeta[columnNameByLc[String(spec.col).toLowerCase()]];
                 if (!m) continue;
                 if (!dynCondMet(line, spec.when)) continue;
                 out.push(m);
@@ -2140,8 +2397,41 @@
         }
 
         /* Whether a built field is visible per its AD_Field.DisplayLogic. Default SHOW when
-           the logic is empty or a token can't be resolved ($Element_record tokens). */
+           the logic is empty or a token can't be resolved.
+
+           The dictionary is the ONLY authority here - there is no per-column override.
+           These fields looked permanently missing not because the logic was wrong for this
+           panel but because the panel could not evaluate it: every token the logic named
+           lived on the ORDER HEADER (@C_Order_Blanket@, @BlanketOrderType@,
+           @Ref_C_Order_ID@, @VAS_OrderType@) and the panel never carried those, so each
+           resolved to "" and the field was judged invisible on every document. The header
+           now carries them (LogicContext, model side), and "@x@=null" is evaluated as an
+           IS NULL test rather than a compare against the string "null" (PanelUtil), so the
+           dictionary's own rules decide - which is what they were written to do. */
+        /* ---------- narrow DisplayLogic overrides ----------
+           The exception to the rule above, and deliberately a short list. Each of these
+           References fields is required on a SALES ORDER, but its dictionary DisplayLogic
+           is written for the document that raises the link (e.g. the blanket-release
+           windows, or an accounting-element gate) and therefore hides it on an ordinary
+           sales order. Purchase orders and quotations are untouched - the dictionary keeps
+           deciding there. `when` uses the same vocabulary as ADDITIONAL_INFO_FIELDS. */
+        var DISPLAY_LOGIC_ALWAYS_SHOW = [
+            { col: "C_Activity_ID",          when: "salesOrder" },   // "Billing Code"
+            { col: "C_OrderLine_Blanket_ID", when: "salesOrder" }    // "Blanket Order Line"
+        ];
+        /* True when this column's DisplayLogic is overridden for the current document. */
+        function dynDisplayForced(m) {
+            if (!m || !m.ColumnName) return false;
+            var name = String(m.ColumnName).toLowerCase();
+            for (var i = 0; i < DISPLAY_LOGIC_ALWAYS_SHOW.length; i++) {
+                var s = DISPLAY_LOGIC_ALWAYS_SHOW[i];
+                if (s.col.toLowerCase() === name && dynCondMet(null, s.when)) return true;
+            }
+            return false;
+        }
+
         function dynFieldVisible(line, m) {
+            if (dynDisplayForced(m)) return true;
             return !(m && m.DisplayLogic && !evalLogic(line, m.DisplayLogic, true));
         }
 
@@ -2176,18 +2466,19 @@
             }
         }
 
-        function appendDynFields(line, $body) {
+        function appendDynFields(line, $body, forceReadOnly) {
             var cols = additionalInfoColumns(line);
             // Build every candidate field FIRST (control + lookup created), then apply
             // DisplayLogic to show/hide - so display logic runs AFTER buildDynField.
-            for (var i = 0; i < cols.length; i++) $body.append(buildDynField(line, cols[i]));
+            for (var i = 0; i < cols.length; i++) $body.append(buildDynField(line, cols[i], forceReadOnly));
             applyDynDisplay(line, $body);
             applyFieldGroups($body);   // inject collapsible Dimension / References headers
             // No overflow clip on the body - an FK dropdown would be cut off.
         }
 
-        function buildDynField(line, m) {
-            var ro = isColumnReadOnly(line, m.ColumnName);
+        function buildDynField(line, m, forceReadOnly) {
+            // forceReadOnly is true when the parent document is completed/void/reversed/closed.
+            var ro = forceReadOnly || isColumnReadOnly(line, m.ColumnName);
             var kind = dynFieldKind(m);
             // Caption only - the framework renders the mandatory red asterisk itself.
             var caption = m.Name || m.ColumnName;
@@ -2338,6 +2629,9 @@
                 stage("M_Warehouse_ID",         parent.M_Warehouse_ID         || 0);
                 stage("DateOrdered",            parent.DateOrdered);
                 stage("IsSOTrx",                !!parent.IsSOTrx);
+                stage("IsSalesQuotation",       !!parent.IsSalesQuotation);
+                stage("IsBlanketTrx",           !!parent.IsBlanketTrx);
+                stage("IsReturnTrx",            !!parent.IsReturnTrx);
                 stage("IsTaxIncluded",          !!parent.IsTaxIncluded);
                 stage("Processed",              !!parent.Processed);
                 stage("DocStatus",              parent.DocStatus              || "");
@@ -2771,7 +3065,7 @@
                 return { col: "M_Product_ID", msg: lbl("VAS_107_ProductChargeRequired", "Select a product or charge") };
 
             var err = VAS.PanelUtil.validateFields(v, [
-                { col: "QtyOrdered",   msg: lbl("VAS_107_FieldRequired", "Required") + ": QtyOrdered",   check: function (vv) { return isMandatory("QtyOrdered")   && !(vv.QtyOrdered > 0); } },
+                { col: "QtyEntered",   msg: lbl("VAS_107_FieldRequired", "Required") + ": QtyEntered",   check: function (vv) { return isMandatory("QtyEntered")   && !(vv.QtyEntered > 0); } },
                 { col: "C_UOM_ID",     msg: lbl("VAS_107_FieldRequired", "Required") + ": C_UOM_ID",     check: function (vv) { return isMandatory("C_UOM_ID")     && !(vv.C_UOM_ID > 0); } },
                 { col: "PriceEntered", msg: lbl("VAS_107_FieldRequired", "Required") + ": PriceEntered", check: function (vv) { return isMandatory("PriceEntered") && (vv.PriceEntered == null || vv.PriceEntered === ""); } },
                 { col: "C_Tax_ID",     msg: lbl("VAS_107_FieldRequired", "Required") + ": C_Tax_ID",     check: function (vv) { return isMandatory("C_Tax_ID")     && !(vv.C_Tax_ID > 0); } },
@@ -2779,8 +3073,8 @@
             ]);
             if (err) return err;
 
-            if (!(v.QtyOrdered > 0))
-                return { col: "QtyOrdered", msg: lbl("VAS_107_QtyRequired", "Quantity must be greater than zero") };
+            if (!(v.QtyEntered > 0))
+                return { col: "QtyEntered", msg: lbl("VAS_107_QtyRequired", "Quantity must be greater than zero") };
 
             var dyn = additionalInfoColumns(line);
             var dynRules = [];
@@ -2833,6 +3127,7 @@
         // (The control handles the pre-select + unchanged-OK no-op internally.)
         function openAttrDialog(line) {
             if (!line.values.M_Product_ID) return;
+            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             // The product must actually carry an attribute set (M_AttributeSet_ID > 0) for
             // the attribute control to be meaningful. A saved line whose product has no
             // attribute set defined must not open the control even if it's clicked - guard
@@ -3338,6 +3633,7 @@
 
         /* ---------- scan dialog ---------- */
         function openScanDialog() {
+            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             closeDialogs();
             scanState = { rows: [], input: "", error: "" };
             var backdrop = $('<div class="vas-obl-dialog-backdrop" id="vasOblScan"></div>');
@@ -3435,7 +3731,7 @@
                     rowId: "r" + (++rowCounter), status: "new", dirty: true, _priceOverride: false,
                     _productType: r.item.Kind === "C" ? "" : (r.item.ProductType || ""),
                     values: { C_OrderLine_ID: 0, Line: maxLine, M_Product_ID: r.item.Kind === "C" ? 0 : r.item.RecordId, C_Charge_ID: r.item.Kind === "C" ? r.item.RecordId : 0,
-                        M_AttributeSetInstance_ID: 0, QtyOrdered: parseInt(r.qty || "1", 10) || 1, C_UOM_ID: 0, PriceEntered: 0, C_Tax_ID: 0, Discount: 0, Notes: "", Description: "" },
+                        M_AttributeSetInstance_ID: 0, QtyOrdered: parseInt(r.qty || "1", 10) || 1, QtyEntered: parseInt(r.qty || "1", 10) || 1, C_UOM_ID: 0, PriceEntered: 0, C_Tax_ID: 0, Discount: 0, Notes: "", Description: "" },
                     display: { productName: r.item.Kind === "C" ? "" : r.item.DisplayName, chargeName: r.item.Kind === "C" ? r.item.DisplayName : "", uomName: "", taxName: "", attrName: "", hasAttributeSet: !!r.item.HasAttributeSet }
                 };
                 seedAllColumns(line.values);
@@ -3449,8 +3745,8 @@
            auto-created - the user adds the next line manually via the Add button. A
            blank/invalid row blocks with the same message the Save button shows. */
         function saveThenAddLine() {
-            if (!parent || !parent.IsEditable) { showToast(lbl("VAS_107_OrderNotEditable", "This order cannot take new lines")); return; }
-            if (unsavedLines().length) saveRows();   // failure already messaged; stay put
+            if (!parent || !parent.IsEditable) { showToast(docMsg("VAS_107_OrderNotEditable", "This {0} cannot take new lines")); return; }
+            if (unsavedLines().length) afterCallouts(function () { saveRows(); });   // wait for in-flight callout first
             editing = null; render();
         }
 
@@ -3470,7 +3766,7 @@
             // Core fields drive the business setters; Values carries the full column
             // bag so every callout-set column is persisted server-side.
             return { C_OrderLine_ID: v.C_OrderLine_ID || 0, RowKey: l.rowId, Line: v.Line || 0, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0,
-                M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0, QtyOrdered: v.QtyOrdered || 0, C_UOM_ID: v.C_UOM_ID || 0,
+                M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0, QtyEntered: v.QtyEntered || 0, QtyOrdered: v.QtyOrdered || 0, C_UOM_ID: v.C_UOM_ID || 0,
                 PriceEntered: v.PriceEntered || 0, C_Tax_ID: v.C_Tax_ID || 0, Discount: v.Discount || 0, Description: v.Description || "",
                 Values: v,
                 // Columns the user intentionally changed in the Additional Info modal.
@@ -3485,6 +3781,38 @@
         function flushPendingSave() {
             var ids = pendingSaveIds; pendingSaveIds = {};
             for (var k in ids) { if (ids.hasOwnProperty(k)) { saveRows(null, ids); return; } }
+        }
+
+        /* One async callout finished. Drains the waiter queue once nothing is outstanding. */
+        function calloutSettled() {
+            if (calloutPending > 0) calloutPending--;
+            if (calloutPending > 0 || !calloutWaiters.length) return;
+            var waiters = calloutWaiters;
+            calloutWaiters = [];
+            for (var i = 0; i < waiters.length; i++) {
+                try { waiters[i](); } catch (ex) { if (window.console) console.log(ex); }
+            }
+        }
+
+        /* Run fn once every in-flight callout has applied its values — immediately when none
+           is pending. Used by Save so a qty/price typed and Saved without tabbing out is
+           persisted with the callout's recomputed price / tax / amounts. */
+        function afterCallouts(fn) {
+            if (!calloutPending) { fn(); return; }
+            var ran = false;
+            var once = function () { if (ran) return; ran = true; fn(); };
+            calloutWaiters.push(once);
+            // Backstop: never let a wedged callout block Save forever.
+            setTimeout(once, CALLOUT_WAIT_MS);
+        }
+
+        /* The single Save entry point for every user gesture (Save button, keyboard shortcut).
+           Commits the focused cell then waits for any in-flight callout to finish before
+           posting — so the line saves with the recomputed price / tax / amounts. */
+        function flushAndSave() {
+            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
+            flushActiveEdit();
+            afterCallouts(function () { saveRows(); });
         }
 
         /* Save the currently-unsaved lines as a non-blocking batch. Each saved row shows
@@ -3624,6 +3952,7 @@
 
         function deleteSelected() {
             if (!panelEditable()) return;             // read-only when doc completed/void/reversed/closed
+            if (blockedByDirtyHeader()) return;       // unsaved header edit — save the tab first
             var sel = selectedLines(); if (!sel.length) return;
             var ids = [], localOnly = [];
             sel.forEach(function (l) { if (l.values.C_OrderLine_ID > 0) ids.push(l.values.C_OrderLine_ID); else localOnly.push(l); });
@@ -3636,7 +3965,7 @@
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { applyLinePaging(res); reloadLinesKeepingUnsaved(res.Lines); showToast(lbl("VAS_107_LinesDeleted", "Lines deleted")); refreshSummary(); refreshHeaderRecord(); }
+                    if (res && res.Success) { applyLinePaging(res); reloadLinesKeepingUnsaved(res.Lines); showToast(lbl("VAS_107_LinesDeleted", "Lines deleted")); if (linesTotal === 0) { taxSummary = null; renderTotals(); } refreshSummary(); refreshHeaderRecord(); }
                     else showToast(lbl((res && res.ErrorKey) || "VAS_107_DeleteFailed", "Delete failed"));
                 },
                 error: function (err) { console.log(err); showBusy(false); showToast(lbl("VAS_107_DeleteFailed", "Delete failed")); }
@@ -3684,7 +4013,7 @@
             /** Alt+Ctrl+N — add a new line, same as the Add button. */
             onNew: function () { addLine(); },
             /** Alt+Ctrl+S — save all unsaved lines, same as the Save button. */
-            onSave: function () { saveRows(); },
+            onSave: function () { flushAndSave(); },
             /**
              * Alt+Ctrl+D — delete the selected line(s).
              * Shows a toast when nothing is selected; read-only guard is
@@ -3698,17 +4027,26 @@
                 deleteSelected();
             },
             /**
-             * Alt+Ctrl+Z — undo changes on the first selected dirty/new line.
+             * Alt+Ctrl+Z — undo the "active" line using the same priority chain as VAS_074:
+             *   1. The row currently in edit mode (field has focus).
+             *   2. The first selected unsaved row.
+             *   3. The first unsaved row on the page (no selection required).
+             *   4. Toast "Nothing to undo" when there is nothing to revert.
              * A saved+dirty line reverts to its pristine snapshot (undoLine).
-             * A never-saved line is discarded entirely (discardNewLine), matching
-             * the behaviour of the per-row Undo (↺) button.
+             * A never-saved line is discarded entirely (discardNewLine).
              */
             onUndo: function () {
-                var sel = lines.filter(function (l) {
-                    return l._sel && !l._saving && (l.dirty || l.status === "new");
-                });
-                if (!sel.length) return;
-                var target = sel[0];
+                if (!panelEditable()) return;
+                var target = (editing && lineById(editing.rowId)) || null;
+                if (!target || !(target.status === "new" || target.dirty)) {
+                    target = selectedLines().filter(function (l) { return !l._saving && (l.status === "new" || l.dirty); })[0] || null;
+                }
+                if (!target) {
+                    for (var i = 0; i < lines.length; i++) {
+                        if (!lines[i]._saving && (lines[i].status === "new" || lines[i].dirty)) { target = lines[i]; break; }
+                    }
+                }
+                if (!target) { showToast(lbl("VAS_107_NothingToUndo", "Nothing to undo")); return; }
                 if (target.status === "new") { discardNewLine(target); } else { undoLine(target); }
             },
             /**
@@ -3733,7 +4071,12 @@
     };
 
     VAS.VAS_107_CreateOrderBottomPanel.prototype.refreshPanelData = function (recordID, selectedRow) {
-        if (selectedRow == undefined || recordID <= 0) { this.clear(); return; }
+        if (selectedRow == undefined || recordID <= 0) {
+            // Pass true when a row exists in the grid but the order has no DB ID yet
+            // (new unsaved record), so the panel can show a more helpful message.
+            this.clear(selectedRow !== undefined && recordID <= 0);
+            return;
+        }
         this.record_ID = recordID;
         this.selectedRow = selectedRow;
         this.fetchData(recordID);

@@ -154,6 +154,10 @@
  *                          "was X → now Y" under the field's name, the old
  *                          value struck through and the new one carrying the
  *                          row's colour. Matches VAS_101 / VAS_104.
+ *   VAI163   2026-08-21  The narrow-panel header grids took the minmax(0, 1fr)
+ *                        floor the rest of the panel already had. Consistency
+ *                        pass — this panel's tracks and cells were already
+ *                        correct, so nothing here was overlapping.
  ***********************************************************/
 
 .vas_099-root {
@@ -359,10 +363,10 @@
 
 /* Narrow panels: stack the two columns and drop the pills below the title. */
 @container (max-width: 460px) {
-    .vas_099-hdrCard { grid-template-columns: 1fr; }
+    .vas_099-hdrCard { grid-template-columns: minmax(0, 1fr); }
     .vas_099-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--grn-row-div); padding-bottom: 0.75em; }
     /* Two field columns are too cramped this narrow — back to a single stack. */
-    .vas_099-hdrColR { grid-template-columns: 1fr; }
+    .vas_099-hdrColR { grid-template-columns: minmax(0, 1fr); }
     .vas_099-hdrTop  { flex-direction: column; }
     .vas_099-hdrPills { justify-content: flex-start; }
 }
@@ -945,9 +949,9 @@
    keeps the shrink-to-fit box inside the track so a long figure still clips
    with the ellipsis its cell already carries. */
 .vas_099-qpMini .vas_099-qpMiniRow > span.vas_099-ta-r {
-    justify-self: end;
+   /* justify-self: end;*/
     max-width: 100%;
-    text-align: right;
+    text-align: left;
     font-variant-numeric: tabular-nums;
 }
 .vas_099-qpMini .vas_099-qpMiniRow > span.vas_099-ta-c {
@@ -1475,4 +1479,13 @@
 .vas_099-cvNew {
     color: var(--grn-text); font-weight: 700;
     overflow-wrap: break-word; word-break: break-word;
+}
+
+/* Each e-mail sent against an appointment or task, inside that row's drawer.
+   The second and later ones are ruled off, so several notices about the same
+   meeting do not read as one long message. */
+.vas_099-actMailSplit {
+    margin-top: 0.625em;
+    padding-top: 0.625em;
+    border-top: 1px solid var(--grn-card-bd);
 }

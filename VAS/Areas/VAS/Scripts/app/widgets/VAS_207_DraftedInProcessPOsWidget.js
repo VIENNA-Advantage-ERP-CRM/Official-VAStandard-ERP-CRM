@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Module Name : VAS
  * Purpose     : Widget 05 - Drafted / In-Process POs (Purchase Order Dashboard)
  *               Read-only 3x1 glass KPI tile with drill-down modal work queue for
@@ -159,9 +159,6 @@
 
             $card = $(
                 '<button type="button" class="vas-207-card vas-207-border-info" aria-label="' + esc(titleText) + '">' +
-                    '<svg class="vas-207-opencue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-                        '<path d="M7 17 17 7M9 7h8v8"/>' +
-                    '</svg>' +
                     '<p class="vas-207-title">' + esc(titleText) + '</p>' +
                     '<div class="vas-207-kpi-row">' +
                         '<div class="vas-207-kpi-left">' +
@@ -725,15 +722,15 @@
                     '<div class="vas-207-mrow vas-207-lines-row">' +
                         '<span class="vas-207-cell vas-207-lh-num vas-207-right vas-207-c-std" title="' + (startIdx + i + 1) + '">' + (startIdx + i + 1) + '</span>' +
                         '<span class="vas-207-cell vas-207-lh-prod vas-207-c-prim" title="' + esc(l.ProductName) + '">' + esc(l.ProductName) + '</span>' +
-                        '<span class="vas-207-cell vas-207-lh-attr vas-207-c-std" title="' + esc(l.AttributeDesc || '—') + '">' + esc(l.AttributeDesc || '—') + '</span>' +
+                        '<span class="vas-207-cell vas-207-lh-attr vas-207-c-std" title="' + esc(l.AttributeDesc || '') + '">' + esc(l.AttributeDesc || '') + '</span>' +
                         '<span class="vas-207-cell vas-207-lh-uom vas-207-c-std" title="' + esc(l.UOM) + '">' + esc(l.UOM) + '</span>' +
                         '<span class="vas-207-cell vas-207-lh-ord vas-207-right vas-207-c-std" title="' + formatNumber(l.QtyOrdered) + '">' + formatNumber(l.QtyOrdered) + '</span>' +
-                        '<span class="vas-207-cell vas-207-lh-rec vas-207-right vas-207-c-std" title="' + formatNumber(l.QtyDelivered) + '">' + formatNumber(l.QtyDelivered) + '</span>' +
-                        '<span class="vas-207-cell vas-207-lh-pend vas-207-right vas-207-c-prim" title="' + formatNumber(l.QtyPending) + '">' + formatNumber(l.QtyPending) + '</span>' +
+                        '<span class="vas-207-cell vas-207-lh-rec vas-207-right vas-207-c-std" title="' + nsDash(l, formatNumber(l.QtyDelivered)) + '">' + nsDash(l, formatNumber(l.QtyDelivered)) + '</span>' +
+                        '<span class="vas-207-cell vas-207-lh-pend vas-207-right vas-207-c-prim" title="' + nsDash(l, formatNumber(l.QtyPending)) + '">' + nsDash(l, formatNumber(l.QtyPending)) + '</span>' +
                         '<span class="vas-207-cell vas-207-lh-rate vas-207-right vas-207-c-std" title="' + esc(formattedRate) + '">' + esc(formattedRate) + '</span>' +
                         '<span class="vas-207-cell vas-207-lh-amt vas-207-right vas-207-c-emph" title="' + esc(formattedAmount) + '">' + esc(formattedAmount) + '</span>' +
-                        '<span class="vas-207-cell vas-207-lh-stat" title="' + esc(l.LineStatus) + '">' +
-                            '<span class="vas-207-chip ' + chipClass + '">' + esc(l.LineStatus) + '</span>' +
+                        '<span class="vas-207-cell vas-207-lh-stat" title="' + esc(nsDash(l, l.LineStatus)) + '">' +
+                            '<span class="vas-207-chip ' + chipClass + '">' + esc(nsDash(l, l.LineStatus)) + '</span>' +
                         '</span>' +
                     '</div>'
                 );
@@ -789,6 +786,15 @@
 
         function openPurchaseOrderRecord(orderId) {
             if (!orderId) { return; }
+
+            // Navigating away must dismiss the popup. closeModal() here is a closure
+            // private to the modal builder, so drop the overlay via the module-level
+            // handle instead.
+            if ($activeModalOverlay) {
+                $activeModalOverlay.remove();
+                $activeModalOverlay = null;
+                modalStack = [];
+            }
 
             try {
                 // Table 259 is C_Order
@@ -897,5 +903,12 @@
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
     };
+
+
+    /* A charge line, or a product that is not of Item type, is never received:
+       received, pending and line status render as a dash instead of a figure. */
+    function nsDash(l, v) {
+        return (l && (l.IsNonStock || l.isNonStock)) ? '–' : v;
+    }
 
 })(VAS, jQuery);

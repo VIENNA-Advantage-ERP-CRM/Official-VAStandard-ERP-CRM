@@ -1,4 +1,4 @@
-/// <summary>
+﻿/// <summary>
 /// Module Name : VASLogic
 /// Purpose     : Sales Order Overview tab panel data (read side) + two write
 ///               actions (Complete Sales Order, Create Contract from a line).
@@ -197,6 +197,122 @@
 ///                        The line number and item move out of the field's NAME
 ///                        into ChangeScope, where the panel draws them on their
 ///                        own sub-line rather than inside the headline.
+///   VAI163   2026-08-20  - LoadProjectOrigin reads C_Order.C_ProjectRef_ID as well
+///                          as C_Project_ID. Both name a C_Project — the platform's
+///                          own revenue-recognition code posts C_ProjectRef_ID
+///                          straight into a journal line's C_Project_ID — and an
+///                          order that carries only the reference reported no
+///                          origin at all, so the strip called it "Manual". The
+///                          record's own C_Project_ID still wins where it has one;
+///                          each column is guarded separately, so a schema with
+///                          neither behaves exactly as before.
+///                        - Invoices carry their CREATED stamp (C_Invoice.Created)
+///                          alongside DateInvoiced, for the progress line's
+///                          Invoiced stage. DateInvoiced is a document field a user
+///                          can back-date, and the stage is dated by when the
+///                          invoice was actually raised — the same treatment
+///                          shipments were given for Shipped / Delivered.
+///   VAI163   2026-08-20  The Quotation and Blanket Order origins are ATTEMPTED
+///                        rather than gated on ColumnExists, and each falls back
+///                        to the link the LINES carry. Both chips reported nothing
+///                        and the strip called the order "Manual".
+///                        Two independent faults, one per chip:
+///                          * The dictionary guard was itself the failure. A
+///                            deployment whose AD_Column has no row for the column
+///                            — or whose AD_Table carries more than one row named
+///                            C_Order, which makes the guard's scalar sub-select
+///                            RAISE rather than answer — was told "no such column"
+///                            however good the data was. VAS_092 reached this
+///                            conclusion on its own blanket chip; both statements
+///                            now run, and a genuinely missing column throws once
+///                            and is remembered (the static _*LookupUsable flags).
+///                          * The header column is not where the link always
+///                            lives. C_Order.C_Order_Blanket is stamped only by
+///                            CreateReleaseDocFromBO, while MOrder.CopyFrom writes
+///                            C_OrderLine.C_OrderLine_Blanket_ID for ANY release
+///                            document; CopyOrder stamps the quotation header only
+///                            where C_Order carries the column, and the line
+///                            references (C_OrderLine.C_Order_Quotation, else
+///                            C_Quotation_Line_ID) separately. Reading the header
+///                            alone found nothing on either.
+///                        Every predicate is COALESCE rather than NVL, so the
+///                        statements read the same on Oracle and PostgreSQL.
+///   VAI163   2026-08-21  Activity: an appointment or task now carries the
+///                        e-mails sent against IT - MailAttachment1 keyed on
+///                        AppointmentsInfo rather than on this panel's own
+///                        table - with the recipient (MailAddress), subject
+///                        (Title), when (Created) and who sent it (CreatedBy).
+///                        The body (TextMsg, flattened) travels with the row so
+///                        the panel reveals it on click. Read in one query for
+///                        the whole feed through VAS_ActivitySourcesModel.
+///   VAI163   2026-08-24  - CustomerEmail: the address the panel's Send Invoice
+///                          button seeds the share/e-mail form's recipient with,
+///                          beside the customer's name. The order's own contact
+///                          address is preferred; any active contact of the
+///                          customer (MIN over AD_User, so the scalar sub-select
+///                          cannot return two rows and raise on Oracle) stands in
+///                          when the order names none. A blank one is not a
+///                          failure — VAS_SentEmailDocModel resolves the recipient
+///                          from AD_Table_ID + RecordID on the server.
+///                        - IsEmailSent (C_Order.VAS_IsEmailSent) for the header's
+///                          "Email Sent" badge, drawn only when the flag is set —
+///                          the milestone rule the Posted badge beside it follows.
+///                          Read in its OWN statement (LoadEmailSent) and ATTEMPTED
+///                          rather than dictionary-guarded: it is a module column,
+///                          so selecting it alongside the header would fail the
+///                          WHOLE overview on a deployment that has not taken it.
+///   VAI163   2026-08-26  - The e-mail feed was EMPTY on databases that have mails.
+///                          Two causes, both here. The AD_Table id was a SCALAR
+///                          sub-select, and AD_Table can carry more than one row
+///                          named C_Order — which on Oracle RAISES rather than
+///                          answering, taking the whole lookup into its catch. And
+///                          AttachmentType was required to equal 'M', a value that
+///                          varies between installations and is sometimes null. It
+///                          is IN + UPPER for the table and "not 'I'" for the kind
+///                          now: 'I' is a letter and anything else a mail, so the
+///                          two partition the table — nothing hidden, and nothing
+///                          double-counted against the shared loader, which takes
+///                          the letters (it is called with includeMail: false).
+///                        - IsShipConfirmTarget (LoadShipConfirmTarget):
+///                          IsShipConfirm on C_DocTypeTarget_ID, falling back to
+///                          the completed type. The progress line's Shipped and
+///                          Delivered stages read the delivery order differently
+///                          with confirmation on — where it SITS In Process
+///                          awaiting confirmation — than with it off, where
+///                          completion is the milestone. Its own attempted
+///                          statement, like LoadEmailSent.
+///                        - Deliveries, invoices and receipts each carry
+///                          CompletedDate: the document's workflow DocComplete
+///                          stamp, falling back to its own Updated stamp, and null
+///                          while it is open. The Delivered / Invoiced / Paid
+///                          stages date themselves by these — they went green on a
+///                          document merely EXISTING before, so a drafted invoice
+///                          reported an invoiced order. Read for each set in ONE
+///                          statement (LoadCompletionStamps), not per document.
+///   VAI163   2026-09-01  CustomerEmail came back BLANK on PostgreSQL, so Send
+///                        Invoice fell through to the server recipient lookup,
+///                        which failed the same way and left the user on the
+///                        screen instead of the Preview and Share Document form.
+///                        Cause: "EMail IS NOT NULL" is an Oracle-only test for
+///                        "has an address" — on PostgreSQL an empty string is a
+///                        real value that passes it, and since '' sorts first the
+///                        MIN() picked the blank. Both the sub-select and the
+///                        chosen address are now length-tested after TRIM, which
+///                        reads the same on either engine. Same fix as VAS_092.
+///   VAI163   2026-09-01  Times were wrong on PostgreSQL — appointments first, but
+///                        every stamp the panel prints had the same defect. The
+///                        DateTimeKind the PROVIDER tags a value with reached the
+///                        JSON: Oracle says Unspecified and Npgsql says Utc or
+///                        Local, Newtonsoft writes a zone designator for the latter
+///                        two and none for the first, and the panel's parseDbDate
+///                        reads the two shapes differently. EVERY date and
+///                        timestamp this model emits now goes through Stamp() — the
+///                        header dates, the delivery / invoice / payment stamps,
+///                        the history and completion dates, the change log's
+///                        EventOn and every activity EventTime — as do the shared
+///                        appointment / task / call / letter sources in
+///                        VAS_ActivitySourcesModel, where the helper lives. A no-op
+///                        on Oracle.
 /// </summary>
 
 using System;
@@ -259,6 +375,28 @@ namespace VASLogic.Models
                               contact.Name               AS ContactName,
                               contact.Phone              AS ContactPhone,
                               contact.EMail              AS ContactEmail,
+                              -- The CUSTOMER's own e-mail address, used to seed the
+                              -- Send Invoice recipient when the order names no
+                              -- contact of its own. MIN, not a bare column: a
+                              -- customer can carry several contacts and a scalar
+                              -- sub-select that returns more than one row raises on
+                              -- Oracle instead of answering.
+                              --   IS NOT NULL alone is an ORACLE-ONLY filter: there
+                              -- an empty string IS null, on PostgreSQL it is a real
+                              -- value that survives the test — and because '' sorts
+                              -- before every address, MIN then returns the BLANK for
+                              -- any customer carrying one contact with no e-mail.
+                              -- That is what left the Send Invoice recipient empty on
+                              -- PostgreSQL. LENGTH(TRIM(..)) > 0 drops blank and
+                              -- whitespace-only addresses on both engines (on Oracle
+                              -- TRIM of a blank is null, so the row fails the test
+                              -- there too).
+                              (SELECT MIN(bpu.EMail)
+                                 FROM AD_User bpu
+                                WHERE bpu.C_BPartner_ID = o.C_BPartner_ID
+                                  AND bpu.IsActive      = 'Y'
+                                  AND bpu.EMail IS NOT NULL
+                                  AND LENGTH(TRIM(bpu.EMail)) > 0) AS CustomerEMail,
                               sr.Name                    AS SalesRepName,
                               pt.Name                    AS PaymentTermName,
                               pl.Name                    AS PriceListName,
@@ -291,12 +429,12 @@ namespace VASLogic.Models
             result.C_Order_ID   = Util.GetValueOfInt(r["C_Order_ID"]);
             result.DocumentNo   = Util.GetValueOfString(r["DocumentNo"]);
             result.POReference  = Util.GetValueOfString(r["POReference"]);
-            result.DateOrdered  = Util.GetValueOfDateTime(r["DateOrdered"]);
-            result.DatePromised = Util.GetValueOfDateTime(r["DatePromised"]);
+            result.DateOrdered  = Stamp(r["DateOrdered"]);
+            result.DatePromised = Stamp(r["DatePromised"]);
             result.DocStatus    = Util.GetValueOfString(r["DocStatus"]);
             result.Posted       = Util.GetValueOfString(r["Posted"]);
             result.PriorityRule = Util.GetValueOfString(r["PriorityRule"]);
-            result.Created      = Util.GetValueOfDateTime(r["Created"]);
+            result.Created      = Stamp(r["Created"]);
 
             result.GrandTotal   = Util.GetValueOfDecimal(r["GrandTotal"]);
             result.TotalLines   = Util.GetValueOfDecimal(r["TotalLines"]);
@@ -313,6 +451,18 @@ namespace VASLogic.Models
             result.ContactName    = Util.GetValueOfString(r["ContactName"]);
             result.ContactPhone   = Util.GetValueOfString(r["ContactPhone"]);
             result.ContactEmail   = Util.GetValueOfString(r["ContactEmail"]);
+            // Recipient seed for the Send Invoice / share-document flow. The order's
+            // own contact address is preferred — that is the person this sales order
+            // was placed with — and any active contact of the customer stands in
+            // when the order names none.
+            //   Both candidates are TRIMMED before they are weighed: on PostgreSQL a
+            // contact row can hold an empty (or whitespace-only) address where Oracle
+            // would hold a null, and an all-blank string is not a recipient. What
+            // survives is a real address or nothing at all, which is what the panel's
+            // Send Invoice button needs to decide whether to seed the share form.
+            result.CustomerEmail  = result.ContactEmail.Trim().Length > 0
+                                    ? result.ContactEmail.Trim()
+                                    : Util.GetValueOfString(r["CustomerEMail"]).Trim();
             result.SalesRepName   = Util.GetValueOfString(r["SalesRepName"]);
             result.PaymentTermName = Util.GetValueOfString(r["PaymentTermName"]);
             result.PriceListName  = Util.GetValueOfString(r["PriceListName"]);
@@ -331,6 +481,14 @@ namespace VASLogic.Models
             // Completed stage.
             result.CompletedDate = GetOrderCompletedDate(C_Order_ID);
 
+            // Has the order been e-mailed to the customer? Drives the header's
+            // "Email Sent" badge.
+            LoadEmailSent(C_Order_ID, result);
+
+            // Is this order shipped WITH a confirmation? The progress line's Shipped
+            // and Delivered stages read the delivery order differently either way.
+            LoadShipConfirmTarget(C_Order_ID, result);
+
             // ----- Child data -----
             LoadAddresses(shipLocId, billLocId, result);
             LoadCreatedFrom(C_Order_ID, result);
@@ -342,7 +500,7 @@ namespace VASLogic.Models
             // One flat list for the Documents section, built from the two above
             // plus the receipts allocated to those invoices.
             result.Documents        = LoadDocuments(C_Order_ID, result.Deliveries, result.Invoices);
-            result.Activity         = LoadActivity(C_Order_ID);
+            result.Activity         = LoadActivity(C_Order_ID, result.C_BPartner_ID);
             result.Notes            = LoadNotes(C_Order_ID);
             // Frequencies are no longer loaded: they populated the panel's inline
             // contract form, which is gone — the Contract cell is read-only now.
@@ -494,7 +652,7 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
-                    DateTime? d = Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["CompletedDate"]);
+                    DateTime? d = Stamp(ds.Tables[0].Rows[0]["CompletedDate"]);
                     if (d.HasValue) return d;
                 }
 
@@ -506,7 +664,7 @@ namespace VASLogic.Models
                                        AND o.DocStatus IN ('CO', 'CL')";
                 ds = DB.ExecuteDataset(fallback, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
-                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["Updated"]);
+                return Stamp(ds.Tables[0].Rows[0]["Updated"]);
             }
             catch (Exception ex)
             {
@@ -626,12 +784,13 @@ namespace VASLogic.Models
 
         /// <summary>
         /// Loads the origin documents the order was created from: quotation
-        /// (C_Order.C_Order_Quotation), opportunity (C_Order.VAS_Opportunity_ID
-        /// -> VAS_Opportunity.Name) and project (C_Order.C_Project_ID ->
-        /// C_Project.Name). Each source column is module-optional, so the whole
-        /// block is guarded — a missing column degrades to "no created-from"
-        /// rather than breaking the overview. C_ProjectRef_ID is intentionally
-        /// NOT used.
+        /// (C_Order.C_Order_Quotation, else the same reference on the lines),
+        /// opportunity (C_Order.VAS_Opportunity_ID -> VAS_Opportunity.Name),
+        /// project (C_Order.C_Project_ID, else C_ProjectRef_ID -> C_Project) and
+        /// the blanket it was released against (C_Order.C_Order_Blanket, else
+        /// C_OrderLine.C_OrderLine_Blanket_ID). Each source column is
+        /// module-optional, so a missing one degrades to "no created-from" for
+        /// that chip alone rather than breaking the overview.
         /// </summary>
         private void LoadCreatedFrom(int C_Order_ID, SalesOrderOverviewData d)
         {
@@ -650,28 +809,158 @@ namespace VASLogic.Models
             LoadBlanketOrigin(C_Order_ID, d);
         }
 
-        /// <summary>The quotation this order was raised from
-        /// (C_Order.C_Order_Quotation).</summary>
+        /// <summary>
+        /// Remembers whether the header / line quotation lookups are usable against
+        /// this schema, so a database that genuinely has neither column reports its
+        /// error once rather than on every order the panel opens.
+        /// Null = not tried yet, false = the statement failed, true = it ran.
+        /// </summary>
+        private static bool? _quotationLookupUsable;
+        private static bool? _quotationLineLookupUsable;
+
+        /// <summary>
+        /// The quotation this order was raised from — C_Order.C_Order_Quotation,
+        /// falling back to the same reference on the LINES.
+        ///
+        /// The statement is ATTEMPTED rather than gated on ColumnExists. The
+        /// dictionary guard was the single point at which this feature failed: a
+        /// deployment whose AD_Column has no row for the column — or whose AD_Table
+        /// carries more than one row named C_Order, which makes the guard's scalar
+        /// sub-select RAISE instead of answer — reported "no such column" and the
+        /// chip never appeared, however good the data was. Running the query and
+        /// letting a genuinely missing column throw once is both more accurate and
+        /// cheaper than asking the dictionary to describe the schema. This is what
+        /// VAS_092 learnt on its own blanket chip, and the reason an order raised
+        /// from a quotation reported no origin at all and the strip called it
+        /// "Manual".
+        ///
+        /// COALESCE, not NVL: the statement has to read the same on Oracle and
+        /// PostgreSQL.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected sales order id.</param>
+        /// <param name="d">Overview being populated.</param>
         private void LoadQuotationOrigin(int C_Order_ID, SalesOrderOverviewData d)
         {
-            if (!ColumnExists("C_Order", "C_Order_Quotation")) return;
+            // The header reference first — it names the quotation outright.
+            if (_quotationLookupUsable != false)
+            {
+                try
+                {
+                    string sql = @"SELECT q.C_Order_ID AS QuotationId,
+                                          q.DocumentNo AS QuotationNo
+                                     FROM C_Order o
+                                    INNER JOIN C_Order q
+                                            ON (q.C_Order_ID = o.C_Order_Quotation)
+                                    WHERE o.C_Order_ID = @C_Order_ID
+                                      AND COALESCE(q.IsActive, 'Y') = 'Y'";
+                    DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                    _quotationLookupUsable = true;
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        DataRow r = ds.Tables[0].Rows[0];
+                        d.QuotationId = Util.GetValueOfInt(r["QuotationId"]);
+                        d.QuotationNo = Util.GetValueOfString(r["QuotationNo"]);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Almost certainly "no such column" on a schema without the
+                    // quotation module. Recorded so the next order skips the attempt.
+                    _quotationLookupUsable = false;
+                    _log.Severe("LoadQuotationOrigin/header (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                }
+            }
+
+            LoadQuotationOriginFromLines(C_Order_ID, d);
+        }
+
+        /// <summary>
+        /// The quotation this order was raised from, resolved through its LINES.
+        ///
+        /// This is the fallback that makes the Quotation chip appear for orders the
+        /// header column does not describe, and it is not a rare case: the two
+        /// records of the link are written under DIFFERENT conditions by the same
+        /// copy. CopyOrder stamps the header only where C_Order carries the column
+        /// (Get_ColumnIndex("C_Order_Quotation") > 0), and stamps the LINE
+        /// separately — C_OrderLine.C_Order_Quotation, holding the quotation's own
+        /// C_Order_ID, alongside C_Quotation_Line_ID which holds the quotation LINE
+        /// it came from. An order copied on a schema carrying the line columns but
+        /// not the header one records its quotation on the lines ONLY, and a panel
+        /// reading just the header found nothing to show.
+        ///
+        /// Both line columns are tried, the direct order reference first: it needs
+        /// no second hop, and it is the one CopyOrder writes last. Ordered by id so
+        /// the choice is stable between loads.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected sales order id.</param>
+        /// <param name="d">Overview being populated.</param>
+        private void LoadQuotationOriginFromLines(int C_Order_ID, SalesOrderOverviewData d)
+        {
+            if (_quotationLineLookupUsable == false) return;
+
+            // C_OrderLine.C_Order_Quotation -> the quotation order itself.
+            if (TryQuotationFromLines(C_Order_ID, d,
+                    @"SELECT q.C_Order_ID AS QuotationId,
+                             MAX(q.DocumentNo) AS QuotationNo
+                        FROM C_OrderLine ol
+                       INNER JOIN C_Order q ON (q.C_Order_ID = ol.C_Order_Quotation)
+                       WHERE ol.C_Order_ID = @C_Order_ID
+                         AND COALESCE(ol.IsActive, 'Y') = 'Y'
+                         AND COALESCE(q.IsActive, 'Y')  = 'Y'
+                         AND q.C_Order_ID <> ol.C_Order_ID
+                       GROUP BY q.C_Order_ID
+                       ORDER BY q.C_Order_ID", "C_Order_Quotation"))
+                return;
+
+            // C_OrderLine.C_Quotation_Line_ID -> the quotation's LINE -> its order.
+            TryQuotationFromLines(C_Order_ID, d,
+                @"SELECT q.C_Order_ID AS QuotationId,
+                         MAX(q.DocumentNo) AS QuotationNo
+                    FROM C_OrderLine ol
+                   INNER JOIN C_OrderLine ql ON (ql.C_OrderLine_ID = ol.C_Quotation_Line_ID)
+                   INNER JOIN C_Order q      ON (q.C_Order_ID      = ql.C_Order_ID)
+                   WHERE ol.C_Order_ID = @C_Order_ID
+                     AND COALESCE(ol.IsActive, 'Y') = 'Y'
+                     AND COALESCE(q.IsActive, 'Y')  = 'Y'
+                     AND q.C_Order_ID <> ol.C_Order_ID
+                   GROUP BY q.C_Order_ID
+                   ORDER BY q.C_Order_ID", "C_Quotation_Line_ID");
+        }
+
+        /// <summary>
+        /// Runs one line-level quotation lookup and fills the chip from its first
+        /// row. Returns true when it found one, so the caller stops.
+        ///
+        /// A failure marks the whole line-level route unusable: both statements rest
+        /// on line columns from the same module, so if one is absent the other is
+        /// too, and there is nothing to be gained by asking again on the next order.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected sales order id.</param>
+        /// <param name="d">Overview being populated.</param>
+        /// <param name="sql">The query. Must select QuotationId + QuotationNo and
+        /// bind @C_Order_ID exactly once.</param>
+        /// <param name="what">The column being read, for the log line only.</param>
+        private bool TryQuotationFromLines(int C_Order_ID, SalesOrderOverviewData d,
+                                           string sql, string what)
+        {
             try
             {
-                string sql = @"SELECT q.C_Order_ID AS QuotationId, q.DocumentNo AS QuotationNo
-                                 FROM C_Order o
-                                INNER JOIN C_Order q
-                                        ON (q.C_Order_ID = o.C_Order_Quotation AND q.IsActive = 'Y')
-                                WHERE o.C_Order_ID = @C_Order_ID";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
-                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+                _quotationLineLookupUsable = true;
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return false;
 
                 DataRow r = ds.Tables[0].Rows[0];
                 d.QuotationId = Util.GetValueOfInt(r["QuotationId"]);
                 d.QuotationNo = Util.GetValueOfString(r["QuotationNo"]);
+                return d.QuotationId > 0;
             }
             catch (Exception ex)
             {
-                _log.Severe("LoadQuotationOrigin (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                _quotationLineLookupUsable = false;
+                _log.Severe("LoadQuotationOrigin/lines " + what +
+                            " (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                return false;
             }
         }
 
@@ -702,7 +991,21 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// The project this order was raised for (C_Order.C_Project_ID).
+        /// The project this order was raised for — C_Order.C_Project_ID, else
+        /// C_Order.C_ProjectRef_ID.
+        ///
+        /// Both columns name a C_Project. C_ProjectRef_ID is the reference an order
+        /// is keyed against on screens that carry it instead of the dimension
+        /// column, and the platform treats the two as the same thing: its
+        /// revenue-recognition runs post C_ProjectRef_ID straight into a journal
+        /// line's C_Project_ID. Reading only the first meant an order raised
+        /// against a project reference reported no origin at all, and the Created
+        /// From strip called it "Manual".
+        ///
+        /// C_Project_ID wins where the record has one; the reference answers for
+        /// the rest. Each column is guarded on its own, so the reference is read on
+        /// a schema without the dimension column and vice versa, and a schema with
+        /// neither contributes no chip exactly as before.
         ///
         /// The project's NUMBER (C_Project.Value) travels with its name: the strip
         /// names documents by their identifier, and the name is what the chip's
@@ -710,7 +1013,21 @@ namespace VASLogic.Models
         /// </summary>
         private void LoadProjectOrigin(int C_Order_ID, SalesOrderOverviewData d)
         {
-            if (!ColumnExists("C_Order", "C_Project_ID")) return;
+            bool hasProject = ColumnExists("C_Order", "C_Project_ID");
+            bool hasRef     = ColumnExists("C_Order", "C_ProjectRef_ID");
+            if (!hasProject && !hasRef) return;
+
+            // NULLIF keeps a stored 0 from being taken for a project id, so the
+            // reference is still reached on an order whose dimension column is
+            // present but empty — which is every order keyed the reference way.
+            string idExpr;
+            if (hasProject && hasRef)
+                idExpr = "COALESCE(NULLIF(o.C_Project_ID, 0), NULLIF(o.C_ProjectRef_ID, 0))";
+            else if (hasProject)
+                idExpr = "NULLIF(o.C_Project_ID, 0)";
+            else
+                idExpr = "NULLIF(o.C_ProjectRef_ID, 0)";
+
             try
             {
                 string sql = @"SELECT p.C_Project_ID AS ProjectId,
@@ -718,7 +1035,7 @@ namespace VASLogic.Models
                                       p.Name         AS ProjectName
                                  FROM C_Order o
                                 INNER JOIN C_Project p
-                                        ON (p.C_Project_ID = o.C_Project_ID AND p.IsActive = 'Y')
+                                        ON (p.C_Project_ID = " + idExpr + @" AND p.IsActive = 'Y')
                                 WHERE o.C_Order_ID = @C_Order_ID";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
@@ -808,34 +1125,106 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// The blanket sales order this order was released against
-        /// (C_Order.C_Order_Blanket -> the blanket, which is itself a C_Order).
+        /// Remembers whether the header / line blanket lookups are usable against
+        /// this schema, so a database that genuinely has neither column reports its
+        /// error once rather than on every order the panel opens.
+        /// </summary>
+        private static bool? _blanketLookupUsable;
+        private static bool? _blanketLineLookupUsable;
+
+        /// <summary>
+        /// The blanket sales order this order was released against —
+        /// C_Order.C_Order_Blanket, falling back to the link its LINES carry.
         ///
-        /// Read in its own statement under its own guard: C_Order_Blanket is a
-        /// module column that not every schema carries, and putting it in the query
-        /// above would have cost that query its quotation / opportunity / project
-        /// origins on any schema without it. An order released from a blanket used
-        /// to show no origin at all and the panel called it "Manual".
+        /// The statement is ATTEMPTED rather than gated on ColumnExists, for the
+        /// reason set out on <see cref="LoadQuotationOrigin"/>: the dictionary guard
+        /// was itself the thing that failed, and an order released from a blanket
+        /// showed no origin at all while the strip called it "Manual".
         ///
         /// IsBlanketTrx on the parent is deliberately NOT required: the release
-        /// order's own C_Order_Blanket reference is the part of the link the
-        /// platform always writes, and demanding the flag hides the chip wherever
-        /// it is not carried. Follows VAS_092.
+        /// order's own reference is the part of the link the platform writes, and
+        /// demanding a second optional flag only adds another way for the statement
+        /// to fail. Follows VAS_092.
         /// </summary>
+        /// <param name="C_Order_ID">Selected sales order id.</param>
+        /// <param name="d">Overview being populated.</param>
         private void LoadBlanketOrigin(int C_Order_ID, SalesOrderOverviewData d)
         {
-            if (!ColumnExists("C_Order", "C_Order_Blanket")) return;
+            // The header reference first — it names the blanket outright.
+            if (_blanketLookupUsable != false)
+            {
+                try
+                {
+                    // COALESCE, not NVL: this statement has to read the same on
+                    // Oracle and PostgreSQL.
+                    string sql = @"SELECT bo.C_Order_ID AS BlanketOrderId,
+                                          bo.DocumentNo AS BlanketOrderNo
+                                     FROM C_Order o
+                                    INNER JOIN C_Order bo
+                                            ON (bo.C_Order_ID = o.C_Order_Blanket)
+                                    WHERE o.C_Order_ID = @C_Order_ID
+                                      AND COALESCE(bo.IsActive, 'Y') = 'Y'";
+                    DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                    _blanketLookupUsable = true;
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        DataRow r = ds.Tables[0].Rows[0];
+                        d.BlanketOrderId = Util.GetValueOfInt(r["BlanketOrderId"]);
+                        d.BlanketOrderNo = Util.GetValueOfString(r["BlanketOrderNo"]);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _blanketLookupUsable = false;
+                    _log.Severe("LoadBlanketOrigin/header (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                }
+            }
+
+            LoadBlanketOriginFromLines(C_Order_ID, d);
+        }
+
+        /// <summary>
+        /// The blanket this order was released against, resolved through its LINES
+        /// (C_OrderLine.C_OrderLine_Blanket_ID -> the blanket's own order line ->
+        /// that line's order).
+        ///
+        /// This is the fallback that makes the Blanket Order chip appear for release
+        /// orders the header column does not describe, and it is not a rare case:
+        /// the two records of the link are written by DIFFERENT code. The header
+        /// column C_Order.C_Order_Blanket is stamped only by the
+        /// CreateReleaseDocFromBO process, which sets it explicitly after copying,
+        /// whereas the LINE reference is written by MOrder.CopyFrom for ANY document
+        /// whose type IsReleaseDocument(). A release order raised through any other
+        /// path therefore records its blanket on the lines ONLY.
+        ///
+        /// The purchase-side panel reached exactly this conclusion
+        /// (VAS_092.LoadBlanketOriginFromLines); this is its sales-side mirror, and
+        /// C_OrderLine is the same table on both sides.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected sales order id.</param>
+        /// <param name="d">Overview being populated.</param>
+        private void LoadBlanketOriginFromLines(int C_Order_ID, SalesOrderOverviewData d)
+        {
+            if (_blanketLineLookupUsable == false) return;
 
             try
             {
                 string sql = @"SELECT bo.C_Order_ID AS BlanketOrderId,
-                                      bo.DocumentNo AS BlanketOrderNo
-                                 FROM C_Order o
+                                      MAX(bo.DocumentNo) AS BlanketOrderNo
+                                 FROM C_OrderLine ol
+                                INNER JOIN C_OrderLine bol
+                                        ON (bol.C_OrderLine_ID = ol.C_OrderLine_Blanket_ID)
                                 INNER JOIN C_Order bo
-                                        ON (bo.C_Order_ID = o.C_Order_Blanket)
-                                WHERE o.C_Order_ID = @C_Order_ID
-                                  AND bo.IsActive  = 'Y'";
+                                        ON (bo.C_Order_ID = bol.C_Order_ID)
+                                WHERE ol.C_Order_ID = @C_Order_ID
+                                  AND COALESCE(ol.IsActive, 'Y') = 'Y'
+                                  AND COALESCE(bo.IsActive, 'Y') = 'Y'
+                                  AND bo.C_Order_ID <> ol.C_Order_ID
+                                GROUP BY bo.C_Order_ID
+                                ORDER BY bo.C_Order_ID";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                _blanketLineLookupUsable = true;
                 if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
 
                 DataRow r = ds.Tables[0].Rows[0];
@@ -844,7 +1233,10 @@ namespace VASLogic.Models
             }
             catch (Exception ex)
             {
-                _log.Severe("LoadBlanketOrigin (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                // A schema without C_OrderLine_Blanket_ID simply has no line-level
+                // link to read. Recorded so the next order skips the attempt.
+                _blanketLineLookupUsable = false;
+                _log.Severe("LoadBlanketOrigin/lines (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
             }
         }
 
@@ -905,7 +1297,7 @@ namespace VASLogic.Models
                     LineHistoryData h = new LineHistoryData();
                     h.C_OrderLine_ID = Util.GetValueOfInt(r["C_OrderLine_ID"]);
                     h.LineNo         = Util.GetValueOfInt(r["LineNo"]);
-                    h.ChangedOn      = Util.GetValueOfDateTime(r["ChangedOn"]);
+                    h.ChangedOn      = Stamp(r["ChangedOn"]);
                     h.UpdatedByName  = Util.GetValueOfString(r["UpdatedByName"]);
                     h.QtyEntered     = Util.GetValueOfDecimal(r["QtyEntered"]);
                     h.PriceEntered   = Util.GetValueOfDecimal(r["PriceEntered"]);
@@ -1212,6 +1604,7 @@ namespace VASLogic.Models
                                   io.MovementDate,
                                   io.TrackingNo,
                                   io.Created,
+                                  io.Updated,
                                   wh.Name AS WarehouseName,
                                   COALESCE(SUM(COALESCE(iol.MovementQty, 0)), 0) AS DeliveredQty,
                                   COUNT(iol.M_InOutLine_ID) AS LineCount,
@@ -1238,10 +1631,16 @@ namespace VASLogic.Models
                                   AND io.IsSOTrx    = 'Y'
                                   AND io.DocStatus NOT IN ('RE', 'VO')
                                 GROUP BY io.M_InOut_ID, io.DocumentNo, io.DocStatus, io.MovementDate,
-                                         io.TrackingNo, io.Created, wh.Name
+                                         io.TrackingNo, io.Created, io.Updated, wh.Name
                                 ORDER BY io.MovementDate DESC, io.DocumentNo DESC";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return rows;
+
+                // When each shipment COMPLETED, for the progress line's Shipped and
+                // Delivered stages. Read for the whole set in one statement.
+                Dictionary<int, DateTime> stamps = LoadCompletionStamps("M_InOut",
+                    "SELECT dio.M_InOut_ID FROM M_InOut dio WHERE dio.C_Order_ID = "
+                    + C_Order_ID + " AND dio.IsSOTrx = 'Y'");
 
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
@@ -1249,7 +1648,7 @@ namespace VASLogic.Models
                     dv.M_InOut_ID    = Util.GetValueOfInt(r["M_InOut_ID"]);
                     dv.DocumentNo    = Util.GetValueOfString(r["DocumentNo"]);
                     dv.DocStatus     = Util.GetValueOfString(r["DocStatus"]);
-                    dv.MovementDate  = Util.GetValueOfDateTime(r["MovementDate"]);
+                    dv.MovementDate  = Stamp(r["MovementDate"]);
                     dv.TrackingNo    = Util.GetValueOfString(r["TrackingNo"]);
                     dv.WarehouseName = Util.GetValueOfString(r["WarehouseName"]);
                     dv.DeliveredQty  = Util.GetValueOfDecimal(r["DeliveredQty"]);
@@ -1258,8 +1657,12 @@ namespace VASLogic.Models
                     // and Delivered stages. MovementDate is a document field a user
                     // can back-date or set forward, so the stage could report a day
                     // on which nothing had yet been entered. Follows VAS_092.
-                    dv.Created       = Util.GetValueOfDateTime(r["Created"]);
+                    dv.Created       = Stamp(r["Created"]);
                     dv.DeliveredValue = Util.GetValueOfDecimal(r["DeliveredValue"]);
+                    // Null until the shipment is completed — the Delivered stage
+                    // dates itself with this, and an open shipment has no such date.
+                    dv.CompletedDate = CompletedOn(stamps, dv.M_InOut_ID, dv.DocStatus,
+                                                   Stamp(r["Updated"]));
                     rows.Add(dv);
                 }
             }
@@ -1284,6 +1687,8 @@ namespace VASLogic.Models
                                   inv.DocumentNo,
                                   inv.DocStatus,
                                   inv.DateInvoiced,
+                                  inv.Created,
+                                  inv.Updated,
                                   COALESCE(inv.GrandTotal, 0) AS GrandTotal,
                                   inv.IsPaid
                                 FROM C_Invoice inv
@@ -1295,15 +1700,24 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return rows;
 
+                // When each invoice COMPLETED — the Invoiced stage reports the
+                // LATEST of these, and a drafted invoice contributes none.
+                Dictionary<int, DateTime> stamps = LoadCompletionStamps("C_Invoice",
+                    "SELECT div.C_Invoice_ID FROM C_Invoice div WHERE div.C_Order_ID = "
+                    + C_Order_ID + " AND div.IsSOTrx = 'Y'");
+
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
                     InvoiceData iv = new InvoiceData();
                     iv.C_Invoice_ID = Util.GetValueOfInt(r["C_Invoice_ID"]);
                     iv.DocumentNo   = Util.GetValueOfString(r["DocumentNo"]);
                     iv.DocStatus    = Util.GetValueOfString(r["DocStatus"]);
-                    iv.DateInvoiced = Util.GetValueOfDateTime(r["DateInvoiced"]);
+                    iv.DateInvoiced = Stamp(r["DateInvoiced"]);
+                    iv.Created      = Stamp(r["Created"]);
                     iv.GrandTotal   = Util.GetValueOfDecimal(r["GrandTotal"]);
                     iv.IsPaid       = Util.GetValueOfString(r["IsPaid"]) == "Y";
+                    iv.CompletedDate = CompletedOn(stamps, iv.C_Invoice_ID, iv.DocStatus,
+                                                   Stamp(r["Updated"]));
                     rows.Add(iv);
                 }
             }
@@ -1410,6 +1824,7 @@ namespace VASLogic.Models
                                                p.DocumentNo,
                                                p.DocStatus,
                                                p.DateTrx,
+                                               p.Updated,
                                                COALESCE(p.PayAmt, 0)      AS PayAmt,
                                                COALESCE(p.DiscountAmt, 0) AS DiscountAmt
                                  FROM C_Payment p
@@ -1422,16 +1837,27 @@ namespace VASLogic.Models
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
 
+                // When each receipt COMPLETED — the Paid stage reports the LATEST of
+                // these, and a drafted receipt contributes none.
+                Dictionary<int, DateTime> stamps = LoadCompletionStamps("C_Payment",
+                    @"SELECT DISTINCT dal.C_Payment_ID FROM C_AllocationLine dal
+                       INNER JOIN C_Invoice dci ON (dal.C_Invoice_ID = dci.C_Invoice_ID)
+                       WHERE dci.C_Order_ID = " + C_Order_ID + " AND dal.C_Payment_ID IS NOT NULL");
+
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
+                    int paymentId = Util.GetValueOfInt(r["C_Payment_ID"]);
+                    string status = Util.GetValueOfString(r["DocStatus"]);
                     list.Add(new SalesOrderDocumentData
                     {
                         Type        = "receipt",
                         TableName   = "C_Payment",
-                        RecordId    = Util.GetValueOfInt(r["C_Payment_ID"]),
+                        RecordId    = paymentId,
                         DocumentNo  = Util.GetValueOfString(r["DocumentNo"]),
-                        DocStatus   = Util.GetValueOfString(r["DocStatus"]),
-                        DocDate     = Util.GetValueOfDateTime(r["DateTrx"]),
+                        DocStatus   = status,
+                        DocDate     = Stamp(r["DateTrx"]),
+                        CompletedDate = CompletedOn(stamps, paymentId, status,
+                                                    Stamp(r["Updated"])),
                         Amount      = Util.GetValueOfDecimal(r["PayAmt"]),
                         DiscountAmt = Util.GetValueOfDecimal(r["DiscountAmt"])
                     });
@@ -1452,7 +1878,7 @@ namespace VASLogic.Models
         /// (AppointmentsInfo / R_Request are intentionally not joined here —
         /// no verified direct C_Order link exists for them.)
         /// </summary>
-        private List<ActivityData> LoadActivity(int C_Order_ID)
+        private List<ActivityData> LoadActivity(int C_Order_ID, int C_BPartner_ID)
         {
             // A runaway guard, not a headline count. It used to be 15 — the same
             // number the panel PAGES at — so the feed could never exceed one page,
@@ -1464,10 +1890,16 @@ namespace VASLogic.Models
 
             LoadNoteActivity(C_Order_ID, activity);
             LoadEmailActivity(C_Order_ID, activity);
+            // ...and the mail filed against the CUSTOMER rather than against this
+            // order, which is where the platform's mail sync anchors anything it
+            // matches by correspondent instead of by document.
+            LoadPartnerEmailActivity(C_BPartner_ID, activity);
             LoadDeliveryActivity(C_Order_ID, activity);
             LoadInvoiceActivity(C_Order_ID, activity);
             LoadOrderMilestoneActivity(C_Order_ID, activity);
             LoadOrderChangeActivity(C_Order_ID, activity);
+            // Appointments, tasks, calls and letters filed against the order.
+            LoadSharedSourceActivity(C_Order_ID, activity);
 
             activity.Sort((a, b) =>
                 b.EventTime.GetValueOrDefault(DateTime.MinValue)
@@ -1486,13 +1918,24 @@ namespace VASLogic.Models
                 // CreatedBy: a note logged by the platform itself leaves AD_User_ID
                 // null, and those notes appeared in the feed with no name against
                 // them. Follows VAS_092.
+                //
+                // The table id is looked up with IN + UPPER, like the e-mail and
+                // partner-mail loaders below and like VAS_100's own note loader.
+                // It used to be a case-sensitive SCALAR sub-select, which failed two
+                // ways: AD_Table can carry more than one row named C_Order (a
+                // duplicated or differently-cased dictionary entry) and a scalar
+                // sub-select returning several rows RAISES on Oracle, taking every
+                // note into the catch below; and a dictionary that spells the name
+                // any other way matched nothing at all. Either way the notes simply
+                // vanished from the feed.
                 string sql = @"SELECT ce.CharacterData, ce.Created, u.Name AS UserName
                                  FROM CM_ChatEntry ce
                                  INNER JOIN CM_Chat ch     ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
                                  LEFT OUTER JOIN AD_User u
                                         ON (u.AD_User_ID = COALESCE(ce.AD_User_ID, ce.CreatedBy))
-                                WHERE ch.AD_Table_ID =
-                                      (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'C_Order')
+                                WHERE ch.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'C_ORDER')
                                   AND ch.Record_ID = @C_Order_ID
                                   AND ce.IsActive  = 'Y'";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
@@ -1504,7 +1947,7 @@ namespace VASLogic.Models
                         EventType   = "Note",
                         Title       = Util.GetValueOfString(r["CharacterData"]),
                         ActorName   = Util.GetValueOfString(r["UserName"]),
-                        EventTime   = Util.GetValueOfDateTime(r["Created"])
+                        EventTime   = Stamp(r["Created"])
                     });
                 }
             }
@@ -1532,9 +1975,23 @@ namespace VASLogic.Models
         {
             try
             {
-                // AttachmentType 'M' is a mail (platform convention — see
-                // MRequest / SendRequestNotification); anything else on this table
-                // is a letter / inbound document, not an e-mail sent from here.
+                // Two things kept real mails off this feed, and both are here:
+                //
+                //   - The table id was a SCALAR sub-select. AD_Table can carry more
+                //     than one row named C_Order (a differently-cased or duplicated
+                //     dictionary entry), and a scalar sub-select returning more than
+                //     one row RAISES on Oracle — taking the whole lookup, and with
+                //     it every e-mail, into the catch below. IN + UPPER answers
+                //     whichever rows there are.
+                //   - AttachmentType was required to equal 'M'. That value varies
+                //     between installations and some rows leave it null, so
+                //     demanding 'M' hid mails that were really there. The two kinds
+                //     on this table PARTITION it: a letter is 'I' and an e-mail is
+                //     anything else. Reading it as not-'I' hides nothing — and it
+                //     still has to be read, because the shared sources loader brings
+                //     the letters in separately and dropping the test altogether
+                //     would list every letter twice.
+                //
                 // COALESCE, not NVL: this panel's SQL runs on both databases.
                 string sql = @"SELECT ma.MailAddress,
                                       ma.MailAddressCc,
@@ -1547,11 +2004,12 @@ namespace VASLogic.Models
                                       u.Name AS UserName
                                  FROM MailAttachment1 ma
                                  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy)
-                                WHERE ma.AD_Table_ID =
-                                      (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'C_Order')
+                                WHERE ma.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'C_ORDER')
                                   AND ma.Record_ID = @C_Order_ID
-                                  AND COALESCE(ma.IsActive, 'Y')       = 'Y'
-                                  AND COALESCE(ma.AttachmentType, 'M') = 'M'
+                                  AND COALESCE(ma.IsActive, 'Y')        = 'Y'
+                                  AND COALESCE(to_char(ma.AttachmentType), 'M') <> 'I'
                                 ORDER BY ma.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
@@ -1573,7 +2031,7 @@ namespace VASLogic.Models
                         MailFrom   = Util.GetValueOfString(r["MailAddressFrom"]),
                         IsMailSent = Util.GetValueOfString(r["IsMailSent"]) == "Y",
                         ActorName  = Util.GetValueOfString(r["UserName"]),
-                        EventTime  = Util.GetValueOfDateTime(r["Created"])
+                        EventTime  = Stamp(r["Created"])
                     });
                 }
             }
@@ -1582,6 +2040,101 @@ namespace VASLogic.Models
                 // Non-fatal: a schema without MailAttachment1 simply shows no
                 // e-mail rows, and the rest of the feed is unaffected.
                 _log.Severe("LoadEmailActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// The mail filed against the CUSTOMER (MailAttachment1 anchored on
+        /// C_BPartner + Record_ID = C_BPartner_ID), added to the feed alongside
+        /// the order's own correspondence.
+        ///
+        /// The platform's mail sync anchors an incoming message by WHO it is from,
+        /// not by which document it concerns: with TABLEATTACH = C_BPartner it
+        /// files the row against the partner (see AttachMailToBP), and only a
+        /// message whose subject carries the encoded table/record marker is ever
+        /// anchored to the order itself. Correspondence with a customer therefore
+        /// never reached this feed, while a partner-level history panel listed it
+        /// in full.
+        ///
+        /// These rows are NOT about this order — every order of that customer's
+        /// carries the same ones — so each is flagged IsPartnerMail and the panel
+        /// tags it apart rather than letting it read as this document's trail.
+        ///
+        /// Capped independently of the feed's own guard: a long-standing customer
+        /// can carry years of correspondence, and without a cap of its own it
+        /// would crowd out the order's real history once the feed is trimmed.
+        /// </summary>
+        /// <param name="C_BPartner_ID">Customer on the order.</param>
+        /// <param name="list">Activity list being populated.</param>
+        private void LoadPartnerEmailActivity(int C_BPartner_ID, List<ActivityData> list)
+        {
+            if (C_BPartner_ID <= 0) return;
+
+            // The newest correspondence only. Trimmed here rather than in SQL so
+            // the statement stays the same on both databases.
+            const int MAX_PARTNER_MAILS = 50;
+
+            try
+            {
+                // Same shape as LoadEmailActivity, anchored on the partner: IN +
+                // UPPER over AD_Table (a scalar sub-select RAISES on Oracle when
+                // the dictionary carries more than one row of that name), and
+                // "not 'I'" for the type, so a letter is left to the shared
+                // sources reader and cannot be listed twice.
+                string sql = @"SELECT ma.MailAddress,
+                                      ma.MailAddressCc,
+                                      ma.MailAddressBcc,
+                                      ma.MailAddressFrom,
+                                      ma.Title,
+                                      ma.TextMsg,
+                                      ma.Created,
+                                      ma.IsMailSent,
+                                      u.Name AS UserName
+                                 FROM MailAttachment1 ma
+                                 LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy)
+                                WHERE ma.AD_Table_ID IN
+                                      (SELECT t.AD_Table_ID FROM AD_Table t
+                                        WHERE UPPER(t.TableName) = 'C_BPARTNER')
+                                  AND ma.Record_ID = @C_BPartner_ID
+                                  AND COALESCE(ma.IsActive, 'Y')        = 'Y'
+                                  AND COALESCE(TO_CHAR(ma.AttachmentType), 'M') <> 'I'
+                                ORDER BY ma.Created DESC";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@C_BPartner_ID", C_BPartner_ID)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0) return;
+
+                int taken = 0;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    if (taken >= MAX_PARTNER_MAILS) break;
+                    taken++;
+
+                    list.Add(new ActivityData
+                    {
+                        EventType     = "Email",
+                        IsPartnerMail = true,
+                        Title         = Util.GetValueOfString(r["Title"]),
+                        // Mails sent as HTML store their markup in TextMsg; the
+                        // panel shows a body as text, so it is flattened here.
+                        Body          = MailBodyToText(Util.GetValueOfString(r["TextMsg"])),
+                        MailTo        = Util.GetValueOfString(r["MailAddress"]),
+                        MailCc        = Util.GetValueOfString(r["MailAddressCc"]),
+                        MailBcc       = Util.GetValueOfString(r["MailAddressBcc"]),
+                        MailFrom      = Util.GetValueOfString(r["MailAddressFrom"]),
+                        IsMailSent    = Util.GetValueOfString(r["IsMailSent"]) == "Y",
+                        ActorName     = Util.GetValueOfString(r["UserName"]),
+                        EventTime     = Stamp(r["Created"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal, exactly as the order's own pass: the rest of the feed
+                // is unaffected.
+                _log.Severe("LoadPartnerEmailActivity (C_BPartner_ID=" + C_BPartner_ID + "): " + ex.Message);
             }
         }
 
@@ -1674,7 +2227,7 @@ namespace VASLogic.Models
                         EventType  = "Delivery",
                         Title      = Util.GetValueOfString(r["DocumentNo"]),
                         ActorName  = Util.GetValueOfString(r["UserName"]),
-                        EventTime  = Util.GetValueOfDateTime(r["Updated"])
+                        EventTime  = Stamp(r["Updated"])
                     });
                 }
             }
@@ -1706,7 +2259,7 @@ namespace VASLogic.Models
                         Title      = Util.GetValueOfString(r["DocumentNo"]),
                         Amount     = Util.GetValueOfDecimal(r["GrandTotal"]),
                         ActorName  = Util.GetValueOfString(r["UserName"]),
-                        EventTime  = Util.GetValueOfDateTime(r["Updated"])
+                        EventTime  = Stamp(r["Updated"])
                     });
                 }
             }
@@ -1735,7 +2288,7 @@ namespace VASLogic.Models
                     EventType = "Created",
                     Title     = Util.GetValueOfString(r["DocumentNo"]),
                     ActorName = Util.GetValueOfString(r["CreatedByName"]),
-                    EventTime = Util.GetValueOfDateTime(r["Created"])
+                    EventTime = Stamp(r["Created"])
                 });
 
                 string docStatus = Util.GetValueOfString(r["DocStatus"]);
@@ -1752,7 +2305,7 @@ namespace VASLogic.Models
                         Title     = Util.GetValueOfString(r["DocumentNo"]),
                         ActorName = Util.GetValueOfString(r["UpdatedByName"]),
                         EventTime = GetOrderCompletedDate(C_Order_ID)
-                                    ?? Util.GetValueOfDateTime(r["Updated"])
+                                    ?? Stamp(r["Updated"])
                     });
                 }
             }
@@ -1795,6 +2348,8 @@ namespace VASLogic.Models
                                       u.Name         AS UserName,
                                       col.Name       AS FieldLabel,
                                       col.ColumnName AS FieldColumn,
+                                      col.AD_Reference_ID       AS RefType,
+                                      col.AD_Reference_Value_ID AS RefValueId,
                                       adt.TableName  AS ChangedTable,
                                       ol.Line        AS LineNo,
                                       p.Name         AS ProductName,
@@ -1854,19 +2409,29 @@ namespace VASLogic.Models
 
                     // The move itself. A save that rewrites a field with the value it
                     // already had is not an edit, and the platform logs plenty of those.
+                    // Compared on the RAW values, before either is resolved: two
+                    // records can share a name, and dropping such a row would hide a
+                    // real edit.
                     string oldValue = ChangeValue(Util.GetValueOfString(r["OldValue"]));
                     string newValue = ChangeValue(Util.GetValueOfString(r["NewValue"]));
                     if (string.Equals(oldValue, newValue, StringComparison.Ordinal)) continue;
+
+                    // ... and then reported as the field SHOWS them, not as the log
+                    // stored them: a reference reads as the referenced record's
+                    // identifier, a list value as its label, a date as the date alone.
+                    string column  = Util.GetValueOfString(r["FieldColumn"]);
+                    int refType    = Util.GetValueOfInt(r["RefType"]);
+                    int refValueId = Util.GetValueOfInt(r["RefValueId"]);
 
                     list.Add(new ActivityData
                     {
                         EventType   = "Updated",
                         FieldName   = field,
-                        OldValue    = oldValue,
-                        NewValue    = newValue,
+                        OldValue    = _changeValues.Display(oldValue, column, refType, refValueId),
+                        NewValue    = _changeValues.Display(newValue, column, refType, refValueId),
                         ChangeScope = scope,
                         ActorName   = Util.GetValueOfString(r["UserName"]),
-                        EventTime   = Util.GetValueOfDateTime(r["EventOn"])
+                        EventTime   = Stamp(r["EventOn"])
                     });
                 }
             }
@@ -2264,9 +2829,250 @@ namespace VASLogic.Models
         //  Helpers                                                          //
         // ================================================================= //
 
+        /// <summary>
+        /// Resolves a change-log value into the text the field shows — a reference
+        /// into the referenced record's identifier, a list code into its label, a
+        /// timestamp into the date alone. Shared with the other overview panels
+        /// (VAS_ChangeLogValueModel). One per request, so its caches last exactly
+        /// as long as the feed being built.
+        /// </summary>
+        private readonly VAS_ChangeLogValueModel _changeValues = new VAS_ChangeLogValueModel();
+
+        /// <summary>Reads the appointment / task / call / letter sources every
+        /// overview panel shares (VAS_ActivitySourcesModel).</summary>
+        private readonly VAS_ActivitySourcesModel _activitySources = new VAS_ActivitySourcesModel();
+
+        /// <summary>
+        /// Every date and timestamp this panel hands the client is read through
+        /// here rather than through Util.GetValueOfDateTime directly, so the
+        /// DateTimeKind the PROVIDER tagged the value with cannot reach the JSON.
+        /// Oracle tags Unspecified and Npgsql tags Utc or Local; Newtonsoft writes
+        /// a zone designator for the latter two and none for the first, and the
+        /// panel's parseDbDate reads the two shapes differently — which is why
+        /// times were hours out on PostgreSQL. A no-op for a value that is already
+        /// Unspecified, so the Oracle path is untouched. See
+        /// VAS_ActivitySourcesModel.Stamp for the full account.
+        /// </summary>
+        private static DateTime? Stamp(object value)
+        {
+            return VAS_ActivitySourcesModel.Stamp(value);
+        }
+
+        /// <summary>
+        /// The correspondence and engagement sources shared with every other
+        /// overview panel: appointments and tasks (AppointmentsInfo, split on
+        /// IsTask), calls (VA048_CallDetails) and letters (MailAttachment1,
+        /// AttachmentType 'I'), each pinned to the order by AD_Table_ID +
+        /// Record_ID.
+        ///
+        /// Mails stay with LoadEmailActivity, which carries the recipient and body
+        /// detail the mail drawer needs and already asks for AttachmentType 'M',
+        /// so the two kinds cannot overlap.
+        ///
+        /// This is what the header comment on LoadActivity used to rule out — it
+        /// said AppointmentsInfo had "no verified direct C_Order link". There is
+        /// one: the same polymorphic AD_Table_ID + Record_ID pair every other
+        /// correspondence table uses, which VAS_105 and VAS_190 both read.
+        /// </summary>
+        private void LoadSharedSourceActivity(int C_Order_ID, List<ActivityData> list)
+        {
+            List<VAS_ActivitySourceRow> rows =
+                _activitySources.Load("C_Order", C_Order_ID, false);
+            foreach (VAS_ActivitySourceRow s in rows)
+            {
+                list.Add(new ActivityData
+                {
+                    // appointment | task | call | letter
+                    EventType   = s.Kind,
+                    Title       = s.Title,
+                    Body        = s.Body,
+                    Location    = s.Location,
+                    IsClosed    = s.IsClosed,
+                    IsCancelled = s.IsCancelled,
+                    MailTo      = s.MailTo,
+                    MailCc      = s.MailCc,
+                    MailBcc     = s.MailBcc,
+                    MailFrom    = s.MailFrom,
+                    IsMailSent  = s.IsMailSent,
+                    // An appointment or task brings the mails sent against it.
+                    Mails       = s.Mails,
+                    ActorName   = s.ActorName,
+                    EventTime   = s.EventTime
+                });
+            }
+        }
+
         private SqlParameter[] OrderParam(int C_Order_ID)
         {
             return new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) };
+        }
+
+        /// <summary>
+        /// Remembers whether C_Order.VAS_IsEmailSent is readable against this
+        /// schema, so a deployment without the column reports it once rather than
+        /// on every order the panel opens.
+        /// </summary>
+        private static bool? _emailSentLookupUsable;
+
+        /// <summary>
+        /// Whether the sales order has been e-mailed to the customer
+        /// (C_Order.VAS_IsEmailSent = 'Y'), which the header reports as an "Email
+        /// Sent" badge — shown only when the flag is set, the same milestone rule
+        /// the Posted badge beside it follows.
+        ///
+        /// Read in its OWN statement rather than as a column of the header SELECT,
+        /// and ATTEMPTED rather than gated on a dictionary guard: VAS_IsEmailSent is
+        /// a module column, so selecting it alongside the header would fail the
+        /// WHOLE overview on a deployment that has not taken it. A genuinely missing
+        /// column throws once here, is remembered, and the badge simply never shows.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected sales order id.</param>
+        /// <param name="d">Overview being populated.</param>
+        private void LoadEmailSent(int C_Order_ID, SalesOrderOverviewData d)
+        {
+            if (_emailSentLookupUsable == false) return;
+
+            try
+            {
+                // COALESCE, not NVL: this statement has to read the same on Oracle
+                // and PostgreSQL.
+                string sql = @"SELECT COALESCE(o.VAS_IsEmailSent, 'N') AS IsEmailSent
+                                 FROM C_Order o
+                                WHERE o.C_Order_ID = @C_Order_ID";
+                object v = DB.ExecuteScalar(sql, OrderParam(C_Order_ID), null);
+                _emailSentLookupUsable = true;
+                d.IsEmailSent = Util.GetValueOfString(v) == "Y";
+            }
+            catch (Exception ex)
+            {
+                // Almost certainly "no such column" on a schema without the module
+                // column. Recorded so the next order skips the attempt.
+                _emailSentLookupUsable = false;
+                _log.Severe("LoadEmailSent (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Remembers whether the target document type's IsShipConfirm can be read
+        /// against this schema, for the same reason
+        /// <see cref="_emailSentLookupUsable"/> exists.
+        /// </summary>
+        private static bool? _shipConfirmLookupUsable;
+
+        /// <summary>
+        /// Whether this order's TARGET document type asks for a shipment
+        /// confirmation (C_DocTypeTarget_ID -> C_DocType.IsShipConfirm).
+        ///
+        /// The target type, not the completed one: it is the type the order is being
+        /// processed AS — the one the user picks on the record — and C_DocType_ID
+        /// only catches up with it when the document completes. The completed type
+        /// is kept as the fallback, so a schema that leaves the target unset still
+        /// answers from the type the order ended on.
+        ///
+        /// This is what splits the progress line's Shipped and Delivered stages in
+        /// two. With confirmation ON, the delivery order sits In Process awaiting its
+        /// confirmation and never reaches Completed on its own, so the stages have to
+        /// read that state as progress rather than as nothing having happened; with
+        /// it OFF, completion is the milestone.
+        ///
+        /// Its own statement, ATTEMPTED rather than gated: reading it beside the
+        /// header would fail the whole overview on a schema that lacks the column.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected sales order id.</param>
+        /// <param name="d">Overview being populated.</param>
+        private void LoadShipConfirmTarget(int C_Order_ID, SalesOrderOverviewData d)
+        {
+            if (_shipConfirmLookupUsable == false) return;
+
+            try
+            {
+                string sql = @"SELECT COALESCE(dtt.IsShipConfirm, dt.IsShipConfirm, 'N') AS IsShipConfirm
+                                 FROM C_Order o
+                                 LEFT OUTER JOIN C_DocType dtt ON (dtt.C_DocType_ID = o.C_DocTypeTarget_ID)
+                                 LEFT OUTER JOIN C_DocType dt  ON (dt.C_DocType_ID  = o.C_DocType_ID)
+                                WHERE o.C_Order_ID = @C_Order_ID";
+                object v = DB.ExecuteScalar(sql, OrderParam(C_Order_ID), null);
+                _shipConfirmLookupUsable = true;
+                d.IsShipConfirmTarget = Util.GetValueOfString(v) == "Y";
+            }
+            catch (Exception ex)
+            {
+                _shipConfirmLookupUsable = false;
+                _log.Severe("LoadShipConfirmTarget (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// When each of a set of documents was COMPLETED — the Created stamp of its
+        /// workflow DocComplete activity — keyed by record id.
+        ///
+        /// One statement for the whole set rather than one per document: the
+        /// progress line needs the completion moment of every delivery, invoice and
+        /// receipt the order touches, and asking per record would put an unbounded
+        /// number of round trips behind one panel load.
+        ///
+        /// Both the table name and the id source are written in as literals. They
+        /// are this file's own SQL, never user text, and it keeps the statement free
+        /// of binds entirely — the app's Oracle layer binds by POSITION, so an id
+        /// source carrying a bind name would have to be kept in step with the
+        /// parameter array for no gain.
+        /// </summary>
+        /// <param name="tableName">AD_Table.TableName of the documents' table.</param>
+        /// <param name="recordIdSource">SELECT yielding the record ids to look up.</param>
+        /// <returns>Record id -> completion moment; empty when none has completed.</returns>
+        private Dictionary<int, DateTime> LoadCompletionStamps(string tableName, string recordIdSource)
+        {
+            Dictionary<int, DateTime> map = new Dictionary<int, DateTime>();
+            try
+            {
+                string sql = @"SELECT wfp.Record_ID, MAX(wfa.Created) AS CompletedOn
+                                 FROM AD_WF_Process wfp
+                                INNER JOIN AD_WF_Activity wfa
+                                        ON (wfa.AD_WF_Process_ID = wfp.AD_WF_Process_ID)
+                                INNER JOIN AD_WF_Node wfn
+                                        ON (wfn.AD_WF_Node_ID = wfa.AD_WF_Node_ID)
+                                INNER JOIN AD_Table adt
+                                        ON (adt.AD_Table_ID = wfp.AD_Table_ID)
+                                WHERE UPPER(adt.TableName) = '" + tableName.ToUpper() + @"'
+                                  AND wfp.Record_ID IN (" + recordIdSource + @")
+                                  AND wfp.IsActive = 'Y'
+                                  AND wfa.IsActive = 'Y'
+                                  AND wfn.IsActive = 'Y'
+                                  AND wfa.WFState  = 'CC'
+                                  AND UPPER(TRIM(wfn.Value)) IN ('DOCCOMPLETE', 'COMPLETE', '(DOCCOMPLETE)')
+                                GROUP BY wfp.Record_ID";
+                DataSet ds = DB.ExecuteDataset(sql, null, null);
+                if (ds == null || ds.Tables.Count == 0) return map;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    int id = Util.GetValueOfInt(r["Record_ID"]);
+                    DateTime? on = Stamp(r["CompletedOn"]);
+                    if (id > 0 && on.HasValue) map[id] = on.Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: every caller falls back to the document's own Updated
+                // stamp, which is the closest thing a document completed outside the
+                // workflow engine has.
+                _log.Severe("LoadCompletionStamps (" + tableName + "): " + ex.Message);
+            }
+            return map;
+        }
+
+        /// <summary>
+        /// The completion moment for one document: its workflow stamp where there is
+        /// one, else the document's own last-updated stamp — but only for a document
+        /// that IS completed. An open document has no completion date, and reporting
+        /// its Updated stamp as one would date a milestone it has not reached.
+        /// </summary>
+        private static DateTime? CompletedOn(Dictionary<int, DateTime> stamps, int recordId,
+                                             string docStatus, DateTime? updated)
+        {
+            if (docStatus != "CO" && docStatus != "CL") return null;
+            if (stamps != null && stamps.ContainsKey(recordId)) return stamps[recordId];
+            return updated;
         }
 
         /// <summary>
@@ -2411,6 +3217,12 @@ namespace VASLogic.Models
             public string    DocumentNo  { get; set; }
             public string    DocStatus   { get; set; }
             public DateTime? DocDate     { get; set; }
+            /// <summary>When the document COMPLETED — its workflow DocComplete
+            /// stamp, falling back to its own last-updated stamp. Null while it is
+            /// open, so the progress line can tell "not yet" from "on this
+            /// date". Carried for the receipts, which the Paid stage dates
+            /// itself by.</summary>
+            public DateTime? CompletedDate { get; set; }
             // Null for a document with no monetary total of its own (a shipment) —
             // distinct from a genuine zero.
             public decimal?  Amount      { get; set; }
@@ -2430,6 +3242,11 @@ namespace VASLogic.Models
             // progress line's Shipped / Delivered stages are dated by, since
             // MovementDate can be back-dated.
             public DateTime? Created      { get; set; }
+            /// <summary>When the shipment COMPLETED — its workflow DocComplete
+            /// stamp, falling back to its own last-updated stamp; null while it is
+            /// open. The Delivered stage dates itself by this, where Shipped reports
+            /// when the shipment was RAISED.</summary>
+            public DateTime? CompletedDate { get; set; }
             public string   TrackingNo    { get; set; }
             public string   WarehouseName { get; set; }
             public decimal  DeliveredQty  { get; set; }
@@ -2445,6 +3262,14 @@ namespace VASLogic.Models
             public string   DocumentNo   { get; set; }
             public string   DocStatus    { get; set; }
             public DateTime? DateInvoiced { get; set; }
+            // When the invoice RECORD was raised (C_Invoice.Created) — what the
+            // progress line's Invoiced stage is dated by, since DateInvoiced can be
+            // back-dated. Same treatment as DeliveryData.Created.
+            public DateTime? Created      { get; set; }
+            /// <summary>When the invoice COMPLETED — its workflow DocComplete stamp,
+            /// falling back to its own last-updated stamp; null while it is drafted.
+            /// The Invoiced stage reports the LATEST of these.</summary>
+            public DateTime? CompletedDate { get; set; }
             public decimal  GrandTotal   { get; set; }
             public bool     IsPaid       { get; set; }
         }
@@ -2477,6 +3302,27 @@ namespace VASLogic.Models
             public string   MailBcc    { get; set; }   // MailAddressBcc
             public string   MailFrom   { get; set; }   // MailAddressFrom
             public bool     IsMailSent { get; set; }
+
+            /// <summary>True when the mail is filed against the CUSTOMER
+            /// (MailAttachment1 anchored on C_BPartner) rather than against this
+            /// order. It is correspondence with the partner, not about this
+            /// document, so the panel tags it apart — every order of theirs
+            /// carries the same rows.</summary>
+            public bool     IsPartnerMail { get; set; }
+
+            // Appointment / task rows (AppointmentsInfo): where the meeting is and
+            // whether it has been dealt with. Empty on every other event type.
+            public string   Location    { get; set; }
+            public bool     IsClosed    { get; set; }
+            public bool     IsCancelled { get; set; }
+
+            /// <summary>The e-mails sent against an APPOINTMENT or TASK itself
+            /// (MailAttachment1 anchored on AppointmentsInfo): recipient, subject,
+            /// body, when and by whom. Distinct from the mail fields above, which
+            /// are correspondence about the ORDER. Empty on every other event
+            /// type; the bodies travel with the row so the panel reveals them on
+            /// click without a second round trip.</summary>
+            public List<VAS_ActivityMailRow> Mails { get; set; }
         }
 
         public class NoteData
@@ -2534,6 +3380,20 @@ namespace VASLogic.Models
             public string    ContactName    { get; set; }
             public string    ContactPhone   { get; set; }
             public string    ContactEmail   { get; set; }
+            /// <summary>Customer e-mail address that seeds the Send Invoice
+            /// recipient: the order's own contact address, falling back to any
+            /// active contact of the customer.</summary>
+            public string    CustomerEmail  { get; set; }
+            /// <summary>C_Order.VAS_IsEmailSent = 'Y' — the order was e-mailed to
+            /// the customer. Drives the header's "Email Sent" badge, which is drawn
+            /// only when the flag is set.</summary>
+            public bool      IsEmailSent    { get; set; }
+            /// <summary>IsShipConfirm on the order's TARGET document type
+            /// (C_DocTypeTarget_ID, falling back to the completed type) — this order
+            /// is to be shipped with a confirmation. It is what decides whether the
+            /// progress line's Shipped and Delivered stages read the delivery order's
+            /// IN PROCESS state as progress or wait for it to complete.</summary>
+            public bool      IsShipConfirmTarget { get; set; }
             public string    SalesRepName   { get; set; }
             public string    PaymentTermName { get; set; }
             public string    PriceListName  { get; set; }

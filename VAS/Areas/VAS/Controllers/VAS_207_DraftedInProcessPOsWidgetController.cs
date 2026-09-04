@@ -1,4 +1,4 @@
-/************************************************************
+﻿﻿﻿﻿﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Controller for Drafted / In-Process POs Widget (Purchase Order Dashboard)
  *                  Provides aggregate counts, server-side converted values, and
@@ -92,6 +92,7 @@ namespace VIS.Controllers
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                       AND o.DocStatus IN ('DR', 'IP')
+                      AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
                     GROUP BY
                         o.C_Order_ID,
                         o.DocumentNo,
@@ -104,7 +105,15 @@ namespace VIS.Controllers
                         rep.Name
                     ORDER BY o.Created DESC, o.DocumentNo DESC";
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // MRole.AddAccessSQL cannot parse this statement (GROUP BY / derived tables /
+                // several JOIN..ON clauses). AccessSqlParser mis-locates the insertion point and
+                // appends the access predicates after GROUP BY / HAVING / ORDER BY, producing
+                // ORA-00933 / ORA-00979 / ORA-00904. Apply the same role access through a simple,
+                // parseable sub-query on C_Order instead.
+                string orderAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    "SELECT accessOrd.C_Order_ID FROM C_Order accessOrd WHERE accessOrd.AD_Client_ID = " + clientId,
+                    "accessOrd", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql = sql.Replace("@P_ORDER_ACCESS@", orderAccessSql);
 
                 List<DraftedPORecord> records = new List<DraftedPORecord>();
                 int draftedCount = 0;
@@ -239,11 +248,25 @@ namespace VIS.Controllers
                     SELECT
                         ol.C_OrderLine_ID             AS line_id,
                         ol.Line                       AS line_no,
-                        COALESCE(p.Name, ol.Description, '—') AS product_name,
-                        COALESCE(p.Value, '')         AS product_code,
-                        COALESCE(asi.Description, '') AS attribute_desc,
-                        COALESCE(u.UOMSymbol, u.Name, '') AS uom_symbol,
+                        -- A charge line, or a product that is not of Item type, carries no
+                        -- stock movement: the widget shows its name, UOM, ordered, rate and
+                        -- amount, and dashes for received / pending / line status.
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0
+                             THEN COALESCE(ch.Name, N'')
+                             ELSE COALESCE(p.Name, ol.Description, N'—') END AS product_name,
+                        CASE WHEN COALESCE(ol.C_Charge_ID, 0) > 0 THEN 'Y'
+                             WHEN ol.M_Product_ID IS NOT NULL AND COALESCE(p.ProductType, 'I') <> 'I' THEN 'Y'
+                             ELSE 'N' END AS IsNonStock,
+                        COALESCE(p.Value, N'')         AS product_code,
+                        CASE WHEN COALESCE(ol.M_AttributeSetInstance_ID, 0) > 0
+                             THEN COALESCE(asi.Description, N'')
+                             ELSE N'' END AS attribute_desc,
+                        COALESCE(u.UOMSymbol, u.Name, N'') AS uom_symbol,
                         COALESCE(ol.QtyOrdered, 0)    AS qty_ordered,
+                        -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
+                        -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
+                        -- widget shows the selected UOM, so quantities are scaled to it.
+                        COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyDelivered, 0)  AS qty_delivered,
                         CASE WHEN COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
                              THEN COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)
@@ -256,6 +279,7 @@ namespace VIS.Controllers
                     FROM C_OrderLine ol
                     INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
                     LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
+                    LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
                     LEFT JOIN C_UOM u ON u.C_UOM_ID = ol.C_UOM_ID
                     LEFT JOIN M_AttributeSetInstance asi ON asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
                     LEFT JOIN C_Currency cur ON cur.C_Currency_ID = o.C_Currency_ID
@@ -275,7 +299,18 @@ namespace VIS.Controllers
                     {
                         decimal qtyOrdered = Util.GetValueOfDecimal(dr["qty_ordered"]);
                         decimal qtyDelivered = Util.GetValueOfDecimal(dr["qty_delivered"]);
+
+                        // Quantities are shown in the UOM the line was entered in. QtyEntered is in the
+                        // line's own C_UOM_ID; QtyOrdered / QtyDelivered are in the product's base UOM,
+                        // so delivered is scaled by this line's own entered/ordered ratio. Header
+                        // roll-ups above stay in the base UOM - summing mixed UOMs is meaningless.
+                        decimal enteredQtyUom = Util.GetValueOfDecimal(dr["QtyEntered"]);
+                        decimal uomRatio = (qtyOrdered != 0) ? (enteredQtyUom / qtyOrdered) : 1m;
+                        qtyOrdered = enteredQtyUom;
+                        qtyDelivered = qtyDelivered * uomRatio;
                         decimal qtyPending = Util.GetValueOfDecimal(dr["qty_pending"]);
+                        // Pending follows the converted figures, not the base-UOM value.
+                        qtyPending = Math.Max(0m, qtyOrdered - qtyDelivered);
                         string parentDocStatus = Util.GetValueOfString(dr["doc_status"]);
 
                         string lineStatus = "Pending";
@@ -305,6 +340,9 @@ namespace VIS.Controllers
                             QtyPending = qtyPending,
                             PriceActual = Util.GetValueOfDecimal(dr["price_actual"]),
                             LineNetAmt = Util.GetValueOfDecimal(dr["line_net_amt"]),
+                            // Charge / non-Item lines are never received - the client renders dashes
+                            // for received, pending and line status.
+                            isNonStock = Util.GetValueOfString(dr["IsNonStock"]) == "Y",
                             LineStatus = lineStatus,
                             CurrencySymbol = Util.GetValueOfString(dr["cur_symbol"]),
                             CurrencyIso = Util.GetValueOfString(dr["cur_iso"])

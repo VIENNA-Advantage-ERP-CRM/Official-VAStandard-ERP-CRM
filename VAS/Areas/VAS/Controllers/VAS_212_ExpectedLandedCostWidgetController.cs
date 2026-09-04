@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Expected Landed Cost on PO Widget (Purchase Order Dashboard)
  *                  Provides aggregated expected landed cost amounts by cost element
@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Linq;
 using System.Web.Mvc;
 using VAdvantage.Classes;
@@ -224,6 +225,203 @@ namespace VIS.Controllers
             catch (Exception ex)
             {
                 _log.Log(Level.SEVERE, "VAS_212_ExpectedLandedCostWidget.GetExpectedLandedCost", ex);
+                return Json(JsonConvert.SerializeObject(new
+                {
+                    error = Msg.GetMsg(ctx, "Error") ?? "Error",
+                    message = ex.Message
+                }), JsonRequestBehavior.AllowGet);
+            }
+        }
+
+
+        /// <summary>
+        /// Drill-down for a single cost element: the open purchase orders that make up its
+        /// expected landed cost for the selected month, with amounts converted server-side
+        /// into the accounting schema currency.
+        /// </summary>
+        /// <param name="costElementId">M_CostElement_ID clicked in the widget.</param>
+        /// <param name="month">1-12 month index.</param>
+        /// <param name="year">4-digit year.</param>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetCostElementDetail(int costElementId, int month, int year)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Json(new
+                {
+                    error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null || costElementId <= 0)
+            {
+                return Json(new { error = "Invalid Request" }, JsonRequestBehavior.AllowGet);
+            }
+
+            int clientId = ctx.GetAD_Client_ID();
+            int selectedYear = year > 0 ? year : DateTime.Now.Year;
+            int selectedMonth = month > 0 ? month : DateTime.Now.Month;
+            DateTime monthStart = new DateTime(selectedYear, selectedMonth, 1);
+            DateTime monthEndExclusive = monthStart.AddMonths(1);
+
+            try
+            {
+                // Accounting schema currency, same resolution the summary uses.
+                int schemaCurrencyId = 0;
+                string curSymbol = "";
+                string curIso = "";
+                int stdPrecision = 2;
+
+                string curSql = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.ISO_Code, c.StdPrecision
+                                    FROM C_AcctSchema cs
+                                   INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
+                                   INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
+                                   WHERE ci.AD_Client_ID = @ClientID
+                                     AND ci.IsActive = 'Y'
+                                     AND cs.IsActive = 'Y'
+                                     AND c.IsActive = 'Y'";
+                curSql = MRole.GetDefault(ctx).AddAccessSQL(curSql, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+                DataSet cDs = DB.ExecuteDataset(curSql, new SqlParameter[] { new SqlParameter("@ClientID", clientId) }, null);
+                if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
+                {
+                    schemaCurrencyId = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
+                    curSymbol = Util.GetValueOfString(cDs.Tables[0].Rows[0]["CurSymbol"]);
+                    curIso = Util.GetValueOfString(cDs.Tables[0].Rows[0]["ISO_Code"]);
+                    stdPrecision = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["StdPrecision"]);
+                }
+
+                // Same open-PO definition as the summary query, narrowed to one cost element.
+                string sql = @"
+                    WITH order_qty AS (
+                        SELECT
+                            o.C_Order_ID,
+                            SUM(COALESCE(ol.QtyOrdered, 0)) AS ordered_qty,
+                            SUM(COALESCE(ol.QtyDelivered, 0)) AS delivered_qty
+                        FROM C_Order o
+                        LEFT JOIN C_OrderLine ol
+                            ON ol.C_Order_ID = o.C_Order_ID
+                           AND ol.IsActive = 'Y'
+                        WHERE o.AD_Client_ID = @ClientID
+                          AND o.IsActive = 'Y'
+                          AND o.IsSOTrx = 'N'
+                          AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                          AND o.DateOrdered >= @MonthStart
+                          AND o.DateOrdered < @MonthEndExclusive
+                          AND o.DocStatus IN ('DR', 'IP', 'CO')
+                        GROUP BY o.C_Order_ID
+                    )
+                    SELECT
+                        ec.C_ExpectedCost_ID AS expected_cost_id,
+                        ec.C_Order_ID        AS purchase_order_id,
+                        o.DocumentNo         AS purchase_order_number,
+                        o.DateOrdered        AS order_date,
+                        o.DocStatus          AS document_status,
+                        o.AD_Org_ID          AS org_id,
+                        COALESCE(bp.Name, N'')  AS vendor_name,
+                        COALESCE(w.Name, N'')   AS warehouse_name,
+                        ec.Amt               AS entered_amount,
+                        ec.C_Currency_ID     AS entered_currency_id,
+                        ec.C_ConversionType_ID AS conversion_type_id,
+                        oq.ordered_qty,
+                        oq.delivered_qty
+                    FROM C_ExpectedCost ec
+                    INNER JOIN C_Order o
+                        ON o.C_Order_ID = ec.C_Order_ID
+                    INNER JOIN order_qty oq
+                        ON oq.C_Order_ID = o.C_Order_ID
+                    INNER JOIN C_BPartner bp
+                        ON bp.C_BPartner_ID = o.C_BPartner_ID
+                    LEFT JOIN M_Warehouse w
+                        ON w.M_Warehouse_ID = o.M_Warehouse_ID
+                    WHERE ec.IsActive = 'Y'
+                      AND ec.M_CostElement_ID = @CostElementID
+                      AND (
+                           o.DocStatus IN ('DR', 'IP')
+                           OR (
+                               o.DocStatus = 'CO'
+                               AND COALESCE(oq.ordered_qty, 0) > COALESCE(oq.delivered_qty, 0)
+                           )
+                      )
+                    ORDER BY o.DateOrdered DESC, o.DocumentNo DESC";
+
+                SqlParameter[] queryParams = new SqlParameter[]
+                {
+                    new SqlParameter("@ClientID", clientId),
+                    new SqlParameter("@MonthStart", monthStart),
+                    new SqlParameter("@MonthEndExclusive", monthEndExclusive),
+                    new SqlParameter("@CostElementID", costElementId)
+                };
+
+                string elementName = Util.GetValueOfString(DB.ExecuteScalar(
+                    "SELECT Name FROM M_CostElement WHERE M_CostElement_ID = " + costElementId, null, null));
+
+                List<object> rows = new List<object>();
+                decimal total = 0;
+
+                DataSet ds = DB.ExecuteDataset(sql, queryParams, null);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (DataRow row in ds.Tables[0].Rows)
+                    {
+                        int orderId = Util.GetValueOfInt(row["purchase_order_id"]);
+                        int orgId = Util.GetValueOfInt(row["org_id"]);
+                        int enteredCurId = Util.GetValueOfInt(row["entered_currency_id"]);
+                        int convTypeId = Util.GetValueOfInt(row["conversion_type_id"]);
+                        decimal enteredAmt = Util.GetValueOfDecimal(row["entered_amount"]);
+                        DateTime? orderDateN = Util.GetValueOfDateTime(row["order_date"]);
+                        DateTime orderDate = orderDateN.HasValue ? orderDateN.Value : DateTime.Now;
+
+                        decimal convertedAmt = enteredAmt;
+                        if (schemaCurrencyId > 0 && enteredCurId > 0 && enteredCurId != schemaCurrencyId)
+                        {
+                            try
+                            {
+                                convertedAmt = MConversionRate.Convert(
+                                    ctx, enteredAmt, enteredCurId, schemaCurrencyId,
+                                    orderDate, convTypeId, clientId, orgId);
+                            }
+                            catch (Exception ex)
+                            {
+                                _log.Warning("MConversionRate.Convert failed for C_ExpectedCost_ID "
+                                    + Util.GetValueOfInt(row["expected_cost_id"]) + ": " + ex.Message);
+                                convertedAmt = enteredAmt;
+                            }
+                        }
+
+                        total += convertedAmt;
+
+                        rows.Add(new
+                        {
+                            purchaseOrderId = orderId,
+                            purchaseOrderNo = Util.GetValueOfString(row["purchase_order_number"]),
+                            orderDate = orderDateN.HasValue
+                                ? orderDateN.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                            docStatus = Util.GetValueOfString(row["document_status"]),
+                            vendorName = Util.GetValueOfString(row["vendor_name"]),
+                            warehouseName = Util.GetValueOfString(row["warehouse_name"]),
+                            amount = convertedAmt
+                        });
+                    }
+                }
+
+                return Json(JsonConvert.SerializeObject(new
+                {
+                    success = true,
+                    costElementId = costElementId,
+                    costElementName = elementName,
+                    totalAmount = total,
+                    curSymbol = curSymbol,
+                    curIso = curIso,
+                    stdPrecision = stdPrecision,
+                    rows = rows
+                }), JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                _log.Log(Level.SEVERE, "VAS_212_ExpectedLandedCostWidget.GetCostElementDetail", ex);
                 return Json(JsonConvert.SerializeObject(new
                 {
                     error = Msg.GetMsg(ctx, "Error") ?? "Error",
