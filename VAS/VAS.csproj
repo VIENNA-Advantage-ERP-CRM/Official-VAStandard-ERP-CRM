@@ -216,6 +216,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_140_ContractsExpiringWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_141_CustomersBySegmentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_236_ReceiptvsPaymentWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_238_UnreconciledBankLineWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_AttributeControlController.cs" />
     <Compile Include="Areas\VAS\Controllers\BouncedChequesController.cs" />
     <Compile Include="Areas\VAS\Controllers\AvgDaysToPayController.cs" />
@@ -443,6 +444,7 @@
     <Content Include="Areas\VAS\Content\VAS_120_CustomerSearchWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_121_NewCustomerWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_236_ReceiptvsPaymentWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_238_UnreconciledBankLineWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_KpiDrillThrough.css" />
     <Content Include="Areas\VAS\Content\VAS_122_TotalCustomersWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_124_DelayedPaymentsWidget.css" />
@@ -463,6 +465,7 @@
     <Content Include="Areas\VAS\Content\VAS_173_TransfersByWarehouseWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_174_TransferQueueWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_236_ReceiptvsPaymentWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_238_UnreconciledBankLineWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_167_NewTransferQuickActionWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_168_OpenTransfersWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_169_UnderConfirmationWidget.js" />

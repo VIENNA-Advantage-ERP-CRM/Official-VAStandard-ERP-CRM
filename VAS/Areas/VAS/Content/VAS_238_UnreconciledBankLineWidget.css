@@ -1,0 +1,628 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_238_UnreconciledBankLineWidget.css
+ * Unreconciled Bank Lines (Banking dashboard, 5x2 paginated exception list).
+ *
+ * TWO SOURCES, EACH FOR WHAT IT OWNS.
+ *   design.md -> dashboard-widgets.md owns the SHELL and the ROWS: the glass card,
+ *   the icon well, the title / subtitle clamps, the header pill and chip tiers,
+ *   §Grid Data Rows (transparent header, #C5D2DD head divider, #E2EAF1 row divider,
+ *   last:border-b-0, hover rgba(234,248,255,.5)), the §Widget Footer Pager,
+ *   §No Inner Scrollbars and the widget-root em anchor. That is what makes this card
+ *   sit correctly beside VAS_231 / VAS_233 / VAS_234 / VAS_235 / VAS_236.
+ *   The widget specification owns the COLUMNS and the AGE CHIP: the five-track grid
+ *   with narration widest, and the green / amber / red SLA bands.
+ *
+ * All internal sizing is em-driven off the widget root anchor; borders, radii and
+ * shadows stay in px ("Not Scaled With em"). No native tag selector is styled -
+ * every rule is scoped to a vas-238- class.
+ *
+ * THE ROW GRID is one constant shared by the header row and every body row, so a
+ * column label always sits over its column:
+ *
+ *   1.05fr        1.3fr         1.6fr      0.6fr  0.95fr
+ *   Date          Bank Account  Narration  Age    Amount
+ *
+ * Narration still takes the most width - bank narrations are the longest text on the
+ * card and the only column with no natural size. Amount is LAST and right-aligned:
+ * it is the row's conclusion and the one column a reader scans vertically, so it sits
+ * against the card's trailing edge where a column of figures belongs.
+ *
+ * THE AGE CHIP HAS NO GREY TIER. green <= 7d, amber <= 21d, red beyond. An old line
+ * must not fade into the background: the amber-to-red progression is what makes the
+ * aging tail visible at a glance, which is the whole point of an exception list.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-238-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so the row grid and the base font can both step with the
+       CELL, not the viewport. Also the positioning context for the busy overlay. */
+    container: vas-238 / inline-size;
+}
+
+    .vas-238-root,
+    .vas-238-root * {
+        box-sizing: border-box;
+    }
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Everything inside is em against this.
+
+   Width only - the page size is MEASURED from the list height (see syncCapacity in
+   the JS), so a short cell shows fewer rows rather than smaller type. */
+.vas-238-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: .85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    /* §No Inner Scrollbars - a page always fits, so nothing here ever scrolls. */
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Header: icon well + title/subtitle + badge + account filter ---- */
+.vas-238-header {
+    display: flex;
+    align-items: flex-start;
+    gap: .5em;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: .6em;
+}
+
+/* Icon well: 1.75em on the card's em lever - the sibling widgets' well, so the icons
+   read identically side by side. Flat #EAF8FF tile, 9px radius, no inset ring. */
+.vas-238-icon {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+    .vas-238-icon svg {
+        width: .95em;
+        height: .95em;
+        display: block;
+    }
+
+.vas-238-head-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* §Widget Header title verbatim: the --dash-inline-size clamp, Medium (500),
+   line-height 1.2, #102C3F - the sibling cards' title, so the headings match on a
+   shared row. */
+.vas-238-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Subtitle: the §Widget Header pattern verbatim - Roboto Regular, #717182,
+   line-height 1.3, FIXED 2px top margin. It says which SIDE of the reconciliation gap
+   this card shows, so it is never confused with the payments-side card. */
+.vas-238-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-238-subtitle:empty {
+    display: none;
+}
+
+/* The open-count badge - the glance-label chip tier (0.6875em bold), amber because an
+   open line is an EXCEPTION rather than an error. It counts the whole filtered set,
+   not the page. */
+.vas-238-badge {
+    flex: 0 0 auto;
+    align-self: center;
+    font-size: clamp(10.5px, calc(var(--dash-inline-size, 100vw) * .0075), 12px);
+    font-weight: 700;
+    line-height: 1;
+    color: #9A6500;
+    background: #FFF6E2;
+    border-radius: 999px;
+    padding: .35em .7em;
+    white-space: nowrap;
+}
+
+/* Bank account filter - the interactive pill tier of the two-tier chip system (never
+   a third tier). Absolute clamp rather than an em, like the title: the card base drops
+   in a narrow cell and an em control would follow it down and stop being readable.
+   max-width + ellipsis cap it whatever the tenant names its accounts. */
+.vas-238-acct {
+    flex: 0 0 auto;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: .3em;
+    max-width: 34%;
+    font-family: inherit;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008125), 13px);
+    font-weight: 500;
+    line-height: 1.3;
+    color: #41576A;
+    background: rgba(255, 255, 255, .66);
+    border: 1px solid #D9E2EB;
+    border-radius: 999px;
+    padding: .3em .7em;
+    box-shadow: 0 4px 10px rgba(16, 47, 74, .05);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+    .vas-238-acct:hover {
+        background: #FFFFFF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-238-acct:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 1px;
+    }
+
+    .vas-238-acct svg {
+        flex: 0 0 auto;
+        color: #0083DA;
+    }
+
+.vas-238-acct-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Body ---- */
+.vas-238-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* THE shared row grid - header and body rows both. */
+.vas-238-row {
+    display: grid;
+    grid-template-columns: 1.05fr 1.3fr 1.6fr 0.6fr 0.95fr;
+    gap: .625em;
+    align-items: center;
+}
+
+/* §Grid Data Rows header: 0.6875em Medium, TRANSPARENT background (never a tinted
+   band - it reads inconsistently against different glass gradients), #41576A, with a
+   #C5D2DD divider under it.
+
+   THE TYPE SCALE GOES ON THE CELLS, NOT ON THE ROW - and that is load-bearing, not
+   style. .vas-238-row sizes nothing in em here, but the CELLS do, and a font-size on
+   the row would also cascade into the grid's own gap. Keeping the row at 1em keeps
+   its tracks identical to the body's, which is what puts each label over its column. */
+.vas-238-ghead {
+    flex: 0 0 auto;
+    background: transparent;
+    padding: 0 2px 8px 2px;
+    border-bottom: 1px solid #C5D2DD;
+}
+
+    .vas-238-ghead > span {
+        font-size: .6875em;
+        font-weight: 500;
+        color: #41576A;
+        line-height: 1.25;
+        text-transform: capitalize;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+/* The list holds exactly ONE page and never scrolls - the page size is measured from
+   this element's height (see syncCapacity in the JS), so overflow:hidden here is what
+   makes the measurement meaningful rather than a fallback. */
+.vas-238-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* §Grid Data Rows body row: 11px 2px padding, 1px #E2EAF1 divider, none on the last,
+   hover rgba(234,248,255,0.5). */
+.vas-238-brow {
+    padding: 11px 2px;
+    border-bottom: 1px solid #E2EAF1;
+    color: #102C3F;
+    font-size: .8125em;
+}
+
+    .vas-238-brow:last-child {
+        border-bottom: 0;
+    }
+
+    .vas-238-brow:hover {
+        background: rgba(234, 248, 255, .5);
+    }
+
+.vas-238-brow > div {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-238-date {
+    color: #5F7283;
+}
+
+/* The narration is the row's identity, so it carries the row's weight - and it is the
+   only cell allowed to be the widest thing on the line. */
+.vas-238-narr {
+    font-weight: 500;
+    color: #102C3F;
+}
+
+/* Opens the STATEMENT the line belongs to - reconciliation happens there, not on one
+   line. Accent and an underline on hover mark it; the size and weight stay the cell's,
+   so a linked narration and a plain one (a row whose window could not be resolved)
+   still line up as the same field. */
+.vas-238-narrlink {
+    color: #106AB0;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+    .vas-238-narrlink:hover,
+    .vas-238-narrlink:focus {
+        color: #0083DA;
+        text-decoration: underline;
+    }
+
+    .vas-238-narrlink:focus-visible {
+        outline: 2px solid rgba(0, 131, 218, .45);
+        outline-offset: 2px;
+        border-radius: 2px;
+    }
+
+/* A blank Description shows a dash, not a link - there is nothing to name, and a
+   linked dash reads as a control by mistake. */
+.vas-238-nil {
+    color: #9F9F9F;
+}
+
+.vas-238-num {
+    text-align: right;
+}
+
+.vas-238-amt {
+    font-weight: 700;
+}
+
+/* Direction tones. The printed + / − carries the same meaning as text, so the reading
+   never rests on colour alone. */
+.vas-238-pos {
+    color: #20A464;
+}
+
+.vas-238-neg {
+    color: #D14545;
+}
+
+.vas-238-acctname {
+    color: #5F7283;
+}
+
+.vas-238-agecell {
+    min-width: 0;
+}
+
+/* Age chip - the glance-label tier (0.6875em bold), never the interactive tier. */
+.vas-238-chip {
+    display: inline-flex;
+    align-items: center;
+    font-size: .8461em; /* 0.6875em of the card, from the row's 0.8125em */
+    font-weight: 700;
+    line-height: 1;
+    border-radius: 999px;
+    padding: .3em .6em;
+    white-space: nowrap;
+}
+
+/* The SLA bands. NO grey tier - see the file header. */
+.vas-238-chip-green {
+    background: #E7F7EF;
+    color: #0B6B45;
+}
+
+.vas-238-chip-amber {
+    background: #FFF6E2;
+    color: #9A6500;
+}
+
+.vas-238-chip-red {
+    background: #FCEFEF;
+    color: #A33F3F;
+}
+
+/* Nothing unreconciled is GOOD news, not an error - it is said inside the list and the
+   header keeps its title and column labels. Only a load failure takes the whole card
+   over (.vas-238-state below). */
+.vas-238-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: .8125em;
+    color: #5F7283;
+    text-align: center;
+}
+
+/* ---- Footer pager (design.md §Widget Footer Pager) ----
+   Reserve the pager's height even on a single page so the list's measured height is
+   constant whether or not the pager is shown - otherwise the adaptive row-fit would
+   re-clip every time the pager appeared. The pager itself still hides on one page. */
+.vas-238-pagerwrap {
+    flex-shrink: 0;
+    min-height: 2.5em;
+}
+
+.vas-238-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5em;
+    margin-top: .5em;
+    padding-top: .4em;
+    border-top: 1px solid #E4EDF4;
+}
+
+.vas-238-pager-info {
+    font-size: .6875em;
+    color: #748494;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vas-238-pager-nav {
+    display: flex;
+    align-items: center;
+    gap: .35em;
+    flex-shrink: 0;
+}
+
+.vas-238-pager-label {
+    font-size: .75em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas-238-pgbtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    border-radius: 6px;
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+
+    .vas-238-pgbtn:hover:not(:disabled) {
+        background: #EAF4FC;
+        border-color: #C6D6E4;
+    }
+
+    /* A disabled control is visibly inert as well as programmatically disabled - it
+       keeps its box and reports its state, it is never hidden. */
+    .vas-238-pgbtn:disabled {
+        color: #B8C6D2;
+        border-color: #E2EAF1;
+        cursor: default;
+    }
+
+    .vas-238-pgbtn:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 2px;
+    }
+
+/* ---- State takeover: reserved for a load failure ---- */
+.vas-238-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .8125em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.35;
+}
+
+.vas-238-hidden {
+    display: none !important;
+}
+
+/* ---- Bank account picker (body-mounted, so NOT scoped under .vas-238-root) ----
+   Fixed-position panel anchored to the pill by script. rem-based, not em: it lives on
+   <body> and has no widget root anchor to scale against. Identical in shape to the
+   sibling Banking cards' popovers. */
+.vas-238-pp {
+    position: fixed;
+    /* Same narrow band the sibling popovers use: above the glass cards, below every
+       framework layer (jQuery UI .ui-front = 100, dialogs 101+). */
+    z-index: 95;
+    box-sizing: border-box;
+    min-width: 220px;
+    max-width: calc(100vw - 16px);
+    max-height: 60vh;
+    overflow: auto;
+    padding: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(8, 24, 38, .22);
+    color: #102C3F;
+}
+
+    .vas-238-pp * {
+        box-sizing: border-box;
+    }
+
+.vas-238-pp-h {
+    font-size: .6875rem;
+    font-weight: 700;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 8px 10px 4px;
+}
+
+.vas-238-pp-empty {
+    padding: 8px 10px 10px;
+    font-size: .8125rem;
+    color: #748494;
+}
+
+.vas-238-pp-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .875rem;
+    color: #102C3F;
+    padding: 9px 10px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+    .vas-238-pp-opt:hover {
+        background: #EAF8FF;
+    }
+
+    .vas-238-pp-opt[aria-selected="true"] {
+        background: #EAF8FF;
+        font-weight: 700;
+        color: #0083DA;
+    }
+
+    .vas-238-pp-opt:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: -2px;
+    }
+
+.vas-238-pp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-238-pp-tick {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+    color: #0083DA;
+    opacity: 0;
+}
+
+.vas-238-pp-opt[aria-selected="true"] .vas-238-pp-tick {
+    opacity: 1;
+}
+
+/* ---- Narrow cells ----
+ *
+ * Columns fold away widest-first, and Narration, Age and Amount always survive:
+ * between them they say what a line is, how overdue it is and what it is worth. Bank
+ * Account goes first - it is on the row tooltip, and the account filter usually names
+ * it anyway - then Date, because the Age chip carries the time dimension more usefully
+ * in a narrow cell than an exact date does. No horizontal scrollbar is ever introduced
+ * to preserve the desktop columns.
+ *
+ * The nth-child indices below track the header's own five spans, in the order
+ * Date(1), Bank Account(2), Narration(3), Age(4), Amount(5). */
+@container vas-238 (max-width: 460px) {
+    .vas-238-row {
+        grid-template-columns: 1.05fr 1.9fr 0.6fr 0.95fr;
+        gap: .5em;
+    }
+
+    /* 2 = Bank Account */
+    .vas-238-ghead > span:nth-child(2),
+    .vas-238-brow > .vas-238-acctname {
+        display: none;
+    }
+}
+
+@container vas-238 (max-width: 340px) {
+    .vas-238-row {
+        grid-template-columns: 1.9fr 0.6fr 0.95fr;
+    }
+
+    /* 1 = Date */
+    .vas-238-ghead > span:nth-child(1),
+    .vas-238-brow > .vas-238-date {
+        display: none;
+    }
+}
+
+/* ---- Narrow cells: step the card base font down so the em scale follows ----
+ *
+ * The sibling widgets' breakpoints and values. The overrides are ABSOLUTE px, never a
+ * relative `em` - an em override here would resolve against the inherited page font
+ * rather than the clamp and collapse the anchor unpredictably. */
+@container vas-238 (max-width: 300px) {
+    .vas-238-card {
+        font-size: 13px;
+    }
+}
+
+@container vas-238 (max-width: 220px) {
+    .vas-238-card {
+        font-size: 11px;
+    }
+}
