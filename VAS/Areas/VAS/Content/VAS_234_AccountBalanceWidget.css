@@ -1,0 +1,821 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_234_AccountBalanceWidget.css
+ * Account-wise Balance (Banking dashboard, row table).
+ *
+ * TWO SOURCES, EACH FOR WHAT IT OWNS.
+ *   design.md -> dashboard-widgets.md owns the SHELL: the glass card, the icon
+ *   well, the title / subtitle clamps, the header pill, the popover, the footer
+ *   pager, §No Inner Scrollbars, and the widget-root em anchor. That is what makes
+ *   this card sit correctly beside VAS_231 and VAS_233 on the same dashboard.
+ *   The widget specification owns the ROW: its three-column grid, the flow figures
+ *   stacked over a centre-axis bar, and its named semantic tones -
+ *     inflow / positive  #1D9E75      sunken track   #F1F5F9
+ *     outflow / negative #D85A30      axis + border  #CBD5E1
+ *   Those tones are used verbatim; the specification forbids substituting other
+ *   chart colours, and they are the one part of this card that is not a design.md
+ *   token.
+ *
+ * All internal sizing is em-driven off the widget root anchor; borders, radii and
+ * shadows stay in px ("Not Scaled With em"). No native tag selector is styled -
+ * every rule is scoped to a vas-234- class.
+ *
+ * THE ROW GRID is one constant shared by the header row and every body row, so a
+ * column label always sits over its column:
+ *
+ *   minmax(0,11.25em) minmax(0,1fr) minmax(0,7.375em)
+ *      Account            Flow          Closing balance
+ *
+ * (11.25em / 7.375em are the specification's 180px / 118px on the 16px anchor, so
+ * they scale with the widget instead of pinning it to one dashboard width.)
+ *
+ * The FLOW cell is itself two stacked lines - the three figures, then the bar - so
+ * each figure sits directly over the bar segment it describes. The bar is NOT a
+ * progress bar: its track is inert, both halves grow outwards from a centre axis,
+ * and the asymmetry between them is the net.
+ *
+ * NARROW CELLS collapse to the specification's mobile shape: Account and Closing
+ * balance share the first line, the flow visualisation spans the full width beneath
+ * them, and the column header is dropped. No horizontal scrollbar is ever introduced
+ * to preserve the desktop columns.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-234-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so the row grid and the base font can both step with the
+       CELL, not with the viewport. */
+    container: vas-234 / inline-size;
+}
+
+    .vas-234-root,
+    .vas-234-root * {
+        box-sizing: border-box;
+    }
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Everything inside is em against this. */
+.vas-234-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: .85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    /* §No Inner Scrollbars - a page always fits, so nothing here ever scrolls. */
+    overflow: hidden;
+    /* Every figure on the card lines up digit for digit. */
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Header: icon well + title/subtitle + sort control ---- */
+.vas-234-header {
+    display: flex;
+    align-items: flex-start;
+    gap: .5em;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: .6em;
+}
+
+/* Icon well: 1.75em on the card's em lever - the sibling widgets' well, so the icons
+   read identically side by side. Flat #EAF8FF tile, 9px radius, no inset ring. */
+.vas-234-icon {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+    .vas-234-icon svg {
+        width: .95em;
+        height: .95em;
+        display: block;
+    }
+
+.vas-234-head-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* §Widget Header title verbatim: the --dash-inline-size clamp, Medium (500),
+   line-height 1.2, #102C3F - the sibling cards' title, so the headings match on a
+   shared row. */
+.vas-234-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Subtitle: the §Widget Header pattern verbatim - Roboto Regular, #717182,
+   line-height 1.3, FIXED 2px top margin. It names both reporting periods, so the
+   flow figures and the closing-balance change are never over an unstated window.
+   One line with an ellipsis; the full text is on the title attribute. */
+.vas-234-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-234-subtitle:empty {
+    display: none;
+}
+
+/* Sort control - the §Widget Header right-side slot, styled as the interactive pill
+   tier of the two-tier chip system (never a third tier). Absolute clamp rather than
+   an em, like the title and subtitle: the card base drops to 13px in a short cell and
+   an em control would follow it down and stop being readable. */
+.vas-234-sort {
+    flex: 0 0 auto;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: .35em;
+    max-width: 40%;
+    font-family: inherit;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008125), 13px);
+    font-weight: 500;
+    line-height: 1.3;
+    color: #41576A;
+    background: rgba(255, 255, 255, .66);
+    border: 1px solid #D9E2EB;
+    border-radius: 999px;
+    padding: .3em .7em;
+    box-shadow: 0 4px 10px rgba(16, 47, 74, .05);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+    .vas-234-sort:hover {
+        background: #FFFFFF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-234-sort:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 1px;
+    }
+
+    .vas-234-sort svg {
+        width: .9em;
+        height: .9em;
+        flex: 0 0 auto;
+        color: #0083DA;
+    }
+
+.vas-234-sort-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Body ---- */
+.vas-234-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* THE shared row grid - header and body rows both. */
+.vas-234-row {
+    display: grid;
+    grid-template-columns: minmax(0, 11.25em) minmax(0, 1fr) minmax(0, 7.375em);
+    gap: 1em;
+    align-items: center;
+}
+
+/* §Grid Data Rows header: 0.6875em Medium, TRANSPARENT background (never a tinted
+   band - it reads inconsistently against different glass gradients), muted, with a
+   #C5D2DD divider under it.
+
+   THE TYPE SCALE GOES ON THE CELLS, NOT ON THE ROW - and that is load-bearing, not
+   style. .vas-234-row sizes its tracks in em (11.25em / 1fr / 7.375em, gap 1em) and
+   an em always resolves against the element's OWN font-size. Putting .6875em on this
+   row would compute its three tracks at 0.6875x the body row's, so the Account column
+   would come out narrower and the Flow column wider than the rows beneath it, and
+   every label would sit over the wrong place: "Outflow" drifting left of the outflow
+   figure, "Inflow" right of the inflow figure. Leaving the row at 1em keeps its
+   tracks identical to the body's, which is what puts each label over its own column. */
+.vas-234-ghead {
+    flex: 0 0 auto;
+    background: transparent;
+    padding: 0 2px 8px 2px;
+    border-bottom: 1px solid #C5D2DD;
+}
+
+    /* Direct children only - the flow header's own nested spans inherit from here. */
+    .vas-234-ghead > span {
+        font-size: .6875em;
+        font-weight: 500;
+        color: #41576A;
+        line-height: 1.25;
+    }
+
+/* THE FLOW SUB-GRID. The three flow labels and the three flow figures below them use
+   the SAME three tracks, so each label lands over the figure it names and over the
+   part of the bar that figure describes: outflow at the left end, net over the axis,
+   inflow at the right end.
+
+   1fr auto 1fr rather than space-between: space-between only centres its middle item
+   when the two flanking items happen to be the same width, so "Net" would drift off
+   the bar's axis as soon as an outflow figure grew wider than an inflow one. Equal
+   flanking tracks put the middle one dead centre by construction, which is where the
+   axis is. */
+.vas-234-ghead .vas-234-flow,
+.vas-234-nums {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: .5em;
+    align-items: baseline;
+    min-width: 0;
+}
+
+.vas-234-hf-o,
+.vas-234-hf-n,
+.vas-234-hf-i {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Outflow reads outwards to the left, inflow outwards to the right - the same
+   direction each grows on the bar. */
+.vas-234-hf-o,
+.vas-234-o {
+    text-align: left;
+}
+
+.vas-234-hf-n,
+.vas-234-n {
+    text-align: center;
+}
+
+.vas-234-hf-i,
+.vas-234-i {
+    text-align: right;
+}
+
+/* The two arrows say which way each side of the bar below grows. Muted so they read
+   as direction marks rather than as part of the label. */
+.vas-234-arrow {
+    color: #8A97A5;
+    font-weight: 400;
+}
+
+.vas-234-hf-o .vas-234-arrow {
+    margin-right: .25em;
+}
+
+.vas-234-hf-i .vas-234-arrow {
+    margin-left: .25em;
+}
+
+.vas-234-ghead .vas-234-acct {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-234-ghead .vas-234-bal {
+    text-align: right;
+}
+
+/* The list holds exactly ONE page and never scrolls - the page size is measured from
+   this element's height (see syncCapacity in the JS), so overflow:hidden here is what
+   makes the measurement meaningful rather than a fallback. */
+.vas-234-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Body row: a top divider rather than a bottom one, so the last row never leaves a
+   rule hanging above the footer. */
+.vas-234-brow {
+    padding: .4em 2px;
+    border-top: 1px solid #E6EBF1;
+    color: #16202B;
+}
+
+    .vas-234-brow:first-child {
+        border-top: 0;
+    }
+
+    .vas-234-brow:hover {
+        background: rgba(234, 248, 255, .5);
+    }
+
+/* The ROW itself is not clickable - only the account name is (see .vas-234-namelink).
+   A row carries five figures a user may want to read or select, so a click anywhere on
+   it launching a window would be a surprise rather than an affordance. */
+
+/* ---- Account cell ---- */
+.vas-234-acct {
+    min-width: 0;
+}
+
+.vas-234-name {
+    font-size: .875em;
+    font-weight: 500;
+    color: #16202B;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The account name as a zoom link. Only the ACCENT and the underline mark it - the
+   weight and size stay the row's, so a linked name and a plain one (an account whose
+   window could not be resolved) still line up and still read as the same field. The
+   underline is held back until hover / focus so a column of five links does not read
+   as a block of rules. */
+.vas-234-namelink {
+    color: #1B6FD1;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+    .vas-234-namelink:hover,
+    .vas-234-namelink:focus {
+        color: #145AA8;
+        text-decoration: underline;
+    }
+
+    .vas-234-namelink:focus-visible {
+        outline: 2px solid rgba(27, 111, 209, .45);
+        outline-offset: 2px;
+        border-radius: 2px;
+    }
+
+/* EVERY account name is a link, whether or not the account moved this period. The
+   link opens the Bank Account record, which exists either way - dimming it on a quiet
+   row made the name look like plain text and hid a working affordance. "No activity"
+   is said once, in the flow column, and nothing else on the row is toned down for it. */
+
+/* "····9032 · INR" - the number arrives already masked from the server, and the ISO
+   code states which currency every figure on this row is in. */
+.vas-234-meta {
+    margin-top: 2px;
+    font-size: .75em;
+    font-weight: 400;
+    color: #8A97A5;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A row that saw no movement stays fully legible but steps back a tone - the account
+   is still there, it simply has nothing to report this period. */
+.vas-234-dim {
+    color: #5B6875;
+}
+
+/* ---- Flow cell: three figures stacked over the bar ---- */
+.vas-234-flow {
+    min-width: 0;
+}
+
+/* Tracks come from the shared flow sub-grid above; only the type scale and the gap to
+   the bar are this element's own. */
+.vas-234-nums {
+    margin-bottom: .3125em;
+    font-size: .75em;
+    line-height: 1.25;
+}
+
+    /* The no-activity message replaces all three figures, so it takes the whole flow
+       column as one track and centres over the axis. */
+    .vas-234-nums--quiet {
+        grid-template-columns: 1fr;
+        justify-items: center;
+    }
+
+.vas-234-nums > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-234-o {
+    color: #D85A30;
+}
+
+.vas-234-i {
+    color: #1D9E75;
+}
+
+/* The net is the flow line's conclusion, so it is the only one of the three at
+   Medium. Its own colour comes from .vas-234-up / .vas-234-down. */
+.vas-234-n {
+    font-weight: 500;
+}
+
+.vas-234-quiet {
+    color: #8A97A5;
+}
+
+/* DIVERGING bar. The track is the sunken tone and is inert - it is not a progress
+   groove and never fills. Both halves grow outwards from the axis, and the asymmetry
+   between them is the net. */
+.vas-234-bar {
+    position: relative;
+    height: 9px;
+    border-radius: 5px;
+    background: #F1F5F9;
+    min-width: 0;
+}
+
+.vas-234-bar > i {
+    position: absolute;
+    top: 0;
+    height: 9px;
+    display: block;
+}
+
+/* Each half is rounded on its OUTER end only, so the two meet flush at the axis
+   instead of pinching into a waist. Widths come from the server, already expressed
+   as a share of the whole track and capped at 50%. */
+.vas-234-bar-out {
+    right: 50%;
+    background: #D85A30;
+    border-radius: 5px 0 0 5px;
+}
+
+.vas-234-bar-in {
+    left: 50%;
+    background: #1D9E75;
+    border-radius: 0 5px 5px 0;
+}
+
+/* The axis is always drawn, even on a row with no movement at all - it is the zero
+   the two sides are measured from, and it stands slightly proud of the track so it
+   reads as an axis rather than as a segment boundary. */
+.vas-234-axis {
+    left: 50%;
+    top: -3px;
+    width: 1px;
+    height: 15px;
+    background: #CBD5E1;
+}
+
+/* ---- Closing balance cell ---- */
+.vas-234-bal {
+    min-width: 0;
+    text-align: right;
+}
+
+.vas-234-bal-v {
+    font-size: .875em;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    color: #16202B;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Direction tones for the net figure. The explicit + / − sign printed with it carries
+   the same meaning as text, so the reading never rests on colour alone. */
+.vas-234-up {
+    color: #1D9E75;
+}
+
+.vas-234-down {
+    color: #D85A30;
+}
+
+/* ---- Loading skeleton: the shape of the page it is replacing ----
+   Never the previous page's figures dimmed - those would read as live data for as
+   long as the request takes. */
+.vas-234-skel {
+    display: grid;
+    grid-template-columns: minmax(0, 11.25em) minmax(0, 1fr) minmax(0, 7.375em);
+    gap: 1em;
+    align-items: center;
+    padding: .875em 2px;
+    border-top: 1px solid #E6EBF1;
+}
+
+    .vas-234-skel:first-child {
+        border-top: 0;
+    }
+
+.vas-234-skel span {
+    height: .75em;
+    border-radius: 4px;
+    background: #F1F5F9;
+    animation: vas-234-pulse 1.2s ease-in-out infinite;
+}
+
+.vas-234-skel-a {
+    width: 70%;
+}
+
+.vas-234-skel-b {
+    width: 100%;
+}
+
+.vas-234-skel-c {
+    width: 60%;
+    justify-self: end;
+}
+
+@keyframes vas-234-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vas-234-skel span {
+        animation: none;
+    }
+}
+
+/* Empty list - having no accessible bank accounts is a real answer, so it renders
+   INSIDE the list and the header and column labels stay put. Only a load failure
+   takes the whole card over (.vas-234-state below). */
+.vas-234-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: .8125em;
+    color: #5B6875;
+}
+
+/* ---- Footer: count left, pager right ----
+   Hidden entirely on a single page, and never rendered at all when there are no
+   rows. */
+.vas-234-foot {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    flex-wrap: wrap;
+}
+
+.vas-234-foot:not(:empty) {
+    border-top: 1px solid #E6EBF1;
+    padding-top: .6em;
+    margin-top: .2em;
+}
+
+.vas-234-count {
+    font-size: .6875em;
+    color: #8A97A5;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vas-234-pager {
+    display: flex;
+    align-items: center;
+    gap: .4em;
+    flex-shrink: 0;
+}
+
+.vas-234-page {
+    font-size: .75em;
+    font-weight: 500;
+    color: #5B6875;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas-234-pgbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: #16202B;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+
+    .vas-234-pgbtn:hover:not(:disabled) {
+        background: #F1F5F9;
+        border-color: #B6C5D4;
+    }
+
+    /* A disabled control is visibly inert as well as programmatically disabled - the
+       button keeps its box and reports its state, it is never hidden. */
+    .vas-234-pgbtn:disabled {
+        color: #B8C6D2;
+        border-color: #E6EBF1;
+        cursor: default;
+    }
+
+    .vas-234-pgbtn:focus-visible {
+        outline: 2px solid #1B6FD1;
+        outline-offset: 2px;
+    }
+
+    .vas-234-pgbtn svg {
+        width: .875em;
+        height: .875em;
+    }
+
+/* ---- State takeover: reserved for a load failure ---- */
+.vas-234-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .8125em;
+    font-weight: 400;
+    color: #5B6875;
+    line-height: 1.35;
+}
+
+.vas-234-hidden {
+    display: none !important;
+}
+
+/* ---- Sort picker (body-mounted, so it is NOT scoped under .vas-234-root) ----
+   Fixed-position panel anchored to the control by script. rem-based, not em: it lives
+   on <body> and has no widget root anchor to scale against. */
+.vas-234-pp {
+    position: fixed;
+    /* Same narrow band the sibling popovers use: above the glass cards, below every
+       framework layer (jQuery UI .ui-front = 100, dialogs 101+). */
+    z-index: 95;
+    box-sizing: border-box;
+    min-width: 200px;
+    max-width: calc(100vw - 16px);
+    max-height: 60vh;
+    overflow: auto;
+    padding: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(8, 24, 38, .22);
+    color: #102C3F;
+}
+
+    .vas-234-pp * {
+        box-sizing: border-box;
+    }
+
+.vas-234-pp-h {
+    font-size: .6875rem;
+    font-weight: 700;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 8px 10px 4px;
+}
+
+.vas-234-pp-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .875rem;
+    color: #102C3F;
+    padding: 9px 10px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+    .vas-234-pp-opt:hover {
+        background: #EAF8FF;
+    }
+
+    .vas-234-pp-opt[aria-selected="true"] {
+        background: #EAF8FF;
+        font-weight: 700;
+        color: #0083DA;
+    }
+
+    .vas-234-pp-opt:focus-visible {
+        outline: 2px solid #1B6FD1;
+        outline-offset: -2px;
+    }
+
+.vas-234-pp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-234-pp-tick {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+    color: #0083DA;
+    opacity: 0;
+}
+
+.vas-234-pp-opt[aria-selected="true"] .vas-234-pp-tick {
+    opacity: 1;
+}
+
+.vas-234-pp-tick svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ---- Narrow cells: the specification's mobile shape ----
+ *
+ * Account and Closing balance share the first line; the flow visualisation spans the
+ * full width beneath them; the column header is dropped, because its three flow
+ * labels no longer sit over anything. No horizontal scrollbar is introduced to keep
+ * the desktop columns - §16 forbids exactly that. */
+@container vas-234 (max-width: 460px) {
+    .vas-234-ghead {
+        display: none;
+    }
+
+    .vas-234-brow,
+    .vas-234-skel {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: .625em .75em;
+    }
+
+    .vas-234-brow .vas-234-acct {
+        grid-column: 1;
+    }
+
+    .vas-234-brow .vas-234-bal {
+        grid-column: 2;
+    }
+
+    .vas-234-brow .vas-234-flow {
+        grid-column: 1 / -1;
+    }
+
+    .vas-234-skel-c {
+        justify-self: end;
+    }
+
+    .vas-234-skel-b {
+        grid-column: 1 / -1;
+    }
+}
+
+/* ---- Narrow cells: step the card base font down so the em scale follows ----
+ *
+ * The sibling widgets' breakpoints and values. The overrides are ABSOLUTE px, never a
+ * relative `em` - an em override here would resolve against the inherited page font
+ * rather than the clamp and collapse the anchor unpredictably. */
+@container vas-234 (max-width: 300px) {
+    .vas-234-card {
+        font-size: 13px;
+    }
+}
+
+@container vas-234 (max-width: 220px) {
+    .vas-234-card {
+        font-size: 11px;
+    }
+}

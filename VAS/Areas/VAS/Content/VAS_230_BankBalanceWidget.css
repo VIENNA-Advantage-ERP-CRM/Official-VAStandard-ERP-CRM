@@ -1,0 +1,368 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_230_BankBalanceWidget.css
+ * Bank Balance (Banking dashboard, 2x1 single-metric KPI card).
+ *
+ * TWO SOURCES, EACH FOR WHAT IT OWNS.
+ *   design.md -> dashboard-widgets.md owns the SHELL and the STAT: the glass card,
+ *   the icon well, the title clamp, the interactive pill tier, §KPI And Summary Widget
+ *   and §Widget Stat Values (value 1.75em, Roboto SemiBold 600, line-height 1.05) and
+ *   §No Inner Scrollbars. That is what makes this card sit correctly beside
+ *   VAS_231 / VAS_233 / VAS_234 / VAS_235 / VAS_236 / VAS_238 / VAS_239.
+ *   The supplied widget.html owns the LAYOUT: the account pill in the header, and a
+ *   body holding one figure.
+ *
+ * THE VALUE IS 1.75em, NOT THE MOCK'S 34px. The mock hard-codes a pixel size; every
+ * other KPI on this dashboard sits on the widget-root em lever, so a fixed value would
+ * print this card's number up to a third larger than its neighbours' on a 2K dashboard.
+ * 1.75em resolves to 28px at the laptop floor and 35px at the clamp ceiling, which is
+ * the §Widget Stat Values table exactly.
+ *
+ * THERE IS NO FOOTER. The delta, the arrow and the "vs last close" caption are removed
+ * by requirement, so no rule here reserves or styles a footer band - the body holds one
+ * child and centres it.
+ *
+ * All internal sizing is em-driven off the widget root anchor; borders, radii and
+ * shadows stay in px ("Not Scaled With em"). No native tag selector is styled - every
+ * rule is scoped to a vas-230- class.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-230-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so the header and the base font can both step with the
+       CELL, not the viewport. Also the positioning context for the busy overlay. */
+    container: vas-230 / inline-size;
+}
+
+    .vas-230-root,
+    .vas-230-root * {
+        box-sizing: border-box;
+    }
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size
+   contract and finally to the viewport. Everything inside is em against this. */
+.vas-230-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: .85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    /* §No Inner Scrollbars - one figure always fits, so nothing here ever scrolls. */
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Header: icon well + title + account pill, all on one line ----
+   A 2x1 cell is about 124px tall at the 1280px laptop floor (§Content Fit Budget), so
+   the header gets one row and the value gets the rest. align-items:center rather than
+   flex-start: there is no subtitle, so the three items share one optical line. */
+.vas-230-header {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: .5em;
+}
+
+/* Icon well: 1.75em on the card's em lever - the sibling widgets' well, so the icons
+   read identically side by side. Flat #EAF8FF tile, 9px radius, no inset ring. */
+.vas-230-icon {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+    .vas-230-icon svg {
+        width: .95em;
+        height: .95em;
+        display: block;
+    }
+
+/* §Widget Header title verbatim: the --dash-inline-size clamp, Medium (500),
+   line-height 1.2, #102C3F - the sibling cards' title, so the headings match on a
+   shared row. On a KPI card this title IS the stat's label (§KPI And Summary Widget),
+   which is why there is no separate label above the value. */
+.vas-230-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Bank account selector - the interactive pill tier of the two-tier chip system (never
+   a third tier). Absolute clamp rather than an em, like the title: the card base drops
+   in a narrow cell and an em control would follow it down and stop being readable.
+   max-width + ellipsis cap it whatever the tenant names its accounts - and on a 2x1 the
+   cap has to be generous, because the pill is the only thing naming what the figure
+   below it belongs to. */
+.vas-230-acct {
+    flex: 0 1 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: .3em;
+    max-width: 48%;
+    font-family: inherit;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008125), 13px);
+    font-weight: 500;
+    line-height: 1.3;
+    color: #41576A;
+    background: rgba(255, 255, 255, .66);
+    border: 1px solid #D9E2EB;
+    border-radius: 999px;
+    padding: .3em .7em;
+    box-shadow: 0 4px 10px rgba(16, 47, 74, .05);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+    .vas-230-acct:hover {
+        background: #FFFFFF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-230-acct:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 1px;
+    }
+
+    .vas-230-acct svg {
+        flex: 0 0 auto;
+        color: #0083DA;
+    }
+
+.vas-230-acct-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Body: one figure, centred ----
+   The sibling single-metric cards (VAS_016 / VAS_018 / VAS_024 / VAS_025) distribute
+   header / value / footer with justify-content:space-between so the value ends up
+   vertically centred. This card has NO footer, and space-between with a single child
+   would pin that child to the top - so it centres explicitly, which lands the figure in
+   the same place the family puts it. No margin-top:auto anywhere. */
+.vas-230-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* §Widget Stat Values: 1.75em, Roboto SemiBold (600), line-height 1.05. The slight
+   negative tracking is the reference mock's, and it keeps a long compact figure from
+   reading loose at this size. */
+.vas-230-value {
+    font-size: 1.75em;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -.01em;
+    color: #102C3F;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-left: .3125em;
+}
+
+/* The currency symbol reads as a supporting mark, not as part of the number: the mock's
+   16px against a 34px value is ~0.47 of it, expressed here against the value's own em
+   so it tracks the stat at every dashboard width. */
+.vas-230-cur {
+    font-size: .47em;
+    font-weight: 500;
+    color: #41576A;
+    margin-right: .12em;
+    vertical-align: baseline;
+}
+
+/* The minus keeps the VALUE's size - it is part of the figure, and shrinking it would
+   let an overdrawn balance read as a positive one at a glance. */
+.vas-230-sign {
+    margin-right: .04em;
+}
+
+/* An overdrawn balance. The printed minus carries the same meaning as text, so the
+   reading never rests on colour alone. */
+.vas-230-neg {
+    color: #D14545;
+}
+
+/* No balance line for this account. Said at body scale rather than stat scale - it is a
+   sentence, not a figure - and never rendered as a zero. */
+.vas-230-nil {
+    font-size: .8125em;
+    font-weight: 400;
+    line-height: 1.35;
+    letter-spacing: normal;
+    color: #5F7283;
+    white-space: normal;
+    text-align: center;
+}
+
+/* ---- State takeover: a load failure, or no accessible bank account ---- */
+.vas-230-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 .5em;
+    font-size: .8125em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.35;
+    text-align: center;
+}
+
+.vas-230-hidden {
+    display: none !important;
+}
+
+/* ---- Bank account picker (body-mounted, so NOT scoped under .vas-230-root) ----
+   Fixed-position panel anchored to the pill by script. rem-based, not em: it lives on
+   <body> and has no widget root anchor to scale against. Identical in shape to the
+   sibling Banking cards' popovers. */
+.vas-230-pp {
+    position: fixed;
+    /* Same narrow band the sibling popovers use: above the glass cards, below every
+       framework layer (jQuery UI .ui-front = 100, dialogs 101+). */
+    z-index: 95;
+    box-sizing: border-box;
+    min-width: 220px;
+    max-width: calc(100vw - 16px);
+    max-height: 60vh;
+    overflow: auto;
+    padding: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(8, 24, 38, .22);
+    color: #102C3F;
+}
+
+    .vas-230-pp * {
+        box-sizing: border-box;
+    }
+
+.vas-230-pp-h {
+    font-size: .6875rem;
+    font-weight: 700;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 8px 10px 4px;
+}
+
+.vas-230-pp-empty {
+    padding: 8px 10px 10px;
+    font-size: .8125rem;
+    color: #748494;
+}
+
+.vas-230-pp-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .875rem;
+    color: #102C3F;
+    padding: 9px 10px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+    .vas-230-pp-opt:hover {
+        background: #EAF8FF;
+    }
+
+    .vas-230-pp-opt[aria-selected="true"] {
+        background: #EAF8FF;
+        font-weight: 700;
+        color: #0083DA;
+    }
+
+    .vas-230-pp-opt:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: -2px;
+    }
+
+.vas-230-pp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-230-pp-tick {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+    color: #0083DA;
+    opacity: 0;
+}
+
+.vas-230-pp-opt[aria-selected="true"] .vas-230-pp-tick {
+    opacity: 1;
+}
+
+/* ---- Narrow cells ----
+ *
+ * The title and the pill both have to survive: one says what the figure is, the other
+ * says whose it is. The icon well is the only expendable element, so it goes first and
+ * hands its width to the two of them. No horizontal scrollbar is ever introduced. */
+@container vas-230 (max-width: 260px) {
+    .vas-230-icon {
+        display: none;
+    }
+
+    .vas-230-acct {
+        max-width: 58%;
+    }
+}
+
+/* ---- Narrow cells: step the card base font down so the em scale follows ----
+ *
+ * The sibling widgets' breakpoints and values. The overrides are ABSOLUTE px, never a
+ * relative `em` - an em override here would resolve against the inherited page font
+ * rather than the clamp and collapse the anchor unpredictably. */
+@container vas-230 (max-width: 200px) {
+    .vas-230-card {
+        font-size: 13px;
+    }
+}
+
+@container vas-230 (max-width: 150px) {
+    .vas-230-card {
+        font-size: 11px;
+    }
+}
