@@ -253,6 +253,158 @@
 ///                        value as already-zoned and skip its own conversion,
 ///                        printing the stored clock. Same JSON on either engine
 ///                        now. No-op on Oracle.
+///   VAI163   2026-09-04  - The accounting section reads again. Its three queries
+///                          ran the MRole rewriter over tables that have no key
+///                          column for it to reach: AD_ClientInfo is keyed on
+///                          AD_Client_ID and M_Product_Acct on the pair
+///                          (M_Product_ID, C_AcctSchema_ID) — neither carries the
+///                          &lt;TableName&gt;_ID column SQL_FULLYQUALIFIED asks for. The
+///                          statement then either failed outright or matched
+///                          nothing, and a product whose Accounting tab is full
+///                          was reported as setting no accounts — or, when the
+///                          schema list itself came back empty, had no Accounting
+///                          section at all. All three are scoped to the reader's
+///                          own client explicitly instead. The access filter still
+///                          decides whether the PRODUCT may be seen (LoadSummary);
+///                          these rows are its dependents, reached by its id, and
+///                          the same rule the activity trail already follows now
+///                          covers them.
+///                        - A change to CreatedBy or UpdatedBy names the user. The
+///                          two columns hold an AD_User_ID but neither name ends
+///                          "_ID", so the table-reference branch never looked at
+///                          them and the timeline printed the raw key. They resolve
+///                          to the user's CODE (AD_User.Value), falling back to the
+///                          name where a tenant leaves the code unset.
+///   VAI163   2026-09-04  - A RECEIVED mail is a mail. MailAttachment1's
+///                          AttachmentType says which DIRECTION a message went, not
+///                          which kind of correspondence it is: AttachMailToBP files
+///                          every message it pulls from the inbox under 'I' — with
+///                          MailAddressFrom, DateMailReceived and MailUID on the same
+///                          row — and a sent one under 'M'. Reading 'I' as a LETTER
+///                          therefore reported every mail the tenant received against
+///                          the product as a letter, and left no received mail in the
+///                          feed as a mail at all. All MailAttachment1 rows are typed
+///                          "mail" now and the inbound ones carry IsReceived, read
+///                          from the type and then from the row's own evidence so an
+///                          untyped row is still placed correctly.
+///                        - Reserved and On order name the ONE open order behind the
+///                          figure (DocumentNo), on the same terms as its dates:
+///                          only where the count is exactly one. The caption gave a
+///                          date and a due date but nothing to look the order up by.
+///                        - Supplier information reports vendors the product was
+///                          BOUGHT from as well as vendors on its Vendor tab. It read
+///                          M_Product_PO and only stamped those rows with the purchase
+///                          history, so a product bought on a one-off order from a
+///                          vendor nobody had added to that tab showed no last used
+///                          vendor — and, with an empty tab, no Supplier section at
+///                          all. Such a vendor is added from the history itself and
+///                          flagged IsFromOrdersOnly, carrying no vendor-product terms
+///                          because it has no such record to carry them.
+///   VAI163   2026-09-04  Accounting reads FRPT_Product_Acct as well as
+///                        M_Product_Acct, FRPT first. The two are alternative
+///                        schemes for the same tab and the INSTALLATION picks
+///                        which is live: MProduct.AfterSave writes to
+///                        FRPT_Product_Acct when FRPT_Product_Category_Acct
+///                        exists and to M_Product_Acct when it does not. FRPT
+///                        keeps a ROW per account — (M_Product_ID,
+///                        C_AcctSchema_ID, FRPT_AcctDefault_ID,
+///                        C_ValidCombination_ID, SeqNo), the role NAMED by the
+///                        FRPT_AcctDefault record — rather than the twelve fixed
+///                        P_*_Acct columns, so on a tenant running it the
+///                        column reader looked at an empty M_Product_Acct and
+///                        reported every product as setting no accounts. Both
+///                        readers are dictionary-guarded and neither is assumed:
+///                        the classic table answers wherever FRPT is absent or
+///                        silent.
+///   VAI163   2026-09-04  Recent transactions: the INVENTORY REVALUATION source, and
+///                        four window names corrected.
+///                        - MInventoryRevaluation stamps the movements it posts with
+///                          MovementType 'IR' and M_Transaction.M_RevaluationLine_ID,
+///                          and this reader knew about neither — so a revaluation
+///                          arrived with no document type, no number and nothing to
+///                          click through to, reading as the unmapped-movement
+///                          fallback "Stock movement". Read now through
+///                          M_RevaluationLine to the M_InventoryRevaluation header,
+///                          with its own C_DocType name where the table carries one.
+///                          It names no window: one table, one screen, so the
+///                          dictionary's zoom target is right.
+///                        - An assembly opens VAS_Production (was VAS_Assembly), a
+///                          production execution VAMFG_ProductionExecution (was
+///                          VAMFG_ProductionOrder) and an asset disposal
+///                          VAFAM_AstDisposal (was VAFAM_AssetDisposal). None of the
+///                          three names existed in the dictionary, so each fell back
+///                          to its table's zoom target and the click failed on
+///                          access.
+///                        - A JOB WORK row's screen is decided by its DOCUMENT TYPE —
+///                          C_DocType.DocBaseType 'JW-' is the out — rather than by
+///                          the sign on the movement. VA143_JobWorkInOut is one table
+///                          under two screens and carries no direction flag of its
+///                          own. A job work OUT document both sends material to the
+///                          subcontractor and takes the processed goods back, so it
+///                          posts movements of both signs, and reading the sign put
+///                          the inbound ones on the Job Work In screen even where the
+///                          document was an out. Both the type column and DocBaseType
+///                          are dictionary-guarded and the sign still stands in where
+///                          either is missing.
+///   VAI163   2026-09-04  - The latest quality check reports the CONFIRMATION it was
+///                          raised on, not the receipt or transfer behind it: the
+///                          confirmation's own DocumentNo, and M_InOutConfirm /
+///                          M_MovementConfirm as what the panel opens. The check lives
+///                          on the confirmation screen, so naming the source document
+///                          sent a reader clicking through to the GRN or the delivery
+///                          order — a different document, which does not carry the
+///                          check at all. Neither confirmation names a window: one
+///                          table, one screen, so the zoom target is right.
+///                        - It also reports the confirmation's TYPE (the dictionary's
+///                          name for M_InOutConfirm.ConfirmType; the transfer side has
+///                          no type column and the panel names the document itself) and
+///                          the receipt's SALES REPRESENTATIVE in place of the business
+///                          partner, which named the vendor the goods came from and
+///                          answered a question nobody had. A transfer has no sales
+///                          representative, so the field is simply absent there.
+///                        - VOIDED and REVERSED documents are excluded, on the
+///                          confirmation and on the document behind it. A check that
+///                          was undone is not what was last found.
+///                        - An attribute-set instance carrying only attribute VALUES
+///                          is named from those values (FillAsiTexts — one statement
+///                          for the whole section, never one per row) where
+///                          M_AttributeSetInstance.Description is blank. That
+///                          description is a denormalised cache plenty of rows never
+///                          have written to them, and with no lot and no serial to
+///                          stand in, a BOM detail line specified for an attribute set
+///                          reported no attributes at all.
+///   VAI163   2026-09-04  Activity: what an entry SAYS and what it SORTS on are now
+///                        two different things, and the appointment reader carries
+///                        everything its detail view needs.
+///                        - An appointment or task is stamped with Created and
+///                          CreatedBy — when it was raised and who raised it. It was
+///                          stamped with the meeting's StartDate and its AD_User_ID,
+///                          and since AppointmentsInfo keeps one row per ATTENDEE
+///                          that user is whichever attendee's row survived
+///                          de-duplication: a name picked at random out of the
+///                          meeting, against a date on which nobody did anything.
+///                        - SortDate keeps the feed scannable: every source orders on
+///                          when it was raised, except an appointment and a task,
+///                          which order on when they are scheduled.
+///                        - The detail view's fields are read in the same statement —
+///                          category, location, meeting URL and its description,
+///                          comments, transcript, attendees, and for a task its
+///                          assignee, due date, priority (PriorityKey resolved through
+///                          the dictionary) and completion. Every one is
+///                          dictionary-guarded; one absent column must not cost the
+///                          feed. The attendee rows the feed collapses are gathered
+///                          into People rather than thrown away, and AttendeeInfo's
+///                          numeric tokens resolve in ONE lookup for the whole feed.
+///                        - A mail's direction comes from AttachmentType alone. A SENT
+///                          mail carries MailAddressFrom too — it is the address it
+///                          went out from — so treating a sender as evidence of an
+///                          inbound message reported every sent mail as received.
+///                        - Free text goes through PlainText: the CRM screens store
+///                          subjects, comments and chat entries HTML-ENCODED, so a
+///                          subject typed "Performance & Growth" reached the panel
+///                          reading "Performance &amp;amp; Growth". MailBodyToText
+///                          cannot answer for these — it returns early on anything
+///                          that does not look like markup.
 /// </summary>
 
 using System;
@@ -282,6 +434,14 @@ namespace VASLogic.Models
 
         /// <summary>C_DocType.DocBaseType of a sales order proper.</summary>
         private const string DOCBASETYPE_SALESORDER = "SOO";
+
+        /// <summary>
+        /// C_DocType.DocBaseType of a JOB WORK OUT — material going out to the
+        /// subcontractor. VA143_JobWorkInOut is one table under two screens and
+        /// carries no direction flag of its own, so its document TYPE is what
+        /// separates them; anything else on that table is a job work in.
+        /// </summary>
+        private const string DOCBASETYPE_JOBWORKOUT = "JW-";
 
         /// <summary>
         /// The C_DocType.DocSubTypeSO values that are NOT a sales order, though
@@ -917,6 +1077,7 @@ namespace VASLogic.Models
             s.ReservedOrderCount    = reserved.OrderCount;
             s.ReservedDateOrdered   = reserved.DateOrdered;
             s.ReservedDatePromised  = reserved.DatePromised;
+            s.ReservedDocumentNo    = reserved.DocumentNo;
 
             // --- On order: still-open quantity on completed PURCHASE orders ---
             OutstandingOrderInfo onOrder = LoadOutstandingOrderQty(ctx, M_Product_ID, false);
@@ -924,6 +1085,7 @@ namespace VASLogic.Models
             s.OnOrderCount          = onOrder.OrderCount;
             s.OnOrderDateOrdered    = onOrder.DateOrdered;
             s.OnOrderDatePromised   = onOrder.DatePromised;
+            s.OnOrderDocumentNo     = onOrder.DocumentNo;
 
             // The one availability formula this panel uses.
             s.AvailableToPromise = s.OnHandQty - s.ReservedQty;
@@ -942,14 +1104,15 @@ namespace VASLogic.Models
         /// are blanket orders and anything that is not a purchase order proper:
         /// a blanket order commits a price, it does not put stock on order.
         ///
-        /// The two dates are aggregates over the whole set, so they only describe
-        /// the figure when the set holds ONE order; the caller is what enforces
-        /// that, by showing them only when the count is one.
+        /// The two dates AND the document number are aggregates over the whole
+        /// set, so they only describe the figure when the set holds ONE order;
+        /// this method is what enforces that, reading them off the row only when
+        /// the count is one. MIN over a single row is that row.
         /// </summary>
         /// <param name="ctx">User context.</param>
         /// <param name="M_Product_ID">Selected product id.</param>
         /// <param name="isSalesOrder">True for reserved (SO), false for on order (PO).</param>
-        /// <returns>Quantity, order count and the single order's dates.</returns>
+        /// <returns>Quantity, order count and the single order's number and dates.</returns>
         private OutstandingOrderInfo LoadOutstandingOrderQty(Ctx ctx, int M_Product_ID,
                                                              bool isSalesOrder)
         {
@@ -961,7 +1124,8 @@ namespace VASLogic.Models
             string sql = @"SELECT COALESCE(SUM(COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)), 0) AS OutstandingQty,
                                   COUNT(DISTINCT o.C_Order_ID) AS OrderCount,
                                   MIN(o.DateOrdered) AS DateOrdered,
-                                  MIN(o.DatePromised) AS DatePromised
+                                  MIN(o.DatePromised) AS DatePromised,
+                                  MIN(o.DocumentNo) AS DocumentNo
                            FROM C_Order o
                            INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID
                                                          AND ol.IsActive='Y')"
@@ -990,6 +1154,10 @@ namespace VASLogic.Models
             {
                 info.DateOrdered  = Stamp(r["DateOrdered"]);
                 info.DatePromised = Stamp(r["DatePromised"]);
+                // Which order it is. The caption named a date and a due date but
+                // never the document, so a reader who wanted to go and look at the
+                // one order behind the figure had nothing to look it up by.
+                info.DocumentNo   = Util.GetValueOfString(r["DocumentNo"]);
             }
             return info;
         }
@@ -1152,6 +1320,12 @@ namespace VASLogic.Models
         /// preferred — it is what the platform's own formatter produced — and the
         /// lot / serial / guarantee values stand in when there is none. A "--"
         /// placeholder description is treated as absent.
+        ///
+        /// Where all four are empty the caller is left with nothing, which is the
+        /// case an instance carrying ONLY attribute values falls into:
+        /// M_AttributeSetInstance.Description is a denormalised cache that plenty
+        /// of rows never have written to them. <see cref="FillAsiTexts"/> resolves
+        /// those from the attribute values themselves.
         /// </summary>
         private string BuildAsiText(string description, string lot, string serNo, DateTime? guarantee)
         {
@@ -1163,6 +1337,81 @@ namespace VASLogic.Models
             if (!string.IsNullOrEmpty(serNo)) parts.Add(serNo.Trim());
             if (guarantee.HasValue)           parts.Add(guarantee.Value.ToString("yyyy-MM-dd"));
             return string.Join(" · ", parts.ToArray());
+        }
+
+        /// <summary>
+        /// Names the attribute-set instances whose text came back EMPTY, by
+        /// reading the attribute values themselves (M_AttributeInstance), and
+        /// hands each id its "Attribute: Value" line.
+        ///
+        /// The instances that need it are collected first and read in ONE
+        /// statement — never one query per row, which on a section carrying a
+        /// product's whole movement history would be hundreds. Only genuinely
+        /// blank ones are asked about, so an instance whose stored description is
+        /// good costs nothing.
+        /// </summary>
+        /// <param name="asiIds">Instance ids with no text yet; may be empty.</param>
+        /// <returns>Instance id to its readable text; ids that name nothing are absent.</returns>
+        private Dictionary<int, string> FillAsiTexts(List<int> asiIds)
+        {
+            Dictionary<int, string> texts = new Dictionary<int, string>();
+            if (asiIds == null || asiIds.Count == 0) return texts;
+            if (!TableExists("M_AttributeInstance") || !TableExists("M_Attribute")) return texts;
+
+            // What an instance stores per attribute: a LIST attribute points at an
+            // M_AttributeValue, and a text or numeric one keeps its own value on
+            // the instance row. Each is optional between revisions.
+            bool hasValueId  = ColumnExists("M_AttributeInstance", "M_AttributeValue_ID")
+                            && TableExists("M_AttributeValue");
+            bool hasValue    = ColumnExists("M_AttributeInstance", "Value");
+            bool hasValueNum = ColumnExists("M_AttributeInstance", "ValueNumber");
+
+            List<string> valueParts = new List<string>();
+            if (hasValueId)  valueParts.Add("av.Name");
+            if (hasValue)    valueParts.Add("ai.Value");
+            if (hasValueNum) valueParts.Add("CAST(ai.ValueNumber AS VARCHAR(60))");
+            if (valueParts.Count == 0) return texts;
+
+            string valueExpr = valueParts.Count == 1
+                ? valueParts[0] : "COALESCE(" + string.Join(", ", valueParts.ToArray()) + ")";
+            string valueJoin = hasValueId
+                ? @" LEFT OUTER JOIN M_AttributeValue av
+                       ON (av.M_AttributeValue_ID=ai.M_AttributeValue_ID)" : "";
+
+            // The id list is built from integers this model read out of the
+            // database, so nothing typed by a user reaches the statement. No MRole:
+            // these are the attribute values OF rows already read under the access
+            // filter, reached by id — see LoadAcctRow for the same rule.
+            string sql = @"SELECT ai.M_AttributeSetInstance_ID AS AsiId,
+                                  a.Name AS AttributeName,
+                                  " + valueExpr + @" AS AttributeValue
+                           FROM M_AttributeInstance ai
+                           INNER JOIN M_Attribute a ON (a.M_Attribute_ID=ai.M_Attribute_ID)"
+                           + valueJoin + @"
+                           WHERE ai.M_AttributeSetInstance_ID IN (" + JoinIds(asiIds) + @")
+                           ORDER BY ai.M_AttributeSetInstance_ID, a.Name";
+
+            DataSet ds = Query(sql, null, "FillAsiTexts");
+            if (ds == null || ds.Tables.Count == 0) return texts;
+
+            Dictionary<int, List<string>> partsById = new Dictionary<int, List<string>>();
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                string value = Util.GetValueOfString(r["AttributeValue"]).Trim();
+                if (value.Length == 0) continue;   // an attribute left unanswered says nothing
+
+                int asiId = Util.GetValueOfInt(r["AsiId"]);
+                string name = Util.GetValueOfString(r["AttributeName"]).Trim();
+
+                if (!partsById.ContainsKey(asiId)) partsById[asiId] = new List<string>();
+                partsById[asiId].Add(name.Length > 0 ? name + ": " + value : value);
+            }
+
+            foreach (KeyValuePair<int, List<string>> pair in partsById)
+            {
+                texts[pair.Key] = string.Join(" · ", pair.Value.ToArray());
+            }
+            return texts;
         }
 
         // ----------------------------------------------------------------- //
@@ -1535,6 +1784,9 @@ namespace VASLogic.Models
                            AND bp.M_AttributeSetInstance_ID > 0)"
                 : "";
 
+            string asiIdExpr = hasAsi
+                ? "COALESCE(bp.M_AttributeSetInstance_ID, 0)" : "0";
+
             string sql = @"SELECT b.M_BOM_ID,
                                   b.Name AS BomName,
                                   bp.M_BOMProduct_ID,
@@ -1543,6 +1795,7 @@ namespace VASLogic.Models
                                   parent.Name AS ParentProductName,
                                   COALESCE(parent.IsVerified, 'N') AS IsVerified,
                                   COALESCE(bp.BOMQty, 0) AS BomQty,
+                                  " + asiIdExpr + @" AS AsiId,
                                   " + asiExprs + @"
                            FROM M_BOMProduct bp
                            INNER JOIN M_BOM b ON (b.M_BOM_ID=bp.M_BOM_ID
@@ -1558,9 +1811,15 @@ namespace VASLogic.Models
             DataSet ds = Query(sql, ProductParam(M_Product_ID), "LoadWhereUsedBoms");
             if (ds == null || ds.Tables.Count == 0) return;
 
+            // Detail lines whose instance named nothing, to be resolved from the
+            // attribute VALUES in one further statement.
+            List<int> unnamedAsiIds = new List<int>();
+            Dictionary<int, List<BomRowData>> rowsByAsi =
+                new Dictionary<int, List<BomRowData>>();
+
             foreach (DataRow r in ds.Tables[0].Rows)
             {
-                rows.Add(new BomRowData
+                BomRowData row = new BomRowData
                 {
                     Kind             = "usedin",
                     M_BOM_ID         = Util.GetValueOfInt(r["M_BOM_ID"]),
@@ -1578,7 +1837,30 @@ namespace VASLogic.Models
                         Util.GetValueOfString(r["SerNo"]),
                         Stamp(r["GuaranteeDate"])),
                     IsVerified       = Util.GetValueOfString(r["IsVerified"]) == "Y"
-                });
+                };
+                rows.Add(row);
+
+                // A detail line specified for an attribute set whose instance
+                // carries no description, no lot and no serial reported NOTHING —
+                // and an instance holding only attribute VALUES is exactly that
+                // shape, which is why a BOM line with an attribute set showed
+                // none. Those are named from the values below.
+                int asiId = Util.GetValueOfInt(r["AsiId"]);
+                if (asiId <= 0 || row.Attributes.Length > 0) continue;
+
+                if (!rowsByAsi.ContainsKey(asiId))
+                {
+                    rowsByAsi[asiId] = new List<BomRowData>();
+                    unnamedAsiIds.Add(asiId);
+                }
+                rowsByAsi[asiId].Add(row);
+            }
+
+            Dictionary<int, string> asiTexts = FillAsiTexts(unnamedAsiIds);
+            foreach (KeyValuePair<int, string> pair in asiTexts)
+            {
+                if (!rowsByAsi.ContainsKey(pair.Key)) continue;
+                foreach (BomRowData row in rowsByAsi[pair.Key]) row.Attributes = pair.Value;
             }
         }
 
@@ -1717,26 +1999,79 @@ namespace VASLogic.Models
             return m > r ? movement : receipt;
         }
 
-        /// <summary>The latest check raised on a receipt / shipment confirmation.</summary>
+        /// <summary>
+        /// The DocStatus values a document must not be in for its check to count.
+        /// A voided or reversed confirmation records a check that was undone, and
+        /// the section is read as "what was last found" — so it must not be the
+        /// answer.
+        /// </summary>
+        private const string DOCSTATUS_NOT_VOIDED = " NOT IN ('VO','RE')";
+
+        /// <summary>
+        /// The predicate excluding voided and reversed documents, applied to one
+        /// alias's DocStatus. Empty where the table has no DocStatus, so the
+        /// statement simply keeps its previous reach.
+        /// </summary>
+        private string NotVoidedPredicate(string tableName, string alias)
+        {
+            return ColumnExists(tableName, "DocStatus")
+                ? " AND COALESCE(" + alias + ".DocStatus, ' ')" + DOCSTATUS_NOT_VOIDED : "";
+        }
+
+        /// <summary>
+        /// The latest check raised on a receipt / shipment confirmation.
+        ///
+        /// The row reports the CONFIRMATION, not the receipt behind it: its own
+        /// document number, and the confirmation record as what the panel opens.
+        /// The check is raised ON the confirmation and lives on the Ship/Receipt
+        /// Confirmation screen, so naming the receipt sent a reader clicking
+        /// through to the GRN — a different document, which does not carry the
+        /// check at all.
+        /// </summary>
         private QualityCheckData LoadLatestReceiptQualityCheck(Ctx ctx, int M_Product_ID)
         {
-            if (!TableExists("VA010_ShipConfParameters")) return null;
+            if (!TableExists("VA010_ShipConfParameters") || !TableExists("M_InOutConfirm"))
+                return null;
+
+            // The SALES REPRESENTATIVE on the receipt, which is who a reader asks
+            // about; the business partner was the vendor the goods came from and
+            // answered a question nobody had. Optional on the schema, and absent
+            // altogether on the transfer side.
+            bool hasSalesRep = ColumnExists("M_InOut", "SalesRep_ID");
+            string salesRepExpr = hasSalesRep ? "sr.Name" : "CAST(NULL AS VARCHAR(60))";
+            string salesRepJoin = hasSalesRep
+                ? " LEFT OUTER JOIN AD_User sr ON (sr.AD_User_ID=io.SalesRep_ID)" : "";
+
+            // The confirmation's TYPE — the dictionary's own name for
+            // M_InOutConfirm.ConfirmType, resolved after the read. The table has
+            // no C_DocType_ID; ConfirmType is what says which kind of
+            // confirmation this is.
+            bool hasConfirmType = ColumnExists("M_InOutConfirm", "ConfirmType");
+            string confirmTypeExpr = hasConfirmType
+                ? "ioc.ConfirmType" : "CAST(NULL AS VARCHAR(60))";
 
             string sql = @"SELECT qc.M_InOutLineConfirm_ID   AS ConfirmLineId,
                                   " + QualityCheckColumns("VA010_ShipConfParameters") + @",
                                   " + ConfirmationNoExpr("M_InOutLineConfirm") + @" AS ConfirmationNo,
-                                  io.M_InOut_ID              AS DocRecordId,
-                                  io.DocumentNo,
+                                  ioc.M_InOutConfirm_ID      AS DocRecordId,
+                                  ioc.DocumentNo,
+                                  " + confirmTypeExpr + @" AS ConfirmTypeCode,
                                   COALESCE(io.IsSOTrx, 'N')  AS DocIsSOTrx,
-                                  bp.Name                    AS BPartnerName
+                                  " + salesRepExpr + @" AS SalesRepName
                            FROM VA010_ShipConfParameters qc
                            INNER JOIN M_InOutLineConfirm lc ON (lc.M_InOutLineConfirm_ID=qc.M_InOutLineConfirm_ID)
+                           INNER JOIN M_InOutConfirm ioc ON (ioc.M_InOutConfirm_ID=lc.M_InOutConfirm_ID
+                                                             AND ioc.IsActive='Y')
                            LEFT OUTER JOIN M_InOutLine iol ON (iol.M_InOutLine_ID=lc.M_InOutLine_ID)
-                           LEFT OUTER JOIN M_InOut io ON (io.M_InOut_ID=iol.M_InOut_ID)
-                           LEFT OUTER JOIN C_BPartner bp ON (bp.C_BPartner_ID=io.C_BPartner_ID)
+                           LEFT OUTER JOIN M_InOut io ON (io.M_InOut_ID=iol.M_InOut_ID)"
+                           + salesRepJoin + @"
                            " + QualityCheckParamJoins("VA010_ShipConfParameters") + @"
                            WHERE qc.M_Product_ID=@M_Product_ID
-                             AND qc.IsActive='Y'";
+                             AND qc.IsActive='Y'"
+                           // Neither the confirmation nor the receipt behind it
+                           // may be voided or reversed.
+                           + NotVoidedPredicate("M_InOutConfirm", "ioc")
+                           + NotVoidedPredicate("M_InOut", "io");
             // The check record is the main physical table here, so it carries the
             // access filter — and ORDER BY is appended after it, since the
             // rewriter adds its predicate to the end of what it is handed.
@@ -1744,37 +2079,62 @@ namespace VASLogic.Models
                 sql, "qc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             sql += " ORDER BY " + QUALITY_CHECK_ORDER;
 
-            return BuildLatestQualityCheck(
+            QualityCheckData check = BuildLatestQualityCheck(
                 Query(sql, ProductParam(M_Product_ID), "LoadLatestReceiptQualityCheck"),
-                "RECEIPT", "M_InOut");
+                "RECEIPT", "M_InOutConfirm");
+            if (check != null && hasConfirmType)
+            {
+                // The tenant's own word for the confirmation type, in the reader's
+                // language, rather than the stored code.
+                Dictionary<string, string> labels =
+                    LoadRefListLabels(ctx, "M_InOutConfirm", "ConfirmType");
+                string code = check.DocTypeCode ?? "";
+                if (code.Length > 0 && labels.ContainsKey(code)) check.DocTypeName = labels[code];
+            }
+            return check;
         }
 
-        /// <summary>The latest check raised on an internal transfer's confirmation.</summary>
+        /// <summary>
+        /// The latest check raised on an internal transfer's confirmation
+        /// (M_MovementConfirm). Reported on the same terms as the receipt side —
+        /// the CONFIRMATION's own number, and the confirmation as what the panel
+        /// opens — so a transfer check no longer points at the transfer document.
+        ///
+        /// M_MovementConfirm carries no ConfirmType and no sales representative:
+        /// a transfer moves stock between the tenant's own warehouses, so neither
+        /// exists to report. The panel names the kind of document instead.
+        /// </summary>
         private QualityCheckData LoadLatestMovementQualityCheck(Ctx ctx, int M_Product_ID)
         {
-            if (!TableExists("VA010_MoveConfParameters")) return null;
+            if (!TableExists("VA010_MoveConfParameters") || !TableExists("M_MovementConfirm"))
+                return null;
 
             string sql = @"SELECT qc.M_MovementLineConfirm_ID AS ConfirmLineId,
                                   " + QualityCheckColumns("VA010_MoveConfParameters") + @",
                                   " + ConfirmationNoExpr("M_MovementLineConfirm") + @" AS ConfirmationNo,
-                                  mv.M_Movement_ID            AS DocRecordId,
-                                  mv.DocumentNo,
+                                  mvc.M_MovementConfirm_ID    AS DocRecordId,
+                                  mvc.DocumentNo,
+                                  CAST(NULL AS VARCHAR(60))   AS ConfirmTypeCode,
                                   'N'                         AS DocIsSOTrx,
-                                  CAST(NULL AS VARCHAR(60))   AS BPartnerName
+                                  CAST(NULL AS VARCHAR(60))   AS SalesRepName
                            FROM VA010_MoveConfParameters qc
                            INNER JOIN M_MovementLineConfirm lc ON (lc.M_MovementLineConfirm_ID=qc.M_MovementLineConfirm_ID)
+                           INNER JOIN M_MovementConfirm mvc ON (mvc.M_MovementConfirm_ID=lc.M_MovementConfirm_ID
+                                                                AND mvc.IsActive='Y')
                            LEFT OUTER JOIN M_MovementLine mvl ON (mvl.M_MovementLine_ID=lc.M_MovementLine_ID)
                            LEFT OUTER JOIN M_Movement mv ON (mv.M_Movement_ID=mvl.M_Movement_ID)
                            " + QualityCheckParamJoins("VA010_MoveConfParameters") + @"
                            WHERE qc.M_Product_ID=@M_Product_ID
-                             AND qc.IsActive='Y'";
+                             AND qc.IsActive='Y'"
+                           + NotVoidedPredicate("M_MovementConfirm", "mvc")
+                           + NotVoidedPredicate("M_Movement", "mv");
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql, "qc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             sql += " ORDER BY " + QUALITY_CHECK_ORDER;
 
             return BuildLatestQualityCheck(
                 Query(sql, ProductParam(M_Product_ID), "LoadLatestMovementQualityCheck"),
-                "MOVEMENT", "M_Movement");
+                "MOVEMENT", "M_MovementConfirm");
         }
 
         /// <summary>
@@ -1899,7 +2259,8 @@ namespace VASLogic.Models
             check.DocRecordId    = Util.GetValueOfInt(first["DocRecordId"]);
             check.DocumentNo     = Util.GetValueOfString(first["DocumentNo"]);
             check.ConfirmationNo = Util.GetValueOfString(first["ConfirmationNo"]);
-            check.BPartnerName   = Util.GetValueOfString(first["BPartnerName"]);
+            check.DocTypeCode    = Util.GetValueOfString(first["ConfirmTypeCode"]);
+            check.SalesRepName   = Util.GetValueOfString(first["SalesRepName"]);
             check.DocIsSOTrx     = Util.GetValueOfString(first["DocIsSOTrx"]) == "Y";
             check.CheckDate      = Stamp(first["CheckDate"]);
             check.QtyToVerify    = NullableDecimal(first["QtyToVerify"]);
@@ -2019,12 +2380,17 @@ namespace VASLogic.Models
         /// </summary>
         private void ApplyPurchaseHistory(Ctx ctx, int M_Product_ID, List<SupplierRowData> rows)
         {
-            if (rows.Count == 0) return;
+            // No early return on an empty list. The history is now what SUPPLIES
+            // rows as well as what stamps them, so a product with purchases and
+            // an empty Vendor tab — which is what a product bought on a one-off
+            // order looks like — used to return here with nothing and show no
+            // Supplier section at all.
 
             // The latest purchase order per VENDOR, ranked outside the
             // access-filtered statement. Purchase orders proper only — a blanket
             // order or a vendor return is not what the product was bought on.
             string inner = @"SELECT o.C_BPartner_ID,
+                                    bp.Name AS VendorName,
                                     o.C_Order_ID,
                                     o.DocumentNo,
                                     o.DateOrdered,
@@ -2035,6 +2401,7 @@ namespace VASLogic.Models
                              FROM C_Order o
                              INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID
                                                            AND ol.IsActive='Y')
+                             INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=o.C_BPartner_ID)
                              LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=o.C_Currency_ID)"
                              + OrderDocTypeJoin(false) + @"
                              WHERE ol.M_Product_ID=@M_Product_ID
@@ -2046,6 +2413,7 @@ namespace VASLogic.Models
                 inner, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             string sql = @"SELECT x.C_BPartner_ID,
+                                  x.VendorName,
                                   x.C_Order_ID,
                                   x.DocumentNo,
                                   x.DateOrdered,
@@ -2054,6 +2422,7 @@ namespace VASLogic.Models
                                   x.ISO_Code,
                                   x.CurPrecision
                            FROM (SELECT h.C_BPartner_ID,
+                                        h.VendorName,
                                         h.C_Order_ID,
                                         h.DocumentNo,
                                         h.DateOrdered,
@@ -2073,23 +2442,45 @@ namespace VASLogic.Models
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 int vendorId = Util.GetValueOfInt(r["C_BPartner_ID"]);
+
+                SupplierRowData row = null;
                 for (int i = 0; i < rows.Count; i++)
                 {
-                    if (rows[i].C_BPartner_ID != vendorId) continue;
-
-                    rows[i].LastOrderDate  = Stamp(r["DateOrdered"]);
-                    rows[i].LastOrderNo    = Util.GetValueOfString(r["DocumentNo"]);
-                    rows[i].LastOrderId    = Util.GetValueOfInt(r["C_Order_ID"]);
-                    rows[i].LastOrderPrice = NullableDecimal(r["PriceActual"]);
-                    // The order's own currency describes the price on it; the
-                    // vendor-product row's currency describes only its own field.
-                    string sym = Util.GetValueOfString(r["CurSymbol"]);
-                    if (!string.IsNullOrEmpty(sym)) rows[i].CurSymbol = sym;
-                    string iso = Util.GetValueOfString(r["ISO_Code"]);
-                    if (!string.IsNullOrEmpty(iso)) rows[i].ISO_Code = iso;
-                    rows[i].CurPrecision = Util.GetValueOfInt(r["CurPrecision"]);
-                    break;
+                    if (rows[i].C_BPartner_ID == vendorId) { row = rows[i]; break; }
                 }
+
+                // A vendor the product was actually BOUGHT FROM but that has no
+                // row on its Vendor tab is still a supplier of it, and was the
+                // one the reader most wanted to see: the section is read to
+                // answer "who did we last buy this from", and a purchase from a
+                // vendor nobody had added to M_Product_PO left that question
+                // unanswered — the whole "last used" flag went with it, because
+                // it can only be raised on a row that exists. Such a vendor is
+                // added from the purchase history itself, carrying no
+                // vendor-product terms (no lead time, no preferred flag, no
+                // catalogue number) because it has none to carry.
+                if (row == null)
+                {
+                    row = new SupplierRowData
+                    {
+                        C_BPartner_ID = vendorId,
+                        VendorName    = Util.GetValueOfString(r["VendorName"]),
+                        IsFromOrdersOnly = true
+                    };
+                    rows.Add(row);
+                }
+
+                row.LastOrderDate  = Stamp(r["DateOrdered"]);
+                row.LastOrderNo    = Util.GetValueOfString(r["DocumentNo"]);
+                row.LastOrderId    = Util.GetValueOfInt(r["C_Order_ID"]);
+                row.LastOrderPrice = NullableDecimal(r["PriceActual"]);
+                // The order's own currency describes the price on it; the
+                // vendor-product row's currency describes only its own field.
+                string sym = Util.GetValueOfString(r["CurSymbol"]);
+                if (!string.IsNullOrEmpty(sym)) row.CurSymbol = sym;
+                string iso = Util.GetValueOfString(r["ISO_Code"]);
+                if (!string.IsNullOrEmpty(iso)) row.ISO_Code = iso;
+                row.CurPrecision = Util.GetValueOfInt(r["CurPrecision"]);
             }
 
             // The most recently used vendor of them all. Only one row is marked:
@@ -2371,6 +2762,15 @@ namespace VASLogic.Models
             bool hasJobWork    = ColumnExists("M_Transaction", "VA143_JobWorkInOutLine_ID")
                               && TableExists("VA143_JobWorkInOutLine") && TableExists("VA143_JobWorkInOut");
             bool hasInvoiceTrx = ColumnExists("M_Transaction", "C_InvoiceLine_ID");
+            // An INVENTORY REVALUATION. MInventoryRevaluation stamps the movements
+            // it posts with MovementType 'IR' and M_Transaction.M_RevaluationLine_ID,
+            // and this reader knew about neither — so a revaluation reached the
+            // panel with no document type, no number and nothing to click through
+            // to, under the unmapped-movement fallback "Stock movement", which is
+            // not what it is.
+            bool hasRevaluation = ColumnExists("M_Transaction", "M_RevaluationLine_ID")
+                              && TableExists("M_RevaluationLine")
+                              && TableExists("M_InventoryRevaluation");
 
             // Document numbers, in the order the CASE below tests the sources.
             StringBuilder extraDocNo   = new StringBuilder();
@@ -2438,6 +2838,22 @@ namespace VASLogic.Models
                     extraTypeName.Append(", jwdt.Name");
                 }
             }
+            if (hasRevaluation)
+            {
+                extraDocNo.Append(", revh.DocumentNo");
+                extraTable.Append(" WHEN revh.M_InventoryRevaluation_ID IS NOT NULL THEN 'M_InventoryRevaluation'");
+                extraRecord.Append(", revh.M_InventoryRevaluation_ID");
+                extraJoins.Append(@" LEFT OUTER JOIN M_RevaluationLine revl
+                                            ON (revl.M_RevaluationLine_ID=mt.M_RevaluationLine_ID)
+                                     LEFT OUTER JOIN M_InventoryRevaluation revh
+                                            ON (revh.M_InventoryRevaluation_ID=revl.M_InventoryRevaluation_ID)");
+                if (ColumnExists("M_InventoryRevaluation", "C_DocType_ID"))
+                {
+                    extraJoins.Append(@" LEFT OUTER JOIN C_DocType revdt
+                                                ON (revdt.C_DocType_ID=revh.C_DocType_ID)");
+                    extraTypeName.Append(", revdt.Name");
+                }
+            }
             if (hasInvoiceTrx)
             {
                 // An invoice-driven movement — the cost correction a vendor invoice
@@ -2462,6 +2878,24 @@ namespace VASLogic.Models
             // for the window the row opens. 'N' where there is no such source.
             string invoiceSoTrxExpr = hasInvoiceTrx ? "COALESCE(cinv.IsSOTrx, 'N')" : "'N'";
 
+            // Which way a JOB WORK document went, read from the DOCUMENT and not
+            // from the movement it posted. The two are not the same thing: a job
+            // work OUT document sends material to the subcontractor AND takes the
+            // processed goods back, so it posts movements of both signs — and the
+            // sign was all this reader had, which is why a Job Work Out row opened
+            // the Job Work In screen.
+            //
+            // VA143_JobWorkInOut has no IsSOTrx of its own. What separates the two
+            // is its DOCUMENT TYPE's base type: 'JW-' is the out. The join that
+            // reads it is the one already added above for the type's name, so this
+            // is gated on exactly the condition that emits it — a blank means the
+            // installation has no such column and the movement's sign stands in.
+            bool hasJobWorkDocType = hasJobWork
+                                  && ColumnExists("VA143_JobWorkInOut", "C_DocType_ID")
+                                  && ColumnExists("C_DocType", "DocBaseType");
+            string jobWorkBaseTypeExpr = hasJobWorkDocType
+                ? "COALESCE(jwdt.DocBaseType, ' ')" : "' '";
+
             string inner = @"SELECT mt.M_Transaction_ID,
                                     mt.MovementType,
                                     mt.MovementDate,
@@ -2480,6 +2914,7 @@ namespace VASLogic.Models
                                     + extraRecord + @") AS DocRecordId,
                                     COALESCE(io.IsSOTrx, 'N') AS DocIsSOTrx,
                                     " + invoiceSoTrxExpr + @" AS InvoiceIsSOTrx,
+                                    " + jobWorkBaseTypeExpr + @" AS JobWorkDocBaseType,
                                     " + ioReturnExpr + @" AS DocIsReturn,
                                     " + invInternalExpr + @" AS DocIsInternalUse,
                                     wh.Name AS WarehouseName,
@@ -2542,7 +2977,8 @@ namespace VASLogic.Models
                         Util.GetValueOfString(r["DocIsReturn"]) == "Y",
                         Util.GetValueOfString(r["DocIsInternalUse"]) == "Y",
                         Util.GetValueOfString(r["MovementType"]),
-                        Util.GetValueOfString(r["InvoiceIsSOTrx"]) == "Y"),
+                        Util.GetValueOfString(r["InvoiceIsSOTrx"]) == "Y",
+                        Util.GetValueOfString(r["JobWorkDocBaseType"])),
                     WarehouseName    = Util.GetValueOfString(r["WarehouseName"]),
                     LocatorName      = Util.GetValueOfString(r["LocatorName"]),
                     Attributes       = BuildAsiText(
@@ -2596,9 +3032,14 @@ namespace VASLogic.Models
         /// out to the job worker or came back.</param>
         /// <param name="invoiceIsSOTrx">The invoice behind an invoice-driven
         /// movement is a sales one — a customer invoice rather than a vendor's.</param>
+        /// <param name="jobWorkDocBaseType">The C_DocType.DocBaseType of the job
+        /// work document — <see cref="DOCBASETYPE_JOBWORKOUT"/> for the out, any
+        /// other value for the in. Blank where the installation cannot supply it
+        /// and the movement's own sign has to stand in.</param>
         private static string TransactionWindowName(string docTable, bool isSOTrx,
                                                     bool isReturn, bool isInternalUse,
-                                                    string movementType, bool invoiceIsSOTrx)
+                                                    string movementType, bool invoiceIsSOTrx,
+                                                    string jobWorkDocBaseType)
         {
             if (docTable == "M_InOut")
             {
@@ -2612,24 +3053,37 @@ namespace VASLogic.Models
             if (docTable == "M_Movement") return "VAS_MaterialTransfer";
             // An assembly / disassembly. Both directions are the one document and
             // the one screen — which of them a row is, its movement type says.
-            if (docTable == "M_Production") return "VAS_Assembly";
-            // A production order's own issue or receipt. The name is the one
-            // VAS_098 and VAS_102 already open that screen by.
-            if (docTable == "VAMFG_M_WrkOdrTransaction") return "VAMFG_ProductionOrder";
-            if (docTable == "VAFAM_AssetDisposal") return "VAFAM_AssetDisposal";
+            if (docTable == "M_Production") return "VAS_Production";
+            // A production order's own issue or receipt.
+            if (docTable == "VAMFG_M_WrkOdrTransaction") return "VAMFG_ProductionExecution";
+            if (docTable == "VAFAM_AssetDisposal") return "VAFAM_AstDisposal";
             if (docTable == "VA143_JobWorkInOut")
             {
-                // Goods leaving for the job worker and goods coming back are the
-                // same table under two screens, told apart by the sign on the
-                // movement: '+' is stock arriving, '-' is stock leaving.
-                string mt = (movementType ?? "").Trim();
-                bool inbound = mt.EndsWith("+");
-                return inbound ? "VA143_JobWorkIn" : "VA143_JobWorkOut";
+                // Two screens over one table, and the DOCUMENT TYPE decides which —
+                // not the movement. A job work OUT document both sends material to
+                // the subcontractor and takes the processed goods back, so it posts
+                // movements of both signs; reading the sign put every inbound one
+                // of them on the Job Work In screen, including the ones belonging
+                // to an out document.
+                string baseType = (jobWorkDocBaseType ?? "").Trim();
+                if (baseType.Length > 0)
+                {
+                    return baseType == DOCBASETYPE_JOBWORKOUT
+                        ? "VA143_JobWorkOut" : "VA143_JobWorkIn";
+                }
+                // No direction column on this installation. The sign is all there
+                // is: '+' is stock arriving, '-' is stock leaving.
+                return (movementType ?? "").Trim().EndsWith("+")
+                    ? "VA143_JobWorkIn" : "VA143_JobWorkOut";
             }
             if (docTable == "C_Invoice")
             {
                 return invoiceIsSOTrx ? "VAS_ARInvoice" : "VAS_APInvoice";
             }
+            // An inventory revaluation names no window: M_InventoryRevaluation is
+            // one table under one screen, so the dictionary's own zoom target for
+            // it is right and a name here could only be a second thing to keep in
+            // step with it.
             return "";
         }
 
@@ -2737,6 +3191,17 @@ namespace VASLogic.Models
         ///     sets no accounts of its own, and here is what it is valued under");
         ///     returning null made the whole section vanish, which reads as the
         ///     panel having failed rather than as the product having nothing set.
+        ///
+        /// TWO SCHEMES, and the tenant's own installation decides which is live.
+        /// FRPT_Product_Acct is a row per account — (M_Product_ID,
+        /// C_AcctSchema_ID, FRPT_AcctDefault_ID, C_ValidCombination_ID, SeqNo) —
+        /// where the FRPT_AcctDefault record NAMES the role, instead of the twelve
+        /// fixed P_*_Acct columns M_Product_Acct carries. MProduct.AfterSave picks
+        /// between them on whether FRPT_Product_Category_Acct exists, so a tenant
+        /// running the FRPT scheme writes every product account there and leaves
+        /// M_Product_Acct empty — which is why this section had nothing to report.
+        /// FRPT is asked first and the classic table answers where FRPT is absent
+        /// or silent; neither is assumed, and both are dictionary-guarded.
         /// </summary>
         private AccountingData LoadAccounting(Ctx ctx, int M_Product_ID)
         {
@@ -2746,6 +3211,25 @@ namespace VASLogic.Models
             // second schema keeps its product accounts there, and reading only
             // the primary one reported that product as having none.
             List<AcctSchemaInfo> schemas = LoadAcctSchemas(ctx);
+
+            // ----- The FRPT scheme, where the installation runs it -----
+            for (int i = 0; i < schemas.Count; i++)
+            {
+                List<AccountRowData> frptRows =
+                    LoadFrptAccounts(ctx, M_Product_ID, schemas[i].C_AcctSchema_ID);
+                if (frptRows.Count == 0) continue;   // this schema has nothing; try the next
+
+                return new AccountingData
+                {
+                    SchemaName    = schemas[i].Name,
+                    CostingMethod = schemas[i].CostingMethod,
+                    CurrencyISO   = schemas[i].CurrencyISO,
+                    CurSymbol     = schemas[i].CurSymbol,
+                    Rows          = frptRows
+                };
+            }
+
+            // ----- The classic twelve-column scheme -----
             for (int i = 0; i < schemas.Count; i++)
             {
                 AcctSchemaInfo schema = schemas[i];
@@ -2810,6 +3294,84 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// The product's accounts under the FRPT scheme, for one accounting
+        /// schema: a row per account, each naming its ROLE through the
+        /// FRPT_AcctDefault record it points at and its combination through
+        /// C_ValidCombination.
+        ///
+        /// Empty — never an error — when the installation does not run FRPT at
+        /// all, when the product has no row, or when the role table cannot be
+        /// resolved. The caller falls through to M_Product_Acct on an empty list,
+        /// so a tenant on either scheme sees its own accounts and a tenant that
+        /// has used both sees the FRPT rows, which is where its product window
+        /// writes them.
+        ///
+        /// The role's label comes from whichever identifying column
+        /// FRPT_AcctDefault actually carries; it is a human name already, so the
+        /// panel prints it as it stands rather than looking it up in its map of
+        /// P_*_Acct column names.
+        /// </summary>
+        /// <param name="ctx">User context.</param>
+        /// <param name="M_Product_ID">Selected product id.</param>
+        /// <param name="C_AcctSchema_ID">Accounting schema to read under.</param>
+        /// <returns>Account rows in the tab's own order; empty when there are none.</returns>
+        private List<AccountRowData> LoadFrptAccounts(Ctx ctx, int M_Product_ID,
+                                                      int C_AcctSchema_ID)
+        {
+            List<AccountRowData> rows = new List<AccountRowData>();
+            if (!TableExists("FRPT_Product_Acct") || !TableExists("FRPT_AcctDefault"))
+                return rows;
+
+            // What the role table calls its accounts. Name is the usual answer;
+            // the rest are there so a revision that names the column differently
+            // still labels the row instead of leaving it blank.
+            string labelColumn = FindDisplayColumn("FRPT_AcctDefault",
+                new string[] { "Name", "Value", "FRPT_RecognizeType" });
+            if (string.IsNullOrEmpty(labelColumn)) return rows;
+
+            // SeqNo is the order the accounting tab itself lists them in, and it
+            // is optional on the row table.
+            bool hasSeqNo = ColumnExists("FRPT_Product_Acct", "SeqNo");
+            string orderBy = hasSeqNo
+                ? " ORDER BY COALESCE(pa.SeqNo, 0), ad." + labelColumn
+                : " ORDER BY ad." + labelColumn;
+
+            // The schema and the client are inlined as integers so the statement
+            // carries a single bind name, which positional binding requires. No
+            // MRole: this row is a dependent of a product already read under the
+            // access filter, and FRPT_Product_Acct's key is the triple, not a
+            // FRPT_Product_Acct_ID the rewriter could reach for — see LoadAcctRow.
+            string sql = @"SELECT ad." + labelColumn + @" AS AccountRole,
+                                  vc.Combination,
+                                  vc.Description
+                           FROM FRPT_Product_Acct pa
+                           INNER JOIN FRPT_AcctDefault ad
+                                   ON (ad.FRPT_AcctDefault_ID=pa.FRPT_AcctDefault_ID)
+                           LEFT OUTER JOIN C_ValidCombination vc
+                                   ON (vc.C_ValidCombination_ID=pa.C_ValidCombination_ID)
+                           WHERE pa.M_Product_ID=@M_Product_ID
+                             AND pa.C_AcctSchema_ID=" + C_AcctSchema_ID + @"
+                             AND pa.AD_Client_ID=" + ctx.GetAD_Client_ID() + @"
+                             AND pa.IsActive='Y'
+                             AND COALESCE(pa.C_ValidCombination_ID, 0) > 0"
+                           + orderBy;
+
+            DataSet ds = Query(sql, ProductParam(M_Product_ID), "LoadFrptAccounts");
+            if (ds == null || ds.Tables.Count == 0) return rows;
+
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                rows.Add(new AccountRowData
+                {
+                    AccountRole = Util.GetValueOfString(r["AccountRole"]),
+                    Combination = Util.GetValueOfString(r["Combination"]),
+                    Description = Util.GetValueOfString(r["Description"])
+                });
+            }
+            return rows;
+        }
+
+        /// <summary>
         /// Reads the requested account columns from one accounting-defaults table
         /// for one owner record and accounting schema.
         /// </summary>
@@ -2841,15 +3403,31 @@ namespace VASLogic.Models
             }
             if (available.Count == 0) return found;
 
-            // The schema id is inlined as an integer so the statement carries a
-            // single bind name, which positional binding requires.
+            // The schema id and the client are inlined as integers so the
+            // statement carries a single bind name, which positional binding
+            // requires.
+            //
+            // MRole is deliberately NOT applied here, and this is why the section
+            // came back empty. M_Product_Acct is an accounting-DEFAULTS child: it
+            // has a composite key (M_Product_ID, C_AcctSchema_ID) and no
+            // M_Product_Acct_ID column at all, so the SQL_FULLYQUALIFIED rewriter
+            // — which reaches for the table's own key column — either appended a
+            // predicate against a column that is not there and the statement
+            // failed outright, or matched nothing. Either way the reader returned
+            // no accounts and the panel reported a product whose Accounting tab
+            // is full as setting none.
+            //
+            // Nothing is left unauthorised by dropping it: the product itself was
+            // read under the access filter (LoadSummary), this row is pinned to
+            // that one product, and the client is still scoped explicitly. It is
+            // the same rule the activity trail already follows — the access
+            // filter goes on the record, never on its dependent rows.
             string sql = "SELECT " + select
                        + " FROM " + tableName + @" acct
                           WHERE acct." + keyColumn + @"=@KeyValue
                             AND acct.C_AcctSchema_ID=" + C_AcctSchema_ID + @"
+                            AND acct.AD_Client_ID=" + ctx.GetAD_Client_ID() + @"
                             AND acct.IsActive='Y'";
-            sql = MRole.GetDefault(ctx).AddAccessSQL(
-                sql, "acct", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             DataSet ds = Query(sql,
                 new SqlParameter[] { new SqlParameter("@KeyValue", keyValue) },
@@ -2877,14 +3455,21 @@ namespace VASLogic.Models
 
             // The id list is built from integers this model read out of the
             // database, so nothing typed by a user reaches the statement.
+            //
+            // Client-scoped rather than role-filtered, for the same reason as the
+            // account row above: an account combination is reached BY ID from a
+            // row the panel has already established the reader may see, and it is
+            // an accounting master whose organisation is not the reader's. Under
+            // the org half of the access filter the combination text simply
+            // vanished and every account listed its role against a dash — which
+            // reads exactly like the product having no accounting details.
             string sql = @"SELECT vc.C_ValidCombination_ID,
                                   vc.Combination,
                                   vc.Description
                            FROM C_ValidCombination vc
                            WHERE vc.C_ValidCombination_ID IN (" + JoinIds(ids) + @")
+                             AND vc.AD_Client_ID=" + ctx.GetAD_Client_ID() + @"
                              AND vc.IsActive='Y'";
-            sql = MRole.GetDefault(ctx).AddAccessSQL(
-                sql, "vc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             DataSet ds = Query(sql, null, "LoadCombinations");
             if (ds == null || ds.Tables.Count == 0) return map;
@@ -2929,10 +3514,17 @@ namespace VASLogic.Models
                                                            AND acs.IsActive='Y')
                            INNER JOIN C_Currency cur ON (cur.C_Currency_ID=acs.C_Currency_ID)
                            WHERE ci.AD_Client_ID=@AD_Client_ID";
-            sql = MRole.GetDefault(ctx).AddAccessSQL(
-                sql, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            // Appended after the access filter. The CASE is repeated rather than
-            // ordered by its alias, which not every database accepts.
+            // No MRole here either. AD_ClientInfo is keyed on AD_Client_ID and has
+            // no AD_ClientInfo_ID column, so the SQL_FULLYQUALIFIED rewriter has
+            // no key column to reach for on the statement's main table — and the
+            // one bind this query carries already restricts it to the reader's own
+            // client, which is the whole of what the filter would have said. When
+            // it did fail, it took the schema list with it: no schema meant
+            // LoadAccounting returned null and the Accounting section was not
+            // drawn at all.
+            //
+            // The CASE is repeated rather than ordered by its alias, which not
+            // every database accepts.
             sql += @" ORDER BY CASE WHEN acs.C_AcctSchema_ID=ci.C_AcctSchema1_ID THEN 0
                                     ELSE 1 END, acs.C_AcctSchema_ID";
 
@@ -3004,10 +3596,15 @@ namespace VASLogic.Models
             // next — and since the panel pages this list client-side, an entry
             // that moves across a page boundary reads as the same record showing
             // up twice. Formatting happens on the client.
+            // Sorted on SortDate, which is when the entry was RAISED for every
+            // source but the two scheduled ones: an appointment and a task order
+            // on when they are DUE to happen, which is what a reader scans the
+            // section for, while still being stamped with when they were raised.
+            // ActivitySortDate falls back to the displayed date, so a source that
+            // sets neither is unaffected.
             events.Sort(delegate (ActivityData a, ActivityData b)
             {
-                int byDate = b.EventDate.GetValueOrDefault(DateTime.MinValue)
-                              .CompareTo(a.EventDate.GetValueOrDefault(DateTime.MinValue));
+                int byDate = ActivitySortDate(b).CompareTo(ActivitySortDate(a));
                 if (byDate != 0) return byDate;
                 int byType = string.CompareOrdinal(a.Type ?? "", b.Type ?? "");
                 return byType != 0 ? byType : b.Id.CompareTo(a.Id);
@@ -3016,6 +3613,16 @@ namespace VASLogic.Models
             events = DeduplicateActivity(events);
             if (events.Count > MAX_ACTIVITY) events = events.GetRange(0, MAX_ACTIVITY);
             return events;
+        }
+
+        /// <summary>
+        /// The moment one entry sorts on: its own SortDate where it set one, else
+        /// the date it is stamped with.
+        /// </summary>
+        private static DateTime ActivitySortDate(ActivityData e)
+        {
+            if (e.SortDate.HasValue) return e.SortDate.Value;
+            return e.EventDate.GetValueOrDefault(DateTime.MinValue);
         }
 
         /// <summary>
@@ -3144,13 +3751,16 @@ namespace VASLogic.Models
         /// from 100 to 105" and "Product Type from I to S" — technically accurate
         /// and useless to a reader.
         ///
-        /// Three kinds are resolved:
+        /// Four kinds are resolved:
         ///   * DATE and DATE-TIME columns report the DATE alone. The log stores a
         ///     full timestamp whatever the field's type, so an edited date read
         ///     "20-08-2026 00:00:00" — a midnight nobody chose, against a field
         ///     with no time part at all.
         ///   * LIST columns (Product Type, and every other reference list) against
         ///     AD_Ref_List, in the reader's own language;
+        ///   * CreatedBy and UpdatedBy against AD_User. Both hold a user id, and
+        ///     neither name ends "_ID", so the branch below could not see them and
+        ///     the feed printed the bare key.
         ///   * TABLE / TABLEDIR columns — anything ending "_ID" — against the
         ///     referenced table's own identifier, taking the first of Name / Value
         ///     / DocumentNo that the table actually has.
@@ -3195,6 +3805,21 @@ namespace VASLogic.Models
                     }
                 }
 
+                // ----- The two USER columns -----
+                // CreatedBy and UpdatedBy hold an AD_User_ID, but neither name
+                // ends "_ID", so the table-reference branch below never looked at
+                // them and the timeline printed the raw key: "Updated By changed
+                // from 100 to 1000017". They are resolved to the user's CODE —
+                // AD_User.Value, the login the reader knows the person by —
+                // falling back to the name where a tenant leaves the code unset.
+                if (columnName.Equals("CreatedBy", StringComparison.OrdinalIgnoreCase)
+                    || columnName.Equals("UpdatedBy", StringComparison.OrdinalIgnoreCase))
+                {
+                    oldText = LookupUserCode(oldRaw) ?? oldRaw;
+                    newText = LookupUserCode(newRaw) ?? newRaw;
+                    return;
+                }
+
                 // ----- Table reference (C_UOM_ID, M_Product_Category_ID, ...) -----
                 if (!columnName.EndsWith("_ID", StringComparison.OrdinalIgnoreCase)) return;
 
@@ -3211,6 +3836,26 @@ namespace VASLogic.Models
                 // Never lose the entry over a lookup: the raw values still read.
                 _log.Severe("ResolveChangeValues (" + columnName + "): " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// A user id as the reader knows the person: AD_User.Value, the login
+        /// CODE, falling back to the user's name where the tenant leaves the code
+        /// unset — a blank cell would be a worse answer than the name. Null when
+        /// the value is not a user id or names nobody, and the caller keeps what
+        /// was stored.
+        /// </summary>
+        /// <param name="raw">The stored AD_User_ID, as the change log holds it.</param>
+        private string LookupUserCode(string raw)
+        {
+            string[] candidates = new string[] { "Value", "Name" };
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                if (!ColumnExists("AD_User", candidates[i])) continue;
+                string text = LookupIdentifier("AD_User", "AD_User_ID", candidates[i], raw);
+                if (!string.IsNullOrEmpty(text)) return text;
+            }
+            return null;
         }
 
         /// <summary>
@@ -3515,26 +4160,40 @@ namespace VASLogic.Models
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 DateTime? received = Stamp(r["DateMailReceived"]);
+                string mailFrom = Util.GetValueOfString(r["MailAddressFrom"]);
                 ActivityData a = new ActivityData();
                 a.Id        = Util.GetValueOfInt(r["MailAttachment1_ID"]);
-                // MailAttachment1 holds two kinds of correspondence, and
-                // AttachmentType is what separates them: 'I' is an inbound LETTER,
-                // anything else a mail. They used to arrive as one type, so a
-                // letter was reported to the reader as an e-mail.
+                // EVERY MailAttachment1 row is a mail. AttachmentType says which
+                // DIRECTION it went, not which kind of correspondence it is: the
+                // inbox reader (AttachMailToBP) files a received message under 'I'
+                // and stamps it with MailAddressFrom, DateMailReceived and MailUID,
+                // and files a sent one under 'M'.
                 //
-                // The test is for 'I' rather than for 'M' deliberately: the value
-                // varies between installations and some leave it null, so asking
-                // for 'M' would hide mails that are really there. Read this way the
-                // two kinds partition the table — nothing hidden, nothing counted
-                // twice.
-                a.Type      = Util.GetValueOfString(r["AttachmentType"]) == "I"
-                                  ? "letter" : "mail";
-                a.Title     = Util.GetValueOfString(r["Title"]);
+                // Typing 'I' as a LETTER was therefore wrong twice over. Every mail
+                // the tenant RECEIVED against the product — the reply to something
+                // sent from it, which is the row a reader goes looking for — was
+                // reported as a letter, and no received mail appeared in the feed
+                // as a mail at all.
+                a.Type      = "mail";
+                // The ATTACHMENT TYPE alone decides the direction: 'I' is the
+                // inbox, anything else is a mail this tenant sent.
+                //
+                // The record's own fields cannot stand in for it. A SENT mail
+                // carries MailAddressFrom too — it is the address it went out
+                // from — so treating a sender as evidence of an inbound message
+                // reported every sent mail as received. DateMailReceived is only
+                // consulted where the row is untyped altogether, which is the one
+                // case where it says something the type does not.
+                string attachmentType = Util.GetValueOfString(r["AttachmentType"]).Trim();
+                a.IsReceived = attachmentType.Length > 0
+                    ? attachmentType == "I"
+                    : received.HasValue;
+                a.Title     = PlainText(Util.GetValueOfString(r["Title"]));
                 // An HTML mail stores its markup here and the panel renders the
                 // body as text, so it is flattened before it leaves the server.
                 a.Body      = MailBodyToText(Util.GetValueOfString(r["TextMsg"]));
                 a.MailTo    = Util.GetValueOfString(r["MailAddress"]);
-                a.MailFrom  = Util.GetValueOfString(r["MailAddressFrom"]);
+                a.MailFrom  = mailFrom;
                 a.MailCc    = Util.GetValueOfString(r["MailAddressCc"]);
                 a.MailBcc   = Util.GetValueOfString(r["MailAddressBcc"]);
                 a.IsSent    = Util.GetValueOfString(r["IsMailSent"]) == "Y";
@@ -3567,15 +4226,16 @@ namespace VASLogic.Models
 
             foreach (DataRow r in ds.Tables[0].Rows)
             {
-                string title = Util.GetValueOfString(r["Description"]);
-                if (string.IsNullOrEmpty(title)) title = Util.GetValueOfString(r["Reference"]);
+                string title = PlainText(Util.GetValueOfString(r["Description"]));
+                if (string.IsNullOrEmpty(title))
+                    title = PlainText(Util.GetValueOfString(r["Reference"]));
 
                 list.Add(new ActivityData
                 {
                     Id        = Util.GetValueOfInt(r["AD_Note_ID"]),
                     Type      = "note",
                     Title     = title,
-                    Body      = Util.GetValueOfString(r["TextMsg"]),
+                    Body      = PlainText(Util.GetValueOfString(r["TextMsg"])),
                     Actor     = Util.GetValueOfString(r["ActorName"]),
                     EventDate = Stamp(r["Created"])
                 });
@@ -3617,7 +4277,9 @@ namespace VASLogic.Models
 
             foreach (DataRow r in ds.Tables[0].Rows)
             {
-                string text = Util.GetValueOfString(r["CharacterData"]);
+                // The chat screen stores what was typed HTML-ENCODED, so a comment
+                // containing "&" reached the panel reading "&amp;".
+                string text = PlainText(Util.GetValueOfString(r["CharacterData"]));
 
                 list.Add(new ActivityData
                 {
@@ -3638,6 +4300,19 @@ namespace VASLogic.Models
         /// Tasks and appointments linked to the product (AppointmentsInfo). The
         /// IsTask flag is what separates the two; a task's open / completed state
         /// comes from IsClosed, and no label is invented from a numeric status.
+        ///
+        /// The row is stamped with WHEN IT WAS RAISED and WHO RAISED IT — Created
+        /// and CreatedBy — not with the meeting's start date and its AD_User_ID.
+        /// AppointmentsInfo keeps one row per ATTENDEE, so AD_User_ID is whichever
+        /// attendee's row survived de-duplication: a name picked at random out of
+        /// the meeting, against a date that is not when anybody did anything. The
+        /// meeting's own start and end still travel with the row — the feed SORTS
+        /// an appointment or task on its start date, and the detail view shows it.
+        ///
+        /// Everything the detail view needs is read here too, so opening a row
+        /// costs no second round trip: the category, the location, the meeting URL
+        /// and its description, the comments, the attendees, the transcript, and
+        /// for a task its assignee, due date, priority and completion.
         /// </summary>
         private void LoadAppointmentActivity(Ctx ctx, int M_Product_ID, List<ActivityData> list)
         {
@@ -3646,6 +4321,34 @@ namespace VASLogic.Models
             // IsDeleted is not on every revision of the table.
             string deletedFilter = ColumnExists("AppointmentsInfo", "IsDeleted")
                 ? " AND COALESCE(ai.IsDeleted, 'N')='N'" : "";
+
+            // Every one of these is optional between revisions, so each is probed
+            // and replaced by a typed NULL where the schema has not got it — one
+            // absent column must not cost the whole feed.
+            string resultExpr    = AppointmentColumn("Result",    "VARCHAR(4000)");
+            string meetingUrl    = AppointmentColumn("MeetingUrl", "VARCHAR(2000)");
+            string urlDescExpr   = AppointmentColumn("UrlDescription", "VARCHAR(2000)");
+            string commentsExpr  = AppointmentColumn("Comments",  "VARCHAR(4000)");
+            string attendeeExpr  = AppointmentColumn("AttendeeInfo", "VARCHAR(4000)");
+            string priorityExpr  = AppointmentColumn("PriorityKey", "VARCHAR(60)");
+            string taskStatExpr  = AppointmentColumn("TaskStatus", "VARCHAR(60)");
+
+            // The category the appointment was filed under, and the transcript a
+            // recorded meeting leaves behind. Both live in their own tables.
+            bool hasCategory = ColumnExists("AppointmentsInfo", "AppointmentCategory_ID")
+                            && TableExists("AppointmentCategory");
+            string categoryExpr = hasCategory ? "cat.Name" : "CAST(NULL AS VARCHAR(60))";
+            string categoryJoin = hasCategory
+                ? @" LEFT OUTER JOIN AppointmentCategory cat
+                       ON (cat.AppointmentCategory_ID=ai.AppointmentCategory_ID)" : "";
+
+            bool hasTranscript = TableExists("AppointmentTranscript")
+                              && ColumnExists("AppointmentTranscript", "Transcript");
+            string transcriptExpr = hasTranscript
+                ? "atr.Transcript" : "CAST(NULL AS VARCHAR(4000))";
+            string transcriptJoin = hasTranscript
+                ? @" LEFT OUTER JOIN AppointmentTranscript atr
+                       ON (atr.AppointmentsInfo_ID=ai.AppointmentsInfo_ID)" : "";
 
             string sql = @"SELECT ai.AppointmentsInfo_ID,
                                   ai.Subject,
@@ -3657,9 +4360,21 @@ namespace VASLogic.Models
                                   COALESCE(ai.IsClosed, 'N') AS IsClosed,
                                   COALESCE(ai.IsCancelled, 'N') AS IsCancelled,
                                   ai.Created,
-                                  u.Name AS ActorName
+                                  " + resultExpr    + @" AS TaskResult,
+                                  " + meetingUrl    + @" AS MeetingUrl,
+                                  " + urlDescExpr   + @" AS UrlDescription,
+                                  " + commentsExpr  + @" AS Comments,
+                                  " + attendeeExpr  + @" AS AttendeeInfo,
+                                  " + priorityExpr  + @" AS PriorityKey,
+                                  " + taskStatExpr  + @" AS TaskStatus,
+                                  " + categoryExpr  + @" AS CategoryName,
+                                  " + transcriptExpr + @" AS Transcript,
+                                  u.Name AS AssigneeName,
+                                  cu.Name AS ActorName
                            FROM AppointmentsInfo ai
                            LEFT OUTER JOIN AD_User u ON (u.AD_User_ID=ai.AD_User_ID)
+                           LEFT OUTER JOIN AD_User cu ON (cu.AD_User_ID=ai.CreatedBy)"
+                           + categoryJoin + transcriptJoin + @"
                            WHERE ai.AD_Table_ID=" + _productTableId + @"
                              AND ai.Record_ID=@M_Product_ID
                              AND ai.IsActive='Y'" + deletedFilter + @"
@@ -3683,43 +4398,231 @@ namespace VASLogic.Models
                 new Dictionary<string, ActivityData>();
             Dictionary<int, ActivityData> ownerById = new Dictionary<int, ActivityData>();
 
+            // PriorityKey is a LIST column, so its stored codes are resolved to the
+            // tenant's own words in the reader's language — never mapped on the
+            // client, and never shown raw.
+            Dictionary<string, string> priorityLabels =
+                LoadRefListLabels(ctx, "AppointmentsInfo", "PriorityKey");
+
+            // Every attendee row of a meeting, gathered as the rows go past so the
+            // PEOPLE on the detail view are the whole invitation and not just the
+            // one row that survived de-duplication.
+            Dictionary<ActivityData, List<string>> peopleByEntry =
+                new Dictionary<ActivityData, List<string>>();
+
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 bool isTask = Util.GetValueOfString(r["IsTask"]) == "Y";
                 DateTime? start = Stamp(r["StartDate"]);
                 int apptId = Util.GetValueOfInt(r["AppointmentsInfo_ID"]);
+                string subject = PlainText(Util.GetValueOfString(r["Subject"]));
+                string assignee = Util.GetValueOfString(r["AssigneeName"]);
 
                 string meetingKey = (start.HasValue ? start.Value.ToString("s") : "")
-                                  + "|" + Util.GetValueOfString(r["Subject"]);
+                                  + "|" + subject;
 
                 ActivityData kept;
                 if (keptByMeeting.TryGetValue(meetingKey, out kept))
                 {
                     if (apptId > 0) ownerById[apptId] = kept;
+                    // The dropped row is still an ATTENDEE of the meeting the
+                    // reader sees, and its name is the only place that attendee
+                    // appears.
+                    AddPerson(peopleByEntry, kept, assignee);
                     continue;
                 }
+
+                DateTime? created = Stamp(r["Created"]);
+                string priorityCode = Util.GetValueOfString(r["PriorityKey"]);
 
                 ActivityData a = new ActivityData
                 {
                     Id          = apptId,
                     Type        = isTask ? "task" : "appointment",
-                    Title       = Util.GetValueOfString(r["Subject"]),
-                    Body        = Util.GetValueOfString(r["Description"]),
-                    Location    = Util.GetValueOfString(r["Location"]),
+                    Title       = subject,
+                    Body        = PlainText(Util.GetValueOfString(r["Description"])),
+                    Location    = PlainText(Util.GetValueOfString(r["Location"])),
                     IsClosed    = Util.GetValueOfString(r["IsClosed"]) == "Y",
                     IsCancelled = Util.GetValueOfString(r["IsCancelled"]) == "Y",
                     StartDate   = start,
                     EndDate     = Stamp(r["EndDate"]),
+                    // WHO RAISED IT and WHEN. The meeting's own start date and the
+                    // attendee on the surviving row answered neither.
                     Actor       = Util.GetValueOfString(r["ActorName"]),
                     Mails       = new List<VAS_ActivityMailRow>(),
-                    EventDate   = start.HasValue ? start : Stamp(r["Created"])
+                    EventDate   = created.HasValue ? created : start,
+                    // The feed still ORDERS an appointment or a task on when it is
+                    // scheduled, which is what a reader scans this section for.
+                    SortDate    = start.HasValue ? start : created,
+
+                    // --- What the detail view shows, read here so opening a row
+                    //     costs no second round trip ---
+                    CategoryName   = Util.GetValueOfString(r["CategoryName"]),
+                    MeetingUrl     = Util.GetValueOfString(r["MeetingUrl"]),
+                    UrlDescription = PlainText(Util.GetValueOfString(r["UrlDescription"])),
+                    Comments       = PlainText(Util.GetValueOfString(r["Comments"])),
+                    Transcript     = PlainText(Util.GetValueOfString(r["Transcript"])),
+                    TaskResult     = PlainText(Util.GetValueOfString(r["TaskResult"])),
+                    AssigneeName   = assignee,
+                    PriorityCode   = priorityCode,
+                    PriorityName   = (priorityCode.Length > 0 && priorityLabels.ContainsKey(priorityCode))
+                                        ? priorityLabels[priorityCode] : priorityCode,
+                    // TaskStatus holds the completion percentage. It is read as
+                    // text and parsed here, since revisions differ on whether the
+                    // column is numeric.
+                    PercentComplete = ParsePercent(Util.GetValueOfString(r["TaskStatus"]))
                 };
                 list.Add(a);
                 keptByMeeting[meetingKey] = a;
                 if (apptId > 0) ownerById[apptId] = a;
+
+                // The attendees named on the record itself, then this row's own.
+                AddPeopleFromAttendeeInfo(peopleByEntry, a,
+                                          Util.GetValueOfString(r["AttendeeInfo"]));
+                AddPerson(peopleByEntry, a, assignee);
             }
 
+            // The gathered attendee names, resolved and flattened onto each entry.
+            ResolvePeople(peopleByEntry);
+
             AttachAppointmentMails(ownerById);
+        }
+
+        /// <summary>
+        /// An AppointmentsInfo column when the schema has it, else a typed NULL —
+        /// the same shape <see cref="QualityColumn"/> uses. Every field the detail
+        /// view adds is optional between CRM revisions, and one absent column must
+        /// not cost the whole activity feed.
+        /// </summary>
+        private string AppointmentColumn(string columnName, string nullType)
+        {
+            return ColumnExists("AppointmentsInfo", columnName)
+                ? "ai." + columnName : "CAST(NULL AS " + nullType + ")";
+        }
+
+        /// <summary>
+        /// A completion percentage from whatever TaskStatus holds. Null — not
+        /// zero — when the column says nothing: "0% done" and "nobody has recorded
+        /// progress" are different answers and the panel shows them differently.
+        /// </summary>
+        private static int? ParsePercent(string value)
+        {
+            string s = (value ?? "").Trim().TrimEnd('%').Trim();
+            if (s.Length == 0) return null;
+
+            decimal parsed;
+            if (!decimal.TryParse(s, System.Globalization.NumberStyles.Any,
+                                  System.Globalization.CultureInfo.InvariantCulture, out parsed))
+                return null;
+
+            int percent = (int)Math.Round(parsed);
+            if (percent < 0) percent = 0;
+            if (percent > 100) percent = 100;
+            return percent;
+        }
+
+        /// <summary>Adds one person's name to an entry's list, once.</summary>
+        private static void AddPerson(Dictionary<ActivityData, List<string>> peopleByEntry,
+                                      ActivityData entry, string name)
+        {
+            string text = (name ?? "").Trim();
+            if (entry == null || text.Length == 0) return;
+
+            if (!peopleByEntry.ContainsKey(entry)) peopleByEntry[entry] = new List<string>();
+            if (!peopleByEntry[entry].Contains(text)) peopleByEntry[entry].Add(text);
+        }
+
+        /// <summary>
+        /// Splits AppointmentsInfo.AttendeeInfo onto an entry. The column holds a
+        /// semicolon- or comma-separated list that mixes AD_User ids with literal
+        /// names — the same shape VAS_105's meeting reader handles — so numeric
+        /// tokens are kept aside to be resolved in one lookup and anything else is
+        /// taken as the name it already is.
+        /// </summary>
+        private static void AddPeopleFromAttendeeInfo(
+            Dictionary<ActivityData, List<string>> peopleByEntry,
+            ActivityData entry, string attendeeInfo)
+        {
+            if (string.IsNullOrEmpty(attendeeInfo)) return;
+
+            string[] tokens = attendeeInfo.Split(new char[] { ';', ',' });
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                AddPerson(peopleByEntry, entry, tokens[i]);
+            }
+        }
+
+        /// <summary>
+        /// Turns each entry's gathered attendee tokens into its People line: the
+        /// numeric ones are resolved to user names in ONE lookup for the whole
+        /// feed, and a token that names nobody is dropped rather than printed as a
+        /// bare id.
+        /// </summary>
+        private void ResolvePeople(Dictionary<ActivityData, List<string>> peopleByEntry)
+        {
+            if (peopleByEntry.Count == 0) return;
+
+            // Every numeric token across the feed, gathered before anything is read.
+            List<int> userIds = new List<int>();
+            foreach (KeyValuePair<ActivityData, List<string>> pair in peopleByEntry)
+            {
+                foreach (string token in pair.Value)
+                {
+                    int id;
+                    if (int.TryParse(token, out id) && id > 0 && !userIds.Contains(id))
+                        userIds.Add(id);
+                }
+            }
+
+            Dictionary<int, string> names = LoadUserNames(userIds);
+
+            foreach (KeyValuePair<ActivityData, List<string>> pair in peopleByEntry)
+            {
+                List<string> resolved = new List<string>();
+                foreach (string token in pair.Value)
+                {
+                    int id;
+                    if (int.TryParse(token, out id) && id > 0)
+                    {
+                        // A token that names nobody is dropped: a bare user id on
+                        // screen is worse than one fewer name.
+                        if (!names.ContainsKey(id)) continue;
+                        if (!resolved.Contains(names[id])) resolved.Add(names[id]);
+                    }
+                    else if (!resolved.Contains(token))
+                    {
+                        resolved.Add(token);
+                    }
+                }
+                pair.Key.People = string.Join(", ", resolved.ToArray());
+            }
+        }
+
+        /// <summary>
+        /// User names for a set of AD_User ids, in one statement. Empty when there
+        /// is nothing to resolve. No MRole: these are the attendees OF records
+        /// already read under the access filter, reached by id.
+        /// </summary>
+        private Dictionary<int, string> LoadUserNames(List<int> userIds)
+        {
+            Dictionary<int, string> names = new Dictionary<int, string>();
+            if (userIds == null || userIds.Count == 0) return names;
+
+            // The id list is built from integers parsed in managed code, so
+            // nothing typed by a user reaches the statement.
+            string sql = @"SELECT u.AD_User_ID, u.Name
+                           FROM AD_User u
+                           WHERE u.AD_User_ID IN (" + JoinIds(userIds) + ")";
+
+            DataSet ds = Query(sql, null, "LoadUserNames");
+            if (ds == null || ds.Tables.Count == 0) return names;
+
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                string name = Util.GetValueOfString(r["Name"]).Trim();
+                if (name.Length > 0) names[Util.GetValueOfInt(r["AD_User_ID"])] = name;
+            }
+            return names;
         }
 
         /// <summary>
@@ -3812,6 +4715,39 @@ namespace VASLogic.Models
                 // Never lose the mail over a formatting failure — show it raw.
                 _log.Severe("VAS_190 MailBodyToText: " + ex.Message);
                 return body;
+            }
+        }
+
+        /// <summary>
+        /// One line of stored free text as a reader should see it.
+        ///
+        /// The CRM screens write their subjects, descriptions and comments
+        /// HTML-ENCODED, so a subject typed "Performance &amp; Growth" is stored
+        /// "Performance &amp;amp; Growth" and reached the panel with the entity
+        /// showing. <see cref="MailBodyToText"/> cannot answer for these: it
+        /// returns early on anything that does not look like markup, which is
+        /// exactly what a plain subject carrying one entity is.
+        ///
+        /// Entities are decoded and any markup is stripped, in that order, so a
+        /// value holding both is handled once. A field with neither comes back
+        /// untouched.
+        /// </summary>
+        private static string PlainText(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return value;
+            try
+            {
+                string s = WebUtility.HtmlDecode(value);
+                // Decoding can REVEAL markup ("&lt;b&gt;" becomes "<b>"), so the
+                // tag strip follows it rather than leading.
+                if (s.IndexOf('<') >= 0) s = Regex.Replace(s, @"<[^>]*>", string.Empty);
+                return s.Replace(' ', ' ').Trim();
+            }
+            catch (Exception ex)
+            {
+                // Never lose the value over a formatting failure.
+                _log.Severe("VAS_190 PlainText: " + ex.Message);
+                return value;
             }
         }
 
@@ -4007,6 +4943,10 @@ namespace VASLogic.Models
             public int       OrderCount   { get; set; }
             public DateTime? DateOrdered  { get; set; }
             public DateTime? DatePromised { get; set; }
+            /// <summary>The order's own number, carried only where the figure came
+            /// from exactly ONE order — with several in play it names none of
+            /// them.</summary>
+            public string    DocumentNo   { get; set; }
         }
 
         /// <summary>One resolved account combination.</summary>
@@ -4048,7 +4988,7 @@ namespace VASLogic.Models
         public class AttributeRowData
         {
             public string AttributeSetName { get; set; }
-            /// <summary>The set's MandatoryType code (N / A / S); the panel labels it.</summary>
+            /// <summary>The set's MandatoryType code (N / Y / S); the panel labels it.</summary>
             public string SetMandatoryType { get; set; }
             public string Name             { get; set; }   // control key or attribute name
             public string Kind             { get; set; }   // control | instance
@@ -4088,9 +5028,15 @@ namespace VASLogic.Models
             /// several orders in play neither date describes the figure.</summary>
             public DateTime? ReservedDateOrdered  { get; set; }
             public DateTime? ReservedDatePromised { get; set; }
+            /// <summary>That one sales order's own number, on the same terms as
+            /// its dates: present only where the figure came from a single
+            /// order.</summary>
+            public string    ReservedDocumentNo   { get; set; }
             /// <summary>The same two dates for the one open purchase order.</summary>
             public DateTime? OnOrderDateOrdered   { get; set; }
             public DateTime? OnOrderDatePromised  { get; set; }
+            /// <summary>That one purchase order's own number.</summary>
+            public string    OnOrderDocumentNo    { get; set; }
             public int     WarehouseCount     { get; set; }
             public int     LocatorCount       { get; set; }
         }
@@ -4212,9 +5158,23 @@ namespace VASLogic.Models
             /// (an internal-transfer confirmation) — which confirmation the check
             /// was raised on.</summary>
             public string    Source        { get; set; }
+            /// <summary>The CONFIRMATION's own document number — the document the
+            /// check was raised on, not the receipt or transfer behind it.</summary>
             public string    DocumentNo    { get; set; }
+            /// <summary>The confirmation LINE's own number, where the table keeps
+            /// one. Not displayed; the header's number identifies the check.</summary>
             public string    ConfirmationNo { get; set; }
-            public string    BPartnerName  { get; set; }
+            /// <summary>M_InOutConfirm.ConfirmType as stored. Empty on the
+            /// transfer side, whose confirmation has no type column.</summary>
+            public string    DocTypeCode   { get; set; }
+            /// <summary>The dictionary's own name for that code, in the reader's
+            /// language. Empty where the code resolves to nothing, and the panel
+            /// then names the kind of confirmation itself.</summary>
+            public string    DocTypeName   { get; set; }
+            /// <summary>The receipt's sales representative. Empty on a transfer,
+            /// which moves stock between the tenant's own warehouses and has
+            /// none.</summary>
+            public string    SalesRepName  { get; set; }
             /// <summary>When it was checked: VA010_QAQCDate, falling back to when
             /// the check record itself was created.</summary>
             public DateTime? CheckDate     { get; set; }
@@ -4253,6 +5213,12 @@ namespace VASLogic.Models
             /// <summary>True on the ONE vendor the product was most recently
             /// bought from. Every other vendor is an alternative.</summary>
             public bool      IsLastUsed           { get; set; }
+            /// <summary>True where the vendor reached this list from the PURCHASE
+            /// HISTORY alone — the product has been bought from it, but nobody
+            /// added it to the product's Vendor tab. Such a row carries no
+            /// vendor-product terms because there is no such record to read
+            /// them from.</summary>
+            public bool      IsFromOrdersOnly     { get; set; }
             /// <summary>The most recent purchase order from this vendor for this
             /// product — read from the orders themselves, not from the stored
             /// PriceLastPO fields. Null where the vendor has no order history.</summary>
@@ -4373,11 +5339,45 @@ namespace VASLogic.Models
             public string    MailCc      { get; set; }
             public string    MailBcc     { get; set; }
             public bool      IsSent      { get; set; }
+            /// <summary>The mail came IN rather than went out — AttachmentType 'I',
+            /// which is what the inbox reader files a received message under, or a
+            /// row that carries a received date or a sender. The panel leads such a
+            /// row with WHO IT CAME FROM; a sent one leads with where it went.</summary>
+            public bool      IsReceived  { get; set; }
+
+            /// <summary>
+            /// What the feed ORDERS on, which is not always what it shows. Every
+            /// entry is stamped with when it was RAISED (EventDate), because that
+            /// is what a reader is told; an appointment or a task additionally
+            /// sorts on when it is SCHEDULED, which is what makes the section
+            /// scannable. Null falls back to EventDate.
+            /// </summary>
+            public DateTime? SortDate    { get; set; }
 
             // Task / appointment
             public string    Location    { get; set; }
             public bool      IsClosed    { get; set; }
             public bool      IsCancelled { get; set; }
+            /// <summary>AppointmentCategory.Name — the kind of engagement.</summary>
+            public string    CategoryName    { get; set; }
+            public string    MeetingUrl      { get; set; }
+            public string    UrlDescription  { get; set; }
+            public string    Comments        { get; set; }
+            /// <summary>AppointmentTranscript.Transcript, offered as a download.</summary>
+            public string    Transcript      { get; set; }
+            /// <summary>AppointmentsInfo.Result — what a task concluded.</summary>
+            public string    TaskResult      { get; set; }
+            /// <summary>Who the task is assigned to (AppointmentsInfo.AD_User_ID).</summary>
+            public string    AssigneeName    { get; set; }
+            /// <summary>Everyone on the engagement, comma-separated: the attendee
+            /// rows the feed collapsed plus whatever AttendeeInfo names.</summary>
+            public string    People          { get; set; }
+            public string    PriorityCode    { get; set; }
+            /// <summary>The dictionary's own word for that code.</summary>
+            public string    PriorityName    { get; set; }
+            /// <summary>Completion from TaskStatus. Null where nothing has been
+            /// recorded, which is not the same as zero.</summary>
+            public int?      PercentComplete { get; set; }
             public DateTime? StartDate   { get; set; }
             public DateTime? EndDate     { get; set; }
             /// <summary>The e-mails sent against the TASK or APPOINTMENT itself
