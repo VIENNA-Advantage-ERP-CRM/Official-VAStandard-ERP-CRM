@@ -362,6 +362,7 @@ import "../app/widgets/Recurring/VAS_225_SetupsExpiringSoonWidget.js";
 import "../app/widgets/Recurring/VAS_226_NewRecurringWidget.js";
 import "../app/widgets/Recurring/VAS_227_SearchRecurringWidget.js";
 import "../app/widgets/BankingJournal/VAS_229_NewBankJournalWidget.js";
+import "../app/widgets/BankingJournal/VAS_230_BankBalanceWidget.js";
 import "../app/widgets/BankingJournal/VAS_231_NetMovementWidget.js";
 import "../app/widgets/BankingJournal/VAS_233_BankChargesWidget.js";
 import "../app/widgets/BankingJournal/VAS_234_AccountBalanceWidget.js";
