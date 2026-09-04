@@ -6,7 +6,7 @@
  *                  The statement lines the bank has reported and the books have not
  *                  yet matched - the BANK side of the reconciliation gap:
  *
- *                    [!] Unreconciled Bank Lines   [194 open] [ All accounts v ]
+ *                    [!] Unreconciled Bank Lines          [ All accounts v ]
  *                        Statement lines pending reconciliation
  *
  *                    Date          Bank Account      Narration      Age   Amount
@@ -15,6 +15,13 @@
  *                    28 Apr 2026   Axis ····3390     —              23d  −₹6.80L
  *
  *                                              <  1–6 of 194  >
+ *
+ *                  THE GRID MASKS THE ACCOUNT NUMBER, THE FILTER DOES NOT. A row's
+ *                  Account cell shows "Uco Bank ····9032" - enough to recognise the
+ *                  account among many. The pill and its picker show the same account
+ *                  as "Uco Bank 12340000009032", because choosing one account of
+ *                  several at the same bank is exactly what a masked tail cannot do.
+ *                  Both labels are composed server-side; the widget never builds one.
  *
  *                  THE SIGN IS THE DIRECTION HERE. A statement line carries no
  *                  IsReceipt flag - it is the bank's own record - so StmtAmt is shown
@@ -33,8 +40,8 @@
  *                  individual bank lines rather than summing across accounts, so
  *                  converting would only obscure what the statement actually says.
  *
- *                  The bank-account filter scopes the list AND the header count, so
- *                  the badge can never disagree with the rows beneath it.
+ *                  The bank-account filter scopes the list AND the total the pager
+ *                  reports, so the footer can never disagree with the rows above it.
  *
  *                  Design: design.md -> dashboard-widgets.md (Glass Widget, Widget
  *                  Header, Grid Data Rows, Widget Footer Pager, Content Fit Budget,
@@ -50,7 +57,6 @@
  *                   1 | Unreconciled Bank Lines       | VAS_238_UnreconciledBankLine
  *                   2 | Statement lines pending       | VAS_238_UnreconciledHint
  *                     |   reconciliation              |
- *                   3 | open                          | VAS_238_Open
  *                   4 | Date                          | VAS_238_Date
  *                   5 | Bank Account                  | VAS_238_BankAccount
  *                   6 | Narration                     | VAS_238_Narration
@@ -148,7 +154,6 @@
         var $self = this;
         var $root;
         var $card;
-        var $badge;
         var $acctBtn;
         var $list;
         var $foot;
@@ -284,9 +289,6 @@
                             '<div class="vas-238-title"></div>' +
                             '<div class="vas-238-subtitle"></div>' +
                         '</div>' +
-                        /* The badge is a glance-label chip; the filter is the interactive
-                           pill. Two tiers of the chip system, never a third. */
-                        '<span class="vas-238-badge"></span>' +
                         '<button type="button" class="vas-238-acct" aria-haspopup="listbox">' +
                             '<span class="vas-238-acct-label"></span>' +
                             ICONS.chevron +
@@ -305,7 +307,6 @@
             $card.find('.vas-238-subtitle').text(subtitle).attr('title', subtitle);
             $card.find('.vas-238-body').attr('aria-label', title);
 
-            $badge = $card.find('.vas-238-badge');
             $acctBtn = $card.find('.vas-238-acct');
             $list = $card.find('.vas-238-list');
             $foot = $card.find('.vas-238-pagerwrap');
@@ -377,7 +378,6 @@
                     _totalRows = Number(data.TotalRows) || 0;
                     _totalPages = Number(data.TotalPages) || 0;
 
-                    paintBadge();
                     paintRows();
                     observeList();
                 },
@@ -405,22 +405,10 @@
         /* ------------------------------------------------------------ */
 
         /* A load failure takes the card over. Having nothing unreconciled does NOT - that
-           is handled inside the list, so the header, its badge and the column labels stay
-           put. */
+           is handled inside the list, so the header and the column labels stay put. */
         function renderState(text) {
             $card.find('.vas-238-body').addClass('vas-238-hidden');
             $state.removeClass('vas-238-hidden').text(text);
-        }
-
-        /* "194 open" - amber, because an open line is an exception rather than an error.
-           It counts the WHOLE filtered set, not the page, and it is hidden at zero: a
-           badge reading "0 open" is noise next to an empty-state message saying the same
-           thing. */
-        function paintBadge() {
-            if (_totalRows <= 0) { $badge.addClass('vas-238-hidden').text(''); return; }
-
-            var text = _totalRows + ' ' + label('VAS_238_Open', 'open');
-            $badge.removeClass('vas-238-hidden').text(text).attr('title', text);
         }
 
         function paintAccountLabel() {
@@ -545,8 +533,8 @@
                 (Number(item.AgeDays) || 0) + ' ' + label('VAS_238_DaysOld', 'days old'));
 
             if (item.BankAccount) { lines.push(item.BankAccount); }
-            /* The account's own name only when it adds something the masked label does
-               not already say. */
+            /* The account's own name only when it adds something the masked cell label
+               does not already say. */
             if (item.AccountName && item.AccountName !== item.BankAccount) {
                 lines.push(item.AccountName);
             }
@@ -783,7 +771,7 @@
         }
 
         /* Changing the account re-reads from page 1 - the row the user was looking at is
-           not on the same page of a different filter, and the badge has to be recounted. */
+           not on the same page of a different filter, and the total has to be recounted. */
         function selectAccount(id) {
             if (id === _accountId) { return; }
 

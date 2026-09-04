@@ -29,11 +29,13 @@ namespace VAS.Controllers
     ///               the tenant filter and MRole's own access clause - an id the role
     ///               cannot see returns nothing rather than someone else's lines. The
     ///               tenant, today's date, the unreconciled predicate and the role's
-    ///               organization access are all resolved server-side, and account numbers
-    ///               are already masked by the time they are serialized.
+    ///               organization access are all resolved server-side. Row labels carry a
+    ///               masked account tail; the filter's options carry the number in full, so
+    ///               one account can be told from another at the same bank - and only
+    ///               accounts the role may see are ever listed.
     ///
     ///               ONE call per page or filter change. The response carries the page, the
-    ///               header count and the filter's options, because the last two are
+    ///               total row count and the filter's options, because the last two are
     ///               properties of the whole set that a single page could not work out for
     ///               itself.
     ///
@@ -47,8 +49,8 @@ namespace VAS.Controllers
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_238_UnreconciledBankLineWidgetController).FullName);
 
         /// <summary>
-        /// Returns one page of unreconciled statement lines, the total behind the header
-        /// badge, and the accounts the filter can offer.
+        /// Returns one page of unreconciled statement lines, the total the pager reports,
+        /// and the accounts the filter can offer.
         /// </summary>
         /// <param name="bankAccountId">C_BankAccount_ID to restrict to, or 0 for all.</param>
         /// <param name="pageNo">1-based page; clamped by the model.</param>

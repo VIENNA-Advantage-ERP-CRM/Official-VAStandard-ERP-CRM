@@ -34,9 +34,12 @@ namespace VASLogic.Models
     ///                             reference - and showing either under a "Narration"
     ///                             heading would misreport what the bank actually said.
     ///                             A blank one renders as a dash.
-    ///                 Account     bank name plus the masked account tail, "Uco Bank
-    ///                             ····9032" - the same form the account filter uses, so
-    ///                             one account reads identically in both places.
+    ///                 Account     bank name plus a MASKED tail, "Uco Bank ····9032". The
+    ///                             FILTER's options spell the same account's number out in
+    ///                             full - "Uco Bank 12340000009032" - because that is where
+    ///                             one account is singled out and two accounts at one bank
+    ///                             can end in the same digits. A row only has to be
+    ///                             recognisable; the picker has to be unambiguous.
     ///                 Amount      StmtAmt, SIGNED AS STORED. This is the bank's own view:
     ///                             a positive line is money the bank received, a negative
     ///                             one money it paid out. There is no IsReceipt flag on a
@@ -63,8 +66,8 @@ namespace VASLogic.Models
     ///               lines rather than summing across accounts, so converting would only
     ///               obscure what the statement actually says.
     ///
-    ///               The bank-account filter scopes the list and the header count alike, so
-    ///               the badge can never disagree with the rows beneath it. "All accounts"
+    ///               The bank-account filter scopes the list and the total count alike, so
+    ///               the pager can never disagree with the rows above it. "All accounts"
     ///               is the absence of a filter rather than a value, so the client sends 0.
     ///
     ///               MRole row-level security is applied to C_BankStatementLine bsl, the
@@ -94,8 +97,8 @@ namespace VASLogic.Models
         private const int MIN_PageSize = 1;
         private const int MAX_PageSize = 12;
 
-        /* Characters of AccountNo the account filter may show. Everything before them is
-           masked HERE: the full number is never serialized to the browser. */
+        /* Characters of AccountNo a GRID ROW may show; everything before them is masked
+           HERE. The filter's own options are built unmasked - see BuildFullAccountLabel. */
         private const int ACCOUNTNO_VisibleChars = 4;
         private const string ACCOUNTNO_Mask = "····";
 
@@ -104,8 +107,8 @@ namespace VASLogic.Models
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// One page of unreconciled statement lines, the total behind the header badge, and
-        /// the accounts the filter can offer.
+        /// One page of unreconciled statement lines, the total the pager reports, and the
+        /// accounts the filter can offer.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="bankAccountId">C_BankAccount_ID to restrict to, or 0 for every
@@ -157,9 +160,9 @@ namespace VASLogic.Models
         /// <summary>
         /// Counts the open lines, then reads the requested page of them.
         ///
-        /// The COUNT is what the header badge shows, so it comes from the SAME predicate
-        /// and the same account filter as the rows - the badge cannot report a different
-        /// population from the list under it.
+        /// The COUNT is what the pager reports, so it comes from the SAME predicate and
+        /// the same account filter as the rows - the footer cannot report a different
+        /// population from the list above it.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="asOf">Date every row's age is measured against.</param>
@@ -300,10 +303,10 @@ namespace VASLogic.Models
                 item.AgeDays = days < 0 ? 0 : days;
             }
 
-            /* The Account column: "Uco Bank ····9032" - the bank's name with the masked
-               account tail, the same form the filter's own options use, so one account
-               reads identically in both places. */
-            item.BankAccount = BuildAccountLabel(
+            /* The Account column: "Uco Bank ····9032" - the bank's name with a masked tail.
+               The filter's options spell the same account's number out in full; a row only
+               has to be recognisable, the picker has to be unambiguous. */
+            item.BankAccount = BuildMaskedAccountLabel(
                 Util.GetValueOfString(row["Bank_Name"]),
                 Util.GetValueOfString(row["Bank_Account_Name"]),
                 Util.GetValueOfString(row["Account_No"]));
@@ -364,7 +367,10 @@ namespace VASLogic.Models
 
                 AccountOption option = new AccountOption();
                 option.C_BankAccount_ID = Util.GetValueOfInt(row["C_BankAccount_ID"]);
-                option.Name = BuildAccountLabel(
+
+                /* Unmasked: this is the label the pill and the picker show, and it is where
+                   one account is told apart from another at the same bank. */
+                option.Name = BuildFullAccountLabel(
                     Util.GetValueOfString(row["Bank_Name"]),
                     Util.GetValueOfString(row["Account_Name"]),
                     Util.GetValueOfString(row["Account_No"]));
@@ -376,30 +382,58 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// The account as the filter shows it - "UCO ····9032". The bank's name plus a
-        /// masked tail is the most recognisable form; the account's own Name stands in when
-        /// there is no number to mask.
+        /// The account as a row's Account column shows it - "Uco Bank ····9032": the bank's
+        /// name plus a MASKED tail. A grid row is a list of many accounts and only has to
+        /// be recognisable, so the number is not spelled out there.
+        /// </summary>
+        /// <param name="bankName">C_Bank.Name.</param>
+        /// <param name="accountName">C_BankAccount.Name - stands in when there is no number.</param>
+        /// <param name="accountNo">C_BankAccount.AccountNo; only its tail is returned.</param>
+        /// <returns>Display string; may be empty.</returns>
+        private string BuildMaskedAccountLabel(string bankName, string accountName, string accountNo)
+        {
+            return ComposeAccountLabel(bankName, accountName, MaskAccountNo(accountNo));
+        }
+
+        /// <summary>
+        /// The account as the FILTER shows it - "Uco Bank 12340000009032": the bank's name
+        /// plus the account number in full. The filter is where one account is singled out
+        /// from the rest, and a masked tail cannot separate two accounts at the same bank
+        /// that end in the same digits - so the picker spells the number out even though
+        /// the grid does not.
+        /// </summary>
+        /// <param name="bankName">C_Bank.Name.</param>
+        /// <param name="accountName">C_BankAccount.Name - stands in when there is no number.</param>
+        /// <param name="accountNo">C_BankAccount.AccountNo, as stored.</param>
+        /// <returns>Display string; may be empty.</returns>
+        private string BuildFullAccountLabel(string bankName, string accountName, string accountNo)
+        {
+            return ComposeAccountLabel(bankName, accountName, accountNo == null ? "" : accountNo.Trim());
+        }
+
+        /// <summary>
+        /// Joins the bank's name to whichever form of the number the caller settled on, so
+        /// the two labels differ only in that number and never drift apart in shape.
         /// </summary>
         /// <param name="bankName">C_Bank.Name.</param>
         /// <param name="accountName">C_BankAccount.Name.</param>
-        /// <param name="accountNo">C_BankAccount.AccountNo - never returned in full.</param>
+        /// <param name="number">Already-masked or already-full account number; may be empty.</param>
         /// <returns>Display string; may be empty.</returns>
-        private string BuildAccountLabel(string bankName, string accountName, string accountNo)
+        private string ComposeAccountLabel(string bankName, string accountName, string number)
         {
-            string masked = MaskAccountNo(accountNo);
-
-            if (masked.Length > 0)
+            if (number.Length > 0)
             {
-                return String.IsNullOrEmpty(bankName) ? masked : bankName + " " + masked;
+                return String.IsNullOrEmpty(bankName) ? number : bankName + "_" + number;
             }
 
+            /* No number to show at all - the account's own Name is the only thing left that
+               identifies it. */
             if (!String.IsNullOrEmpty(accountName)) { return accountName; }
             return bankName == null ? "" : bankName;
         }
 
         /// <summary>
-        /// Shows only the last few characters of an account number - "····9032". The full
-        /// number is never serialized to the browser, so it can never reach the DOM.
+        /// Shows only the last few characters of an account number - "····9032".
         /// </summary>
         /// <param name="accountNo">Raw C_BankAccount.AccountNo; may be null or short.</param>
         /// <returns>Masked number, or an empty string when there is nothing to mask.</returns>
@@ -438,8 +472,8 @@ namespace VASLogic.Models
             /// <summary>Rows per page actually used, after clamping.</summary>
             public int PageSize { get; set; }
 
-            /// <summary>Open lines in total - the header badge's figure, from the same
-            /// predicate and filter as the rows.</summary>
+            /// <summary>Open lines in total - the pager's figure, from the same predicate
+            /// and filter as the rows.</summary>
             public int TotalRows { get; set; }
 
             /// <summary>CEILING(TotalRows / PageSize).</summary>
@@ -476,7 +510,7 @@ namespace VASLogic.Models
             public decimal Amount { get; set; }
 
             /// <summary>The Account column: bank name plus the masked account tail -
-            /// "Uco Bank ····9032". Never the full number.</summary>
+            /// "Uco Bank ····9032".</summary>
             public string BankAccount { get; set; }
 
             /// <summary>C_Bank.Name on its own, for the row tooltip.</summary>
@@ -504,7 +538,8 @@ namespace VASLogic.Models
             /// <summary>C_BankAccount.C_BankAccount_ID.</summary>
             public int C_BankAccount_ID { get; set; }
 
-            /// <summary>Bank name plus the masked account tail.</summary>
+            /// <summary>Bank name plus the account number IN FULL - the picker's label,
+            /// unmasked so two accounts at one bank can be told apart.</summary>
             public string Name { get; set; }
         }
     }

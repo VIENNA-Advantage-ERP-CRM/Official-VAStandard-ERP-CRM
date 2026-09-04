@@ -71,7 +71,7 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* ---- Header: icon well + title/subtitle + badge + account filter ---- */
+/* ---- Header: icon well + title/subtitle + account filter ---- */
 .vas-238-header {
     display: flex;
     align-items: flex-start;
@@ -141,22 +141,6 @@
 
 .vas-238-subtitle:empty {
     display: none;
-}
-
-/* The open-count badge - the glance-label chip tier (0.6875em bold), amber because an
-   open line is an EXCEPTION rather than an error. It counts the whole filtered set,
-   not the page. */
-.vas-238-badge {
-    flex: 0 0 auto;
-    align-self: center;
-    font-size: clamp(10.5px, calc(var(--dash-inline-size, 100vw) * .0075), 12px);
-    font-weight: 700;
-    line-height: 1;
-    color: #9A6500;
-    background: #FFF6E2;
-    border-radius: 999px;
-    padding: .35em .7em;
-    white-space: nowrap;
 }
 
 /* Bank account filter - the interactive pill tier of the two-tier chip system (never
