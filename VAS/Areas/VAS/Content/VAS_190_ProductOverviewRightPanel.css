@@ -109,6 +109,161 @@
     font-size: 0.875em;
     color: var(--p190-muted);
 }
+.vas_190-emptyTitle { font-weight: 700; color: var(--p190-secondary); }
+.vas_190-emptyHint { margin-top: 0.25em; }
+
+/* ----------------------------------------------------------- */
+/*  Activity detail sheet                                       */
+/* ----------------------------------------------------------- */
+/* One activity entry, opened over the whole panel: a labelled header, the
+   fields that entry actually carries, its content, and its actions pinned to
+   the bottom. It replaces the drawer that used to fold open under a mail row,
+   which could hold a message body and nothing else — an appointment's people,
+   its meeting link and its transcript had nowhere to go.
+
+   Positioned against .vas_190-root (position:relative) so it covers the panel
+   and nothing outside it, and it carries its own font-size anchor because the
+   body's container query does not reach it. */
+.vas_190-sheet {
+    position: absolute;
+    inset: 0;
+    z-index: 1000;
+    background: #FFFFFF;
+    font-size: clamp(16px, 1vw, 18px);
+    display: flex;
+    flex-direction: column;
+}
+
+.vas_190-sheetHead {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+    padding: 1em 0.875em 0.75em;
+    border-bottom: 1px solid var(--p190-divider);
+}
+.vas_190-sheetTitle {
+    flex: 1;
+    min-width: 0;
+    font-weight: 700;
+    font-size: 0.875em;
+    color: var(--p190-text);
+    /* The subject WRAPS here. The row it was opened from clipped it to one
+       line, and this is the place a reader comes to read the whole of it. */
+    overflow-wrap: anywhere;
+}
+.vas_190-sheetX {
+    flex-shrink: 0;
+    width: 1.5em;
+    height: 1.5em;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--p190-muted);
+    cursor: pointer;
+    padding: 0;
+}
+.vas_190-sheetX:hover { background: #F2F6FA; color: var(--p190-text); }
+.vas_190-sheetX:focus-visible { outline: 2px solid var(--p190-action); outline-offset: 1px; }
+.vas_190-sheetX .vas_190-ic svg { width: 1em; height: 1em; }
+
+.vas_190-sheetBody {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overflow-x: hidden;
+    padding: 0.875em;
+}
+
+/* Label left, value right — the shape the engagement view on the customer
+   master uses, so a reader who knows one knows this. */
+.vas_190-sheetRow {
+    display: flex;
+    gap: 0.75em;
+    padding: 0.375em 0;
+    font-size: 0.75em;
+    border-bottom: 1px solid var(--p190-divider);
+}
+.vas_190-sheetRow:last-of-type { border-bottom: none; }
+.vas_190-sheetK {
+    width: 7em;
+    flex-shrink: 0;
+    color: var(--p190-muted);
+}
+.vas_190-sheetV {
+    flex: 1;
+    min-width: 0;
+    color: var(--p190-text);
+    overflow-wrap: anywhere;
+}
+.vas_190-sheetV a { color: var(--p190-action); }
+
+.vas_190-sheetLabel {
+    margin-top: 1em;
+    margin-bottom: 0.375em;
+    font-weight: 700;
+    font-size: 0.6875em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--p190-muted);
+}
+/* The message, comment or note itself. Its own line breaks are the author's,
+   so they are kept. */
+.vas_190-sheetText {
+    font-size: 0.75em;
+    line-height: 1.55;
+    color: var(--p190-secondary);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.vas_190-sheetFoot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5em;
+    padding: 0.75em 0.875em;
+    border-top: 1px solid var(--p190-divider);
+    background: #FFFFFF;
+}
+.vas_190-sheetBtn {
+    font: inherit;
+    font-size: 0.75em;
+    padding: 0.5em 1em;
+    border: 1px solid var(--p190-card-bd);
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: var(--p190-secondary);
+    cursor: pointer;
+}
+.vas_190-sheetBtn:hover { background: #F2F6FA; }
+.vas_190-sheetBtn:focus-visible { outline: 2px solid var(--p190-action); outline-offset: 1px; }
+.vas_190-sheetBtn--primary {
+    border-color: var(--p190-action);
+    background: var(--p190-action);
+    color: #FFFFFF;
+}
+.vas_190-sheetBtn--primary:hover { background: #0071BD; }
+
+/* ----------------------------------------------------------- */
+/*  Task priority badge                                         */
+/* ----------------------------------------------------------- */
+/* In front of a task's headline, in the colours the task screens use. It is
+   the first thing a reader sorts on and it was not on the row at all. */
+.vas_190-prio {
+    display: inline-block;
+    margin-right: 0.375em;
+    padding: 0 0.5em;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.8125em;
+    line-height: 1.5em;
+    vertical-align: baseline;
+}
+.vas_190-prio-high   { background: #FDECEC; color: #C42127; }
+.vas_190-prio-medium { background: var(--p190-warn-bg); color: var(--p190-warn-tx); }
+.vas_190-prio-low    { background: var(--p190-info-bg); color: var(--p190-info-tx); }
 
 /* ----------------------------------------------------------- */
 /*  Section header                                              */
@@ -560,12 +715,30 @@
 /* ----------------------------------------------------------- */
 /* Centred beneath the section content. Never an inner scrollbar: the panel body
    owns scrolling, and a section that paginates does not grow its own. */
+/* What is on screen at the leading edge, the controls at the trailing one. The
+   three used to sit together in the middle: that said which page you were on
+   but never how much there was to page through. */
 .vas_190-pager {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 0.5em;
     padding-top: 0.5em;
+}
+.vas_190-pgRange {
+    font-size: 0.6875em;
+    color: var(--p190-muted);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas_190-pgRange b { font-weight: 700; color: var(--p190-text); }
+.vas_190-pgCtl {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
 }
 .vas_190-pgBtn {
     width: 1.5em;
