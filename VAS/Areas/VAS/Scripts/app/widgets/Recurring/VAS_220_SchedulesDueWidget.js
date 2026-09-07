@@ -60,7 +60,8 @@
  * 24 | Today                                 | VAS_220_Today
  * 25 | Showing                               | VAS_220_Showing
  * 26 | of                                    | VAS_220_Of
- * 27 | schedules due in the next {0} days     | VAS_220_DueInWindow
+ * 27 | schedules due in the next {0} days     | VAS_220_DueInWindow (not used - the
+ *    |                                       | footer note counts and stops there)
  * 28 | No records found                      | VAS_220_NoRecordsFound
  * 29 | Close                                 | VAS_220_Close
  * 30 | Previous                              | VAS_220_Previous
@@ -465,11 +466,14 @@
                 '</button>' +
                 '</div>' +
                 '<div class="vas-220-modal-body"></div>' +
+                /* The footer carries the pager and nothing else. Closing is the X in
+                   the header or Escape - a second Close button down here repeated a
+                   control the dialog already has, in the corner where the eye goes
+                   looking for the next page. */
                 '<div class="vas-220-modal-foot">' +
                 '<span class="vas-220-foot-note"></span>' +
                 '<span class="vas-220-foot-actions">' +
                 '<span class="vas-220-pager"></span>' +
-                '<button type="button" class="vas-220-btn vas-220-btn-primary" data-close="1">' + escapeHtml(closeText) + '</button>' +
                 '</span>' +
                 '</div>' +
                 '</div>' +
@@ -575,17 +579,22 @@
                 '<div class="vas-220-tbl">' + headHtml + '<div class="vas-220-tbody">' + bodyHtml + '</div></div>'
             );
 
-            /* Footer helper carries the dataset size, not the page size, so the user
-               can see how much sits behind the pager. */
-            var footNote = format(
-                label("VAS_220_DueInWindow", "schedules due in the next {0} days"),
-                [formatCount(cachedData.WindowDays)]
-            );
-            footNote = formatCount(totalRows) + ' ' + footNote;
-            if (totalPages > 1) {
+            /* Footer note: which slice of the set is on screen, and how big the set is.
+               It names the slice at every page count - "Showing 1-1 of 1" on a list with
+               nothing to turn - so the footer never goes quiet just because there is a
+               single page, and it reads beside the pager rather than being swapped out
+               for it (the sibling VAS_225 footer works the same way).
+
+               The window is named twice in the dialog head already - in the title and
+               again as the resolved dates in the subtitle - so the note counts and
+               stops there. An empty result has no slice to name and says nothing: the
+               body already carries "No records found". */
+            var footNote = '';
+            if (totalRows > 0) {
                 footNote = label("VAS_220_Showing", "Showing") + ' ' + (start + 1) + '–' + (start + slice.length)
-                    + ' ' + label("VAS_220_Of", "of") + ' ' + footNote;
+                    + ' ' + label("VAS_220_Of", "of") + ' ' + formatCount(totalRows);
             }
+
             $modal.find('.vas-220-foot-note').text(footNote).attr('title', footNote);
 
             var pagerHtml = '';
