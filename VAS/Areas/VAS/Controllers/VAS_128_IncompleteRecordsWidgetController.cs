@@ -330,30 +330,35 @@ namespace VAS.Controllers
                        CASE WHEN COALESCE(p.R_MailText_ID, 0) = 0 THEN 1 ELSE 0 END AS MissMailTemplate,
                        " + missQuality + @" AS MissQualityCriteria,
                        CASE WHEN p.IsBOM = 'Y' AND COALESCE(p.IsVerified, 'N') <> 'Y' THEN 1 ELSE 0 END AS MissVerified,
-                       CASE WHEN EXISTS (
-                               SELECT 1
-                               FROM M_Product_PO po
-                               JOIN C_BPartner v ON (v.C_BPartner_ID = po.C_BPartner_ID AND v.AD_Client_ID = po.AD_Client_ID)
-                               WHERE po.M_Product_ID = p.M_Product_ID
-                                 AND po.AD_Client_ID = p.AD_Client_ID
-                                 AND po.IsActive = 'Y'
-                                 AND po.IsCurrentVendor = 'Y'
-                                 AND v.IsActive = 'Y'
-                                 AND v.IsVendor = 'Y'
-                           ) THEN 0 ELSE 1 END AS MissPreferredVendor,
+                       CASE WHEN pv.M_Product_ID IS NULL THEN 1 ELSE 0 END AS MissPreferredVendor,
                        CASE WHEN p.GuaranteeDays IS NULL THEN 1 ELSE 0 END AS MissGuarantee,
                        CASE WHEN COALESCE(p.M_AttributeSet_ID, 0) = 0 THEN 1 ELSE 0 END AS MissAttributeGroup,
                        CASE WHEN COALESCE(p.M_CustomTariff_ID, 0) = 0 THEN 1 ELSE 0 END AS MissCustomTariff
                 FROM M_Product p
                 JOIN M_Product_Category pc ON (pc.M_Product_Category_ID = p.M_Product_Category_ID)
                 LEFT JOIN AD_User u ON (u.AD_User_ID = p.UpdatedBy)
+                LEFT JOIN PrefVendor pv ON (pv.M_Product_ID = p.M_Product_ID AND pv.AD_Client_ID = p.AD_Client_ID)
                 WHERE p.AD_Client_ID = @AD_Client_ID
                   AND p.IsActive = 'Y'
                   AND COALESCE(p.IsSummary, 'N') = 'N'";
 
-            // MRole (org/role data-access) on the primary table; AddAccessSQL
-            // appends its predicate to the END, and the EXISTS is in the SELECT
-            // list, so appending after the base WHERE stays valid.
+            // MRole (org/role data-access) on the primary table. AddAccessSQL
+            // hands the statement to AccessSqlParser, which finds the main table
+            // by the FIRST " FROM " it sees and only recognises a sub-select
+            // spelled exactly "(SELECT". The preferred-vendor test used to be a
+            // correlated EXISTS in the SELECT list written as "EXISTS (" +
+            // newline + "SELECT", so the parser missed it, read
+            // "FROM M_Product_PO po" as the main FROM, and appended the private
+            // record-access predicate against that alias:
+            //   AND po.M_Product_PO_ID NOT IN (SELECT Record_ID FROM AD_Private_Access ...)
+            // "po" only exists inside the sub-select, so Oracle raised
+            // ORA-00904 "PO"."M_PRODUCT_PO_ID": invalid identifier and the
+            // widget showed "Couldn't load" (the trigger is per database - the
+            // predicate is only emitted where the role carries private-access
+            // rows for that table). The vendor test now lives in the PrefVendor
+            // CTE below, so this statement contains no sub-select at all: the
+            // parser always resolves M_Product/p and qualifies its predicate
+            // with "p.", whatever the formatting.
             innerSql = MRole.GetDefault(ctx).AddAccessSQL(
                 innerSql,
                 "p",
@@ -402,8 +407,25 @@ namespace VAS.Controllers
                 return new List<object>();
             }
 
+            // PrefVendor carries the "has a preferred vendor" set that used to be
+            // a correlated EXISTS inside ProdStatus. It is keyed by client as
+            // well as product so the LEFT JOIN reproduces the old correlation
+            // exactly, and DISTINCT keeps it one row per (product, client) so
+            // the join can never duplicate a product row. It needs no bind
+            // variable of its own: @AD_Client_ID still occurs exactly once in
+            // the whole statement, which positional binding requires.
             string sql = @"
-                WITH ProdStatus AS (
+                WITH PrefVendor AS (
+                    SELECT DISTINCT po.M_Product_ID AS M_Product_ID,
+                                    po.AD_Client_ID AS AD_Client_ID
+                    FROM M_Product_PO po
+                    JOIN C_BPartner v ON (v.C_BPartner_ID = po.C_BPartner_ID AND v.AD_Client_ID = po.AD_Client_ID)
+                    WHERE po.IsActive = 'Y'
+                      AND po.IsCurrentVendor = 'Y'
+                      AND v.IsActive = 'Y'
+                      AND v.IsVendor = 'Y'
+                ),
+                ProdStatus AS (
                     " + innerSql + @"
                 )
                 SELECT s.ProductId, s.ProductName, s.ProductCode, s.CategoryName,
