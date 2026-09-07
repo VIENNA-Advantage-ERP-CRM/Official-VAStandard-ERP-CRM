@@ -1017,7 +1017,7 @@ namespace VASLogic.Models
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql, "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             if (page < 0) page = 0;
-            sql += " ORDER BY il.Line" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
+            sql += " ORDER BY il.Updated DESC" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
 
             DataSet ds = DB.ExecuteDataset(sql,
                 new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);

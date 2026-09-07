@@ -54,6 +54,8 @@
  *                   4 | No bank accounts available    | VAS_230_NoAccounts
  *                   5 | Balance as of                 | VAS_230_AsOf
  *                   6 | Couldn't load                 | VAS_192_CouldntLoad (reuse)
+ *                   7 | Latest balance for the        | VAS_230_BankBalanceHint
+ *                     | account              |
  *
  * Chronological development:
  *   VAI154         Created  Date 2026-09-04
@@ -221,13 +223,22 @@
 
             var title = label('VAS_230_BankBalance', 'Bank Balance');
 
+            /* The explainer under the title, the way VAS_231 carries its own on the
+               same dashboard. It says which balance this is - the account's latest,
+               not a running total and not a figure for the bank as a whole. */
+            var subtitle = label('VAS_230_BankBalanceHint',
+                'Latest balance for the account');
+
             /* Header, then ONE value. No footer element exists in this markup at all -
                there is nothing for a delta or a comparison caption to be bound into. */
             $card = $(
                 '<div class="vas-230-card">' +
                     '<div class="vas-230-header">' +
                         '<span class="vas-230-icon">' + ICONS.currency + '</span>' +
-                        '<div class="vas-230-title"></div>' +
+                        '<div class="vas-230-head-text">' +
+                            '<div class="vas-230-title"></div>' +
+                            '<div class="vas-230-subtitle"></div>' +
+                        '</div>' +
                         '<button type="button" class="vas-230-acct" aria-haspopup="listbox">' +
                             '<span class="vas-230-acct-label"></span>' +
                             ICONS.chevron +
@@ -241,6 +252,10 @@
             );
 
             $card.find('.vas-230-title').text(title).attr('title', title);
+            /* The subtitle truncates to one line in a 2x1 cell that is already sharing
+               its header row with the account pill, so the full sentence also goes on
+               the title attribute - it moves to the tooltip rather than being lost. */
+            $card.find('.vas-230-subtitle').text(subtitle).attr('title', subtitle);
 
             $acctBtn = $card.find('.vas-230-acct');
             $value = $card.find('.vas-230-value');
@@ -366,11 +381,17 @@
 
             var negative = _balance < 0;
 
+            /* Sign and symbol lead the number as one supporting mark, the way
+               VAS_231 composes its net movement, so the two banking cards print a
+               negative figure identically. The red of .vas-230-neg carries the
+               same meaning a second time, so the smaller minus is not the only
+               thing separating an overdraft from a credit. */
             $value.attr('class', 'vas-230-value' + (negative ? ' vas-230-neg' : ''))
                 .attr('title', valueTooltip())
                 .html(
-                    (negative ? '<span class="vas-230-sign">−</span>' : '') +
-                    '<span class="vas-230-cur">' + escapeHtml(_currencySymbol) + '</span>' +
+                    '<span class="vas-230-cur">' +
+                        escapeHtml((negative ? '−' : '') + _currencySymbol) +
+                    '</span>' +
                     escapeHtml(compactAmount(_balance))
                 );
         }

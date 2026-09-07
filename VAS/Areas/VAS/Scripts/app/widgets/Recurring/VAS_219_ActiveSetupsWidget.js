@@ -8,8 +8,9 @@
  * the client; the widget only fetches the KPI over an asynchronous AJAX call.
  *
  * Layout (matches the widget.html build pack for this widget):
- *   line 1  [icon]  Active Setups        (icon well + widget title)
- *   line 2  248                          (KPI value)
+ *   line 1  [icon]  Active Setups              (icon well + widget title)
+ *                   Active with runs remaining (widget subtitle - what is counted)
+ *   line 2  248                                (KPI value)
  *
  * States:
  *   loading  busy overlay over the card, value keeps its last rendered text
@@ -17,10 +18,11 @@
  *   error    value falls back to an em dash and the meta line carries the reason
  *
  * Summary Message Table
- *  # | Current Text  | Message Key
- * ---+---------------+-----------------------------
- *  1 | Active Setups | VAS_219_ActiveSetups
- *  2 | Couldn't load | VAS_219_CouldntLoad
+ *  # | Current Text               | Message Key
+ * ---+----------------------------+-----------------------------
+ *  1 | Active Setups              | VAS_219_ActiveSetups
+ *  2 | Couldn't load              | VAS_219_CouldntLoad
+ *  3 | Recurring Rules with runs remaining | VAS_219_WithRunsRemaining
  */
 ; VAS = window.VAS || {};
 
@@ -127,14 +129,23 @@
         function createWidget() {
             var title = label("VAS_219_ActiveSetups", "Active Setups");
 
+            /* "Active Setups" alone does not say which setups were counted: the
+               query also drops anything with no runs left, so a setup the user
+               can see switched on may still be outside the number. The subtitle
+               states that second half of the filter. */
+            var subtitle = label("VAS_219_WithRunsRemaining", "Recurring Rules with runs remaining");
+
             /* Two-part stack distributed by the card's space-between: header row
-               (icon well + title) on top, KPI value below. No subtitle - the meta
+               (icon well + title/subtitle stack) on top, KPI value below. The meta
                line stays empty and collapsed unless the load fails. */
             $card = $(
                 '<div class="vas-219-card vas-widget-bg" role="group" aria-label="' + escapeHtml(title) + '">' +
                 '<div class="vas-219-top">' +
                 '<span class="vas-219-icon">' + ICON_RECURRING + '</span>' +
+                '<span class="vas-219-titles">' +
                 '<span class="vas-219-label">' + escapeHtml(title) + '</span>' +
+                '<span class="vas-219-subtitle" title="' + escapeHtml(subtitle) + '">' + escapeHtml(subtitle) + '</span>' +
+                '</span>' +
                 '</div>' +
                 '<div class="vas-219-value"><span class="vas-219-value-text">—</span></div>' +
                 '<div class="vas-219-meta"></div>' +

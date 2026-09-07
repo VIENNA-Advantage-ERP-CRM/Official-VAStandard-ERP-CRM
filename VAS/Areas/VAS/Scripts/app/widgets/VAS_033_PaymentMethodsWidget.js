@@ -13,6 +13,8 @@
  *  7  | Next                                 | VAS_Next
  *  8  | Could not load data                  | VAS_ErrorLoading
  *  9  | Of                                   | VAS_Of
+ * 10  | Year to date                         | VAS_033_MessageYearToDate
+ * 11  | This period                          | VAS_033_MessageThisPeriod
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -28,6 +30,7 @@
 
         var $root = $('<div class="vas-payment-methods-root">');
         var $card;
+        var $subtitle;
         var $body;
         var $foot;
         var $pager;
@@ -71,7 +74,13 @@
                 '<path d="M22 12A10 10 0 0 0 12 2v10z"></path>' +
                 '</svg>'
             );
+            var $headText = $('<div class="vas-payment-methods-head-text">');
             var $title = $('<div class="vas-payment-methods-title">').text(lbl('VAS_033_MessagePaymentMethods', 'Payment methods'));
+
+            /* The figures only cover the current accounting period, so the
+               header carries that period as a subtitle -- otherwise a monthly
+               share reads as an all-time one. */
+            $subtitle = $('<div class="vas-payment-methods-subtitle">');
 
             $pager = $('<div class="vas-payment-methods-pager">');
             $pagerPrev = $('<button type="button" class="vas-payment-methods-page-btn" aria-label="' + lbl('VAS_Previous', 'Previous') + '">' +
@@ -89,7 +98,8 @@
             $pager.append($pagerPrev).append($pagerText).append($pagerNext);
 
             $iconBox.append($icon);
-            $head.append($iconBox).append($title);
+            $headText.append($title).append($subtitle);
+            $head.append($iconBox).append($headText);
 
             $body = $('<div class="vas-payment-methods-body">');
 
@@ -174,6 +184,8 @@
         }
 
         function renderData(data) {
+            renderPeriodSubtitle(data);
+
             methodsData = $.isArray(data.methods)
                 ? $.grep(data.methods, function (method) {
                     return method != null;
@@ -193,6 +205,96 @@
             pageNo = 1;
             totalPages = Math.ceil(methodsData.length / pageSize);
             renderPage();
+        }
+
+        /*
+         * The period name ("Sep-26") is what the user recognises, so it is the
+         * subtitle; the exact range it stands for is kept in the tooltip rather
+         * than spent on header width. A client without seeded periods still
+         * gets the range itself.
+         */
+        function renderPeriodSubtitle(data) {
+            if (!$subtitle) {
+                return;
+            }
+
+            var periodName = data && data.periodName ? String(data.periodName) : '';
+            var rangeText = formatPeriodRange(
+                data ? data.dateFrom : '',
+                data ? data.dateTo : ''
+            );
+
+            var label = periodName;
+
+            if (!label && data && String(data.periodFilter).toUpperCase() === 'YTD') {
+                label = lbl('VAS_033_MessageYearToDate', 'Year to date');
+            }
+
+            if (!label) {
+                label = rangeText;
+            }
+
+            if (!label) {
+                label = lbl('VAS_033_MessageThisPeriod', 'This period');
+            }
+
+            var tooltip = rangeText && rangeText !== label
+                ? label + ' | ' + rangeText
+                : label;
+
+            $subtitle.text(label).attr('title', tooltip);
+        }
+
+        /*
+         * Dates arrive as plain "yyyy-MM-dd" strings. Date.parse would read
+         * them as UTC midnight and shift the day backwards west of Greenwich,
+         * so the parts are handed to the local-time constructor instead.
+         */
+        function parseServerDate(value) {
+            if (!value) {
+                return null;
+            }
+
+            var parts = String(value).split('-');
+
+            if (parts.length < 3) {
+                return null;
+            }
+
+            var year = parseInt(parts[0], 10);
+            var month = parseInt(parts[1], 10);
+            var day = parseInt(parts[2], 10);
+
+            if (isNaN(year) || isNaN(month) || isNaN(day)) {
+                return null;
+            }
+
+            var date = new Date(year, month - 1, day);
+
+            return isNaN(date.getTime()) ? null : date;
+        }
+
+        function formatShortDate(date) {
+            if (!date) {
+                return '';
+            }
+
+            return date.toLocaleDateString(window.navigator.language, {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
+        }
+
+        function formatPeriodRange(dateFrom, dateTo) {
+            var from = parseServerDate(dateFrom);
+            var to = parseServerDate(dateTo);
+
+            if (from && to) {
+                return formatShortDate(from) + ' – ' + formatShortDate(to);
+            }
+
+            return formatShortDate(from || to);
         }
 
         function renderPage() {
@@ -579,6 +681,7 @@
 
             $root.remove();
             $card = null;
+            $subtitle = null;
             $body = null;
             $foot = null;
             $pager = null;
