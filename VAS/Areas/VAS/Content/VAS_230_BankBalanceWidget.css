@@ -62,10 +62,12 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* ---- Header: icon well + title + account pill, all on one line ----
+/* ---- Header: icon well + title/subtitle stack + account pill ----
    A 2x1 cell is about 124px tall at the 1280px laptop floor (§Content Fit Budget), so
-   the header gets one row and the value gets the rest. align-items:center rather than
-   flex-start: there is no subtitle, so the three items share one optical line. */
+   the header takes the top and the value gets the rest. align-items:center keeps the
+   well and the pill on the stack's optical centre, the way VAS_231 sets its own
+   header out. The body below is flex:1 and centres its figure, so the subtitle line
+   simply leaves the value less room rather than pushing anything out of the cell. */
 .vas-230-header {
     display: flex;
     align-items: center;
@@ -104,11 +106,44 @@
     font-weight: 500;
     color: #102C3F;
     line-height: 1.2;
-    flex: 1 1 auto;
+    /* The growth lever moved up to .vas-230-head-text when the subtitle went in:
+       left here it would have made the title absorb the stack's free height in the
+       column axis instead of the header's free width. */
+    display: block;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Title and subtitle stack between the well and the pill, so the icon and the account
+   pill centre on the pair rather than on the title alone (mirrors VAS_231). */
+.vas-230-head-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* Shared widget subtitle, one clamp step under the title: it explains the stat, so it
+   must never compete with it. On a 2x1 cell sharing its header row with the account
+   pill this WILL truncate at the laptop floor - the full sentence is on the element's
+   title attribute, so nothing is lost. */
+.vas-230-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-230-subtitle:empty {
+    display: none;
 }
 
 /* Bank account selector - the interactive pill tier of the two-tier chip system (never
@@ -199,16 +234,19 @@
     vertical-align: baseline;
 }
 
-/* The minus keeps the VALUE's size - it is part of the figure, and shrinking it would
-   let an overdrawn balance read as a positive one at a glance. */
-.vas-230-sign {
-    margin-right: .04em;
-}
-
-/* An overdrawn balance. The printed minus carries the same meaning as text, so the
-   reading never rests on colour alone. */
+/* An overdrawn balance. The minus now leads the currency symbol inside .vas-230-cur
+   (matching VAS_231's net movement), so it sits at the supporting size rather than at
+   stat size - but it is still printed, so the reading never rests on colour alone. */
 .vas-230-neg {
     color: #D14545;
+}
+
+/* The leading mark carries the sign, so it takes the overdraft colour with the digits
+   instead of keeping its slate tone - a red number behind a slate minus reads as two
+   separate marks. VAS_231 gets this for free because its .vas-231-cur declares no
+   colour of its own; here the supporting tone has to be handed back explicitly. */
+.vas-230-value.vas-230-neg .vas-230-cur {
+    color: inherit;
 }
 
 /* No balance line for this account. Said at body scale rather than stat scale - it is a

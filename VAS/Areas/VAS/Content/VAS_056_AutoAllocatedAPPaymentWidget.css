@@ -164,6 +164,33 @@
     stroke-linejoin: round;
 }
 
+/* Title and the period-days subtitle stack beside the icon, so the icon stays
+   centred on the pair rather than on the title alone. */
+.VAS-056-AutoAllocatedAPPayment-head-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.VAS-056-AutoAllocatedAPPayment-subtitle {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 0.0625em;
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.3;
+    color: #5f7283;
+}
+
+.VAS-056-AutoAllocatedAPPayment-subtitle:empty {
+    display: none;
+}
+
 .VAS-056-AutoAllocatedAPPayment-title {
     flex: 1 1 auto;
     min-width: 0;
@@ -352,6 +379,7 @@
         font-size: 1em;
     }
 
+    .VAS-056-AutoAllocatedAPPayment-subtitle,
     .VAS-056-AutoAllocatedAPPayment-badge,
     .VAS-056-AutoAllocatedAPPayment-desc {
         font-size: 0.625em;
@@ -1002,6 +1030,7 @@ html[dir="rtl"] .VAS-056-AutoAllocatedAPPayment-dialog th,
 html[dir="rtl"] .VAS-056-AutoAllocatedAPPayment-dialog-summary span,
 html[dir="rtl"] .VAS-056-AutoAllocatedAPPayment-dialog-summary strong,
 html[dir="rtl"] .VAS-056-AutoAllocatedAPPayment-desc,
+html[dir="rtl"] .VAS-056-AutoAllocatedAPPayment-subtitle,
 html[dir="rtl"] .VAS-056-AutoAllocatedAPPayment-dialog-subtitle {
     unicode-bidi: plaintext;
 }

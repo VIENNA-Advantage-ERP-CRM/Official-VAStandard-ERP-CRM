@@ -92,9 +92,9 @@
 }
 
 .vas-220-icon {
-    width: 1.75em;
-    height: 1.75em;
-    border-radius: 9px;
+    width: 2em;
+    height: 2em;
+    border-radius: 10px;
     flex: 0 0 auto;
     display: flex;
     align-items: center;
@@ -104,8 +104,8 @@
 }
 
 .vas-220-icon svg {
-    width: .95em;
-    height: .95em;
+    width: 1em;
+    height: 1em;
     display: block;
 }
 
@@ -113,7 +113,7 @@
    so it never depends on a container-query ancestor. */
 .vas-220-label {
     font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
     min-width: 0;
@@ -458,7 +458,7 @@
 }
 
 .vas-220-c-val {
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
     text-align: right;
     font-variant-numeric: tabular-nums;
