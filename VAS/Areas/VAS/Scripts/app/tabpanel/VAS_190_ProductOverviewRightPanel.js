@@ -232,6 +232,107 @@
  *                          postings fall back to the product category. Every
  *                          SERVICE product had no such section at all, with nothing
  *                          saying whether that was an absence or a failure.
+ *   VAI163   2026-09-04  - A row that names its own window actually opens it. The
+ *                          name was resolved through VIS.dataContext.getJSONRecord,
+ *                          which the framework does not expose, off a response
+ *                          envelope that was never unwrapped, and returned
+ *                          synchronously from a lookup that goes over the wire —
+ *                          so every name resolved to 0, was cached as a miss, and
+ *                          a SUPPLIER row opened the customer window through the
+ *                          zoom-target fallback. It asks this panel's own
+ *                          controller now, the way the payload is fetched, and the
+ *                          record opens in the callback.
+ *                        - A price row reads down three lines: the price list with
+ *                          its VERSION beside the name, then the three figures the
+ *                          list holds named together (list, limit and standard),
+ *                          then what those figures are FOR (per unit, attribute
+ *                          set). The version used to trail the meta line, first to
+ *                          be clipped, and the standard price sat alone in the
+ *                          row's value slot away from the other two.
+ *                        - The attribute set's mandatory type reads as words. The
+ *                          stored code for "always mandatory" is 'Y', not the 'A'
+ *                          the map named, so the section header printed the raw
+ *                          letter against a set that is always mandatory.
+ *   VAI163   2026-09-04  - Reserved and On order name the ONE open order behind
+ *                          the figure, alongside its dates. Both figures answer
+ *                          on the same terms now: the count is stated on the
+ *                          purchase side as well as the sales side, and a single
+ *                          order names itself under either.
+ *                        - A RECEIVED mail reads as a mail and leads with WHO IT
+ *                          CAME FROM. Inbound mails were typed as letters by the
+ *                          model (AttachmentType 'I' is the inbox, not a letter),
+ *                          so the reply to something sent from the product never
+ *                          appeared in the feed as a mail; and the sub-line only
+ *                          ever listed To / Cc / Bcc, which for an inbound message
+ *                          names our own address and answers nothing.
+ *                        - A vendor row states PREFERRED VENDOR and LAST USED as
+ *                          labels, and a row carrying either is never also called
+ *                          an alternative. "Preferred" was a phrase buried in the
+ *                          detail line while the chip beside it said
+ *                          "Alternative"; the section header counts alternatives
+ *                          on the same test the rows do. The last price names the
+ *                          unit it is in (PriceActual is per the product's BASE
+ *                          unit), and the section lists vendors reached through
+ *                          the purchase history as well as through the Vendor tab.
+ *                        - The open-order caption leads with the order's NUMBER
+ *                          and prints ONE date. An order raised and promised on
+ *                          the same day printed that day twice under two labels,
+ *                          which reads as the due date repeated; the due date is
+ *                          the one that describes the figure, so "dated" is only
+ *                          added where it differs.
+ *                        - An INVENTORY REVALUATION and an INVOICE COST ADJUSTMENT
+ *                          are named ('IR', 'VI'). Neither moves stock — both
+ *                          restate what the stock on hand is worth — and both were
+ *                          falling through to the unmapped-movement fallback and
+ *                          reading "Stock movement", which is the one thing they
+ *                          are not.
+ *                        - The Latest quality check card is ONE row: the
+ *                          confirmation's number, its document type, the sales
+ *                          representative and the quantity to verify, with the
+ *                          date at the right and the Checked / Pending chip beside
+ *                          the heading. The per-parameter RESULT rows that
+ *                          followed it are gone — they repeated the parameter
+ *                          names the section lists below with a second reading
+ *                          beside them, so the card said everything twice and
+ *                          pushed the configured parameters, which the section is
+ *                          named after, off the panel. Those parameters page five
+ *                          at a time under the card, which stays at the top.
+ *   VAI163   2026-09-04  - An activity entry opens its own DETAIL SHEET over the
+ *                          panel: label and subject, then the fields that entry
+ *                          actually carries, then its content, then its actions.
+ *                          It replaces the drawer that folded open under a mail
+ *                          row, which could hold a message body and nothing else
+ *                          — an appointment's people, its meeting link and its
+ *                          transcript, and a task's assignee and result, had
+ *                          nowhere to go. Appointments, tasks, notes, mails and
+ *                          letters all open; a field edit and a workflow step
+ *                          state everything they have on the row itself. A mail
+ *                          offers Reply, a recorded meeting offers its transcript
+ *                          as a download.
+ *                        - NO TOOLTIPS in the feed. Nothing there is abridged any
+ *                          more — what a row cannot fit, the sheet holds — so a
+ *                          tooltip repeating the line under the cursor was noise
+ *                          that followed the pointer down the section.
+ *                        - A task row leads with its PRIORITY, in the colours the
+ *                          task screens use, and states who it is assigned to and
+ *                          when it is due BEFORE its open / completed state, with
+ *                          the completion percentage after it. None of the four
+ *                          was on the row.
+ *                        - A note reads "Note", not "Chat": CM_ChatEntry is the
+ *                          plumbing, and what somebody writes on a product is a
+ *                          note everywhere else in the application.
+ *                        - Pagers state WHAT IS ON SCREEN at the leading edge
+ *                          ("Showing 1 – 5 of 12") and put the controls at the
+ *                          trailing one. All three used to sit together in the
+ *                          middle, which said which page you were on but never
+ *                          how much there was. Grid sections page at FIVE like
+ *                          every list section; they ran at ten, so stock by
+ *                          locator and transactions were blocks twice the height
+ *                          of everything around them.
+ *                        - The empty state is written for the reader who actually
+ *                          sees it — somebody on a NEW record, whose product does
+ *                          not exist yet. "No product selected" read as a fault on
+ *                          a row they had just chosen to create.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -299,7 +400,11 @@
         // Per-section page state, keyed by section key. Paging one section never
         // touches another, and a product change resets every one of them.
         var pages = {};
-        var ROWS_PER_PAGE = 10;
+        // FIVE everywhere. The grid sections (stock by locator, transactions) ran
+        // at ten while every list section ran at five, so a product with stock in
+        // a dozen locators — or any real movement history — put a block twice the
+        // height of everything else in the middle of the panel.
+        var ROWS_PER_PAGE = 5;
         // UOM conversions page at FIVE, not ten: they sit high in the panel and a
         // product with many units pushed everything below them off the screen.
         var UOM_ROWS_PER_PAGE = 5;
@@ -351,8 +456,16 @@
         this.init = function () {
             $root = $('<div class="vas_190-root"></div>');
             $body = $('<div class="vas_190-body"></div>');
+            // The empty state is read almost entirely by somebody on a NEW record:
+            // the panel has nothing to show because the product does not exist
+            // yet, which is not the same as nothing being selected. "No product
+            // selected" read as a fault on a row the user had just chosen to
+            // create.
             $emptyState = $('<div class="vas_190-empty" style="display:none;"></div>');
-            $emptyState.text(msg("VAS_190_NoData", "No product selected"));
+            $emptyState.append($('<div class="vas_190-emptyTitle"></div>')
+                .text(msg("VAS_190_NoData", "No product information added yet")));
+            $emptyState.append($('<div class="vas_190-emptyHint"></div>')
+                .text(msg("VAS_190_NoDataHint", "Add product details to see them here.")));
             $root.append($body).append($emptyState);
             createBusyIndicator();
             bindEvents();
@@ -402,46 +515,21 @@
                            openWindowNames($(this)));
             });
 
+            // An activity row opens its own DETAIL SHEET over the panel. It used
+            // to fold a drawer open beneath itself, which could hold a message
+            // body and nothing else — an appointment's people, its meeting link
+            // and its transcript, and a task's assignee and result, had nowhere to
+            // go at all.
             $root.on("click", ".vas_190-actRow.vas_190-is-openable", function () {
-                toggleMail($(this));
+                openActivityDetail(+$(this).attr("data-act-index"));
             });
-            // Mail expansion is keyboard-operable: Enter and Space both toggle.
+            // Those rows are buttons, so they answer the keyboard as one.
             $root.on("keydown", ".vas_190-actRow.vas_190-is-openable", function (e) {
                 if (e.which === 13 || e.which === 32) {
                     e.preventDefault();
-                    toggleMail($(this));
+                    openActivityDetail(+$(this).attr("data-act-index"));
                 }
             });
-        }
-
-        // The message body is the row's own next sibling, the way VAS_092 folds
-        // it: the row states the state, the panel beneath it holds the mail.
-        function toggleMail($row) {
-            // Two kinds of row open: a mail onto its own message, a task or
-            // appointment onto the e-mails sent against it. The row says which,
-            // so the hint names the right thing.
-            var kind = $row.attr("data-openkind");
-            var isAppt = (kind === "appt");
-            // A LETTER opens onto its own text and says so. It used to be offered
-            // as "Show full mail", which named the wrong kind of correspondence on
-            // the one control the reader has to act on.
-            var isLetter = (kind === "letter");
-            var nowOpen = !$row.hasClass("vas_190-is-open");
-            var hint;
-            if (isAppt) {
-                hint = nowOpen ? msg("VAS_190_HideMails", "Hide e-mails")
-                               : msg("VAS_190_ShowMails", "Show e-mails");
-            } else if (isLetter) {
-                hint = nowOpen ? msg("VAS_190_HideLetter", "Hide full letter")
-                               : msg("VAS_190_ShowLetter", "Show full letter");
-            } else {
-                hint = nowOpen ? msg("VAS_190_HideMail", "Hide full mail")
-                               : msg("VAS_190_ShowMail", "Show full mail");
-            }
-            $row.toggleClass("vas_190-is-open", nowOpen)
-                .attr("aria-expanded", nowOpen ? "true" : "false")
-                .attr("title", hint);
-            $row.next(".vas_190-actBody").toggle(nowOpen);
         }
 
         // Opens a record's window filtered to that row through the platform's
@@ -452,26 +540,55 @@
         // -1 so a failed lookup is not repeated on every click.
         var windowIdByName = {};
 
-        function resolveWindowIdByName(windowName) {
-            if (!windowName) return 0;
+        // Resolves ONE window name and hands the answer to `cb` — the id, or 0
+        // when the name names nothing here.
+        //
+        // Three things were wrong with the way it asked before, and each on its
+        // own was enough to make every name resolve to 0:
+        //   * VIS.dataContext.getJSONRecord is not a function the framework
+        //     exposes, so the guard above the call was never satisfied and the
+        //     lookup never left the browser;
+        //   * the controller answers with its JSON envelope, { windowId: n }, and
+        //     the id was parsed straight off that object rather than out of it;
+        //   * a lookup over the wire cannot answer synchronously, so a function
+        //     RETURNING the id could only ever return the miss.
+        // The name was then cached as -1 — "the dictionary does not know it" — so
+        // the one screen this exists for, a supplier row, opened the CUSTOMER
+        // window through the zoom-target fallback for the rest of the session.
+        //
+        // It asks the panel's own controller the same way the payload is fetched.
+        function resolveWindowIdByName(windowName, cb) {
+            if (!windowName) { cb(0); return; }
             if (windowIdByName.hasOwnProperty(windowName)) {
-                return windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0;
+                cb(windowIdByName[windowName] > 0 ? windowIdByName[windowName] : 0);
+                return;
             }
-            try {
-                if (!(window.VIS && VIS.dataContext &&
-                      typeof VIS.dataContext.getJSONRecord === "function")) {
-                    return 0;
+
+            var base = "";
+            try { base = VIS.Application.contextUrl || ""; } catch (e) { cb(0); return; }
+
+            $.ajax({
+                url: base + "VAS_190_ProductOverviewRightPanel/GetWindowId",
+                type: "GET",
+                dataType: "json",
+                data: { windowName: windowName },
+                success: function (raw) {
+                    var id = 0;
+                    try {
+                        var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                        id = res ? parseInt(res.windowId, 10) : 0;
+                    } catch (e2) { id = 0; }
+                    if (isNaN(id) || id < 0) id = 0;
+                    // A name that resolves to nothing is remembered as -1 so the
+                    // miss is not asked again on every click.
+                    windowIdByName[windowName] = id > 0 ? id : -1;
+                    cb(id);
+                },
+                error: function () {
+                    windowIdByName[windowName] = -1;
+                    cb(0);
                 }
-                var id = VIS.dataContext.getJSONRecord(
-                    "VAS_190_ProductOverviewRightPanel/GetWindowId", windowName);
-                id = parseInt(id, 10);
-                if (isNaN(id) || id <= 0) { windowIdByName[windowName] = -1; return 0; }
-                windowIdByName[windowName] = id;
-                return id;
-            } catch (e) {
-                windowIdByName[windowName] = -1;
-                return 0;
-            }
+            });
         }
 
         // Windows a row may ask for BY NAME, because its table's zoom target opens
@@ -483,15 +600,20 @@
         // the tenant's, not ours — the first that resolves wins, and when none
         // does the click falls back to the zoom target exactly as before. Nothing
         // is hard-failed on a name we cannot confirm.
-        var VENDOR_WINDOW_NAMES = ["VAS_Vendor", "VAS_VendorMaster", "VAS_BusinessPartnerVendor"];
+        var VENDOR_WINDOW_NAMES = ["VAS_VendorMaster"];
 
-        function resolveFirstWindowId(names) {
-            if (!names) return 0;
-            for (var i = 0; i < names.length; i++) {
-                var id = resolveWindowIdByName(names[i]);
-                if (id > 0) return id;
-            }
-            return 0;
+        // The names are tried one after the other rather than all at once: the
+        // first that resolves is the answer, and asking for the rest would be
+        // work whose result is thrown away.
+        function resolveFirstWindowId(names, cb) {
+            if (!names || !names.length) { cb(0); return; }
+            var i = 0;
+            (function next() {
+                if (i >= names.length) { cb(0); return; }
+                resolveWindowIdByName(names[i++], function (id) {
+                    if (id > 0) cb(id); else next();
+                });
+            })();
         }
 
         // Opens a record's window filtered to that row through the platform's
@@ -499,23 +621,26 @@
         // inside a panel. Degrades silently so a click can never throw.
         function openRecord(tableName, recordId, isSOTrx, windowNames) {
             if (!tableName || !recordId || +recordId <= 0 || !window.VIS) return;
-            try {
-                // A window named on the ROW wins: it is the only thing that can
-                // tell two records of the same table apart, which is exactly the
-                // customer-versus-vendor case.
-                var windowId = resolveFirstWindowId(windowNames);
-
-                if (windowId <= 0 &&
-                    VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
-                    // The 4th argument picks the sales vs purchase window for a
-                    // dual-purpose table like C_Order.
-                    windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, !!isSOTrx) || 0;
-                }
-                if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === "function") {
-                    var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
-                    VIS.viewManager.startWindow(windowId, zoomQuery);
-                }
-            } catch (e) { console.log(e); }
+            // A window named on the ROW wins: it is the only thing that can tell
+            // two records of the same table apart, which is exactly the
+            // customer-versus-vendor case. Resolving it is a round trip, so the
+            // open happens in the callback — the first click on a name pays for
+            // the lookup, every click after it is answered from the cache.
+            resolveFirstWindowId(windowNames, function (namedId) {
+                try {
+                    var windowId = namedId;
+                    if (windowId <= 0 &&
+                        VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === "function") {
+                        // The 4th argument picks the sales vs purchase window for a
+                        // dual-purpose table like C_Order.
+                        windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, !!isSOTrx) || 0;
+                    }
+                    if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === "function") {
+                        var zoomQuery = VIS.Query.prototype.getEqualQuery(tableName + "_ID", +recordId);
+                        VIS.viewManager.startWindow(windowId, zoomQuery);
+                    }
+                } catch (e) { console.log(e); }
+            });
         }
 
         // ----------------------------------------------------------------- //
@@ -678,6 +803,9 @@
         function render() {
             if (!$body) return;    // the host can hand us a record before init()
 
+            // A detail sheet belongs to the entry that opened it, and that entry
+            // belongs to the product being repainted away.
+            closeDetail();
             $body.empty();
 
             if (!data || !data.Product || !data.Product.M_Product_ID) {
@@ -761,6 +889,13 @@
             if (opts.meta) {
                 $lhs.append($('<div class="vas_190-clM"></div>').text(opts.meta).attr("title", opts.meta));
             }
+            // A THIRD line, for a row that carries two unrelated groups of facts
+            // under its name — a price row states its figures and, separately,
+            // the unit and attribute set those figures are for, and running the
+            // two together on one line reads as one list of six things.
+            if (opts.meta2) {
+                $lhs.append($('<div class="vas_190-clM"></div>').text(opts.meta2).attr("title", opts.meta2));
+            }
             $row.append($lhs);
 
             var $rhs = $('<div class="vas_190-clRhs"></div>');
@@ -835,14 +970,26 @@
 
                 $pager.detach().empty();
                 if (pageCount > 1) {
-                    $pager.append(pagerButton("prev", page <= 0, function () {
+                    // WHAT IS ON SCREEN on the left, the controls on the right.
+                    // The three used to sit together in the middle of the panel,
+                    // which said which page you were on but never how much there
+                    // was — "1 of 3" leaves the reader to multiply.
+                    $pager.append($('<span class="vas_190-pgRange"></span>').append(
+                        $('<span></span>').text(msg("VAS_190_Showing", "Showing") + " "),
+                        $('<b></b>').text((start + 1) + " – " + end),
+                        $('<span></span>').text(" " + msg("VAS_190_Of", "of") + " "),
+                        $('<b></b>').text(String(rows.length))));
+
+                    var $ctl = $('<span class="vas_190-pgCtl"></span>');
+                    $ctl.append(pagerButton("prev", page <= 0, function () {
                         pages[key] = page - 1; paint();
                     }));
-                    $pager.append($('<span class="vas_190-pgText"></span>').text(
+                    $ctl.append($('<span class="vas_190-pgText"></span>').text(
                         (page + 1) + " " + msg("VAS_190_Of", "of") + " " + pageCount));
-                    $pager.append(pagerButton("next", page >= pageCount - 1, function () {
+                    $ctl.append(pagerButton("next", page >= pageCount - 1, function () {
                         pages[key] = page + 1; paint();
                     }));
+                    $pager.append($ctl);
                     $sec.append($pager);
                 }
             }
@@ -1025,9 +1172,15 @@
 
         // M_AttributeSet.MandatoryType — WHEN the set has to be answered, which
         // is a different question from whether any single control is mandatory.
+        //
+        // The stored code for "always mandatory" is 'Y', not 'A'
+        // (MAttributeSet.MANDATORYTYPE_AlwaysMandatory). The map named 'A', so a
+        // set that IS always mandatory matched nothing and the section summary
+        // fell through to printing the raw code — the attribute group read
+        // "Laptop Configuration · Y".
         var ATTR_SET_MANDATORY = {
             "N": { key: "VAS_190_SetNotMandatory",    text: "Not mandatory" },
-            "A": { key: "VAS_190_SetAlwaysMandatory", text: "Always mandatory" },
+            "Y": { key: "VAS_190_SetAlwaysMandatory", text: "Always mandatory" },
             "S": { key: "VAS_190_SetShippingMandatory", text: "Mandatory when shipping" }
         };
 
@@ -1135,11 +1288,11 @@
                 msg("VAS_190_AllWarehouses", "all warehouses")));
             $card.append(metricCell(msg("VAS_190_Reserved", "Reserved"),
                 qtyText(s.ReservedQty, prec, uom),
-                openOrderCaption(s.ReservedOrderCount, true,
+                openOrderCaption(s.ReservedOrderCount, true, s.ReservedDocumentNo,
                                  s.ReservedDateOrdered, s.ReservedDatePromised), true));
             $card.append(metricCell(msg("VAS_190_OnOrder", "On order"),
                 qtyText(s.OnOrderQty, prec, uom),
-                openOrderCaption(s.OnOrderCount, false,
+                openOrderCaption(s.OnOrderCount, false, s.OnOrderDocumentNo,
                                  s.OnOrderDateOrdered, s.OnOrderDatePromised), true));
             $card.append(metricCell(msg("VAS_190_AvailableToPromise", "Available to promise"),
                 qtyText(s.AvailableToPromise, prec, uom),
@@ -1149,10 +1302,14 @@
 
         // What the figure above it came from: how many OPEN orders — not merely
         // completed ones, which said nothing about whether anything is still to
-        // move — and, where it is a single order, when it was raised and when it
-        // is due. With several orders in play neither date describes the figure,
-        // so neither is shown.
-        function openOrderCaption(count, isSales, dateOrdered, datePromised) {
+        // move — and, where it is a single order, WHICH order it is, when it was
+        // raised and when it is due. Both figures answer on the same terms: the
+        // count is stated for the purchase side as well as the sales side, and a
+        // single order names itself under Reserved and under On order alike.
+        //
+        // With several orders in play none of the three describes the figure, so
+        // none of them is shown — only the count.
+        function openOrderCaption(count, isSales, documentNo, dateOrdered, datePromised) {
             var n = +count || 0;
             var noun = isSales
                 ? (n === 1 ? msg("VAS_190_OpenSalesOrder", "open sales order")
@@ -1162,10 +1319,28 @@
 
             var bits = [n + " " + noun];
             if (n === 1) {
+                var docNo = (documentNo === null || documentNo === undefined)
+                    ? "" : String(documentNo).trim();
                 var ordered = formatDate(dateOrdered);
                 var due     = formatDate(datePromised);
-                if (ordered) bits.push(msg("VAS_190_Dated", "dated") + " " + ordered);
-                if (due)     bits.push(msg("VAS_190_Due", "due") + " " + due);
+
+                // WHICH order it is comes first. Its number is what a reader
+                // looks the order up by; a date is not.
+                if (docNo) bits.push(docNo);
+
+                // An order raised and promised on the same day printed that day
+                // twice, under two labels, which reads as the due date repeated —
+                // and on a caption with no document number that was the whole of
+                // it. The due date is the one that says something about the
+                // figure, so it is the one kept.
+                if (due) {
+                    bits.push(msg("VAS_190_Due", "due") + " " + due);
+                    if (ordered && ordered !== due) {
+                        bits.push(msg("VAS_190_Dated", "dated") + " " + ordered);
+                    }
+                } else if (ordered) {
+                    bits.push(msg("VAS_190_Dated", "dated") + " " + ordered);
+                }
             }
             return bits.join(" · ");
         }
@@ -1314,41 +1489,51 @@
 
             paginate($sec, "pricing", rows, PRICE_ROWS_PER_PAGE, function (p) {
                 var sym = p.CurSymbol || p.ISO_Code || "";
-                // A price list holds SEVERAL prices for one product — one per unit
-                // and per attribute set instance. Those two are what tells its
-                // rows apart, so they ride on the row's OWN line beside the list's
-                // name; without them the rows read as one price list repeated with
-                // different figures. The version name is the same name again in
-                // nearly every tenant, so it goes last, where clipping costs least.
+
+                // Line 1 — the price list, with the VERSION beside its name. The
+                // version is what tells one row of a list from another, so it
+                // belongs against the name and not at the tail of the meta line
+                // where it sat, first candidate for clipping.
                 var idBits = [];
+                if (p.VersionName) idBits.push(p.VersionName);
+                var eff = formatDate(p.ValidFrom);
+                if (eff) idBits.push(msg("VAS_190_Effective", "effective") + " " + eff);
+
+                // Line 2 — the three figures the list actually holds, named. The
+                // standard price used to sit alone in the row's value slot, which
+                // put it beside the list price rather than with it.
+                var priceBits = [
+                    msg("VAS_190_ListPrice", "list") + " " +
+                        formatAmount(p.PriceList, sym, p.CurPrecision),
+                    msg("VAS_190_LimitPrice", "limit") + " " +
+                        formatAmount(p.PriceLimit, sym, p.CurPrecision),
+                    msg("VAS_190_StdPrice", "std price") + " " +
+                        formatAmount(p.PriceStd, sym, p.CurPrecision)
+                ];
+
+                // Line 3 — what those figures are FOR. A price list holds one
+                // price per unit and per attribute set instance, so these two are
+                // what tells its rows apart; without them the rows read as one
+                // price list repeated with different figures.
+                var scopeBits = [];
                 // A price row that names no unit of its own is stated in the
                 // product's base unit, which is what the documents will use.
                 var priceUom = p.UomName || data.Product.BaseUomName || "";
-                if (priceUom)     idBits.push(msg("VAS_190_Per", "per") + " " + priceUom);
-                if (p.Attributes) idBits.push(p.Attributes);
-
-                var metaBits = [];
-                var eff = formatDate(p.ValidFrom);
-                if (eff) metaBits.push(msg("VAS_190_Effective", "effective") + " " + eff);
-                metaBits.push(msg("VAS_190_ListPrice", "list") + " " +
-                              formatAmount(p.PriceList, sym, p.CurPrecision));
-                metaBits.push(msg("VAS_190_LimitPrice", "limit") + " " +
-                              formatAmount(p.PriceLimit, sym, p.CurPrecision));
-                if (p.VersionName) metaBits.push(p.VersionName);
+                if (priceUom)     scopeBits.push(msg("VAS_190_Per", "per") + " " + priceUom);
+                if (p.Attributes) scopeBits.push(p.Attributes);
 
                 return listRow({
                     primary: p.PriceListName || "—",
                     primarySoft: idBits.join(" · "),
-                    meta: metaBits.join(" · "),
+                    meta: priceBits.join(" · "),
+                    meta2: scopeBits.join(" · "),
                     // Every version the product is priced on is listed — a list
                     // can carry several and the section used to show one of them
                     // per list — so the row has to say which one is actually in
                     // force today. The rest are history or not yet effective.
                     chip: p.IsCurrentVersion
                         ? { text: msg("VAS_190_CurrentVersion", "Current"), tone: "ok" }
-                        : { text: msg("VAS_190_OtherVersion", "Other version"), tone: "neutral" },
-                    value: formatAmount(p.PriceStd, sym, p.CurPrecision),
-                    valueSub: msg("VAS_190_StdPrice", "std price")
+                        : { text: msg("VAS_190_OtherVersion", "Other version"), tone: "neutral" }
                 });
             }, $list);
         }
@@ -1500,17 +1685,27 @@
             bits.push(text);
         }
 
-        // Which confirmation the check was raised on. The panel says it in the
-        // reader's words rather than printing the table it came from.
+        // What KIND of confirmation the check was raised on, for the side that
+        // cannot say so itself. A receipt confirmation carries its own type
+        // (M_InOutConfirm.ConfirmType) and the server sends the dictionary's name
+        // for it; a transfer confirmation has no type column at all, so the panel
+        // names the document.
         var QC_SOURCE = {
-            "RECEIPT":  { key: "VAS_190_QcOnReceipt",  text: "on receipt confirmation" },
-            "MOVEMENT": { key: "VAS_190_QcOnMovement", text: "on transfer confirmation" }
+            "RECEIPT":  { key: "VAS_190_QcOnReceipt",  text: "Ship / receipt confirmation" },
+            "MOVEMENT": { key: "VAS_190_QcOnMovement", text: "Material transfer confirmation" }
         };
 
-        // The latest quality CHECK: the document it was raised on, then every
-        // parameter read on it with what was expected against what was found.
-        // A parameter still to be read shows its result column empty rather than
-        // a zero — nothing is invented to fill it.
+        // The latest quality CHECK — the confirmation it was raised on, and
+        // nothing else. It is ONE row: the confirmation's number, what kind of
+        // document it is, who the sales representative was and how much is to be
+        // verified, with the date on the right; the row opens the confirmation.
+        //
+        // The per-parameter RESULT rows that used to follow are gone. They
+        // repeated the parameter names listed under this card with a second
+        // reading beside them, so the section said everything twice and pushed the
+        // configured parameters — the thing the section is named after — off the
+        // panel. Whether every parameter has been read is still stated, by the
+        // Checked / Pending chip beside the heading.
         function buildQualityCheck(check) {
             var $card = $('<div class="vas_190-qcCard"></div>');
 
@@ -1525,18 +1720,26 @@
             var $list = $('<div class="vas_190-clist"></div>');
             $card.append($list);
 
-            // The document the check hangs off, and the row opens it.
-            var src = QC_SOURCE[check.Source];
             var docBits = [];
-            if (src) docBits.push(msg(src.key, src.text));
-            if (check.ConfirmationNo) docBits.push(check.ConfirmationNo);
-            if (check.BPartnerName)   docBits.push(check.BPartnerName);
+            // The document's own TYPE where it has one, else the kind of
+            // confirmation this is. Both answer "what document is this"; only the
+            // first is the tenant's own word for it.
+            var src = QC_SOURCE[check.Source];
+            if (check.DocTypeName)  docBits.push(check.DocTypeName);
+            else if (src)           docBits.push(msg(src.key, src.text));
+            // The SALES REPRESENTATIVE. A transfer has none — it moves stock
+            // between the tenant's own warehouses — so the bit is simply absent
+            // there rather than standing empty.
+            if (check.SalesRepName) docBits.push(check.SalesRepName);
             if (check.QtyToVerify !== null && check.QtyToVerify !== undefined
                 && +check.QtyToVerify !== 0) {
                 docBits.push(formatNumber(check.QtyToVerify, 2) + " " +
                              msg("VAS_190_QcToVerify", "to verify"));
             }
 
+            // The CONFIRMATION's number, and the row opens the confirmation — not
+            // the receipt or transfer behind it, which is a different document and
+            // does not carry the check.
             $list.append(listRow({
                 primary: check.DocumentNo || msg("VAS_190_QcNoDocument", "(no document)"),
                 meta: docBits.join(" · "),
@@ -1545,27 +1748,6 @@
                 openId: check.DocRecordId,
                 openSOTrx: check.DocIsSOTrx
             }));
-
-            for (var i = 0; i < check.Lines.length; i++) {
-                var line = check.Lines[i];
-                var expected = (line.AcceptableValue || "").trim();
-                var actual   = (line.ActualValue || "").trim();
-
-                var metaBits = [];
-                if (expected) {
-                    metaBits.push(msg("VAS_190_QcExpected", "expected") + " " + expected);
-                }
-                if (line.Remark) metaBits.push(line.Remark);
-
-                $list.append(listRow({
-                    primary: line.ParameterName || "—",
-                    meta: metaBits.join(" · "),
-                    value: actual || "—",
-                    valueSub: actual
-                        ? msg("VAS_190_QcResult", "result")
-                        : msg("VAS_190_QcNotChecked", "not checked")
-                }));
-            }
             return $card;
         }
 
@@ -1573,20 +1755,28 @@
         //  10. Supplier information                                          //
         // ----------------------------------------------------------------- //
 
-        // A vendor row leads with WHICH vendor this is to the reader: the one the
-        // product was last bought from, or an alternative to it. "Preferred" is a
-        // separate statement — it is the vendor-product record's own flag, not a
-        // fact about any purchase — so it rides on the row's detail line.
+        // A vendor row leads with WHICH vendor this is to the reader, and says so
+        // in LABELS rather than in prose: PREFERRED (the vendor-product record's
+        // own flag) and LAST USED (the most recent purchase) are both chips, and
+        // a row carrying either is not an alternative to anything — "Alternative"
+        // is what is left when a row claims neither. It used to be the blanket
+        // opposite of "Last used", so the preferred vendor read "Alternative"
+        // with the word "preferred vendor" buried in its detail line.
         function renderSuppliers() {
             var rows = data.Suppliers;
 
-            var lastUsedCount = 0;
-            for (var n = 0; n < rows.length; n++) if (rows[n].IsLastUsed) lastUsedCount++;
+            // An alternative is a vendor that is neither preferred nor the one
+            // last bought from — the same test the row's own chips make, so the
+            // header and the rows cannot disagree.
+            var alternatives = 0;
+            for (var n = 0; n < rows.length; n++) {
+                if (!rows[n].IsCurrentVendor && !rows[n].IsLastUsed) alternatives++;
+            }
             var summary = rows.length + " " + (rows.length === 1
                 ? msg("VAS_190_Vendor", "vendor")
                 : msg("VAS_190_Vendors", "vendors"));
-            if (rows.length > lastUsedCount) {
-                summary += " · " + (rows.length - lastUsedCount) + " " +
+            if (alternatives > 0) {
+                summary += " · " + alternatives + " " +
                            msg("VAS_190_Alternative", "alternative");
             }
             var $sec = section(msg("VAS_190_SupplierInformation", "Supplier information"),
@@ -1621,22 +1811,48 @@
                     detail.push(msg("VAS_190_LeadTime", "lead time") + " " +
                                 v.DeliveryTimePromised + " " + msg("VAS_190_Days", "days"));
                 }
-                // The vendor-product record's own flag, stated as what it is.
-                if (v.IsCurrentVendor) {
-                    detail.push(msg("VAS_190_PreferredVendor", "preferred vendor"));
+                // A vendor reached through the ORDERS alone says so. It has no
+                // vendor-product record, so the terms above it are absent by fact
+                // and not by omission — and that is also where a reader would go
+                // to add them.
+                if (v.IsFromOrdersOnly) {
+                    detail.push(msg("VAS_190_NotOnVendorTab", "not on vendor tab"));
                 }
+
+                // Preferred and last used are both labels, and each is its own
+                // statement: the first is the vendor-product record's flag, the
+                // second is what the purchase history says. A row with either is
+                // never also called an alternative.
+                var chips = [];
+                if (v.IsCurrentVendor) {
+                    chips.push({ text: msg("VAS_190_PreferredVendor", "Preferred vendor"),
+                                 tone: "info" });
+                }
+                if (v.IsLastUsed) {
+                    chips.push({ text: msg("VAS_190_LastUsed", "Last used"), tone: "ok" });
+                }
+                if (!chips.length) {
+                    chips.push({ text: msg("VAS_190_AlternativeVendor", "Alternative"),
+                                 tone: "neutral" });
+                }
+
+                // The unit the last price is stated in. C_OrderLine.PriceActual is
+                // in the product's BASE unit whatever unit the line was written
+                // in, so that is the unit named — naming the line's own would put
+                // a carton's label on a per-piece figure.
+                var priceUom = data.Product.BaseUomName || "";
+                var priceSub = msg("VAS_190_LastPrice", "last price");
+                if (priceUom) priceSub += " " + msg("VAS_190_Per", "per") + " " + priceUom;
 
                 return listRow({
                     primary: v.VendorName || "—",
                     meta: detail.join(" · "),
-                    chip: v.IsLastUsed
-                        ? { text: msg("VAS_190_LastUsed", "Last used"), tone: "ok" }
-                        : { text: msg("VAS_190_AlternativeVendor", "Alternative"), tone: "neutral" },
+                    chips: chips,
                     // The PRICE the product was last bought at, which is what the
                     // reader compares vendors on. The vendor's own catalogue
                     // number was here and told them nothing about this vendor.
                     value: lastPrice === null ? "" : formatAmount(lastPrice, sym, v.CurPrecision),
-                    valueSub: lastPrice === null ? "" : msg("VAS_190_LastPrice", "last price"),
+                    valueSub: lastPrice === null ? "" : priceSub,
                     openTable: "C_BPartner",
                     openId: v.C_BPartner_ID,
                     // A supplier row opens the VENDOR master. C_BPartner's zoom
@@ -1771,7 +1987,13 @@
             "P+": { icon: "move",      tone: "warn", key: "VAS_190_MvProductionIn",     text: "Production receipt" },
             "P-": { icon: "move",      tone: "warn", key: "VAS_190_MvProductionOut",    text: "Production issue" },
             "W+": { icon: "move",      tone: "warn", key: "VAS_190_MvWorkOrderIn",      text: "Work order receipt" },
-            "W-": { icon: "move",      tone: "warn", key: "VAS_190_MvWorkOrderOut",     text: "Work order issue" }
+            "W-": { icon: "move",      tone: "warn", key: "VAS_190_MvWorkOrderOut",     text: "Work order issue" },
+            // Two types with no sign, because neither moves stock — both restate
+            // what the stock on hand is WORTH. They were falling through to the
+            // unmapped fallback and reading "Stock movement", which is the one
+            // thing they are not.
+            "IR": { icon: "move",      tone: "info", key: "VAS_190_MvRevaluation",      text: "Inventory revaluation" },
+            "VI": { icon: "move",      tone: "info", key: "VAS_190_MvInvoiceCost",      text: "Invoice cost adjustment" }
         };
 
         function renderTransactions() {
@@ -1967,17 +2189,19 @@
             "appointment": { tone: "purple",  icon: "calendar", key: "VAS_190_TagAppointment", text: "Appointment" },
             "fieldupdate": { tone: "neutral", icon: "pencil",   key: "VAS_190_TagFieldUpdate", text: "Updated" },
             "note":        { tone: "neutral", icon: "doc",      key: "VAS_190_TagNote",        text: "Note" },
-            // A chat comment is somebody typing on the record, which is not the
-            // same event as a system-raised note — so it carries its own chip.
-            "chat":        { tone: "info",    icon: "chat",     key: "VAS_190_TagChat",        text: "Chat" },
-            // An inbound LETTER is a MailAttachment1 record like a mail, filed
-            // under AttachmentType 'I' — the model splits the two now, where both
-            // used to arrive typed "mail" and a letter was reported as an e-mail.
-            //
-            // It carries the DOCUMENT icon, not the envelope. The chip read
-            // "Letter" while wearing the same envelope the mail rows wear, and at
-            // a glance down a feed the icon is what the eye sorts on — so a letter
-            // still read as a mail however the chip was worded.
+            // Somebody typing on the record. It is a CM_ChatEntry underneath, but
+            // "Chat" named the plumbing rather than the thing: what a reader wrote
+            // on a product is a note, and that is what the rest of the application
+            // calls it. Still its own source, separate from the system-raised
+            // AD_Note above.
+            "chat":        { tone: "info",    icon: "chat",     key: "VAS_190_TagChat",        text: "Note" },
+            // NOT CURRENTLY EMITTED. MailAttachment1's AttachmentType 'I' was read
+            // as a letter, but it is what the inbox reader files a RECEIVED MAIL
+            // under — so every mail the tenant received against the product was
+            // being reported here as a letter, and the model types them all "mail"
+            // now, marking the inbound ones IsReceived. The entry is kept, with its
+            // document icon rather than an envelope, for a genuine letter source:
+            // nothing in MailAttachment1 is one.
             "letter":      { tone: "purple",  icon: "doc",      key: "VAS_190_TagLetter",      text: "Letter" },
             // Calls (VA048_CallDetails), the one shared source this panel was
             // missing.
@@ -2005,11 +2229,20 @@
         // sub-lines | right-aligned "when · who", and — for a mail — a caret and
         // the message body folded underneath. Row and body live in one wrapper so
         // the pager owns them as a single item.
-        function buildActivityEntry(a) {
+        // The entry types that OPEN, and the order the feed hands them to the
+        // detail sheet. A field edit and a workflow step state everything they
+        // have on the row itself, so neither opens onto anything.
+        function activityOpens(a) {
+            return a.Type === "appointment" || a.Type === "task" || a.Type === "chat"
+                || a.Type === "mail" || a.Type === "letter";
+        }
+
+        // NO TOOLTIPS anywhere in this function or the rows it builds. The feed's
+        // text is not abridged any more — what a row cannot fit, the detail sheet
+        // holds — so a tooltip repeating the line under the cursor was noise that
+        // followed the pointer down the whole section.
+        function buildActivityEntry(a, index) {
             var meta = ACT_TYPES[a.Type] || ACT_TYPES["note"];
-            // A LETTER is the same MailAttachment1 record as a mail, filed under a
-            // different attachment type, so it gets the same treatment throughout:
-            // its addresses under the subject and its body on click.
             var isMail = (a.Type === "mail" || a.Type === "letter");
             // A task carries its own tone: closed reads as done, open as pending.
             var tone = (a.Type === "task" && a.IsClosed) ? "ok" : meta.tone;
@@ -2022,12 +2255,18 @@
             $tag.append($('<span></span>').text(msg(meta.key, meta.text)));
             $row.append($tag);
 
-            var title = activityTitle(a);
             var $title = $('<span class="vas_190-actTitle"></span>');
-            $title.append($('<span class="vas_190-actLead"></span>')
-                .text(title).attr("title", title));
+            var $lead = $('<span class="vas_190-actLead"></span>');
+            // A task's PRIORITY leads the headline, in the colour the task screen
+            // gives it — it is the first thing a reader sorts on and it was not on
+            // the row at all.
+            if (a.Type === "task" && a.PriorityName) {
+                $lead.append(priorityChip(a));
+            }
+            $lead.append($('<span></span>').text(activityTitle(a)));
+            $title.append($lead);
 
-            // A mail names its recipients under the subject — every address on
+            // A mail names its correspondents under the subject — every address on
             // the To, Cc and Bcc lists, in full, so the line is not an
             // abridgement the reader has to open the message to resolve.
             if (isMail) {
@@ -2042,10 +2281,7 @@
                 if (a.OldValue || a.NewValue) $title.append(changeDelta(a));
             } else {
                 var sub = activityMeta(a);
-                if (sub) {
-                    $title.append($('<small class="vas_190-actSub"></small>')
-                        .text(sub).attr("title", sub));
-                }
+                if (sub) $title.append($('<small class="vas_190-actSub"></small>').text(sub));
             }
             $row.append($title);
 
@@ -2053,44 +2289,296 @@
             if (a.Actor) when += (when ? " · " : "") + a.Actor;
             if (when) $row.append($('<span class="vas_190-actWhen"></span>').text(when));
 
-            // A mail or letter with a body opens on click; the caret shows the
-            // state. The open-kind travels with the row so the hint names the
-            // kind of correspondence the reader is actually opening.
-            if (isMail && a.Body && String(a.Body).trim()) {
-                var isLetterRow = (a.Type === "letter");
+            // The whole row opens its own detail sheet. It used to fold a drawer
+            // open underneath itself, which could only ever hold the message body
+            // — an appointment's people, its meeting link and its transcript, and
+            // a task's assignee and result, had nowhere to go.
+            if (activityOpens(a)) {
                 $row.addClass("vas_190-is-openable")
                     .attr("role", "button")
                     .attr("tabindex", "0")
-                    .attr("aria-expanded", "false")
-                    .attr("data-openkind", isLetterRow ? "letter" : "mail")
-                    .attr("title", isLetterRow
-                        ? msg("VAS_190_ShowLetter", "Show full letter")
-                        : msg("VAS_190_ShowMail", "Show full mail"));
+                    .attr("data-act-index", index);
                 $row.append($('<span class="vas_190-actCaret"></span>').append(svgIcon("chevRight")));
-                $item.append($row);
-                $item.append(buildMailBlock(a));
-                return $item;
-            }
-
-            // A task or appointment opens onto the e-mails sent against IT — the
-            // ones filed on AppointmentsInfo rather than on the product. The row
-            // states how many; the drawer holds each one's recipient, subject,
-            // moment, sender and message.
-            if ((a.Type === "task" || a.Type === "appointment") && activityMails(a).length) {
-                $row.addClass("vas_190-is-openable")
-                    .attr("role", "button")
-                    .attr("tabindex", "0")
-                    .attr("aria-expanded", "false")
-                    .attr("data-openkind", "appt")
-                    .attr("title", msg("VAS_190_ShowMails", "Show e-mails"));
-                $row.append($('<span class="vas_190-actCaret"></span>').append(svgIcon("chevRight")));
-                $item.append($row);
-                $item.append(buildApptMailBlock(a));
-                return $item;
             }
 
             $item.append($row);
             return $item;
+        }
+
+        // The priority badge on a task row: the dictionary's own word for the
+        // code, in the colour the task screens use for it.
+        function priorityChip(a) {
+            return $('<span class="vas_190-prio"></span>')
+                .addClass("vas_190-prio-" + priorityTone(a.PriorityCode))
+                .text(a.PriorityName);
+        }
+
+        // AppointmentsInfo.PriorityKey — '1' high, '2' medium, anything else low.
+        // The same three the account panel's task list paints.
+        function priorityTone(code) {
+            var c = String(code === null || code === undefined ? "" : code).toLowerCase();
+            if (c === "1" || c === "high")   return "high";
+            if (c === "2" || c === "medium") return "medium";
+            return "low";
+        }
+
+        // ----------------------------------------------------------------- //
+        //  Activity detail sheet                                             //
+        // ----------------------------------------------------------------- //
+
+        // The sheet currently open, so a second open replaces it and a product
+        // change closes it.
+        var $sheet = null;
+
+        function closeDetail() {
+            if (!$sheet) return;
+            $sheet.remove();
+            $sheet = null;
+        }
+
+        // Opens one activity entry over the panel: a labelled header, the fields
+        // that entry actually has, its content, and the actions it offers.
+        //
+        // The shape is the engagement view on the customer master — label and
+        // subject at the top, then type / when / detail / people, then the
+        // content, then the actions — so a reader who knows one knows the other.
+        function openActivityDetail(index) {
+            var rows = (data && data.Activity) || [];
+            if (isNaN(index) || index < 0 || index >= rows.length) return;
+
+            var a = rows[index];
+            closeDetail();
+
+            var meta = ACT_TYPES[a.Type] || ACT_TYPES["note"];
+            var tone = (a.Type === "task" && a.IsClosed) ? "ok" : meta.tone;
+
+            $sheet = $('<div class="vas_190-sheet" role="dialog" aria-modal="true"></div>');
+
+            // ----- Header: what kind of thing this is, then what it is about ---
+            var $head = $('<div class="vas_190-sheetHead"></div>');
+            var $tag = $('<span class="vas_190-actTag"></span>').addClass("vas_190-tone-" + tone);
+            if (meta.icon) $tag.append(svgIcon(meta.icon));
+            $tag.append($('<span></span>').text(msg(meta.key, meta.text)));
+            $head.append($tag);
+            $head.append($('<span class="vas_190-sheetTitle"></span>').text(activityTitle(a)));
+
+            var $close = $('<button type="button" class="vas_190-sheetX"></button>')
+                .attr("aria-label", msg("VAS_190_Close", "Close"))
+                .append(svgIcon("close"));
+            $close.on("click", closeDetail);
+            $head.append($close);
+            $sheet.append($head);
+
+            // ----- Body: the fields, then the content -----
+            var $sBody = $('<div class="vas_190-sheetBody"></div>');
+            var fields = detailFields(a);
+            for (var i = 0; i < fields.length; i++) {
+                $sBody.append(detailRow(fields[i]));
+            }
+
+            var content = detailContent(a);
+            if (content.text) {
+                $sBody.append($('<div class="vas_190-sheetLabel"></div>').text(content.label));
+                $sBody.append($('<div class="vas_190-sheetText"></div>').text(content.text));
+            }
+
+            // The e-mails sent against a task or appointment keep their own block:
+            // each is a message in its own right, not a field of the meeting.
+            var mails = activityMails(a);
+            if (mails.length) {
+                $sBody.append($('<div class="vas_190-sheetLabel"></div>')
+                    .text(msg("VAS_190_Emails", "emails")));
+                $sBody.append(buildApptMailBlock(a).show().removeClass("vas_190-actBody"));
+            }
+            $sheet.append($sBody);
+
+            // ----- Footer: close, and whatever this kind of entry can do -----
+            var $foot = $('<div class="vas_190-sheetFoot"></div>');
+
+            // A recorded meeting's transcript is offered as a FILE. It runs to
+            // pages, so putting it on screen would bury everything above it.
+            if (a.Transcript && String(a.Transcript).trim()) {
+                $foot.append(sheetButton(msg("VAS_190_DownloadTranscript", "Download transcript"),
+                    false, function () { downloadTranscript(a); }));
+            }
+            // Replying is only offered where there is somebody to reply TO.
+            if (a.Type === "mail" && replyAddress(a)) {
+                $foot.append(sheetButton(msg("VAS_190_Reply", "Reply"), true,
+                    function () { replyToMail(a); }));
+            }
+            $foot.append(sheetButton(msg("VAS_190_Close", "Close"), false, closeDetail));
+            $sheet.append($foot);
+
+            $root.append($sheet);
+            try { $close.focus(); } catch (e) { }
+        }
+
+        function sheetButton(text, primary, handler) {
+            var $b = $('<button type="button" class="vas_190-sheetBtn"></button>').text(text);
+            if (primary) $b.addClass("vas_190-sheetBtn--primary");
+            $b.on("click", handler);
+            return $b;
+        }
+
+        function detailRow(field) {
+            var $r = $('<div class="vas_190-sheetRow"></div>');
+            $r.append($('<span class="vas_190-sheetK"></span>').text(field.label));
+
+            var $v = $('<span class="vas_190-sheetV"></span>');
+            if (field.href) {
+                $v.append($('<a target="_blank" rel="noopener noreferrer"></a>')
+                    .attr("href", field.href).text(field.value));
+            } else {
+                $v.text(field.value);
+            }
+            $r.append($v);
+            return $r;
+        }
+
+        function pushField(fields, label, value) {
+            var text = (value === null || value === undefined) ? "" : String(value).trim();
+            if (!text) return;
+            fields.push({ label: label, value: text });
+        }
+
+        // The labelled fields one entry carries. Only what the record actually
+        // holds is listed — an absent field is left out rather than shown empty,
+        // so the sheet is never a form with blanks in it.
+        function detailFields(a) {
+            var fields = [];
+            var typeMeta = ACT_TYPES[a.Type] || ACT_TYPES["note"];
+
+            if (a.Type === "appointment" || a.Type === "task") {
+                // The category the engagement was filed under is its type; the
+                // kind of entry stands in where the record names none.
+                pushField(fields, msg("VAS_190_DetailType", "Type"),
+                          a.CategoryName || msg(typeMeta.key, typeMeta.text));
+                pushField(fields, msg("VAS_190_DetailWhen", "When"), meetingWhen(a));
+
+                if (a.Type === "task") {
+                    pushField(fields, msg("VAS_190_AssignedTo", "Assigned to"), a.AssigneeName);
+                    pushField(fields, msg("VAS_190_DueOn", "Due on"), formatDate(a.EndDate));
+                    pushField(fields, msg("VAS_190_Priority", "Priority"), a.PriorityName);
+                    if (a.PercentComplete !== null && a.PercentComplete !== undefined) {
+                        pushField(fields, msg("VAS_190_Status", "Status"), a.PercentComplete + "%");
+                    }
+                    pushField(fields, msg("VAS_190_TaskState", "State"),
+                              a.IsClosed ? msg("VAS_190_TaskCompleted", "Completed")
+                                         : msg("VAS_190_TaskOpen", "Open"));
+                    pushField(fields, msg("VAS_190_TaskResult", "Result"), a.TaskResult);
+                } else if (a.IsCancelled) {
+                    pushField(fields, msg("VAS_190_TaskState", "State"),
+                              msg("VAS_190_Cancelled", "Cancelled"));
+                }
+
+                pushField(fields, msg("VAS_190_DetailDetail", "Detail"), a.Location);
+                pushField(fields, msg("VAS_190_DetailPeople", "People"), a.People);
+
+                if (a.MeetingUrl && String(a.MeetingUrl).trim()) {
+                    fields.push({
+                        label: msg("VAS_190_MeetingUrl", "Meeting URL"),
+                        value: String(a.MeetingUrl).trim(),
+                        href:  String(a.MeetingUrl).trim()
+                    });
+                }
+                pushField(fields, msg("VAS_190_UrlDescription", "URL description"), a.UrlDescription);
+                pushField(fields, msg("VAS_190_Comment", "Comment"), a.Comments);
+                pushField(fields, msg("VAS_190_RaisedBy", "By"), a.Actor);
+                return fields;
+            }
+
+            if (a.Type === "mail") {
+                pushField(fields, msg("VAS_190_DetailType", "Type"), msg(typeMeta.key, typeMeta.text));
+                pushField(fields, msg("VAS_190_DetailDirection", "Direction"),
+                          a.IsReceived ? msg("VAS_190_MailReceived", "Received")
+                                       : msg("VAS_190_MailSent", "Sent"));
+                pushField(fields, msg("VAS_190_DetailWhen", "When"), formatDateTime(a.EventDate));
+                pushField(fields, msg("VAS_190_From", "From"), a.MailFrom);
+                pushField(fields, msg("VAS_190_To", "To"), a.MailTo);
+                pushField(fields, msg("VAS_190_Cc", "Cc"), a.MailCc);
+                pushField(fields, msg("VAS_190_Bcc", "Bcc"), a.MailBcc);
+                pushField(fields, msg("VAS_190_DetailPeople", "People"), a.Actor);
+                return fields;
+            }
+
+            if (a.Type === "letter") {
+                pushField(fields, msg("VAS_190_DetailType", "Type"), msg(typeMeta.key, typeMeta.text));
+                pushField(fields, msg("VAS_190_DetailWhen", "When"), formatDateTime(a.EventDate));
+                pushField(fields, msg("VAS_190_RaisedBy", "By"), a.Actor);
+                return fields;
+            }
+
+            // A note: what it is, when it was written and who wrote it.
+            pushField(fields, msg("VAS_190_DetailType", "Type"), msg(typeMeta.key, typeMeta.text));
+            pushField(fields, msg("VAS_190_DetailWhen", "When"), formatDateTime(a.EventDate));
+            pushField(fields, msg("VAS_190_RaisedBy", "By"), a.Actor);
+            return fields;
+        }
+
+        // The block of prose under the fields, labelled for what it is.
+        function detailContent(a) {
+            if (a.Type === "chat") {
+                return { label: msg("VAS_190_DetailContent", "Content"), text: a.Body || a.Title };
+            }
+            if (a.Type === "appointment" || a.Type === "task") {
+                return { label: msg("VAS_190_DetailDetail", "Detail"), text: a.Body };
+            }
+            return { label: msg("VAS_190_DetailContent", "Content"), text: a.Body };
+        }
+
+        // "12 Aug 2026 09:00 – 10:30", or just the start where there is no end.
+        function meetingWhen(a) {
+            var from = formatDateTime(a.StartDate);
+            var to   = formatDateTime(a.EndDate);
+            if (from && to) return from + " – " + to;
+            return from || to || formatDateTime(a.EventDate) || "";
+        }
+
+        // The address a reply goes to: whoever sent an inbound mail, else whoever
+        // the outbound one went to.
+        function replyAddress(a) {
+            var addr = a.IsReceived ? a.MailFrom : a.MailTo;
+            return (addr === null || addr === undefined) ? "" : String(addr).trim();
+        }
+
+        // Opens the reader's own mail composer on a reply, subject pre-filled.
+        // The panel is read-only and has no compose action of its own, so it hands
+        // the reply to whatever the workstation uses for mail.
+        function replyToMail(a) {
+            var to = replyAddress(a);
+            if (!to) return;
+            var subject = (a.Title || "").trim();
+            if (subject && subject.toLowerCase().indexOf("re:") !== 0) subject = "Re: " + subject;
+            try {
+                window.open("mailto:" + encodeURIComponent(to) +
+                            "?subject=" + encodeURIComponent(subject), "_blank");
+            } catch (e) { console.log(e); }
+        }
+
+        // Saves the meeting transcript as a text file. It runs to pages, so it is
+        // offered as a download rather than put on screen under everything else.
+        function downloadTranscript(a) {
+            try {
+                var name = (a.Title || "transcript").replace(/[\\/:*?"<>|]+/g, " ").trim();
+                var blob = new Blob([String(a.Transcript)], { type: "text/plain;charset=utf-8" });
+
+                // The IE / legacy Edge route, which the VIS shell can still be
+                // hosted in.
+                if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+                    window.navigator.msSaveOrOpenBlob(blob, name + ".txt");
+                    return;
+                }
+                var url = URL.createObjectURL(blob);
+                var link = document.createElement("a");
+                link.href = url;
+                link.download = name + ".txt";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                // Released on the next tick: revoking it synchronously can beat
+                // the click the browser has not finished acting on.
+                setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+            } catch (e) { console.log(e); }
         }
 
         // The e-mails sent against a task or appointment (MailAttachment1 keyed on
@@ -2119,14 +2607,23 @@
             $d.append($('<span class="vas_190-cvOld"></span>').text(oldText));
             $d.append($('<span class="vas_190-cvArrow"></span>').text("→"));
             $d.append($('<span class="vas_190-cvNew"></span>').text(newText));
-            $d.attr("title", oldText + " → " + newText);
             return $d;
         }
 
-        // Every address the mail went to, written out in full and labelled.
+        // Who the mail was between, written out in full and labelled — and which
+        // WAY it went, which is the first thing a reader wants from a feed that
+        // now carries both. A RECEIVED mail leads with its sender: it is the reply
+        // to something sent from the product, and "To <our own address>" answers
+        // nothing about it. A sent one leads with where it went, as before.
         function recipientSummary(a) {
             var bits = [];
-            appendAddressBit(bits, msg("VAS_190_To", "To"), a.MailTo);
+            if (a.IsReceived) {
+                bits.push(msg("VAS_190_MailReceived", "Received"));
+                appendAddressBit(bits, msg("VAS_190_From", "From"), a.MailFrom);
+                appendAddressBit(bits, msg("VAS_190_To", "To"), a.MailTo);
+            } else {
+                appendAddressBit(bits, msg("VAS_190_To", "To"), a.MailTo);
+            }
             appendAddressBit(bits, msg("VAS_190_Cc", "Cc"), a.MailCc);
             appendAddressBit(bits, msg("VAS_190_Bcc", "Bcc"), a.MailBcc);
             return bits.join(" · ");
@@ -2151,11 +2648,10 @@
                 return (a.Title || "").trim() || msg("VAS_190_NoSubject", "(no subject)");
             }
             if (a.Type === "chat") {
-                // The comment itself is the headline. It clips to one line in the
-                // card and the full text is on the row's tooltip, so a long
-                // comment is readable without an expander.
+                // The comment itself is the headline. It clips to one line on the
+                // row and the whole of it is in the detail sheet the row opens.
                 var text = (a.Title || "").replace(/\s+/g, " ").trim();
-                return text || msg("VAS_190_EmptyComment", "(empty comment)");
+                return text || msg("VAS_190_EmptyComment", "(empty note)");
             }
             return (a.Title || "").trim() || msg("VAS_190_Event", "Event");
         }
@@ -2176,8 +2672,21 @@
                 bits.push(a.IsSent ? msg("VAS_190_LetterSent", "Letter sent")
                                    : msg("VAS_190_LetterReceived", "Letter received"));
             } else if (a.Type === "task") {
+                // WHO it is on and WHEN it is due come before its state: those two
+                // are what a reader acts on, and neither was on the row.
+                if (a.AssigneeName) {
+                    bits.push(msg("VAS_190_AssignedTo", "assigned to") + " " + a.AssigneeName);
+                }
+                var due = formatDate(a.EndDate);
+                if (due) bits.push(msg("VAS_190_DueOn", "due") + " " + due);
+
                 bits.push(a.IsClosed ? msg("VAS_190_TaskCompleted", "Completed")
                                      : msg("VAS_190_TaskOpen", "Open"));
+                // How far along it is, after the state. Null means nobody has
+                // recorded progress, which is not the same as 0% and is not shown.
+                if (a.PercentComplete !== null && a.PercentComplete !== undefined) {
+                    bits.push(a.PercentComplete + "%");
+                }
                 appendMailCountBit(bits, a);
             } else if (a.Type === "appointment") {
                 if (a.IsCancelled) bits.push(msg("VAS_190_Cancelled", "Cancelled"));
@@ -2198,25 +2707,10 @@
             return bits.join(" · ");
         }
 
-        // The mail body, folded under its row. Every value goes in through
-        // .text() — the stored message is untrusted text and is never handed to
-        // the browser as markup.
-        function buildMailBlock(a) {
-            var $block = $('<div class="vas_190-actBody" style="display:none;"></div>');
-            $block.append($('<div class="vas_190-mailSub"></div>')
-                .text((a.Title || "").trim() || msg("VAS_190_NoSubject", "(no subject)")));
-
-            var $meta = $('<div class="vas_190-mailMeta"></div>');
-            appendMailRow($meta, msg("VAS_190_From", "From"), a.MailFrom);
-            appendMailRow($meta, msg("VAS_190_To", "To"), a.MailTo);
-            appendMailRow($meta, msg("VAS_190_Cc", "Cc"), a.MailCc);
-            appendMailRow($meta, msg("VAS_190_Bcc", "Bcc"), a.MailBcc);
-            appendMailRow($meta, msg("VAS_190_Date", "Date"), formatDateTime(a.EventDate));
-            $block.append($meta);
-
-            $block.append($('<div class="vas_190-mailBody"></div>').text(a.Body || ""));
-            return $block;
-        }
+        // The mail's own body block is gone: a mail opens its DETAIL SHEET now,
+        // which states the same addresses as labelled fields and holds the message
+        // under them. Only the appointment / task mail block below still folds,
+        // and it lives inside that sheet.
 
         function appendMailRow($meta, label, value) {
             var text = (value === null || value === undefined) ? "" : String(value).trim();
@@ -2289,7 +2783,9 @@
             doc:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>',
             pencil:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
             calendar:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>',
-            chat:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg>'
+            chat:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg>',
+            // Dismisses the activity detail sheet.
+            close:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
         };
 
         // Returns a span wrapping the named inline SVG (innerHTML so the browser
