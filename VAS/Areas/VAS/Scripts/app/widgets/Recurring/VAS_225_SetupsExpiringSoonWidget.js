@@ -480,20 +480,22 @@
             calibrateRowHeight();
         }
 
+        /* The pager always renders, down to "1 of 1" on a single-page list. Blanking it
+           left the footer with a gap where the control belongs, which reads as a pager
+           that failed to load rather than one with nowhere to go - being disabled is
+           what says that. Both arrows disable themselves at the ends, so a single page
+           arrives with neither of them live. */
         function renderPager() {
-            var pagerHtml = '';
-            if (totalPages > 1) {
-                pagerHtml =
-                    '<button type="button" class="vas-225-pbtn" data-page="prev"' + (currentPage === 0 ? ' disabled' : '') +
-                    ' aria-label="' + escapeHtml(label("VAS_225_Previous", "Previous")) + '">' +
-                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>' +
-                    '</button>' +
-                    '<span class="vas-225-ptxt">' + (currentPage + 1) + ' ' + escapeHtml(label("VAS_225_Of", "of")) + ' ' + totalPages + '</span>' +
-                    '<button type="button" class="vas-225-pbtn" data-page="next"' + (currentPage >= totalPages - 1 ? ' disabled' : '') +
-                    ' aria-label="' + escapeHtml(label("VAS_225_Next", "Next")) + '">' +
-                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>' +
-                    '</button>';
-            }
+            var pagerHtml =
+                '<button type="button" class="vas-225-pbtn" data-page="prev"' + (currentPage === 0 ? ' disabled' : '') +
+                ' aria-label="' + escapeHtml(label("VAS_225_Previous", "Previous")) + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>' +
+                '</button>' +
+                '<span class="vas-225-ptxt">' + (currentPage + 1) + ' ' + escapeHtml(label("VAS_225_Of", "of")) + ' ' + Math.max(1, totalPages) + '</span>' +
+                '<button type="button" class="vas-225-pbtn" data-page="next"' + (currentPage >= totalPages - 1 ? ' disabled' : '') +
+                ' aria-label="' + escapeHtml(label("VAS_225_Next", "Next")) + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>' +
+                '</button>';
 
             $pagerEl.html(pagerHtml);
             $pagerEl.find('[data-page]').on('click', function () {
@@ -506,8 +508,14 @@
         }
 
         /* Called by the platform Refresh button and whenever the host dashboard
-           re-broadcasts a record change on the Recurring window. */
+           re-broadcasts a record change on the Recurring window.
+
+           A refresh re-reads the list from the top. The page index is deliberately
+           NOT carried over: setups fall out of the expiry window as they are renewed
+           or run out, so the page the user was on no longer names the same records -
+           and on a list that has since shrunk it can point past the end. */
         this.refreshWidget = function () {
+            currentPage = 0;
             loadList();
         };
 
