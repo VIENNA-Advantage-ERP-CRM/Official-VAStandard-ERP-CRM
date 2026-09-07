@@ -345,7 +345,14 @@
                 signal: loadController ? loadController.signal : undefined
             }).then(function (res) { return res.text(); }).then(function (text) {
                 var data = parseResponse(text);
-                if (!data || data.error) { showRowsError(); return; }
+                if (!data || data.error) {
+                    // The banner is deliberately generic, but the server's
+                    // reason (an ORA-/PG- message, say) is the only thing that
+                    // makes a "Couldn't load" diagnosable - keep it reachable.
+                    console.warn('VAS_128_IncompleteRecordsWidget: load failed -', (data && data.error) || text);
+                    showRowsError();
+                    return;
+                }
                 state.selected = data.trackedFields || [];
                 state.available = data.available || data.availableFields || [];
                 state.items = data.items || [];
