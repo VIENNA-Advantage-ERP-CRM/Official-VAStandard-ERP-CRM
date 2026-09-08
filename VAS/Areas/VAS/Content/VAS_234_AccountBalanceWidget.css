@@ -414,13 +414,9 @@
     line-height: 1.25;
 }
 
-    /* The no-activity message replaces all three figures, so it takes the whole flow
-       column as one track and centres over the axis. */
-    .vas-234-nums--quiet {
-        grid-template-columns: 1fr;
-        justify-items: center;
-    }
-
+/* No .vas-234-nums--quiet variant any more: a row with no movement prints the same
+   three figures as every other row, at nought, so the flow line never changes its track
+   layout mid-list and the three columns stay aligned all the way down the card. */
 .vas-234-nums > span {
     min-width: 0;
     overflow: hidden;
@@ -442,13 +438,17 @@
     font-weight: 500;
 }
 
-.vas-234-quiet {
-    color: #8A97A5;
-}
-
 /* DIVERGING bar. The track is the sunken tone and is inert - it is not a progress
    groove and never fills. Both halves grow outwards from the axis, and the asymmetry
-   between them is the net. */
+   between them is the net.
+
+   EACH BAR IS WEIGHTED AGAINST ITS OWN ACCOUNT, not against the busiest account on the
+   card: the widths arrive from the server already scaled to the larger of THIS row's two
+   flows, so the dominant side fills its half and the other reads as a fraction of it.
+   The bar answers "which way did this account move, and how lopsidedly" - a question
+   that lives inside one row. It deliberately does NOT let two rows be compared by width,
+   because each row is in its own currency and never could be. The figures above the bar
+   carry the magnitude. A row that did not move shows bare axis. */
 .vas-234-bar {
     position: relative;
     height: 9px;

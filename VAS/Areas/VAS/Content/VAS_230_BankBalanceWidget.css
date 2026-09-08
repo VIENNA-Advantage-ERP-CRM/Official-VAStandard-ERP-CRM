@@ -157,7 +157,13 @@
     display: inline-flex;
     align-items: center;
     gap: .3em;
-    max-width: 48%;
+    /* Capped well under half the header so the TITLE gets the width it needs. The pill
+       carries an account label that is as long as the tenant's bank names and account
+       numbers happen to be, and at 48% it was eating the row and truncating both the
+       title and its subtitle. The label ellipses inside the pill instead, where losing
+       the tail of an account number costs least - the full label is on the pill's own
+       title attribute, and the picker shows every account in full. */
+    max-width: 36%;
     font-family: inherit;
     font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008125), 13px);
     font-weight: 500;
@@ -223,42 +229,19 @@
     padding-left: .3125em;
 }
 
-/* The currency symbol reads as a supporting mark, not as part of the number: the mock's
-   16px against a 34px value is ~0.47 of it, expressed here against the value's own em
-   so it tracks the stat at every dashboard width. */
-.vas-230-cur {
-    font-size: .47em;
-    font-weight: 500;
-    color: #41576A;
-    margin-right: .12em;
-    vertical-align: baseline;
-}
+/* NO SEPARATE RULE FOR THE CURRENCY SYMBOL, deliberately. The symbol, the sign and the
+   digits are one run of text at stat size - "$3.22L" - the way the sibling amount cards
+   print theirs. The mock's smaller supporting symbol was a second type tier inside a
+   card whose entire content is one number, and it read as two marks rather than one
+   figure. .vas-230-value already carries the size, weight and tracking for all of it, so
+   there is nothing left for a .vas-230-cur to do; the JS composes the string and sets it
+   with .text().
 
-/* An overdrawn balance. The minus now leads the currency symbol inside .vas-230-cur
-   (matching VAS_231's net movement), so it sits at the supporting size rather than at
-   stat size - but it is still printed, so the reading never rests on colour alone. */
+   An overdrawn balance: the minus is printed AND the figure turns red, so the reading
+   never rests on colour alone - and because the whole run is one element, the sign takes
+   the overdraft colour with the digits instead of needing a rule to hand it back. */
 .vas-230-neg {
     color: #D14545;
-}
-
-/* The leading mark carries the sign, so it takes the overdraft colour with the digits
-   instead of keeping its slate tone - a red number behind a slate minus reads as two
-   separate marks. VAS_231 gets this for free because its .vas-231-cur declares no
-   colour of its own; here the supporting tone has to be handed back explicitly. */
-.vas-230-value.vas-230-neg .vas-230-cur {
-    color: inherit;
-}
-
-/* No balance line for this account. Said at body scale rather than stat scale - it is a
-   sentence, not a figure - and never rendered as a zero. */
-.vas-230-nil {
-    font-size: .8125em;
-    font-weight: 400;
-    line-height: 1.35;
-    letter-spacing: normal;
-    color: #5F7283;
-    white-space: normal;
-    text-align: center;
 }
 
 /* ---- State takeover: a load failure, or no accessible bank account ---- */
@@ -383,8 +366,10 @@
         display: none;
     }
 
+    /* Still the larger share of a narrow header than the desktop cap allows, because the
+       icon's width has just been handed back - but no longer more than half of it. */
     .vas-230-acct {
-        max-width: 58%;
+        max-width: 46%;
     }
 }
 

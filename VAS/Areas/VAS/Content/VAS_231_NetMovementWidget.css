@@ -248,13 +248,14 @@
         color: #A33F3F;
     }
 
-    /* Sign + currency symbol lead the number at a smaller weight so the digits stay
-       the thing the eye lands on. */
-    .vas-231-value .vas-231-cur {
-        font-size: .55em;
-        font-weight: 500;
-        margin-right: .15em;
-    }
+    /* NO SEPARATE RULE FOR THE SIGN AND SYMBOL, deliberately. They are part of the
+       same run of text as the digits and sit at stat size with them - "+$3.22L" -
+       the way the sibling amount cards print theirs. A smaller supporting tier
+       inside a headline whose whole content is one number reads as two marks
+       rather than one figure, and it also meant the sign - which is what carries
+       the direction when colour cannot - was set smaller than everything it
+       qualified. .vas-231-value already owns the size, weight and tracking for all
+       of it, and the negative colour now covers the sign for free. */
 
     /* Between two loads the figure fades rather than disappearing - the card keeps
        its shape and nothing jumps. */
@@ -319,7 +320,11 @@
     color: #5F7283;
 }
 
-/* ---- State takeover: reserved for a load failure or a missing calendar ---- */
+/* ---- State takeover: reserved for a LOAD FAILURE, and nothing else ----
+   Neither an empty period nor a missing one takes the card over any more: both are
+   answers of zero, and a KPI card that swaps its number for a sentence changes shape
+   under the reader. Only a read that genuinely failed - where there is no figure to
+   stand behind - replaces the value. */
 .vas-231-state {
     flex: 1 1 auto;
     display: flex;
