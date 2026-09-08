@@ -33,7 +33,7 @@
  *                  Summary Message Table
  *                    # | Current Text           | Message Key
  *                   ---+------------------------+----------------------------
- *                    1 | Create Banking Journal | VAS_229_CreateBankingJournal
+ *                    1 | New Banking Journal | VAS_229_CreateBankingJournal
  *
  * Chronological development:
  *   VAI145         Created  Date 2026-09-02
@@ -112,7 +112,7 @@
         function buildSkeleton() {
             $root = $('<div class="vas-229-root" id="vas-229-root-' + widgetID + '"></div>');
 
-            var title = getMsg("VAS_229_CreateBankingJournal", "Create Banking Journal");
+            var title = getMsg("VAS_229_CreateBankingJournal", "New Banking Journal");
 
             /* Plus glyph — white "+" on the blue icon well. The icon-well CSS
                already sets color:#FFFFFF on the wrapper, so stroke="currentColor"

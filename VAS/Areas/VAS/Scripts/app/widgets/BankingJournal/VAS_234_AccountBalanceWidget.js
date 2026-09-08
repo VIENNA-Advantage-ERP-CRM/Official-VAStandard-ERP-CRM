@@ -18,13 +18,21 @@
  *                    Showing 1–5 of 45 accounts              <  Page 1 of 9  >
  *
  *                  THE CENTRE-AXIS FLOW BAR IS THE POINT OF THE WIDGET. Outflow
- *                  grows LEFT of the axis, inflow grows RIGHT, and both are drawn
- *                  against ONE scale shared by every row on every page - the largest
- *                  single gross flow in the whole accessible set, which the server
- *                  returns as MaxFlow. The asymmetry between the two sides IS the
- *                  net. It is not a progress bar, not a balance-magnitude bar and
- *                  not a stacked bar, and the bar widths are never derived from the
- *                  closing balance.
+ *                  grows LEFT of the axis, inflow grows RIGHT, and the asymmetry
+ *                  between the two sides IS the net. It is not a progress bar, not a
+ *                  balance-magnitude bar and not a stacked bar, and the bar widths
+ *                  are never derived from the closing balance.
+ *
+ *                  EACH BAR IS WEIGHTED AGAINST ITS OWN ACCOUNT. The server scales a
+ *                  row's two sides to the larger of THAT row's own flows, so the
+ *                  dominant direction fills its half of the track and the other side
+ *                  reads as a fraction of it. The bar answers "which way did this
+ *                  account move, and how lopsidedly" - a question that lives inside
+ *                  one row. Two bars are therefore comparable in SHAPE but not in
+ *                  magnitude, which is the honest position: every row is stated in its
+ *                  own currency, so a scale shared across rows was measuring rupees
+ *                  against dollars and letting one outlier flatten every other bar to
+ *                  nothing. Magnitude lives in the figures above the bar.
  *
  *                  NOTHING IS COMPARED WITH A PREVIOUS PERIOD. The card reports what
  *                  this period did (outflow, inflow, net) and where the account
@@ -67,15 +75,17 @@
  *                   8 | Net variance                  | VAS_234_NetVariance
  *                   9 | Account name                  | VAS_234_AccountName
  *                  10 | Sort by                       | VAS_234_SortBy
- *                  11 | No activity this period       | VAS_234_NoActivity
- *                  12 | No bank accounts available    | VAS_234_NoAccounts
- *                  13 | accounts                      | VAS_234_Accounts
- *                  14 | Page                          | VAS_234_Page
- *                  15 | Showing                       | VAS_020_Showing   (reuse)
- *                  16 | of                            | VAS_020_Of        (reuse)
- *                  17 | Previous                      | VAS_020_Prev      (reuse)
- *                  18 | Next                          | VAS_020_Next      (reuse)
- *                  19 | Couldn't load                 | VAS_192_CouldntLoad (reuse)
+ *                  11 | No bank accounts available    | VAS_234_NoAccounts
+ *                  12 | accounts                      | VAS_234_Accounts
+ *                  13 | Page                          | VAS_234_Page
+ *                  14 | Showing                       | VAS_020_Showing   (reuse)
+ *                  15 | of                            | VAS_020_Of        (reuse)
+ *                  16 | Previous                      | VAS_020_Prev      (reuse)
+ *                  17 | Next                          | VAS_020_Next      (reuse)
+ *                  18 | Couldn't load                 | VAS_192_CouldntLoad (reuse)
+ *
+ *                  VAS_234_NoActivity is RETIRED - a row that did not move now prints
+ *                  zeros like every other row. The key can be dropped from AD_Message.
  *
  * Chronological development:
  *   VAI154         Created  Date 2026-09-03
@@ -180,7 +190,6 @@
         var _ns = '';
 
         var _rows = [];
-        var _maxFlow = 0;
         var _sort = 'netVariance';
         var _page = 1;
         var _pageSize = PAGE_SIZE;
@@ -391,7 +400,6 @@
                     }
 
                     _rows = data.Rows || [];
-                    _maxFlow = Number(data.MaxFlow) || 0;
                     _sort = data.Sort || _sort;
                     _page = Number(data.Page) || 1;
                     _pageSize = Number(data.PageSize) || _pageSize;
@@ -574,18 +582,14 @@
             return parts.join(' · ');
         }
 
-        /* The three flow figures, each sitting over the bar segment it describes. A row
-           with no movement at all says so in words instead - "no activity" is about the
-           FLOWS, and the closing balance beside it still prints. */
-        function numsHtml(item) {
-            if (!item.HasActivity) {
-                return '<div class="vas-234-nums vas-234-nums--quiet">' +
-                    '<span class="vas-234-quiet">' +
-                        escapeHtml(label('VAS_234_NoActivity', 'No activity this period')) +
-                    '</span>' +
-                '</div>';
-            }
+        /* The three flow figures, each sitting over the bar segment it describes.
 
+           A ROW WITH NO MOVEMENT PRINTS ZEROS, not a sentence. Nothing moving is a
+           quantity - it is nought - and swapping the three figures for a caption changed
+           the row's shape mid-list, so the columns stopped lining up down the card exactly
+           where the eye most needs them to. The row still reads as quiet: its bar is bare
+           axis and its closing balance keeps the .vas-234-dim step-back. */
+        function numsHtml(item) {
             var net = Number(item.Net) || 0;
             var netCls = net > 0 ? ' vas-234-up' : (net < 0 ? ' vas-234-down' : '');
 

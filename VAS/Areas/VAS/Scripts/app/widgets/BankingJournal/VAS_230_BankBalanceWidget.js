@@ -20,11 +20,17 @@
  *                  server either, so there is nothing here that could grow one back.
  *
  *                  THE VALUE IS THE LATEST C_BankAccountLine.EndingBalance for the
- *                  selected account - never a sum of its history, never
- *                  C_BankAccount.CurrentBalance and never a statement balance.
+ *                  selected account - never a sum of its history and never a statement
+ *                  balance - FALLING BACK to C_BankAccount.CurrentBalance when the
+ *                  account has no line to read.
  *
- *                  AN ACCOUNT WITH NO BALANCE LINE SAYS SO. It does not print ₹0: zero
- *                  is a real balance and would be read as one.
+ *                  THE CARD ALWAYS PRINTS A FIGURE. An account standing at nothing shows
+ *                  a plain zero with its currency symbol, never a sentence: a KPI card
+ *                  that swaps a number for prose between one account and the next changes
+ *                  shape as the reader pages through the selector and reads as broken.
+ *                  Zero is the answer, so zero is what it says. Only a tenant with no
+ *                  accessible account at all takes the card over - there is then no
+ *                  account to name and no currency to print a zero in.
  *
  *                  Every figure is in the ACCOUNT's own currency, with that currency's
  *                  symbol and StdPrecision - both resolved server-side from
@@ -50,12 +56,14 @@
  *                  ---+-------------------------------+-----------------------------
  *                   1 | Bank Balance                  | VAS_230_BankBalance
  *                   2 | Bank account                  | VAS_230_BankAccountFilter
- *                   3 | No bank balance available     | VAS_230_NoBalance
- *                   4 | No bank accounts available    | VAS_230_NoAccounts
- *                   5 | Balance as of                 | VAS_230_AsOf
- *                   6 | Couldn't load                 | VAS_192_CouldntLoad (reuse)
- *                   7 | Latest balance for the        | VAS_230_BankBalanceHint
- *                     | account              |
+ *                   3 | No bank accounts available    | VAS_230_NoAccounts
+ *                   4 | Balance as of                 | VAS_230_AsOf
+ *                   5 | Couldn't load                 | VAS_192_CouldntLoad (reuse)
+ *                   6 | Latest balance for the        | VAS_230_BankBalanceHint
+ *                     | account                       |
+ *
+ *                  VAS_230_NoBalance is RETIRED - the card prints a zero now instead of
+ *                  saying it has nothing. The key can be dropped from AD_Message.
  *
  * Chronological development:
  *   VAI154         Created  Date 2026-09-04
@@ -129,7 +137,6 @@
         var _accountLabel = '';
         var _accountName = '';
         var _balance = 0;
-        var _hasBalance = false;
         var _currencyCode = '';
         var _currencySymbol = '';
         var _precision = 2;
@@ -322,7 +329,10 @@
                     _precision = precisionOf(data.Precision);
                     _asOf = data.AsOfDate || '';
                     _statementDate = data.StatementDate || '';
-                    _hasBalance = data.HasBalance === true;
+
+                    /* The server always answers with a figure once an account resolves -
+                       the latest balance line, else the account's own CurrentBalance, else
+                       zero - so there is no "has balance" branch left to take here. */
                     _balance = Number(data.EndingBalance) || 0;
 
                     paintAccountLabel();
@@ -365,35 +375,30 @@
             $acctBtn.attr('title', label('VAS_230_BankAccountFilter', 'Bank account') + ': ' + text);
         }
 
-        /* The card's one figure: the account's currency symbol at a supporting size, then
-           the compact amount. An account with no balance line shows the message instead -
-           never a zero it did not read. */
+        /* The card's one figure: sign, currency symbol and compact amount as a SINGLE run
+           of text at stat size - "$3.22L" - the way the sibling amount cards print theirs,
+           rather than the symbol at a smaller supporting size in its own span. A card whose
+           only content is one number should read as one number.
+
+           THERE IS ALWAYS A FIGURE. An account with no balance line falls back server-side
+           to C_BankAccount.CurrentBalance, and an account standing at nothing prints a
+           plain zero WITH its currency symbol - never a sentence. A KPI card that
+           sometimes shows a number and sometimes shows prose changes shape between
+           accounts and reads as broken; zero is the answer, so zero is what it says. (The
+           tenant with no accessible account at all is different and still takes the card
+           over - there is no account to name and no currency to print.) */
         function paintValue() {
             $state.addClass('vas-230-hidden');
             $card.find('.vas-230-body').removeClass('vas-230-hidden');
 
-            if (!_hasBalance) {
-                $value.attr('class', 'vas-230-value vas-230-nil')
-                    .attr('title', label('VAS_230_NoBalance', 'No bank balance available'))
-                    .text(label('VAS_230_NoBalance', 'No bank balance available'));
-                return;
-            }
-
             var negative = _balance < 0;
 
-            /* Sign and symbol lead the number as one supporting mark, the way
-               VAS_231 composes its net movement, so the two banking cards print a
-               negative figure identically. The red of .vas-230-neg carries the
-               same meaning a second time, so the smaller minus is not the only
-               thing separating an overdraft from a credit. */
+            /* The minus leads the symbol and both sit at stat size with the digits. The red
+               of .vas-230-neg says the same thing a second time, so the reading never rests
+               on the sign alone or on colour alone. */
             $value.attr('class', 'vas-230-value' + (negative ? ' vas-230-neg' : ''))
                 .attr('title', valueTooltip())
-                .html(
-                    '<span class="vas-230-cur">' +
-                        escapeHtml((negative ? '−' : '') + _currencySymbol) +
-                    '</span>' +
-                    escapeHtml(compactAmount(_balance))
-                );
+                .text((negative ? '−' : '') + _currencySymbol + compactAmount(_balance));
         }
 
         /* The exact figure behind the compact one, plus which account it belongs to and
