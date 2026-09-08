@@ -31,9 +31,14 @@ namespace VASLogic.Models
     ///                           FULL by explicit request - not masked, because the selector
     ///                           is where two accounts at one bank are told apart.
     ///
-    ///               THE BALANCE SOURCE IS C_BankAccountLine.EndingBalance - deliberately not
-    ///               C_BankAccount.CurrentBalance, not C_BankStatement.EndingBalance, not
-    ///               payment totals and not Fact_Acct.
+    ///               THE BALANCE SOURCE IS C_BankAccountLine.EndingBalance, FALLING BACK TO
+    ///               C_BankAccount.CurrentBalance when the account has no line to read - a
+    ///               newly opened account, or one whose lines have not been generated yet.
+    ///               Still never C_BankStatement.EndingBalance, never payment totals and
+    ///               never Fact_Acct. The two sources are ranked, not mixed: a line is
+    ///               preferred because it is dated, and the account's running balance stands
+    ///               in only when there is no dated figure at all. BalanceSource on the
+    ///               result says which one the card is showing.
     ///
     ///               THE LATEST LINE, NEVER A SUM. C_BankAccountLine keeps a history row per
     ///               account, so adding them would add an account's past balances to its
@@ -73,6 +78,11 @@ namespace VASLogic.Models
     public class VAS_230_BankBalanceModel
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_230_BankBalanceModel).FullName);
+
+        /* Which of the two sources the figure came from. Tokens, not display text - the
+           client resolves any wording it needs from AD_Message. */
+        public const string BALANCESOURCE_Line = "LINE";
+        public const string BALANCESOURCE_Account = "ACCOUNT";
 
         // ─────────────────────────────────────────────────────────────────────
         // §1  Entry point
@@ -127,6 +137,24 @@ namespace VASLogic.Models
             result.Precision = selected.Precision;
 
             ApplyLatestBalance(ctx, selected.C_BankAccount_ID, asOf, result);
+
+            /* THE FALLBACK. No balance line for this account on or before the as-of date -
+               a newly opened account, or one whose lines have not been generated yet -
+               so the account's OWN running balance stands in. C_BankAccount.CurrentBalance
+               is the right second choice: it is the same figure the payment screens read
+               for this account, so the card agrees with them rather than going blank while
+               they show money.
+
+               It carries no StatementDate, which is honest - the card's tooltip then dates
+               the figure to today, which is exactly what a running balance is current as
+               of. BalanceSource records which of the two the figure came from so nothing
+               downstream has to infer it from the presence of a date. */
+            if (!result.HasBalance)
+            {
+                result.EndingBalance = selected.CurrentBalance;
+                result.BalanceSource = BALANCESOURCE_Account;
+                result.HasBalance = true;
+            }
 
             result.Loaded = true;
             return result;
@@ -187,10 +215,16 @@ namespace VASLogic.Models
                table. Both joins are INNER and safe: an account always has a bank and a
                currency. The closing ON is a plain equality so the access parser has nothing to
                trip on. */
+            /* CurrentBalance is read HERE, with the account, rather than by a second query
+               when the balance-line read comes back empty. The selector's list is fetched
+               on every paint anyway, so carrying the account's own running balance along
+               makes the fallback free - no extra round trip, and no query that only runs
+               on the unhappy path and therefore only gets exercised there. */
             string sql = @"
                 SELECT ba.C_BankAccount_ID AS C_BankAccount_ID,
                        ba.Name AS Account_Name,
                        ba.AccountNo AS Account_No,
+                       COALESCE(ba.CurrentBalance,0) AS Current_Balance,
                        b.Name AS Bank_Name,
                        cur.ISO_Code AS Currency_Iso,
                        cur.StdPrecision AS Std_Precision,
@@ -233,6 +267,7 @@ namespace VASLogic.Models
                 option.CurrencyCode = Util.GetValueOfString(row["Currency_Iso"]);
                 option.CurrencySymbol = Util.GetValueOfString(row["Currency_Symbol"]);
                 option.Precision = Util.GetValueOfInt(row["Std_Precision"]);
+                option.CurrentBalance = Util.GetValueOfDecimal(row["Current_Balance"]);
 
                 /* Shown in full, by explicit request - not masked. */
                 string accountNo = Util.GetValueOfString(row["Account_No"]);
@@ -288,8 +323,8 @@ namespace VASLogic.Models
         ///
         /// Newest first, then exactly one row: no aggregate, no window function, and no second
         /// query for a previous balance. An account with no line on or before the as-of date
-        /// leaves HasBalance false - the card then says so rather than printing a zero, because
-        /// a zero balance is a real figure and would be read as one.
+        /// leaves HasBalance false and the caller applies the CurrentBalance fallback - this
+        /// method's job is the LINE, and only the line.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="bankAccountId">The validated account id.</param>
@@ -335,6 +370,7 @@ namespace VASLogic.Models
             DataRow row = ds.Tables[0].Rows[0];
 
             result.EndingBalance = Util.GetValueOfDecimal(row["Ending_Balance"]);
+            result.BalanceSource = BALANCESOURCE_Line;
             result.HasBalance = true;
 
             DateTime? statementDate = Util.GetValueOfDateTime(row["Statement_Date"]);
@@ -380,12 +416,18 @@ namespace VASLogic.Models
             /// <summary>The account currency's C_Currency.StdPrecision.</summary>
             public int Precision { get; set; }
 
-            /// <summary>The latest C_BankAccountLine.EndingBalance, at full stored precision.
-            /// Meaningless unless HasBalance.</summary>
+            /// <summary>The figure the card prints, at full stored precision: the latest
+            /// C_BankAccountLine.EndingBalance when the account has one, otherwise the
+            /// account's own C_BankAccount.CurrentBalance. BalanceSource says which.</summary>
             public decimal EndingBalance { get; set; }
 
-            /// <summary>False when the account has no balance line on or before the as-of date.
-            /// The card then says so - it never prints a zero it did not read.</summary>
+            /// <summary>BALANCESOURCE_Line or BALANCESOURCE_Account - which of the two the
+            /// figure came from. Empty only when the tenant has no accessible account.</summary>
+            public string BalanceSource { get; set; }
+
+            /// <summary>True whenever a figure is available, which is whenever an account was
+            /// resolved: the CurrentBalance fallback always yields one, even if that one is
+            /// zero. False only alongside NoAccounts.</summary>
             public bool HasBalance { get; set; }
 
             /// <summary>StatementDate of the line the balance came from, as yyyy-MM-dd.</summary>
@@ -430,6 +472,11 @@ namespace VASLogic.Models
 
             /// <summary>The account currency's C_Currency.StdPrecision.</summary>
             public int Precision { get; set; }
+
+            /// <summary>C_BankAccount.CurrentBalance - the account's own running balance,
+            /// and the card's fallback when the account has no C_BankAccountLine to read.
+            /// Carried on every option so the fallback costs no second query.</summary>
+            public decimal CurrentBalance { get; set; }
         }
     }
 }

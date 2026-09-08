@@ -65,15 +65,23 @@ namespace VASLogic.Models
     ///               reaching any query. Default is Net variance = ABS(Net) descending, so
     ///               the accounts that moved most are surfaced first.
     ///
-    ///               PAGING. The client is served ONE page, with the totals and the bar
-    ///               scale it needs to render it. Both of those are properties of the whole
-    ///               accessible set rather than of one page: the bar must stay comparable
-    ///               across pages, so MaxFlow is the largest single gross flow anywhere in
-    ///               the set. That is why the accessible accounts are resolved in full and
-    ///               then sliced here rather than paged in SQL - the set is bounded by the
-    ///               tenant's bank accounts (tens, not millions), and paging in SQL would
-    ///               cost an extra COUNT query and an extra MAX query to recover the two
-    ///               values the page cannot know about itself.
+    ///               THE BAR IS WEIGHTED PER ACCOUNT. Each row's two sides are scaled
+    ///               against the larger of that ROW's own flows, so its dominant direction
+    ///               fills its half of the track and the other side reads as a fraction of
+    ///               it. The bar therefore shows the SHAPE of one account's period, a
+    ///               question answerable within a single row. It is NOT scaled against the
+    ///               largest flow in the set: every row is stated in its own currency, so a
+    ///               shared scale measured rupees against dollars and let one outlier
+    ///               flatten every other bar to nothing. Magnitude lives in the figures
+    ///               above the bar and in the tooltip, not in the bar's width.
+    ///
+    ///               PAGING. The client is served ONE page plus the paging totals, which
+    ///               are properties of the whole accessible set rather than of one page.
+    ///               The accessible accounts are therefore resolved in full and sliced here
+    ///               rather than paged in SQL - the set is bounded by the tenant's bank
+    ///               accounts (tens, not millions), and paging in SQL would cost an extra
+    ///               COUNT query to recover the one value the page cannot know about
+    ///               itself.
     ///
     ///               No window functions anywhere: ROW_NUMBER() OVER (... ORDER BY ...)
     ///               puts an ORDER BY inside the SELECT list, and every clause of that kind
@@ -170,11 +178,10 @@ namespace VASLogic.Models
                 Finalise(rows);
             }
 
-            /* MaxFlow and the totals belong to the WHOLE accessible set, so they are taken
-               before the page is cut - a bar on page 3 has to be readable against a bar on
-               page 1. */
-            result.MaxFlow = MaxFlow(rows);
-            ApplyBarPercents(rows, result.MaxFlow);
+            /* Each bar is scaled against its OWN account, so this needs no set-wide figure
+               and can run before or after the page is cut. It runs here, over the whole
+               set, only so every row is complete however it is later sliced or sorted. */
+            ApplyBarPercents(rows);
 
             SortRows(rows, result.Sort);
 
@@ -580,41 +587,44 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// The largest single gross flow - in or out - anywhere in the accessible set. This
-        /// is the ONE scale every bar on every page is drawn against, which is what makes
-        /// two bars comparable whether or not they are on the same page.
-        /// </summary>
-        /// <param name="rows">The whole accessible set.</param>
-        /// <returns>The maximum, or 0 when nothing moved at all.</returns>
-        private decimal MaxFlow(List<AccountRow> rows)
-        {
-            decimal max = 0m;
-            for (int i = 0; i < rows.Count; i++)
-            {
-                decimal outflow = Math.Abs(rows[i].Outflow);
-                decimal inflow = Math.Abs(rows[i].Inflow);
-                if (outflow > max) { max = outflow; }
-                if (inflow > max) { max = inflow; }
-            }
-            return max;
-        }
-
-        /// <summary>
-        /// Turns each row's two gross flows into bar widths. Each side may occupy at most
-        /// half the track, so the largest flow in the set exactly fills its half and every
-        /// other bar reads as a fraction of it.
+        /// Turns each row's two gross flows into bar widths, EACH ROW WEIGHTED AGAINST ITS
+        /// OWN ACCOUNT.
+        ///
+        /// The scale is the larger of that account's own two flows, so its dominant side
+        /// exactly fills its half of the track and the other side reads as a fraction of
+        /// it. What the bar therefore shows is the SHAPE of one account's period - which
+        /// way it moved and how lopsidedly - which is a question that has an answer within
+        /// a single row.
+        ///
+        /// It is deliberately NOT scaled against the largest flow in the whole set any
+        /// more. Every row on this card is stated in its OWN currency (see the class note
+        /// on conversion), so a shared scale silently measured an account in rupees against
+        /// one in dollars and drew a busy account as a sliver purely because a bigger
+        /// NUMBER existed elsewhere. It also meant one outlier flattened every other bar on
+        /// the card to nothing. The cost of the change is that two bars are no longer
+        /// comparable in magnitude across rows - only in shape - which is the honest
+        /// position given the currencies were never comparable to begin with. The figures
+        /// above each bar, and the tooltip, carry the magnitude.
+        ///
+        /// An account that did not move at all keeps both sides at zero: the axis alone is
+        /// drawn, and no division by zero is attempted.
         /// </summary>
         /// <param name="rows">Rows to complete in place.</param>
-        /// <param name="maxFlow">Shared scale from <see cref="MaxFlow"/>.</param>
-        private void ApplyBarPercents(List<AccountRow> rows, decimal maxFlow)
+        private void ApplyBarPercents(List<AccountRow> rows)
         {
-            if (maxFlow <= 0) { return; }
-
             for (int i = 0; i < rows.Count; i++)
             {
                 AccountRow row = rows[i];
-                row.InflowBarPct = Math.Abs(row.Inflow) / maxFlow * BAR_HalfWidthPct;
-                row.OutflowBarPct = Math.Abs(row.Outflow) / maxFlow * BAR_HalfWidthPct;
+
+                decimal inflow = Math.Abs(row.Inflow);
+                decimal outflow = Math.Abs(row.Outflow);
+
+                /* This row's own scale - never the set's. */
+                decimal scale = inflow > outflow ? inflow : outflow;
+                if (scale <= 0) { continue; }
+
+                row.InflowBarPct = inflow / scale * BAR_HalfWidthPct;
+                row.OutflowBarPct = outflow / scale * BAR_HalfWidthPct;
             }
         }
 
@@ -677,9 +687,6 @@ namespace VASLogic.Models
 
             /// <summary>CEILING(TotalRows / PageSize).</summary>
             public int TotalPages { get; set; }
-
-            /// <summary>Largest gross flow in the whole set - the shared bar scale.</summary>
-            public decimal MaxFlow { get; set; }
 
             /// <summary>False only on a failure or a missing accounting calendar; a tenant
             /// with no accessible bank accounts is Loaded=true with an empty page.</summary>

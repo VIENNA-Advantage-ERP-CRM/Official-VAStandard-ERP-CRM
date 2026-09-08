@@ -233,13 +233,11 @@
     transition: opacity 160ms ease;
 }
 
-    /* Currency symbol leads the number at a smaller weight so the digits stay
-       the thing the eye lands on. */
-    .vas-233-value .vas-233-cur {
-        font-size: .55em;
-        font-weight: 500;
-        margin-right: .15em;
-    }
+    /* NO SEPARATE RULE FOR THE CURRENCY SYMBOL, deliberately. The symbol is part of the
+       same run of text as the digits and sits at stat size with them - "$3.22L" - the
+       way the sibling amount cards print theirs. A smaller supporting tier inside a
+       headline whose whole content is one number read as two marks rather than one
+       figure. .vas-233-value already owns the size, weight and tracking for all of it. */
 
     /* Between two loads the figure fades rather than disappearing - the card keeps
        its shape and nothing jumps. */

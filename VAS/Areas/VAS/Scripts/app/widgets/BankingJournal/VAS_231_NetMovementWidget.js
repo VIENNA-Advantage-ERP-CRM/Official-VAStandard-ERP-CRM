@@ -52,9 +52,13 @@
  *                   4 | out                           | VAS_231_Out
  *                   5 | Receipts                      | VAS_231_Receipts
  *                   6 | Payments                      | VAS_231_Payments
- *                   7 | No accounting period          | VAS_231_NoPeriod
- *                   8 | Dashboard period              | VAS_201_DashboardPeriod (reuse)
- *                   9 | Couldn't load                 | VAS_192_CouldntLoad     (reuse)
+ *                   7 | Dashboard period              | VAS_201_DashboardPeriod (reuse)
+ *                   8 | Couldn't load                 | VAS_192_CouldntLoad     (reuse)
+ *
+ *                  VAS_231_NoPeriod is RETIRED - a tenant with no started period now
+ *                  reads as a zero in its own currency rather than as a sentence, and
+ *                  the period chip hides itself when there is nothing to pick. The key
+ *                  can be dropped from AD_Message.
  *
  * Chronological development:
  *   VAI154         Created  Date 2026-09-02
@@ -254,12 +258,16 @@
 
                     paintPeriod();
 
-                    if (_periods.length === 0 || _periodId <= 0) {
-                        renderState(label('VAS_231_NoPeriod', 'No accounting period.'));
-                        return;
-                    }
-
-                    _data = data.Data || null;
+                    /* NO PERIOD IS STILL A FIGURE, NOT A SENTENCE. With no started period
+                       there is nothing to total, and the honest total of nothing is zero -
+                       so the card prints a zero in the tenant's currency rather than
+                       swapping its number for prose. The currency is read from the
+                       bootstrap above and does not depend on the period, so the symbol is
+                       there to print either way. renderFigures() reads a null _data as
+                       zeros, so the path needs no special case beyond leaving _data unset.
+                       The period chip hides itself when there is nothing to pick, which is
+                       where the absence is actually reported. */
+                    _data = (_periods.length === 0 || _periodId <= 0) ? null : (data.Data || null);
                     renderFigures();
                 },
                 error: function () {
@@ -314,8 +322,9 @@
             $value.addClass('vas-231-is-loading');
         }
 
-        /* A load failure takes the card over; an empty period does NOT - zero movement
-           is a real answer and renders as a zero, per the KPI empty-state rule. */
+        /* ONLY a load failure takes the card over. Neither an empty period nor a missing
+           one does: both are answers of zero, and they render as a zero in the tenant's
+           currency, per the KPI empty-state rule. */
         function renderState(text) {
             $value.removeClass('vas-231-is-loading').addClass('vas-231-hidden');
             $split.addClass('vas-231-hidden');
@@ -337,14 +346,15 @@
                used to signal status - the widget surface stays visually consistent and
                the meaning comes from the text, so all a negative net changes is the
                leading sign and the colour of the number. */
+            /* Sign, symbol and digits are ONE run of text at stat size - "+$3.22L" - the
+               way the sibling amount cards print theirs, rather than the sign and symbol
+               in their own smaller span. A card whose headline is one number should read
+               as one number; two type tiers inside it read as two marks. */
             var sign = negative ? '-' : '+';
             $value
                 .toggleClass('vas-231-value--neg', negative)
                 .attr('title', label('VAS_231_NetMovement', 'Net Movement') + ': ' + sign + amountText(net))
-                .html(
-                    '<span class="vas-231-cur">' + escapeHtml(sign + symbol()) + '</span>' +
-                    escapeHtml(compact(net))
-                );
+                .text(sign + symbol() + compact(net));
 
             var inLabel = label('VAS_231_In', 'in');
             var outLabel = label('VAS_231_Out', 'out');

@@ -58,9 +58,13 @@
  *                   4 | Charge payments               | VAS_233_ChargePayments
  *                   5 | Statement charges             | VAS_233_StatementCharges
  *                   6 | vs                            | VAS_233_Vs
- *                   7 | No accounting period          | VAS_231_NoPeriod        (reuse)
- *                   8 | Dashboard period              | VAS_201_DashboardPeriod (reuse)
- *                   9 | Couldn't load                 | VAS_192_CouldntLoad     (reuse)
+ *                   7 | Dashboard period              | VAS_201_DashboardPeriod (reuse)
+ *                   8 | Couldn't load                 | VAS_192_CouldntLoad     (reuse)
+ *
+ *                  The borrowed VAS_231_NoPeriod is no longer referenced here - a tenant
+ *                  with no started period now reads as a zero in its own currency rather
+ *                  than as a sentence, and the period chip hides itself when there is
+ *                  nothing to pick. (VAS_231 has retired the key on its own side too.)
  *
  * Chronological development:
  *   VAI154         Created  Date 2026-09-03
@@ -269,12 +273,16 @@
 
                     paintPeriod();
 
-                    if (_periods.length === 0 || _periodId <= 0) {
-                        renderState(label('VAS_231_NoPeriod', 'No accounting period.'));
-                        return;
-                    }
-
-                    _data = data.Data || null;
+                    /* NO PERIOD IS STILL A FIGURE, NOT A SENTENCE. With no started period
+                       there is nothing to total, and the honest total of nothing is zero -
+                       so the card prints a zero in the tenant's currency rather than
+                       swapping its number for prose. The currency comes from the bootstrap
+                       above and does not depend on the period, so the symbol is there to
+                       print either way. renderFigures() already reads a null _data as
+                       zeros, so the path needs no special case beyond leaving _data unset.
+                       The period chip hides itself when there is nothing to pick, which is
+                       where the absence is actually reported. */
+                    _data = (_periods.length === 0 || _periodId <= 0) ? null : (data.Data || null);
                     renderFigures();
                 },
                 error: function () {
@@ -329,9 +337,9 @@
             $value.addClass('vas-233-is-loading');
         }
 
-        /* A load failure takes the card over; an empty period does NOT - "the bank cost
-           you nothing" is a real answer and renders as a zero, per the KPI empty-state
-           rule. */
+        /* ONLY a load failure takes the card over. Neither an empty period nor a missing
+           one does - "the bank cost you nothing" is a real answer either way, and it
+           renders as a zero in the tenant's currency, per the KPI empty-state rule. */
         function renderState(text) {
             $value.removeClass('vas-233-is-loading').addClass('vas-233-hidden');
             $foot.addClass('vas-233-hidden');
@@ -349,12 +357,13 @@
             /* The value tooltip carries the exact figure AND the split between the two
                places a charge can be recorded, so the operator can tell a payment-screen
                charge from a fee the bank took on the statement without leaving the card. */
+            /* Symbol and digits are ONE run of text at stat size - "$3.22L" - the way the
+               sibling amount cards print theirs, rather than the symbol in its own smaller
+               span. A card whose headline is one number should read as one number; two
+               type tiers inside it read as two marks. */
             $value
                 .attr('title', valueTooltip(amount))
-                .html(
-                    '<span class="vas-233-cur">' + escapeHtml(symbol()) + '</span>' +
-                    escapeHtml(compact(amount))
-                );
+                .text(symbol() + compact(amount));
 
             $foot.html(deltaHtml() + countHtml(count));
         }
