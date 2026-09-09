@@ -46,6 +46,15 @@
  *                  VIS.Util.formatCompactAmount helper
  *                  (Scripts/app/util/CurrencyFormat.js).
  *
+ *                  THE FIGURES ARE NOT ABSOLUTES. The helper returns a magnitude by
+ *                  contract, so every printed figure - the subtitle totals and both
+ *                  gross lines of a tooltip - puts back the sign of the value behind
+ *                  it: a bucket whose reversals outweighed its documents reads as
+ *                  "−$900", not as the "$900" a real receipt of the same size prints.
+ *                  The BAR HEIGHTS stay magnitudes, because a bar is a size and this
+ *                  chart's axis is zero; the net line carries direction by crossing
+ *                  its own mid-line.
+ *
  *                  Design: design.md -> dashboard-widgets.md (Glass Widget, Widget
  *                  Header, Content Fit Budget, No Inner Scrollbars) supplies the shell
  *                  and the header typography; the widget specification supplies the
@@ -498,7 +507,15 @@
             }
 
             /* ---- bar scale: anchored at zero, with headroom so the tallest bar does not
-                   touch the ceiling. An all-zero range still needs a non-zero divisor. ---- */
+                   touch the ceiling. An all-zero range still needs a non-zero divisor.
+
+                   THE GEOMETRY BELOW IS DELIBERATELY MAGNITUDE-BASED, unlike the figures,
+                   which now print their sign. A bar is a SIZE: a bucket that summed
+                   negative still moved that much money and has to be drawn, and a signed
+                   height would put it under the floor of a chart whose axis is zero. The
+                   sign is read from the tooltip and from the subtitle totals, and the net
+                   line - which IS signed - crosses its own mid-line to show the direction
+                   the period actually ran. ---- */
             var maxBar = 0;
             for (var i = 0; i < _points.length; i++) {
                 var r = Math.abs(Number(_points[i].Receipts) || 0);
@@ -785,14 +802,21 @@
             return (isNaN(p) || p < 0 || p > 6) ? 2 : p;
         }
 
+        /* A gross figure. NOT an absolute: compact() returns a magnitude, so a receipts or
+           payments total that summed NEGATIVE - a range whose reversals outweighed its
+           documents - printed as though it were positive, which is the same text the
+           opposite figure would print. Only negatives are marked; a gross running its own
+           way is the ordinary case and needs no plus. */
         function money(value) {
-            return symbol() + compact(value);
+            var v = Number(value) || 0;
+            return (v < 0 ? '−' : '') + symbol() + compact(v);
         }
 
         function signedMoney(value) {
             var v = Number(value) || 0;
             /* An explicit sign on the net - the sign IS the reading, never left to colour
-               alone. A true minus sign, not a hyphen. */
+               alone. A true minus sign, not a hyphen. Composed from the magnitude rather
+               than from money(), which would print the minus twice. */
             return (v < 0 ? '−' : '+') + symbol() + compact(v);
         }
 
@@ -806,18 +830,26 @@
             return String(Math.abs(Number(value) || 0));
         }
 
-        /* Full, non-compact amount for the tooltips: the exact figure behind a bar that is
-           only ever drawn as a proportion. */
-        function amountText(value) {
+        /* The exact figure behind a bar that is only ever drawn as a proportion, WITHOUT a
+           sign - the two helpers below put their own on. Kept separate precisely so a
+           signed reading is never built by prefixing an already-signed one. */
+        function amountMagnitude(value) {
             var abs = Math.abs(Number(value) || 0);
             var p = precision();
             return symbol() + abs.toLocaleString(window.navigator.language,
                 { minimumFractionDigits: p, maximumFractionDigits: p });
         }
 
+        /* Full, non-compact amount for the tooltips. The tooltip is where the exact figure
+           lives, so it must not be the one place a minus goes missing. */
+        function amountText(value) {
+            var v = Number(value) || 0;
+            return (v < 0 ? '−' : '') + amountMagnitude(v);
+        }
+
         function signedAmountText(value) {
             var v = Number(value) || 0;
-            return (v < 0 ? '−' : '+') + amountText(v);
+            return (v < 0 ? '−' : '+') + amountMagnitude(v);
         }
 
         function countSuffix(count) {

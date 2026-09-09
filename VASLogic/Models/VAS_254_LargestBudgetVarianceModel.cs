@@ -33,6 +33,13 @@ namespace VASLogic.Models
     ///                 Ranking   ABS(Variance) descending, so a large underspend and a
     ///                           large overrun sit next to each other - the card is about
     ///                           the SIZE of the gap, not its direction.
+    ///                 Scope     accounts WITH A BUDGET DEFINED for the year, and only
+    ///                           those. A variance measures the distance from what was
+    ///                           approved, so an account carrying an actual and nothing
+    ///                           approved has no variance to measure - it is spending
+    ///                           nobody planned, which is VAS_256's subject. Ranked here
+    ///                           it would rank by its whole actual and crowd genuinely
+    ///                           over- and under-spent budgets off a three-row card.
     ///
     ///               BOTH SIDES COME FROM Fact_Acct, compared at Fact_Acct.Account_ID.
     ///               There is deliberately no separate budget-line matching model here:
@@ -417,9 +424,10 @@ namespace VASLogic.Models
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Reads every account that carries a budget or an actual in the selected year,
-        /// corrects each side for the account's natural balance, ranks by absolute variance
-        /// and hands the requested page back.
+        /// Reads every account that carries a BUDGET in the selected year, corrects each side
+        /// for the account's natural balance, ranks by absolute variance and hands the
+        /// requested page back. An account with an actual but nothing approved is not on this
+        /// card - see the filter below.
         ///
         /// The WHOLE set is read rather than one page. The sign correction depends on
         /// C_ElementValue.AccountType and is applied in C#, so the ranking cannot be done in
@@ -500,11 +508,16 @@ namespace VASLogic.Models
             {
                 VarianceRow row = MapRow(dt.Rows[i]);
 
-                /* An account with neither a budget nor an actual worth reporting is not a
-                   variance. Both sides at nought means the year's postings cancelled out on
-                   that account, and a row of three zeros spends a line of a three-row card
-                   saying nothing. */
-                if (row.Budget == 0 && row.Actual == 0) { continue; }
+                /* ONLY ACCOUNTS WITH A BUDGET. A variance is the distance between what was
+                   APPROVED and what was spent, so an account carrying no budget for the year
+                   has no variance to measure - its actual is not an overrun, it is spending
+                   nobody planned, which is the unbudgeted-actuals card's subject (VAS_256)
+                   and not this one's. Reported here it would rank by its full actual and
+                   crowd genuinely over- and under-spent budgets off a three-row card.
+
+                   A budget of nought is the same case: the year's budget postings cancelled
+                   out on that account, so nothing was approved. */
+                if (row.Budget == 0) { continue; }
 
                 all.Add(row);
             }

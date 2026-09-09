@@ -22,7 +22,9 @@
  *                  prints - not as vertical bars.
  *
  *                  EACH TRACK IS ITS OWN BUCKET'S MIX. The two segments are shares of
- *                  the row's OWN total, so every track fills completely and what it
+ *                  the row's OWN total BY MAGNITUDE - a side's converted sum can be
+ *                  negative when reversals outweigh documents, and a track is a size,
+ *                  which has no sign - so every track fills completely and what it
  *                  shows is the receipts-against-payments split inside that bucket.
  *                  Comparing one bucket with another is the Value column's job - the
  *                  track answers "what is this bucket made of", which is the question
@@ -54,7 +56,15 @@
  *                  format, never a hand-rolled one.
  *
  *                  Direction always comes from C_Payment.IsReceipt, never from the
- *                  sign of the stored amount.
+ *                  sign of the stored amount - but the modal's amount COLOUR follows
+ *                  the sign it actually prints, not that direction. A receipt can be
+ *                  negative (a reversal), and a row reading "−$900" in green says the
+ *                  opposite of its own figure.
+ *
+ *                  ZOOMING CLOSES THE MODAL. Picking a document number out of the list
+ *                  is the end of the drill-down, so the list gets out of the way of the
+ *                  window it just opened - but only once that window has actually
+ *                  opened.
  *
  *                  Design: design.md -> dashboard-widgets.md (Glass Widget, Widget
  *                  Header, Grid Data Rows, No Inner Scrollbars) supplies the shell,
@@ -613,12 +623,21 @@
                fills completely and shows the receipts / payments MIX inside that bucket.
                Comparing bucket against bucket is the Value column's job, not the track's.
 
+               THE SHARES ARE MAGNITUDES. A side's converted sum can be NEGATIVE - a bucket
+               whose reversals outweigh its documents - and a track is a size, which has no
+               sign. Adding the raw values made `own` negative for such a bucket, the guard
+               dropped both shares to zero, and a row holding three open lines and $40.9K of
+               exposure drew an empty groove: the one bucket worth looking at was the one
+               with nothing drawn on it. Mixed signs were worse still - the two could cancel
+               towards zero and throw a share past 100%. Hue encodes DIRECTION (receipts
+               against payments), never the sign, and the Value column carries the sign.
+
                The payment side is taken as the remainder rather than computed separately,
                so the two can never round to 99.9% or 100.1% and leave a sliver of groove
                showing at the end of a full track. A bucket holding nothing draws no
                segments at all - just the empty groove. */
-            var own = rValue + pValue;
-            var rPct = own > 0 ? (rValue / own * 100) : 0;
+            var own = Math.abs(rValue) + Math.abs(pValue);
+            var rPct = own > 0 ? (Math.abs(rValue) / own * 100) : 0;
             var pPct = own > 0 ? (100 - rPct) : 0;
 
             var count = bucket ? (Number(bucket.TotalCount) || 0) : 0;
@@ -855,7 +874,9 @@
 
             paintDialogHead();
 
-            $dlg.find('.vas-235-x').on('click', closeDialog);
+            /* Wrapped rather than passed straight through: jQuery hands the handler the
+               event object, which would arrive as closeDialog's restoreFocus argument. */
+            $dlg.find('.vas-235-x').on('click', function () { closeDialog(); });
 
             /* The backdrop deliberately does NOT dismiss. This modal is a working list -
                the operator reads across a row, pages through it and clicks out to a
@@ -921,7 +942,11 @@
             $dlg.find('.vas-235-x').focus();
         }
 
-        function closeDialog() {
+        /* restoreFocus defaults to true. It is passed FALSE only when the modal is closing
+           because the operator zoomed out of it: focus belongs to the window that just
+           opened, and pulling it back to a count on the dashboard behind would take it away
+           from them. */
+        function closeDialog(restoreFocus) {
             if (!$dlg) { return; }
 
             $dlg.addClass('vas-235-hidden');
@@ -929,6 +954,8 @@
 
             _dlgBucket = '';
             _dlgLoading = false;
+
+            if (restoreFocus === false) { _dlgTrigger = null; return; }
 
             /* Focus returns to the count that opened it, so keyboard users are not dropped
                back at the top of the document. */
@@ -1052,10 +1079,14 @@
 
         function detailRowHtml(item) {
             var amount = Number(item.Amount) || 0;
-            /* Direction is the server's, from IsReceipt - the colour follows the sign it
-               already applied, and the sign itself is printed so the meaning never rests
-               on colour alone. */
-            var cls = item.IsReceipt ? 'vas-235-pos' : 'vas-235-neg';
+
+            /* THE TONE FOLLOWS THE PRINTED SIGN, not the direction. The server signs the
+               amount by IsReceipt, but a receipt can itself be negative - a reversal, or a
+               refund keyed against the receipt - and then it prints "−$900" and MUST read
+               red. Colouring by direction painted that row green while its own figure said
+               the opposite, which is the one thing a tone must never do. Zero and above
+               stay positive: the figure prints "+" and reads as one. */
+            var cls = amount < 0 ? 'vas-235-neg' : 'vas-235-pos';
 
             var vendor = item.Vendor ? item.Vendor : '—';
             var account = item.BankAccount ? item.BankAccount : '—';
@@ -1098,7 +1129,18 @@
         }
 
         /* Zooms to the payment behind a clicked document number. The window id was chosen
-           when the row was rendered, so nothing is decided here beyond reading it back. */
+           when the row was rendered, so nothing is decided here beyond reading it back.
+
+           THE MODAL CLOSES BEHIND THE ZOOM. The list has done its job once the operator has
+           picked a line out of it, and leaving it up would leave a modal floating over the
+           window that just opened underneath - the reader would have to dismiss the
+           drill-down before they could work on the document they asked for.
+
+           It closes only when the zoom ACTUALLY opened something: zoomToRecord resolves to
+           the window id it used, or 0 when the framework pieces were not available. A failed
+           zoom leaves the list where it was rather than dismissing it and showing nothing in
+           its place. Focus is NOT returned to the trigger in this path - the new window is
+           where the operator now is. */
         function zoomToPayment(el) {
             if (!VAS.ZoomUtil || typeof VAS.ZoomUtil.zoomToRecord !== 'function') { return; }
 
@@ -1109,9 +1151,19 @@
 
             var isReceipt = $el.attr('data-receipt') === 'Y';
 
-            VAS.ZoomUtil.zoomToRecord(PAYMENT_ZOOM_COLUMN, id, windowId,
+            var zoom = VAS.ZoomUtil.zoomToRecord(PAYMENT_ZOOM_COLUMN, id, windowId,
                 isReceipt ? RECEIPT_WINDOW_NAME_NEW : PAYMENT_WINDOW_NAME_NEW,
                 isReceipt ? RECEIPT_WINDOW_NAME_OLD : PAYMENT_WINDOW_NAME_OLD);
+
+            /* The util answers with a promise of the window id. Guarded rather than chained
+               blindly: if it ever hands back something else, the modal still closes on the
+               click instead of the whole handler dying on a missing .done. */
+            if (!zoom || typeof zoom.done !== 'function') { closeDialog(false); return; }
+
+            zoom.done(function (openedWindowId) {
+                if (_disposed) { return; }
+                if ((Number(openedWindowId) || 0) > 0) { closeDialog(false); }
+            });
         }
 
         function paintDetailFooter() {
@@ -1171,9 +1223,15 @@
             return (isNaN(p) || p < 0 || p > 6) ? 2 : p;
         }
 
-        /* WIDGET amounts - base currency, compact, from the shared util. */
+        /* WIDGET amounts - base currency, compact, from the shared util.
+
+           A NEGATIVE TOTAL KEEPS ITS SIGN. The compact helper returns a magnitude, so a
+           bucket that summed to −40,900 printed "$40.900K" - the same text a bucket of
+           +40,900 prints, stating the opposite of the figure behind it. Only negatives are
+           marked; a positive exposure is the ordinary case and needs no plus. */
         function money(value) {
-            return symbol() + compact(value);
+            var v = Number(value) || 0;
+            return (v < 0 ? '−' : '') + symbol() + compact(v);
         }
 
         function compact(value) {
@@ -1186,11 +1244,14 @@
             return String(Math.abs(Number(value) || 0));
         }
 
-        /* Full, non-compact base-currency amount for the row tooltips. */
+        /* Full, non-compact base-currency amount for the row tooltips. Signed on the same
+           rule as money(): the tooltip is where the exact figure lives, so it must not be
+           the one place a minus goes missing. */
         function amountText(value) {
-            var abs = Math.abs(Number(value) || 0);
+            var v = Number(value) || 0;
+            var abs = Math.abs(v);
             var p = precision();
-            return symbol() + abs.toLocaleString(window.navigator.language,
+            return (v < 0 ? '−' : '') + symbol() + abs.toLocaleString(window.navigator.language,
                 { minimumFractionDigits: p, maximumFractionDigits: p });
         }
 

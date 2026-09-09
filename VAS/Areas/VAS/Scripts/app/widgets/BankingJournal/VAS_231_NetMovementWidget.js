@@ -18,6 +18,12 @@
  *                  zero. Unlike VAS_197 the list is NOT restricted to open
  *                  periods: a closed month still has a net movement worth reading.
  *
+ *                  THE TWO GROSS FIGURES ARE NOT ABSOLUTES. They are the period's
+ *                  signed sums, so a period whose reversals outweighed its documents
+ *                  shows "-₹900 in" rather than the "₹900" a real receipt of the same
+ *                  size would print. Only the HEADLINE composes its own sign, from the
+ *                  net; the split line carries whatever sign its own figure has.
+ *
  *                  Amounts arrive already converted into the tenant's base
  *                  (accounting-schema) currency and are formatted through the
  *                  shared VIS.Util.formatCompactAmount helper
@@ -364,14 +370,14 @@
                     escapeHtml(label('VAS_231_Receipts', 'Receipts') + ': ' + amountText(inAmt) +
                         countSuffix(_data ? _data.ReceiptsCount : 0)) + '">' +
                     '<span class="vas-231-dot vas-231-dot--pos"></span>' +
-                    escapeHtml(symbol() + compact(inAmt)) +
+                    escapeHtml(grossText(inAmt)) +
                     '<span class="vas-231-lbl">' + escapeHtml(inLabel) + '</span>' +
                 '</span>' +
                 '<span class="vas-231-neg" title="' +
                     escapeHtml(label('VAS_231_Payments', 'Payments') + ': ' + amountText(outAmt) +
                         countSuffix(_data ? _data.PaymentsCount : 0)) + '">' +
                     '<span class="vas-231-dot vas-231-dot--neg"></span>' +
-                    escapeHtml(symbol() + compact(outAmt)) +
+                    escapeHtml(grossText(outAmt)) +
                     '<span class="vas-231-lbl">' + escapeHtml(outLabel) + '</span>' +
                 '</span>'
             );
@@ -406,6 +412,20 @@
             }
             catch (e) { if (window.console) { console.log(e); } }
             return String(Math.abs(Number(value) || 0));
+        }
+
+        /* One gross figure on the split line - "$3.22L", and "-$900" when the period's
+           reversals outweighed its documents.
+
+           THE MAGNITUDE IS NOT AN ABSOLUTE. compact() returns a magnitude, so a negative
+           gross printed as though it were positive: the same "$900" a receipt of +900
+           prints, in a line whose whole job is to say what went in and what went out.
+           The headline composes its own sign from the net, which is why it cannot use
+           this helper and this line cannot use the headline's. Only negatives are marked
+           - a gross that ran its own way is the ordinary case and needs no plus. */
+        function grossText(value) {
+            var v = Number(value) || 0;
+            return (v < 0 ? '-' : '') + symbol() + compact(v);
         }
 
         /* Full, non-compact amount for the tooltips: the exact figure behind the

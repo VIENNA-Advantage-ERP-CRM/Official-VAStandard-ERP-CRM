@@ -49,6 +49,16 @@
  *                  absolute figure and the account's ISO code is already under its
  *                  name.
  *
+ *                  A FLOW THAT RAN THE OTHER WAY TAKES THE OTHER WAY'S COLOUR. Inflow
+ *                  and outflow are normally positive and each reads in its column's
+ *                  own tone. Either can arrive NEGATIVE - reversals outweighing the
+ *                  period's documents - and then the money moved in the opposite
+ *                  direction: a negative inflow is money leaving and turns red, a
+ *                  negative outflow is money arriving and turns green, figure and bar
+ *                  segment together. Such a figure also prints its minus sign, so the
+ *                  reading never rests on colour alone; the ordinary same-direction
+ *                  flows stay unsigned, since for those the column IS the direction.
+ *
  *                  Sort, paging and the period are all server-resolved. The control
  *                  sends a KEY from a fixed list, never an expression; a page or sort
  *                  change is one request and preserves the other two.
@@ -594,10 +604,30 @@
             var netCls = net > 0 ? ' vas-234-up' : (net < 0 ? ' vas-234-down' : '');
 
             return '<div class="vas-234-nums">' +
-                '<span class="vas-234-o">' + escapeHtml(flow(item, item.Outflow)) + '</span>' +
+                '<span class="vas-234-o' + flipCls(item.Outflow) + '">' +
+                    escapeHtml(flow(item, item.Outflow)) + '</span>' +
                 '<span class="vas-234-n' + netCls + '">' + escapeHtml(signedFlow(item, net)) + '</span>' +
-                '<span class="vas-234-i">' + escapeHtml(flow(item, item.Inflow)) + '</span>' +
+                '<span class="vas-234-i' + flipCls(item.Inflow) + '">' +
+                    escapeHtml(flow(item, item.Inflow)) + '</span>' +
             '</div>';
+        }
+
+        /* A FLOW THAT RAN THE OTHER WAY takes the opposite side's tone.
+
+           Each column has a direction and a colour to match it: outflow is money leaving
+           and reads in the outflow tone, inflow is money arriving and reads in the inflow
+           tone. But either figure can arrive NEGATIVE - a reversed receipt makes Inflow
+           negative, a reversed payment makes Outflow negative - and then the money went the
+           OTHER way. Colouring it by its column said the opposite of what happened: a −900
+           inflow is money out, and it was drawn in the inflow green.
+
+           So the tone follows the money, not the column. `.vas-234-flip` swaps the cell to
+           the other side's colour, and barHtml puts it on that side's bar segment too. The
+           figure itself prints its minus sign in that case (see flow), so the reading never
+           rests on colour alone - the ordinary, same-direction flows stay unsigned exactly
+           as before, because for those the column IS the direction. */
+        function flipCls(value) {
+            return (Number(value) || 0) < 0 ? ' vas-234-flip' : '';
         }
 
         /* The bar itself. Widths come from the SERVER (each side already expressed as its
@@ -608,9 +638,14 @@
             var outPct = clampHalf(item.OutflowBarPct);
             var inPct = clampHalf(item.InflowBarPct);
 
+            /* The widths are magnitudes, so a negative flow still draws its bar on its own
+               side of the axis - it moved, and a row that moved must not read as bare axis.
+               The SIGN is carried by the tone: the same flip the figure above it takes. */
             return '<div class="vas-234-bar" aria-hidden="true">' +
-                (outPct > 0 ? '<i class="vas-234-bar-out" style="width:' + outPct.toFixed(1) + '%"></i>' : '') +
-                (inPct > 0 ? '<i class="vas-234-bar-in" style="width:' + inPct.toFixed(1) + '%"></i>' : '') +
+                (outPct > 0 ? '<i class="vas-234-bar-out' + flipCls(item.Outflow) +
+                    '" style="width:' + outPct.toFixed(1) + '%"></i>' : '') +
+                (inPct > 0 ? '<i class="vas-234-bar-in' + flipCls(item.Inflow) +
+                    '" style="width:' + inPct.toFixed(1) + '%"></i>' : '') +
                 '<i class="vas-234-axis"></i>' +
             '</div>';
         }
@@ -914,9 +949,16 @@
 
         /* The three flow figures are bare magnitudes: they are all in the currency the row
            already states under the account name, and repeating the symbol three times
-           across one row costs width the cell does not have. */
+           across one row costs width the cell does not have.
+
+           A NEGATIVE FLOW KEEPS ITS SIGN, and only a negative one. The compact helper
+           returns a magnitude, so a −900 inflow printed as "900" - the same text an inflow
+           of +900 prints, in a column whose direction no longer applied to it. The ordinary
+           case is unchanged and still unsigned: there the column IS the direction, which is
+           the whole reason this card draws a diverging bar instead of writing minus signs. */
         function flow(item, value) {
-            return compact(item, value);
+            var v = Number(value) || 0;
+            return (v < 0 ? '−' : '') + compact(item, v);
         }
 
         /* An explicit sign on the net - the sign IS the reading, so it is never left to be

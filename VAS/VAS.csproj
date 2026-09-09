@@ -1151,6 +1151,9 @@
     <Compile Include="Areas\VAS\Controllers\VAS_252_TopBudgetOverRunsWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_252_TopBudgetOverRunsWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\Budget\VAS_252_TopBudgetOverRunsWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_253_UtlizationbyDimensionWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_253_UtlizationbyDimensionWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Budget\VAS_253_UtlizationbyDimensionWidget.js" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>
