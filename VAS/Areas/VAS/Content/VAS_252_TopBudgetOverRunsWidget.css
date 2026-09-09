@@ -308,7 +308,7 @@
 
 /* The account is the row's identity, so it carries the row's weight. */
 .vas-252-account {
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
 }
 

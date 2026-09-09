@@ -376,3 +376,4 @@ import "../app/widgets/Budget/VAS_256_UnBudgetedActualWidget.js";
 import "../app/widgets/Budget/VAS_254_LargestBudgetVarianceWidget.js";
 import "../app/widgets/Budget/VAS_252_TopBudgetOverRunsWidget.js";
 import "../app/widgets/Budget/VAS_253_UtlizationbyDimensionWidget.js";
+import "../app/widgets/Budget/VAS_255_BudgetNearLimitWidge.js";
