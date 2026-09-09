@@ -185,6 +185,17 @@
             });
         }
 
+        /* Open an amount cell with its value SELECTED, so the first keystroke replaces the
+           number instead of landing beside a digit of it. Qty and Price are reached either
+           by clicking the cell or by tabbing into it, and both arrive here through the same
+           re-render - so one call covers "move" and "select" alike. A caret is still
+           available: clicking a second time inside the now-focused input drops it where the
+           user clicked. Guarded because select() throws on a detached or hidden input. */
+        function focusAndSelect($inp) {
+            $inp.focus();
+            try { if ($inp[0] && $inp[0].select) $inp[0].select(); } catch (e) { }
+        }
+
         /* ---------- short helpers ---------- */
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -1208,7 +1219,10 @@
                     if (e.key === "Escape") { editing = null; render(); }
                 });
                 wrap.append($inp);
-                setTimeout(function () { $inp.focus(); }, 0);
+                // Amount cells (Price, and any other numeric routed through here) open with
+                // the value selected; text cells keep a plain caret so an existing
+                // description can be edited rather than replaced wholesale.
+                setTimeout(function () { if (opts.amount) focusAndSelect($inp); else $inp.focus(); }, 0);
             } else {
                 var disp = opts.amount ? (value ? fmtMoney(value) : "") : (value || "");
                 wrap.append(dispInput(line, field, disp, { align: opts.align, placeholder: placeholder }));
@@ -1240,7 +1254,7 @@
                     if (e.key === "Escape") { editing = null; render(); }
                 });
                 wrap.append($q);
-                setTimeout(function () { $q.focus(); }, 0);
+                setTimeout(function () { focusAndSelect($q); }, 0);
             } else {
                 var hasQ = v.QtyEntered !== undefined && v.QtyEntered !== "" && +v.QtyEntered !== 0;
                 wrap.append(dispInput(line, "quantity", hasQ ? fmtAmtInput(v.QtyEntered, 2) : "",
