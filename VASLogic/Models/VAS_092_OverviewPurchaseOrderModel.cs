@@ -1685,7 +1685,14 @@ namespace VASLogic.Models
                                         WHERE UPPER(t.TableName) = 'C_ORDER')
                                   AND ma.Record_ID               = @C_Order_ID
                                   AND COALESCE(ma.IsActive, 'Y') = 'Y'
-                                  AND COALESCE(TO_CHAR(ma.AttachmentType), 'M') <> 'I'
+                                  -- Not COALESCE(TO_CHAR(...)): PostgreSQL has no
+                                  -- single-argument to_char, so that form failed
+                                  -- the whole statement there and the feed showed
+                                  -- no mails. An IS NULL branch needs neither it
+                                  -- nor a COALESCE across character sets, which is
+                                  -- what the TO_CHAR was answering on Oracle.
+                                  AND (ma.AttachmentType IS NULL
+                                    OR TRIM(ma.AttachmentType) <> 'I')
                                 ORDER BY ma.Created DESC";
                 SqlParameter[] param = new SqlParameter[]
                 {

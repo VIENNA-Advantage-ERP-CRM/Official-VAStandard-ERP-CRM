@@ -405,12 +405,69 @@
 ///                          reading "Performance &amp;amp; Growth". MailBodyToText
 ///                          cannot answer for these — it returns early on anything
 ///                          that does not look like markup.
+///   VAI163   2026-09-08  Seven corrections, all reported off the running panel:
+///                        - ACCOUNTING. The costing method was the SCHEMA's, printed
+///                          as its stored code: "S" reached the screen, which is the
+///                          dictionary's shorthand for Standard Costing. It is now the
+///                          method the product is actually valued under — the product
+///                          CATEGORY's override where it sets one, on either
+///                          accounting-defaults scheme — resolved through AD_Ref_List
+///                          to its name, with the code kept as the fallback.
+///                          Each FRPT account also carries the accounting default's
+///                          own fields (Related To, Variance Type, Recognize Type,
+///                          Foreign Currency Revaluation), DISCOVERED from AD_Column
+///                          rather than named here: only FRPT_RelatedTo is a column
+///                          name confirmed against a tenant, and a guessed one fails
+///                          silently.
+///                        - ACTIVITY. AttachmentType 'I' is a LETTER again — an
+///                          attached letter document — which is how VAS_105, VAS_123
+///                          and VAS_ActivitySourcesModel have always read it. Reading
+///                          it as a DIRECTION (2026-08-18, above) made this panel the
+///                          only one that showed a letter as "Mail — Received".
+///                          Direction is now a mail's property alone.
+///                        - ZOOM. An inventory revaluation names its window
+///                          (VAS_InventoryRevaluations) instead of relying on the
+///                          dictionary's zoom target, which the reader's role may not
+///                          open — the click failed with an access error. The two
+///                          quality-check confirmations name theirs the same way:
+///                          VAS_ShipReceiptConfirm and VAS_MoveConfirmation.
+///                        - SUPPLIERS. One vendor off the purchase orders alone, the
+///                          most recent, instead of every vendor ever bought from —
+///                          the older ones read as "Alternative", claiming a supplier
+///                          list the product does not have. The last price is now the
+///                          order line's ENTERED price with the line's OWN unit beside
+///                          it: PriceActual is always base-unit, so a line bought in
+///                          cartons reported a per-piece figure.
+///                        - BOM. An own BOM is a HEADER and never reported the
+///                          attribute set its detail lines are specified for; it now
+///                          gathers the distinct sets across them.
+///   VAI163   2026-09-08  A mail's body now travels in TWO forms. The flattened
+///                        text stays (it feeds the row's sub-line, the reply quote
+///                        and every fallback); BodyHtml carries the same message as
+///                        MARKUP, so the detail sheet can show it as it was written
+///                        rather than as one run of grey text — which is what
+///                        VAS_105's e-mail modal shows and what was asked for.
+///
+///                        MailBodyToSafeHtml is the whole of the difference from
+///                        VAS_105, which assigns the stored body straight to
+///                        innerHTML. A mail body is authored by whoever sent the
+///                        mail and anyone can send mail to a tenant, so this is the
+///                        one string in the payload the browser is asked to PARSE
+///                        rather than escape — it goes out through a whitelist of
+///                        elements and attributes, with comments (conditional ones
+///                        included), scripts, styles, frames, forms and every
+///                        executable URL scheme removed first, and comes back empty
+///                        wherever that cannot be done. Verified against the usual
+///                        vectors before shipping. If a rendering complaint ever
+///                        traces to a stripped element, widen KEEP_TAGS /
+///                        KEEP_ATTRS — never the sanitiser's exits.
 /// </summary>
 
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -559,12 +616,136 @@ namespace VASLogic.Models
             // ----- Accounting: only what the product's own tab actually sets -----
             // Every product type, service included — the accounting section reports
             // what the product is valued under whether or not it sets accounts.
-            result.Accounting = LoadAccounting(ctx, M_Product_ID);
+            // The category is passed in because the COSTING METHOD can be set on
+            // it: the schema's method is only the tenant-wide default.
+            result.Accounting = LoadAccounting(ctx, M_Product_ID,
+                                               result.Product.M_Product_Category_ID);
 
             // ----- Activity: merged from its sources, newest first -----
             result.Activity = LoadActivity(ctx, M_Product_ID);
+            // The signature of what the feed was built from, so the panel can tell
+            // WITHOUT re-reading the whole overview whether somebody has since added
+            // a mail, note, appointment, task or call against this product.
+            result.ActivityStamp = GetActivityStamp(ctx, M_Product_ID);
 
             return result;
+        }
+
+        /// <summary>
+        /// A cheap change-signature over the ACTIVITY sources for one product:
+        /// how many rows they hold and the latest Updated stamp among them.
+        ///
+        /// This exists because nothing tells the panel that an activity was added.
+        /// Mails, notes, appointments, tasks and calls are raised from the window's
+        /// own toolbars and dialogs, which are framework code the panel cannot hook,
+        /// and they never touch M_Product - so no record-level event fires and the
+        /// feed silently goes stale until somebody presses Refresh. The panel polls
+        /// this instead and re-reads the overview only when the answer changes.
+        ///
+        /// Count AND stamp are both returned because neither alone is sufficient:
+        /// the count misses an EDIT to an existing row, and the stamp misses a
+        /// DELETE (which lowers the count while leaving the maximum untouched).
+        /// </summary>
+        /// <param name="ctx">session context, for the role check</param>
+        /// <param name="M_Product_ID">product whose activity is being watched</param>
+        /// <returns>row count and latest change stamp across the activity sources</returns>
+        public ActivityStampData GetActivityStamp(Ctx ctx, int M_Product_ID)
+        {
+            ActivityStampData stamp = new ActivityStampData();
+            if (M_Product_ID <= 0) return stamp;
+            // Role check first. This is a separate endpoint from the overview, so it
+            // cannot inherit that one's access decision - without this it would report
+            // how much activity a product has to a caller not allowed to see the
+            // product at all. One indexed lookup.
+            if (ctx != null && !CanReadProduct(ctx, M_Product_ID)) return stamp;
+            if (_productTableId <= 0) _productTableId = GetTableId("M_Product");
+            if (_productTableId <= 0) return stamp;
+
+            // One statement per source, UNION ALL'd into a single round trip.
+            // NOTE: each part binds its OWN parameter name. Oracle binds
+            // positionally, so a name reused across the union would be bound once
+            // per occurrence and the parameter array would no longer line up.
+            List<string> parts = new List<string>();
+            List<SqlParameter> ps = new List<SqlParameter>();
+            string tid = _productTableId.ToString();
+
+            if (TableExists("MailAttachment1"))
+            {
+                parts.Add(@"SELECT COUNT(1) AS C, MAX(ma.Updated) AS U FROM MailAttachment1 ma
+                            WHERE ma.AD_Table_ID=" + tid + " AND ma.Record_ID=@pidMail");
+                ps.Add(new SqlParameter("@pidMail", M_Product_ID));
+            }
+            if (TableExists("AD_Note"))
+            {
+                parts.Add(@"SELECT COUNT(1) AS C, MAX(n.Updated) AS U FROM AD_Note n
+                            WHERE n.AD_Table_ID=" + tid + " AND n.Record_ID=@pidNote");
+                ps.Add(new SqlParameter("@pidNote", M_Product_ID));
+            }
+            if (TableExists("CM_ChatEntry"))
+            {
+                // Watched at ENTRY level, not chat level: a product gets ONE CM_Chat
+                // and every note after the first is another CM_ChatEntry under it, so
+                // watching CM_Chat would see the first note and never another.
+                parts.Add(@"SELECT COUNT(1) AS C, MAX(ce.Updated) AS U
+                            FROM CM_ChatEntry ce
+                            INNER JOIN CM_Chat ch ON (ch.CM_Chat_ID=ce.CM_Chat_ID)
+                            WHERE ch.AD_Table_ID=" + tid + " AND ch.Record_ID=@pidChat");
+                ps.Add(new SqlParameter("@pidChat", M_Product_ID));
+            }
+            if (TableExists("AppointmentsInfo"))
+            {
+                parts.Add(@"SELECT COUNT(1) AS C, MAX(ai.Updated) AS U FROM AppointmentsInfo ai
+                            WHERE ai.AD_Table_ID=" + tid + " AND ai.Record_ID=@pidAppt");
+                ps.Add(new SqlParameter("@pidAppt", M_Product_ID));
+            }
+            if (TableExists("VA048_CallDetails"))
+            {
+                parts.Add(@"SELECT COUNT(1) AS C, MAX(cd.Updated) AS U FROM VA048_CallDetails cd
+                            WHERE cd.AD_Table_ID=" + tid + " AND cd.Record_ID=@pidCall");
+                ps.Add(new SqlParameter("@pidCall", M_Product_ID));
+            }
+
+            if (parts.Count == 0) return stamp;
+
+            string sql = "SELECT SUM(x.C) AS TotalCount, MAX(x.U) AS LastChange FROM ("
+                       + string.Join(" UNION ALL ", parts.ToArray()) + ") x";
+
+            DataSet ds = Query(sql, ps.ToArray(), "GetActivityStamp");
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return stamp;
+
+            DataRow r = ds.Tables[0].Rows[0];
+            stamp.Count = Util.GetValueOfInt(r["TotalCount"]);
+            DateTime? last = Stamp(r["LastChange"]);
+            // Compared as a STRING on the client, never as a date: the value only has
+            // to differ from the previous reading, and a round-trip through the JSON
+            // date shapes is exactly where a provider's DateTimeKind would change it.
+            stamp.LastChange = last.HasValue
+                ? last.Value.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture)
+                : "";
+            return stamp;
+        }
+
+        /// <summary>
+        /// Whether the caller's role may read this product. Used by the polling
+        /// endpoint, which has no other access decision of its own.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="M_Product_ID">product to test</param>
+        /// <returns>true when the role can see the row</returns>
+        private bool CanReadProduct(Ctx ctx, int M_Product_ID)
+        {
+            try
+            {
+                string sql = "SELECT COUNT(1) FROM M_Product p WHERE p.M_Product_ID=@pid";
+                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                return Util.GetValueOfInt(DB.ExecuteScalar(sql,
+                    new SqlParameter[] { new SqlParameter("@pid", M_Product_ID) }, null)) > 0;
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("VAS_190 CanReadProduct: " + ex.Message);
+                return false;
+            }
         }
 
         // ----------------------------------------------------------------- //
@@ -1700,6 +1881,12 @@ namespace VASLogic.Models
             if (!TableExists("M_BOM")) return rows;
 
             LoadOwnBoms(ctx, M_Product_ID, rows);
+            // The attribute sets its own BOMs are specified for. A where-used row
+            // IS a detail line and reads its own; an own BOM is a HEADER, and its
+            // detail lines' attribute sets were not read at all — so a BOM built
+            // for a particular attribute set showed none, which is what a reader
+            // checking they are looking at the right BOM goes to the row for.
+            LoadOwnBomAttributes(rows);
             LoadWhereUsedBoms(ctx, M_Product_ID, rows);
 
             // Newest first, on the record's own creation stamp, with its id as
@@ -1751,6 +1938,118 @@ namespace VASLogic.Models
                     Created        = Stamp(r["Created"]),
                     IsVerified     = Util.GetValueOfString(r["IsVerified"]) == "Y"
                 });
+            }
+        }
+
+        /// <summary>
+        /// Fills each OWN bom row with the attribute set(s) its detail lines are
+        /// specified for.
+        ///
+        /// The attribute set lives on the BOM DETAIL (M_BOMProduct), never on the
+        /// header, so a header row has to gather it from its lines. Distinct, and
+        /// in the order the lines are read: a BOM built for one attribute set
+        /// names it once however many components carry it, and one whose lines
+        /// differ names each.
+        ///
+        /// Silent where the detail table does not carry an instance column, where
+        /// no line names one, or where an instance resolves to no readable text —
+        /// the row then simply has no attribute set to state, exactly as before.
+        /// </summary>
+        /// <param name="rows">BOM rows; only the "own" ones are touched.</param>
+        private void LoadOwnBomAttributes(List<BomRowData> rows)
+        {
+            if (!ColumnExists("M_BOMProduct", "M_AttributeSetInstance_ID")) return;
+
+            // The own BOMs still to be described, by their id, so a detail row can
+            // be handed straight to the header it belongs to.
+            Dictionary<int, BomRowData> byBom = new Dictionary<int, BomRowData>();
+            List<int> bomIds = new List<int>();
+            for (int i = 0; i < rows.Count; i++)
+            {
+                if (rows[i].Kind != "own" || rows[i].M_BOM_ID <= 0) continue;
+                if (byBom.ContainsKey(rows[i].M_BOM_ID)) continue;
+                byBom[rows[i].M_BOM_ID] = rows[i];
+                bomIds.Add(rows[i].M_BOM_ID);
+            }
+            if (bomIds.Count == 0) return;
+
+            // Every id inlined is one this model read out of M_BOM itself, so
+            // nothing typed by a user reaches the statement — and the query then
+            // carries no bind at all, which positional binding is happiest with.
+            // No MRole: these lines are dependents of BOMs already read under the
+            // access filter.
+            string sql = @"SELECT bp.M_BOM_ID,
+                                  bp.M_AttributeSetInstance_ID AS AsiId,
+                                  asi.Description AS AsiDescription,
+                                  asi.Lot,
+                                  asi.SerNo,
+                                  asi.GuaranteeDate
+                           FROM M_BOMProduct bp
+                           LEFT OUTER JOIN M_AttributeSetInstance asi
+                                  ON (asi.M_AttributeSetInstance_ID=bp.M_AttributeSetInstance_ID)
+                           WHERE bp.M_BOM_ID IN (" + JoinIds(bomIds) + @")
+                             AND bp.IsActive='Y'
+                             AND COALESCE(bp.M_AttributeSetInstance_ID, 0) > 0
+                           ORDER BY bp.M_BOM_ID, bp.M_BOMProduct_ID";
+
+            DataSet ds = Query(sql, null, "LoadOwnBomAttributes");
+            if (ds == null || ds.Tables.Count == 0) return;
+
+            // The texts each BOM gathered, and the instances that named nothing —
+            // an instance holding only attribute VALUES has no description, no lot
+            // and no serial, and is resolved from the values in one further
+            // statement rather than one per line.
+            Dictionary<int, List<string>> textsByBom = new Dictionary<int, List<string>>();
+            Dictionary<int, List<int>> bomsByAsi = new Dictionary<int, List<int>>();
+            List<int> unnamedAsiIds = new List<int>();
+
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                int bomId = Util.GetValueOfInt(r["M_BOM_ID"]);
+                if (!byBom.ContainsKey(bomId)) continue;
+                if (!textsByBom.ContainsKey(bomId)) textsByBom[bomId] = new List<string>();
+
+                string text = BuildAsiText(
+                    Util.GetValueOfString(r["AsiDescription"]),
+                    Util.GetValueOfString(r["Lot"]),
+                    Util.GetValueOfString(r["SerNo"]),
+                    Stamp(r["GuaranteeDate"]));
+
+                if (text.Length > 0)
+                {
+                    if (!textsByBom[bomId].Contains(text)) textsByBom[bomId].Add(text);
+                    continue;
+                }
+
+                int asiId = Util.GetValueOfInt(r["AsiId"]);
+                if (asiId <= 0) continue;
+                if (!bomsByAsi.ContainsKey(asiId))
+                {
+                    bomsByAsi[asiId] = new List<int>();
+                    unnamedAsiIds.Add(asiId);
+                }
+                if (!bomsByAsi[asiId].Contains(bomId)) bomsByAsi[asiId].Add(bomId);
+            }
+
+            Dictionary<int, string> asiTexts = FillAsiTexts(unnamedAsiIds);
+            foreach (KeyValuePair<int, string> pair in asiTexts)
+            {
+                if (!bomsByAsi.ContainsKey(pair.Key) ||
+                    string.IsNullOrEmpty(pair.Value)) continue;
+
+                foreach (int bomId in bomsByAsi[pair.Key])
+                {
+                    if (!textsByBom.ContainsKey(bomId))
+                        textsByBom[bomId] = new List<string>();
+                    if (!textsByBom[bomId].Contains(pair.Value))
+                        textsByBom[bomId].Add(pair.Value);
+                }
+            }
+
+            foreach (KeyValuePair<int, List<string>> pair in textsByBom)
+            {
+                if (pair.Value.Count == 0) continue;
+                byBom[pair.Key].Attributes = string.Join(" · ", pair.Value.ToArray());
             }
         }
 
@@ -2241,6 +2540,26 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// The screen a confirmation is opened on.
+        ///
+        /// Named rather than left to the dictionary's zoom target for the table,
+        /// for the reason the transaction rows give: the target these two resolve
+        /// to is not one the reader's role may open, so clicking the check row
+        /// raised an access error instead of showing the confirmation the check
+        /// was recorded on. An unknown table still returns empty and the click
+        /// falls back to the zoom target exactly as before.
+        /// </summary>
+        /// <param name="docTable">M_InOutConfirm or M_MovementConfirm.</param>
+        private static string ConfirmationWindowName(string docTable)
+        {
+            // Ship / GRN confirmation — the one screen serves both directions.
+            if (docTable == "M_InOutConfirm")    return "VAS_ShipReceiptConfirm";
+            // The internal transfer's own confirmation.
+            if (docTable == "M_MovementConfirm") return "VAS_MoveConfirmation";
+            return "";
+        }
+
+        /// <summary>
         /// Turns the rows of a check query into ONE check: the newest confirmation
         /// line, with every parameter read on it. The rows arrive newest first, so
         /// the first row names the check and the rows sharing its confirmation
@@ -2256,6 +2575,7 @@ namespace VASLogic.Models
             QualityCheckData check = new QualityCheckData();
             check.Source         = source;
             check.DocTableName   = docTable;
+            check.DocWindowName  = ConfirmationWindowName(docTable);
             check.DocRecordId    = Util.GetValueOfInt(first["DocRecordId"]);
             check.DocumentNo     = Util.GetValueOfString(first["DocumentNo"]);
             check.ConfirmationNo = Util.GetValueOfString(first["ConfirmationNo"]);
@@ -2386,6 +2706,25 @@ namespace VASLogic.Models
             // order looks like — used to return here with nothing and show no
             // Supplier section at all.
 
+            // The UNIT the order was written in, and the price stated in it.
+            //
+            // PriceActual is always in the product's BASE unit whatever unit the
+            // line was bought in, so a line ordered in cartons reported a
+            // per-piece figure under the carton's name — or, before this, under
+            // the base unit's name, which is not what the purchase order says.
+            // PriceEntered is the price ON the line's own unit and the two travel
+            // together; where the line names no unit, or carries no entered price,
+            // the base-unit figure stands in and the panel names the base unit.
+            // See the same rule on the order line elsewhere in this application.
+            bool hasLineUom  = ColumnExists("C_OrderLine", "C_UOM_ID");
+            bool hasEntered  = ColumnExists("C_OrderLine", "PriceEntered");
+            string uomNameExpr = hasLineUom
+                ? "uom.Name" : "CAST(NULL AS VARCHAR(60))";
+            string uomJoin = hasLineUom
+                ? " LEFT OUTER JOIN C_UOM uom ON (uom.C_UOM_ID=ol.C_UOM_ID)" : "";
+            string enteredExpr = hasEntered
+                ? "ol.PriceEntered" : "CAST(NULL AS NUMERIC)";
+
             // The latest purchase order per VENDOR, ranked outside the
             // access-filtered statement. Purchase orders proper only — a blanket
             // order or a vendor return is not what the product was bought on.
@@ -2395,6 +2734,8 @@ namespace VASLogic.Models
                                     o.DocumentNo,
                                     o.DateOrdered,
                                     ol.PriceActual,
+                                    " + enteredExpr + @" AS PriceEntered,
+                                    " + uomNameExpr + @" AS OrderUomName,
                                     cur.CurSymbol,
                                     cur.ISO_Code,
                                     COALESCE(cur.StdPrecision, 2) AS CurPrecision
@@ -2403,6 +2744,7 @@ namespace VASLogic.Models
                                                            AND ol.IsActive='Y')
                              INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=o.C_BPartner_ID)
                              LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=o.C_Currency_ID)"
+                             + uomJoin
                              + OrderDocTypeJoin(false) + @"
                              WHERE ol.M_Product_ID=@M_Product_ID
                                AND o.IsActive='Y'
@@ -2418,6 +2760,8 @@ namespace VASLogic.Models
                                   x.DocumentNo,
                                   x.DateOrdered,
                                   x.PriceActual,
+                                  x.PriceEntered,
+                                  x.OrderUomName,
                                   x.CurSymbol,
                                   x.ISO_Code,
                                   x.CurPrecision
@@ -2427,6 +2771,8 @@ namespace VASLogic.Models
                                         h.DocumentNo,
                                         h.DateOrdered,
                                         h.PriceActual,
+                                        h.PriceEntered,
+                                        h.OrderUomName,
                                         h.CurSymbol,
                                         h.ISO_Code,
                                         h.CurPrecision,
@@ -2473,7 +2819,23 @@ namespace VASLogic.Models
                 row.LastOrderDate  = Stamp(r["DateOrdered"]);
                 row.LastOrderNo    = Util.GetValueOfString(r["DocumentNo"]);
                 row.LastOrderId    = Util.GetValueOfInt(r["C_Order_ID"]);
-                row.LastOrderPrice = NullableDecimal(r["PriceActual"]);
+
+                // The price and the unit it is stated in, kept together. The
+                // ENTERED price belongs to the line's own unit; only where the
+                // line carries neither does the base-unit figure answer, and the
+                // unit is then left empty so the panel names the base unit itself.
+                decimal? entered = NullableDecimal(r["PriceEntered"]);
+                string orderUom  = Util.GetValueOfString(r["OrderUomName"]);
+                if (entered.HasValue && entered.Value != 0 && orderUom.Length > 0)
+                {
+                    row.LastOrderPrice   = entered;
+                    row.LastOrderUomName = orderUom;
+                }
+                else
+                {
+                    row.LastOrderPrice   = NullableDecimal(r["PriceActual"]);
+                    row.LastOrderUomName = "";
+                }
                 // The order's own currency describes the price on it; the
                 // vendor-product row's currency describes only its own field.
                 string sym = Util.GetValueOfString(r["CurSymbol"]);
@@ -2482,6 +2844,18 @@ namespace VASLogic.Models
                 if (!string.IsNullOrEmpty(iso)) row.ISO_Code = iso;
                 row.CurPrecision = Util.GetValueOfInt(r["CurPrecision"]);
             }
+
+            // ONE vendor off the orders alone, never several.
+            //
+            // A vendor with no row on the product's Vendor tab is here to answer
+            // "who did we last buy this from" for a product nobody has maintained
+            // a vendor list for. Every such vendor the product had ever been
+            // bought from was being added, and each of the older ones then read as
+            // an "Alternative" — which claims the product has a supplier list it
+            // does not have, and says the wrong thing about a one-off purchase
+            // years old. Only the most recent one is kept; the rest are history
+            // that belongs to the purchase orders, not to the supplier list.
+            KeepLatestOrdersOnlyVendor(rows);
 
             // The most recently used vendor of them all. Only one row is marked:
             // "last used" is a superlative, not a category.
@@ -2505,6 +2879,48 @@ namespace VASLogic.Models
                 SupplierRowData lastUsed = rows[lastUsedIndex];
                 rows.RemoveAt(lastUsedIndex);
                 rows.Insert(0, lastUsed);
+            }
+        }
+
+        /// <summary>
+        /// Drops every vendor reached through the PURCHASE ORDERS alone except the
+        /// most recently bought from.
+        ///
+        /// A vendor with a row on the product's Vendor tab is part of its supplier
+        /// list and is always kept, however long ago it was last used. One reached
+        /// only through an order is not: it is there to answer who the product was
+        /// last bought from where the tab is empty, and one answer is what that
+        /// question has.
+        ///
+        /// Ties — two orders on the same day, or none of them dated — are settled
+        /// by the order id, which is the same tie-break the ranking query uses, so
+        /// the row that survives does not change between refreshes.
+        /// </summary>
+        private static void KeepLatestOrdersOnlyVendor(List<SupplierRowData> rows)
+        {
+            int keepIndex = -1;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                if (!rows[i].IsFromOrdersOnly) continue;
+                if (keepIndex < 0) { keepIndex = i; continue; }
+
+                DateTime best = rows[keepIndex].LastOrderDate
+                                    .GetValueOrDefault(DateTime.MinValue);
+                DateTime here = rows[i].LastOrderDate
+                                    .GetValueOrDefault(DateTime.MinValue);
+                if (here > best ||
+                    (here == best && rows[i].LastOrderId > rows[keepIndex].LastOrderId))
+                {
+                    keepIndex = i;
+                }
+            }
+            if (keepIndex < 0) return;
+
+            // Backwards, so removing one does not move the rest out from under the
+            // index still to be tested.
+            for (int i = rows.Count - 1; i >= 0; i--)
+            {
+                if (i != keepIndex && rows[i].IsFromOrdersOnly) rows.RemoveAt(i);
             }
         }
 
@@ -3080,10 +3496,14 @@ namespace VASLogic.Models
             {
                 return invoiceIsSOTrx ? "VAS_ARInvoice" : "VAS_APInvoice";
             }
-            // An inventory revaluation names no window: M_InventoryRevaluation is
-            // one table under one screen, so the dictionary's own zoom target for
-            // it is right and a name here could only be a second thing to keep in
-            // step with it.
+            // An inventory revaluation. The dictionary's own zoom target for
+            // M_InventoryRevaluation was relied on here — one table, one screen,
+            // so a name looked like a second thing to keep in step — but the zoom
+            // it resolves to is not one the reader's role may open, and the click
+            // failed with an access error instead of opening anything. The window
+            // is named, like every other document above, and the name falls back
+            // to that zoom target when the dictionary does not carry it.
+            if (docTable == "M_InventoryRevaluation") return "VAS_InventoryRevaluations";
             return "";
         }
 
@@ -3203,7 +3623,8 @@ namespace VASLogic.Models
         /// FRPT is asked first and the classic table answers where FRPT is absent
         /// or silent; neither is assumed, and both are dictionary-guarded.
         /// </summary>
-        private AccountingData LoadAccounting(Ctx ctx, int M_Product_ID)
+        private AccountingData LoadAccounting(Ctx ctx, int M_Product_ID,
+                                              int M_Product_Category_ID)
         {
             List<string> wanted = new List<string>(PRODUCT_ACCT_COLUMNS);
 
@@ -3219,14 +3640,15 @@ namespace VASLogic.Models
                     LoadFrptAccounts(ctx, M_Product_ID, schemas[i].C_AcctSchema_ID);
                 if (frptRows.Count == 0) continue;   // this schema has nothing; try the next
 
-                return new AccountingData
+                AccountingData frpt = new AccountingData
                 {
                     SchemaName    = schemas[i].Name,
-                    CostingMethod = schemas[i].CostingMethod,
                     CurrencyISO   = schemas[i].CurrencyISO,
                     CurSymbol     = schemas[i].CurSymbol,
                     Rows          = frptRows
                 };
+                FillCostingMethod(ctx, frpt, schemas[i], M_Product_Category_ID);
+                return frpt;
             }
 
             // ----- The classic twelve-column scheme -----
@@ -3251,10 +3673,10 @@ namespace VASLogic.Models
 
                 AccountingData acct = new AccountingData();
                 acct.SchemaName    = schema.Name;
-                acct.CostingMethod = schema.CostingMethod;
                 acct.CurrencyISO   = schema.CurrencyISO;
                 acct.CurSymbol     = schema.CurSymbol;
                 acct.Rows          = new List<AccountRowData>();
+                FillCostingMethod(ctx, acct, schema, M_Product_Category_ID);
 
                 // Reported in the order the list above declares them, not in
                 // whatever order the dictionary happens to return.
@@ -3265,6 +3687,10 @@ namespace VASLogic.Models
 
                     AccountRowData row = new AccountRowData();
                     row.AccountRole = column;
+                    // The classic scheme's account is a COLUMN, not a record, so
+                    // there is no accounting-default behind it to quote. Empty
+                    // rather than null, so the panel can enumerate without a guard.
+                    row.Details = new List<AccountDetailData>();
                     if (combos.ContainsKey(id))
                     {
                         row.Combination = combos[id].Combination;
@@ -3281,16 +3707,102 @@ namespace VASLogic.Models
             if (schemas.Count > 0)
             {
                 AcctSchemaInfo primary = schemas[0];
-                return new AccountingData
+                AccountingData empty = new AccountingData
                 {
                     SchemaName    = primary.Name,
-                    CostingMethod = primary.CostingMethod,
                     CurrencyISO   = primary.CurrencyISO,
                     CurSymbol     = primary.CurSymbol,
                     Rows          = new List<AccountRowData>()
                 };
+                FillCostingMethod(ctx, empty, primary, M_Product_Category_ID);
+                return empty;
             }
             return null;   // the client has no accounting schema at all
+        }
+
+        /// <summary>
+        /// States the costing method the product is actually valued under, and
+        /// names it.
+        ///
+        /// Two things were wrong with reporting C_AcctSchema.CostingMethod as it
+        /// stood:
+        ///   - It is only the tenant's DEFAULT. The method is overridable per
+        ///     product category, and a category that sets its own was reported
+        ///     under the schema's — so the panel named a costing method the
+        ///     product is not valued by.
+        ///   - It is a STORED CODE. "S" reached the screen verbatim, which is the
+        ///     dictionary's shorthand for Standard Costing and not a word anybody
+        ///     outside the accounting tables reads. Every other coded field on
+        ///     this panel is resolved through AD_Ref_List and this one is now too,
+        ///     in the reader's own language.
+        ///
+        /// The code still travels alongside the name: it is what the accounting
+        /// tables hold, and a schema whose reference cannot be resolved has the
+        /// code to fall back on rather than an empty caption.
+        /// </summary>
+        private void FillCostingMethod(Ctx ctx, AccountingData acct,
+                                       AcctSchemaInfo schema, int M_Product_Category_ID)
+        {
+            string code = CategoryCostingMethod(ctx, M_Product_Category_ID,
+                                                schema.C_AcctSchema_ID);
+            if (string.IsNullOrEmpty(code)) code = schema.CostingMethod;
+
+            acct.CostingMethod = code;
+            acct.CostingMethodName = "";
+            if (string.IsNullOrEmpty(code)) return;
+
+            Dictionary<string, string> labels =
+                LoadRefListLabels(ctx, "C_AcctSchema", "CostingMethod");
+            if (labels.ContainsKey(code)) acct.CostingMethodName = labels[code];
+        }
+
+        /// <summary>
+        /// The costing method the product CATEGORY sets for this accounting
+        /// schema, or an empty string when it sets none and the schema's own
+        /// method stands.
+        ///
+        /// Both accounting-defaults schemes are asked, in the order
+        /// <see cref="LoadAccounting"/> asks them, so a tenant on either sees its
+        /// own override; a tenant on neither, or a category that leaves the
+        /// column at its default, falls through to the schema. Every table and
+        /// column is dictionary-guarded — the override is optional and an older
+        /// dictionary simply has nothing to say here.
+        ///
+        /// No MRole, for the reason the account row gives: these tables are keyed
+        /// on (category, schema) and have no key column of their own for the
+        /// rewriter to reach for, and the client is scoped explicitly.
+        /// </summary>
+        private string CategoryCostingMethod(Ctx ctx, int M_Product_Category_ID,
+                                             int C_AcctSchema_ID)
+        {
+            if (M_Product_Category_ID <= 0 || C_AcctSchema_ID <= 0) return "";
+
+            string[] tables = new string[] { "FRPT_Product_Category_Acct",
+                                             "M_Product_Category_Acct" };
+            for (int i = 0; i < tables.Length; i++)
+            {
+                if (!TableExists(tables[i]) ||
+                    !ColumnExists(tables[i], "CostingMethod")) continue;
+
+                // The category and the schema are inlined as integers this model
+                // read itself, leaving the statement a single bind name — which
+                // positional binding requires.
+                string sql = "SELECT ca.CostingMethod FROM " + tables[i] + @" ca
+                              WHERE ca.M_Product_Category_ID=@M_Product_Category_ID
+                                AND ca.C_AcctSchema_ID=" + C_AcctSchema_ID + @"
+                                AND ca.AD_Client_ID=" + ctx.GetAD_Client_ID() + @"
+                                AND ca.IsActive='Y'";
+                DataSet ds = Query(sql,
+                    new SqlParameter[] { new SqlParameter("@M_Product_Category_ID",
+                                                          M_Product_Category_ID) },
+                    "CategoryCostingMethod(" + tables[i] + ")");
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    continue;
+
+                string code = Util.GetValueOfString(ds.Tables[0].Rows[0]["CostingMethod"]).Trim();
+                if (code.Length > 0) return code;
+            }
+            return "";
         }
 
         /// <summary>
@@ -3336,6 +3848,19 @@ namespace VASLogic.Models
                 ? " ORDER BY COALESCE(pa.SeqNo, 0), ad." + labelColumn
                 : " ORDER BY ad." + labelColumn;
 
+            // The accounting-default record's own fields — Related To, Variance
+            // Type, Recognize Type and Foreign Currency Revaluation — which is
+            // what the accounting defaults screen states against each account and
+            // what tells two accounts of the same name apart. Discovered from the
+            // dictionary rather than named here; see AcctDefaultFields.
+            List<AcctDefaultField> detailFields = AcctDefaultFields(ctx);
+            StringBuilder detailSelect = new StringBuilder();
+            for (int i = 0; i < detailFields.Count; i++)
+            {
+                detailSelect.Append(", ad.").Append(detailFields[i].ColumnName)
+                            .Append(" AS Detail").Append(i);
+            }
+
             // The schema and the client are inlined as integers so the statement
             // carries a single bind name, which positional binding requires. No
             // MRole: this row is a dependent of a product already read under the
@@ -3343,7 +3868,8 @@ namespace VASLogic.Models
             // FRPT_Product_Acct_ID the rewriter could reach for — see LoadAcctRow.
             string sql = @"SELECT ad." + labelColumn + @" AS AccountRole,
                                   vc.Combination,
-                                  vc.Description
+                                  vc.Description"
+                                  + detailSelect + @"
                            FROM FRPT_Product_Acct pa
                            INNER JOIN FRPT_AcctDefault ad
                                    ON (ad.FRPT_AcctDefault_ID=pa.FRPT_AcctDefault_ID)
@@ -3365,10 +3891,165 @@ namespace VASLogic.Models
                 {
                     AccountRole = Util.GetValueOfString(r["AccountRole"]),
                     Combination = Util.GetValueOfString(r["Combination"]),
-                    Description = Util.GetValueOfString(r["Description"])
+                    Description = Util.GetValueOfString(r["Description"]),
+                    Details     = ReadAcctDefaultDetails(ctx, r, detailFields)
                 });
             }
             return rows;
+        }
+
+        /// <summary>
+        /// One field of FRPT_AcctDefault the panel reports under an account.
+        /// </summary>
+        private class AcctDefaultField
+        {
+            public string ColumnName;
+            /// <summary>The dictionary's own label for the field — what the
+            /// accounting defaults screen prints beside it.</summary>
+            public string Label;
+            /// <summary>AD_Column.AD_Reference_Value_ID, or 0 where the field is
+            /// not a coded list and its stored value is already readable.</summary>
+            public int    ReferenceValueId;
+        }
+
+        /// <summary>The accounting-default fields, resolved once per request.</summary>
+        private List<AcctDefaultField> _acctDefaultFields;
+
+        /// <summary>
+        /// The FRPT_AcctDefault fields the Accounting section states under each
+        /// account: Related To, Variance Type, Recognize Type and Foreign Currency
+        /// Revaluation, in that order.
+        ///
+        /// DISCOVERED from the dictionary rather than named as constants. Only
+        /// FRPT_RelatedTo is a column name this codebase has confirmed against a
+        /// running tenant; the other three are named differently between module
+        /// revisions, and a guessed column name fails SILENTLY here — the field
+        /// would simply never appear and nothing would say why. Matching the
+        /// dictionary on what the column is ABOUT finds it whatever the revision
+        /// calls it, and a revision that has none of them contributes nothing
+        /// rather than breaking the statement.
+        ///
+        /// The LABEL is the dictionary's own, translated, so the panel prints the
+        /// same words as the accounting defaults screen it is quoting.
+        /// </summary>
+        private List<AcctDefaultField> AcctDefaultFields(Ctx ctx)
+        {
+            if (_acctDefaultFields != null) return _acctDefaultFields;
+
+            List<AcctDefaultField> fields = new List<AcctDefaultField>();
+            _acctDefaultFields = fields;
+            if (!TableExists("FRPT_AcctDefault")) return fields;
+
+            // What each field is about, in the order the section states them. The
+            // patterns are deliberately loose: FRPT_RecognizeType, RecognizeType
+            // and FRPT_RecognitionType all answer "RECOGNIZ".
+            string[] patterns = new string[]
+            {
+                "%RELATEDTO%", "%VARIANCETYPE%", "%RECOGNIZ%", "%REVALUAT%"
+            };
+
+            bool hasTrl = TableExists("AD_Column_Trl");
+            string labelExpr = hasTrl
+                ? "COALESCE(ct.Name, c.Name, c.ColumnName)" : "COALESCE(c.Name, c.ColumnName)";
+            string trlJoin = hasTrl
+                ? @" LEFT OUTER JOIN AD_Column_Trl ct ON (ct.AD_Column_ID=c.AD_Column_ID
+                                                          AND ct.AD_Language=@AD_Language
+                                                          AND ct.IsActive='Y')"
+                : "";
+
+            try
+            {
+                // The pattern is bound ONCE and the table name is a literal of this
+                // class's own, so the statement carries at most two binds in the
+                // order they appear — @AD_Language, then @Pattern — which is what
+                // positional binding needs. One statement per pattern rather than
+                // an OR list, so the fields come back in the order the section
+                // states them without sorting on a CASE the databases disagree on.
+                for (int p = 0; p < patterns.Length; p++)
+                {
+                    string sql = @"SELECT c.ColumnName,
+                                          " + labelExpr + @" AS FieldLabel,
+                                          COALESCE(c.AD_Reference_Value_ID, 0) AS RefValueId
+                                   FROM AD_Column c
+                                   INNER JOIN AD_Table t ON (t.AD_Table_ID=c.AD_Table_ID)"
+                                   + trlJoin + @"
+                                   WHERE UPPER(t.TableName)='FRPT_ACCTDEFAULT'
+                                     AND c.IsActive='Y'
+                                     AND UPPER(c.ColumnName) LIKE @Pattern
+                                   ORDER BY c.ColumnName";
+
+                    List<SqlParameter> ps = new List<SqlParameter>();
+                    if (hasTrl)
+                        ps.Add(new SqlParameter("@AD_Language", ctx.GetAD_Language()));
+                    ps.Add(new SqlParameter("@Pattern", patterns[p]));
+
+                    DataSet ds = Query(sql, ps.ToArray(), "AcctDefaultFields(" + patterns[p] + ")");
+                    if (ds == null || ds.Tables.Count == 0) continue;
+
+                    foreach (DataRow r in ds.Tables[0].Rows)
+                    {
+                        string column = Util.GetValueOfString(r["ColumnName"]);
+                        if (column.Length == 0) continue;
+
+                        // A pattern can match more than one column on a revision
+                        // that carries both an old and a new spelling; each is
+                        // reported once and only once.
+                        bool seen = false;
+                        for (int i = 0; i < fields.Count; i++)
+                        {
+                            if (string.Equals(fields[i].ColumnName, column,
+                                              StringComparison.OrdinalIgnoreCase))
+                            { seen = true; break; }
+                        }
+                        if (seen) continue;
+
+                        fields.Add(new AcctDefaultField
+                        {
+                            ColumnName       = column,
+                            Label            = Util.GetValueOfString(r["FieldLabel"]),
+                            ReferenceValueId = Util.GetValueOfInt(r["RefValueId"])
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: without them each account states its name and its
+                // combination, exactly as before.
+                _log.Severe("VAS_190 AcctDefaultFields: " + ex.Message);
+                fields.Clear();
+            }
+            return fields;
+        }
+
+        /// <summary>
+        /// The accounting-default fields of ONE account row, labelled and resolved:
+        /// a coded field through its own reference list, everything else as stored.
+        /// A field the record leaves empty is left out rather than printed blank.
+        /// </summary>
+        private List<AccountDetailData> ReadAcctDefaultDetails(Ctx ctx, DataRow r,
+                                                               List<AcctDefaultField> fields)
+        {
+            List<AccountDetailData> details = new List<AccountDetailData>();
+            for (int i = 0; i < fields.Count; i++)
+            {
+                string value = Util.GetValueOfString(r["Detail" + i]).Trim();
+                if (value.Length == 0) continue;
+
+                if (fields[i].ReferenceValueId > 0)
+                {
+                    Dictionary<string, string> labels =
+                        LoadRefListLabelsById(ctx, fields[i].ReferenceValueId);
+                    if (labels.ContainsKey(value)) value = labels[value];
+                }
+
+                details.Add(new AccountDetailData
+                {
+                    Label = fields[i].Label,
+                    Value = value
+                });
+            }
+            return details;
         }
 
         /// <summary>
@@ -4163,35 +4844,41 @@ namespace VASLogic.Models
                 string mailFrom = Util.GetValueOfString(r["MailAddressFrom"]);
                 ActivityData a = new ActivityData();
                 a.Id        = Util.GetValueOfInt(r["MailAttachment1_ID"]);
-                // EVERY MailAttachment1 row is a mail. AttachmentType says which
-                // DIRECTION it went, not which kind of correspondence it is: the
-                // inbox reader (AttachMailToBP) files a received message under 'I'
-                // and stamps it with MailAddressFrom, DateMailReceived and MailUID,
-                // and files a sent one under 'M'.
+                // AttachmentType 'I' is a LETTER — an attached letter document
+                // filed against the product — and anything else is an e-mail.
                 //
-                // Typing 'I' as a LETTER was therefore wrong twice over. Every mail
-                // the tenant RECEIVED against the product — the reply to something
-                // sent from it, which is the row a reader goes looking for — was
-                // reported as a letter, and no received mail appeared in the feed
-                // as a mail at all.
-                a.Type      = "mail";
-                // The ATTACHMENT TYPE alone decides the direction: 'I' is the
-                // inbox, anything else is a mail this tenant sent.
-                //
-                // The record's own fields cannot stand in for it. A SENT mail
-                // carries MailAddressFrom too — it is the address it went out
-                // from — so treating a sender as evidence of an inbound message
-                // reported every sent mail as received. DateMailReceived is only
-                // consulted where the row is untyped altogether, which is the one
-                // case where it says something the type does not.
+                // This panel briefly read the column as a DIRECTION instead, on
+                // the reasoning that the inbox reader (AttachMailToBP) files a
+                // received message under 'I'; every row was typed "mail" and the
+                // 'I' ones marked received. It is the reading the rest of the
+                // application does not make: VAS_105, VAS_123 and the shared
+                // VAS_ActivitySourcesModel all split MailAttachment1 into letters
+                // ('I') and mails (not 'I'), and this panel showed a letter under
+                // an envelope captioned "Mail — Received". Reverted so the feed
+                // agrees with every other panel that reads the same table.
                 string attachmentType = Util.GetValueOfString(r["AttachmentType"]).Trim();
-                a.IsReceived = attachmentType.Length > 0
-                    ? attachmentType == "I"
-                    : received.HasValue;
+                bool isLetter = attachmentType == "I";
+                a.Type      = isLetter ? "letter" : "mail";
+                // A letter carries no direction: it is a document attached to the
+                // product, not a message that went one way or the other, and the
+                // panel states only its heading. Direction is a MAIL's property,
+                // and there DateMailReceived stands in only for a row the tenant
+                // left untyped — a sent mail carries MailAddressFrom too (it is
+                // the address it went out from), so a sender is no evidence of an
+                // inbound message.
+                a.IsReceived = !isLetter
+                             && attachmentType.Length == 0
+                             && received.HasValue;
                 a.Title     = PlainText(Util.GetValueOfString(r["Title"]));
-                // An HTML mail stores its markup here and the panel renders the
-                // body as text, so it is flattened before it leaves the server.
-                a.Body      = MailBodyToText(Util.GetValueOfString(r["TextMsg"]));
+                // BOTH forms of the body travel, and they answer different
+                // questions. The flattened text is what the row's own sub-line
+                // and a reply quote need, and it is the fallback for a message
+                // that has no markup or whose markup sanitises away to nothing.
+                // The safe markup is what the detail sheet renders, so a mail
+                // reads as it was written rather than as one grey paragraph.
+                string storedBody = Util.GetValueOfString(r["TextMsg"]);
+                a.Body      = MailBodyToText(storedBody);
+                a.BodyHtml  = MailBodyToSafeHtml(storedBody);
                 a.MailTo    = Util.GetValueOfString(r["MailAddress"]);
                 a.MailFrom  = mailFrom;
                 a.MailCc    = Util.GetValueOfString(r["MailAddressCc"]);
@@ -4718,6 +5405,276 @@ namespace VASLogic.Models
             }
         }
 
+        // ----------------------------------------------------------------- //
+        //  Mail body -> SAFE markup                                          //
+        // ----------------------------------------------------------------- //
+
+        /// <summary>How much source markup is worth carrying for one mail. A body
+        /// past this is a newsletter, not a message, and the whole feed's worth of
+        /// them travels in every payload; the flattened text still carries the
+        /// message in full.</summary>
+        private const int MAIL_HTML_MAX = 32000;
+
+        /// <summary>Elements dropped WITH their content: they carry no message,
+        /// and what they do carry executes, loads or submits.</summary>
+        private const string DROP_WITH_CONTENT =
+            "script|style|iframe|frame|frameset|noframes|object|embed|applet|form|"
+            + "input|select|option|textarea|button|link|meta|base|title|noscript|svg|math";
+
+        /// <summary>Elements kept. Anything else has its TAG removed and its text
+        /// preserved, so an unknown wrapper costs the reader nothing.</summary>
+        private const string KEEP_TAGS =
+            "|a|b|blockquote|br|caption|center|code|col|colgroup|dd|div|dl|dt|em|font|"
+            + "h1|h2|h3|h4|h5|h6|hr|i|img|li|ol|p|pre|s|small|span|strike|strong|sub|"
+            + "sup|table|tbody|td|tfoot|th|thead|tr|u|ul|";
+
+        /// <summary>Attributes kept on any element that is kept. href, src and
+        /// target are handled separately — each is only allowed on the one element
+        /// it belongs to, and href / src have their value checked.</summary>
+        private const string KEEP_ATTRS =
+            "|align|alt|bgcolor|border|cellpadding|cellspacing|color|colspan|dir|face|"
+            + "height|rowspan|size|span|start|style|title|valign|width|";
+
+        /// <summary>
+        /// Turns a stored mail body into markup the panel may render.
+        ///
+        /// WHY THIS EXISTS. The detail sheet used to show a flattened body: every
+        /// tag stripped, the whole message as one run of text. That is safe and it
+        /// is unreadable — a quoted reply, a table of figures or a signature block
+        /// all arrive as the same grey paragraph. The reader asked for the message
+        /// as it was written, which means handing markup to the browser.
+        ///
+        /// WHY IT IS SANITISED. A mail body is written by whoever sent the mail,
+        /// and anyone can send mail to a tenant. Rendering it as it was stored
+        /// would let a sender put script into a panel that runs inside the
+        /// application's own session — this is the one string in the payload the
+        /// browser parses instead of escaping, so it is the one string that has to
+        /// be made safe first. VAS_105's own e-mail modal assigns the stored body
+        /// straight to innerHTML; that is the part of it not copied here.
+        ///
+        /// WHAT SURVIVES. Formatting and nothing else: a whitelist of elements, a
+        /// whitelist of attributes on them, links and images whose URL uses a
+        /// scheme that only fetches. Everything outside those lists is removed —
+        /// an unknown ELEMENT loses its tag but keeps its text, so a message is
+        /// never silently emptied by a wrapper this list has not heard of.
+        ///
+        /// Returns an empty string for a plain-text body (there is nothing to
+        /// format), for one that sanitises down to nothing, and on any failure —
+        /// the caller then shows the flattened text, which is what it always did.
+        /// </summary>
+        private static string MailBodyToSafeHtml(string body)
+        {
+            if (string.IsNullOrEmpty(body)) return "";
+            if (!HTML_BODY.IsMatch(body)) return "";        // plain text: nothing to format
+
+            try
+            {
+                string s = body.Length > MAIL_HTML_MAX ? body.Substring(0, MAIL_HTML_MAX) : body;
+
+                // Comments first, and before anything else looks at the string. A
+                // comment can hide a tag from every pattern below, and on the
+                // legacy engines this shell can still be hosted in a CONDITIONAL
+                // comment is not a comment at all — it is markup that runs.
+                s = Regex.Replace(s, @"<!--.*?-->", " ", RegexOptions.Singleline);
+                s = Regex.Replace(s, @"<!\[CDATA\[.*?\]\]>", " ", RegexOptions.Singleline);
+                s = Regex.Replace(s, @"<!\s*DOCTYPE[^>]*>", " ", RegexOptions.IgnoreCase);
+                s = Regex.Replace(s, @"<\?.*?\?>", " ", RegexOptions.Singleline);
+
+                // The dangerous elements, with whatever they contain.
+                s = Regex.Replace(s,
+                    @"<\s*(" + DROP_WITH_CONTENT + @")\b[^>]*>.*?<\s*/\s*\1\s*>", " ",
+                    RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                // …and again for the ones that never had a closing tag, and for an
+                // opening tag whose partner the truncation above cut off.
+                s = Regex.Replace(s,
+                    @"<\s*/?\s*(" + DROP_WITH_CONTENT + @")\b[^>]*>", " ",
+                    RegexOptions.IgnoreCase);
+
+                // Every remaining tag is rebuilt from scratch. Nothing of the
+                // original tag text survives into the output: the name is matched
+                // against the whitelist and each attribute is re-emitted only if it
+                // passes, so an attribute this code does not understand cannot
+                // reach the browser by being left alone.
+                // The name must follow the '<' IMMEDIATELY, exactly as a browser
+                // requires. Allowing whitespace between them was more aggressive
+                // than the thing this is protecting: in "qty < b and c > d" a
+                // browser reads text, while this read a <b> element and threw the
+                // words inside it away. Anything not matched here is left for the
+                // escape below, so being strict loses no protection — only the
+                // over-reach that was eating a sentence.
+                s = Regex.Replace(s, @"<(/?)([a-zA-Z][a-zA-Z0-9]*)((?:[^>""']|""[^""]*""|'[^']*')*)>",
+                    delegate (Match m)
+                    {
+                        string close = m.Groups[1].Value;
+                        string name  = m.Groups[2].Value.ToLowerInvariant();
+                        if (KEEP_TAGS.IndexOf("|" + name + "|", StringComparison.Ordinal) < 0)
+                            return "";                       // unknown element: tag goes, text stays
+                        if (close.Length > 0) return "</" + name + ">";
+                        return "<" + name + SafeAttributes(name, m.Groups[3].Value) + ">";
+                    },
+                    RegexOptions.IgnoreCase);
+
+                // A stray '<' that was never part of a tag would be read as the
+                // start of one by the browser. Nothing below this line is markup
+                // this method wrote, so anything still unmatched is text.
+                s = Regex.Replace(s, @"<(?![/a-zA-Z])", "&lt;");
+
+                return s.Trim();
+            }
+            catch (Exception ex)
+            {
+                // Never render half-sanitised markup. The caller falls back to the
+                // flattened text, which is always present.
+                _log.Severe("VAS_190 MailBodyToSafeHtml: " + ex.Message);
+                return "";
+            }
+        }
+
+        /// <summary>
+        /// The attributes of one kept element, re-emitted. Anything not on the
+        /// whitelist — every `on*` handler included, since none of them is on it —
+        /// is simply not written out.
+        /// </summary>
+        /// <param name="tag">The element's lower-case name.</param>
+        /// <param name="raw">The text between the element name and the '&gt;'.</param>
+        private static string SafeAttributes(string tag, string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return AnchorExtras(tag);
+
+            StringBuilder outp = new StringBuilder();
+            MatchCollection ms = Regex.Matches(raw,
+                @"([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s""'>]+))",
+                RegexOptions.IgnoreCase);
+
+            foreach (Match m in ms)
+            {
+                string name = m.Groups[1].Value.ToLowerInvariant();
+                string value = m.Groups[2].Success ? m.Groups[2].Value
+                             : m.Groups[3].Success ? m.Groups[3].Value
+                             : m.Groups[4].Value;
+                // Decoded before it is judged, because the BROWSER decodes it
+                // before it acts on it: "java&#115;cript:x" is a javascript URL
+                // however it is spelled in the source.
+                string decoded = WebUtility.HtmlDecode(value ?? "");
+
+                if (name == "href")
+                {
+                    if (tag != "a" || !IsFetchOnlyUrl(decoded, false)) continue;
+                }
+                else if (name == "src")
+                {
+                    if (tag != "img" || !IsFetchOnlyUrl(decoded, true)) continue;
+                }
+                else if (name == "style")
+                {
+                    decoded = SafeStyle(decoded);
+                    if (decoded.Length == 0) continue;
+                }
+                else if (name == "target")
+                {
+                    continue;                    // anchors get their own; see below
+                }
+                else if (KEEP_ATTRS.IndexOf("|" + name + "|", StringComparison.Ordinal) < 0)
+                {
+                    continue;
+                }
+
+                outp.Append(' ').Append(name).Append("=\"")
+                    .Append(AttrEncode(decoded)).Append('"');
+            }
+            return outp.ToString() + AnchorExtras(tag);
+        }
+
+        /// <summary>
+        /// What every anchor gets, whatever it asked for: a new tab, and no handle
+        /// back to this one. A link in a mail that opened in place would navigate
+        /// the application away from the window the reader is working in, and
+        /// `noopener` denies the opened page a reference to it.
+        /// </summary>
+        private static string AnchorExtras(string tag)
+        {
+            return tag == "a" ? " target=\"_blank\" rel=\"noopener noreferrer\"" : "";
+        }
+
+        /// <summary>
+        /// Whether a URL only FETCHES — as opposed to running something. Anything
+        /// whose scheme is not on the list is refused, including the schemes that
+        /// execute (javascript:, vbscript:) and the ones that carry a document
+        /// (data:text/html). A relative URL has no scheme and is allowed: it can
+        /// only address this application, and in a mail it simply will not resolve.
+        /// </summary>
+        /// <param name="url">The decoded attribute value.</param>
+        /// <param name="isImage">Images may additionally use an inline data: image,
+        /// which is how a mail carries its own pictures.</param>
+        private static bool IsFetchOnlyUrl(string url, bool isImage)
+        {
+            string u = (url ?? "").Trim();
+            if (u.Length == 0) return false;
+
+            // Whitespace and control characters INSIDE a scheme are ignored by
+            // browsers — "java\tscript:x" runs — so they are removed before the
+            // scheme is read, not after.
+            string probe = Regex.Replace(u, @"[\x00-\x20]", "");
+            int colon = probe.IndexOf(':');
+            int slash = probe.IndexOf('/');
+            int hash  = probe.IndexOf('#');
+            // No scheme at all — a relative URL or a fragment.
+            if (colon < 0) return true;
+            // A colon that appears after the path has begun is part of the path,
+            // not a scheme ("images/a:b.png").
+            if ((slash >= 0 && slash < colon) || (hash >= 0 && hash < colon)) return true;
+
+            string scheme = probe.Substring(0, colon).ToLowerInvariant();
+            if (scheme == "http" || scheme == "https" || scheme == "ftp"
+                || scheme == "mailto" || scheme == "cid" || scheme == "tel") return true;
+            if (isImage && scheme == "data")
+            {
+                return Regex.IsMatch(probe,
+                    @"^data:image/(png|jpe?g|gif|bmp|webp|x-icon);base64,[A-Za-z0-9+/=]+$",
+                    RegexOptions.IgnoreCase);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// An inline style with the parts that are not styling taken out.
+        ///
+        /// A style attribute is where markup stops being decoration on the legacy
+        /// engines this shell can still be hosted in: expression(), behavior: and
+        /// -moz-binding all execute, and @import fetches. url() is dropped whole
+        /// rather than parsed — a background image is not worth the surface — and
+        /// position is dropped because a mail has no business escaping the box the
+        /// panel gives it. A declaration list that trips any of the first group is
+        /// abandoned entirely rather than patched.
+        /// </summary>
+        private static string SafeStyle(string style)
+        {
+            string s = (style ?? "").Replace("\\", " ");
+            string probe = Regex.Replace(s, @"[\x00-\x20]", "").ToLowerInvariant();
+            if (probe.IndexOf("expression(", StringComparison.Ordinal) >= 0
+                || probe.IndexOf("javascript:", StringComparison.Ordinal) >= 0
+                || probe.IndexOf("vbscript:", StringComparison.Ordinal) >= 0
+                || probe.IndexOf("behavior:", StringComparison.Ordinal) >= 0
+                || probe.IndexOf("-moz-binding", StringComparison.Ordinal) >= 0
+                || probe.IndexOf("@import", StringComparison.Ordinal) >= 0) return "";
+
+            s = Regex.Replace(s, @"url\s*\([^)]*\)", "", RegexOptions.IgnoreCase);
+            s = Regex.Replace(s, @"position\s*:\s*(fixed|absolute|sticky)[^;]*;?", "",
+                              RegexOptions.IgnoreCase);
+            return s.Trim();
+        }
+
+        /// <summary>An attribute value, encoded for the double-quoted slot this
+        /// class writes it into.</summary>
+        private static string AttrEncode(string value)
+        {
+            return (value ?? "")
+                .Replace("&", "&amp;")
+                .Replace("\"", "&quot;")
+                .Replace("<", "&lt;")
+                .Replace(">", "&gt;");
+        }
+
         /// <summary>
         /// One line of stored free text as a reader should see it.
         ///
@@ -5120,7 +6077,10 @@ namespace VASLogic.Models
             /// <summary>The attribute set instance the DETAIL LINE is specified
             /// for (M_BOMProduct.M_AttributeSetInstance_ID). Empty on an own BOM
             /// row and where the line names no instance.</summary>
-            public string  Attributes      { get; set; }   // usedin
+            /// <summary>The attribute set the BOM is specified for: the detail
+            /// line's own on a where-used row, and the distinct sets across its
+            /// detail lines on an own BOM.</summary>
+            public string  Attributes      { get; set; }
             /// <summary>When the record was created — the BOM itself on an own
             /// row, the detail line on a where-used one. The section orders on
             /// it, newest first.</summary>
@@ -5184,6 +6144,11 @@ namespace VASLogic.Models
             public bool      IsComplete    { get; set; }
             /// <summary>The document the check hangs off, for the panel's zoom.</summary>
             public string    DocTableName  { get; set; }
+            /// <summary>The window that document is opened on, by NAME — the
+            /// Ship/GRN or Material Transfer confirmation screen. Tried before the
+            /// dictionary's zoom target, which the reader's role may not open; see
+            /// <see cref="ConfirmationWindowName"/>.</summary>
+            public string    DocWindowName { get; set; }
             public int       DocRecordId   { get; set; }
             public bool      DocIsSOTrx    { get; set; }
             public List<QualityCheckLineData> Lines { get; set; }
@@ -5225,7 +6190,15 @@ namespace VASLogic.Models
             public DateTime? LastOrderDate        { get; set; }
             public string    LastOrderNo          { get; set; }
             public int       LastOrderId          { get; set; }
+            /// <summary>What the product was last bought at, stated in
+            /// <see cref="LastOrderUomName"/> — the order line's ENTERED price
+            /// where the line names a unit, and its base-unit PriceActual
+            /// otherwise.</summary>
             public decimal?  LastOrderPrice       { get; set; }
+            /// <summary>The unit that price is per — the purchase order line's own
+            /// C_UOM. Empty where the line named none and the figure is therefore
+            /// the product's base unit, which the panel names itself.</summary>
+            public string    LastOrderUomName     { get; set; }
             public string    ISO_Code             { get; set; }
             public string    CurSymbol            { get; set; }
             public int       CurPrecision         { get; set; }
@@ -5292,18 +6265,43 @@ namespace VASLogic.Models
             public int       CurPrecision     { get; set; }
         }
 
+        /// <summary>One field of the accounting-default record behind an account
+        /// row, already labelled and resolved — what the accounting defaults
+        /// screen shows against that account.</summary>
+        public class AccountDetailData
+        {
+            /// <summary>The dictionary's own label for the field, in the reader's
+            /// language.</summary>
+            public string Label { get; set; }
+            /// <summary>The value, resolved through its reference list where it is
+            /// a coded field. 'Y' / 'N' are passed through as stored and the panel
+            /// words them.</summary>
+            public string Value { get; set; }
+        }
+
         public class AccountRowData
         {
             public string AccountRole    { get; set; }   // the M_Product_Acct column name
             public string Combination    { get; set; }
             public string Description    { get; set; }
+            /// <summary>The accounting-default fields behind this account — Related
+            /// To, Variance Type, Recognize Type, Foreign Currency Revaluation.
+            /// Never null; empty on the classic scheme, whose account is a COLUMN
+            /// and has no such record to read.</summary>
+            public List<AccountDetailData> Details { get; set; }
         }
 
         public class AccountingData
         {
             /// <summary>The accounting schema these accounts were read under.</summary>
             public string                SchemaName    { get; set; }
+            /// <summary>The stored code — 'S', 'A', … — kept because it is what the
+            /// accounting tables hold and what the name falls back to.</summary>
             public string                CostingMethod { get; set; }
+            /// <summary>The dictionary's own name for that code ("Standard
+            /// Costing"), in the reader's language. Empty where the reference
+            /// resolves to nothing, and the panel then prints the code.</summary>
+            public string                CostingMethodName { get; set; }
             public string                CurrencyISO   { get; set; }
             public string                CurSymbol     { get; set; }
             public List<AccountRowData>  Rows          { get; set; }
@@ -5334,6 +6332,22 @@ namespace VASLogic.Models
 
             // Mail (revealed inline on click)
             public string    Body        { get; set; }
+            /// <summary>
+            /// The mail's body as SAFE MARKUP, so the detail sheet can show a
+            /// formatted message instead of a flattened one — the sender's
+            /// paragraphs, tables, lists and links as they were written.
+            ///
+            /// Empty where the stored body is plain text (there is nothing to
+            /// format) and where sanitisation left nothing behind. The panel then
+            /// renders <see cref="Body"/> as text, which is what it always did, so
+            /// the formatted view is an addition and never a replacement.
+            ///
+            /// SANITISED, not raw — see <see cref="MailBodyToSafeHtml"/>. This is
+            /// the one string in the whole payload the browser is asked to parse
+            /// as markup rather than escape, and its author is whoever sent the
+            /// mail.
+            /// </summary>
+            public string    BodyHtml    { get; set; }
             public string    MailTo      { get; set; }
             public string    MailFrom    { get; set; }
             public string    MailCc      { get; set; }
@@ -5420,6 +6434,27 @@ namespace VASLogic.Models
             public int                         TransactionTotal { get; set; }
             public AccountingData              Accounting     { get; set; }
             public List<ActivityData>          Activity       { get; set; }
+            /// <summary>Signature of the sources <see cref="Activity"/> was built
+            /// from, so the panel can detect an activity added elsewhere without
+            /// re-reading the whole overview.</summary>
+            public ActivityStampData           ActivityStamp  { get; set; }
+        }
+
+        /// <summary>
+        /// A change-signature over one product's activity sources. Both members are
+        /// needed: the count alone misses an edit, the stamp alone misses a delete.
+        /// </summary>
+        public class ActivityStampData
+        {
+            /// <summary>Total rows across every activity source.</summary>
+            public int Count { get; set; }
+            /// <summary>Latest Updated stamp, as yyyyMMddHHmmss; empty when there is
+            /// none. A STRING because the client only compares it for equality, and
+            /// a date round trip is where a provider's DateTimeKind would change the
+            /// shape out from under that comparison.</summary>
+            public string LastChange { get; set; }
+
+            public ActivityStampData() { LastChange = ""; }
         }
     }
 }

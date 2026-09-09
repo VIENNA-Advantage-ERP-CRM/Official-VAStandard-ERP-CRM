@@ -57,7 +57,7 @@ namespace VASLogic.Models
         private const int CATALOG_PAGE_SIZE = 50;
 
         /// <summary>Saved requisition lines loaded per page (server-side paging).</summary>
-        private const int LINE_PAGE_SIZE = 20;
+        private const int LINE_PAGE_SIZE = 10;
 
         #region Panel (read) data
 
