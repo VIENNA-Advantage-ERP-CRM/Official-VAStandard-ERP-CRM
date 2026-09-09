@@ -292,6 +292,12 @@ import "../app/tabpanel/VAS_065_APInvoicePanel.js";
 import "../app/tabpanel/VAS_074_CreateInvoiceLinePanel.js";
 import "../app/tabpanel/VAS_107_CreateOrderBottomPanel.js";
 import "../app/tabpanel/VAS_240_RequisitionBottomPanel.js";
+/* The three quantity-line panels are standalone classes, each modelled on
+   VAS_240 - there is no shared engine to import first, and no ordering
+   requirement between them. */
+import "../app/tabpanel/VAS_247_MaterialTransferBottomPanel.js";
+import "../app/tabpanel/VAS_248_DeliveryOrderBottomPanel.js";
+import "../app/tabpanel/VAS_249_GRNBottomPanel.js";
 import "../app/tabpanel/VAS_218_CreateOppLines.js";
 import "../app/widgets/VAS_056_AutoAllocatedAPPaymentWidget.js";
 import "../app/widgets/VAS_072_MatchSuggestionAPPayment.js";

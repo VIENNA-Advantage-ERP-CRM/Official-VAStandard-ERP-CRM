@@ -46,6 +46,17 @@
 ///                        Oracle form, so the designator made them read the value
 ///                        as already-zoned and skip their own conversion. Same
 ///                        JSON on either engine now.
+///   VAI163   2026-09-08  Letters and appointment mails were missing on PostgreSQL.
+///                        Both filters read COALESCE(TO_CHAR(AttachmentType), 'M')
+///                        — TO_CHAR so a national-character column could be
+///                        COALESCEd with a plain literal on Oracle without raising
+///                        ORA-12704 — and PostgreSQL has no single-argument
+///                        to_char. The statement failed, and because the failure
+///                        is remembered in a STATIC flag it took every panel's
+///                        letters out for the life of the app, not just the record
+///                        being viewed. Both now use an IS NULL branch and a
+///                        TRIMmed comparison: no COALESCE across character sets,
+///                        no TO_CHAR, same meaning on Oracle.
 /// </summary>
 
 using System;
@@ -464,7 +475,8 @@ namespace VASLogic.Models
                                     WHERE ma.AD_Table_ID = " + apptTableId + @"
                                       AND ma.Record_ID IN (" + idList + @")
                                       AND COALESCE(ma.IsActive, 'Y') = 'Y'
-                                      AND COALESCE(TO_CHAR(ma.AttachmentType), 'M') <> 'I'
+                                      AND (ma.AttachmentType IS NULL
+                                        OR TRIM(ma.AttachmentType) <> 'I')
                                     ORDER BY ma.Created DESC,
                                              ma.MailAttachment1_ID DESC";
                     DataSet ds = DB.ExecuteDataset(sql, null, null);
@@ -598,7 +610,7 @@ namespace VASLogic.Models
             // of its own.
             string kindFilter = includeMail
                 ? ""
-                : " AND COALESCE(TO_CHAR(ma.AttachmentType), 'M') = 'I'";
+                : " AND TRIM(ma.AttachmentType) = 'I'";
 
             try
             {
@@ -627,7 +639,11 @@ namespace VASLogic.Models
 
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
-                    bool isLetter = Util.GetValueOfString(r["AttachmentType"]) == "I";
+                    // Trimmed, as the SQL filter is: the column is blank-padded on
+                    // some installations, and an untrimmed 'I ' would read as a
+                    // mail here while the WHERE clause had already called it a
+                    // letter.
+                    bool isLetter = Util.GetValueOfString(r["AttachmentType"]).Trim() == "I";
                     DateTime? received = Stamp(r["DateMailReceived"]);
                     DateTime? created  = Stamp(r["Created"]);
 
