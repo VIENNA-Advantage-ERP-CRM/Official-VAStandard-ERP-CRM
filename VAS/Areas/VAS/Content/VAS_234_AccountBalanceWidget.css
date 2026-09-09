@@ -432,6 +432,20 @@
     color: #1D9E75;
 }
 
+/* THE FLIP: a flow that ran opposite to its own column. A negative inflow is money
+   LEAVING and must read in the outflow tone; a negative outflow is money ARRIVING and
+   must read in the inflow tone. Set by the JS from the sign of the figure, which also
+   prints its minus in that case - so the direction is never carried by colour alone.
+   Scoped to each cell class so the swap is explicit in both directions rather than one
+   generic "bad" colour standing in for two different readings. */
+.vas-234-o.vas-234-flip {
+    color: #1D9E75;
+}
+
+.vas-234-i.vas-234-flip {
+    color: #D85A30;
+}
+
 /* The net is the flow line's conclusion, so it is the only one of the three at
    Medium. Its own colour comes from .vas-234-up / .vas-234-down. */
 .vas-234-n {
@@ -477,6 +491,18 @@
     left: 50%;
     background: #1D9E75;
     border-radius: 0 5px 5px 0;
+}
+
+/* The same flip the figures take. The segment stays on ITS OWN side of the axis - the
+   side is the column, and a negative inflow is still an inflow line - but its tone
+   follows the money, so a red bar to the right of the axis reads as "this account's
+   receipts went backwards this period", which is exactly what happened. */
+.vas-234-bar-out.vas-234-flip {
+    background: #1D9E75;
+}
+
+.vas-234-bar-in.vas-234-flip {
+    background: #D85A30;
 }
 
 /* The axis is always drawn, even on a row with no movement at all - it is the zero
