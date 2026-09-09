@@ -116,10 +116,18 @@ namespace VASLogic.Models
         private const int MIN_PageSize = 1;
         private const int MAX_PageSize = 50;
 
-        /* Characters of AccountNo the modal may show. Everything before them is masked
-           HERE: the full number is never serialized to the browser. */
+        /* Characters of AccountNo a MODAL ROW may show; everything before them is masked
+           HERE. The FILTER's options are built unmasked - see BuildFullBankAccount - so a
+           full number does reach the browser for the accounts the role may select. */
         private const int ACCOUNTNO_VisibleChars = 4;
         private const string ACCOUNTNO_Mask = "····";
+
+        /* What separates the bank's name from the account number in a composed label. The
+           FILTER spells the number out, so the two need a real separator between them; a
+           MODAL row's masked tail already begins with "····", which is break enough on its
+           own and would read as two separators if a dot were added in front of it. */
+        private const string SEPARATOR_Full = " · ";
+        private const string SEPARATOR_Masked = " ";
 
         // ─────────────────────────────────────────────────────────────────────
         // §1  Summary - the widget itself
@@ -414,9 +422,15 @@ namespace VASLogic.Models
 
                 AccountOption option = new AccountOption();
                 option.C_BankAccount_ID = Util.GetValueOfInt(row["C_BankAccount_ID"]);
-                /* The same "UCO ····9032" form the modal shows, so one account reads
-                   identically in the filter and in the detail rows. */
-                option.Name = BuildBankAccount(
+
+                /* THE FILTER SHOWS THE NUMBER IN FULL - "UCO Bank 12340000003331" - by
+                   explicit request, and unlike the modal's rows, which keep the masked
+                   tail. The two are different jobs: a detail row only has to be
+                   RECOGNISABLE among many, whereas the filter is where ONE account is
+                   singled out from the rest, and a masked tail cannot separate two
+                   accounts at the same bank that happen to end in the same digits. The
+                   sibling VAS_230 selector makes the same call for the same reason. */
+                option.Name = BuildFullBankAccount(
                     Util.GetValueOfString(row["Bank_Name"]),
                     Util.GetValueOfString(row["Account_Name"]),
                     Util.GetValueOfString(row["Account_No"]));
@@ -682,31 +696,78 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// The bank account as the modal shows it - "UCO ····9032". The bank's name plus a
-        /// masked tail is the most recognisable form; the account's own Name stands in when
-        /// there is no number to mask, and an empty string when there is neither, which the
-        /// client renders as a dash.
+        /// The bank account as the MODAL's rows show it - "UCO ····9032". The bank's name
+        /// plus a masked tail is the most recognisable form; the account's own Name stands
+        /// in when there is no number to mask, and an empty string when there is neither,
+        /// which the client renders as a dash.
+        ///
+        /// The FILTER does not use this - see <see cref="BuildFullBankAccount"/>.
         /// </summary>
         /// <param name="bankName">C_Bank.Name.</param>
         /// <param name="accountName">C_BankAccount.Name.</param>
-        /// <param name="accountNo">C_BankAccount.AccountNo - never returned in full.</param>
+        /// <param name="accountNo">C_BankAccount.AccountNo; only its tail is returned.</param>
         /// <returns>Display string; may be empty.</returns>
         private string BuildBankAccount(string bankName, string accountName, string accountNo)
         {
-            string masked = MaskAccountNo(accountNo);
+            /* A PLAIN SPACE here, not the filter's middle dot. The mask's own "····" is
+               already a strong visual break between the bank and the number, and a dot in
+               front of it - "UCO · ····9032" - reads as two separators in a row. */
+            return ComposeBankAccount(bankName, accountName, MaskAccountNo(accountNo),
+                SEPARATOR_Masked);
+        }
 
-            if (masked.Length > 0)
+        /// <summary>
+        /// The bank account as the FILTER shows it - "UCO Bank 12340000003331": the bank's
+        /// name plus the account number IN FULL.
+        ///
+        /// The filter is where one account is singled out from the rest, and a masked tail
+        /// cannot separate two accounts at the same bank that end in the same digits. A
+        /// detail row only has to be recognisable among many, which is why the modal keeps
+        /// the mask - the two labels are answering different questions.
+        /// </summary>
+        /// <param name="bankName">C_Bank.Name.</param>
+        /// <param name="accountName">C_BankAccount.Name.</param>
+        /// <param name="accountNo">C_BankAccount.AccountNo, as stored.</param>
+        /// <returns>Display string; may be empty.</returns>
+        private string BuildFullBankAccount(string bankName, string accountName, string accountNo)
+        {
+            /* A MIDDLE DOT between the bank and the number. Unmasked, the two run straight
+               into each other - "UCO Bank 12340000003331" - and a bank whose name ends in a
+               digit or a branch code leaves the reader working out where one stops and the
+               other starts. The separator is the same one the sibling VAS_230 selector
+               uses, so an account reads identically in both cards' controls. */
+            return ComposeBankAccount(bankName, accountName,
+                accountNo == null ? "" : accountNo.Trim(), SEPARATOR_Full);
+        }
+
+        /// <summary>
+        /// Joins the bank's name to whichever form of the number the caller settled on, so
+        /// the masked and the full label differ only in that number and its separator, and
+        /// never drift apart in shape.
+        /// </summary>
+        /// <param name="bankName">C_Bank.Name.</param>
+        /// <param name="accountName">C_BankAccount.Name - stands in when there is no number.</param>
+        /// <param name="number">Already-masked or already-full account number; may be empty.</param>
+        /// <param name="separator">What goes between the two - SEPARATOR_Full for a spelled
+        /// out number, SEPARATOR_Masked when the mask already supplies the break.</param>
+        /// <returns>Display string; may be empty.</returns>
+        private string ComposeBankAccount(string bankName, string accountName, string number,
+            string separator)
+        {
+            if (number.Length > 0)
             {
-                return String.IsNullOrEmpty(bankName) ? masked : bankName + " " + masked;
+                return String.IsNullOrEmpty(bankName) ? number : bankName + separator + number;
             }
 
+            /* No number at all - the account's own Name is the only thing left that
+               identifies it. */
             if (!String.IsNullOrEmpty(accountName)) { return accountName; }
             return bankName == null ? "" : bankName;
         }
 
         /// <summary>
-        /// Shows only the last few characters of an account number - "····9032". The full
-        /// number is never serialized to the browser, so it can never reach the DOM.
+        /// Shows only the last few characters of an account number - "····9032". Used by
+        /// the modal's rows; the filter spells the number out instead.
         /// </summary>
         /// <param name="accountNo">Raw C_BankAccount.AccountNo; may be null or short.</param>
         /// <returns>Masked number, or an empty string when there is nothing to mask.</returns>
@@ -1002,8 +1063,9 @@ namespace VASLogic.Models
             /// <summary>C_BankAccount.C_BankAccount_ID.</summary>
             public int C_BankAccount_ID { get; set; }
 
-            /// <summary>Bank name plus the masked account tail - the same form the detail
-            /// rows use, so one account reads identically in both places.</summary>
+            /// <summary>Bank name plus the account number IN FULL - unmasked, unlike the
+            /// detail rows, because the filter is where two accounts at one bank have to be
+            /// told apart.</summary>
             public string Name { get; set; }
         }
 

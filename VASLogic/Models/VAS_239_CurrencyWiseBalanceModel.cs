@@ -33,10 +33,19 @@ namespace VASLogic.Models
     ///                             different currencies are never added together.
     ///
     ///               THE BALANCE SOURCE IS C_BankAccountLine.EndingBalance - deliberately not
-    ///               C_BankStatement.EndingBalance, not C_BankAccount.CurrentBalance and not
-    ///               Fact_Acct. EndingBalance is the balance after the beginning balance has
-    ///               been adjusted for the period's payments and disbursements, which is the
-    ///               figure this card is defined to report.
+    ///               C_BankStatement.EndingBalance and not Fact_Acct. EndingBalance is the
+    ///               balance after the beginning balance has been adjusted for the period's
+    ///               payments and disbursements, which is the figure this card is defined to
+    ///               report.
+    ///
+    ///               NO LINE AT ALL FALLS BACK TO C_BankAccount.CurrentBalance. An account
+    ///               that has never had a balance line - a newly opened one, or a tenant that
+    ///               does not keep bank account lines at all - is NOT dropped and is NOT
+    ///               reported as zero: it contributes the account's own running balance,
+    ///               converted AS OF TODAY because a running balance carries no date of its
+    ///               own to convert on. This mirrors VAS_234, which closes an account with no
+    ///               statement the same way. A line that DOES exist always wins - the running
+    ///               balance is the fallback, never a correction.
     ///
     ///               ONE LINE PER ACCOUNT, THE LATEST ONE. C_BankAccountLine keeps a history
     ///               row per account, so summing the table would add an account's own past
@@ -54,11 +63,12 @@ namespace VASLogic.Models
     ///               newest line per account. That is still set-based - there is no query per
     ///               account anywhere in this model.
     ///
-    ///               TWO QUERIES, NOT ONE, AND THAT IS DELIBERATE. Conversion runs in a second
-    ///               set-based query restricted to the latest line ids the first pass
-    ///               resolved. Folding currencyConvert(...) into the first query would call it
-    ///               once per HISTORY row and then discard all but the newest - the cost of
-    ///               the whole history rather than of the answer.
+    ///               CONVERSION IS ITS OWN QUERY, AND THAT IS DELIBERATE. It runs set-based,
+    ///               restricted to the latest line ids the first pass resolved. Folding
+    ///               currencyConvert(...) into the line query would call it once per HISTORY
+    ///               row and then discard all but the newest - the cost of the whole history
+    ///               rather than of the answer. Accounts on the CurrentBalance fallback are
+    ///               converted by a second such query against C_BankAccount, dated today.
     ///
     ///               BASE CURRENCY IS RESOLVED, NEVER ASSUMED. AD_ClientInfo.C_AcctSchema1_ID
     ///               -&gt; C_AcctSchema.C_Currency_ID, with that currency's ISO code, symbol
@@ -74,10 +84,11 @@ namespace VASLogic.Models
     ///               native figure and reports the gap, and the grand total is withheld
     ///               (TotalAvailable=false) rather than quietly under-reported.
     ///
-    ///               MRole row-level security is applied to C_BankAccountLine bal, the main
-    ///               physical table of both reads - never to C_BankAccount / C_Currency /
-    ///               C_AcctSchema / AD_ClientInfo, which are joined only for metadata, and
-    ///               never to a derived or grouped result. ORDER BY is appended AFTER
+    ///               MRole row-level security is applied to the main physical table of every
+    ///               read - C_BankAccountLine bal where the balance lines come from,
+    ///               C_BankAccount ba where the accounts and their running balances do - never
+    ///               to C_Currency / C_AcctSchema / AD_ClientInfo, which are joined only for
+    ///               metadata, and never to a derived or grouped result. ORDER BY is appended AFTER
     ///               AddAccessSQL so its FROM-clause parser never meets a trailing clause, and
     ///               every join ON is a plain equality so it never meets a function call
     ///               either. Compatible with PostgreSQL and Oracle.
@@ -112,8 +123,9 @@ namespace VASLogic.Models
         /// <param name="pageSize">Rows per page; clamped to [1,10].</param>
         /// <returns>Populated <see cref="CurrencyBalanceResult"/> (never null). Loaded is
         /// false only when there is no context or no primary accounting schema; a tenant with
-        /// no bank balance lines returns Loaded=true and an empty page, because "no balances
-        /// recorded" is a real answer rather than an error.</returns>
+        /// no bank accounts at all returns Loaded=true and an empty page, because "no balances
+        /// recorded" is a real answer rather than an error. A tenant with accounts but no
+        /// balance lines reports every account's C_BankAccount.CurrentBalance.</returns>
         public CurrencyBalanceResult GetCurrencyBalances(Ctx ctx, int pageNo, int pageSize)
         {
             CurrencyBalanceResult result = new CurrencyBalanceResult();
@@ -144,10 +156,16 @@ namespace VASLogic.Models
 
             result.BaseCurrency = baseCurrency;
 
-            List<LatestLine> lines = GetLatestLinePerAccount(ctx, asOf);
+            /* The ACCOUNTS come first and the balance lines are laid over them, so an account
+               with no line of its own still reaches the card - on its own CurrentBalance -
+               instead of disappearing from the currency it holds. */
+            List<Account> accounts = GetAccounts(ctx);
+            Dictionary<int, LatestLine> latestByAccount = GetLatestLinePerAccount(ctx, asOf);
+            List<LatestLine> lines = MergeAccountsAndLines(accounts, latestByAccount, asOf);
+
             if (lines.Count > 0)
             {
-                ApplyBaseAmounts(ctx, baseCurrency, lines);
+                ApplyBaseAmounts(ctx, baseCurrency, lines, asOf);
             }
 
             List<CurrencyRow> rows = GroupByCurrency(lines, baseCurrency);
@@ -236,47 +254,111 @@ namespace VASLogic.Models
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // §3  The latest balance line per bank account
+        // §3  The bank accounts, and the latest balance line of each
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// One line per bank account - the latest C_BankAccountLine dated on or before the
-        /// as-of date - carrying its native EndingBalance and the ACCOUNT's currency.
+        /// Every active bank account the role may see, with its OWN currency and its running
+        /// C_BankAccount.CurrentBalance.
+        ///
+        /// This is the spine of the card: a currency appears because an ACCOUNT holds it, not
+        /// because a balance line happens to exist. CurrentBalance is read here so an account
+        /// with no line at all still has a figure to report; the merge below simply prefers the
+        /// real line wherever there is one.
+        ///
+        /// C_Bank is deliberately not joined - the card names currencies, never banks, and an
+        /// inactive bank row must not make an active account's holding vanish.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <returns>Accessible bank accounts (never null).</returns>
+        private List<Account> GetAccounts(Ctx ctx)
+        {
+            List<Account> accounts = new List<Account>();
+
+            /* C_Currency is a display lookup; C_BankAccount ba is the physical table the user
+               is reading from. The join is INNER and safe - an account always has a currency -
+               and its ON is a plain equality so the access parser has nothing to trip on. */
+            string sql = @"
+                SELECT ba.C_BankAccount_ID AS C_BankAccount_ID,
+                       ba.CurrentBalance AS Current_Balance,
+                       ba.C_Currency_ID AS C_Currency_ID,
+                       cur.ISO_Code AS Iso_Code,
+                       cur.StdPrecision AS Std_Precision,
+                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Currency_Symbol
+                FROM C_BankAccount ba
+                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=ba.C_Currency_ID)
+                WHERE ba.IsActive='Y'
+                  AND cur.IsActive='Y'
+                  AND ba.AD_Client_ID=@AD_Client_ID";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ba", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
+            if (ds == null || ds.Tables.Count == 0) { return accounts; }
+
+            DataTable dt = ds.Tables[0];
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                DataRow row = dt.Rows[i];
+
+                Account account = new Account();
+                account.C_BankAccount_ID = Util.GetValueOfInt(row["C_BankAccount_ID"]);
+                account.C_Currency_ID = Util.GetValueOfInt(row["C_Currency_ID"]);
+                account.IsoCode = Util.GetValueOfString(row["Iso_Code"]);
+                account.Symbol = Util.GetValueOfString(row["Currency_Symbol"]);
+                account.Precision = Util.GetValueOfInt(row["Std_Precision"]);
+
+                /* A NULL CurrentBalance coerces to zero, which is the right reading here: the
+                   column is the account's running balance and an account that has never moved
+                   money holds nothing. */
+                account.CurrentBalance = Util.GetValueOfDecimal(row["Current_Balance"]);
+
+                accounts.Add(account);
+            }
+
+            return accounts;
+        }
+
+        /// <summary>
+        /// The latest C_BankAccountLine dated on or before the as-of date, per bank account,
+        /// keyed by account.
         ///
         /// The read is ordered account, date, id ASCENDING and the forward pass simply
         /// overwrites, so the entry left standing for an account is its newest line. That is
         /// the portable equivalent of ROW_NUMBER() OVER (PARTITION BY ... ORDER BY
         /// StatementDate DESC, C_BankAccountLine_ID DESC) = 1, without putting an ORDER BY
         /// inside the SELECT list where MRole's parser would have to read it.
+        ///
+        /// The currency is NOT read here - it belongs to the account, and GetAccounts already
+        /// has it.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="asOf">The as-of date; bounds StatementDate exclusively at asOf + 1
         /// day, which keeps a future-dated line from being treated as the current balance
         /// while still admitting one stamped today.</param>
-        /// <returns>The latest line per accessible bank account (never null).</returns>
-        private List<LatestLine> GetLatestLinePerAccount(Ctx ctx, DateTime asOf)
+        /// <returns>C_BankAccount_ID -&gt; its latest line (never null; may be empty).</returns>
+        private Dictionary<int, LatestLine> GetLatestLinePerAccount(Ctx ctx, DateTime asOf)
         {
-            List<LatestLine> lines = new List<LatestLine>();
+            Dictionary<int, LatestLine> byAccount = new Dictionary<int, LatestLine>();
 
-            /* C_BankAccount and C_Currency are display/grouping lookups; C_BankAccountLine bal
-               is the physical table the balances come from. Both joins are INNER and safe: a
-               balance line always has an account, and an account always has a currency. The
-               closing ON is a plain equality so the access parser has nothing to trip on. */
+            /* C_BankAccount is joined to keep a line of a deactivated account out;
+               C_BankAccountLine bal is the physical table the balances come from. The join is
+               INNER and safe - a balance line always has an account - and its ON is a plain
+               equality so the access parser has nothing to trip on. */
             string sql = @"
                 SELECT bal.C_BankAccountLine_ID AS C_BankAccountLine_ID,
                        bal.C_BankAccount_ID AS C_BankAccount_ID,
                        bal.StatementDate AS Statement_Date,
-                       bal.EndingBalance AS Ending_Balance,
-                       ba.C_Currency_ID AS C_Currency_ID,
-                       cur.ISO_Code AS Iso_Code,
-                       cur.StdPrecision AS Std_Precision,
-                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Currency_Symbol
+                       bal.EndingBalance AS Ending_Balance
                 FROM C_BankAccountLine bal
                 INNER JOIN C_BankAccount ba ON (ba.C_BankAccount_ID=bal.C_BankAccount_ID)
-                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=ba.C_Currency_ID)
                 WHERE bal.IsActive='Y'
                   AND ba.IsActive='Y'
-                  AND cur.IsActive='Y'
                   AND bal.AD_Client_ID=@AD_Client_ID
                   AND bal.StatementDate<@As_Of_Exclusive";
 
@@ -298,9 +380,7 @@ namespace VASLogic.Models
             };
 
             DataSet ds = DB.ExecuteDataset(sql, parameters, null);
-            if (ds == null || ds.Tables.Count == 0) { return lines; }
-
-            Dictionary<int, LatestLine> byAccount = new Dictionary<int, LatestLine>();
+            if (ds == null || ds.Tables.Count == 0) { return byAccount; }
 
             DataTable dt = ds.Tables[0];
             for (int i = 0; i < dt.Rows.Count; i++)
@@ -310,10 +390,6 @@ namespace VASLogic.Models
                 LatestLine line = new LatestLine();
                 line.C_BankAccountLine_ID = Util.GetValueOfInt(row["C_BankAccountLine_ID"]);
                 line.C_BankAccount_ID = Util.GetValueOfInt(row["C_BankAccount_ID"]);
-                line.C_Currency_ID = Util.GetValueOfInt(row["C_Currency_ID"]);
-                line.IsoCode = Util.GetValueOfString(row["Iso_Code"]);
-                line.Symbol = Util.GetValueOfString(row["Currency_Symbol"]);
-                line.Precision = Util.GetValueOfInt(row["Std_Precision"]);
                 line.NativeBalance = Util.GetValueOfDecimal(row["Ending_Balance"]);
 
                 DateTime? statementDate = Util.GetValueOfDateTime(row["Statement_Date"]);
@@ -324,9 +400,59 @@ namespace VASLogic.Models
                 byAccount[line.C_BankAccount_ID] = line;
             }
 
-            foreach (KeyValuePair<int, LatestLine> entry in byAccount)
+            return byAccount;
+        }
+
+        /// <summary>
+        /// Turns the accounts into the one-balance-per-account list the rest of the model
+        /// works on: the account's latest balance line where it has one, and the account's own
+        /// C_BankAccount.CurrentBalance where it has none.
+        ///
+        /// A fallback entry is marked by <see cref="LatestLine.UsesCurrentBalance"/> and
+        /// carries C_BankAccountLine_ID=0, because there is no line behind it - that is what
+        /// sends it down the account-based conversion path in §4, dated today rather than on a
+        /// StatementDate that does not exist.
+        /// </summary>
+        /// <param name="accounts">Every accessible bank account.</param>
+        /// <param name="latestByAccount">C_BankAccount_ID -&gt; latest line, where there is one.</param>
+        /// <param name="asOf">The as-of date - the conversion date of a fallback entry.</param>
+        /// <returns>Exactly one entry per account (never null).</returns>
+        private List<LatestLine> MergeAccountsAndLines(List<Account> accounts,
+            Dictionary<int, LatestLine> latestByAccount, DateTime asOf)
+        {
+            List<LatestLine> lines = new List<LatestLine>();
+
+            for (int i = 0; i < accounts.Count; i++)
             {
-                lines.Add(entry.Value);
+                Account account = accounts[i];
+
+                LatestLine line;
+                if (latestByAccount.ContainsKey(account.C_BankAccount_ID))
+                {
+                    /* A real line always wins. CurrentBalance is the fallback for an account
+                       with no line at all, never a correction to one that has. */
+                    line = latestByAccount[account.C_BankAccount_ID];
+                }
+                else
+                {
+                    line = new LatestLine();
+                    line.C_BankAccount_ID = account.C_BankAccount_ID;
+                    line.NativeBalance = account.CurrentBalance;
+                    line.UsesCurrentBalance = true;
+
+                    /* A running balance is "as of now" by definition - it carries no date of
+                       its own - so it converts on the as-of date, which is today. */
+                    line.StatementDate = asOf;
+                }
+
+                /* The currency is the ACCOUNT's in both cases - that is what the card groups
+                   by, and a line has no currency of its own. */
+                line.C_Currency_ID = account.C_Currency_ID;
+                line.IsoCode = account.IsoCode;
+                line.Symbol = account.Symbol;
+                line.Precision = account.Precision;
+
+                lines.Add(line);
             }
 
             return lines;
@@ -339,22 +465,31 @@ namespace VASLogic.Models
         /// <summary>
         /// Fills each line's base-currency amount.
         ///
-        /// A line already IN the base currency is not converted at all - its own EndingBalance
-        /// is the base amount, exactly, with no rate lookup to fail. Every other line goes
-        /// through the currencyConvert(...) database function ONCE, dated on that line's own
-        /// StatementDate, in one set-based query per batch of line ids. There is no query per
-        /// account and no conversion of the history rows the forward pass already discarded.
+        /// An entry already IN the base currency is not converted at all - its own balance is
+        /// the base amount, exactly, with no rate lookup to fail. Every other entry goes
+        /// through the currencyConvert(...) database function ONCE, in one set-based query per
+        /// batch of ids. There is no query per account and no conversion of the history rows
+        /// the forward pass already discarded.
         ///
-        /// A NULL result means no rate covers that date: the line is flagged rather than
+        /// TWO CONVERSION PATHS, BECAUSE THE TWO SOURCES CARRY DIFFERENT DATES. A balance line
+        /// converts on its own StatementDate, read straight from C_BankAccountLine. An account
+        /// on the CurrentBalance fallback has no such date - a running balance is "as of now" -
+        /// so it converts on the as-of date, i.e. TODAY, read from C_BankAccount.
+        ///
+        /// A NULL result means no rate covers that date: the entry is flagged rather than
         /// counted as zero, and its amount stays out of every sum.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="baseCurrency">The resolved reporting currency.</param>
         /// <param name="lines">Latest lines, completed in place.</param>
-        private void ApplyBaseAmounts(Ctx ctx, BaseCurrency baseCurrency, List<LatestLine> lines)
+        /// <param name="asOf">The as-of date - the conversion date of a CurrentBalance entry.</param>
+        private void ApplyBaseAmounts(Ctx ctx, BaseCurrency baseCurrency, List<LatestLine> lines,
+            DateTime asOf)
         {
             Dictionary<int, LatestLine> byLine = new Dictionary<int, LatestLine>();
-            List<int> toConvert = new List<int>();
+            Dictionary<int, LatestLine> byAccount = new Dictionary<int, LatestLine>();
+            List<int> lineIds = new List<int>();
+            List<int> accountIds = new List<int>();
 
             for (int i = 0; i < lines.Count; i++)
             {
@@ -370,11 +505,19 @@ namespace VASLogic.Models
                     continue;
                 }
 
-                byLine[line.C_BankAccountLine_ID] = line;
-                toConvert.Add(line.C_BankAccountLine_ID);
+                if (line.UsesCurrentBalance)
+                {
+                    byAccount[line.C_BankAccount_ID] = line;
+                    accountIds.Add(line.C_BankAccount_ID);
+                }
+                else
+                {
+                    byLine[line.C_BankAccountLine_ID] = line;
+                    lineIds.Add(line.C_BankAccountLine_ID);
+                }
             }
 
-            if (toConvert.Count == 0) { return; }
+            if (lineIds.Count == 0 && accountIds.Count == 0) { return; }
 
             /* The conversion type is resolved from configuration, never hard-coded. When the
                tenant has no default the argument is SQL NULL and the database function applies
@@ -382,10 +525,23 @@ namespace VASLogic.Models
             int conversionTypeId = MConversionType.GetDefault(ctx.GetAD_Client_ID());
             string conversionTypeSql = conversionTypeId > 0 ? conversionTypeId.ToString() : "NULL";
 
-            for (int start = 0; start < toConvert.Count; start += CONVERT_BatchSize)
+            for (int start = 0; start < lineIds.Count; start += CONVERT_BatchSize)
             {
                 ReadBaseAmounts(ctx, baseCurrency, conversionTypeSql, byLine,
-                    IdList(toConvert, start, CONVERT_BatchSize));
+                    IdList(lineIds, start, CONVERT_BatchSize));
+            }
+
+            if (accountIds.Count == 0) { return; }
+
+            /* TO_DATE renders the date the way THIS backend reads it - the one place the two
+               databases disagree about a literal - so today's date reaches currencyConvert
+               without a bound placeholder inside a function call in the SELECT list. */
+            string asOfSql = GlobalVariable.TO_DATE(asOf.Date, true);
+
+            for (int start = 0; start < accountIds.Count; start += CONVERT_BatchSize)
+            {
+                ReadCurrentBalanceBaseAmounts(ctx, baseCurrency, conversionTypeSql, asOfSql,
+                    byAccount, IdList(accountIds, start, CONVERT_BatchSize));
             }
         }
 
@@ -460,7 +616,83 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Renders one batch of line ids as a comma-separated list. The values are integers
+        /// Runs one conversion batch for the accounts that had no balance line, converting
+        /// C_BankAccount.CurrentBalance AS OF TODAY, and writes each result back onto its
+        /// entry.
+        ///
+        /// The date is today's precisely because a running balance has no date of its own: it
+        /// states what the account holds now, so the rate that applies to it is the one in
+        /// force now.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="baseCurrency">The resolved reporting currency.</param>
+        /// <param name="conversionTypeSql">Server-resolved conversion type id, or "NULL".</param>
+        /// <param name="asOfSql">The as-of date as a backend-portable SQL date literal.</param>
+        /// <param name="byAccount">C_BankAccount_ID -&gt; entry, for writing results back.</param>
+        /// <param name="idList">Comma-separated account ids - server-derived integers only.</param>
+        private void ReadCurrentBalanceBaseAmounts(Ctx ctx, BaseCurrency baseCurrency,
+            string conversionTypeSql, string asOfSql, Dictionary<int, LatestLine> byAccount,
+            string idList)
+        {
+            if (idList.Length == 0) { return; }
+
+            /* Same composition rule as ReadBaseAmounts: every argument of currencyConvert is a
+               column, a server-resolved INTEGER or a date literal this model built itself.
+               Nothing here is bound and nothing here came from the browser. */
+            StringBuilder sql = new StringBuilder();
+            sql.Append(@"
+                SELECT ba.C_BankAccount_ID AS C_BankAccount_ID,
+                       currencyConvert(ba.CurrentBalance,ba.C_Currency_ID,")
+               .Append(baseCurrency.C_Currency_ID)
+               .Append(",")
+               .Append(asOfSql)
+               .Append(",")
+               .Append(conversionTypeSql)
+               .Append(@",ba.AD_Client_ID,ba.AD_Org_ID) AS Base_Amt
+                FROM C_BankAccount ba
+                WHERE ba.IsActive='Y'
+                  AND ba.AD_Client_ID=@AD_Client_ID
+                  AND ba.C_BankAccount_ID IN (").Append(idList).Append(")");
+
+            /* Secured on the same physical table the accounts were read from, so an account the
+               role cannot see cannot re-enter the result through this query either. */
+            string finalSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "ba",
+                MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            DataSet ds = DB.ExecuteDataset(finalSql, parameters, null);
+            if (ds == null || ds.Tables.Count == 0) { return; }
+
+            DataTable dt = ds.Tables[0];
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                DataRow row = dt.Rows[i];
+
+                int accountId = Util.GetValueOfInt(row["C_BankAccount_ID"]);
+                if (!byAccount.ContainsKey(accountId)) { continue; }
+
+                LatestLine line = byAccount[accountId];
+
+                /* NULL means no rate covers today. It is NOT zero - the same rule the balance
+                   lines follow: flagged, and left out of both sums. */
+                object value = row["Base_Amt"];
+                if (value == null || value == DBNull.Value)
+                {
+                    line.BaseAvailable = false;
+                    continue;
+                }
+
+                line.BaseBalance = Util.GetValueOfDecimal(value);
+                line.BaseAvailable = true;
+            }
+        }
+
+        /// <summary>
+        /// Renders one batch of ids as a comma-separated list. The values are integers
         /// this model read from the database itself - no browser input reaches this string.
         /// </summary>
         /// <param name="ids">All ids awaiting conversion.</param>
@@ -590,21 +822,55 @@ namespace VASLogic.Models
         // §6  Transfer objects
         // ─────────────────────────────────────────────────────────────────────
 
-        /// <summary>One bank account's latest balance line. Internal - the client only ever
-        /// sees the grouped currency rows.</summary>
+        /// <summary>One bank account and its currency, as the card groups by. Internal - the
+        /// client only ever sees the grouped currency rows.</summary>
+        private class Account
+        {
+            /// <summary>C_BankAccount.C_BankAccount_ID.</summary>
+            public int C_BankAccount_ID { get; set; }
+
+            /// <summary>C_BankAccount.CurrentBalance - the running balance, used only when the
+            /// account has no C_BankAccountLine at all.</summary>
+            public decimal CurrentBalance { get; set; }
+
+            /// <summary>C_BankAccount.C_Currency_ID - the account's currency.</summary>
+            public int C_Currency_ID { get; set; }
+
+            /// <summary>That currency's ISO code.</summary>
+            public string IsoCode { get; set; }
+
+            /// <summary>That currency's display symbol, falling back to its ISO code.</summary>
+            public string Symbol { get; set; }
+
+            /// <summary>That currency's C_Currency.StdPrecision.</summary>
+            public int Precision { get; set; }
+        }
+
+        /// <summary>One bank account's balance - its latest line, or its running balance where
+        /// it has no line. Internal - the client only ever sees the grouped currency
+        /// rows.</summary>
         private class LatestLine
         {
-            /// <summary>C_BankAccountLine.C_BankAccountLine_ID.</summary>
+            /// <summary>C_BankAccountLine.C_BankAccountLine_ID; 0 when
+            /// <see cref="UsesCurrentBalance"/>, because there is no line behind the figure.</summary>
             public int C_BankAccountLine_ID { get; set; }
 
             /// <summary>Owning C_BankAccount_ID - what "latest" is resolved per.</summary>
             public int C_BankAccount_ID { get; set; }
 
-            /// <summary>The line's StatementDate - also the conversion date.</summary>
+            /// <summary>The line's StatementDate - also the conversion date. The as-of date
+            /// when <see cref="UsesCurrentBalance"/>, since a running balance carries no date
+            /// of its own.</summary>
             public DateTime StatementDate { get; set; }
 
-            /// <summary>C_BankAccountLine.EndingBalance, in the account's own currency.</summary>
+            /// <summary>C_BankAccountLine.EndingBalance, in the account's own currency - or
+            /// C_BankAccount.CurrentBalance when <see cref="UsesCurrentBalance"/>.</summary>
             public decimal NativeBalance { get; set; }
+
+            /// <summary>True when the account had NO balance line and the figure came from
+            /// C_BankAccount.CurrentBalance instead - which is also what sends it down the
+            /// account-based, dated-today conversion path.</summary>
+            public bool UsesCurrentBalance { get; set; }
 
             /// <summary>C_BankAccount.C_Currency_ID - the account's currency.</summary>
             public int C_Currency_ID { get; set; }
@@ -704,7 +970,8 @@ namespace VASLogic.Models
             /// <summary>Its C_Currency.StdPrecision - the Native cell's decimals.</summary>
             public int Precision { get; set; }
 
-            /// <summary>SUM of the latest EndingBalance of every account in this currency,
+            /// <summary>SUM of the latest EndingBalance of every account in this currency -
+            /// or that account's C_BankAccount.CurrentBalance where it has no balance line -
             /// stated in this currency and never converted.</summary>
             public decimal NativeBalance { get; set; }
 

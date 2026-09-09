@@ -277,3 +277,6 @@
 @import "../VAS_236_ReceiptvsPaymentWidget.css";
 @import "../VAS_238_UnreconciledBankLineWidget.css";
 @import "../VAS_239_CurrencyWiseBalanceWidget.css";
+@import "../VAS_256_UnBudgetedActualWidget.css";
+@import "../VAS_254_LargestBudgetVarianceWidget.css";
+@import "../VAS_252_TopBudgetOverRunsWidget.css";

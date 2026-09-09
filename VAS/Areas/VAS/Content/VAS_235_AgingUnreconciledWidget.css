@@ -207,7 +207,15 @@
         color: #0083DA;
     }
 
+/* min-width:0 is what actually makes the ellipsis work, and it matters more here now
+   that the filter spells the account number out in full: a flex item defaults to
+   min-width:auto and refuses to shrink below its content, so without this a long label
+   would push past the pill's max-width and squeeze the chevron instead of clipping
+   itself. The full label stays on the pill's title attribute, and the picker - which is
+   not width-capped the same way - shows every account complete. */
 .vas-235-acct-label {
+    flex: 0 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -255,9 +263,12 @@
         white-space: nowrap;
     }
 
+/* `end`, not `right`: a figure column is read against its own trailing edge in both
+   directions, and the caption has to sit over the column it names. See the RTL note at
+   the foot of this file. */
 .vas-235-h-val,
 .vas-235-h-cnt {
-    text-align: right;
+    text-align: end;
 }
 
 /* The legend sits in the TRACK column, directly over the colours it names - so no row
@@ -355,11 +366,20 @@
     min-width: 0;
 }
 
-/* Receipts first, then payments - a hairline of the card's own white between them so
-   the split stays legible even when one side is a sliver. */
+/* Receipts first, then payments - a hairline of the card's own white between them so the
+   split stays legible even when one side is a sliver.
+
+   The hairline is `border-inline-end`, not `border-right`. The track is a flex row, so
+   under RTL the receipts segment sits at the RIGHT and payments to its left; a physical
+   right border would then draw on the segment's outer edge - against the end of the
+   groove - instead of between the two colours, and the split would lose its separator.
+
+   The gradients keep `90deg`. They shade within a single segment rather than marking a
+   boundary, so a mirrored ramp reads the same either way, and there is no logical
+   equivalent for a gradient angle worth reaching for here. */
 .vas-235-r {
     background: linear-gradient(90deg, #5FCB97, #20A464);
-    border-right: 1.5px solid rgba(255, 255, 255, .9);
+    border-inline-end: 1.5px solid rgba(255, 255, 255, .9);
 }
 
 .vas-235-p {
@@ -368,7 +388,7 @@
 
 .vas-235-val {
     min-width: 0;
-    text-align: right;
+    text-align: end;
     font-size: .84375em;
     font-weight: 700;
     line-height: 1.2;
@@ -379,7 +399,7 @@
 
 .vas-235-cnt {
     min-width: 0;
-    text-align: right;
+    text-align: end;
     line-height: 1.2;
 }
 
@@ -444,18 +464,13 @@
         white-space: nowrap;
     }
 
-/* Nothing unreconciled is GOOD news, not an error - it is said across the list and
-   the header keeps its (zero) totals above it. Only a load failure takes the whole
-   card over (.vas-235-state below). */
-.vas-235-empty {
-    flex: 1 1 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: .8125em;
-    color: #5F7283;
-    text-align: center;
-}
+/* NO EMPTY-STATE RULE HERE ANY MORE. Nothing unreconciled is good news, and it is now
+   said by the LADDER ITSELF: all five buckets draw at zero, with empty grooves, a zero
+   value and a zero count. That is a more precise answer than a sentence - it says the
+   book is clean in every age band - and it keeps the card's shape as the reader moves
+   through the account picker, so a clean account reads as a clean account rather than
+   as a card that failed to load. Only a load failure takes the whole card over
+   (.vas-235-state below). */
 
 /* ---- State takeover: reserved for a load failure ---- */
 .vas-235-state {
@@ -521,7 +536,7 @@
     color: #102C3F;
     padding: 9px 10px;
     border-radius: 8px;
-    text-align: left;
+    text-align: start;
 }
 
     .vas-235-pp-opt:hover {
@@ -672,8 +687,17 @@
     white-space: nowrap;
 }
 
+/* The close button is pushed to the header's TRAILING edge by an auto margin on its
+   leading side. `margin-inline-start`, NOT `margin-left`: the logical property resolves
+   to margin-left under LTR and margin-right under RTL, so the free space always lands
+   between the title and the button.
+
+   With the physical property this was visibly wrong in RTL. `flex-direction: row` lays
+   the children out right-to-left there, so the close button is already the leftmost
+   item - and `margin-left:auto` then put the slack on its OUTER side, shunting the
+   button back against the title and leaving the whole gap at the far left edge. */
 .vas-235-x {
-    margin-left: auto;
+    margin-inline-start: auto;
     flex: 0 0 auto;
     width: 30px;
     height: 30px;
@@ -844,9 +868,10 @@
     color: #41576A;
 }
 
-/* Days and Amount are the numeric columns - right-aligned, per the specification. */
+/* Days and Amount are the numeric columns - trailing-aligned, per the specification.
+   `end` rather than `right` so they follow the document direction. */
 .vas-235-dnum {
-    text-align: right;
+    text-align: end;
 }
 
 /* Direction tones. The explicit + / − printed with the figure carries the same
@@ -1015,4 +1040,27 @@
     .vas-235-trackcell {
         display: none;
     }
+}
+
+/* ==========================================================
+   RTL
+   Most of this file needs nothing here, because the direction-sensitive rules are
+   written with LOGICAL properties rather than physical ones and resolve per direction
+   on their own:
+
+     .vas-235-x            margin-inline-start:auto  keeps the close button on the
+                           header's trailing edge - the bug this block was added for
+     .vas-235-r            border-inline-end draws the hairline BETWEEN the two segments
+                           whichever way the track runs
+     text-align:end/start  on the figure columns, their captions, and the picker options
+
+   Only one thing genuinely has to be flipped, and it is an ICON rather than a layout.
+   A chevron is a picture of a direction: "previous" points back the way the reader
+   came, which is LEFT in an LTR document and RIGHT in an RTL one. Nothing in CSS can
+   infer that from the glyph, so it is mirrored explicitly. The pager BUTTONS themselves
+   are not touched - they are laid out by flex and reverse on their own, so mirroring
+   the container as well would flip them back.
+   ========================================================== */
+[dir="rtl"] .vas-235-dpg svg {
+    transform: scaleX(-1);
 }

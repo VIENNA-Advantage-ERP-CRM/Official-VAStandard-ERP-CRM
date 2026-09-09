@@ -1142,6 +1142,15 @@
     <Compile Include="Areas\VAS\Controllers\VAS_239_CurrencyWiseBalanceWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_239_CurrencyWiseBalanceWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BankingJournal\VAS_239_CurrencyWiseBalanceWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_256_UnBudgetedActualWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_256_UnBudgetedActualWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Budget\VAS_256_UnBudgetedActualWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_254_LargestBudgetVarianceWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_254_LargestBudgetVarianceWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Budget\VAS_254_LargestBudgetVarianceWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_252_TopBudgetOverRunsWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_252_TopBudgetOverRunsWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Budget\VAS_252_TopBudgetOverRunsWidget.js" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>
