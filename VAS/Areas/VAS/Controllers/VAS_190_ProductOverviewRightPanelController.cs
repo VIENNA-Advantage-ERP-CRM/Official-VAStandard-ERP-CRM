@@ -57,6 +57,33 @@ namespace VAS.Controllers
         }
 
         /// <summary>
+        /// Returns a cheap change-signature over the product's ACTIVITY sources -
+        /// row count plus the latest change stamp.
+        ///
+        /// The panel polls this while it is on screen so a mail, note, appointment,
+        /// task or call raised from the window's own toolbars shows up on its own.
+        /// Those dialogs are framework code the panel cannot hook and they never
+        /// touch M_Product, so no record-level event fires and nothing else would
+        /// tell the feed it had gone stale. Deliberately a SEPARATE, small action:
+        /// polling the full overview would re-run every section's query.
+        /// </summary>
+        /// <param name="M_Product_ID">Selected product id.</param>
+        /// <returns>JSON-serialized
+        /// <see cref="VAS_190_ProductOverviewRightPanelModel.ActivityStampData"/>.</returns>
+        public JsonResult GetActivityStamp(int M_Product_ID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_190_ProductOverviewRightPanelModel model =
+                    new VAS_190_ProductOverviewRightPanelModel();
+                retJSON = JsonConvert.SerializeObject(model.GetActivityStamp(ctx, M_Product_ID));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
         /// Resolves an AD_Window_ID from a window NAME, for the panel's
         /// record-open path. Window ids differ between environments, so the panel
         /// never carries a numeric one — it names the window and asks here.

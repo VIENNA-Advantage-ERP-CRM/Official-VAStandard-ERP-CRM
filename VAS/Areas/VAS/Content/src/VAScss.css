@@ -268,6 +268,10 @@
 @import "../VAS_225_SetupsExpiringSoonWidget.css";
 @import "../VAS_226_NewRecurringWidget.css";
 @import "../VAS_227_SearchRecurringWidget.css";
+/* The three quantity-line bottom panels, each with its own stylesheet. */
+@import "../VAS_247_MaterialTransferBottomPanel.css";
+@import "../VAS_248_DeliveryOrderBottomPanel.css";
+@import "../VAS_249_GRNBottomPanel.css";
 @import "../VAS_229_NewBankJournalWidget.css";
 @import "../VAS_230_BankBalanceWidget.css";
 @import "../VAS_231_NetMovementWidget.css";

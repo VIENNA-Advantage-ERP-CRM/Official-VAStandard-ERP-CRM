@@ -79,11 +79,22 @@
     overscroll-behavior: auto;
     /*padding: 0.75em;*/
     font-family: var(--cil-font);
-    /* Canonical panel anchor — VIEWPORT-stable so the panel renders at the same physical
-       size on every screen resolution (mirrors VAS_074). All internal em tokens resolve
-       against this anchor; container-type lets inner primitives use cqi if needed. */
+    /* Canonical panel anchor. All internal em tokens resolve against it; container-type
+       lets inner primitives use cqi if needed.
+
+       ZOOM-STABLE, and deliberately a CONSTANT rather than clamp(16px, 1vw, 18px).
+       Browser zoom works by shrinking the viewport measured in CSS pixels — at 125% a
+       1920-wide screen reports 1536 — so a vw-derived anchor SHRINKS as the user zooms
+       IN: the anchor fell 18px -> 16px and every em inside the panel went with it, so the
+       panel visibly contracted against the framework chrome around it, which is sized in
+       fixed px and does not. A constant anchor makes zoom do only what the user asked for
+       — magnify everything uniformly — so the panel keeps its size on screen.
+       16px is the clamp's own floor, i.e. what every viewport under ~1800px already
+       resolved to, so ordinary screens are unchanged at 100% zoom.
+       Narrow-width responsiveness is handled where it belongs: the layout media query at
+       the foot of this file, which drops columns instead of scaling type down. */
     container-type: inline-size;
-    --panel-anchor: clamp(16px, 1vw, 18px);
+    --panel-anchor: 16px;
     font-size: var(--panel-anchor);
     color: var(--cil-text);
     /* Bottom panel top-edge divider per windows-and-panels.md (Bottom Panel > Shared Rules) */
@@ -92,6 +103,45 @@
 /* Same guard down the wrapper chain in case the host stretches an inner block as the
    flex item rather than the root itself. */
 .vas-obl-body, .vas-obl-panel, .vas-obl-table, .vas-obl-tbody {
+    min-width: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Full-width host - survives browser zoom / window resize
+   ---------------------------------------------------------------------------
+   The panel itself is already fluid: .vas-obl-root is width:100% and the row grid is
+   built from fr tracks, which always fill their container. So when the lines table
+   renders narrower than the form above it - the empty band down the right-hand side of
+   the panel - the CONTAINER is the problem, not the panel.
+
+   The framework's own stylesheet sizes the tab-panel host for a RIGHT-docked panel:
+
+       .vis-ad-w-p-ap-tp-outerwrap { display:flex; justify-content:flex-end; width:250px; }
+
+   and only releases that below 600px (@media (max-width:600px) -> width:auto). A
+   BOTTOM-docked panel like this one is therefore stretched to its real width by framework
+   JS, as an INLINE pixel width computed once at layout time. Browser zoom changes the CSS
+   viewport but does not recompute that inline width, so the host keeps its pre-zoom pixel
+   width and the panel is left short of the window's right edge.
+
+   Fixed here rather than in JS because an author !important declaration outranks an inline
+   style, so this keeps winning even when the framework re-asserts its own width after a
+   later relayout. Scoped with :has() to a host that actually contains THIS panel, so
+   right-docked panels keep the 250px the framework intends. (The JS fitHostWidth() is the
+   fallback for browsers without :has().)
+
+   This is the same fix VAS_074 (invoice lines) already carries; this panel never got it. */
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-obl-root) {
+    width: auto !important;
+    max-width: 100% !important;
+}
+
+/* The host's inner wrappers can carry their own computed widths; release them the same way
+   so the width actually reaches the panel root. */
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-obl-root) > .vis-ad-w-p-ap-tp-o-body,
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-obl-root) .vis-ad-w-p-ap-tp-o-b-content {
+    width: auto !important;
+    max-width: 100% !important;
     min-width: 0;
 }
 
@@ -298,7 +348,14 @@
 
 .vas-obl-row {
     display: grid;
-    grid-template-columns: 1.75em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(4.75em, 0.4fr) minmax(6.75em, 0.85fr) 3.5em;
+    /* check | Product | Description | Qty/UOM | Price | Tax | Taxable Amount | "..."
+       Description was 2fr and Tax 0.4fr, which read badly at every width: Description
+       claimed the widest track on the row for a one-line note while Tax - which shows a
+       whole tax name ("IGST 18%") and, in edit, a <select> - had the narrowest flexible
+       track on the row and truncated. Description drops to 1.6fr and Tax rises to 0.7fr,
+       matching Price, so the four right-hand figure columns now step down evenly instead
+       of one of them being a sliver. */
+    grid-template-columns: 1.75em minmax(0, 1.9fr) minmax(0, 1.6fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(5.5em, 0.7fr) minmax(6.75em, 0.85fr) 3.5em;
     gap: 0.75em;
     align-items: center;
     padding: 0.75em 0;
@@ -932,7 +989,12 @@
 
 .vas-obl-more-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    /* minmax(0, 1fr), not a bare 1fr: a bare fr track floors at its content's min-content
+       width, so one long dictionary caption ("Tax Collected at Source") widens its column
+       and pushes the other one out of the dialog at high zoom, where the dialog itself has
+       fewer CSS pixels to spend. See the field min-width:0 rule below - both halves are
+       needed, the track has to be allowed to shrink AND the field has to be allowed to. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 0.25em 2em;
     padding: 1em 1.25em;
     align-items: start;
@@ -1904,7 +1966,9 @@
 
 .vas-obl-form-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    /* minmax(0, 1fr) so a long attribute name cannot floor its track and shove the second
+       column past the dialog edge - same reason as .vas-obl-more-grid. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     column-gap: 0.75em;
     row-gap: 0.75em;
     padding: 1em 1.25em;
@@ -1939,15 +2003,69 @@
     transform: translateX(-50%) translateY(0);
 }
 
-/* ---------- responsive ---------- */
-@media (max-width: 60em) {
-    .vas-obl-row {
-        grid-template-columns: 1.75em minmax(0, 1.6fr) 7em 6em 6em 3.5em;
-    }
+/* ---------- responsive ----------
+   These are @container queries, not @media queries, and that is the whole point.
 
+   A media query asks how wide the VIEWPORT is. This is a bottom panel: it occupies a
+   fraction of the window, and how much is decided by the framework's splitter, not by the
+   viewport - so a viewport breakpoint fires at the wrong moment in both directions (a
+   half-width panel on a wide screen stayed at eight columns and crushed them; a full-width
+   panel on a 990px screen dropped columns it had room for). A container query asks how
+   wide THIS PANEL is, which is the measurement the layout actually depends on.
+
+   It is also what makes the panel fit under zoom. Browser zoom shrinks everything measured
+   in CSS pixels, the panel's own box included, so as the user zooms in the container
+   crosses these thresholds and the grid sheds columns in step - the row keeps fitting
+   instead of overflowing or crushing its cells. The root already declares
+   `container-type: inline-size`, so it is the query container for everything below.
+
+   `em` inside a container query resolves against the QUERY CONTAINER's font size - the
+   panel anchor, a constant 16px - so these thresholds are fixed, real widths and do not
+   drift with zoom or with the host page's root font size.
+
+   Each step keeps the columns you cannot enter a line without (product, quantity, price)
+   and drops the ones that can be read elsewhere - Description and Tax first, then the
+   computed Taxable Amount. Every step also uses flexible minmax() tracks rather than the
+   fixed em widths this rule used to carry: fixed tracks plus gaps consumed ~28em, so at a
+   narrow width the product column was left with almost nothing and its text collided with
+   the quantity. */
+@container (max-width: 60em) {
+    .vas-obl-row {
+        grid-template-columns: 1.75em minmax(0, 1.6fr) minmax(5.5em, 0.9fr) minmax(4.5em, 0.7fr) minmax(6em, 0.9fr) 3.5em;
+    }
+    /* Description (3) and Tax (6). */
     .vas-obl-row--head .vas-obl-cell:nth-child(3), .vas-obl-row--line .vas-obl-cell:nth-child(3),
     .vas-obl-row--head .vas-obl-cell:nth-child(6), .vas-obl-row--line .vas-obl-cell:nth-child(6) {
         display: none;
+    }
+}
+
+@container (max-width: 42em) {
+    .vas-obl-row {
+        grid-template-columns: 1.75em minmax(0, 1.5fr) minmax(5em, 0.9fr) minmax(4.5em, 0.8fr) 3em;
+        gap: 0.5em;
+    }
+    /* ...and Taxable Amount (7): it is a computed figure, and the Total below the grid
+       still states the money. Product, Quantity/UOM and Price survive to the narrowest
+       step - a line cannot be keyed without them. */
+    .vas-obl-row--head .vas-obl-cell:nth-child(7), .vas-obl-row--line .vas-obl-cell:nth-child(7) {
+        display: none;
+    }
+
+    .vas-obl-panel__header {
+        padding: 0 0.5em;
+    }
+}
+
+/* The Additional Info / attribute dialogs mount at BODY level, outside the panel's
+   container, so they are sized against the viewport - which is the right measurement for a
+   position:fixed dialog and shrinks under zoom exactly as they need. Below ~48em there is
+   no room for two field columns side by side, so the form grids go single-column instead
+   of squeezing every caption and control to half a narrow dialog. */
+@media (max-width: 48em) {
+    .vas-obl-more-grid,
+    .vas-obl-form-grid {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 

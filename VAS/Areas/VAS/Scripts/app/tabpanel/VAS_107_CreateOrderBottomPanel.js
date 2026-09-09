@@ -269,7 +269,58 @@
             createBusyIndicator();
             buildShell();
             $(document).on("mousedown.vascil", onDocMouseDown);
+            fitHostWidth();
+            /* Browser zoom fires resize, so this is where a stale host width is re-released.
+               Debounced through rAF - a zoom or a splitter drag emits a burst of events and
+               the work is a DOM write. */
+            $(window).on("resize.vasobl107", function () {
+                if (fitRaf) return;
+                var run = function () { fitRaf = null; fitHostWidth(); };
+                // Called through `window.` on purpose: a detached requestAnimationFrame
+                // reference throws "Illegal invocation" in some browsers.
+                fitRaf = window.requestAnimationFrame
+                    ? window.requestAnimationFrame(run)
+                    : window.setTimeout(run, 16);
+            });
         };
+
+        /* Pending rAF/timeout handle for the resize-driven re-fit. */
+        var fitRaf = null;
+
+        /* Exposed so the prototype's sizeChanged (a framework callback) can re-fit too. */
+        this.fitHostWidth = function () { fitHostWidth(); };
+
+        /* True when the browser understands :has(), i.e. when the stylesheet's own
+           full-width rule for the tab-panel host is doing the job. */
+        function supportsHas() {
+            try { return !!(window.CSS && CSS.supports && CSS.supports("selector(:has(*))")); }
+            catch (e) { return false; }
+        }
+
+        /* Fallback for browsers WITHOUT :has() - see the "Full-width host" block in
+           VAS_107_CreateOrderBottomPanel.css for the full explanation.
+
+           Short version: the framework's stylesheet sizes the tab-panel host at 250px (the
+           right-dock width) and framework JS stretches a bottom-docked panel to its real
+           width with an INLINE pixel width, computed once at layout time. Browser zoom
+           changes the CSS viewport but does not recompute that inline width, so after a zoom
+           the host keeps its pre-zoom width and the panel renders short of the window's
+           right edge, leaving the empty band beside the lines grid.
+
+           The CSS rule handles this on its own where :has() is supported (an author
+           !important beats an inline style), so this only runs where that rule cannot match.
+           Writing width:auto INLINE is what beats the framework's own inline pixel width
+           there. */
+        function fitHostWidth() {
+            if (supportsHas()) return;
+            try {
+                if (!$root || !$root.length) return;
+                var host = $root.closest(".vis-ad-w-p-ap-tp-outerwrap");
+                if (!host.length) return;
+                host[0].style.width = "auto";
+                host[0].style.maxWidth = "100%";
+            } catch (e) { if (window.console) console.log(e); }
+        }
 
         function createBusyIndicator() {
             $busy = $('<div class="vis-apanel-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
@@ -508,9 +559,17 @@
 
         /* The panel heading and the section's accessible name, e.g. "Purchase Order
            Lines & Summary". Both come from ONE message so a translation can put the
-           document name wherever its language needs it. */
+           document name wherever its language needs it.
+
+           A QUOTATION reads from its OWN message key rather than from the generic
+           "{0} Lines & Summary" wording, so a site can word the quotation heading
+           independently of the order heading (several languages do not simply swap the
+           noun). Both keys still run through docMsg, so a customised message that keeps
+           the {0} placeholder continues to get the document noun substituted. */
         function docTitle() {
-            return docMsg("VAS_107_LinesSummaryFor", "{0} Lines & Summary");
+            return docIsQuotation()
+                ? docMsg("VAS_107_QuotationLinesSummary", "Quotation Lines & Summary")
+                : docMsg("VAS_107_LinesSummaryFor", "{0} Lines & Summary");
         }
 
         /* Re-label everything that names the document. buildShell() builds the header
@@ -592,7 +651,12 @@
             $row.append('<div class="vas-obl-cell" role="columnheader">' + esc(lbl("Description", "Description")) + "</div>");
             $row.append('<div class="vas-obl-cell vas-obl-cell--right" role="columnheader">' + esc(lbl("VAS_107_QtyUom", "Quantity / UOM")) + "</div>");
             $row.append('<div class="vas-obl-cell vas-obl-cell--right vas-obl-hdr-price" role="columnheader">' + priceHeaderHtml() + "</div>");
-            $row.append('<div class="vas-obl-cell" role="columnheader">' + esc(lbl("Tax", "Tax")) + "</div>");
+            // Tax is right-aligned like the three figure columns around it. Left-aligned, its
+            // heading sat one 0.75em gap from the RIGHT edge of the right-aligned Price
+            // heading, so "Price" and "Tax" collided into what read as a single "Price Tax"
+            // label. Right-aligning it puts a whole (empty) track between the two words and
+            // makes Quantity / Price / Tax / Taxable Amount one tidy right-hand cluster.
+            $row.append('<div class="vas-obl-cell vas-obl-cell--right" role="columnheader">' + esc(lbl("Tax", "Tax")) + "</div>");
             $row.append('<div class="vas-obl-cell vas-obl-cell--right" role="columnheader">' + esc(lbl("VAS_107_TaxableAmt", "Taxable Amount")) + "</div>");
             $row.append('<div class="vas-obl-cell vas-obl-cell--more" role="columnheader" aria-label="' + esc(lbl("VAS_107_More", "More")) + '"></div>');
             return $row;
@@ -815,7 +879,10 @@
             $saveBtn.removeClass("vas-obl-is-hidden");
             var plural   = n > 1 ? lbl("VAS_107_PluralS", "s") : "";
             var countTxt = n > 0 ? " (" + n + ")" : "";
-            $saveBtn.html(icon("hard-drive", "💾") + "<span>" + esc(lbl("VAS_107_SaveRow", "Save row")) + plural + countTxt + "</span>");
+            // Save glyph: the framework icon font (vis vis-save), the SAME mark the invoice
+            // line panel (VAS_074) uses, so Save reads identically across the document
+            // panels instead of this one carrying its own hard-drive SVG.
+            $saveBtn.html('<i class="vis vis-save vas-obl-icon" aria-hidden="true"></i><span>' + esc(lbl("VAS_107_SaveRow", "Save row")) + plural + countTxt + "</span>");
             var sc = selectedCount();
             $deleteBtn.find(".vas-obl-sel-count").text(sc > 0 ? "(" + sc + ")" : "");
             if ($selectAll) $selectAll.prop("checked", lines.length > 0 && sc === lines.length).prop("disabled", locked);
@@ -999,7 +1066,12 @@
                     if (e.key === "Escape") { editing = null; render(); }
                 });
                 wrap.append($inp);
-                setTimeout(function () { $inp.focus(); }, 0);
+                // An AMOUNT cell (Price) opens with its whole value selected, so typing
+                // replaces the figure outright - the caret never has to be placed and the
+                // old digits never have to be deleted first. Mirrors the opportunity-lines
+                // panel (VAS_218). A text cell (Description) is left with the caret where
+                // the click put it, because a description is usually amended, not replaced.
+                setTimeout(function () { $inp.focus(); if (opts.amount) $inp.select(); }, 0);
             } else {
                 var disp = opts.amount ? (value ? fmtMoney(value) : "") : (value || "");
                 wrap.append(dispInput(line, field, disp, { align: opts.align, placeholder: placeholder }));
@@ -1031,7 +1103,8 @@
                     if (e.key === "Escape") { editing = null; render(); }
                 });
                 wrap.append($q);
-                setTimeout(function () { $q.focus(); }, 0);
+                // Quantity opens fully selected - see renderEditableCell.
+                setTimeout(function () { $q.focus(); $q.select(); }, 0);
             } else {
                 var hasQ = v.QtyEntered !== undefined && v.QtyEntered !== "" && +v.QtyEntered !== 0;
                 wrap.append(dispInput(line, "quantity", hasQ ? fmtAmtInput(v.QtyEntered, 2) : "",
@@ -1068,7 +1141,8 @@
         function renderTaxCell(line) {
             var v = line.values;
             var editable = parent && parent.IsEditable;
-            var cell = $('<div class="vas-obl-cell" role="cell"></div>');
+            // Right-aligned to match its column header - see buildHeadRow.
+            var cell = $('<div class="vas-obl-cell vas-obl-cell--right" role="cell"></div>');
             var wrap = $('<div class="vas-obl-cell-edit"></div>');
             var isEditing = editing && editing.rowId === line.rowId && editing.field === "tax";
             if (isEditing) wrap.addClass("is-editing");
@@ -1077,7 +1151,7 @@
             if (isEditing) {
                 // Tax options filtered to this line's context (C_Tax_ID AD_Val_Rule);
                 // refined in place once the per-row list arrives.
-                var $sel = $('<select class="vas-obl-cell-edit__select"></select>');
+                var $sel = $('<select class="vas-obl-cell-edit__select"></select>').css("text-align", "right");
                 fillTaxOptions($sel, line);
                 ensureRowLookups(line, function () {
                     if (editing && editing.rowId === line.rowId && editing.field === "tax" && $sel.closest("body").length)
@@ -1094,7 +1168,7 @@
                 wrap.append($sel);
                 setTimeout(function () { $sel.focus(); }, 0);
             } else {
-                wrap.append(dispInput(line, "tax", line.display.taxName || "", { placeholder: "—", cls: "vas-obl-taxval" }));
+                wrap.append(dispInput(line, "tax", line.display.taxName || "", { align: "right", placeholder: "—", cls: "vas-obl-taxval" }));
             }
             return cell;
         }
@@ -2136,9 +2210,15 @@
             // On every real order, purchase as well as sales; not on a quotation.
             { col: "C_ProjectPhase_ID", when: "order" },
             { col: "C_Campaign_ID" },
-            // C_Activity_ID is NOT here: this dictionary labels it "Billing Code" and it
-            // is read as a billing reference rather than as an accounting dimension, so
-            // it lives under References on every order kind. See the entry there.
+            // "Billing Code" (C_Activity_ID) sits in TWO places, and the two entries are
+            // mutually exclusive by `when`, so exactly one is ever built - see the second
+            // entry under References. On a QUOTATION it belongs here, with the accounting
+            // dimensions: a quotation carries no billing references at all (no blanket
+            // release, no originating PO line, no converted-from quotation line), so
+            // References is empty on a quotation and the field would otherwise be the lone
+            // survivor holding an empty section open. On every real order it stays under
+            // References, where it is read as a billing reference rather than a dimension.
+            { col: "C_Activity_ID", when: "quotation" },
             { col: "VAS_Opportunity_ID" },
             // --- Contract group (SALES ORDERS only: IsSOTrx = 'Y' and not a quotation).
             // Contract billing is raised against the customer document, so these never
@@ -2164,16 +2244,19 @@
             // field is not offered at all.
             { col: "IsDropShip",       when: "purchaseDropShip" },
             { col: "VAMRP_PlanRun_ID", when: "purchase" },   // MRP plan run (VAMRP module)
-            // "Billing Code" — this dictionary's label for C_Activity_ID. It is read as a
-            // billing reference rather than as an accounting dimension, so it belongs
-            // here and not under Dimension, on purchase and sales orders alike. The
-            // caption the modal prints is the dictionary's own (AD_Field / AD_Column
-            // Name), so it reads "Billing Code" without the panel hard-coding the word.
-            // On a sales order it is always offered - see DISPLAY_LOGIC_ALWAYS_SHOW.
+            // "Billing Code" — this dictionary's label for C_Activity_ID. On a real ORDER
+            // it is read as a billing reference rather than as an accounting dimension, so
+            // it belongs here; on a QUOTATION it moves up into Dimension (see the paired
+            // entry there). The caption the modal prints is the dictionary's own (AD_Field
+            // / AD_Column Name), so it reads "Billing Code" without the panel hard-coding
+            // the word. On any sales document it is always offered - see
+            // DISPLAY_LOGIC_ALWAYS_SHOW.
             { col: "C_Activity_ID", when: "order" },
-            // Blanket release link — carried by both purchase and sales orders, and always
+            // Blanket release link ("Order Line"). It records which BLANKET order line the
+            // release came from, so it is meaningless on a quotation - a quotation is never
+            // a release against a blanket. Real orders only (purchase and sales); always
             // offered on a sales order (DISPLAY_LOGIC_ALWAYS_SHOW).
-            { col: "C_OrderLine_Blanket_ID" },
+            { col: "C_OrderLine_Blanket_ID", when: "order" },
             // Original PO Line. The column is Ref_C_Orderline_ID, NOT Ref_OrderLine_ID -
             // both exist on C_OrderLine and only this one carries that field label. Its
             // own DisplayLogic (@Ref_C_Order_ID@>0 & @VAS_OrderType@='VO') restricts it
@@ -2205,6 +2288,12 @@
             if (when === "purchaseDropShip") return docIsPurchase() && docIsDropShip();
             // Sales order that is not a quotation (IsSOTrx = 'Y' AND IsSalesQuotation = 'N').
             if (when === "salesOrder") return docIsSalesOrder();
+            // Any SALES-side document (IsSOTrx = 'Y') - sales order OR quotation.
+            if (when === "sales") return !!(parent && parent.IsSOTrx);
+            // A quotation only (IsSOTrx = 'Y' AND IsSalesQuotation = 'Y'). The exact
+            // complement of "order", so a column listed under both lands in exactly one
+            // group whatever the document is.
+            if (when === "quotation") return docIsQuotation();
             // Any real order, sales or purchase - excludes quotations only.
             if (when === "order") return docIsOrder();
             if (when === "svcExpenseOrCharge") {
@@ -2381,9 +2470,17 @@
         }
 
         function additionalInfoColumns(line) {
-            var out = [];
+            var out = [], seen = {};
             for (var i = 0; i < ADDITIONAL_INFO_FIELDS.length; i++) {
                 var spec = ADDITIONAL_INFO_FIELDS[i];
+                // A column may be listed twice so it can sit in a different GROUP per
+                // document kind (C_Activity_ID: Dimension on a quotation, References on an
+                // order). The two entries carry complementary `when`s, so only one survives
+                // the filter below - but guard anyway: building the same ColumnName twice
+                // would put two [data-col="X"] fields in the modal, and every lookup there
+                // (applyDynDisplay, applyFieldGroups, the save reconcile) addresses fields
+                // by that attribute and would silently act on the first one only.
+                if (seen[spec.col]) continue;
                 if (!isModuleInstalled(spec.col)) continue;
                 // Exact dictionary case first, then a case-insensitive fallback - the curated
                 // list above is hand-written and must not lose a field to a casing difference
@@ -2391,6 +2488,7 @@
                 var m = columnMeta[spec.col] || columnMeta[columnNameByLc[String(spec.col).toLowerCase()]];
                 if (!m) continue;
                 if (!dynCondMet(line, spec.when)) continue;
+                seen[spec.col] = true;
                 out.push(m);
             }
             return out;
@@ -2413,10 +2511,15 @@
            References fields is required on a SALES ORDER, but its dictionary DisplayLogic
            is written for the document that raises the link (e.g. the blanket-release
            windows, or an accounting-element gate) and therefore hides it on an ordinary
-           sales order. Purchase orders and quotations are untouched - the dictionary keeps
-           deciding there. `when` uses the same vocabulary as ADDITIONAL_INFO_FIELDS. */
+           sales order. Purchase orders are untouched - the dictionary keeps deciding
+           there. `when` uses the same vocabulary as ADDITIONAL_INFO_FIELDS.
+
+           Billing Code uses `sales`, not `salesOrder`: a QUOTATION carries the same
+           dictionary DisplayLogic as the sales order it becomes, so without the override
+           the field was offered on the order and missing on the quotation even though the
+           accounting schema enables it and the Quotation line tab shows it. */
         var DISPLAY_LOGIC_ALWAYS_SHOW = [
-            { col: "C_Activity_ID",          when: "salesOrder" },   // "Billing Code"
+            { col: "C_Activity_ID",          when: "sales" },        // "Billing Code"
             { col: "C_OrderLine_Blanket_ID", when: "salesOrder" }    // "Blanket Order Line"
         ];
         /* True when this column's DisplayLogic is overridden for the current document. */
@@ -4082,12 +4185,23 @@
         this.fetchData(recordID);
     };
 
-    VAS.VAS_107_CreateOrderBottomPanel.prototype.sizeChanged = function (width) { this.panelWidth = width; };
+    /* The framework calls sizeChanged(HEIGHT, WIDTH) - in that order. The old single-arg
+       `function (width)` signature therefore stored the HEIGHT in panelWidth (harmless only
+       because nothing read it). The width argument cannot be trusted either: on a window
+       resize the framework calls viewManager.sizeChanged(h, window.innerwidth) - lower-case
+       "w", so the value is undefined. Both are recorded for completeness, but the actual
+       re-fit re-measures from the DOM instead of believing either number. */
+    VAS.VAS_107_CreateOrderBottomPanel.prototype.sizeChanged = function (height, width) {
+        this.panelHeight = height;
+        this.panelWidth = width;
+        if (typeof this.fitHostWidth === "function") this.fitHostWidth();
+    };
 
     VAS.VAS_107_CreateOrderBottomPanel.prototype.dispose = function () {
         // Remove the capture-phase shortcut listener registered during init (VAI154 12-Aug-2026).
         if (this._shortcuts) { this._shortcuts.dispose(); this._shortcuts = null; }
         $(document).off("mousedown.vascil").off("keydown.vascil");
+        $(window).off("resize.vasobl107");
         $("#vasOblAttr, #vasOblScan, .vas-obl-toast").remove();
         this.record_ID = 0; this.table_ID = 0; this.windowNo = 0;
         this.curTab = null; this.selectedRow = null; this.panelWidth = null;

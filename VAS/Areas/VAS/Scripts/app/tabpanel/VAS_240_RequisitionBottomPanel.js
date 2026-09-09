@@ -31,8 +31,8 @@
 
         /* parent requisition context returned by GetPanelData */
         var parent = null;
-        /* server-side line paging (20/page): current 0-based page, total saved lines, size */
-        var linePage = 0, linesTotal = 0, linePageSize = 20;
+        /* server-side line paging (10/page): current 0-based page, total saved lines, size */
+        var linePage = 0, linesTotal = 0, linePageSize = 10;
         /* saved total of every line NOT on the current page (document total minus this
            page). renderTotals adds the live current-page sum so the totals row reflects the
            WHOLE requisition, not just the loaded page, while still updating during edits. */
@@ -226,7 +226,7 @@
 
         this.fetchData = function (recordID, page) {
             // Framework calls fetchData(recordID) on record load -> reset to page 0; the
-            // pager calls it with an explicit page. Server returns LinePageSize (20) rows.
+            // pager calls it with an explicit page. Server returns LinePageSize (10) rows.
             var reqPage = (typeof page === "number" && page >= 0) ? page : 0;
             // Capture a monotonic token before the AJAX call so a stale response arriving
             // after the user navigated to a different record can be silently discarded in
@@ -256,7 +256,7 @@
                     parent = data || null;
                     linesTotal = (parent && parent.LinesTotal) || 0;
                     linePage = (parent && +parent.LinePage) || 0;
-                    linePageSize = (parent && +parent.LinePageSize) || 20;
+                    linePageSize = (parent && +parent.LinePageSize) || 10;
                     otherSub = (parent && +parent.OtherPagesSubtotal) || 0;
                     uomList = (parent && parent.UomList) || [];
                     // Cache the AD_Column meta (callout code + validation) once per load.
@@ -472,7 +472,7 @@
             $totalsRow = $('<div class="vas-rbl-totals-block"></div>');
             $table.append($totalsRow);
             $panel.append($table);
-            // Server-side line pager (20/page): "X-Y of N" + prev/next.
+            // Server-side line pager (10/page): "X-Y of N" + prev/next.
             $pager = $('<div class="vas-rbl-linepager" style="display:none;"></div>');
             $pager.on("click", "[data-act=lp-prev]", function () { gotoLinePage(linePage - 1); });
             $pager.on("click", "[data-act=lp-next]", function () { gotoLinePage(linePage + 1); });
@@ -540,7 +540,7 @@
            right. Shown whenever the requisition has saved lines (even a single page). */
         function renderPager() {
             if (!$pager) return;
-            var total = linesTotal || 0, size = linePageSize || 20;
+            var total = linesTotal || 0, size = linePageSize || 10;
             if (!total) { $pager.hide().empty(); return; }
             var pageCount = Math.max(1, Math.ceil(total / size));
             var start = linePage * size + 1;
@@ -572,7 +572,7 @@
            silently discards a new/edited row. */
         function gotoLinePage(p) {
             if (!parent || !parent.M_Requisition_ID) return;
-            var pageCount = Math.max(1, Math.ceil((linesTotal || 0) / (linePageSize || 20)));
+            var pageCount = Math.max(1, Math.ceil((linesTotal || 0) / (linePageSize || 10)));
             if (p < 0) p = 0; if (p > pageCount - 1) p = pageCount - 1;
             if (p === linePage) return;
             if (unsavedLines().length) { showToast(lbl("VAS_240_SavePageFirst", "Save or discard your changes before changing page")); return; }

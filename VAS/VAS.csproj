@@ -199,6 +199,9 @@
     <Compile Include="Areas\VAS\Controllers\VAS_188_TopUsedProductsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_074_CreateInvoiceLinePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_107_CreateOrderBottomPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_247_MaterialTransferBottomPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_248_DeliveryOrderBottomPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_249_GRNBottomPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_240_RequisitionBottomPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_218_CreateOppLinesController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_105_AccountRightPanelController.cs" />
@@ -456,6 +459,9 @@
     <Content Include="Areas\VAS\Content\VAS_236_ReceiptvsPaymentWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_238_UnreconciledBankLineWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_218_CreateOppLines.css" />
+    <Content Include="Areas\VAS\Content\VAS_247_MaterialTransferBottomPanel.css" />
+    <Content Include="Areas\VAS\Content\VAS_248_DeliveryOrderBottomPanel.css" />
+    <Content Include="Areas\VAS\Content\VAS_249_GRNBottomPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_KpiDrillThrough.css" />
     <Content Include="Areas\VAS\Content\VAS_122_TotalCustomersWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_124_DelayedPaymentsWidget.css" />
@@ -713,6 +719,9 @@
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_191_APPaymentDetailPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_074_CreateInvoiceLinePanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_107_CreateOrderBottomPanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_247_MaterialTransferBottomPanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_248_DeliveryOrderBottomPanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_249_GRNBottomPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_240_RequisitionBottomPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_030_BouncedAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_027_ClearedAPPaymentWidget.js" />

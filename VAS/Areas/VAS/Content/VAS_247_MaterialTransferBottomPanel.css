@@ -1,0 +1,1727 @@
+/* ============================================================
+ * Module Name    : CRM Extension VAS_247
+ * Purpose        : Material Transfer Bottom Panel — styles
+ * Employee Code  : VAI154
+ * Date           : 09-Sep-2026
+ * VAS_247_MaterialTransferBottomPanel — editable M_MovementLine grid
+ * Modelled on VAS_240_RequisitionBottomPanel:
+ *   - editable lines table with selection + unsaved cue
+ *   - catalog autocomplete popover (keyboard nav)
+ *   - attribute picker dialog (shared VIS.AttributeControl)
+ *   - scan barcode dialog
+ *   - Additional Info modal (dictionary fields, collapsible groups)
+ * A movement line carries no money, so there is no price column, no line
+ * amount and no grand-total rule here — the totals block states a line
+ * count and a quantity. What it has instead is TWO locator columns.
+ * All sizing in em (no px), classes namespaced vas-mtl-* so nothing
+ * leaks into the host page. Tokens are shared with the body-level
+ * dialogs / toast (which mount outside .vas-mtl-root).
+ * ============================================================ */
+
+.vas-mtl-root,
+.vas-mtl-dialog-backdrop,
+.vas-mtl-toast {
+    --mtl-action-blue: #0083da;
+    --mtl-action-blue-hover: #0069ae;
+    --mtl-link-deep: #005fa3;
+    --mtl-blue-soft: #eaf8ff;
+    --mtl-blue-border: #bfe4ff;
+    --mtl-surface: #ffffff;
+    --mtl-surface-muted: #fbfdff;
+    --mtl-surface-amber: #fff6e0;
+    --mtl-divider: #e2eaf1;
+    --mtl-divider-strong: #c5d2dd;
+    --mtl-divider-soft: #eef2f6;
+    --mtl-border-default: #d9e2eb;
+    --mtl-border-field: #d7d7d7;
+    --mtl-text: #102c3f;
+    --mtl-text-strong: #111827;
+    --mtl-text-secondary: #41576a;
+    --mtl-text-muted: #5f7283;
+    --mtl-text-faint: #9f9f9f;
+    --mtl-text-disabled: #9aa6b2;
+    --mtl-warning: #d78b10;
+    --mtl-danger: #d14545;
+    --mtl-danger-bg: #fcefef;
+    --mtl-danger-text: #a33f3f;
+    --mtl-purple: #5f4aa6;
+    --mtl-purple-bg: #efeeff;
+    --mtl-r-sm: 6px;
+    --mtl-r-md: 8px;
+    --mtl-r-lg: 10px;
+    --mtl-r-pill: 999px;
+    --mtl-shadow-pop: 0 10px 24px rgba(15, 61, 97, 0.12);
+    --mtl-shadow-dialog: 0 20px 50px rgba(15, 61, 97, 0.2);
+    --mtl-font: "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+}
+
+.vas-mtl-root {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    /* When the framework mounts this as a flex item, the default min-width:auto resolves
+       to the grid's min-content (the longest product / locator word), so the root refuses
+       to shrink to its host and the whole panel spills past the viewport with a horizontal
+       scrollbar. min-width:0 lets it shrink so the fr tracks fit and ellipsis-truncate. */
+    min-width: 0;
+    max-width: 100%;
+    /* overflow-x:hidden (not auto) makes the root a hard horizontal clip boundary, so its
+       content can never push a shrink-to-fit framework host wider than the viewport.
+       Vertical stays scrollable for long line lists. */
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    /* overscroll-behavior:auto (NOT contain) so the wheel/trackpad CHAINS to the page once
+       this inner scroller hits its top/bottom. `contain` traps the scroll here and the page
+       feels stuck while the pointer is over the panel. */
+    overscroll-behavior: auto;
+    font-family: var(--mtl-font);
+    color: var(--mtl-text);
+    /* Query container for the responsive rules at the foot of this file. */
+    container-type: inline-size;
+    /* Canonical panel anchor, deliberately a CONSTANT rather than a vw-derived clamp.
+       Browser zoom shrinks the viewport measured in CSS pixels, so a vw anchor SHRINKS as
+       the user zooms in and the whole panel contracts against framework chrome that is
+       sized in fixed px. A constant makes zoom do only what was asked - magnify. */
+    --panel-anchor: 16px;
+    font-size: var(--panel-anchor);
+}
+
+/* Same guard down the wrapper chain in case the host stretches an inner block as the
+   flex item rather than the root itself. */
+.vas-mtl-body, .vas-mtl-panel, .vas-mtl-table, .vas-mtl-tbody {
+    min-width: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Full-width host - survives browser zoom / window resize
+   ---------------------------------------------------------------------------
+   The panel is already fluid (root is width:100%, the row grid is fr tracks). When it
+   renders narrower than the form above it, the CONTAINER is the problem.
+
+   The framework stylesheet sizes the tab-panel host for a RIGHT-docked panel
+   (.vis-ad-w-p-ap-tp-outerwrap { width:250px }) and stretches a BOTTOM-docked one with an
+   INLINE pixel width computed once at layout time. Browser zoom changes the CSS viewport
+   but never recomputes that inline width, so the host keeps its pre-zoom pixels and the
+   panel stops short of the window's right edge.
+
+   Fixed in CSS rather than JS because an author !important outranks an inline style, so it
+   keeps winning when the framework re-asserts its width after a later relayout. Scoped
+   with :has() to a host containing THIS panel, so right-docked panels keep the 250px the
+   framework intends. (The panel's own fitHostWidth() is the fallback for browsers
+   without :has().) */
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-mtl-root) {
+    width: auto !important;
+    max-width: 100% !important;
+}
+
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-mtl-root) > .vis-ad-w-p-ap-tp-o-body,
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-mtl-root) .vis-ad-w-p-ap-tp-o-b-content {
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0;
+}
+
+/* Hide the framework-rendered tab title bar and its coloured header. The framework places
+   .vis-ad-w-p-ap-tp-body-head immediately before our root, so this adjacency :has()
+   targets ONLY this panel's head — never a sibling panel's. It is redundant with the
+   panel's own heading. */
+.vis-ad-w-p-ap-tp-body-head:has(+ .vas-mtl-root) {
+    display: none !important;
+}
+
+.vas-mtl-root * {
+    box-sizing: border-box;
+}
+
+.vas-mtl-empty {
+    display: flex;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    color: var(--mtl-text-muted);
+}
+
+.vas-mtl-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.875em;
+    height: 0.875em;
+}
+
+.vas-mtl-is-hidden {
+    display: none !important;
+}
+
+/* ---------- panel ---------- */
+/* Panel Foundation Rule 1 — wrapper. Plain block container — no flex layout — so the panel
+   grows with its content and the root's overflow-y:auto scrolls the whole panel (header +
+   lines + totals) as one unit. */
+.vas-mtl-panel {
+    background: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+/* Panel Foundation Rule 2 — header chrome */
+.vas-mtl-panel__header {
+    min-height: 56px;
+    padding: 0 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+}
+
+.vas-mtl-panel__title {
+    margin: 0;
+    font-size: 1.1em;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--mtl-text-strong);
+}
+
+.vas-mtl-panel__subtitle {
+    margin: 0.125em 0 0;
+    font-size: 0.8125em;
+    color: var(--mtl-text-muted);
+}
+
+.vas-mtl-panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625em;
+}
+
+/* ---------- buttons ---------- */
+.vas-mtl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    padding: 0.5em 0.875em;
+    border: 1px solid transparent;
+    border-radius: var(--mtl-r-pill);
+    background: transparent;
+    font-family: inherit;
+    font-size: 0.85em;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background .12s, color .12s, border-color .12s;
+}
+
+.vas-mtl-btn--outline {
+    background: var(--mtl-surface);
+    border-color: var(--mtl-action-blue);
+    color: var(--mtl-action-blue);
+}
+
+    .vas-mtl-btn--outline:hover {
+        background: var(--mtl-blue-soft);
+    }
+
+.vas-mtl-btn--outline-pill {
+    background: var(--mtl-surface);
+    border-color: var(--mtl-action-blue);
+    color: var(--mtl-action-blue);
+    font-size: 0.75em;
+    font-weight: 600;
+    padding: 0.375em 0.75em;
+}
+
+    .vas-mtl-btn--outline-pill:hover {
+        background: var(--mtl-blue-soft);
+    }
+
+.vas-mtl-btn--primary {
+    background: var(--mtl-action-blue);
+    border-color: var(--mtl-action-blue);
+    color: #fff;
+    font-weight: 700;
+    padding: 0.5em 1.125em;
+}
+
+    .vas-mtl-btn--primary:hover {
+        background: var(--mtl-action-blue-hover);
+    }
+
+    .vas-mtl-btn--primary:disabled {
+        background: #9fcdec;
+        border-color: #9fcdec;
+        cursor: not-allowed;
+    }
+
+.vas-mtl-btn--ghost {
+    background: var(--mtl-surface);
+    border-color: var(--mtl-border-default);
+    color: var(--mtl-text-secondary);
+    font-weight: 600;
+    padding: 0.5em 1.125em;
+}
+
+    .vas-mtl-btn--ghost:hover {
+        background: var(--mtl-surface-muted);
+    }
+
+.vas-mtl-btn--save {
+    background: var(--mtl-surface);
+    border-color: var(--mtl-purple);
+    color: var(--mtl-purple);
+}
+
+    .vas-mtl-btn--save:hover {
+        background: var(--mtl-purple-bg);
+    }
+
+    .vas-mtl-btn--save.vas-mtl-is-disabled,
+    .vas-mtl-btn--save:disabled {
+        cursor: not-allowed;
+        border-color: #dbe6ee;
+        color: var(--mtl-text-disabled);
+        background: var(--mtl-surface);
+    }
+
+.vas-mtl-btn--danger {
+    background: var(--mtl-surface);
+    border-color: var(--mtl-danger-text);
+    color: var(--mtl-danger-text);
+}
+
+    .vas-mtl-btn--danger:hover {
+        background: #fbe6e6;
+    }
+
+.vas-mtl-btn.vas-mtl-is-disabled, .vas-mtl-btn:disabled {
+    cursor: not-allowed;
+    border-color: #dbe6ee;
+    color: var(--mtl-text-disabled);
+    background: var(--mtl-surface);
+}
+
+/* ---------- table (panel body) ---------- */
+/* Panel Foundation Rule 3 — the font-size anchor lives on .vas-mtl-root. The table is a
+   plain flex column that grows with its content; the root scrolls it. */
+.vas-mtl-table {
+    overflow-x: hidden;
+    padding: 0.5em 1.25em 1.125em;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Panel Foundation Rule 4 — form-control reset. Scoped to the root + body-level dialogs so
+   every button/input/select inside the panel inherits the root's font-size anchor instead
+   of falling back to the UA default (~13.33px in Chrome). :where() gives it zero
+   specificity, so controls setting their own size still win. */
+:where(.vas-mtl-root, .vas-mtl-dialog-backdrop) button,
+:where(.vas-mtl-root, .vas-mtl-dialog-backdrop) input,
+:where(.vas-mtl-root, .vas-mtl-dialog-backdrop) select,
+:where(.vas-mtl-root, .vas-mtl-dialog-backdrop) textarea,
+:where(.vas-mtl-root, .vas-mtl-dialog-backdrop) optgroup {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+/* Seven tracks, in the order renderRow builds them: select, product, description, from
+   locator, to locator, quantity + UOM, "...". (VAS_240 has a price and a line-amount track
+   where the two locators sit here; a movement line carries no money.)
+
+   The head row and each body row are SEPARATE grid containers sharing this rule, so both
+   must resolve identical tracks — which is why no track may be content-dependent. Every
+   flexible track is minmax(0, Nfr) so a long value shrinks its own cell instead of pushing
+   the next column over its neighbour at an odd zoom level. */
+.vas-mtl-row {
+    display: grid;
+    grid-template-columns: 1.75em minmax(0, 1.9fr) minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(6em, 0.9fr) 3.5em;
+    gap: 0.75em;
+    align-items: center;
+    padding: 0.75em 0;
+    border-bottom: 1px solid var(--mtl-divider);
+    transition: background .12s;
+}
+
+.vas-mtl-row--head {
+    padding: 0.625em 0;
+    border-bottom-color: var(--mtl-divider-strong);
+    align-items: start;
+}
+
+    .vas-mtl-row--head .vas-mtl-cell {
+        letter-spacing: 0.005em;
+        font-size: 0.9125em;
+        font-weight: 400;
+        color: var(--mtl-text);
+    }
+
+.vas-mtl-row--line {
+    position: relative;
+}
+
+    .vas-mtl-row--line.is-selected {
+        background: var(--mtl-blue-soft);
+    }
+
+    .vas-mtl-row--line.is-busy {
+        opacity: 0.55;
+        pointer-events: none;
+    }
+
+.vas-mtl-row-spin {
+    position: absolute;
+    top: 50%;
+    right: 1.25em;
+    width: 1em;
+    height: 1em;
+    margin-top: -0.5em;
+    border: 2px solid var(--mtl-border-default);
+    border-top-color: var(--mtl-action-blue);
+    border-radius: 50%;
+    animation: vasMtlSpin 0.7s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes vasMtlSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* An unsaved row is tinted with a left bar, so "what have I not committed yet" is
+   answerable at a glance without reading the Save button's counter. */
+.vas-mtl-row--line.is-unsaved {
+    background: var(--mtl-surface-amber);
+    box-shadow: inset 3px 0 0 var(--mtl-warning);
+}
+
+    .vas-mtl-row--line.is-unsaved.is-selected {
+        background: var(--mtl-blue-soft);
+    }
+
+.vas-mtl-row--line.is-invalid {
+    background: var(--mtl-danger-bg);
+    box-shadow: inset 3px 0 0 var(--mtl-danger);
+}
+
+/* Per-row inline validation message (replaces a global toast on Save). Spans the whole
+   grid row on its own line, red, under the offending line's cells. */
+.vas-mtl-row--line .vas-mtl-row-error {
+    grid-column: 1 / -1;
+    margin: 0.125em 0 0 2.5em;
+    font-size: 0.75em;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--mtl-danger);
+}
+
+.vas-mtl-emptyrow {
+    padding: 1.5em;
+    text-align: center;
+    color: var(--mtl-text-muted);
+    border-bottom: 1px solid var(--mtl-divider);
+}
+
+/* ---------- totals block ---------- */
+/* CSS Grid with two shared columns (label | value). Every row uses display:contents so its
+   label and value become direct grid items — this forces all labels into one column track
+   and all values into the other, so label right-edges align regardless of per-cell
+   font-size. justify-content:end right-aligns the whole grid within the table. */
+.vas-mtl-totals-block {
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 1.25em;
+    row-gap: 0.4em;
+    align-items: baseline;
+    justify-content: end;
+    padding: 0.75em 0 0.5em;
+}
+
+.vas-mtl-totals-row {
+    display: contents;
+}
+
+.vas-mtl-totals-row__label {
+    font-size: 0.875em;
+    color: var(--mtl-text-muted);
+    white-space: nowrap;
+    text-align: right;
+}
+
+.vas-mtl-totals-row__value {
+    font-size: 1.1em;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    text-align: right;
+    letter-spacing: -0.01em;
+    color: var(--mtl-text);
+}
+
+/* Total Quantity is the movement's headline figure — the equivalent of VAS_240's grand
+   total, and the only line in this block that is emphasised. */
+.vas-mtl-totals-row--grand .vas-mtl-totals-row__label,
+.vas-mtl-totals-row--grand .vas-mtl-totals-row__value {
+    padding-top: 0.4em;
+    margin-top: 0.1em;
+}
+
+    .vas-mtl-totals-row--grand .vas-mtl-totals-row__label {
+        font-size: 0.9375em;
+        font-weight: 700;
+        color: var(--mtl-text-strong);
+    }
+
+.vas-mtl-totals-row--grand .vas-mtl-totals-row__value {
+    font-size: 1.1875em;
+    font-weight: 700;
+    color: var(--mtl-text-strong);
+    letter-spacing: -0.02em;
+    border-top: 1px solid var(--mtl-divider);
+}
+
+/* ---------- cells ---------- */
+/* min-width:0 lets the ITEM shrink; a grid item keeps min-width:auto (its own
+   content-based minimum) otherwise and paints straight over its neighbour. */
+.vas-mtl-cell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 0.875em;
+    color: var(--mtl-text);
+}
+
+.vas-mtl-cell--check {
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-mtl-cell--right {
+    text-align: right;
+    align-items: flex-end;
+}
+
+.vas-mtl-cell--more {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25em;
+}
+
+/* The catalog popover is absolutely positioned against this cell, so it must not clip. */
+.vas-mtl-cell--product {
+    overflow: visible;
+}
+
+.vas-mtl-cell input[type="checkbox"] {
+    width: 1em;
+    height: 1em;
+    accent-color: var(--mtl-action-blue);
+    cursor: pointer;
+}
+
+/* Read-only movement (.vas-mtl-locked): the selection / select-all checkbox and the "..."
+   button are disabled -> not-allowed. A disabled control IGNORES its own `cursor` in
+   Chromium, so put the cursor on the (enabled) parent cell and let the disabled control
+   pass pointer events through to it. */
+.vas-mtl-locked .vas-mtl-cell--check,
+.vas-mtl-locked .vas-mtl-cell--more {
+    cursor: not-allowed;
+}
+
+    .vas-mtl-locked .vas-mtl-cell--check input[type="checkbox"]:disabled,
+    .vas-mtl-locked .vas-mtl-more-btn:disabled {
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+/* ---------- editable cell (underline affordance, never a box-in-box) ---------- */
+.vas-mtl-cell-edit {
+    min-height: 2.2em;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    cursor: text;
+    border-bottom: 1px solid transparent;
+    transition: border-color .12s;
+}
+    /* The cell value is always an <input> or <select>; the wrapper never carries a border
+       (the control shows an underline only while focused), so a blurred cell shows none. */
+    .vas-mtl-cell-edit.is-editing {
+        border-bottom-color: transparent;
+    }
+
+.vas-mtl-cell-edit__sub {
+    margin-top: 0.125em;
+    font-size: 0.75em;
+    color: var(--mtl-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Attribute-set-instance description shown under the product, click to open the attribute
+   control. Coloured like a link (e.g. "LOT-2291 | 2026-04-30"). */
+.vas-mtl-attr-link {
+    display: block;
+    margin-top: 0.125em;
+    font-size: 0.85em;
+    font-weight: 400;
+    color: var(--mtl-action-blue);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+    .vas-mtl-attr-link:hover {
+        text-decoration: underline;
+    }
+
+.vas-mtl-attr-link--empty {
+    font-weight: 400;
+    font-style: italic;
+    color: var(--mtl-text-muted);
+}
+
+/* Read-only movement, or a product whose attribute set was removed: the attribute is
+   informational text, not an interactive link. */
+.vas-mtl-attr-link--disabled {
+    color: var(--mtl-text-secondary);
+    cursor: default;
+}
+
+    .vas-mtl-attr-link--disabled:hover {
+        text-decoration: none;
+    }
+
+/* Editing / resting cell controls. These MUST out-specify the framework
+   input[type=text] reset (which paints a filled, bordered, rounded, padded box): scope by
+   wrapper + element tag so the control stays flush and TRANSPARENT, inheriting the row
+   background (e.g. the cream tint of an unsaved row) instead of showing a white box.
+   Underline only on focus -> none when blurred. */
+.vas-mtl-cell-edit input.vas-mtl-cell-edit__input,
+.vas-mtl-cell-edit select.vas-mtl-cell-edit__select {
+    width: 100%;
+    min-width: 0;
+    flex: none;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    outline: none;
+    box-shadow: none;
+    background: transparent;
+    background-color: transparent;
+    padding: 0.1em 0;
+    font-family: inherit;
+    font-size: 1em;
+    border-bottom: 1px solid transparent;
+    transition: border-color .12s;
+    text-overflow: ellipsis;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    font-weight: 500;
+}
+
+    .vas-mtl-cell-edit input.vas-mtl-cell-edit__input:not([readonly]):focus,
+    .vas-mtl-cell-edit select.vas-mtl-cell-edit__select:focus {
+        border-bottom-color: var(--mtl-action-blue);
+    }
+
+.vas-mtl-cell-edit input.vas-mtl-cell-edit__input {
+    font-weight: 500;
+    color: var(--mtl-text);
+}
+
+.vas-mtl-cell-edit select.vas-mtl-cell-edit__select {
+    color: var(--mtl-text-secondary);
+}
+
+.vas-mtl-cell-edit input.vas-mtl-cell-edit__input::placeholder {
+    color: var(--mtl-text-disabled);
+}
+
+.vas-mtl-cell-disp {
+    /* Resting cells are click-to-edit, never drag targets - block text selection so a
+       press-and-move doesn't start a drag. */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+/* Cursor: the resting cell is a readonly <input>, so the framework's input reset forces
+   `cursor: not-allowed` on it (higher specificity than a bare class). Override with a
+   tag+class selector (scoped under .vas-mtl-cell-edit) AND !important so it always wins:
+   an editable cell is click-to-edit -> pointer; a locked cell -> not-allowed. */
+.vas-mtl-cell-edit input.vas-mtl-cell-disp {
+    cursor: pointer !important;
+}
+/* read-only movement or read-only column */
+.vas-mtl-cell-edit input.vas-mtl-cell-disp--ro {
+    cursor: not-allowed !important;
+}
+/* Column read-only field rendered DISABLED (e.g. C_UOM_ID on a saved line): grey the text
+   but keep the borderless transparent look (override the browser's disabled styling).
+   Chromium ignores `cursor` on a disabled control, so pass pointer events through to the
+   cell wrapper, which shows the not-allowed cursor. */
+.vas-mtl-cell-edit input.vas-mtl-cell-disp:disabled {
+    color: var(--mtl-text-disabled);
+    -webkit-text-fill-color: var(--mtl-text-disabled);
+    background: transparent;
+    opacity: 1;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.vas-mtl-cell-edit:has(input.vas-mtl-cell-disp:disabled) {
+    cursor: not-allowed;
+}
+
+.vas-mtl-cell-edit input.vas-mtl-cell-disp--sub {
+    font-size: 0.85em;
+    font-weight: 500;
+    color: var(--mtl-text-muted);
+}
+
+.vas-mtl-cell-edit input.vas-mtl-qtyval {
+    text-align: right;
+    font-weight: 400;
+    font-size: 1em;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-mtl-cell-edit input.vas-mtl-uomsub {
+    text-align: right;
+    margin-top: 0.125em;
+}
+
+/* ---------- catalog popover ---------- */
+.vas-mtl-catalog-popover {
+    /* Attaches flush under the input (no top gap / no top border) so the input underline
+       and the dropdown read as ONE element - not two stacked border lines. Opaque fill. */
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 0;
+    z-index: 30;
+    min-width: 22.5em;
+    background: #ffffff;
+    border: 1px solid var(--mtl-divider-strong);
+    border-top: none;
+    border-radius: 0 0 var(--mtl-r-md) var(--mtl-r-md);
+    box-shadow: var(--mtl-shadow-pop);
+    max-height: 16.25em;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+
+/* Flipped state: not enough room below the input, so open UPWARD. Attaches flush ABOVE the
+   input (no bottom gap / no bottom border) so the two read as one element, mirroring the
+   default downward attachment. */
+.vas-mtl-catalog-popover--above {
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    margin-bottom: 0;
+    border-top: 1px solid var(--mtl-divider-strong);
+    border-bottom: none;
+    border-radius: var(--mtl-r-md) var(--mtl-r-md) 0 0;
+}
+
+.vas-mtl-catalog__hint {
+    padding: 0.55em 0.75em;
+    font-size: 0.75em;
+    color: var(--mtl-text-muted);
+}
+
+.vas-mtl-catalog-popover__item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    border: none;
+    background: transparent;
+    text-align: left;
+    padding: 0.4em 0.625em;
+    border-bottom: 1px solid var(--mtl-divider-soft);
+    cursor: pointer;
+}
+
+    .vas-mtl-catalog-popover__item:last-child {
+        border-bottom: none;
+    }
+
+    .vas-mtl-catalog-popover__item:hover {
+        background: #f1f8ff;
+    }
+
+    .vas-mtl-catalog-popover__item.is-highlighted {
+        background: var(--mtl-blue-soft);
+    }
+
+.vas-mtl-catalog-popover__name {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    font-size: 0.8125em;
+    color: var(--mtl-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The product's own unit, stated on the right of each catalog row so the quantity the user
+   is about to key has a unit before the row is even picked. */
+.vas-mtl-catalog-popover__meta {
+    flex-shrink: 0;
+    font-size: 0.75em;
+    color: var(--mtl-text-muted);
+}
+
+/* ---------- badges ---------- */
+.vas-mtl-badge {
+    display: inline-block;
+    border-radius: var(--mtl-r-pill);
+    padding: 0.125em 0.5em;
+    font-weight: 600;
+    font-size: 0.625em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.vas-mtl-badge--product {
+    background: var(--mtl-blue-soft);
+    color: var(--mtl-link-deep);
+}
+
+.vas-mtl-badge--danger {
+    background: var(--mtl-danger-bg);
+    color: var(--mtl-danger-text);
+}
+
+/* ---------- row action buttons ---------- */
+.vas-mtl-more-btn {
+    width: 1.5em;
+    height: 1.5em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: var(--mtl-r-sm);
+    color: var(--mtl-text-muted);
+    cursor: pointer;
+    transition: background .12s, color .12s;
+}
+
+    .vas-mtl-more-btn:hover {
+        background: #f1f8ff;
+        color: var(--mtl-action-blue);
+    }
+
+    .vas-mtl-more-btn.is-open {
+        background: var(--mtl-blue-soft);
+        color: var(--mtl-action-blue);
+    }
+    /* The line already holds Additional-Info values: tint the button so the user can see
+       there is something inside without opening it. */
+    .vas-mtl-more-btn.has-values {
+        background: var(--mtl-blue-soft);
+        color: var(--mtl-action-blue);
+    }
+
+        .vas-mtl-more-btn.has-values:hover {
+            background: #d9eeff;
+        }
+    /* Read-only movement, or no visible additional field: not-allowed, no hover tint. */
+    .vas-mtl-more-btn:disabled {
+        cursor: not-allowed !important;
+        color: var(--mtl-text-disabled);
+    }
+
+        .vas-mtl-more-btn:disabled:hover {
+            background: transparent;
+            color: var(--mtl-text-disabled);
+        }
+
+/* Row Undo: only shown on a saved row with unsaved edits (revert to snapshot) or a new
+   row (discard). Amber to read as "discard pending change" against the unsaved-row tint. */
+.vas-mtl-undo-btn {
+    width: 1.5em;
+    height: 1.5em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: var(--mtl-r-sm);
+    color: var(--mtl-warning);
+    cursor: pointer;
+    transition: background .12s, color .12s;
+}
+
+    .vas-mtl-undo-btn:hover {
+        background: var(--mtl-surface-amber);
+        color: var(--mtl-danger-text);
+    }
+
+/* ---------- canonical underline form field ---------- */
+.vas-mtl-field__input {
+    display: block;
+    width: 100%;
+    border: none;
+    border-bottom: 1px solid var(--mtl-border-field);
+    background: transparent;
+    padding: 0.375em 0;
+    font-family: inherit;
+    font-size: 0.8125em;
+    color: var(--mtl-text);
+    outline: none;
+    transition: border-color .12s;
+}
+
+    .vas-mtl-field__input:hover, .vas-mtl-field__input:focus {
+        border-bottom-color: var(--mtl-action-blue);
+    }
+
+    .vas-mtl-field__input::placeholder {
+        color: var(--mtl-text-faint);
+    }
+
+/* FK dropdown must not force the (narrow) grid cell wider -> no horizontal scroll. */
+.vas-mtl-fk-popover {
+    min-width: 0;
+    left: 0;
+    right: 0;
+}
+
+/* A curated "..." field hidden by its AD_Field.DisplayLogic. The field is still BUILT
+   (control + lookup preserved) and only toggled off, so it drops out of the grid layout
+   without being re-created when the logic flips back to visible. */
+.vas-mtl-dyn-hidden {
+    display: none !important;
+}
+
+/* ---------- Additional Info modal: framework dictionary fields ----------
+   The "..." modal lays out FRAMEWORK fields (input-group vis-input-wrap). The framework's
+   own CSS renders each field borderless (leading icon + floating label + value + trailing
+   button); we only lay them out 2-up and prevent horizontal overflow — no control styling
+   of our own beyond restoring the single-window edit-view look, which this dialog does not
+   inherit because it does not carry .vis-ad-w-p-vc-editview. */
+/* Body fills whatever height remains inside the dialog. min-height:0 is required so a flex
+   child can shrink below its content size. */
+.vas-mtl-more-body {
+    height: auto;
+    min-height: 0;
+}
+
+.vas-mtl-more-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25em 2em;
+    padding: 1em 1.25em;
+    align-items: start;
+    /* Pack rows to the top so the flex:1 body doesn't distribute extra height as blank
+       gaps between the field rows (align-content default is stretch). */
+    align-content: start;
+}
+
+    .vas-mtl-more-grid > .input-group,
+    .vas-mtl-more-grid > .vis-control-wrap {
+        min-width: 0;
+    }
+
+    .vas-mtl-more-grid > .input-group {
+        flex-wrap: nowrap;
+    }
+
+/* Single-window edit-view look ported from the framework's .vis-ad-w-p-vc-editview rules.
+   Scoped to .vis-input-wrap .vis-control-wrap so ONLY framework dictionary controls go
+   borderless - our own scan / search / FK inputs keep their borders. */
+.vas-mtl-dialog .vis-input-wrap .vis-control-wrap input:not([type=button]):not([type="checkbox"]):not([type="radio"]),
+.vas-mtl-dialog .vis-input-wrap .vis-control-wrap select,
+.vas-mtl-dialog .vis-input-wrap .vis-control-wrap textarea {
+    border: 0px solid rgba(var(--v-c-on-secondary), .2);
+    border-radius: 0;
+    color: rgba(var(--v-c-on-common), 1);
+    background-color: transparent;
+    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+}
+
+.vas-mtl-dialog .vis-input-wrap {
+    position: relative;
+    flex-wrap: nowrap;
+    border-bottom: 1px solid #d2d2d2;
+}
+
+    .vas-mtl-dialog .vis-input-wrap .vis-ev-ctrlinfowrap {
+        display: none !important;
+    }
+
+    .vas-mtl-dialog .vis-input-wrap:hover,
+    .vas-mtl-dialog .vis-input-wrap.focus,
+    .vas-mtl-dialog .vis-input-wrap.vis-ev-col-error,
+    .vas-mtl-dialog .vis-input-wrap:has(:focus) {
+        border-bottom: 1px solid rgba(var(--v-c-primary), 1);
+    }
+
+    .vas-mtl-dialog .vis-input-wrap.vis-ev-col-error {
+        border-bottom: 1px solid #F5A0AD !important;
+    }
+
+    .vas-mtl-dialog .vis-input-wrap:has(.vis-ec-col-lblchkbox):hover,
+    .vas-mtl-dialog .vis-input-wrap:has(label:first-child),
+    .vas-mtl-dialog .vis-input-wrap:has(label:first-child):hover,
+    .vas-mtl-dialog .vis-input-wrap:has(.vis-ec-col-lblchkbox),
+    .vas-mtl-dialog .vis-input-wrap:has(.vis-progressCtrlWrap) {
+        border-bottom: 1px solid transparent !important;
+    }
+
+    .vas-mtl-dialog .vis-input-wrap:has(.vis-ev-col-readonly) .input-group-text .fa-handshake-o,
+    .vas-mtl-dialog .vis-input-wrap:has(.vis-ev-col-readonly) .input-group-text .fa-caret-down {
+        color: rgba(var(--v-c-on-secondary), .9);
+    }
+
+    .vas-mtl-dialog .vis-input-wrap:has(.vis-ev-col-readonly) {
+        border-bottom: 1px solid #f3f3f3 !important;
+    }
+
+    .vas-mtl-dialog .vis-input-wrap:has(input:focus),
+    .vas-mtl-dialog .vis-input-wrap:has(select:focus),
+    .vas-mtl-dialog .vis-input-wrap:has(textarea:focus) {
+        border-bottom: 1px solid rgba(var(--v-c-primary), 1);
+    }
+
+    .vas-mtl-dialog .vis-input-wrap:has(.vis-ev-col-wrap-button) {
+        border-bottom: 1px solid transparent;
+    }
+
+    .vas-mtl-dialog .vis-input-wrap:has(.vis-ev-col-mandatory) .vis-ev-col-msign {
+        display: none;
+    }
+
+    .vas-mtl-dialog .vis-input-wrap.focus {
+        border-color: rgba(var(--v-c-primary), 1);
+    }
+
+    .vas-mtl-dialog .vis-input-wrap .input-group-append {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .vas-mtl-dialog .vis-input-wrap input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 0;
+    }
+
+    .vas-mtl-dialog .vis-input-wrap:hover input[type="date"]::-webkit-calendar-picker-indicator,
+    .vas-mtl-dialog .vis-input-wrap.focus input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 1;
+    }
+
+    .vas-mtl-dialog .vis-input-wrap select {
+        background-image: none;
+    }
+
+    .vas-mtl-dialog .vis-input-wrap:hover select,
+    .vas-mtl-dialog .vis-input-wrap.focus select {
+        background-image: linear-gradient(45deg, transparent 50%, rgba(var(--v-c-primary),1) 50%), linear-gradient(135deg, rgba(var(--v-c-primary),1) 50%, transparent 50%);
+    }
+
+    .vas-mtl-dialog .vis-input-wrap:hover .input-group-append,
+    .vas-mtl-dialog .vis-input-wrap.focus .input-group-append,
+    .vas-mtl-dialog .vis-input-wrap:has(:focus) .input-group-append {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* Search-reference lookup button (getBtn(0) = button.input-group-text): no border /
+       outline / box-shadow in any state - the focus cue is the field's own underline, not
+       a box on the button. !important + the :focus-within ancestor case are needed to beat
+       the framework's own VIS.all.min.css rules. */
+    .vas-mtl-dialog .vis-input-wrap .input-group-append .input-group-text,
+    .vas-mtl-dialog .vis-input-wrap .input-group-append .input-group-text:hover,
+    .vas-mtl-dialog .vis-input-wrap .input-group-append .input-group-text:focus,
+    .vas-mtl-dialog .vis-input-wrap .input-group-append .input-group-text:active,
+    .vas-mtl-dialog .vis-input-wrap .input-group-append .input-group-text:focus-visible,
+    .vas-mtl-dialog .input-group:focus-within .input-group-append .input-group-text {
+        border: 0 !important;
+        outline: 0 !important;
+        box-shadow: none !important;
+    }
+
+.vas-mtl-dialog .input-group-prepend .input-group-text i {
+    color: rgba(var(--v-c-on-secondary),.7);
+    cursor: default;
+}
+
+/* The prepended icon must NOT be a bordered box - its border/background would draw a
+   second line over the field underline. */
+.vas-mtl-dialog .vis-input-wrap .input-group-prepend .input-group-text {
+    background-color: transparent;
+    border: 1px solid #f0f0f0 !important;
+    border-radius: 0;
+    position: relative;
+    top: -8px;
+}
+
+.vas-mtl-dialog .input-group-text i {
+    color: rgba(var(--v-c-primary),1);
+}
+
+.vas-mtl-dialog .vis-input-wrap .input-group-text {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* "..." modal only: float the field label a touch higher. */
+.vas-mtl-more-body .vis-input-wrap input:focus ~ label,
+.vas-mtl-more-body .vis-input-wrap input:not(:placeholder-shown) ~ label,
+.vas-mtl-more-body .vis-input-wrap textarea:not(:placeholder-shown) ~ label,
+.vas-mtl-more-body .vis-input-wrap select:focus ~ label,
+.vas-mtl-more-body .vis-input-wrap textarea:focus ~ label,
+.vas-mtl-more-body .vis-input-wrap select ~ label {
+    top: -11px;
+}
+
+/* "..." modal only: the checkbox's own caption (a static first-child label, not a floating
+   one) stays at top: 0 so it sits inline with the checkbox. */
+.vas-mtl-more-body .vis-control-wrap > label:first-child {
+    top: 0;
+}
+
+/* Keep the control borderless even on focus. The framework adds a 1px border (with
+   !important) to a focused input/select/textarea, which shows as a stray border on click;
+   here the focus cue is the .vis-input-wrap underline turning primary, so suppress the
+   per-control border. The .vis-ev-col variants out-specify the framework's !important
+   focus rule. */
+.vas-mtl-dialog .vis-input-wrap .vis-control-wrap input:focus,
+.vas-mtl-dialog .vis-input-wrap .vis-control-wrap select:focus,
+.vas-mtl-dialog .vis-input-wrap .vis-control-wrap textarea:focus,
+.vas-mtl-dialog .vis-ev-col .vis-input-wrap .vis-control-wrap input:focus,
+.vas-mtl-dialog .vis-ev-col .vis-input-wrap .vis-control-wrap select:focus,
+.vas-mtl-dialog .vis-ev-col .vis-input-wrap .vis-control-wrap textarea:focus {
+    border: 0 !important;
+}
+
+/* ---------- search + scan inputs ---------- */
+.vas-mtl-search-input {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    border: 1px solid var(--mtl-border-default);
+    background: var(--mtl-surface);
+    border-radius: var(--mtl-r-lg);
+    padding: 0.4375em 0.625em;
+    margin-top: 0.75em;
+    transition: border-color .12s;
+}
+
+    .vas-mtl-search-input:focus-within {
+        border-color: var(--mtl-action-blue);
+    }
+
+    .vas-mtl-search-input .vas-mtl-icon {
+        color: var(--mtl-text-muted);
+        flex-shrink: 0;
+    }
+
+    .vas-mtl-search-input input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-family: inherit;
+        font-size: 0.8125em;
+        color: var(--mtl-text);
+    }
+
+.vas-mtl-scan-input {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    border: 2px solid var(--mtl-action-blue);
+    background: #f7fbff;
+    border-radius: var(--mtl-r-lg);
+    padding: 0.5em 0.75em;
+    margin-top: 0.75em;
+}
+
+    .vas-mtl-scan-input:focus-within {
+        background: var(--mtl-surface);
+    }
+
+.vas-mtl-scan-input__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.375em;
+    height: 1.375em;
+    border: none;
+    background: transparent;
+    border-radius: var(--mtl-r-sm);
+    color: var(--mtl-action-blue);
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+    .vas-mtl-scan-input__icon:hover {
+        background: var(--mtl-blue-soft);
+    }
+
+.vas-mtl-scan-input input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 0.875em;
+    color: var(--mtl-text);
+}
+
+/* ---------- dialog ---------- */
+.vas-mtl-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1em;
+    z-index: 99;
+    font-family: var(--mtl-font);
+    color: var(--mtl-text);
+}
+
+    .vas-mtl-dialog-backdrop * {
+        box-sizing: border-box;
+    }
+
+/* The Additional-Info modal sits BELOW the framework window layer so a Search field's
+   lookup/info window (opened by its button) appears ON TOP, not behind the modal. It only
+   needs to be above the panel itself. */
+#vasMtlMore.vas-mtl-dialog-backdrop {
+    z-index: 99;
+}
+
+/* Additional Info dialog — fills most of the viewport. */
+#vasMtlMore .vas-mtl-dialog {
+    width: min(68em, 92vw);
+    height: min(35em, 90vh);
+}
+
+.vas-mtl-dialog {
+    background: var(--mtl-surface);
+    border-radius: 14px;
+    box-shadow: var(--mtl-shadow-dialog);
+    width: 45em;
+    max-width: 100%;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-mtl-dialog--wide {
+    width: 56em;
+    height: 30em;
+}
+
+.vas-mtl-dialog__header {
+    padding: 0.875em 1.25em 0.75em;
+    border-bottom: 1px solid var(--mtl-divider);
+}
+
+.vas-mtl-dialog__header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+}
+
+.vas-mtl-dialog__title-block {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+/* Header close (✕) - dismisses the dialog, discarding the modal's edits. */
+.vas-mtl-dialog__close {
+    flex: 0 0 auto;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--mtl-text-muted);
+    font-size: 1em;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color .12s, color .12s;
+}
+
+    .vas-mtl-dialog__close:hover {
+        background: var(--mtl-divider);
+        color: var(--mtl-text);
+    }
+
+.vas-mtl-dialog__title {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--mtl-text);
+}
+
+.vas-mtl-dialog__hint {
+    margin: 0;
+    font-size: 0.75em;
+    color: var(--mtl-text-muted);
+}
+
+.vas-mtl-dialog__sub {
+    margin: 0.25em 0 0;
+    font-size: 0.75em;
+    color: var(--mtl-text-muted);
+}
+
+.vas-mtl-dialog__error {
+    margin: 0.5em 0 0;
+    font-size: 0.75em;
+    color: var(--mtl-danger);
+}
+
+.vas-mtl-dialog__body {
+    flex: 1;
+    overflow-y: auto;
+    margin-top: 1em;
+}
+
+.vas-mtl-dialog__body--fixed {
+    display: flex;
+    flex-direction: column;
+    height: 22.5em;
+}
+
+.vas-mtl-dialog__body--loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 8em;
+}
+
+.vas-mtl-dialog-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2em;
+}
+
+.vas-mtl-dialog-spin {
+    display: inline-block;
+    width: 2em;
+    height: 2em;
+    border: 3px solid var(--mtl-border-default);
+    border-top-color: var(--mtl-action-blue);
+    border-radius: 50%;
+    animation: vasMtlSpin 0.7s linear infinite;
+}
+
+.vas-mtl-dialog__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.75em 1.25em;
+    border-top: 1px solid var(--mtl-divider);
+}
+
+.vas-mtl-dialog__footer--end {
+    justify-content: flex-end;
+}
+
+.vas-mtl-dialog__summary {
+    margin: 0;
+    font-size: 0.75em;
+    color: var(--mtl-text-muted);
+}
+
+.vas-mtl-dialog__actions {
+    display: flex;
+    gap: 0.5em;
+}
+
+/* ---------- scan dialog body ---------- */
+.vas-mtl-scan-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1.25em;
+    text-align: center;
+}
+
+.vas-mtl-scan-empty__badge {
+    width: 3.5em;
+    height: 3.5em;
+    border-radius: 50%;
+    background: var(--mtl-blue-soft);
+    color: var(--mtl-action-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-mtl-scan-empty__title {
+    margin: 0.875em 0 0;
+    font-size: 0.875em;
+    font-weight: 600;
+    color: var(--mtl-text);
+}
+
+.vas-mtl-scan-empty__hint {
+    margin: 0.25em 0 0;
+    font-size: 0.75em;
+    color: var(--mtl-text-muted);
+}
+
+.vas-mtl-scan-grid {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-mtl-scan-grid__head, .vas-mtl-scan-grid__row {
+    display: grid;
+    grid-template-columns: minmax(6.75em, auto) minmax(8.75em, 1.4fr) minmax(6em, auto) minmax(6em, auto) 1.75em;
+    gap: 0.75em;
+    align-items: center;
+    padding: 0.5em 1.25em;
+}
+
+.vas-mtl-scan-grid__head {
+    flex-shrink: 0;
+    background: var(--mtl-surface-muted);
+    border-bottom: 1px solid var(--mtl-divider-strong);
+    font-size: 0.625em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--mtl-text-muted);
+}
+
+.vas-mtl-scan-grid__body {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.vas-mtl-scan-grid__row {
+    padding-top: 0.625em;
+    padding-bottom: 0.625em;
+    border-bottom: 1px solid var(--mtl-divider-soft);
+}
+
+    .vas-mtl-scan-grid__row.is-unknown {
+        background: #fff7f7;
+    }
+
+.vas-mtl-scan-grid__code {
+    font-weight: 600;
+    font-size: 0.8125em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-mtl-scan-grid__name {
+    font-size: 0.8125em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-mtl-qty-stepper {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+}
+
+    .vas-mtl-qty-stepper button {
+        width: 1.5em;
+        height: 1.5em;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--mtl-border-default);
+        background: var(--mtl-surface);
+        border-radius: var(--mtl-r-sm);
+        color: var(--mtl-text-secondary);
+        font-size: 0.875em;
+        cursor: pointer;
+    }
+
+        .vas-mtl-qty-stepper button:hover {
+            background: #f7fbff;
+        }
+
+        .vas-mtl-qty-stepper button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+    .vas-mtl-qty-stepper input {
+        width: 2.5em;
+        height: 1.5em;
+        text-align: center;
+        border: 1px solid var(--mtl-border-default);
+        border-radius: var(--mtl-r-sm);
+        background: var(--mtl-surface);
+        font-family: inherit;
+        font-weight: 600;
+        font-size: 0.75em;
+        color: var(--mtl-text);
+        outline: none;
+    }
+
+        .vas-mtl-qty-stepper input:focus {
+            border-color: var(--mtl-action-blue);
+        }
+
+.vas-mtl-icon-btn--danger {
+    width: 1.5em;
+    height: 1.5em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: var(--mtl-r-sm);
+    color: var(--mtl-danger-text);
+    cursor: pointer;
+}
+
+    .vas-mtl-icon-btn--danger:hover {
+        background: #fbe6e6;
+    }
+
+/* ---------- pagers ---------- */
+/* Shared small square nav button, used by the line pager (and by the attribute picker
+   when it renders inside this panel's dialog chrome). */
+.vas-mtl-attr-pagebtn {
+    border: 1px solid var(--mtl-border-default);
+    background: var(--mtl-surface);
+    color: var(--mtl-text);
+    cursor: pointer;
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 6px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-mtl-attr-pagebtn:hover:not(:disabled) {
+        border-color: var(--mtl-action-blue);
+        color: var(--mtl-action-blue);
+    }
+
+    .vas-mtl-attr-pagebtn:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+
+/* Server-side line pager (20/page) below the lines table: "Showing X-Y of N" on the left,
+   "‹ P of Q ›" nav on the right. */
+.vas-mtl-linepager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding: 0.5em 0.75em;
+}
+
+.vas-mtl-linepager__showing {
+    font-size: 0.8125em;
+    color: var(--mtl-text-muted);
+    white-space: nowrap;
+}
+
+.vas-mtl-linepager__nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.vas-mtl-linepager__info {
+    font-size: 0.8125em;
+    color: var(--mtl-text-muted);
+    white-space: nowrap;
+}
+
+.vas-mtl-empty-message {
+    padding: 1.25em;
+    text-align: center;
+    font-size: 0.75em;
+    color: var(--mtl-text-muted);
+}
+
+/* ---------- collapsible field groups (Additional Info modal) ----------
+   Full-row section headers injected before each group's anchor field. The Show More/Less
+   toggle collapses/expands the fields that follow. */
+.vas-mtl-more-grid > .vas-mtl-fldgrp {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    /* Extra bottom margin so the next row's floated labels clear the bar. */
+    margin: 0.25em 0 1em;
+    padding: 0.5em 0.875em;
+    border-radius: var(--mtl-r-sm);
+    background: linear-gradient(90deg, #cfe8ff 0%, #eaf6ff 55%, var(--mtl-surface) 100%);
+}
+
+    .vas-mtl-more-grid > .vas-mtl-fldgrp:first-child {
+        margin-top: 0;
+    }
+
+.vas-mtl-fldgrp-name {
+    font-size: 0.875em;
+    font-weight: 600;
+    color: var(--mtl-text);
+}
+
+.vas-mtl-fldgrp-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    border: 0;
+    background: transparent;
+    color: var(--mtl-action-blue);
+    font-family: inherit;
+    font-size: 0.8125em;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.125em 0.25em;
+}
+
+    .vas-mtl-fldgrp-toggle:hover {
+        text-decoration: underline;
+    }
+
+.vas-mtl-fldgrp-chev {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+}
+
+/* Expanded -> chevron up; collapsed -> flip to point down. */
+.vas-mtl-fldgrp[data-collapsed="1"] .vas-mtl-fldgrp-chev {
+    transform: rotate(180deg);
+}
+
+/* Member field hidden while its group is collapsed (independent of DisplayLogic). */
+.vas-mtl-more-grid > .vas-mtl-grp-collapsed {
+    display: none !important;
+}
+
+/* Section header all of whose fields are DisplayLogic-hidden — must not show. */
+.vas-mtl-more-grid > .vas-mtl-fldgrp-empty {
+    display: none !important;
+}
+
+/* ---------- toast (mounted on body, outside the root) ---------- */
+.vas-mtl-toast {
+    position: fixed;
+    bottom: 2em;
+    left: 50%;
+    transform: translateX(-50%) translateY(1em);
+    background: var(--mtl-text);
+    color: #fff;
+    padding: 0.7em 1.2em;
+    border-radius: var(--mtl-r-sm);
+    font-family: var(--mtl-font);
+    font-size: 0.8em;
+    box-shadow: var(--mtl-shadow-pop);
+    opacity: 0;
+    transition: opacity .25s, transform .25s;
+    z-index: 10002;
+}
+
+.vas-mtl-toast--show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ---------- responsive ----------
+   @container, not @media: this is a bottom panel whose width is set by the framework
+   splitter, not by the viewport, so a viewport breakpoint fires at the wrong moment in
+   both directions. It is also what makes the panel fit under zoom - zoom shrinks
+   everything measured in CSS pixels, this panel's own box included, so the container
+   crosses these thresholds as the user zooms in and the grid sheds columns in step instead
+   of crushing them.
+
+   `em` inside a container query resolves against the QUERY CONTAINER's font size - the
+   constant 16px anchor - so these thresholds are fixed real widths. */
+@container (max-width: 60em) {
+    /* Description (3rd cell) is the first to go: every other cell carries something the
+       row is actually read for - the product, the two bins, the quantity. */
+    .vas-mtl-row {
+        grid-template-columns: 1.75em minmax(0, 1.8fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(6em, 0.9fr) 3.5em;
+    }
+
+    .vas-mtl-row--head .vas-mtl-cell:nth-child(3),
+    .vas-mtl-row--line .vas-mtl-cell:nth-child(3) {
+        display: none;
+    }
+}
+
+@container (max-width: 44em) {
+    /* Narrower still: keep the product, the DESTINATION bin and the quantity. The source
+       bin goes before the destination one because a transfer is read as "what is going
+       where" - the destination is the answer the reader wants. */
+    .vas-mtl-row {
+        grid-template-columns: 1.75em minmax(0, 2fr) minmax(0, 1.2fr) minmax(5.5em, 0.9fr) 3.5em;
+    }
+
+    .vas-mtl-row--head .vas-mtl-cell:nth-child(4),
+    .vas-mtl-row--line .vas-mtl-cell:nth-child(4) {
+        display: none;
+    }
+}
+
+@container (max-width: 30em) {
+    .vas-mtl-row {
+        gap: 0.5em;
+    }
+
+    .vas-mtl-panel__header {
+        padding: 0 0.5em;
+    }
+
+    /* Icon-only toolbar: at this width the labels wrap the header into three rows and push
+       the grid off screen. */
+    .vas-mtl-btn > span {
+        display: none;
+    }
+
+    .vas-mtl-btn {
+        padding: 0.5em 0.625em;
+    }
+}

@@ -219,6 +219,39 @@
     overflow-wrap: anywhere;
 }
 
+/* A mail body rendered as the sender wrote it. Everything here is containment:
+   the markup is somebody else's, it was authored for a full-width mail client,
+   and it is being shown in a narrow side panel.
+
+   pre-wrap is turned OFF — the sender's own block elements do the wrapping now,
+   and leaving it on would add a blank line for every newline between their
+   tags. */
+.vas_190-sheetHtml {
+    white-space: normal;
+    /* Long enough to read in, bounded so a newsletter cannot push the Close
+       button off the sheet. */
+    max-height: 22em;
+    overflow: auto;
+}
+/* A mail's own font sizes and colours are its own; only the extremes are
+   overridden, so the message still looks like itself inside the panel. */
+.vas_190-sheetHtml img { max-width: 100%; height: auto; }
+/* A fixed-width table is the usual way a mail is laid out, and it is usually
+   wider than this panel. It scrolls in its own right rather than widening the
+   sheet. */
+.vas_190-sheetHtml table { max-width: 100%; display: block; overflow-x: auto; }
+.vas_190-sheetHtml td, .vas_190-sheetHtml th { padding: 0.15em 0.35em; }
+.vas_190-sheetHtml a { color: var(--p190-link, #1D4ED8); }
+.vas_190-sheetHtml pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A quoted reply chain arrives as nested blockquotes and can indent the text
+   off the panel after three or four rounds. */
+.vas_190-sheetHtml blockquote {
+    margin: 0.4em 0 0.4em 0.6em;
+    padding-left: 0.6em;
+    border-left: 2px solid var(--p190-border, #E5E7EB);
+}
+.vas_190-sheetHtml h1, .vas_190-sheetHtml h2, .vas_190-sheetHtml h3 { font-size: 1.15em; }
+
 .vas_190-sheetFoot {
     display: flex;
     justify-content: flex-end;
@@ -261,9 +294,22 @@
     line-height: 1.5em;
     vertical-align: baseline;
 }
-.vas_190-prio-high   { background: #FDECEC; color: #C42127; }
-.vas_190-prio-medium { background: var(--p190-warn-bg); color: var(--p190-warn-tx); }
-.vas_190-prio-low    { background: var(--p190-info-bg); color: var(--p190-info-tx); }
+/* The task colour scheme, taken from VAS_105 (.vas_105_acct-prio--*) rather
+   than mixed here. A reader moves between the two panels and a task that is
+   amber on one and orange on the other reads as two different states; these are
+   now the same four values in both places, so "the same priority" looks the
+   same wherever it is shown.
+
+   The medium and low entries used the panel's own generic warn / info tokens,
+   which is why they drifted — those tokens answer to this panel's palette, not
+   to what the task screens call a priority. */
+.vas_190-prio-high     { background: #FAD7D7; color: #8F2D2D; }
+.vas_190-prio-medium   { background: #FAEEDA; color: #9A6500; }
+.vas_190-prio-low      { background: #D9ECFF; color: #0E5DA8; }
+/* A CLOSED task, whatever it was raised at. Its priority has stopped being the
+   thing to act on, so it stops competing for attention with the open ones —
+   VAS_105's fourth priority colour, used for exactly this. */
+.vas_190-prio-resolved { background: #CCEFDD; color: #0C5D38; }
 
 /* ----------------------------------------------------------- */
 /*  Section header                                              */
@@ -602,6 +648,13 @@
     overflow: hidden; text-overflow: ellipsis; }
 .vas_190-eS { font-weight: 400; font-size: 0.75em; color: var(--p190-muted); white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
+/* A BOM row whose right-hand slot carries the attribute set it is specified for.
+   The slot does not shrink by default — a quantity is short and must never be
+   clipped — but an attribute set runs to a sentence, and at flex-shrink 0 it
+   pushed the row wider than the panel and took the name on the left off the
+   screen with it. Capped at a share of the row and left to the ellipsis its own
+   lines already carry. */
+.vas_190-eVal.vas_190-eVal-attr { flex-shrink: 1; max-width: 45%; }
 
 /* ----------------------------------------------------------- */
 /*  Data grid (stock details, transactions)                     */

@@ -313,6 +313,21 @@
 ///                        appointment / task / call / letter sources in
 ///                        VAS_ActivitySourcesModel, where the helper lives. A no-op
 ///                        on Oracle.
+///   VAI163   2026-09-08  Activity showed NO e-mails at all on PostgreSQL. The
+///                        AttachmentType test read COALESCE(TO_CHAR(x), 'M') — the
+///                        TO_CHAR added on Oracle so a national-character column
+///                        could be COALESCEd with a plain literal without raising
+///                        ORA-12704. PostgreSQL has no single-argument to_char, so
+///                        the statement failed outright and the catch returned an
+///                        empty feed: the order's own mails, the customer's mails
+///                        and (through VAS_ActivitySourcesModel) the letters all
+///                        disappeared, together with the recipient, subject, body,
+///                        date and sender the panel reveals on click. Written now
+///                        as an IS NULL branch plus a TRIMmed comparison, which
+///                        needs neither COALESCE across character sets nor
+///                        TO_CHAR — the form VAS_105 has always used on both
+///                        engines. Same meaning on Oracle, and the letters are
+///                        still read only once.
 /// </summary>
 
 using System;
@@ -1992,7 +2007,15 @@ namespace VASLogic.Models
                 //     the letters in separately and dropping the test altogether
                 //     would list every letter twice.
                 //
-                // COALESCE, not NVL: this panel's SQL runs on both databases.
+                // COALESCE, not NVL: this panel's SQL runs on both databases —
+                // and, for the same reason, the type test is neither COALESCEd
+                // nor wrapped in TO_CHAR. COALESCE(AttachmentType, 'M') raises
+                // ORA-12704 where the column is national-character, and the
+                // TO_CHAR that answered that has no single-argument form on
+                // PostgreSQL, where it took the whole statement — and with it
+                // every e-mail on the feed — into the catch below. An IS NULL
+                // branch says the same thing on both engines: a row with no type
+                // is a mail. TRIM so a blank-padded 'I ' is still a letter.
                 string sql = @"SELECT ma.MailAddress,
                                       ma.MailAddressCc,
                                       ma.MailAddressBcc,
@@ -2009,7 +2032,8 @@ namespace VASLogic.Models
                                         WHERE UPPER(t.TableName) = 'C_ORDER')
                                   AND ma.Record_ID = @C_Order_ID
                                   AND COALESCE(ma.IsActive, 'Y')        = 'Y'
-                                  AND COALESCE(to_char(ma.AttachmentType), 'M') <> 'I'
+                                  AND (ma.AttachmentType IS NULL
+                                    OR TRIM(ma.AttachmentType) <> 'I')
                                 ORDER BY ma.Created DESC";
                 DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
                 if (ds == null || ds.Tables.Count == 0) return;
@@ -2080,7 +2104,8 @@ namespace VASLogic.Models
                 // UPPER over AD_Table (a scalar sub-select RAISES on Oracle when
                 // the dictionary carries more than one row of that name), and
                 // "not 'I'" for the type, so a letter is left to the shared
-                // sources reader and cannot be listed twice.
+                // sources reader and cannot be listed twice — written without
+                // COALESCE or TO_CHAR for the reason the order's own pass gives.
                 string sql = @"SELECT ma.MailAddress,
                                       ma.MailAddressCc,
                                       ma.MailAddressBcc,
@@ -2097,7 +2122,8 @@ namespace VASLogic.Models
                                         WHERE UPPER(t.TableName) = 'C_BPARTNER')
                                   AND ma.Record_ID = @C_BPartner_ID
                                   AND COALESCE(ma.IsActive, 'Y')        = 'Y'
-                                  AND COALESCE(TO_CHAR(ma.AttachmentType), 'M') <> 'I'
+                                  AND (ma.AttachmentType IS NULL
+                                    OR TRIM(ma.AttachmentType) <> 'I')
                                 ORDER BY ma.Created DESC";
                 SqlParameter[] param = new SqlParameter[]
                 {
