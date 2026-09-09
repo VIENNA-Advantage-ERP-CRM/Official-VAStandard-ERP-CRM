@@ -35,6 +35,13 @@
  *                  exhaustion date - all of those need an assumed spending pattern,
  *                  and this card deliberately has none. It is budget minus actual.
  *
+ *                  ONLY ACCOUNTS WITH A BUDGET. A variance is the distance from what
+ *                  was APPROVED, so an account carrying an actual and nothing approved
+ *                  is not on this card at all - that is spending nobody planned, and
+ *                  the unbudgeted-actuals card (VAS_256) is where it belongs. Listed
+ *                  here it would rank by its whole actual and push genuinely over- and
+ *                  under-spent budgets off a three-row card.
+ *
  *                  THE ROWS ARE NOT INTERACTIVE. There is no drill-down here and no
  *                  row is a button: the card answers "where are the biggest gaps",
  *                  which the two lines already say in full. That is a deliberate

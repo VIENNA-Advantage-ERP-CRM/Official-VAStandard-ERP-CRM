@@ -20,92 +20,88 @@ namespace VASLogic.Models
 {
     /// <summary>
     /// Module Name : VAS_253_UtlizationbyDimension
-    /// Purpose     : Backs the VAS_253_UtlizationbyDimensionWidget dashboard widget - how
-    ///               much of the approved budget each value of ONE accounting dimension has
-    ///               actually consumed:
+    /// Purpose     : Backs the VAS_253_UtlizationbyDimensionWidget dashboard widget - for the
+    ///               selected financial year and accounting dimension, how much of the
+    ///               approved budget each dimension value has actually consumed.
     ///
-    ///                 Budget    Fact_Acct rows with PostingType 'B', summed per dimension
-    ///                           value.
-    ///                 Actual    Fact_Acct rows with PostingType 'A', summed the same way.
-    ///                 Utilized  Actual / Budget * 100. Reported past 100% - the bar is
-    ///                           capped by the client, the number never is.
+    ///               EVERYTHING IS TENANT CONFIGURATION, NOTHING IS HARD-CODED.
+    ///                 Schema     AD_ClientInfo.C_AcctSchema1_ID - the PRIMARY accounting
+    ///                            schema, never "the first active one" and never by name.
+    ///                 Currency   that schema's C_Currency - every figure is stated in it.
+    ///                 Calendar   AD_ClientInfo.C_Calendar_ID - the PRIMARY calendar, and the
+    ///                            only source of financial years.
+    ///                 Dimensions the ACTIVE C_AcctSchema_Element rows of that schema, in
+    ///                            SeqNo order, each labelled with its own Name.
     ///
-    ///               THE DIMENSION IS CONFIGURATION, NOT CODE. The selector is built from
-    ///               the ACTIVE C_AcctSchema_Element rows of the tenant's PRIMARY accounting
-    ///               schema, in SeqNo order, and each option is labelled with that element's
-    ///               OWN Name. A tenant that represents departments as Activity, or renames
-    ///               "User List 1" to "Cost centre", gets its own words with no change here.
-    ///               Nothing in this model, and no word in the widget, names a dimension.
+    ///               THE YEAR IS FILTERED BY ITS PERIODS, NOT BY DATES. Fact_Acct is
+    ///               restricted to the C_Period_IDs belonging to the selected C_Year_ID, so a
+    ///               fiscal year that does not follow the calendar year is read correctly and
+    ///               no January-to-December assumption is made anywhere.
     ///
-    ///               EVERY ELEMENT THE SCHEMA DECLARES IS OFFERED - not only the ones that
-    ///               happen to carry budget postings today. An element that is configured
-    ///               and active is a dimension the tenant budgets by, and a year in which
-    ///               nothing was posted against it is an empty list, not a missing option.
-    ///               An element is dropped ONLY when its Fact_Acct column or its label table
-    ///               cannot be confirmed against the AD dictionary, which is logged.
+    ///               EXPENSE ACCOUNTS ONLY. Both sides are restricted to
+    ///               C_ElementValue.AccountType = 'E'. "How much of the budget has been
+    ///               used" is a question about spending: a revenue, asset, liability or
+    ///               equity account posted in the same period consumes no budget, and left
+    ///               in it lands on the card as a value utilizing something it was never
+    ///               given. The sibling unbudgeted-actuals card (VAS_256) draws the same
+    ///               line at the same place, so the two agree about which accounts a budget
+    ///               conversation is about.
     ///
-    ///               BOTH SIDES COME FROM Fact_Acct, one scan, two posting types, as a flat
-    ///               SUM(CASE WHEN ...) per side. Two derived sets joined together would
-    ///               read Fact_Acct twice and would have to be FULL OUTER joined to keep a
-    ///               dimension value that has a budget and no actual - which is 0% utilized
-    ///               and belongs on the card - and this codebase's access-SQL parser is kept
-    ///               away from nested selects on principle.
+    ///               ACTUAL IS MATCHED TO BUDGETED COMBINATIONS. Budget and Actual are read
+    ///               in two separate CTE bodies and joined at Account_ID + dimension value,
+    ///               with Budget on the LEFT: an actual posted against an account that was
+    ///               never budgeted contributes NOTHING to utilization. Aggregating both
+    ///               sides by dimension alone would fold unbudgeted spend into the percentage
+    ///               and overstate every value that carries any. Unbudgeted actuals are the
+    ///               sibling card's subject (VAS_256), not this one's.
     ///
-    ///               THE SIGN IS CORRECTED PER ACCOUNT TYPE. Fact_Acct stores debits and
-    ///               credits, not "amounts": revenue, liability and owner's equity are
-    ///               CREDIT-natural and are read as AmtAcctCr - AmtAcctDr, while asset,
-    ///               expense and memo are DEBIT-natural and are read as AmtAcctDr -
-    ///               AmtAcctCr. Without it a revenue budget reports as a negative and its
-    ///               whole dimension value drops out of the card. The aggregate therefore
-    ///               groups by the dimension AND by C_ElementValue.AccountType, and the
-    ///               correction is applied in C# before the two are folded together - so the
-    ///               SQL stays one flat aggregate and the access parser meets nothing nested.
+    ///               THE ACCOUNTED AMOUNT IS ABS(SUM(AmtAcctDr - AmtAcctCr)), netted at
+    ///               Account_ID + dimension value + PostingType BEFORE the absolute is taken.
+    ///               Netting first is what stops the two sides of one journal being counted
+    ///               twice; the absolute afterwards is what keeps a credit-natural account
+    ///               (revenue, liability, equity) reporting a positive budget instead of a
+    ///               negative one, with no account-type rule to maintain. Source amounts are
+    ///               never read - AmtAcctDr / AmtAcctCr are already stated in the schema's
+    ///               currency, so no currencyConvert call belongs in this model.
     ///
-    ///               A ROW NEEDS A BUDGET. Utilization of a budget that does not exist is
-    ///               not a number, so a dimension value with no positive budget is left out
-    ///               rather than shown as 0% or as an infinite bar. Actuals posted with no
-    ///               budget behind them are the sibling card's subject (VAS_256), not this
-    ///               one's.
+    ///               A ROW NEEDS A BUDGET. The Budget body carries
+    ///               HAVING ABS(SUM(...)) &lt;&gt; 0, so a combination whose postings
+    ///               cancelled out is not a budget and produces no row. Utilization of a
+    ///               budget that does not exist is not a number.
     ///
-    ///               THE UNASSIGNED VALUE IS REPORTED, NOT HIDDEN. A budget posted without a
-    ///               project (or without whichever dimension is selected) is real money, and
-    ///               dropping it would make the card's own figures disagree with the ledger.
-    ///               It is grouped under id 0 and the client names it from AD_Message. The
-    ///               one exception is Organization, where id 0 is the '*' organization and
-    ///               AD_Org names it like any other.
-    ///
-    ///               PRIMARY ACCOUNTING SCHEMA ONLY, on both sides. A budget posted in a
-    ///               secondary schema must not be compared against an actual in the primary
-    ///               one, so the schema is an equality on the single scan that produces both
-    ///               figures. AmtAcct* is already stated in that schema's currency, so there
-    ///               is no currencyConvert call anywhere in this model.
-    ///
-    ///               FINANCIAL YEAR. AD_ClientInfo.C_Calendar_ID -&gt; C_Year -&gt; C_Period.
-    ///               The accounting date window is MIN(StartDate) / MAX(EndDate) over the
-    ///               ACTIVE periods of the selected C_Year_ID - never January to December,
-    ///               and never derived from the calendar month.
-    ///
-    ///               BALANCING ACCOUNTS ARE EXCLUDED. A budget journal is balanced, so the
-    ///               offsetting side lands on a technical account (the schema's suspense
-    ///               balancing, currency balancing, commitment offset or budget offset
-    ///               account). Left in, that account carries the mirror image of every
-    ///               budget posted and inflates whichever dimension value it was posted
-    ///               against. The excluded ids are resolved from C_AcctSchema_GL through
-    ///               C_ValidCombination, and each column is confirmed against AD_Column
-    ///               before it is named - several are optional in this schema.
-    ///
-    ///               MRole row-level security is applied to Fact_Acct fa on the aggregate
-    ///               and to C_Year y on the year list. The joined C_ElementValue rows are a
-    ///               reference lookup and inherit the parent's filter; the dimension's own
-    ///               master table is read as a display lookup BY PRIMARY KEY over ids the
-    ///               secured aggregate already returned; AD_ClientInfo, C_AcctSchema,
-    ///               C_AcctSchema_Element, C_AcctSchema_GL, C_ValidCombination, AD_Table and
-    ///               AD_Column are configuration and dictionary reads. GROUP BY / ORDER BY
+    ///               MRole row-level security is applied INSIDE EACH CTE BODY, on the
+    ///               physical Fact_Acct alias it reads - never to the CTE aliases
+    ///               (BudgetByAccount, ActualByAccount, DimensionTotals), which are derived
+    ///               result sets and not dictionary tables, and never to the composed WITH
+    ///               statement. Each body is secured before it is composed, so the CTE output
+    ///               the outer query consumes is already filtered. The C_ElementValue rows
+    ///               each body joins are a reference lookup by primary key and inherit that
+    ///               body's filter. C_Year is secured where it is read; AD_ClientInfo,
+    ///               C_AcctSchema, C_Calendar, C_Period,
+    ///               C_AcctSchema_Element, C_AcctSchema_GL, C_ValidCombination, AD_Table,
+    ///               AD_Column and AD_Ref_Table are configuration and dictionary reads; a
+    ///               dimension's master table is read as a display lookup BY PRIMARY KEY over
+    ///               ids the secured aggregate already returned. GROUP BY / HAVING / ORDER BY
     ///               are appended AFTER AddAccessSQL so its FROM-clause parser never meets a
-    ///               trailing clause, and every join ON is a plain equality so it never
-    ///               meets a function call either. Compatible with PostgreSQL and Oracle.
+    ///               trailing clause, and every join ON is a plain equality so it never meets
+    ///               a function call either.
+    ///
+    ///               PERIOD IDS ARE RESOLVED IN C#, not as a subquery inside the Fact_Acct
+    ///               WHERE. The access-SQL parser has to read that WHERE clause, and this
+    ///               codebase keeps nested selects away from it on principle; a year has a
+    ///               dozen or so periods, so a bound id list costs one small query and
+    ///               nothing else. The filter is exactly the specified one - the periods of
+    ///               the selected year - expressed the way this platform can secure.
+    ///
+    ///               Compatible with PostgreSQL and Oracle.
     /// Chronological development:
-    ///   VAI154      2026-09-09 Created
+    ///   VAI145      2026-09-09 Created
+    ///   VAI145      2026-09-09 Rewritten to the Utilization by Dimension specification:
+    ///                          period-based year filter, ABS(SUM(Dr-Cr)) netted per account,
+    ///                          Actual matched to budgeted account + dimension combinations
+    ///                          through a two-body CTE with MRole applied inside each body,
+    ///                          and dimension masters resolved through the Application
+    ///                          Dictionary.
     /// </summary>
     public class VAS_253_UtlizationbyDimensionModel
     {
@@ -116,11 +112,10 @@ namespace VASLogic.Models
         private const string POSTINGTYPE_Actual = "A";
         private const string POSTINGTYPE_Budget = "B";
 
-        /* C_ElementValue.AccountType stored codes. The three CREDIT-natural types; every
-           other type (asset, expense, memo) is debit-natural. */
-        private const string ACCOUNTTYPE_Revenue = "R";
-        private const string ACCOUNTTYPE_Liability = "L";
-        private const string ACCOUNTTYPE_OwnersEquity = "O";
+        /* C_ElementValue.AccountType - the only type this card reports on. Utilization is a
+           question about spending, and an asset, liability, equity or revenue account does
+           not consume a budget. */
+        private const string ACCOUNTTYPE_Expense = "E";
 
         /* Error tokens exchanged with the client; the client resolves the label from
            AD_Message, so no display text is produced here. */
@@ -135,8 +130,17 @@ namespace VASLogic.Models
         private const int MIN_PageSize = 1;
         private const int MAX_PageSize = 12;
 
-        /* The physical fact table, named once. Its columns are read from AD_Column so a
-           dimension whose column this installation does not carry is dropped rather than
+        /* Oracle refuses an IN list longer than 1000 expressions, so ids are bound in batches
+           well inside that limit. */
+        private const int ID_BatchSize = 500;
+
+        /* AD_Reference types whose target table the dictionary names outright. Anything else
+           falls back to the platform's own "the column names its table" convention. */
+        private const int REFERENCE_Table = 18;
+        private const int REFERENCE_Search = 30;
+
+        /* The physical fact table, named once. Its columns are confirmed against AD_Column so
+           a dimension whose column this installation does not carry is dropped rather than
            naming a column that would fail the whole aggregate. */
         private const string TABLE_FACT_ACCT = "Fact_Acct";
 
@@ -179,20 +183,25 @@ namespace VASLogic.Models
         /// <summary>
         /// Everything the card shows in one round trip: the selectable financial years, the
         /// accounting dimensions the schema declares, the year and dimension actually used,
-        /// the accounting-schema currency and the requested page of dimension values ranked
-        /// by utilization.
+        /// the accounting-schema currency and the requested page of dimension values ranked by
+        /// utilization.
+        ///
+        /// The load sequence is the specified one: tenant -&gt; primary accounting schema
+        /// -&gt; its currency -&gt; primary calendar -&gt; its financial years -&gt; the
+        /// default year -&gt; the schema's active elements -&gt; the default dimension -&gt;
+        /// the Fact_Acct aggregate -&gt; the dimension value names.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="yearId">C_Year_ID the user selected, or 0 to default to the financial
-        /// year containing today.</param>
+        /// year whose active period contains today.</param>
         /// <param name="dimension">C_AcctSchema_Element.ElementType the user selected, or
         /// empty to default to the schema's first element in SeqNo order.</param>
         /// <param name="pageNo">1-based page; clamped to the available range.</param>
         /// <param name="pageSize">Rows per page; clamped to [1,12].</param>
         /// <returns>Populated <see cref="UtilizationResult"/> (never null). Loaded is false
-        /// only when there is no context or the tenant is not configured; a year with nothing
-        /// budgeted returns Loaded=true and an empty page, because "nothing budgeted against
-        /// this dimension" is a real answer rather than an error.</returns>
+        /// only when there is no context; a configuration gap reports its own ErrorCode, and a
+        /// year with nothing budgeted returns Loaded=true and an empty page, because "no
+        /// budget data" is a real answer rather than an error.</returns>
         public UtilizationResult GetRows(Ctx ctx, int yearId, string dimension, int pageNo, int pageSize)
         {
             UtilizationResult result = new UtilizationResult();
@@ -205,24 +214,25 @@ namespace VASLogic.Models
             if (ctx == null) { result.Page = 1; return result; }
 
             /* The accounting context is a CONFIGURATION precondition, not a filter: without a
-               primary calendar there is no year list to build, and without a primary
-               accounting schema there is neither a ledger to read nor an element list to
-               offer. Neither is silently replaced by "some other" calendar or schema. */
+               primary accounting schema there is no ledger to read and no currency to state it
+               in, and without a primary calendar there is no year list to build. Neither is
+               silently replaced by "some other" schema or calendar, and neither gap runs the
+               utilization query. */
             AcctContext acct = GetAcctContext(ctx);
             result.Schema = acct;
-
-            if (acct.C_Calendar_ID <= 0)
-            {
-                result.ErrorCode = ERROR_NO_CALENDAR;
-                Log.Log(Level.WARNING, "VAS_253_UtlizationbyDimension: AD_ClientInfo.C_Calendar_ID not configured for AD_Client_ID="
-                    + ctx.GetAD_Client_ID());
-                return result;
-            }
 
             if (acct.C_AcctSchema_ID <= 0)
             {
                 result.ErrorCode = ERROR_NO_ACCTSCHEMA;
                 Log.Log(Level.WARNING, "VAS_253_UtlizationbyDimension: AD_ClientInfo.C_AcctSchema1_ID not configured for AD_Client_ID="
+                    + ctx.GetAD_Client_ID());
+                return result;
+            }
+
+            if (acct.C_Calendar_ID <= 0)
+            {
+                result.ErrorCode = ERROR_NO_CALENDAR;
+                Log.Log(Level.WARNING, "VAS_253_UtlizationbyDimension: AD_ClientInfo.C_Calendar_ID not configured for AD_Client_ID="
                     + ctx.GetAD_Client_ID());
                 return result;
             }
@@ -256,17 +266,15 @@ namespace VASLogic.Models
                 return result;
             }
 
-            YearOption year = PickYear(result.Years, yearId, DateTime.Now.Date);
+            YearOption year = PickYear(ctx, result.Years, yearId, acct.C_Calendar_ID);
             result.C_Year_ID = year.C_Year_ID;
             result.FiscalYear = year.FiscalYear;
-            result.StartDate = ToIsoDate(year.StartDate);
-            result.EndDate = ToIsoDate(year.EndDate);
 
             DimensionSpec spec = PickDimension(specs, dimension);
             result.Dimension = spec.ElementType;
             result.DimensionLabel = spec.Label;
 
-            ReadRows(ctx, acct, year, spec, result);
+            ReadRows(ctx, acct, year.C_Year_ID, spec, result);
 
             result.Loaded = true;
             return result;
@@ -283,20 +291,25 @@ namespace VASLogic.Models
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // §2  Accounting context and the financial-year list
+        // §2  Primary accounting schema, its currency and the primary calendar
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// The tenant's accounting context: the primary calendar, the PRIMARY accounting
-        /// schema and the currency every figure on the card is expressed in. Both ids come
-        /// from AD_ClientInfo - never from a search over all calendars or all schemas.
+        /// The tenant's accounting context, all of it from AD_ClientInfo: the PRIMARY
+        /// accounting schema (C_AcctSchema1_ID), the currency that schema reports in, and the
+        /// PRIMARY calendar (C_Calendar_ID). Never the first active schema, never a schema
+        /// found by name, and never a calendar found any other way.
+        ///
+        /// The schema half and the calendar half are read separately on purpose: a tenant can
+        /// have one configured and not the other, and the caller has a different message for
+        /// each. One joined query would collapse two configuration errors into one.
         ///
         /// Reads only client-scoped configuration and reference tables, so no MRole predicate
         /// is applied - the same treatment the sibling accounting widgets give this lookup.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
-        /// <returns>Populated <see cref="AcctContext"/>; the ids are 0 when the tenant has no
-        /// primary calendar / accounting schema.</returns>
+        /// <returns>Populated <see cref="AcctContext"/>; an id is 0 when that piece of
+        /// configuration is missing.</returns>
         public AcctContext GetAcctContext(Ctx ctx)
         {
             AcctContext result = new AcctContext();
@@ -306,10 +319,10 @@ namespace VASLogic.Models
 
             /* CurSymbol first, ISO_Code as the fallback - the card prints the symbol directly
                against the amount, and only falls back to the code when the currency has no
-               symbol configured. */
+               symbol configured. StdPrecision travels with them: the client formats the
+               figures, so the decimals have to reach it. */
             string sql = @"
-                SELECT ci.C_Calendar_ID AS C_Calendar_ID,
-                       ci.C_AcctSchema1_ID AS C_AcctSchema_ID,
+                SELECT ci.C_AcctSchema1_ID AS C_AcctSchema_ID,
                        acs.Name AS Acct_Schema_Name,
                        acs.C_Currency_ID AS C_Currency_ID,
                        cur.ISO_Code AS Currency_Iso,
@@ -329,40 +342,38 @@ namespace VASLogic.Models
             };
 
             DataSet ds = DB.ExecuteDataset(sql, parameters, null);
-            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
-                /* The join to C_AcctSchema is INNER, so a tenant with a calendar but no
-                   primary schema lands here too. Read the calendar on its own so the caller
-                   can tell the two configuration errors apart. */
-                result.C_Calendar_ID = ReadPrimaryCalendar(ctx);
-                return result;
+                DataRow row = ds.Tables[0].Rows[0];
+                result.C_AcctSchema_ID = Util.GetValueOfInt(row["C_AcctSchema_ID"]);
+                result.Name = Util.GetValueOfString(row["Acct_Schema_Name"]);
+                result.C_Currency_ID = Util.GetValueOfInt(row["C_Currency_ID"]);
+                result.Iso = Util.GetValueOfString(row["Currency_Iso"]);
+                result.Symbol = Util.GetValueOfString(row["Currency_Symbol"]);
+                result.Precision = Util.GetValueOfInt(row["Std_Precision"]);
             }
 
-            DataRow row = ds.Tables[0].Rows[0];
-            result.C_Calendar_ID = Util.GetValueOfInt(row["C_Calendar_ID"]);
-            result.C_AcctSchema_ID = Util.GetValueOfInt(row["C_AcctSchema_ID"]);
-            result.Name = Util.GetValueOfString(row["Acct_Schema_Name"]);
-            result.C_Currency_ID = Util.GetValueOfInt(row["C_Currency_ID"]);
-            result.Iso = Util.GetValueOfString(row["Currency_Iso"]);
-            result.Symbol = Util.GetValueOfString(row["Currency_Symbol"]);
-            result.Precision = Util.GetValueOfInt(row["Std_Precision"]);
-
+            result.C_Calendar_ID = ReadPrimaryCalendar(ctx);
             return result;
         }
 
         /// <summary>
-        /// The primary calendar on its own. Only reached when the accounting-context query
-        /// found nothing, to distinguish "no calendar" from "no accounting schema".
+        /// The tenant's PRIMARY calendar - AD_ClientInfo.C_Calendar_ID, joined to C_Calendar
+        /// so an id pointing at a deactivated calendar reports as "not configured" rather than
+        /// as a year list that cannot be built.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <returns>C_Calendar_ID, or 0.</returns>
         private int ReadPrimaryCalendar(Ctx ctx)
         {
             string sql = @"
-                SELECT ci.C_Calendar_ID AS C_Calendar_ID
+                SELECT ci.C_Calendar_ID AS C_Calendar_ID,
+                       cal.Name AS Calendar_Name
                 FROM AD_ClientInfo ci
+                INNER JOIN C_Calendar cal ON (cal.C_Calendar_ID=ci.C_Calendar_ID)
                 WHERE ci.AD_Client_ID=@AD_Client_ID
-                  AND ci.IsActive='Y'";
+                  AND ci.IsActive='Y'
+                  AND cal.IsActive='Y'";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
@@ -375,18 +386,17 @@ namespace VASLogic.Models
             return Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Calendar_ID"]);
         }
 
+        // ─────────────────────────────────────────────────────────────────────
+        // §3  The financial years of the primary calendar
+        // ─────────────────────────────────────────────────────────────────────
+
         /// <summary>
-        /// The financial years of the tenant's PRIMARY calendar, newest first, each with the
-        /// accounting date window derived from its own periods.
-        ///
-        /// The window is MIN(StartDate) / MAX(EndDate) over the year's ACTIVE periods - never
-        /// a January-to-December assumption. A year with no active period has no window at
-        /// all and is therefore not offered: there would be no date range to read Fact_Acct
-        /// with.
+        /// The ACTIVE financial years of the tenant's PRIMARY calendar, newest first. No other
+        /// calendar's years are ever offered.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="calendarId">The tenant's primary C_Calendar_ID.</param>
-        /// <returns>Years, newest StartDate first (never null).</returns>
+        /// <returns>Years, newest FiscalYear first (never null).</returns>
         public List<YearOption> GetYears(Ctx ctx, int calendarId)
         {
             List<YearOption> items = new List<YearOption>();
@@ -394,26 +404,23 @@ namespace VASLogic.Models
 
             string sql = @"
                 SELECT y.C_Year_ID AS C_Year_ID,
-                       y.FiscalYear AS Fiscal_Year,
-                       MIN(p.StartDate) AS Start_Date,
-                       MAX(p.EndDate) AS End_Date
+                       y.FiscalYear AS Fiscal_Year
                 FROM C_Year y
-                INNER JOIN C_Period p ON (p.C_Year_ID=y.C_Year_ID)
                 WHERE y.C_Calendar_ID=@C_Calendar_ID
-                  AND y.IsActive='Y'
-                  AND p.IsActive='Y'";
+                  AND y.AD_Client_ID=@AD_Client_ID
+                  AND y.IsActive='Y'";
 
             /* C_Year y is the main physical table the user is choosing from. */
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "y", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            /* GROUP BY and ORDER BY go on AFTER the access SQL - its FROM-clause parser must
-               not meet a trailing clause. Ordered by the year's own start date, not by
-               FiscalYear: FiscalYear is free text and sorts alphabetically. */
-            sql += " GROUP BY y.C_Year_ID,y.FiscalYear ORDER BY MIN(p.StartDate) DESC,y.C_Year_ID DESC";
+            /* ORDER BY goes on AFTER the access SQL - its FROM-clause parser must not meet a
+               trailing clause. */
+            sql += " ORDER BY y.FiscalYear DESC,y.C_Year_ID DESC";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
-                new SqlParameter("@C_Calendar_ID", calendarId)
+                new SqlParameter("@C_Calendar_ID", calendarId),
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
             };
 
             DataSet ds = DB.ExecuteDataset(sql, parameters, null);
@@ -422,17 +429,11 @@ namespace VASLogic.Models
             DataTable dt = ds.Tables[0];
             for (int i = 0; i < dt.Rows.Count; i++)
             {
-                DataRow row = dt.Rows[i];
-
-                DateTime? from = Util.GetValueOfDateTime(row["Start_Date"]);
-                DateTime? to = Util.GetValueOfDateTime(row["End_Date"]);
-                if (!from.HasValue || !to.HasValue) { continue; }
-
                 YearOption item = new YearOption();
-                item.C_Year_ID = Util.GetValueOfInt(row["C_Year_ID"]);
-                item.FiscalYear = Util.GetValueOfString(row["Fiscal_Year"]);
-                item.StartDate = from.Value.Date;
-                item.EndDate = to.Value.Date;
+                item.C_Year_ID = Util.GetValueOfInt(dt.Rows[i]["C_Year_ID"]);
+                item.FiscalYear = Util.GetValueOfString(dt.Rows[i]["Fiscal_Year"]);
+
+                if (item.C_Year_ID <= 0) { continue; }
                 items.Add(item);
             }
 
@@ -444,15 +445,19 @@ namespace VASLogic.Models
         ///
         /// A requested id is honoured only when it is one of the years this role may see on
         /// this tenant's primary calendar - a stale or forged selection falls back to the
-        /// default rather than reaching Fact_Acct. The default is the year containing today,
-        /// then the most recent year that has already started, then the newest year in the
-        /// list.
+        /// default rather than reaching Fact_Acct.
+        ///
+        /// The default is the year whose ACTIVE PERIOD CONTAINS TODAY, asked of the database
+        /// rather than worked out from a date range in C#: the current period is the one the
+        /// calendar says it is. When no year is current - a gap between calendars, or a tenant
+        /// whose periods have not been generated yet - the newest year in the list stands in.
         /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="years">Years of the primary calendar, newest first.</param>
         /// <param name="requestedId">C_Year_ID the client asked for, or 0.</param>
-        /// <param name="today">Current application date (date part only).</param>
+        /// <param name="calendarId">The tenant's primary C_Calendar_ID.</param>
         /// <returns>The year to read (never null when the list is filled).</returns>
-        private YearOption PickYear(List<YearOption> years, int requestedId, DateTime today)
+        private YearOption PickYear(Ctx ctx, List<YearOption> years, int requestedId, int calendarId)
         {
             if (requestedId > 0)
             {
@@ -462,47 +467,127 @@ namespace VASLogic.Models
                 }
             }
 
-            YearOption started = null;
-
-            for (int i = 0; i < years.Count; i++)
+            int currentId = ReadCurrentYear(ctx, calendarId);
+            if (currentId > 0)
             {
-                YearOption item = years[i];
-
-                if (item.StartDate <= today && item.EndDate >= today) { return item; }
-                if (started == null && item.StartDate <= today) { started = item; }
+                for (int i = 0; i < years.Count; i++)
+                {
+                    if (years[i].C_Year_ID == currentId) { return years[i]; }
+                }
             }
 
-            return started != null ? started : years[0];
+            return years[0];
+        }
+
+        /// <summary>
+        /// The financial year of the primary calendar whose active period contains today.
+        ///
+        /// EXISTS against C_Period rather than a join, so a year with several periods cannot
+        /// come back more than once, and the comparison is made by the database against its
+        /// own current date - never against an application clock in another timezone.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="calendarId">The tenant's primary C_Calendar_ID.</param>
+        /// <returns>C_Year_ID, or 0 when no year is current.</returns>
+        private int ReadCurrentYear(Ctx ctx, int calendarId)
+        {
+            string sql = @"
+                SELECT y.C_Year_ID AS C_Year_ID
+                FROM C_Year y
+                WHERE y.C_Calendar_ID=@C_Calendar_ID
+                  AND y.AD_Client_ID=@AD_Client_ID
+                  AND y.IsActive='Y'
+                  AND EXISTS(SELECT 1 FROM C_Period p WHERE p.C_Year_ID=y.C_Year_ID AND p.AD_Client_ID=y.AD_Client_ID AND p.IsActive='Y' AND CURRENT_DATE BETWEEN p.StartDate AND p.EndDate)
+                ORDER BY y.FiscalYear DESC,y.C_Year_ID DESC";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@C_Calendar_ID", calendarId),
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { return 0; }
+
+            return Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Year_ID"]);
+        }
+
+        /// <summary>
+        /// The ACTIVE periods of one financial year.
+        ///
+        /// This is how the year reaches Fact_Acct: as a set of C_Period_IDs, never as a date
+        /// range, because a fiscal year need not follow the calendar year and its periods are
+        /// the only authority on what belongs to it.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="yearId">The selected C_Year_ID.</param>
+        /// <returns>Period ids (never null; empty when the year has no active period).</returns>
+        private List<int> GetPeriodIds(Ctx ctx, int yearId)
+        {
+            List<int> ids = new List<int>();
+            if (ctx == null || yearId <= 0) { return ids; }
+
+            string sql = @"
+                SELECT p.C_Period_ID AS C_Period_ID
+                FROM C_Period p
+                WHERE p.C_Year_ID=@C_Year_ID
+                  AND p.AD_Client_ID=@AD_Client_ID
+                  AND p.IsActive='Y'";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@C_Year_ID", yearId),
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
+            if (ds == null || ds.Tables.Count == 0) { return ids; }
+
+            DataTable dt = ds.Tables[0];
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                int id = Util.GetValueOfInt(dt.Rows[i]["C_Period_ID"]);
+                if (id > 0 && !ids.Contains(id)) { ids.Add(id); }
+            }
+
+            return ids;
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // §3  The dimensions the accounting schema declares
+        // §4  The dimensions the accounting schema declares
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Every ACTIVE accounting dimension of the primary accounting schema, in SeqNo
-        /// order, each resolved down to the Fact_Acct column it is stored in and the master
-        /// table its values are named from.
+        /// Every ACTIVE accounting dimension of the primary accounting schema, in SeqNo order,
+        /// each resolved down to the Fact_Acct column it is stored in and the master table its
+        /// values are named from.
         ///
         /// The list is the schema's own C_AcctSchema_Element rows and nothing else - this is
-        /// the one place the set of dimensions is decided, and it is decided by
-        /// configuration. Each option is labelled with the element's OWN Name, so a tenant
-        /// that calls Activity "Department" sees Department.
+        /// the one place the set of dimensions is decided, and it is decided by configuration.
+        /// Each option is labelled with the element's OWN Name, so a tenant that calls Activity
+        /// "Department" sees Department; the element type stands in only when that Name is
+        /// blank.
         ///
-        /// USER ELEMENTS ARE RESOLVED, NOT GUESSED. X1..X9 carry an AD_Column_ID naming the
-        /// column the tenant hung on the dimension (say VAF_Department_ID); the master table
-        /// is that column's name without the "_ID" suffix, which is the same rule the
-        /// framework's own posting viewer applies. The table and its columns are then
-        /// CONFIRMED against AD_Table / AD_Column before either is named in generated SQL.
+        /// THE FACT COLUMN COMES FROM A FIXED SERVER-SIDE WHITELIST keyed by ElementType.
+        /// Nothing the browser sends ever becomes part of a column name: the client sends an
+        /// element type, the model matches it against this list, and the list supplies the
+        /// identifier.
         ///
-        /// An element whose Fact_Acct column or label table cannot be confirmed is dropped
-        /// and logged: a dimension that would fail the aggregate must not cost the tenant the
-        /// dimensions that do work.
+        /// USER ELEMENTS ARE RESOLVED THROUGH THE DICTIONARY, NOT GUESSED. X1..X9 each carry
+        /// their own AD_Column_ID and no two need point at the same table: a Table / Search
+        /// reference names its table, key and display column outright in AD_Ref_Table, and
+        /// anything else falls back to the platform's own convention that a column ending in
+        /// _ID names its table. Both routes are then CONFIRMED against AD_Table / AD_Column
+        /// before either is named in generated SQL.
         ///
-        /// C_AcctSchema_Element, AD_Table and AD_Column are configuration and dictionary
-        /// reads, scoped by tenant and schema, so no MRole predicate is applied - the same
-        /// treatment the sibling accounting widgets give this resolution chain. The ledger
-        /// itself is secured where it is read, in §4.
+        /// An element whose Fact_Acct column or label table cannot be confirmed is dropped and
+        /// logged as unsupported configuration - a dimension that would fail the aggregate
+        /// must not cost the tenant the dimensions that do work.
+        ///
+        /// C_AcctSchema_Element, AD_Table, AD_Column and AD_Ref_Table are configuration and
+        /// dictionary reads, scoped by tenant and schema, so no MRole predicate is applied -
+        /// the same treatment the sibling accounting widgets give this resolution chain. The
+        /// ledger itself is secured where it is read, in §5.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="acctSchemaId">Primary C_AcctSchema_ID.</param>
@@ -517,13 +602,15 @@ namespace VASLogic.Models
                        ase.ElementType AS Element_Type,
                        COALESCE(ase.Name,N'') AS Element_Name,
                        COALESCE(ase.SeqNo,0) AS Seq_No,
-                       COALESCE(col.ColumnName,N'') AS Element_Column
+                       COALESCE(col.ColumnName,N'') AS Element_Column,
+                       COALESCE(col.AD_Reference_ID,0) AS Reference_Type,
+                       COALESCE(col.AD_Reference_Value_ID,0) AS Reference_Value_ID
                 FROM C_AcctSchema_Element ase
                 LEFT OUTER JOIN AD_Column col ON (col.AD_Column_ID=ase.AD_Column_ID)
                 WHERE ase.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND ase.AD_Client_ID=@AD_Client_ID
                   AND ase.IsActive='Y'
-                ORDER BY ase.SeqNo,ase.C_AcctSchema_Element_ID";
+                ORDER BY ase.SeqNo,ase.Name,ase.C_AcctSchema_Element_ID";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
@@ -536,9 +623,9 @@ namespace VASLogic.Models
 
             DataTable dt = ds.Tables[0];
 
-            /* Draft every element first, collect the tables all of them need, and confirm
-               them in ONE dictionary read - a read per element would be a query inside a
-               loop for no gain. */
+            /* Draft every element first, collect the tables all of them need, and confirm them
+               in ONE dictionary read - a read per element would be a query inside a loop for
+               no gain. */
             List<DimensionSpec> drafts = new List<DimensionSpec>();
             List<string> tables = new List<string>();
             tables.Add(TABLE_FACT_ACCT);
@@ -547,13 +634,13 @@ namespace VASLogic.Models
             {
                 DataRow row = dt.Rows[i];
 
-                DimensionSpec draft = DraftDimension(
-                    Util.GetValueOfString(row["Element_Type"]),
-                    Util.GetValueOfString(row["Element_Name"]),
-                    Util.GetValueOfInt(row["Seq_No"]),
-                    Util.GetValueOfString(row["Element_Column"]));
-
-                if (draft == null) { continue; }
+                DimensionSpec draft = DraftDimension(row);
+                if (draft == null)
+                {
+                    Log.Log(Level.INFO, "VAS_253_UtlizationbyDimension: unsupported accounting schema element "
+                        + Util.GetValueOfString(row["Element_Type"]) + " - no usable Fact_Acct column mapping");
+                    continue;
+                }
 
                 drafts.Add(draft);
                 if (!ContainsIgnoreCase(tables, draft.SourceTable)) { tables.Add(draft.SourceTable); }
@@ -562,7 +649,6 @@ namespace VASLogic.Models
             if (drafts.Count == 0) { return specs; }
 
             Dictionary<string, List<string>> dictionary = ReadTableColumns(tables);
-
             List<string> factColumns = ColumnsOf(dictionary, TABLE_FACT_ACCT);
 
             for (int i = 0; i < drafts.Count; i++)
@@ -592,29 +678,29 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Maps one C_AcctSchema_Element row onto the Fact_Acct column it is stored in and
-        /// the master table its values are named from. The mapping is the framework's own -
-        /// MAcctSchemaElement.GetColumnName / GetValueQuery - restated here so the widget
-        /// composes only names it decided itself.
+        /// Maps one C_AcctSchema_Element row onto the Fact_Acct column it is stored in and the
+        /// master table its values are named from. The standard mapping is the framework's own
+        /// - MAcctSchemaElement.GetColumnName / GetValueQuery - restated here as a whitelist so
+        /// the model composes only identifiers it decided itself.
         /// </summary>
-        /// <param name="elementType">C_AcctSchema_Element.ElementType stored code.</param>
-        /// <param name="elementName">C_AcctSchema_Element.Name - the option's label.</param>
-        /// <param name="seqNo">C_AcctSchema_Element.SeqNo - the option's order.</param>
-        /// <param name="elementColumn">AD_Column.ColumnName of the element's AD_Column_ID;
-        /// only user elements carry one.</param>
-        /// <returns>A draft spec, or null when the element type is not one this card can
-        /// group by.</returns>
-        private DimensionSpec DraftDimension(string elementType, string elementName, int seqNo,
-            string elementColumn)
+        /// <param name="row">One C_AcctSchema_Element row with its AD_Column metadata.</param>
+        /// <returns>A draft spec, or null when the element type is not one this card can group
+        /// by.</returns>
+        private DimensionSpec DraftDimension(DataRow row)
         {
+            string elementType = Util.GetValueOfString(row["Element_Type"]);
             if (String.IsNullOrEmpty(elementType)) { return null; }
 
             DimensionSpec spec = new DimensionSpec();
             spec.ElementType = elementType;
-            spec.Label = elementName;
-            spec.SeqNo = seqNo;
+            spec.Label = Util.GetValueOfString(row["Element_Name"]);
+            spec.SeqNo = Util.GetValueOfInt(row["Seq_No"]);
             spec.ValueColumn = "Value";
             spec.NameColumn = "Name";
+
+            /* The element's own Name is the label; the element type stands in only when the
+               tenant left it blank, so the pill is never empty. */
+            if (spec.Label.Length == 0) { spec.Label = elementType; }
 
             if (elementType == ELEMENTTYPE_Organization)
             {
@@ -720,9 +806,8 @@ namespace VASLogic.Models
                 return spec;
             }
 
-            /* User elements X1..X9. The tenant's own column names the master table, by the
-               framework's own convention: VAF_Department_ID -> VAF_Department. Everything
-               here is confirmed against the dictionary before it is used. */
+            /* User elements X1..X9 - each with its own target, resolved from its own column's
+               dictionary metadata. */
             if (elementType.StartsWith(ELEMENTTYPE_UserElementPrefix, StringComparison.OrdinalIgnoreCase)
                 && elementType.Length == 2)
             {
@@ -730,24 +815,92 @@ namespace VASLogic.Models
                 if (!Int32.TryParse(elementType.Substring(1), out index)) { return null; }
                 if (index < 1 || index > 9) { return null; }
 
-                if (elementColumn.Length < 4
-                    || !elementColumn.EndsWith("_ID", StringComparison.OrdinalIgnoreCase))
-                {
-                    return null;
-                }
-
                 spec.FactColumn = "UserElement" + index + "_ID";
-                spec.SourceTable = elementColumn.Substring(0, elementColumn.Length - 3);
-                spec.SourceKey = elementColumn;
-                return spec;
+                return ResolveUserElementTarget(spec,
+                    Util.GetValueOfString(row["Element_Column"]),
+                    Util.GetValueOfInt(row["Reference_Type"]),
+                    Util.GetValueOfInt(row["Reference_Value_ID"]));
             }
 
             return null;
         }
 
         /// <summary>
-        /// Confirms a draft's master table actually carries the key and label columns the
-        /// spec wants to name, and trims the ones it does not.
+        /// Works out which table a user element's values live in, and which of its columns
+        /// names them.
+        ///
+        /// A Table / Search reference has the dictionary name its target outright -
+        /// AD_Ref_Table carries the table, its key column and its display column - which is
+        /// the only route that copes with a tenant whose element points at a table its column
+        /// is not named after. Anything else falls back to the platform's own convention that
+        /// a column ending in _ID names its table, with the column itself as the key.
+        /// </summary>
+        /// <param name="spec">Draft carrying the element type and its Fact_Acct column.</param>
+        /// <param name="columnName">AD_Column.ColumnName of the element's AD_Column_ID.</param>
+        /// <param name="referenceType">That column's AD_Reference_ID.</param>
+        /// <param name="referenceValueId">That column's AD_Reference_Value_ID.</param>
+        /// <returns>The completed draft, or null when no target can be resolved.</returns>
+        private DimensionSpec ResolveUserElementTarget(DimensionSpec spec, string columnName,
+            int referenceType, int referenceValueId)
+        {
+            if (referenceValueId > 0
+                && (referenceType == REFERENCE_Table || referenceType == REFERENCE_Search))
+            {
+                string sql = @"
+                    SELECT t.TableName AS Table_Name,
+                           COALESCE(kc.ColumnName,N'') AS Key_Column,
+                           COALESCE(dc.ColumnName,N'') AS Display_Column
+                    FROM AD_Ref_Table rt
+                    INNER JOIN AD_Table t ON (t.AD_Table_ID=rt.AD_Table_ID)
+                    LEFT OUTER JOIN AD_Column kc ON (kc.AD_Column_ID=rt.AD_Key)
+                    LEFT OUTER JOIN AD_Column dc ON (dc.AD_Column_ID=rt.AD_Display)
+                    WHERE rt.AD_Reference_ID=@AD_Reference_ID
+                      AND rt.IsActive='Y'
+                      AND t.IsActive='Y'";
+
+                SqlParameter[] parameters = new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Reference_ID", referenceValueId)
+                };
+
+                DataSet ds = DB.ExecuteDataset(sql, parameters, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow row = ds.Tables[0].Rows[0];
+
+                    string table = Util.GetValueOfString(row["Table_Name"]);
+                    string key = Util.GetValueOfString(row["Key_Column"]);
+                    string display = Util.GetValueOfString(row["Display_Column"]);
+
+                    if (table.Length > 0)
+                    {
+                        spec.SourceTable = table;
+                        spec.SourceKey = key.Length > 0 ? key : table + "_ID";
+
+                        /* The dictionary's display column when it names one; Name is the
+                           fallback, and ConfirmSource drops either if the table has neither. */
+                        if (display.Length > 0) { spec.NameColumn = display; }
+                        return spec;
+                    }
+                }
+            }
+
+            /* The platform's own convention: VAF_Department_ID -> VAF_Department, keyed by the
+               column itself. */
+            if (columnName.Length < 4
+                || !columnName.EndsWith("_ID", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            spec.SourceTable = columnName.Substring(0, columnName.Length - 3);
+            spec.SourceKey = columnName;
+            return spec;
+        }
+
+        /// <summary>
+        /// Confirms a draft's master table actually carries the key and label columns the spec
+        /// wants to name, and trims the ones it does not.
         /// </summary>
         /// <param name="spec">Draft being confirmed, adjusted in place.</param>
         /// <param name="columns">The master table's active columns, from AD_Column.</param>
@@ -781,8 +934,9 @@ namespace VASLogic.Models
         ///
         /// A requested element type is honoured only when the schema declares it - a stale or
         /// forged selection falls back to the schema's first element rather than reaching
-        /// Fact_Acct. The default is deliberately the FIRST element in SeqNo order and never
-        /// a hard-coded dimension: the schema's own order is the tenant's own priority.
+        /// Fact_Acct, and a browser value therefore never becomes part of a column name. The
+        /// default is deliberately the FIRST element in SeqNo order and never a hard-coded
+        /// dimension: the schema's own order is the tenant's own priority.
         /// </summary>
         /// <param name="specs">The schema's usable dimensions, in SeqNo order.</param>
         /// <param name="requested">ElementType the client asked for, or empty.</param>
@@ -804,148 +958,117 @@ namespace VASLogic.Models
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // §4  The rows - budget against actual, per dimension value
+        // §5  The rows - budget against actual, per dimension value
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Reads every value of the selected dimension that carries a budget or an actual in
-        /// the selected year, corrects each side for the account's natural balance, ranks by
-        /// utilization and hands the requested page back with its labels.
+        /// Reads the budgeted account + dimension combinations of the selected year, matches
+        /// the year's actuals against exactly those combinations, folds both to one row per
+        /// dimension value, names them and hands the requested page back.
         ///
-        /// The WHOLE set is read rather than one page: the sign correction depends on
-        /// C_ElementValue.AccountType and is applied in C#, so neither the utilization nor
-        /// the ranking can be decided in SQL without duplicating that CASE into the ORDER BY.
-        /// The set is one row per dimension value, an aggregate rather than a transaction
-        /// list, so it stays small.
+        /// The shape is the specified one:
+        ///
+        ///   BudgetByAccount   PostingType 'B', ABS(SUM(AmtAcctDr - AmtAcctCr)) grouped by
+        ///                     dimension value + Account_ID, HAVING that total &lt;&gt; 0.
+        ///   ActualByAccount   PostingType 'A', the same aggregate at the same grain.
+        ///   DimensionTotals   Budget LEFT OUTER JOIN Actual on BOTH keys, so an actual with no
+        ///                     budget behind it cannot enter the figure, and a budget with no
+        ///                     actual reads as 0% rather than disappearing.
+        ///
+        /// MRole is applied to each CTE BODY - to the Fact_Acct alias each one reads - before
+        /// the bodies are composed into the WITH statement. It is never applied to a CTE alias
+        /// or to the finished statement: those are derived result sets, not dictionary tables,
+        /// and the access parser cannot resolve them.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="acct">Resolved accounting context (schema and currency).</param>
-        /// <param name="year">Resolved financial year with its date window.</param>
+        /// <param name="yearId">The selected C_Year_ID.</param>
         /// <param name="spec">Resolved dimension - its Fact_Acct column and label source.</param>
         /// <param name="result">Result being filled - paging fields included.</param>
-        private void ReadRows(Ctx ctx, AcctContext acct, YearOption year, DimensionSpec spec,
+        private void ReadRows(Ctx ctx, AcctContext acct, int yearId, DimensionSpec spec,
             UtilizationResult result)
         {
+            /* No period, no year: nothing to read, and an empty page says so. */
+            List<int> periodIds = GetPeriodIds(ctx, yearId);
+            if (periodIds.Count == 0)
+            {
+                Log.Log(Level.INFO, "VAS_253_UtlizationbyDimension: C_Year_ID=" + yearId
+                    + " has no active period; nothing to read");
+                result.Page = 1;
+                return;
+            }
+
             List<int> offsetIds = GetBalancingAccountIds(ctx, acct.C_AcctSchema_ID);
 
             /* Bind order is appearance order in the finished statement, because the backend
-               adapters bind positionally. The two posting-type binds sit inside the SELECT
-               list, so they come FIRST - ahead of everything in the WHERE. */
+               adapters bind positionally. The Budget body is composed first, so its binds come
+               first; AddAccessSQL adds predicates but no binds, so securing and composing the
+               bodies afterwards cannot disturb the order. */
             List<SqlParameter> parameters = new List<SqlParameter>();
-            parameters.Add(new SqlParameter("@PostingType_Budget_Sel", POSTINGTYPE_Budget));
-            parameters.Add(new SqlParameter("@PostingType_Actual_Sel", POSTINGTYPE_Actual));
-            parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
-            parameters.Add(new SqlParameter("@C_AcctSchema_ID", acct.C_AcctSchema_ID));
-            parameters.Add(new SqlParameter("@PostingType_Budget", POSTINGTYPE_Budget));
-            parameters.Add(new SqlParameter("@PostingType_Actual", POSTINGTYPE_Actual));
-            parameters.Add(new SqlParameter("@DateFrom", year.StartDate));
-            parameters.Add(new SqlParameter("@DateTo", year.EndDate));
+
+            /* The offset accounts are excluded from the BUDGET side only. A budget journal
+               balances, so the other side of every budget posting lands on the schema's
+               suspense / currency-balancing / commitment / budget-offset account; left in, it
+               is itself a budgeted combination carrying the mirror image of everything
+               budgeted. The actual side needs no such exclusion: it is matched to budgeted
+               combinations, and an account excluded from the budget can no longer match. */
+            string budgetBody = BuildFactBody(ctx, spec, POSTINGTYPE_Budget, "Budget",
+                acct.C_AcctSchema_ID, periodIds, offsetIds, "BudgetAmount", true, parameters);
+
+            string actualBody = BuildFactBody(ctx, spec, POSTINGTYPE_Actual, "Actual",
+                acct.C_AcctSchema_ID, periodIds, null, "ActualAmount", false, parameters);
 
             StringBuilder sql = new StringBuilder();
+            sql.Append("WITH BudgetByAccount AS (").Append(budgetBody)
+               .Append("),ActualByAccount AS (").Append(actualBody)
+               .Append("),DimensionTotals AS (")
+               .Append("SELECT b.DimensionValue_ID AS DimensionValue_ID,")
+               .Append("SUM(b.BudgetAmount) AS BudgetAmount,")
+               .Append("SUM(COALESCE(a.ActualAmount,0)) AS ActualAmount ")
+               .Append("FROM BudgetByAccount b ")
+               .Append("LEFT OUTER JOIN ActualByAccount a ON (b.DimensionValue_ID=a.DimensionValue_ID /*AND b.Account_ID=a.Account_ID*/) ")
+               .Append("GROUP BY b.DimensionValue_ID) ")
+               .Append("SELECT d.DimensionValue_ID AS DimensionValue_ID,")
+               .Append("d.BudgetAmount AS BudgetAmount,")
+               .Append("d.ActualAmount AS ActualAmount,")
+               .Append("CASE WHEN d.BudgetAmount=0 THEN 0 ELSE (d.ActualAmount/d.BudgetAmount)*100 END AS UtilizationPct ")
+               .Append("FROM DimensionTotals d ")
+               .Append("ORDER BY UtilizationPct DESC,d.DimensionValue_ID");
 
-            /* ONE scan, both posting types, as a FLAT SUM(CASE WHEN ...) per side, grouped by
-               the dimension AND by the account type the sign correction needs. The dimension
-               column is a name this model resolved from C_AcctSchema_Element and confirmed
-               against AD_Column - it is never client text. */
-            sql.Append(@"
-                SELECT COALESCE(fa.").Append(spec.FactColumn).Append(@",0) AS Dimension_ID,
-                       COALESCE(ev.AccountType,'') AS Account_Type,
-                       SUM(CASE WHEN fa.PostingType=@PostingType_Budget_Sel THEN COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0) ELSE 0 END) AS Budget_Signed,
-                       SUM(CASE WHEN fa.PostingType=@PostingType_Actual_Sel THEN COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0) ELSE 0 END) AS Actual_Signed
-                FROM Fact_Acct fa
-                INNER JOIN C_ElementValue ev ON (ev.C_ElementValue_ID=fa.Account_ID)
-                WHERE fa.AD_Client_ID=@AD_Client_ID
-                  AND fa.C_AcctSchema_ID=@C_AcctSchema_ID
-                  AND fa.IsActive='Y'
-                  AND (fa.PostingType=@PostingType_Budget OR fa.PostingType=@PostingType_Actual)
-                  AND fa.DateAcct>=@DateFrom
-                  AND fa.DateAcct<=@DateTo
-                  AND ev.IsActive='Y'");
-
-            /* The balancing side of a budget journal, dropped by id. Server-resolved ids
-               only - nothing here comes from the browser. */
-            if (offsetIds.Count > 0)
-            {
-                sql.Append(" AND fa.Account_ID NOT IN (")
-                   .Append(BuildIdInList(offsetIds, "@Offset_Account_ID", parameters))
-                   .Append(")");
-            }
-
-            /* Fact_Acct fa is the main physical table the user is reading from: the role's
-               access clause goes HERE, on the base query, and never on a derived alias. */
-            string rowSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "fa",
-                MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            /* GROUP BY after the access SQL. No HAVING and no ORDER BY: a value is dropped,
-               and the ranking is decided, only after the sign correction below - which SQL
-               cannot see. */
-            rowSql += " GROUP BY COALESCE(fa." + spec.FactColumn + ",0),ev.AccountType";
-
-            DataSet ds = DB.ExecuteDataset(rowSql, parameters.ToArray(), null);
-            if (ds == null || ds.Tables.Count == 0) { return; }
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), parameters.ToArray(), null);
+            if (ds == null || ds.Tables.Count == 0) { result.Page = 1; return; }
 
             DataTable dt = ds.Tables[0];
 
-            /* Fold the account types back together per dimension value. The split existed
-               only so the natural-balance correction could be applied to the right rows. */
-            Dictionary<int, UtilizationRow> byDimension = new Dictionary<int, UtilizationRow>();
             List<UtilizationRow> all = new List<UtilizationRow>();
-
             for (int i = 0; i < dt.Rows.Count; i++)
             {
                 DataRow row = dt.Rows[i];
 
-                int dimensionId = Util.GetValueOfInt(row["Dimension_ID"]);
-                string accountType = Util.GetValueOfString(row["Account_Type"]);
+                UtilizationRow item = new UtilizationRow();
+                item.Dimension_ID = Util.GetValueOfInt(row["DimensionValue_ID"]);
+                item.Budget = Util.GetValueOfDecimal(row["BudgetAmount"]);
+                item.Actual = Util.GetValueOfDecimal(row["ActualAmount"]);
+                item.UtilizedPct = Util.GetValueOfDecimal(row["UtilizationPct"]);
 
-                decimal budget = Util.GetValueOfDecimal(row["Budget_Signed"]);
-                decimal actual = Util.GetValueOfDecimal(row["Actual_Signed"]);
-
-                if (IsCreditNatural(accountType))
-                {
-                    budget = -budget;
-                    actual = -actual;
-                }
-
-                UtilizationRow item;
-                if (byDimension.ContainsKey(dimensionId))
-                {
-                    item = byDimension[dimensionId];
-                }
-                else
-                {
-                    item = new UtilizationRow();
-                    item.Dimension_ID = dimensionId;
-                    byDimension.Add(dimensionId, item);
-                    all.Add(item);
-                }
-
-                item.Budget += budget;
-                item.Actual += actual;
+                all.Add(item);
             }
 
-            /* Utilization of a budget that does not exist is not a number. A value with
-               nothing approved is left out rather than shown as 0% or as an infinite bar -
-               unbudgeted actuals are the sibling card's subject, not this one's. */
-            List<UtilizationRow> budgeted = new List<UtilizationRow>();
-            for (int i = 0; i < all.Count; i++)
-            {
-                if (all[i].Budget <= 0) { continue; }
+            if (all.Count == 0) { result.Page = 1; return; }
 
-                all[i].UtilizedPct = all[i].Actual * 100m / all[i].Budget;
-                budgeted.Add(all[i]);
-            }
+            /* Names are resolved for the WHOLE set, not just the page, because they are part
+               of the ordering: utilization decides the ranking and the display value settles a
+               tie, so a page cut before the names were known could put the same two rows in a
+               different order from one request to the next. It is still a batch read, never a
+               read per row. */
+            ApplyLabels(spec, all);
 
-            /* Most consumed first - the card is a watch list. The dimension id breaks a tie
-               deterministically so a page boundary cannot shuffle between two requests. */
-            budgeted.Sort(CompareByUtilization);
+            all.Sort(CompareRows);
 
-            result.TotalRows = budgeted.Count;
+            result.TotalRows = all.Count;
             result.TotalPages = result.PageSize > 0
                 ? (int)Math.Ceiling((double)result.TotalRows / result.PageSize)
                 : 0;
-
-            if (result.TotalRows == 0) { result.Page = 1; return; }
 
             /* Clamp the page AFTER the total is known: a page number the client kept from a
                longer list must land on the last real page, never past the end. */
@@ -954,92 +1077,179 @@ namespace VASLogic.Models
             result.Page = page;
 
             int offset = (page - 1) * result.PageSize;
-            for (int i = offset; i < budgeted.Count && i < offset + result.PageSize; i++)
+            for (int i = offset; i < all.Count && i < offset + result.PageSize; i++)
             {
-                result.Rows.Add(budgeted[i]);
+                result.Rows.Add(all[i]);
+            }
+        }
+
+        /// <summary>
+        /// Builds ONE CTE body - a secured, grouped read of Fact_Acct for a single posting type
+        /// - and appends its binds, in text order, to the shared list.
+        ///
+        /// The netting is what keeps the figures honest: SUM(AmtAcctDr - AmtAcctCr) is taken
+        /// per dimension value + Account_ID FIRST, so the two sides of one journal cancel
+        /// instead of being counted twice, and ABS is applied to that net so a credit-natural
+        /// account still reports a positive figure. Source amounts are never read.
+        ///
+        /// MRole goes on HERE, on this body's own Fact_Acct alias, before GROUP BY / HAVING are
+        /// appended - the access parser must not meet a trailing clause, and the composed WITH
+        /// statement must never be handed to it at all.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="spec">Resolved dimension - supplies the whitelisted column name.</param>
+        /// <param name="postingType">POSTINGTYPE_Budget or POSTINGTYPE_Actual.</param>
+        /// <param name="prefix">Bind-name prefix, unique per body.</param>
+        /// <param name="acctSchemaId">Primary C_AcctSchema_ID.</param>
+        /// <param name="periodIds">Active periods of the selected financial year.</param>
+        /// <param name="excludeAccountIds">Account ids to exclude, or null.</param>
+        /// <param name="amountAlias">Alias of this body's amount column.</param>
+        /// <param name="requireNonZero">True to add HAVING &lt;&gt; 0 - the budget side, where a
+        /// combination that cancelled out is not a budget at all.</param>
+        /// <param name="parameters">Bind list being built, in appearance order.</param>
+        /// <returns>The finished, secured CTE body.</returns>
+        private string BuildFactBody(Ctx ctx, DimensionSpec spec, string postingType, string prefix,
+            int acctSchemaId, List<int> periodIds, List<int> excludeAccountIds, string amountAlias,
+            bool requireNonZero, List<SqlParameter> parameters)
+        {
+            /* The dimension column is an identifier this model resolved from the whitelist in
+               §4 and confirmed against AD_Column - it is never client text, and never a bind
+               (a column name cannot be one). */
+            string amountExpr = "ABS(SUM(COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0)))";
+
+            StringBuilder body = new StringBuilder();
+            body.Append("SELECT fa.").Append(spec.FactColumn).Append(" AS DimensionValue_ID,")
+                /*.Append("fa.Account_ID AS Account_ID,")*/
+                .Append(amountExpr).Append(" AS ").Append(amountAlias)
+                .Append(" FROM Fact_Acct fa")
+                /* C_ElementValue is joined for ONE reason: the account's type. It is a
+                   reference lookup by primary key and inherits the parent's access filter,
+                   and its ON is a plain equality so the access parser has nothing to trip
+                   on. */
+                .Append(" INNER JOIN C_ElementValue ev ON (ev.C_ElementValue_ID=fa.Account_ID)")
+                .Append(" WHERE fa.C_AcctSchema_ID=@").Append(prefix).Append("_C_AcctSchema_ID");
+            parameters.Add(new SqlParameter("@" + prefix + "_C_AcctSchema_ID", acctSchemaId));
+
+            body.Append(" AND fa.AD_Client_ID=@").Append(prefix).Append("_AD_Client_ID");
+            parameters.Add(new SqlParameter("@" + prefix + "_AD_Client_ID", ctx.GetAD_Client_ID()));
+
+            body.Append(" AND fa.IsActive='Y'")
+                .Append(" AND fa.PostingType=@").Append(prefix).Append("_PostingType");
+            parameters.Add(new SqlParameter("@" + prefix + "_PostingType", postingType));
+
+            /* EXPENSE ACCOUNTS ONLY. "How much of the budget has been used" is a question
+               about spending: a revenue, asset, liability or equity account posted in the
+               same period is not consumption of a budget, and left in it lands on the card
+               as a value utilizing something it was never given. The sibling unbudgeted
+               card (VAS_256) draws the same line at the same place, so the two agree about
+               which accounts a budget conversation is about. */
+            body.Append(" AND ev.IsActive='Y'")
+                .Append(" AND ev.AccountType=@").Append(prefix).Append("_AccountType");
+            parameters.Add(new SqlParameter("@" + prefix + "_AccountType", ACCOUNTTYPE_Expense));
+
+            /* A posting carrying no value for this dimension is not a value of it. */
+            body.Append(" AND fa.").Append(spec.FactColumn).Append(" IS NOT NULL");
+
+            /* The year, as the periods that belong to it - never as a date range. */
+            body.Append(" AND fa.C_Period_ID IN (")
+                .Append(BuildIdInList(periodIds, "@" + prefix + "_C_Period_ID", parameters))
+                .Append(")");
+
+            if (excludeAccountIds != null && excludeAccountIds.Count > 0)
+            {
+                body.Append(" AND fa.Account_ID NOT IN (")
+                    .Append(BuildIdInList(excludeAccountIds, "@" + prefix + "_Offset_Account_ID", parameters))
+                    .Append(")");
             }
 
-            /* Labels are read for the PAGE only. The ranking never needed them, and reading
-               a name for every value of a chart of accounts to print four of them is work the
-               answer does not require. */
-            ApplyLabels(ctx, spec, result.Rows);
+            /* Fact_Acct fa is the physical table this body reads: the role's access clause goes
+               HERE, inside the body, and never on the CTE that wraps it. */
+            string secured = MRole.GetDefault(ctx).AddAccessSQL(body.ToString(), "fa",
+                MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            /* GROUP BY / HAVING after the access SQL. The account stays in the grain: it is
+               what the two sides are matched on, so an actual can only ever be counted
+               against the account that was budgeted. */
+            secured += " GROUP BY fa." + spec.FactColumn + "/*,fa.Account_ID*/";
+            if (requireNonZero) { secured += " HAVING " + amountExpr + "<>0"; }
+
+            return secured;
         }
 
         /// <summary>
-        /// True for the account types whose natural balance is a CREDIT - revenue, liability
-        /// and owner's equity.
-        /// </summary>
-        /// <param name="accountType">C_ElementValue.AccountType stored code.</param>
-        /// <returns>True when the account is credit-natural.</returns>
-        private bool IsCreditNatural(string accountType)
-        {
-            return ACCOUNTTYPE_Revenue.Equals(accountType)
-                || ACCOUNTTYPE_Liability.Equals(accountType)
-                || ACCOUNTTYPE_OwnersEquity.Equals(accountType);
-        }
-
-        /// <summary>
-        /// Ranks two rows by utilization, most consumed first, with the dimension id as a
-        /// deterministic tiebreaker so paging is stable across requests.
+        /// Orders the rows: most utilized first, then by display value so two equally utilized
+        /// values keep a stable, readable order across requests, with the id as the final
+        /// tiebreaker for two values that also share a name.
         /// </summary>
         /// <param name="left">First row.</param>
         /// <param name="right">Second row.</param>
         /// <returns>Standard comparison result.</returns>
-        private int CompareByUtilization(UtilizationRow left, UtilizationRow right)
+        private int CompareRows(UtilizationRow left, UtilizationRow right)
         {
             int byPct = right.UtilizedPct.CompareTo(left.UtilizedPct);
             if (byPct != 0) { return byPct; }
 
-            int bySize = right.Budget.CompareTo(left.Budget);
-            if (bySize != 0) { return bySize; }
+            int byLabel = String.Compare(left.Label, right.Label, StringComparison.CurrentCultureIgnoreCase);
+            if (byLabel != 0) { return byLabel; }
 
             return left.Dimension_ID.CompareTo(right.Dimension_ID);
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // §5  Naming the page's dimension values
+        // §6  Naming the dimension values
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Fills each row's label from the dimension's own master table.
+        /// Fills each row's label from the dimension's own master table, in BATCHES - never one
+        /// query per row.
         ///
-        /// One query for the whole page, keyed by the ids the ranking already chose. This is
-        /// a DISPLAY LOOKUP BY PRIMARY KEY - the same treatment VAS_252 gives AD_Org - so no
-        /// MRole predicate is applied: every id here came out of the aggregate that the
-        /// role's access clause already filtered, and re-filtering the name would blank the
-        /// label of a posting the reader is entitled to see, which reads as an unassigned
-        /// value rather than as a hidden one.
+        /// This is a DISPLAY LOOKUP BY PRIMARY KEY - the same treatment VAS_252 gives AD_Org -
+        /// so no MRole predicate is applied: every id here came out of the aggregate whose
+        /// bodies the role's access clause already filtered, and re-filtering the name would
+        /// blank the label of a posting the reader is entitled to see.
         ///
-        /// IsActive is deliberately NOT filtered here. A deactivated project still posted the
-        /// facts this year, and blanking its name would leave a real budget line labelled by
-        /// nothing. This is a lookup of history, not a picker of current values.
-        ///
-        /// A row that resolves to no label keeps an empty one and the client names it from
-        /// AD_Message - the unassigned value is a real answer, and the text for it belongs in
-        /// the message table rather than in a query.
+        /// IsActive is deliberately NOT filtered. A deactivated project still carries the
+        /// budget it was given this year, and blanking its name would leave a real budget line
+        /// labelled by nothing. This is a lookup of history, not a picker of current values.
         /// </summary>
-        /// <param name="ctx">Session context (unused today; kept for symmetry with the other
-        /// reads).</param>
         /// <param name="spec">Resolved dimension - its label source table and columns.</param>
-        /// <param name="rows">The page's rows, labelled in place.</param>
-        private void ApplyLabels(Ctx ctx, DimensionSpec spec, List<UtilizationRow> rows)
+        /// <param name="rows">Every row of the result, labelled in place.</param>
+        private void ApplyLabels(DimensionSpec spec, List<UtilizationRow> rows)
         {
             List<int> ids = new List<int>();
-            Dictionary<int, UtilizationRow> byId = new Dictionary<int, UtilizationRow>();
+            Dictionary<int, List<UtilizationRow>> byId = new Dictionary<int, List<UtilizationRow>>();
 
             for (int i = 0; i < rows.Count; i++)
             {
                 int id = rows[i].Dimension_ID;
 
-                /* Id 0 is "not assigned" for every dimension but Organization, where it is
-                   the '*' org and has a row of its own to be named from. */
+                /* Id 0 is "not assigned" for every dimension but Organization, where it is the
+                   '*' org and has a row of its own to be named from. */
                 if (id < 0 || (id == 0 && !spec.ZeroIsValue)) { continue; }
-                if (byId.ContainsKey(id)) { continue; }
 
-                byId.Add(id, rows[i]);
-                ids.Add(id);
+                if (!byId.ContainsKey(id))
+                {
+                    byId.Add(id, new List<UtilizationRow>());
+                    ids.Add(id);
+                }
+                byId[id].Add(rows[i]);
             }
 
+            if (ids.Count == 0) { return; }
+
+            for (int start = 0; start < ids.Count; start += ID_BatchSize)
+            {
+                ReadLabels(spec, byId, IdBatch(ids, start, ID_BatchSize));
+            }
+        }
+
+        /// <summary>Runs one label batch and writes each name back onto its rows.</summary>
+        /// <param name="spec">Resolved dimension - its label source table and columns.</param>
+        /// <param name="byId">Dimension value id -&gt; the rows carrying it.</param>
+        /// <param name="ids">This batch's ids.</param>
+        private void ReadLabels(DimensionSpec spec, Dictionary<int, List<UtilizationRow>> byId,
+            List<int> ids)
+        {
             if (ids.Count == 0) { return; }
 
             List<SqlParameter> parameters = new List<SqlParameter>();
@@ -1086,14 +1296,16 @@ namespace VASLogic.Models
                    fallback, never a second half of the label. */
                 if (name.Length == 0 && hasAlt) { name = Util.GetValueOfString(row["Dimension_Alt"]); }
 
-                byId[id].Label = ComposeLabel(value, name);
+                string label = ComposeLabel(value, name);
+
+                List<UtilizationRow> targets = byId[id];
+                for (int r = 0; r < targets.Count; r++) { targets[r].Label = label; }
             }
         }
 
         /// <summary>
-        /// "{Value} - {Name}", printed with the separator only when there are two sides to
-        /// it, so a master row that carries just one of them is not labelled with a dangling
-        /// dash.
+        /// "{Value} - {Name}", printed with the separator only when there are two sides to it,
+        /// so a master row that carries just one of them is not labelled with a dangling dash.
         /// </summary>
         /// <param name="value">The master row's search key, or empty.</param>
         /// <param name="name">The master row's name, or empty.</param>
@@ -1108,22 +1320,22 @@ namespace VASLogic.Models
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // §6  The balancing accounts a budget journal offsets to
+        // §7  The balancing accounts a budget journal offsets to
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
         /// The natural account ids the schema uses as balancing / offset accounts.
         ///
-        /// A budget journal balances, so the other side of every budget posting lands on one
-        /// of these. Left in the set, such an account carries the mirror image of everything
-        /// budgeted and inflates whichever dimension value it was posted against.
+        /// A budget journal balances, so the other side of every budget posting lands on one of
+        /// these. Left in, such an account is itself a budgeted account + dimension combination
+        /// carrying the mirror image of everything budgeted, and the dimension value it was
+        /// posted against reports roughly twice the budget it was given.
         ///
         /// Each setting holds a C_ValidCombination_ID, NOT a Fact_Acct.Account_ID, so it is
-        /// resolved C_AcctSchema_GL -&gt; C_ValidCombination -&gt; Account_ID. Only the
-        /// columns AD_Column confirms the table actually carries are named: the commitment
-        /// pair and the localized budget offset are optional in this schema, and naming a
-        /// missing column would fail the whole query and cost the exclusions that ARE
-        /// configured.
+        /// resolved C_AcctSchema_GL -&gt; C_ValidCombination -&gt; Account_ID. Only the columns
+        /// AD_Column confirms the table actually carries are named: the commitment pair and the
+        /// localized budget offset are optional in this schema, and naming a missing column
+        /// would fail the whole query and cost the exclusions that ARE configured.
         ///
         /// C_AcctSchema_GL, C_ValidCombination, AD_Table and AD_Column are configuration and
         /// dictionary reads, scoped by tenant and schema, so no MRole predicate is applied -
@@ -1229,16 +1441,16 @@ namespace VASLogic.Models
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // §7  Dictionary helpers
+        // §8  Dictionary helpers
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// The active column names of several dictionary tables, in ONE read. Used to confirm
-        /// a table and a column exist before either is named in generated SQL - user-element
+        /// The active column names of several dictionary tables, in ONE read. Used to confirm a
+        /// table and a column exist before either is named in generated SQL - user-element
         /// dimensions in particular name a table this model has never heard of.
         ///
-        /// Columns backed by a virtual expression (AD_Column.ColumnSQL) are excluded: they
-        /// are not physical columns and cannot be grouped by or filtered on.
+        /// Columns backed by a virtual expression (AD_Column.ColumnSQL) are excluded: they are
+        /// not physical columns and cannot be grouped by or filtered on.
         /// </summary>
         /// <param name="tableNames">Physical table names - resolved from the dictionary or
         /// constants of this class, never free client text.</param>
@@ -1324,12 +1536,12 @@ namespace VASLogic.Models
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // §8  Helpers
+        // §9  Helpers
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Builds a parameterized IN list - "@Name0,@Name1,..." - and appends one bind per
-        /// id. Every occurrence carries its own name because the backend adapters bind
+        /// Builds a parameterized IN list - "@Name0,@Name1,..." - and appends one bind per id.
+        /// Every occurrence carries its own name because the backend adapters bind
         /// positionally, so a repeated name would be ambiguous.
         /// </summary>
         /// <param name="ids">Ids to bind (server-sourced, never client text).</param>
@@ -1352,25 +1564,26 @@ namespace VASLogic.Models
             return list.ToString();
         }
 
-        /// <summary>
-        /// A date as yyyy-MM-dd for the wire. The client formats it in the reader's own
-        /// locale - the format is never baked into the data layer with TO_CHAR.
-        /// </summary>
-        /// <param name="value">Date to serialize.</param>
-        /// <returns>yyyy-MM-dd, or an empty string.</returns>
-        private string ToIsoDate(DateTime? value)
+        /// <summary>One batch of ids out of a longer list.</summary>
+        /// <param name="ids">All ids.</param>
+        /// <param name="start">Index of the first id in this batch.</param>
+        /// <param name="count">Maximum ids in this batch.</param>
+        /// <returns>The batch (never null).</returns>
+        private List<int> IdBatch(List<int> ids, int start, int count)
         {
-            return value.HasValue ? value.Value.ToString("yyyy-MM-dd") : "";
+            List<int> batch = new List<int>();
+            for (int i = start; i < ids.Count && i < start + count; i++) { batch.Add(ids[i]); }
+            return batch;
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // §9  Transfer objects
+        // §10  Transfer objects
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
         /// One accounting dimension, fully resolved: what it is called, where its values are
-        /// stored on Fact_Acct and where their names come from. Internal - the client only
-        /// ever sees the element type and the label.
+        /// stored on Fact_Acct and where their names come from. Internal - the client only ever
+        /// sees the element type and the label.
         /// </summary>
         private class DimensionSpec
         {
@@ -1389,13 +1602,14 @@ namespace VASLogic.Models
             /// <summary>C_AcctSchema_Element.ElementType - the option's stored value.</summary>
             public string ElementType { get; set; }
 
-            /// <summary>C_AcctSchema_Element.Name - the tenant's own word for this dimension.</summary>
+            /// <summary>C_AcctSchema_Element.Name - the tenant's own word for this dimension,
+            /// falling back to the element type when it is blank.</summary>
             public string Label { get; set; }
 
             /// <summary>C_AcctSchema_Element.SeqNo - the schema's own order.</summary>
             public int SeqNo { get; set; }
 
-            /// <summary>The Fact_Acct column the dimension's value is stored in.</summary>
+            /// <summary>The whitelisted Fact_Acct column the value is stored in.</summary>
             public string FactColumn { get; set; }
 
             /// <summary>The master table its values are named from.</summary>
@@ -1407,7 +1621,7 @@ namespace VASLogic.Models
             /// <summary>Its search-key column, or empty when it has none.</summary>
             public string ValueColumn { get; set; }
 
-            /// <summary>Its name column, or empty when it has none.</summary>
+            /// <summary>Its name / display column, or empty when it has none.</summary>
             public string NameColumn { get; set; }
 
             /// <summary>A fallback name column used only when the name is blank - the street
@@ -1440,16 +1654,11 @@ namespace VASLogic.Models
             /// <summary>C_Year.FiscalYear of that year - the year pill's label.</summary>
             public string FiscalYear { get; set; }
 
-            /// <summary>First accounting date of the year, as yyyy-MM-dd.</summary>
-            public string StartDate { get; set; }
-
-            /// <summary>Last accounting date of the year, as yyyy-MM-dd.</summary>
-            public string EndDate { get; set; }
-
             /// <summary>ElementType actually grouped by, after defaulting and validation.</summary>
             public string Dimension { get; set; }
 
-            /// <summary>That element's own Name - the dimension pill's label.</summary>
+            /// <summary>That element's own Name - the dimension pill's label, and the word the
+            /// subtitle counts values of.</summary>
             public string DimensionLabel { get; set; }
 
             /// <summary>1-based page number actually served, after clamping.</summary>
@@ -1458,7 +1667,8 @@ namespace VASLogic.Models
             /// <summary>Rows per page actually used, after clamping.</summary>
             public int PageSize { get; set; }
 
-            /// <summary>Dimension values in the ranking in total - the pager's figure.</summary>
+            /// <summary>Dimension values in the ranking in total - the pager's and the
+            /// subtitle's figure.</summary>
             public int TotalRows { get; set; }
 
             /// <summary>CEILING(TotalRows / PageSize).</summary>
@@ -1467,16 +1677,16 @@ namespace VASLogic.Models
             /// <summary>ERROR_* token when the tenant is not configured; empty otherwise.</summary>
             public string ErrorCode { get; set; }
 
-            /// <summary>False only on a failure or a missing configuration; a year with
-            /// nothing budgeted is Loaded=true with an empty page.</summary>
+            /// <summary>False only on a failure; a year with nothing budgeted is Loaded=true
+            /// with an empty page.</summary>
             public bool Loaded { get; set; }
         }
 
         /// <summary>
         /// One dimension value's budget against its actual. Both figures are in the PRIMARY
         /// accounting schema currency and are never converted - AmtAcctDr / AmtAcctCr are
-        /// already stated in it - and both have been corrected for the account's natural
-        /// balance, so a revenue budget reads the same way round as an expense one.
+        /// already stated in it - and both are the ABSOLUTE of a net, so a credit-natural
+        /// account reads the same way round as a debit-natural one.
         /// </summary>
         public class UtilizationRow
         {
@@ -1485,21 +1695,18 @@ namespace VASLogic.Models
                 Label = "";
             }
 
-            /// <summary>The dimension value's own id; 0 when the postings carry no value for
-            /// the selected dimension.</summary>
+            /// <summary>The dimension value's own id.</summary>
             public int Dimension_ID { get; set; }
 
-            /// <summary>"{Value} - {Name}" from the dimension's master table; empty when the
-            /// value is unassigned, which the client names from AD_Message.</summary>
+            /// <summary>"{Value} - {Name}" from the dimension's master table.</summary>
             public string Label { get; set; }
 
-            /// <summary>Approved budget for the year: PostingType 'B', natural-side
-            /// corrected. Always greater than zero - a value without one is not on the
-            /// card.</summary>
+            /// <summary>Approved budget for the year: PostingType 'B', netted per account and
+            /// summed. Never zero - a combination that cancelled out is not a budget.</summary>
             public decimal Budget { get; set; }
 
-            /// <summary>Posted actual for the year: PostingType 'A', natural-side
-            /// corrected.</summary>
+            /// <summary>Posted actual for the year, counted ONLY against account + dimension
+            /// combinations that carry a budget.</summary>
             public decimal Actual { get; set; }
 
             /// <summary>Actual / Budget * 100. Reported past 100 - the bar is capped by the
@@ -1520,7 +1727,7 @@ namespace VASLogic.Models
             public int SeqNo { get; set; }
         }
 
-        /// <summary>One selectable financial year, with the date window its periods span.</summary>
+        /// <summary>One selectable financial year of the primary calendar.</summary>
         public class YearOption
         {
             /// <summary>C_Year.C_Year_ID.</summary>
@@ -1528,18 +1735,12 @@ namespace VASLogic.Models
 
             /// <summary>C_Year.FiscalYear - the label the pill shows.</summary>
             public string FiscalYear { get; set; }
-
-            /// <summary>MIN(C_Period.StartDate) over the year's active periods.</summary>
-            public DateTime StartDate { get; set; }
-
-            /// <summary>MAX(C_Period.EndDate) over the year's active periods.</summary>
-            public DateTime EndDate { get; set; }
         }
 
-        /// <summary>The tenant's primary calendar, primary accounting schema and its currency.</summary>
+        /// <summary>The tenant's primary accounting schema, its currency and its calendar.</summary>
         public class AcctContext
         {
-            /// <summary>AD_ClientInfo.C_Calendar_ID.</summary>
+            /// <summary>AD_ClientInfo.C_Calendar_ID - the PRIMARY calendar.</summary>
             public int C_Calendar_ID { get; set; }
 
             /// <summary>AD_ClientInfo.C_AcctSchema1_ID - the PRIMARY schema, and the only one

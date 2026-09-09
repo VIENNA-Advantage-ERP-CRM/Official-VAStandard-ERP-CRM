@@ -42,6 +42,13 @@
  *                  proration - all of those need an assumed spending pattern, and this
  *                  card deliberately has none. It is actual over budget.
  *
+ *                  AND IT IS ACTUAL AGAINST WHAT WAS BUDGETED. The server counts an
+ *                  actual only where the SAME account and the SAME dimension value carry
+ *                  a budget for the year; spend on an account nobody budgeted is not
+ *                  utilization of anything and belongs to the unbudgeted-actuals card
+ *                  (VAS_256). The subtitle counts the values that HAVE a budget, which
+ *                  is why it can be smaller than the number of values in the master.
+ *
  *                  THE ROWS ARE NOT INTERACTIVE. There is no drill-down here and no row
  *                  is a button: the card answers "what is running out", which the line
  *                  and the bar already say in full. That is a deliberate difference from
@@ -65,27 +72,28 @@
  *                   # | Current Text                       | Message Key
  *                  ---+------------------------------------+--------------------------
  *                   1 | Utilization by dimension           | VAS_253_UtilizationByDim
- *                   2 | Actual against approved budget     | VAS_253_UtilizationHint
- *                   3 | Dimension                          | VAS_253_Dimension
- *                   4 | No accounting dimensions are       | VAS_253_NoDimensions
+ *                   2 | Actual against approved            | VAS_253_UtilizationHint
+ *                   3 | values                             | VAS_253_Values
+ *                   4 | Dimension                          | VAS_253_Dimension
+ *                   5 | No accounting dimensions are       | VAS_253_NoDimensions
  *                     |   configured                       |
- *                   5 | No budget was found for the        | VAS_253_NoUtilization
- *                     |   selected dimension and financial |
- *                     |   year.                            |
- *                   6 | (Not assigned)                     | VAS_253_NotAssigned
- *                   7 | Budget                             | VAS_254_Budget          (reuse)
- *                   8 | Actual                             | VAS_252_Actual          (reuse)
- *                   9 | Utilized                           | VAS_252_Utilized        (reuse)
- *                  10 | of                                 | VAS_020_Of              (reuse)
- *                  11 | Financial year                     | VAS_256_FinancialYear   (reuse)
- *                  12 | No financial years available       | VAS_256_NoYears         (reuse)
- *                  13 | No primary calendar is configured  | VAS_256_NoCalendar      (reuse)
- *                  14 | No primary accounting schema is    | VAS_256_NoAcctSchema    (reuse)
+ *                   6 | No budget data is available for    | VAS_253_NoUtilization
+ *                     |   the selected year and dimension. |
+ *                   7 | (Not assigned)                     | VAS_253_NotAssigned
+ *                   8 | sorted by utilization              | VAS_253_SortedByUtilization
+ *                   9 | Budget                             | VAS_254_Budget          (reuse)
+ *                  10 | Actual                             | VAS_252_Actual          (reuse)
+ *                  11 | Utilized                           | VAS_252_Utilized        (reuse)
+ *                  12 | of                                 | VAS_020_Of              (reuse)
+ *                  13 | Financial year                     | VAS_256_FinancialYear   (reuse)
+ *                  14 | No financial years available       | VAS_256_NoYears         (reuse)
+ *                  15 | No primary calendar is configured  | VAS_256_NoCalendar      (reuse)
+ *                  16 | No primary accounting schema is    | VAS_256_NoAcctSchema    (reuse)
  *                     |   configured                       |
- *                  15 | Showing                            | VAS_020_Showing         (reuse)
- *                  16 | Previous                           | VAS_020_Prev            (reuse)
- *                  17 | Next                               | VAS_020_Next            (reuse)
- *                  18 | Couldn't load                      | VAS_192_CouldntLoad     (reuse)
+ *                  17 | Showing                            | VAS_020_Showing         (reuse)
+ *                  18 | Previous                           | VAS_020_Prev            (reuse)
+ *                  19 | Next                               | VAS_020_Next            (reuse)
+ *                  20 | Couldn't load                      | VAS_192_CouldntLoad     (reuse)
  *
  * Chronological development:
  *   VAI154         Created  Date 2026-09-09
@@ -287,7 +295,6 @@
             $root = $('<div class="vas-253-root" id="vas-253-root-' + widgetID + '"></div>');
 
             var title = label('VAS_253_UtilizationByDim', 'Utilization by dimension');
-            var subtitle = label('VAS_253_UtilizationHint', 'Actual against approved budget');
 
             $card = $(
                 '<div class="vas-253-card">' +
@@ -317,11 +324,11 @@
             );
 
             $card.find('.vas-253-title').text(title).attr('title', title);
-            /* The subtitle truncates in a cell that is already sharing its header row with
-               two pills, so the full sentence also goes on the title attribute - it moves
-               to the tooltip rather than being lost. */
-            $card.find('.vas-253-subtitle').text(subtitle).attr('title', subtitle);
             $card.find('.vas-253-list').attr('aria-label', title);
+
+            /* The subtitle starts as the bare hint and gains its count and its dimension
+               word once the first read lands - see paintSubtitle. */
+            paintSubtitle();
 
             $yearBtn = $card.find('.vas-253-year');
             $dimBtn = $card.find('.vas-253-dim');
@@ -490,16 +497,37 @@
             return '';
         }
 
+        /* "Actual against approved · 6 Organization values" - the count is the WHOLE
+           ranking, not the page, and the word for the values is the accounting schema
+           element's own Name. Before the first read lands there is no count and no
+           dimension to name, so the bare hint stands on its own rather than printing a
+           zero the card does not yet know. */
+        function paintSubtitle() {
+            var text = label('VAS_253_UtilizationHint', 'Actual against approved');
+
+            if (_dimensionLabel) {
+                text += ' · ' + _totalRows + ' ' + _dimensionLabel + ' ' +
+                    label('VAS_253_Values', 'values');
+            }
+
+            /* The subtitle truncates in a cell that is already sharing its header row with
+               two pills, so the full sentence also goes on the title attribute - it moves to
+               the tooltip rather than being lost. */
+            $card.find('.vas-253-subtitle').text(text).attr('title', text);
+        }
+
         function paintRows() {
             $state.addClass('vas-253-hidden');
             $card.find('.vas-253-body').removeClass('vas-253-hidden');
+
+            paintSubtitle();
 
             if (!_rows || _rows.length === 0) {
                 /* A dimension with nothing budgeted is a real answer, not an error - and
                    with no rows there is nothing to page, so the footer goes too. */
                 $list.html('<div class="vas-253-empty">' +
                     escapeHtml(label('VAS_253_NoUtilization',
-                        'No budget was found for the selected dimension and financial year.')) + '</div>');
+                        'No budget data is available for the selected year and dimension.')) + '</div>');
                 $foot.empty();
                 return;
             }
@@ -614,8 +642,12 @@
             var from = (_page - 1) * _pageSize + 1;
             var to = Math.min(_page * _pageSize, _totalRows);
 
+            /* "Showing 1-4 of 11 · sorted by utilization" - the note says what the order
+               means, which a list ranked by something other than its label needs to state
+               somewhere. */
             var showing = label('VAS_020_Showing', 'Showing') + ' ' + from + '-' + to + ' ' +
-                label('VAS_020_Of', 'of') + ' ' + _totalRows;
+                label('VAS_020_Of', 'of') + ' ' + _totalRows + ' · ' +
+                label('VAS_253_SortedByUtilization', 'sorted by utilization');
 
             var prevDis = _page <= 1 ? ' disabled' : '';
             var nextDis = _page >= _totalPages ? ' disabled' : '';
