@@ -1,97 +1,109 @@
 /************************************************************
  * Module Name    : VAS
- * Purpose        : Largest Budget Variances - a 3x2 paginated list for the
+ * Purpose        : Utilization by Dimension - a 4x2 paginated bar list for the
  *                  Budgeting dashboard.
  *
- *                  The accounts whose approved budget and posted actual are furthest
- *                  apart, in BOTH directions:
+ *                  How much of the approved budget each value of ONE accounting
+ *                  dimension has actually consumed:
  *
- *                    [↕] Largest budget variances        [ FY 2026 v ]
- *                        Ranked by absolute variance
+ *                    [~] Utilization by dimension   [ FY 2026 v ] [ Organization v ]
+ *                        Actual against approved budget
  *
- *                    IT services                              +$480K
- *                    Budget $1.9M · actual $1.42M
+ *                    Head office                    $3.1M of $4.86M · 63.8%
+ *                    ▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░
  *
- *                    Cloud infrastructure                     −$117K
- *                    Budget $612K · actual $729K
+ *                    Mumbai plant                   $2.27M of $3.24M · 70.0%
+ *                    ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░
  *
- *                    Showing 1–3 of 24                    <  1 of 8  >
+ *                    Showing 1-4 of 11                        <  1 of 3  >
  *
- *                  TWO-LINE ROWS, NOT A TABLE. The account is the row's identity and
- *                  takes the first line; the budget and actual it is derived from sit
- *                  under it as a meta line at the smaller tier; the variance is the
- *                  row's conclusion and sits right-aligned against the trailing edge.
- *                  A three-column table of the same figures would give the two
- *                  supporting numbers the same weight as the answer.
+ *                  THE DIMENSION IS CONFIGURATION, NOT CODE. The second pill is built
+ *                  from the ACTIVE accounting-schema elements of the tenant's primary
+ *                  accounting schema, each labelled with that element's OWN name. A
+ *                  tenant that represents departments as Activity - or renames "User
+ *                  List 1" to "Cost centre" - sees its own words, and no word in this
+ *                  file names a dimension. Switching the pill changes only the labels
+ *                  and the figures: the rhythm of the card is identical either way.
  *
- *                  BOTH DIRECTIONS, RANKED TOGETHER. Rows are ordered by ABSOLUTE
- *                  variance, so a large underspend and a large overrun sit next to
- *                  each other - the card is about the SIZE of the gap, not its
- *                  direction. Favourable (came in under budget) is green with an
- *                  explicit +, unfavourable is red with an explicit −. THE SIGN IS
- *                  NEVER LEFT TO COLOUR ALONE.
+ *                  A LABEL LINE AND A TRACK, NOT A TABLE. The dimension value is the
+ *                  row's identity and takes the leading edge; what it consumed of what
+ *                  it was given is the row's conclusion and sits against the trailing
+ *                  edge; the bar underneath is the same fact drawn, so the row reads at
+ *                  a glance and at full precision without a second card.
  *
- *                  NOTHING IS INFERRED. No burn rate, no run rate, no projected
- *                  exhaustion date - all of those need an assumed spending pattern,
- *                  and this card deliberately has none. It is budget minus actual.
+ *                  THE BAR IS CAPPED, THE NUMBER IS NOT. A value over budget draws a
+ *                  full red track and prints its true percentage - 118.4% - because the
+ *                  overflow is exactly what the reader is looking for. The threshold
+ *                  tones are the design system's: brand under 85%, warning from 85%,
+ *                  danger from 100%. THE TONE IS NEVER THE ONLY SIGNAL - the percentage
+ *                  is printed beside every bar.
  *
- *                  ONLY ACCOUNTS WITH A BUDGET. A variance is the distance from what
- *                  was APPROVED, so an account carrying an actual and nothing approved
- *                  is not on this card at all - that is spending nobody planned, and
- *                  the unbudgeted-actuals card (VAS_256) is where it belongs. Listed
- *                  here it would rank by its whole actual and push genuinely over- and
- *                  under-spent budgets off a three-row card.
+ *                  NOTHING IS INFERRED. No burn rate, no run rate, no elapsed-time
+ *                  proration - all of those need an assumed spending pattern, and this
+ *                  card deliberately has none. It is actual over budget.
  *
- *                  THE ROWS ARE NOT INTERACTIVE. There is no drill-down here and no
- *                  row is a button: the card answers "where are the biggest gaps",
- *                  which the two lines already say in full. That is a deliberate
- *                  difference from VAS_256, whose rows DO open a transaction list.
+ *                  AND IT IS ACTUAL AGAINST WHAT WAS BUDGETED. The server counts an
+ *                  actual only where the SAME account and the SAME dimension value carry
+ *                  a budget for the year; spend on an account nobody budgeted is not
+ *                  utilization of anything and belongs to the unbudgeted-actuals card
+ *                  (VAS_256). The subtitle counts the values that HAVE a budget, which
+ *                  is why it can be smaller than the number of values in the master.
  *
- *                  ONE CURRENCY, THE SCHEMA'S OWN. Every figure is an accounting
- *                  amount in the primary accounting schema's currency, printed with
- *                  that currency's symbol against the number - "$480K", never
- *                  "USD 480K" - falling back to the ISO code only when the currency
- *                  has no symbol. Nothing is converted and no scale is assumed: the
- *                  ISO code decides whether the compact form steps in lakh/crore or
- *                  thousand/million.
+ *                  THE ROWS ARE NOT INTERACTIVE. There is no drill-down here and no row
+ *                  is a button: the card answers "what is running out", which the line
+ *                  and the bar already say in full. That is a deliberate difference from
+ *                  VAS_256, whose rows DO open a transaction list.
+ *
+ *                  ONE CURRENCY, THE SCHEMA'S OWN. Every figure is an accounting amount
+ *                  in the primary accounting schema's currency, printed with that
+ *                  currency's symbol against the number - "$3.1M", never "USD 3.1M" -
+ *                  falling back to the ISO code only when the currency has no symbol.
+ *                  Nothing is converted and no scale is assumed: the ISO code decides
+ *                  whether the compact form steps in lakh/crore or thousand/million.
  *
  *                  Design: design.md -> dashboard-widgets.md (Glass Widget, Widget
  *                  Header, Widget Footer Pager, Content Fit Budget, No Inner
  *                  Scrollbars) supplies the shell and the pager; the widget
- *                  specification supplies the two-line row and the signed variance.
+ *                  specification supplies the utilization row and its threshold tones.
  *
  *                  Summary Message Table
  *                  Rows marked (reuse) already exist under another key and are NOT
  *                  duplicated here.
  *                   # | Current Text                       | Message Key
  *                  ---+------------------------------------+--------------------------
- *                   1 | Largest budget variances           | VAS_254_LargestVariance
- *                   2 | Ranked by absolute variance        | VAS_254_VarianceHint
- *                   3 | actual                             | VAS_254_ActualLower
- *                   4 | Variance                           | VAS_254_Variance
- *                   5 | No budget variances found for the  | VAS_254_NoVariances
- *                     |   selected financial year.         |
- *                   6 | Budget                             | VAS_254_Budget
- *                   7 | Financial year                     | VAS_256_FinancialYear   (reuse)
- *                   8 | No financial years available       | VAS_256_NoYears         (reuse)
- *                   9 | No primary calendar is configured  | VAS_256_NoCalendar      (reuse)
- *                  10 | No primary accounting schema is    | VAS_256_NoAcctSchema    (reuse)
+ *                   1 | Utilization by dimension           | VAS_253_UtilizationByDim
+ *                   2 | Actual against approved            | VAS_253_UtilizationHint
+ *                   3 | values                             | VAS_253_Values
+ *                   4 | Dimension                          | VAS_253_Dimension
+ *                   5 | No accounting dimensions are       | VAS_253_NoDimensions
  *                     |   configured                       |
- *                  11 | Showing                            | VAS_020_Showing         (reuse)
+ *                   6 | No budget data is available for    | VAS_253_NoUtilization
+ *                     |   the selected year and dimension. |
+ *                   7 | (Not assigned)                     | VAS_253_NotAssigned
+ *                   8 | sorted by utilization              | VAS_253_SortedByUtilization
+ *                   9 | Budget                             | VAS_254_Budget          (reuse)
+ *                  10 | Actual                             | VAS_252_Actual          (reuse)
+ *                  11 | Utilized                           | VAS_252_Utilized        (reuse)
  *                  12 | of                                 | VAS_020_Of              (reuse)
- *                  13 | Previous                           | VAS_020_Prev            (reuse)
- *                  14 | Next                               | VAS_020_Next            (reuse)
- *                  15 | Couldn't load                      | VAS_192_CouldntLoad     (reuse)
+ *                  13 | Financial year                     | VAS_256_FinancialYear   (reuse)
+ *                  14 | No financial years available       | VAS_256_NoYears         (reuse)
+ *                  15 | No primary calendar is configured  | VAS_256_NoCalendar      (reuse)
+ *                  16 | No primary accounting schema is    | VAS_256_NoAcctSchema    (reuse)
+ *                     |   configured                       |
+ *                  17 | Showing                            | VAS_020_Showing         (reuse)
+ *                  18 | Previous                           | VAS_020_Prev            (reuse)
+ *                  19 | Next                               | VAS_020_Next            (reuse)
+ *                  20 | Couldn't load                      | VAS_192_CouldntLoad     (reuse)
  *
  * Chronological development:
- *   VAI154         Created  Date 2026-09-08
+ *   VAI154         Created  Date 2026-09-09
  ***********************************************************/
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
 
-    /* CSS lives in VAS/Areas/VAS/Content/VAS_254_LargestBudgetVarianceWidget.css. All
-       classes are namespaced `vas-254-` so they never collide with sibling widgets. */
+    /* CSS lives in VAS/Areas/VAS/Content/VAS_253_UtlizationbyDimensionWidget.css. All
+       classes are namespaced `vas-253-` so they never collide with sibling widgets. */
 
     /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on :root
        equal to the dashboard container's current pixel width so the header clamps
@@ -118,11 +130,11 @@
        viewBox: an SVG with only a viewBox falls back to 300x150px if a stylesheet is
        stale, which would sprawl across the header. */
     var ICONS = {
-        /* A two-headed vertical arrow: the card measures a gap that runs in both
-           directions, which is exactly what this card is for. */
-        variance: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        /* A bar chart on an axis: the card measures consumption per dimension value,
+           which is exactly what this glyph says. */
+        utilization: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
             'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
-            '<path d="M12 3v18"></path><path d="m7 8 5-5 5 5"></path><path d="M7 16l5 5 5-5"></path></svg>',
+            '<path d="M3 3v18h18"></path><path d="M7 16h4"></path><path d="M7 11h9"></path><path d="M7 6h6"></path></svg>',
         chevron: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
             'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
             '<polyline points="6 9 12 15 18 9"></polyline></svg>',
@@ -141,17 +153,27 @@
        key and reads the same in every language. */
     var NIL = '-';
 
-    /* Paging. Three rows fit at 1280px; the adaptive fit may ask for more in a taller
-       cell, and the server clamps whatever is asked for. */
-    var DEFAULT_PAGE_SIZE = 3;
+    /* design.md threshold tones for a utilization track. Brand up to 85%, warning from
+       85%, danger from 100% - and the percentage is always printed beside the bar, so
+       the tone is never the only signal. */
+    var WARN_PCT = 85;
+    var RISK_PCT = 100;
+
+    /* Paging. Four bars fit at 1280px in a 4x2 cell; the adaptive fit may ask for more
+       in a taller cell, and the server clamps whatever is asked for. */
+    var DEFAULT_PAGE_SIZE = 4;
     var MIN_PAGE_SIZE = 1;
     var MAX_PAGE_SIZE = 12;
 
-    /* A two-line row is taller than a single-line one - this is only the pre-measurement
-       fallback, replaced by the tallest rendered row on the first paint. */
+    /* A label line plus a track - this is only the pre-measurement fallback, replaced by
+       the tallest rendered row on the first paint. */
     var ROW_HEIGHT_FALLBACK = 56;
 
-    VAS.VAS_254_LargestBudgetVarianceWidget = function () {
+    /* Which pill a popover belongs to. */
+    var PICK_YEAR = 'year';
+    var PICK_DIMENSION = 'dimension';
+
+    VAS.VAS_253_UtlizationbyDimensionWidget = function () {
         this.frame;
         this.windowNo;
         this.widgetInfo;
@@ -160,6 +182,7 @@
         var $root;
         var $card;
         var $yearBtn;
+        var $dimBtn;
         var $list;
         var $foot;
         var $state;
@@ -174,9 +197,12 @@
 
         var _rows = [];
         var _years = [];
+        var _dimensions = [];
         var _schema = null;
         var _yearId = 0;
         var _fiscalYear = '';
+        var _dimension = '';
+        var _dimensionLabel = '';
         var _page = 1;
         var _pageSize = DEFAULT_PAGE_SIZE;
         var _totalRows = 0;
@@ -185,6 +211,7 @@
         var _rowH = 0;
         var _needsSync = false;
         var _loading = false;
+        var _pickerKind = '';
         var _pickerOpen = false;
         var _disposed = false;
         var _rootObserver = null;
@@ -198,7 +225,7 @@
                 ? VIS.Utility.Util.getValueOfInt($self.widgetInfo.AD_UserHomeWidgetID)
                 : 0);
             if (widgetID === 0) { widgetID = $self.windowNo; }
-            _ns = '.vas254_' + widgetID;
+            _ns = '.vas253_' + widgetID;
 
             buildSkeleton();
             createBusyIndicator();
@@ -207,8 +234,8 @@
 
         /* The framework's own widget loader, overlaid on the whole card while a read is in
            flight - the same treatment every sibling VAS widget gives its loads. It covers
-           EVERY read: the initial load, the Refresh button, a page turn and a year change.
-           Created visible so it is already up from the moment the widget mounts. */
+           EVERY read: the initial load, the Refresh button, a page turn and either filter
+           change. Created visible so it is already up from the moment the widget mounts. */
         function createBusyIndicator() {
             $busy = $('<div class="vis-busyindicatorouterwrap vas-widget-busy-wrap">' +
                 '<div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>' +
@@ -253,8 +280,9 @@
 
         /* The dashboard's Refresh button calls this. It goes back to page 1: a refresh
            re-reads the whole year, postings may have landed since the last load, and the
-           page the user was on is not reliably the same page afterwards. The chosen YEAR is
-           kept - that is a filter the user set, not a position in a list. */
+           page the user was on is not reliably the same page afterwards. The chosen YEAR
+           and DIMENSION are kept - those are filters the user set, not a position in a
+           list. */
         this.refreshWidget = function () {
             closePicker();
             fetchPage(1);
@@ -264,50 +292,63 @@
         /* DOM skeleton                                                 */
         /* ------------------------------------------------------------ */
         function buildSkeleton() {
-            $root = $('<div class="vas-254-root" id="vas-254-root-' + widgetID + '"></div>');
+            $root = $('<div class="vas-253-root" id="vas-253-root-' + widgetID + '"></div>');
 
-            var title = label('VAS_254_LargestVariance', 'Largest budget variances');
-            var subtitle = label('VAS_254_VarianceHint', 'Ranked by absolute variance');
+            var title = label('VAS_253_UtilizationByDim', 'Utilization by dimension');
 
             $card = $(
-                '<div class="vas-254-card">' +
-                    '<div class="vas-254-header">' +
-                        '<span class="vas-254-icon">' + ICONS.variance + '</span>' +
-                        '<div class="vas-254-head-text">' +
-                            '<div class="vas-254-title"></div>' +
-                            '<div class="vas-254-subtitle"></div>' +
+                '<div class="vas-253-card">' +
+                    '<div class="vas-253-header">' +
+                        '<span class="vas-253-icon">' + ICONS.utilization + '</span>' +
+                        '<div class="vas-253-head-text">' +
+                            '<div class="vas-253-title"></div>' +
+                            '<div class="vas-253-subtitle"></div>' +
                         '</div>' +
-                        '<button type="button" class="vas-254-year" aria-haspopup="listbox">' +
-                            '<span class="vas-254-year-label"></span>' +
-                            ICONS.chevron +
-                        '</button>' +
+                        '<div class="vas-253-filters">' +
+                            '<button type="button" class="vas-253-pill vas-253-year" aria-haspopup="listbox">' +
+                                '<span class="vas-253-pill-label"></span>' +
+                                ICONS.chevron +
+                            '</button>' +
+                            '<button type="button" class="vas-253-pill vas-253-dim" aria-haspopup="listbox">' +
+                                '<span class="vas-253-pill-label"></span>' +
+                                ICONS.chevron +
+                            '</button>' +
+                        '</div>' +
                     '</div>' +
-                    '<div class="vas-254-body">' +
-                        '<div class="vas-254-list" role="list"></div>' +
-                        '<div class="vas-254-pagerwrap"></div>' +
+                    '<div class="vas-253-body">' +
+                        '<div class="vas-253-list" role="list"></div>' +
+                        '<div class="vas-253-pagerwrap"></div>' +
                     '</div>' +
-                    '<div class="vas-254-state vas-254-hidden"></div>' +
+                    '<div class="vas-253-state vas-253-hidden"></div>' +
                 '</div>'
             );
 
-            $card.find('.vas-254-title').text(title).attr('title', title);
-            /* The subtitle truncates in a 3-column cell that is already sharing its header
-               row with the year pill, so the full sentence also goes on the title attribute
-               - it moves to the tooltip rather than being lost. */
-            $card.find('.vas-254-subtitle').text(subtitle).attr('title', subtitle);
-            $card.find('.vas-254-list').attr('aria-label', title);
+            $card.find('.vas-253-title').text(title).attr('title', title);
+            $card.find('.vas-253-list').attr('aria-label', title);
 
-            $yearBtn = $card.find('.vas-254-year');
-            $list = $card.find('.vas-254-list');
-            $foot = $card.find('.vas-254-pagerwrap');
-            $state = $card.find('.vas-254-state');
+            /* The subtitle starts as the bare hint and gains its count and its dimension
+               word once the first read lands - see paintSubtitle. */
+            paintSubtitle();
+
+            $yearBtn = $card.find('.vas-253-year');
+            $dimBtn = $card.find('.vas-253-dim');
+            $list = $card.find('.vas-253-list');
+            $foot = $card.find('.vas-253-pagerwrap');
+            $state = $card.find('.vas-253-state');
 
             paintYearLabel();
+            paintDimensionLabel();
 
             $yearBtn.on('click' + _ns, function (e) {
                 e.preventDefault();
                 e.stopPropagation();
-                togglePicker();
+                togglePicker(PICK_YEAR);
+            });
+
+            $dimBtn.on('click' + _ns, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                togglePicker(PICK_DIMENSION);
             });
 
             $root.append($card);
@@ -322,13 +363,18 @@
             showBusyIndicator();
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_254_LargestBudgetVarianceWidget/GetRows',
+                url: VIS.Application.contextUrl + 'VAS_253_UtlizationbyDimensionWidget/GetRows',
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
                 /* Asynchronous, always - nothing here justifies blocking the UI thread. */
                 async: true,
-                data: { yearId: _yearId, pageNo: pageNo, pageSize: _pageSize },
+                data: {
+                    yearId: _yearId,
+                    dimension: _dimension,
+                    pageNo: pageNo,
+                    pageSize: _pageSize
+                },
                 success: function (raw) {
                     _loading = false;
                     if (_disposed) { return; }
@@ -339,6 +385,12 @@
                         renderState(label('VAS_192_CouldntLoad', "Couldn't load"));
                         return;
                     }
+
+                    /* The year and dimension lists come back with every read, so a newly
+                       opened financial year or a newly activated accounting-schema element
+                       appears on the next refresh without a second endpoint. */
+                    _years = data.Years || [];
+                    _dimensions = data.Dimensions || [];
 
                     /* A configuration gap is a different answer from a failed read, and it
                        says which piece of setup is missing rather than "couldn't load". */
@@ -354,12 +406,12 @@
 
                     _schema = data.Schema || null;
 
-                    /* The year list comes back with every read, so a newly opened financial
-                       year appears on the next refresh without a second endpoint. */
-                    _years = data.Years || [];
                     _yearId = Number(data.C_Year_ID) || 0;
                     _fiscalYear = data.FiscalYear || '';
+                    _dimension = data.Dimension || '';
+                    _dimensionLabel = data.DimensionLabel || '';
                     paintYearLabel();
+                    paintDimensionLabel();
 
                     _rows = data.Rows || [];
                     _page = Number(data.Page) || 1;
@@ -393,12 +445,12 @@
         /* Render                                                       */
         /* ------------------------------------------------------------ */
 
-        /* A load failure or a missing configuration takes the card over. Having no
-           variances does NOT - that is handled inside the list, so the header and the
-           subtitle stay put. */
+        /* A load failure or a missing configuration takes the card over. Having no budgeted
+           values does NOT - that is handled inside the list, so the header, the subtitle
+           and both filters stay put. */
         function renderState(text) {
-            $card.find('.vas-254-body').addClass('vas-254-hidden');
-            $state.removeClass('vas-254-hidden').text(text);
+            $card.find('.vas-253-body').addClass('vas-253-hidden');
+            $state.removeClass('vas-253-hidden').text(text);
         }
 
         function errorLabel(code) {
@@ -411,13 +463,24 @@
             if (code === 'NOYEAR') {
                 return label('VAS_256_NoYears', 'No financial years available');
             }
+            if (code === 'NODIMENSION') {
+                return label('VAS_253_NoDimensions', 'No accounting dimensions are configured');
+            }
             return label('VAS_192_CouldntLoad', "Couldn't load");
         }
 
         function paintYearLabel() {
             var text = _fiscalYear || yearNameOf(_yearId);
-            $yearBtn.find('.vas-254-year-label').text(text);
+            $yearBtn.find('.vas-253-pill-label').text(text);
             $yearBtn.attr('title', label('VAS_256_FinancialYear', 'Financial year') + ': ' + text);
+        }
+
+        /* The dimension pill carries the ELEMENT'S OWN NAME, never a word from this file -
+           that is the whole point of driving the list from the accounting schema. */
+        function paintDimensionLabel() {
+            var text = _dimensionLabel || dimensionNameOf(_dimension);
+            $dimBtn.find('.vas-253-pill-label').text(text);
+            $dimBtn.attr('title', label('VAS_253_Dimension', 'Dimension') + ': ' + text);
         }
 
         function yearNameOf(id) {
@@ -427,16 +490,44 @@
             return '';
         }
 
+        function dimensionNameOf(value) {
+            for (var i = 0; i < _dimensions.length; i++) {
+                if (_dimensions[i].Value === value) { return _dimensions[i].Label || ''; }
+            }
+            return '';
+        }
+
+        /* "Actual against approved · 6 Organization values" - the count is the WHOLE
+           ranking, not the page, and the word for the values is the accounting schema
+           element's own Name. Before the first read lands there is no count and no
+           dimension to name, so the bare hint stands on its own rather than printing a
+           zero the card does not yet know. */
+        function paintSubtitle() {
+            var text = label('VAS_253_UtilizationHint', 'Actual against approved');
+
+            if (_dimensionLabel) {
+                text += ' · ' + _totalRows + ' ' + _dimensionLabel + ' ' +
+                    label('VAS_253_Values', 'values');
+            }
+
+            /* The subtitle truncates in a cell that is already sharing its header row with
+               two pills, so the full sentence also goes on the title attribute - it moves to
+               the tooltip rather than being lost. */
+            $card.find('.vas-253-subtitle').text(text).attr('title', text);
+        }
+
         function paintRows() {
-            $state.addClass('vas-254-hidden');
-            $card.find('.vas-254-body').removeClass('vas-254-hidden');
+            $state.addClass('vas-253-hidden');
+            $card.find('.vas-253-body').removeClass('vas-253-hidden');
+
+            paintSubtitle();
 
             if (!_rows || _rows.length === 0) {
-                /* A year with nothing budgeted or posted is a real answer, not an error -
-                   and with no rows there is nothing to page, so the footer goes too. */
-                $list.html('<div class="vas-254-empty">' +
-                    escapeHtml(label('VAS_254_NoVariances',
-                        'No budget variances found for the selected financial year.')) + '</div>');
+                /* A dimension with nothing budgeted is a real answer, not an error - and
+                   with no rows there is nothing to page, so the footer goes too. */
+                $list.html('<div class="vas-253-empty">' +
+                    escapeHtml(label('VAS_253_NoUtilization',
+                        'No budget data is available for the selected year and dimension.')) + '</div>');
                 $foot.empty();
                 return;
             }
@@ -453,80 +544,97 @@
             if (_needsSync) { scheduleSync(); }
         }
 
-        /* A two-line row: the account on top, the two figures it is derived from beneath,
-           and the variance right-aligned as the row's conclusion. Not a button - this card
-           has no drill-down, so nothing here should look activatable. */
+        /* A label line over a track. Not a button - this card has no drill-down, so nothing
+           here should look activatable. */
         function rowHtml(item) {
-            var account = accountText(item);
-            var meta = metaText(item);
-            var variance = Number(item.Variance) || 0;
+            var name = valueText(item);
+            var pct = Number(item.UtilizedPct) || 0;
+            var measure = measureText(item);
 
-            /* Favourable = came in UNDER budget. The tone and the printed sign say the same
-               thing twice, so the reading never rests on colour alone. */
-            var tone = variance < 0 ? 'vas-254-neg' : 'vas-254-pos';
+            /* The bar is capped at the track; the printed percentage is not. An overrun is
+               a full track AND a number above 100, so the size of the overrun is never
+               lost to the cap. */
+            var width = pct;
+            if (width < 0) { width = 0; }
+            if (width > 100) { width = 100; }
 
-            return '<div class="vas-254-brow" role="listitem" title="' +
-                        escapeHtml(rowTooltip(item, account)) + '">' +
-                '<span class="vas-254-l">' +
-                    lineCell('vas-254-name', account) +
-                    lineCell('vas-254-meta', meta) +
-                '</span>' +
-                '<span class="vas-254-r">' +
-                    '<span class="vas-254-var ' + tone + '" title="' +
-                        escapeHtml(signedFullAmount(variance)) + '">' +
-                        escapeHtml(signedCompactAmount(variance)) +
+            return '<div class="vas-253-brow" role="listitem" title="' +
+                        escapeHtml(rowTooltip(item, name)) + '">' +
+                '<div class="vas-253-btop">' +
+                    lineCell('vas-253-name', name) +
+                    '<span class="vas-253-measure" title="' + escapeHtml(measure) + '">' +
+                        escapeHtml(measure) +
                     '</span>' +
-                '</span>' +
+                '</div>' +
+                '<div class="vas-253-track">' +
+                    '<i class="vas-253-fill ' + toneClass(pct) + '" style="width:' +
+                        width.toFixed(1) + '%"></i>' +
+                '</div>' +
             '</div>';
         }
 
-        /* One line of the row's left column. An empty value renders the missing-value dash
-           rather than collapsing the line, which would change the row's height and unsettle
-           the adaptive row fit. */
+        /* design.md threshold tones. The class only carries the colour - the percentage
+           beside the bar carries the reading. */
+        function toneClass(pct) {
+            if (pct >= RISK_PCT) { return 'vas-253-risk'; }
+            if (pct >= WARN_PCT) { return 'vas-253-warn'; }
+            return 'vas-253-ok';
+        }
+
+        /* The row's identity. An empty value renders the missing-value dash rather than
+           collapsing the line, which would change the row's height and unsettle the
+           adaptive row fit. */
         function lineCell(cls, text) {
             if (isBlank(text)) {
-                return '<span class="' + cls + ' vas-254-nil">' + NIL + '</span>';
+                return '<span class="' + cls + ' vas-253-nil">' + NIL + '</span>';
             }
 
             return '<span class="' + cls + '" title="' + escapeHtml(text) + '">' +
                 escapeHtml(text) + '</span>';
         }
 
-        /* "{Account Value} — {Account Name}". Either half may be missing on a badly seeded
-           chart of accounts, so the em dash is only printed when there are two sides to it,
-           and a row with neither falls through to the missing-value dash. */
-        function accountText(item) {
-            var value = item.AccountValue || '';
-            var name = item.AccountName || '';
+        /* The dimension value's name, as the server resolved it from that dimension's own
+           master table.
 
-            if (value && name) { return value + ' — ' + name; }
-            return value || name;
+           TWO DIFFERENT KINDS OF EMPTY, and they must not be told the same way. A row with
+           NO value (id 0) is postings that carry no value for the selected dimension - a
+           real group with real money in it, named from AD_Message. A row that HAS a value
+           the master table could not name is a gap in the data, and falls through to the
+           missing-value dash like every other unnamed cell on the dashboard - calling it
+           "not assigned" would state something that is not true. */
+        function valueText(item) {
+            var name = item.Label || '';
+            if (name) { return name; }
+
+            if ((Number(item.Dimension_ID) || 0) > 0) { return ''; }
+
+            return label('VAS_253_NotAssigned', '(Not assigned)');
         }
 
-        /* "Budget $1.9M · actual $1.42M" - the two figures the variance is derived from,
-           so the reader can see WHY the gap is what it is without a second card. Composed
-           from the same two numbers the variance was computed from server-side, so the meta
-           line and the trailing value can never disagree. */
-        function metaText(item) {
-            return label('VAS_254_Budget', 'Budget') + ' ' + compactAmount(Number(item.Budget) || 0) +
-                ' · ' + label('VAS_254_ActualLower', 'actual') + ' ' +
-                compactAmount(Number(item.Actual) || 0);
+        /* "$3.1M of $4.86M · 63.8%" - what was consumed, out of what was approved, and the
+           ratio between them. Composed from the same two figures the server computed the
+           percentage from, so the line and the bar can never disagree. */
+        function measureText(item) {
+            return compactAmount(Number(item.Actual) || 0) + ' ' +
+                label('VAS_020_Of', 'of') + ' ' +
+                compactAmount(Number(item.Budget) || 0) + ' · ' +
+                percentText(Number(item.UtilizedPct) || 0);
         }
 
         /* Everything the row holds, at full precision - the cells above are compact. */
-        function rowTooltip(item, account) {
+        function rowTooltip(item, name) {
             var lines = [];
 
-            lines.push(isBlank(account) ? NIL : account);
+            lines.push(isBlank(name) ? NIL : name);
             lines.push(label('VAS_254_Budget', 'Budget') + ': ' + fullAmount(Number(item.Budget) || 0));
-            lines.push(label('VAS_254_ActualLower', 'actual') + ': ' + fullAmount(Number(item.Actual) || 0));
-            lines.push(label('VAS_254_Variance', 'Variance') + ': ' +
-                signedFullAmount(Number(item.Variance) || 0));
+            lines.push(label('VAS_252_Actual', 'Actual') + ': ' + fullAmount(Number(item.Actual) || 0));
+            lines.push(label('VAS_252_Utilized', 'Utilized') + ': ' +
+                percentText(Number(item.UtilizedPct) || 0));
 
             return lines.join('\n');
         }
 
-        /* ---- Canonical Widget Footer Pager (design.md): "Showing a–b of N" left, compact
+        /* ---- Canonical Widget Footer Pager (design.md): "Showing a-b of N" left, compact
              prev / next control right. Hidden on a single page. ---- */
         function paintFooter() {
             if (_totalPages <= 1) { $foot.empty(); return; }
@@ -534,32 +642,36 @@
             var from = (_page - 1) * _pageSize + 1;
             var to = Math.min(_page * _pageSize, _totalRows);
 
-            var showing = label('VAS_020_Showing', 'Showing') + ' ' + from + '–' + to + ' ' +
-                label('VAS_020_Of', 'of') + ' ' + _totalRows;
+            /* "Showing 1-4 of 11 · sorted by utilization" - the note says what the order
+               means, which a list ranked by something other than its label needs to state
+               somewhere. */
+            var showing = label('VAS_020_Showing', 'Showing') + ' ' + from + '-' + to + ' ' +
+                label('VAS_020_Of', 'of') + ' ' + _totalRows + ' · ' +
+                label('VAS_253_SortedByUtilization', 'sorted by utilization');
 
             var prevDis = _page <= 1 ? ' disabled' : '';
             var nextDis = _page >= _totalPages ? ' disabled' : '';
 
             $foot.html(
-                '<div class="vas-254-pager">' +
-                    '<span class="vas-254-pager-info" title="' + escapeHtml(showing) + '">' +
+                '<div class="vas-253-pager">' +
+                    '<span class="vas-253-pager-info" title="' + escapeHtml(showing) + '">' +
                         escapeHtml(showing) + '</span>' +
-                    '<div class="vas-254-pager-nav">' +
-                        '<button type="button" class="vas-254-pgbtn vas-254-pg-prev" aria-label="' +
+                    '<div class="vas-253-pager-nav">' +
+                        '<button type="button" class="vas-253-pgbtn vas-253-pg-prev" aria-label="' +
                             escapeHtml(label('VAS_020_Prev', 'Previous')) + '"' + prevDis + '>' + ICONS.prev + '</button>' +
-                        '<span class="vas-254-pager-label">' + _page + ' ' +
+                        '<span class="vas-253-pager-label">' + _page + ' ' +
                             escapeHtml(label('VAS_020_Of', 'of')) + ' ' + _totalPages + '</span>' +
-                        '<button type="button" class="vas-254-pgbtn vas-254-pg-next" aria-label="' +
+                        '<button type="button" class="vas-253-pgbtn vas-253-pg-next" aria-label="' +
                             escapeHtml(label('VAS_020_Next', 'Next')) + '"' + nextDis + '>' + ICONS.next + '</button>' +
                     '</div>' +
                 '</div>'
             );
 
-            /* A page change keeps the year filter - only the page number moves. */
-            $foot.find('.vas-254-pg-prev').on('click', function () {
+            /* A page change keeps both filters - only the page number moves. */
+            $foot.find('.vas-253-pg-prev').on('click', function () {
                 if (!_loading && _page > 1) { fetchPage(_page - 1); }
             });
-            $foot.find('.vas-254-pg-next').on('click', function () {
+            $foot.find('.vas-253-pg-next').on('click', function () {
                 if (!_loading && _page < _totalPages) { fetchPage(_page + 1); }
             });
         }
@@ -583,9 +695,9 @@
                 return;
             }
 
-            /* Size off the TALLEST rendered row. Every row here is two lines, but a long
-               account name can still wrap the first one on a narrow cell. */
-            var rendered = $list[0].querySelectorAll('.vas-254-brow');
+            /* Size off the TALLEST rendered row. Every row here is a line over a track, but
+               a long dimension value can still wrap the label on a narrow cell. */
+            var rendered = $list[0].querySelectorAll('.vas-253-brow');
             var maxH = 0;
             for (var i = 0; i < rendered.length; i++) {
                 if (rendered[i].offsetHeight > maxH) { maxH = rendered[i].offsetHeight; }
@@ -618,45 +730,74 @@
         }
 
         /* ------------------------------------------------------------ */
-        /* Financial year picker - anchored under the pill, on <body>    */
+        /* Filter pickers - anchored under a pill, on <body>             */
         /* ------------------------------------------------------------ */
+
+        /* ONE panel serves both pills. They are never open at the same time, they are the
+           same control at the same tier, and a second panel would be a second set of
+           document listeners to leak. */
         function buildPicker() {
-            $picker = $('<div class="vas-254-pp vas-254-hidden" role="listbox" aria-label="' +
-                escapeHtml(label('VAS_256_FinancialYear', 'Financial year')) + '"></div>');
+            $picker = $('<div class="vas-253-pp vas-253-hidden" role="listbox"></div>');
             $('body').append($picker);
 
-            $picker.on('click', '.vas-254-pp-opt', function () {
-                var id = parseInt($(this).attr('data-id'), 10) || 0;
+            $picker.on('click', '.vas-253-pp-opt', function () {
+                var kind = _pickerKind;
+                var key = $(this).attr('data-id');
                 closePicker();
-                selectYear(id);
+
+                if (kind === PICK_YEAR) { selectYear(parseInt(key, 10) || 0); }
+                else { selectDimension(key); }
             });
         }
 
+        function activeButton() {
+            return _pickerKind === PICK_YEAR ? $yearBtn : $dimBtn;
+        }
+
         function fillPicker() {
-            var html = '<div class="vas-254-pp-h">' +
-                escapeHtml(label('VAS_256_FinancialYear', 'Financial year')) + '</div>';
+            var isYear = _pickerKind === PICK_YEAR;
 
-            if (_years.length === 0) {
-                html += '<div class="vas-254-pp-empty">' +
-                    escapeHtml(label('VAS_256_NoYears', 'No financial years available')) + '</div>';
+            var heading = isYear
+                ? label('VAS_256_FinancialYear', 'Financial year')
+                : label('VAS_253_Dimension', 'Dimension');
+
+            var html = '<div class="vas-253-pp-h">' + escapeHtml(heading) + '</div>';
+            var i;
+
+            if (isYear) {
+                if (_years.length === 0) {
+                    html += '<div class="vas-253-pp-empty">' +
+                        escapeHtml(label('VAS_256_NoYears', 'No financial years available')) + '</div>';
+                }
+
+                for (i = 0; i < _years.length; i++) {
+                    var y = _years[i];
+                    html += optionHtml(String(Number(y.C_Year_ID) || 0), y.FiscalYear || '',
+                        Number(y.C_Year_ID) === _yearId);
+                }
+            }
+            else {
+                if (_dimensions.length === 0) {
+                    html += '<div class="vas-253-pp-empty">' +
+                        escapeHtml(label('VAS_253_NoDimensions', 'No accounting dimensions are configured')) + '</div>';
+                }
+
+                for (i = 0; i < _dimensions.length; i++) {
+                    var d = _dimensions[i];
+                    html += optionHtml(d.Value || '', d.Label || '', d.Value === _dimension);
+                }
             }
 
-            for (var i = 0; i < _years.length; i++) {
-                var y = _years[i];
-                html += optionHtml(Number(y.C_Year_ID) || 0, y.FiscalYear || '');
-            }
-
+            $picker.attr('aria-label', heading);
             $picker.html(html);
         }
 
-        function optionHtml(id, text) {
-            var selected = id === _yearId;
-
-            return '<button type="button" class="vas-254-pp-opt" role="option" data-id="' + id +
-                    '" aria-selected="' + (selected ? 'true' : 'false') + '">' +
-                '<span class="vas-254-pp-name" title="' + escapeHtml(text) + '">' +
+        function optionHtml(key, text, selected) {
+            return '<button type="button" class="vas-253-pp-opt" role="option" data-id="' +
+                    escapeHtml(key) + '" aria-selected="' + (selected ? 'true' : 'false') + '">' +
+                '<span class="vas-253-pp-name" title="' + escapeHtml(text) + '">' +
                     escapeHtml(text) + '</span>' +
-                '<span class="vas-254-pp-tick">' + ICONS.tick + '</span>' +
+                '<span class="vas-253-pp-tick">' + ICONS.tick + '</span>' +
             '</button>';
         }
 
@@ -675,9 +816,10 @@
         }
 
         function positionPicker() {
-            if (!$picker || !$yearBtn || !$yearBtn[0]) { return; }
+            var $btn = activeButton();
+            if (!$picker || !$btn || !$btn[0]) { return; }
 
-            var rect = $yearBtn[0].getBoundingClientRect();
+            var rect = $btn[0].getBoundingClientRect();
             var gap = 6;
             var edge = 8;
 
@@ -696,7 +838,7 @@
             }
 
             var top = below ? rect.bottom + gap : rect.top - ph - gap;
-            /* Right-aligned to the pill: it sits at the card's trailing edge, so a
+            /* Right-aligned to the pill: the pills sit at the card's trailing edge, so a
                left-aligned panel would hang off the dashboard. */
             var left = Math.min(rect.right - _pickerW, window.innerWidth - _pickerW - edge);
             left = Math.max(edge, left);
@@ -708,11 +850,12 @@
             if (_pickerOpen) { positionPicker(); }
         }
 
-        function openPicker() {
+        function openPicker(kind) {
             if (!$picker) { buildPicker(); }
 
+            _pickerKind = kind;
             fillPicker();
-            $picker.removeClass('vas-254-hidden');
+            $picker.removeClass('vas-253-hidden');
             _pickerOpen = true;
             measurePicker();
 
@@ -727,7 +870,7 @@
         function closePicker() {
             if (!_pickerOpen) { return; }
             _pickerOpen = false;
-            if ($picker) { $picker.addClass('vas-254-hidden'); }
+            if ($picker) { $picker.addClass('vas-253-hidden'); }
 
             $(document).off('click' + _ns);
             $(document).off('keydown' + _ns);
@@ -735,14 +878,19 @@
             document.removeEventListener('scroll', onAnchorScroll, true);
         }
 
-        function togglePicker() {
-            if (_pickerOpen) { closePicker(); } else { openPicker(); }
+        function togglePicker(kind) {
+            /* Clicking the OTHER pill while a panel is open moves the panel rather than
+               closing it - the two pills are one control row. */
+            if (_pickerOpen && _pickerKind === kind) { closePicker(); return; }
+            if (_pickerOpen) { closePicker(); }
+            openPicker(kind);
         }
 
         function onDocumentClick(e) {
             if (!$picker) { return; }
             if ($picker[0].contains(e.target)) { return; }
             if ($yearBtn[0] && $yearBtn[0].contains(e.target)) { return; }
+            if ($dimBtn[0] && $dimBtn[0].contains(e.target)) { return; }
             closePicker();
         }
 
@@ -750,14 +898,24 @@
             if (e.key === 'Escape' || e.keyCode === 27) { closePicker(); }
         }
 
-        /* Changing the year re-reads from page 1 - the row the user was looking at is not
-           on the same page of a different year, and the ranking has to be recomputed. */
+        /* Changing either filter re-reads from page 1 - the row the user was looking at is
+           not on the same page of a different year or a different dimension, and the
+           ranking has to be recomputed. */
         function selectYear(id) {
             if (id <= 0 || id === _yearId) { return; }
 
             _yearId = id;
             _fiscalYear = yearNameOf(id);
             paintYearLabel();
+            fetchPage(1);
+        }
+
+        function selectDimension(value) {
+            if (!value || value === _dimension) { return; }
+
+            _dimension = value;
+            _dimensionLabel = dimensionNameOf(value);
+            paintDimensionLabel();
             fetchPage(1);
         }
 
@@ -798,26 +956,6 @@
             return (v < 0 ? '−' : '') + symbol() + magnitude;
         }
 
-        /* The variance, with its sign ALWAYS printed - a plus on a favourable gap as much
-           as a minus on an unfavourable one. The sign is what carries the direction when
-           the colour cannot: in print, for a colour-blind reader, or anywhere the tone is
-           lost. A true minus sign, not a hyphen. */
-        function signedCompactAmount(value) {
-            var v = Number(value) || 0;
-            var magnitude;
-
-            try {
-                if (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {
-                    magnitude = VIS.Util.formatCompactAmount(v, isoCode(), precision());
-                }
-            }
-            catch (e) { if (window.console) { console.log(e); } }
-
-            if (magnitude === undefined) { magnitude = String(Math.abs(v)); }
-
-            return (v < 0 ? '−' : '+') + symbol() + magnitude;
-        }
-
         /* Full, non-compact amount for the tooltips: the exact figure behind the compact
            cell. Grouping and the decimal separator come from the browser locale, the
            decimals from the schema currency's precision. */
@@ -835,10 +973,16 @@
             return (v < 0 ? '−' : '') + symbol() + text;
         }
 
-        function signedFullAmount(value) {
+        /* One decimal, and the separator from the reader's own locale - never a hard-coded
+           dot, which reads as a thousands mark in half of Europe. */
+        function percentText(value) {
             var v = Number(value) || 0;
-            var text = fullAmount(v);
-            return v < 0 ? text : '+' + text;
+
+            try {
+                return v.toLocaleString(window.navigator.language,
+                    { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+            }
+            catch (e) { return v.toFixed(1) + '%'; }
         }
 
         /* ------------------------------------------------------------ */
@@ -846,14 +990,13 @@
         /* ------------------------------------------------------------ */
 
         /* True when a value is nothing the reader can be shown. A zero is NOT blank: it is
-           a figure, and a budget of nought against an actual is the largest variance there
-           is. */
+           a figure, and nothing spent against an approved budget is 0% utilized. */
         function isBlank(value) {
             return value === null || value === undefined || String(value) === '';
         }
 
-        /* Every database-sourced string - and an account name is user-supplied text - goes
-           through here before it reaches the DOM. */
+        /* Every database-sourced string - and a dimension value's name is user-supplied
+           text - goes through here before it reaches the DOM. */
         function escapeHtml(s) {
             var v = (s === null || s === undefined) ? '' : String(s);
             return v.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -894,17 +1037,19 @@
             if ($picker) { $picker.off(); $picker.remove(); $picker = null; }
             if ($busy) { $busy.remove(); $busy = null; }
             if ($yearBtn) { $yearBtn.off(_ns); }
+            if ($dimBtn) { $dimBtn.off(_ns); }
             if ($foot) { $foot.off(); }
 
             _rows = [];
             _years = [];
+            _dimensions = [];
         };
     };
 
     /* ---------------------------------------------------------------- */
     /* Required prototype hooks (same surface as other VAS widgets)     */
     /* ---------------------------------------------------------------- */
-    VAS.VAS_254_LargestBudgetVarianceWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_253_UtlizationbyDimensionWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo = windowNo;
@@ -922,11 +1067,11 @@
        this.refreshWidget() would be unreachable at best and infinite recursion the day
        the instance one is removed. */
 
-    VAS.VAS_254_LargestBudgetVarianceWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_253_UtlizationbyDimensionWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
     };
 
-    VAS.VAS_254_LargestBudgetVarianceWidget.prototype.dispose = function () {
+    VAS.VAS_253_UtlizationbyDimensionWidget.prototype.dispose = function () {
         try { this.releasePanel(); } catch (e) { /* ignore */ }
         if (this.frame && typeof this.frame.dispose === 'function') {
             try { this.frame.dispose(); } catch (e) { /* ignore */ }

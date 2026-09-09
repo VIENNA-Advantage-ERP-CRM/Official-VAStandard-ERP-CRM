@@ -42,7 +42,11 @@ namespace VASLogic.Models
     ///                 Age           whole days between DateAcct and AsOfDate. Future-dated
     ///                               payments are excluded, so it can never be negative.
     ///                 Buckets       b1 0-7, b2 8-15, b3 16-30, b4 31-60, b5 60+.
-    ///                 Direction     C_Payment.IsReceipt - NEVER the sign of PayAmt.
+    ///                 Direction     C_Payment.IsReceipt - NEVER the sign of PayAmt. Which
+    ///                               side of a bucket a payment counts towards is therefore
+    ///                               fixed by the document, but its converted AMOUNT is
+    ///                               signed and a side's sum can come back negative when a
+    ///                               bucket's reversals outweigh its documents.
     ///
     ///               ONE SET OF CUT-OFFS. AsOfDate, AsOfDateExclusive and the four cut-off
     ///               dates are computed once, here, and drive the summary and every bucket
@@ -684,7 +688,7 @@ namespace VASLogic.Models
             item.IsReceipt = String.Equals(Util.GetValueOfString(row["Is_Receipt"]),
                 ISRECEIPT_Yes, StringComparison.OrdinalIgnoreCase);
 
-            decimal amount = Math.Abs(Util.GetValueOfDecimal(row["Pay_Amt"]));
+            decimal amount = Util.GetValueOfDecimal(row["Pay_Amt"]);
             item.Amount = item.IsReceipt ? amount : -amount;
 
             item.BankAccount = BuildBankAccount(
@@ -960,13 +964,16 @@ namespace VASLogic.Models
             /// <summary>Unreconciled receipts (IsReceipt='Y') in this bucket.</summary>
             public int ReceiptCount { get; set; }
 
-            /// <summary>Their converted SUM(ABS(PayAmt)), in base currency.</summary>
+            /// <summary>Their converted SUM(PayAmt), in base currency. SIGNED, not an
+            /// absolute: a bucket whose reversals outweigh its documents sums negative, and
+            /// the client draws the track from the magnitude and prints the sign.</summary>
             public decimal ReceiptAmt { get; set; }
 
             /// <summary>Unreconciled payments (IsReceipt='N') in this bucket.</summary>
             public int PaymentCount { get; set; }
 
-            /// <summary>Their converted SUM(ABS(PayAmt)), in base currency.</summary>
+            /// <summary>Their converted SUM(PayAmt), in base currency - signed, on the same
+            /// rule as <see cref="ReceiptAmt"/>.</summary>
             public decimal PaymentAmt { get; set; }
 
             /// <summary>Both sides' line counts - the row's Count column.</summary>

@@ -24,11 +24,15 @@ namespace VASLogic.Models
     ///               active bank account, showing what moved through it this reporting
     ///               period and what it closed at:
     ///
-    ///                 Inflow    SUM(ABS(PayAmt)) WHERE IsReceipt='Y', DocStatus IN
+    ///                 Inflow    SUM(PayAmt) WHERE IsReceipt='Y', DocStatus IN
     ///                           ('CO','CL'), DateAcct inside the current period.
-    ///                 Outflow   the same for IsReceipt='N', always a POSITIVE magnitude -
-    ///                           the direction is carried by which side of the bar's axis
-    ///                           it is drawn on, never by a minus sign.
+    ///                 Outflow   the same for IsReceipt='N'. Both are normally POSITIVE
+    ///                           magnitudes and the direction is then carried by which side
+    ///                           of the bar's axis the figure is drawn on, not by a sign -
+    ///                           but EITHER CAN COME BACK NEGATIVE when the period's
+    ///                           reversals outweigh its documents, and then the money ran
+    ///                           the other way. The client prints that sign and swaps the
+    ///                           figure and its bar segment to the opposite side's tone.
     ///                 Net       Inflow - Outflow, the figure over the bar's axis.
     ///                 Closing   EndingBalance of the LATEST settled statement dated before
     ///                           the period end, falling back to C_BankAccount.CurrentBalance
@@ -262,7 +266,7 @@ namespace VASLogic.Models
                     /* Net VARIANCE is the size of the movement, not its direction - an
                        account that paid out heavily is as interesting as one that took in
                        heavily, so the magnitude sorts and the sign does not. */
-                    cmp = Math.Abs(b.Net).CompareTo(Math.Abs(a.Net));
+                    cmp = (b.Net).CompareTo((a.Net));
                 }
 
                 return cmp != 0 ? cmp : a.BankAccountId.CompareTo(b.BankAccountId);
@@ -441,7 +445,7 @@ namespace VASLogic.Models
 
             /* The conversion call appears twice and the provider binds POSITIONALLY, so
                nothing inside it is bound - every argument is a column. */
-            string convert = "ABS(currencyConvert(p.PayAmt,p.C_Currency_ID,ba.C_Currency_ID,p.DateAcct,p.C_ConversionType_ID,p.AD_Client_ID,p.AD_Org_ID))";
+            string convert = "(currencyConvert(p.PayAmt,p.C_Currency_ID,ba.C_Currency_ID,p.DateAcct,p.C_ConversionType_ID,p.AD_Client_ID,p.AD_Org_ID))";
 
             StringBuilder sql = new StringBuilder();
             sql.Append(@"
@@ -608,6 +612,14 @@ namespace VASLogic.Models
         ///
         /// An account that did not move at all keeps both sides at zero: the axis alone is
         /// drawn, and no division by zero is attempted.
+        ///
+        /// THE WIDTHS ARE MAGNITUDES. A flow can arrive NEGATIVE - a reversed receipt makes
+        /// Inflow negative, a reversed payment makes Outflow negative - and a bar is a size,
+        /// which has no sign. Comparing the raw values instead measured a scale of
+        /// MAX(-900, 0) = 0 and drew no bar at all for a row that had plainly moved, so the
+        /// one row on the card that most needed looking at was the one with nothing on it.
+        /// The DIRECTION of a negative flow is carried by its tone, which the client flips
+        /// to the opposite side's colour.
         /// </summary>
         /// <param name="rows">Rows to complete in place.</param>
         private void ApplyBarPercents(List<AccountRow> rows)

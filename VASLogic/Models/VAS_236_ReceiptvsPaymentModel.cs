@@ -23,14 +23,16 @@ namespace VASLogic.Models
     /// Purpose     : Backs the VAS_236_ReceiptvsPaymentWidget dashboard widget - money in
     ///               against money out over time, as one point per period:
     ///
-    ///                 Receipts  SUM(ABS(PayAmt)) WHERE IsReceipt='Y'
-    ///                 Payments  SUM(ABS(PayAmt)) WHERE IsReceipt='N'
+    ///                 Receipts  SUM(PayAmt) WHERE IsReceipt='Y'
+    ///                 Payments  SUM(PayAmt) WHERE IsReceipt='N'
     ///                 Net       Receipts - Payments
     ///
-    ///               Direction comes from C_Payment.IsReceipt, never from the stored sign,
-    ///               which is why both sides are summed through ABS(): a negative amount in
-    ///               the data must not flip a receipt into a payment. Only settled money
-    ///               counts - DocStatus IN ('CO','CL').
+    ///               DIRECTION comes from C_Payment.IsReceipt, never from the stored sign:
+    ///               a negative amount in the data must not flip a receipt into a payment,
+    ///               so which SIDE a payment counts towards is fixed by the document. The
+    ///               AMOUNT, though, is summed as it stands - no ABS - so a period whose
+    ///               reversals outweigh its documents sums negative and the client prints
+    ///               that sign. Only settled money counts - DocStatus IN ('CO','CL').
     ///
     ///               NO DATE FUNCTIONS IN SQL. Bucketing by day / week / month is the one
     ///               place the two backends diverge hardest - DATE_TRUNC('week', ...)
@@ -302,8 +304,12 @@ namespace VASLogic.Models
         {
             /* The target currency is a server-resolved id, never client input, so it is
                inlined rather than bound - the conversion appears twice and the provider
-               binds by POSITION. ABS() because the direction is carried by IsReceipt, never
-               by the stored sign. */
+               binds by POSITION.
+
+               NO ABS. The direction is carried by IsReceipt - which CASE arm a payment
+               falls into - so the amount itself does not need forcing positive, and
+               forcing it would hide a reversal by reporting it as money that moved the
+               other way. The client prints whatever sign the sum comes back with. */
             string convert = "currencyConvert(p.PayAmt,p.C_Currency_ID," + acctCurrencyId
                 + ",p.DateAcct,p.C_ConversionType_ID,p.AD_Client_ID,p.AD_Org_ID)";
 
