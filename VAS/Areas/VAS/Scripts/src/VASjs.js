@@ -372,3 +372,6 @@ import "../app/widgets/BankingJournal/VAS_235_AgingUnreconciledWidget.js";
 import "../app/widgets/BankingJournal/VAS_236_ReceiptvsPaymentWidget.js";
 import "../app/widgets/BankingJournal/VAS_238_UnreconciledBankLineWidget.js";
 import "../app/widgets/BankingJournal/VAS_239_CurrencyWiseBalanceWidget.js";
+import "../app/widgets/Budget/VAS_256_UnBudgetedActualWidget.js";
+import "../app/widgets/Budget/VAS_254_LargestBudgetVarianceWidget.js";
+import "../app/widgets/Budget/VAS_252_TopBudgetOverRunsWidget.js";

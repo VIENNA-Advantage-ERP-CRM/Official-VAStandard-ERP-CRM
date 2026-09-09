@@ -153,6 +153,9 @@
     <Compile Include="Models\VAS_107_CreateOrderBottomPanelModel.cs" />
     <Compile Include="Models\VAS_240_RequisitionBottomPanelModel.cs" />
     <Compile Include="Models\VAS_218_CreateOppLinesModel.cs" />
+    <Compile Include="Models\VAS_254_LargestBudgetVarianceModel.cs" />
+    <Compile Include="Models\VAS_252_TopBudgetOverRunsModel.cs" />
+    <Compile Include="Models\VAS_256_UnBudgetedActualModel.cs" />
     <Compile Include="Models\VAS_ActivitySourcesModel.cs" />
     <Compile Include="Models\VAS_ChangeLogValueModel.cs" />
     <Compile Include="Models\VAS_092_OverviewPurchaseOrderModel.cs" />

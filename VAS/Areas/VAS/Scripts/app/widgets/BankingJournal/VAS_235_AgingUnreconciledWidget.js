@@ -79,12 +79,11 @@
  *                  11 | All accounts                  | VAS_235_AllAccounts
  *                  12 | Bank account                  | VAS_235_BankAccountFilter
  *                  13 | Policy threshold              | VAS_235_PolicyThreshold
- *                  13 | 0-7 days                      | VAS_235_Bucket1
- *                  14 | 8-15 days                     | VAS_235_Bucket2
- *                  15 | 16-30 days                    | VAS_235_Bucket3
- *                  16 | 31-60 days                    | VAS_235_Bucket4
- *                  17 | 60+ days                      | VAS_235_Bucket5
- *                  18 | Nothing unreconciled          | VAS_235_NothingOpen
+ *                  14 | 0-7 days                      | VAS_235_Bucket1
+ *                  15 | 8-15 days                     | VAS_235_Bucket2
+ *                  16 | 16-30 days                    | VAS_235_Bucket3
+ *                  17 | 31-60 days                    | VAS_235_Bucket4
+ *                  18 | 60+ days                      | VAS_235_Bucket5
  *                  19 | view detail                   | VAS_235_ViewDetail
  *                  20 | Unreconciled items            | VAS_235_DlgTitle
  *                  21 | as on                         | VAS_235_AsOn
@@ -96,15 +95,21 @@
  *                  27 | Currency                      | VAS_235_PaymentCurrency
  *                  28 | Days (column heading)         | VAS_235_DaysCol
  *                  29 | Amount                        | VAS_235_Amount
- *                  28 | lines                         | VAS_235_Lines
- *                  29 | No unreconciled payments      | VAS_235_NoDetail
+ *                  30 | lines                         | VAS_235_Lines
+ *                  31 | No unreconciled payments      | VAS_235_NoDetail
  *                     |   found for this aging bucket |
- *                  31 | Close                         | VAS_235_Close
- *                  32 | Showing                       | VAS_020_Showing     (reuse)
- *                  33 | of                            | VAS_020_Of          (reuse)
- *                  34 | Previous                      | VAS_020_Prev        (reuse)
- *                  35 | Next                          | VAS_020_Next        (reuse)
- *                  36 | Couldn't load                 | VAS_192_CouldntLoad (reuse)
+ *                  32 | Close                         | VAS_235_Close
+ *                  33 | Showing                       | VAS_020_Showing     (reuse)
+ *                  34 | of                            | VAS_020_Of          (reuse)
+ *                  35 | Previous                      | VAS_020_Prev        (reuse)
+ *                  36 | Next                          | VAS_020_Next        (reuse)
+ *                  37 | Couldn't load                 | VAS_192_CouldntLoad (reuse)
+ *
+ *                  VAS_235_NothingOpen ("Nothing unreconciled") is RETIRED - a clean
+ *                  book now draws the five buckets at zero instead of replacing the
+ *                  list with a sentence. The key can be dropped from AD_Message.
+ *                  VAS_235_NoDetail stays: the DIALOG still needs it, because a bucket
+ *                  with no lines is only ever opened from a count that is not zero.
  *
  * Chronological development:
  *   VAI154         Created  Date 2026-09-03
@@ -474,8 +479,9 @@
         /* Render - the widget                                          */
         /* ------------------------------------------------------------ */
 
-        /* A load failure takes the card over. Having nothing unreconciled does NOT - that
-           is handled inside the list, so the header and its totals stay put. */
+        /* A load failure takes the card over. Having nothing unreconciled does NOT - the
+           bucket ladder simply draws at zero, so the header, its totals and the whole
+           list stay exactly where they were. */
         function renderState(text) {
             $card.find('.vas-235-body').addClass('vas-235-hidden');
             $state.removeClass('vas-235-hidden').text(text);
@@ -543,17 +549,24 @@
             return label('VAS_235_AllAccounts', 'All accounts');
         }
 
+        /* THE LADDER ALWAYS RENDERS, INCLUDING WHEN NOTHING IS OUTSTANDING. An account
+           with a clean book draws all five buckets at zero - empty grooves, a zero value
+           and a zero count - rather than a "Nothing unreconciled" sentence in place of
+           the list.
+
+           Two reasons. The zeros ARE the answer, and they are a more precise one than the
+           sentence: they say the book is clean in every age band, which is what an aging
+           report is asked. And the card keeps its shape as the reader moves through the
+           account picker - the bucket labels, the policy divider and the two figure
+           columns stay where they were on the previous account, so a clean account reads
+           as a clean account rather than as a card that failed to load.
+
+           Nothing here needs a special case: rowHtml and rowTooltip already treat a
+           missing bucket as zero, because the server may legitimately return fewer than
+           five. */
         function paintRows() {
             $state.addClass('vas-235-hidden');
             $card.find('.vas-235-body').removeClass('vas-235-hidden');
-
-            /* Nothing outstanding at all is good news, not an error - it is said once,
-               across the list, and the header keeps its (zero) totals. */
-            if (_totalCount === 0) {
-                $list.html('<div class="vas-235-empty">' +
-                    escapeHtml(label('VAS_235_NothingOpen', 'Nothing unreconciled')) + '</div>');
-                return;
-            }
 
             var html = '';
 
