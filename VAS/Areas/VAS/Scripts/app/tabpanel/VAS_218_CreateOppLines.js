@@ -217,6 +217,28 @@
         }
 
         /**
+         * Prevents non-numeric key presses on Qty and Price inputs.
+         * Allows digits, decimal point, navigation keys, and Ctrl/Meta shortcuts.
+         * Call at the start of a keydown handler before other key checks.
+         * @param {KeyboardEvent} e
+         */
+        function blockNonNumeric(e) {
+            // Let browser/OS shortcuts through (Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+Z, etc.)
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            var k = e.key;
+            // Allow navigation, editing, and the keys the existing handler already processes
+            if (k === 'Tab' || k === 'Enter' || k === 'Escape' ||
+                k === 'Backspace' || k === 'Delete' ||
+                k === 'ArrowLeft' || k === 'ArrowRight' ||
+                k === 'ArrowUp' || k === 'ArrowDown' ||
+                k === 'Home' || k === 'End') return;
+            // Allow digits and decimal point
+            if (/^[0-9.]$/.test(k)) return;
+            // Block all other characters (letters, symbols, etc.)
+            e.preventDefault();
+        }
+
+        /**
          * Formats a number as a money string with two decimal places.
          * @param {number} n
          * @returns {string}
@@ -1189,6 +1211,24 @@
         }
 
         /**
+         * Returns false when tabbing into the given role would land on a read-only cell,
+         * so moveFocus can skip non-interactive stops in TAB_ORDER.
+         * Currently only UOM can be read-only (saved lines and charge lines).
+         * Mirrors the uomRO calculation in renderQtyUomCell.
+         * @param {object} line - Line being evaluated.
+         * @param {string} role - TAB_ORDER role name.
+         * @returns {boolean} true when the role is interactable.
+         */
+        function isRoleEditable(line, role) {
+            if (role === "uom") {
+                var v = line.values;
+                // UOM is read-only on saved lines and on charge lines (mirrors renderQtyUomCell)
+                return !!(line._isNew && !(parseInt(v.C_Charge_ID, 10) > 0));
+            }
+            return true;
+        }
+
+        /**
          * Advances editing focus to the next (or previous) editable cell in TAB_ORDER.
          * The caller must inline-commit the current field's value BEFORE calling this,
          * so the data is saved even though we bypass the blur handler.
@@ -1197,6 +1237,9 @@
          * input is removed from the DOM which fires a stale blur. Each cell's blur handler
          * guards against this by checking whether `editing` still points at itself before
          * resetting it.
+         *
+         * Read-only roles (e.g. UOM on saved/charge lines) are skipped so Tab never lands
+         * on a non-interactive cell and gets stuck.
          *
          * Crossing a row boundary moves to the first/last cell of the adjacent row.
          * When there is no adjacent row the editor simply closes.
@@ -1212,6 +1255,11 @@
             var lineIdx = lines.indexOf(line);
             var nextPos = reverse ? cur - 1 : cur + 1;
 
+            // Skip read-only fields in the direction of travel
+            while (nextPos >= 0 && nextPos < order.length && !isRoleEditable(line, order[nextPos])) {
+                nextPos = reverse ? nextPos - 1 : nextPos + 1;
+            }
+
             if (nextPos >= 0 && nextPos < order.length) {
                 // Stay on same row, move to next/prev field
                 editing = { rowId: line.rowId, field: ROLE_TO_FIELD[order[nextPos]] || order[nextPos] };
@@ -1220,9 +1268,17 @@
                 // Cross to the adjacent row's first (forward) or last (backward) field
                 var targetIdx = reverse ? lineIdx - 1 : lineIdx + 1;
                 if (targetIdx >= 0 && targetIdx < lines.length) {
-                    var targetLine  = lines[targetIdx];
-                    var targetRole  = reverse ? order[order.length - 1] : order[0];
-                    editing = { rowId: targetLine.rowId, field: ROLE_TO_FIELD[targetRole] || targetRole };
+                    var targetLine = lines[targetIdx];
+                    var targetPos  = reverse ? order.length - 1 : 0;
+                    // Skip read-only roles on the target row as well
+                    while (targetPos >= 0 && targetPos < order.length && !isRoleEditable(targetLine, order[targetPos])) {
+                        targetPos = reverse ? targetPos - 1 : targetPos + 1;
+                    }
+                    if (targetPos >= 0 && targetPos < order.length) {
+                        editing = { rowId: targetLine.rowId, field: ROLE_TO_FIELD[order[targetPos]] || order[targetPos] };
+                    } else {
+                        editing = null;
+                    }
                     renderRow(lineIdx);
                     renderRow(targetIdx);
                 } else {
@@ -1651,6 +1707,7 @@
                 });
                 $q.on("keydown", function (e) {
                     e.stopPropagation();
+                    blockNonNumeric(e);   // restrict to digits and decimal point
                     if (e.key === "Enter") { $q.trigger("blur"); }
                     if (e.key === "Tab") {
                         e.preventDefault();
@@ -1754,6 +1811,7 @@
                 });
                 $inp.on("keydown", function (e) {
                     e.stopPropagation();
+                    blockNonNumeric(e);   // restrict to digits and decimal point
                     if (e.key === "Enter") { $inp.trigger("blur"); }
                     if (e.key === "Tab") {
                         e.preventDefault();
@@ -2485,14 +2543,21 @@
                             showToast(res.ErrorDetail || msg(res.ErrorKey) || msg("VAS_218_DeleteError"), true);
                             renderAll();
                         } else if (res && res.Success) {
-                            // Replace local lines with the server-confirmed page so counts
-                            // and dirty state are authoritative after the delete.
+                            // The server only returns persisted rows. Collect any in-memory
+                            // draft lines that the user has not saved yet so they survive the
+                            // replace — they are not in the DB and would otherwise be discarded.
+                            var preservedDrafts = [];
+                            for (var p = 0; p < lines.length; p++) {
+                                if (lines[p]._isNew) preservedDrafts.push(lines[p]);
+                            }
                             totalLineCount = res.LinesTotal || 0;
                             linePage       = (+res.LinePage + 1) || 1;
                             otherAmt       = parseNum(res.OtherPagesPlannedAmt);
                             lines = [];
                             var rows = res.Lines || [];
                             for (var m = 0; m < rows.length; m++) lines.push(fromServerRow(rows[m]));
+                            // Re-append draft rows that were not part of the delete operation
+                            for (var d = 0; d < preservedDrafts.length; d++) lines.push(preservedDrafts[d]);
                             renderAll();
                         } else {
                             showToast(msg("VAS_218_DeleteError"), true);

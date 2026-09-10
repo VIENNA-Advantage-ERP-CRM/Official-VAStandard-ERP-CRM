@@ -103,9 +103,8 @@
             var p = (prec != null ? Math.max(0, parseInt(prec, 10) || 0) : getPrec());
             var abs = Math.abs(v);
             if (abs >= 1e6) return s + (v / 1e6).toFixed(Math.min(p, 1)).replace(/\.0$/, '') + 'M';
-            if (abs >= 1e3) return s + (abs >= 1e5
-                ? String(Math.round(v / 1e3))
-                : (v / 1e3).toFixed(Math.min(p, 1)).replace(/\.0$/, '')) + 'K';
+            // K: always 2 decimal places, strip trailing zeros (e.g. 318,577.48 → 318.58K, 5,000 → 5K)
+            if (abs >= 1e3) return s + (v / 1e3).toFixed(2).replace(/\.?0+$/, '') + 'K';
             return s + toNum(v).toFixed(p).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         }
 
@@ -130,15 +129,28 @@
             if (p.length < 2) return ts;
             var d = p[0].split('-'), t = p[1].split(':');
             var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            var dt = new Date(Date.UTC(
+            // TO_CHAR on the server returns the DB server's local time string — parse as local,
+            // not UTC. Using Date.UTC() was incorrectly double-applying the timezone offset
+            // (server local → treated as UTC → getHours() re-adds local offset).
+            var dt = new Date(
                 parseInt(d[0], 10), parseInt(d[1], 10) - 1, parseInt(d[2], 10),
                 parseInt(t[0], 10), parseInt(t[1], 10)
-            ));
+            );
             var h = dt.getHours(), mi = dt.getMinutes();
             var miStr = (mi < 10 ? '0' : '') + mi;
             var ampm = h >= 12 ? 'pm' : 'am';
             if (h > 12) h -= 12; else if (h === 0) h = 12;
             return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + h + ':' + miStr + ampm;
+        }
+
+        // Date-only variant of fmtEngTs — used for meetings where only the date is relevant.
+        function fmtEngDate(ts) {
+            if (!ts) return '';
+            var datePart = String(ts).split(' ')[0]; // YYYY-MM-DD
+            var d = datePart.split('-');
+            if (d.length < 3) return ts;
+            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            return months[parseInt(d[1], 10) - 1] + ' ' + parseInt(d[2], 10);
         }
 
         function initials(name) {
@@ -312,15 +324,18 @@
                     var userId = (window.VIS && VIS.context && typeof VIS.context.getAD_User_ID === 'function')
                         ? VIS.context.getAD_User_ID() : 0;
                     fetchModal('GetWhatsAppTopicMeta', { topicId: resolvedTopicId }, function (err1, meta) {
+                        // chatId may be 0 when WSP_SMChat_ID is not set on the topic — still allow send
                         var chatId = (!err1 && meta) ? (meta.chatId || 0) : 0;
                         var mobile = (!err1 && meta) ? (meta.mobile || '') : '';
+                        // WSP/Inbox endpoints require POST (matches VIS.dataContext.getJSONData behaviour)
                         $.ajax({
                             url:      VIS.Application.contextUrl + 'WSP/Inbox/GetUserSocialAcct',
+                            type:     'POST',
                             dataType: 'json',
                             data:     { User_ID: userId, Provider: 'WHATSAPP' },
                             success:  function (raw) {
                                 var accts = (typeof raw === 'string') ? JSON.parse(raw) : raw;
-                                if (!accts || !accts.length || !chatId) {
+                                if (!accts || !accts.length) {
                                     $btn.prop('disabled', false);
                                     return;
                                 }
@@ -333,7 +348,7 @@
                                     account_type:  'WHATSAPP',
                                     account_id:    cfg.AccountValue || '',
                                     user_id:       userId,
-                                    chat_id:       chatId,
+                                    chat_id:       chatId || '',
                                     chatdate:      new Date(),
                                     attendee:      mobile,
                                     chatname:      topic.contactName || '',
@@ -487,7 +502,7 @@
                     pairRow(msg('VAS_105_Employees'), data.employees ? Number(data.employees).toLocaleString() : '', false) +
                     pairRow(msg('VAS_105_AccountID'), data.accountCode, false) +
                     pairRow(msg('VAS_105_Region'), data.region, false) +
-                    pairRowLink(msg('VAS_105_Website'), data.website, data.website) +
+                    pairRowLink(msg('VAS_105_Website'), data.website, data.website ? (/^https?:\/\//i.test(data.website) ? data.website : 'https://' + data.website) : '') +
                     pairRow(msg('VAS_105_Owner'), data.owner, true) +
                   '</div>' +
                 '</div>';
@@ -832,15 +847,18 @@
 
             var cntEl = document.getElementById(secId('contracts') + '_cnt');
             if (cntEl) {
-                // Completed/Active: C_Contract Processed=Y or VAS_ContractMaster ARD, not yet past end date
+                // Active: C_Contract Processed=Y or VAS_ContractMaster ARD, end date not yet passed
                 var active = allItems.filter(function(c){
                     return (c.statusCode === 'Y' || c.statusCode === 'ARD') && !(c.endDate && c.endDate < today);
                 }).length;
                 // In Progress/Draft: C_Contract Processed=N or VAS_ContractMaster DFT
                 var inProg = allItems.filter(function(c){ return c.statusCode === 'N' || c.statusCode === 'DFT'; }).length;
+                // Other: overdue, expired, terminated, sent-for-approval, or any unrecognised status
+                var other  = allItems.length - active - inProg;
                 var parts  = [];
                 if (active) parts.push(String(active) + ' ' + msg('Active'));
                 if (inProg) parts.push(String(inProg) + ' ' + msg('VAS_105_InProgress'));
+                if (other  > 0) parts.push(String(other) + ' ' + msg('VAS_105_Other'));
                 cntEl.textContent = parts.join(' · ');
             }
 
@@ -1132,10 +1150,16 @@
 
         function renderProjects(el, data) {
             var allItems = (data && data.items) ? data.items : [];
-            // Main panel shows only Draft, In Progress, and Complete — Hold (OH) and Closed (CL) are
-            // accessible via the "View All" button which fetches the full unfiltered list.
+            // Main panel hides Hold and Closed; View All shows everything.
+            // Match by statusCode (code-list value) AND statusName (display label) to handle
+            // any DB reference list values that differ from the expected OH/CL codes.
             var HIDDEN_PROJ_CODES = { 'OH': 1, 'CL': 1 };
-            allItems = allItems.filter(function (p) { return !HIDDEN_PROJ_CODES[p.statusCode]; });
+            var HIDDEN_PROJ_NAMES = /\b(hold|closed)\b/i;
+            allItems = allItems.filter(function (p) {
+                if (HIDDEN_PROJ_CODES[p.statusCode]) return false;
+                if (p.statusName && HIDDEN_PROJ_NAMES.test(p.statusName)) return false;
+                return true;
+            });
 
             if (!allItems.length) { el.innerHTML = emptyState('VAS_105_NoProjects'); return; }
 
@@ -1197,13 +1221,17 @@
             var u = String(text).toUpperCase();
             var cls, dot;
             if (u.indexOf('URGENT') >= 0 || u.indexOf('CRITICAL') >= 0) {
-                cls = 'vas_105_t-danger'; dot = '#ED1C24';
+                cls = 'vas_105_t-danger';  dot = '#EF4444'; // red
             } else if (u.indexOf('HIGH') >= 0) {
-                cls = 'vas_105_t-warn';   dot = '#D78B10';
-            } else if (u.indexOf('MED') >= 0 || u.indexOf('MEDIUM') >= 0) {
-                cls = 'vas_105_t-info';   dot = '#0083DA';
+                cls = 'vas_105_t-warn';    dot = '#F59E0B'; // amber
+            } else if (u.indexOf('MED') >= 0) {
+                cls = 'vas_105_t-info';    dot = '#7C3AED'; // purple — matches VIS priority list
+            } else if (u.indexOf('MINOR') >= 0) {
+                cls = 'vas_105_t-success'; dot = '#16A34A'; // green
+            } else if (u.indexOf('LOW') >= 0) {
+                cls = 'vas_105_t-cyan';    dot = '#0E7490'; // cyan
             } else {
-                cls = 'vas_105_t-neutral'; dot = '#94A3B8';
+                cls = 'vas_105_t-neutral'; dot = '#94A3B8'; // slate fallback
             }
             return '<span class="vas_105_tag ' + cls + '">' +
                    '<span style="width:0.45em;height:0.45em;border-radius:50%;background:' + dot + ';flex-shrink:0;display:inline-block;margin-right:0.3em;"></span>' +
@@ -1440,7 +1468,8 @@
                 if (item.touchType === 'NOTE') {
                     titleText = (item.title || msg('Notes')) + (item.who ? ' · ' + item.who : '');
                 } else if (item.touchType === 'EMAIL' || item.touchType === 'LETTER') {
-                    var emailPrefix = item.direction === 'in' ? msg('From') : msg('To');
+                    // direction='out': CRM user (who) is the sender → "From who"; direction='in': recipient → "To who"
+                    var emailPrefix = item.direction === 'in' ? msg('To') : msg('From');
                     titleText = (item.title || '') + (item.who ? ' · ' + emailPrefix + ' ' + item.who : '');
                 } else if (item.touchType === 'CHAT') {
                     titleText = msg('VAS_105_WhatsApp') + (item.who ? ' · ' + msg('VAS_105_With') + ' ' + item.who : '');
@@ -2026,15 +2055,26 @@
                   '</div>' +
                 '</div>';
 
-            // ── Description: plain text, no background box ────────────────────
+            // ── Phase flag (needed by both descHtml and phaseBlock) ──────────────
+            // Show phase notation and phase list only when ProjectLineLevel = 'A' (Phase level).
+            // Other non-project levels (Task, SubTask, etc.) do not show the notation.
+            var hasPhases = p.projectLineLevel === 'A';
+            var noteId    = 'vas_105_phasenote_' + widgetID;
+
+            // ── Description: plain text; when project has phases, an inline span
+            //    is appended — the GetProjectPhases callback will populate it with
+            //    the current phase-progress notation (e.g. "Phase 2 of 3 in progress.").
             var descHtml = p.description
                 ? '<p style="margin:0 0 0.875em;font-size:0.875em;line-height:1.65;color:#5F7283;">' +
-                  esc(p.description) + '</p>'
-                : '';
+                  esc(p.description) +
+                  (hasPhases ? ' <span id="' + noteId + '"></span>' : '') +
+                  '</p>'
+                : (hasPhases
+                    ? '<p style="margin:0 0 0.875em;font-size:0.875em;">' +
+                      '<span id="' + noteId + '"></span></p>'
+                    : '');
 
             // ── Phase list placeholder (filled by AJAX below) ─────────────────
-            // ProjectLineLevel 'P' = direct project lines (no phases); anything else = phase/task level.
-            var hasPhases = p.projectLineLevel && p.projectLineLevel !== 'P';
             var phaseBlock = hasPhases
                 ? '<div id="vas_105_phaselist_' + widgetID + '" style="margin-top:1em;">' +
                     '<span style="font-size:0.8125em;color:var(--acct-muted);">' + esc(msg('VAS_105_LoadingPhases')) + '</span>' +
@@ -2091,7 +2131,8 @@
                         var phaseEl = document.getElementById('vas_105_phaselist_' + widgetID);
                         if (!phaseEl) return;
                         try {
-                            var res    = JSON.parse(JSON.parse(raw));
+                            var res    = null;
+                            try { res = (typeof raw === 'string') ? jQuery.parseJSON(raw) : raw; } catch (pe) {}
                             var phases = (res && res.phases) ? res.phases : [];
                             if (!phases.length) { phaseEl.innerHTML = ''; return; }
                             var SVG_DONE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -2112,6 +2153,24 @@
                                       '</div>';
                             }
                             phaseEl.innerHTML = ph;
+
+                            // Populate the phase-progress notation in the description section.
+                            // Find the first incomplete phase (ordered by seqNo ASC from server).
+                            var inProgressIdx = -1;
+                            for (var j = 0; j < phases.length; j++) {
+                                if (!phases[j].isComplete) { inProgressIdx = j; break; }
+                            }
+                            var noteEl = document.getElementById(noteId);
+                            if (noteEl && inProgressIdx >= 0) {
+                                var noteText = msg('Phase') + ' ' + phases[inProgressIdx].seqNo +
+                                               ' ' + msg('of') + ' ' + phases.length +
+                                               ' ' + msg('VAS_105_InProgress') + '.';
+                                noteEl.innerHTML =
+                                    '<span style="display:inline-block;background:#1E3A8A;color:#fff;' +
+                                    'border-radius:0.3em;padding:0.1em 0.55em;font-size:0.8em;' +
+                                    'font-weight:700;margin-left:0.25em;line-height:1.5;">' +
+                                    esc(noteText) + '</span>';
+                            }
                         } catch (e) {
                             phaseEl.innerHTML = '';
                         }
@@ -2951,16 +3010,16 @@
                     '  </div>',
                     '</div>',
 
-                    // ── Comments: plain-text display block ──
-                    data.comments
-                        ? '<div class="vas_105_mtg-notes">' + esc(data.comments) + '</div>'
-                        : '',
-
                     // ── Meeting URL (editable) ──
                     '<div class="vas_105_mtg-field">',
                     '  <label class="vas_105_mtg-field-label">', esc(msg('VAS_105_MeetingUrl')), '</label>',
                     '  <input type="text" class="vas_105_mtg-input" id="', widgetID, '_mtgUrl" value="', esc(data.meetingUrl || ''), '">',
                     '</div>',
+
+                    // ── Comments: plain-text display block ──
+                    data.comments
+                        ? '<div class="vas_105_mtg-notes">' + esc(data.comments) + '</div>'
+                        : '',
 
                     // ── Hidden textarea carries comments for Save ──
                     '<textarea id="', widgetID, '_mtgComments" style="display:none;">', esc(data.comments || ''), '</textarea>',
@@ -3149,8 +3208,10 @@
         // - Sections with an add entry-point: hide only when non-editable AND empty.
         // - Contacts/Locations: each column is toggled independently; the shared
         //   outer wrapper (wrap_cl) is hidden only when both columns are hidden.
+        // - Support (tickets): always visible so resolved tickets remain reachable via
+        //   the "View past tickets" button even when there are no open tickets.
         function applySecVisibility(secName, itemCount) {
-            if (secName === 'overview') return;  // overview always visible
+            if (secName === 'overview' || secName === 'tickets') return;  // always visible
             var $wrap = secWrap(secName);
             if (!$wrap.length) return;
 

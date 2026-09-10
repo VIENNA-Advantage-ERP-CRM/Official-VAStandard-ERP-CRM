@@ -34,6 +34,7 @@
             opportunityLoading:      false,
             lines:                   null,
             linesLoading:            false,
+            linesPage:               0,
             addresses:               null,
             addressesLoading:        false,
             terms:                   null,
@@ -42,6 +43,7 @@
             tasks:                   null,
             tasksLoading:            false,
             taskTab:                 'up',
+            tasksPage:               0,
             engagement:              null,
             engagementLoading:       false,
             engagementPage:          0,
@@ -64,8 +66,14 @@
         }
 
         // ── Helper: AD_Message lookup with key fallback ──────────────────────
+        // VIS.Msg.getMsg returns "[KeyName]" (truthy) when the key is missing from
+        // AD_Message, so the normal `|| k` fallback never fires for missing keys.
+        // The regex detects that bracket-wrapped pattern and falls back to the bare
+        // key instead, so the UI shows "When" rather than "[When]".
         function msg(k) {
-            return (VIS && VIS.Msg && VIS.Msg.getMsg) ? (VIS.Msg.getMsg(k) || k) : k;
+            var v = (VIS && VIS.Msg && VIS.Msg.getMsg) ? VIS.Msg.getMsg(k) : null;
+            if (!v || /^\[.+\]$/.test(v)) return k;
+            return v;
         }
 
         // ── Helper: safe number coercion ─────────────────────────────────────
@@ -118,15 +126,28 @@
             if (p.length < 2) return ts;
             var d = p[0].split('-'), t = p[1].split(':');
             var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            var dt = new Date(Date.UTC(
+            // TO_CHAR on the server returns the DB server's local time string — parse as local,
+            // not UTC. Using Date.UTC() was incorrectly double-applying the timezone offset
+            // (server local → treated as UTC → getHours() re-adds local offset).
+            var dt = new Date(
                 parseInt(d[0], 10), parseInt(d[1], 10) - 1, parseInt(d[2], 10),
                 parseInt(t[0], 10), parseInt(t[1], 10)
-            ));
+            );
             var h = dt.getHours(), mi = dt.getMinutes();
             var miStr = (mi < 10 ? '0' : '') + mi;
             var ampm = h >= 12 ? 'pm' : 'am';
             if (h > 12) h -= 12; else if (h === 0) h = 12;
             return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + h + ':' + miStr + ampm;
+        }
+
+        // Date-only variant of fmtEngTs — used for meetings where only the date is relevant.
+        function fmtEngDate(ts) {
+            if (!ts) return '';
+            var datePart = String(ts).split(' ')[0]; // YYYY-MM-DD
+            var d = datePart.split('-');
+            if (d.length < 3) return ts;
+            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            return months[parseInt(d[1], 10) - 1] + ' ' + parseInt(d[2], 10);
         }
 
         // ── Helper: inline SVG wrapper ────────────────────────────────────────
@@ -152,8 +173,12 @@
         var SVG_WRENCH = svg('<path d="M14.5 6.5a4.5 4.5 0 0 0-6 6L3 18l3 3 5.5-5.5a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.5-3.5Z"/>');
         var SVG_USERS  = svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.2 3.5-5 6.5-5s5.5 1.8 6.5 5M16 3.7a3.5 3.5 0 0 1 0 8.6M18.5 15.4c1.7.8 2.9 2.4 3.5 4.6"/>');
         var SVG_PHONE  = svg('<path d="M5 3h4l1.6 4.4L8 9.4a13 13 0 0 0 6.6 6.6l2-2.6L21 15v4a2 2 0 0 1-2.2 2A17.5 17.5 0 0 1 3 5.2 2 2 0 0 1 5 3Z"/>');
-        var SVG_PLUS   = svg('<path d="M12 5v14M5 12h14"/>');
-        var SVG_LINK   = svg('<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>');
+        var SVG_PLUS    = svg('<path d="M12 5v14M5 12h14"/>');
+        var SVG_LINK    = svg('<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>');
+        // Quotation line type icons: Expense (receipt), Charge (credit card), Resource (person)
+        var SVG_RECEIPT = svg('<path d="M4 3v18l4-2 4 2 4-2 4 2V3z"/><path d="M9 9h6M9 13h4"/>');
+        var SVG_CHARGE  = svg('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M7 15h2M13 15h4"/>');
+        var SVG_PERSON  = svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-3.8 4.3-6 8-6s6.8 2.2 8 6"/>');
         // Part 3 icon constants
         var SVG_SEND  = svg('<path d="m3 11 18-7-7 18-2.5-7.5L3 11Z"/>');
         var SVG_LEFT  = svg('<path d="m14 6-6 6 6 6"/>');
@@ -374,6 +399,7 @@
             if (!orderId || orderId <= 0) return;
             state.linesLoading = true;
             state.lines        = null;
+            state.linesPage    = 0;
 
             postJSON('GetQuotationLines', { C_Order_ID: orderId }, function (err, data) {
                 state.linesLoading = false;
@@ -439,6 +465,7 @@
             if (!orderId || orderId <= 0) return;
             state.tasksLoading = true;
             state.tasks        = null;
+            state.tasksPage    = 0;   // reset to first page on fresh load
             renderTasks();
 
             postJSON('GetTasks', { C_Order_ID: orderId }, function (err, data) {
@@ -453,6 +480,7 @@
             if (!orderId || orderId <= 0) return;
             state.engagementLoading = true;
             state.engagement        = null;
+            state.engagementPage    = 0;   // reset to first page on fresh load
             renderEngagement();
 
             postJSON('GetEngagement', { C_Order_ID: orderId }, function (err, data) {
@@ -548,9 +576,14 @@
                 chips += '<span class="vas_123_qrp-chip vas_123_qrp-chip--success">' + esc(msg('VAS_123_Converted')) + '</span>';
             }
 
-            // Credit hold chip — only when CreditStatus === 'H'
-            if (h.creditStatus === 'H') {
-                chips += '<span class="vas_123_qrp-chip vas_123_qrp-chip--warn">' + esc(msg('VAS_123_CreditHold')) + '</span>';
+            // Credit status chip — SO_CreditStatus: O/X = OK (no chip), W = Watch, H = Hold, C = Stop
+            var _hcs = h.creditStatus || '';
+            if (_hcs === 'W') {
+                chips += '<span class="vas_123_qrp-chip vas_123_qrp-chip--warn">'  + esc(msg('VAS_123_CreditWatch')) + '</span>';
+            } else if (_hcs === 'H') {
+                chips += '<span class="vas_123_qrp-chip vas_123_qrp-chip--risk">'  + esc(msg('VAS_123_CreditHold'))  + '</span>';
+            } else if (_hcs === 'C') {
+                chips += '<span class="vas_123_qrp-chip vas_123_qrp-chip--risk">'  + esc(msg('VAS_123_CreditStop'))  + '</span>';
             }
 
             // Sub-line: partner · quoted date · sales rep
@@ -615,20 +648,14 @@
                     '<p class="vas_123_qrp-m-value">' + esc(fmtCurrency(h.grandTotal, sym, prec)) + '</p>' +
                 '</div>';
 
-            // ── Cell 2: Margin (GrandTotal − TotalLines, % of net) ───────────
-            var grandTotalNum = toNum(h.grandTotal);
-            var totalLinesNum = toNum(h.totalLines);
-            var marginAmt     = grandTotalNum - totalLinesNum;
-            var marginPctNum  = totalLinesNum > 0 ? (marginAmt / totalLinesNum * 100).toFixed(1) : '';
-            var marginMetaHtml = marginPctNum
-                ? (esc(marginPctNum + '%') + ' ' + esc(msg('VAS_123_OfNet')))
-                : '';
-            var marginValueTone = marginAmt > 0 ? ' vas_123_qrp-m-value--success' : (marginAmt < 0 ? ' vas_123_qrp-m-value--risk' : '');
-            var marginHtml =
+            // ── Cell 2: Tax Amount — sum of actual tax charged (C_OrderTax.TaxAmt) ─
+            // Read directly from C_OrderTax so IsTaxIncluded = 'Y' is handled
+            // correctly (grand - totalLines would give 0 in that case).
+            var taxAmtNum  = toNum(h.taxAmt);
+            var taxHtml =
                 '<div class="vas_123_qrp-mcell">' +
-                    '<p class="vas_123_qrp-m-label">' + esc(msg('VAS_123_Margin')) + '</p>' +
-                    '<p class="vas_123_qrp-m-value' + marginValueTone + '">' + esc(fmtCurrency(marginAmt, sym, prec)) + '</p>' +
-                    (marginMetaHtml ? '<p class="vas_123_qrp-m-meta">' + marginMetaHtml + '</p>' : '') +
+                    '<p class="vas_123_qrp-m-label">' + esc(msg('VAS_123_Tax')) + '</p>' +
+                    '<p class="vas_123_qrp-m-value">' + esc(fmtCurrency(taxAmtNum, sym, prec)) + '</p>' +
                 '</div>';
 
             // ── Cell 3: Valid Until ──────────────────────────────────────────
@@ -685,7 +712,7 @@
             // 4-column metric grid
             container.innerHTML =
                 '<div class="vas_123_qrp-mgrid vas_123_qrp-mgrid--4">' +
-                    grandTotalHtml + marginHtml + validUntilHtml + convertedHtml +
+                    grandTotalHtml + taxHtml + validUntilHtml + convertedHtml +
                 '</div>';
         }
 
@@ -711,10 +738,12 @@
             if (!m) { container.innerHTML = ''; return; }
 
             var meetingUrl   = m.meetingUrl || m.url || '';
+            // Only show the header card when the meeting has a join URL.
+            if (!meetingUrl) { container.innerHTML = ''; return; }
+
             var location     = m.location || '';
             var channel      = resolveChannel(meetingUrl, location);
             var attendees    = parseAttendees(m.attendeeInfo);
-            var joinDisabled = meetingUrl ? '' : 'disabled';
 
             // Build attendee avatar stack (show up to 4)
             var avatarsHtml = '';
@@ -744,12 +773,13 @@
                         '</div>' +
                         '<div class="vas_123_qrp-pc-actions">' +
                             (avatarsHtml ? '<span class="vas_123_qrp-avstack">' + avatarsHtml + '</span>' : '') +
-                            '<button class="vas_123_qrp-btn vas_123_qrp-btn--primary"' +
-                                ' data-action="joinMeeting"' +
-                                ' data-url="' + esc(meetingUrl) + '"' +
-                                (joinDisabled ? ' disabled' : '') + '>' +
-                                SVG_VIDEO + ' ' + esc(msg('VAS_123_Join')) +
-                            '</button>' +
+                            (meetingUrl
+                                ? '<button class="vas_123_qrp-btn vas_123_qrp-btn--primary"' +
+                                      ' data-action="joinMeeting"' +
+                                      ' data-url="' + esc(meetingUrl) + '">' +
+                                      SVG_VIDEO + ' ' + esc(msg('VAS_123_Join')) +
+                                  '</button>'
+                                : '') +
                         '</div>' +
                     '</div>' +
                 '</div>';
@@ -1117,23 +1147,47 @@
 
             var addBtnHtml = '';
 
+            var LINE_PAGE_SIZE = 5;
+            var totalLines     = lines.length;
+            var totalPages     = Math.ceil(totalLines / LINE_PAGE_SIZE) || 1;
+            // Clamp current page in case lines reload produced fewer pages
+            if (state.linesPage >= totalPages) state.linesPage = totalPages - 1;
+            if (state.linesPage < 0)           state.linesPage = 0;
+            var pageStart      = state.linesPage * LINE_PAGE_SIZE;
+            var pageEnd        = Math.min(pageStart + LINE_PAGE_SIZE, totalLines);
+            var pageLines      = lines.slice(pageStart, pageEnd);
+
             var bodyHtml;
             if (!lines.length) {
                 bodyHtml = '<p class="vas_123_qrp-emptyline">' + esc(msg('VAS_123_LinesEmpty')) + '</p>';
             } else {
                 var histMap  = state.lineHistory || {};
                 var rowsHtml = '';
-                for (var i = 0; i < lines.length; i++) {
-                    var l         = lines[i];
-                    var lId       = l.c_OrderLine_ID || l.C_OrderLine_ID || 0;
-                    var isService = !!(l.isService    || l.IsService);
+                for (var i = 0; i < pageLines.length; i++) {
+                    var l         = pageLines[i];
+                    var lId         = l.c_OrderLine_ID || l.C_OrderLine_ID || 0;
+                    var isService   = !!(l.isService    || l.IsService);
+                    var productType = l.productType    || l.ProductType   || '';
+                    var chargeId    = toNum(l.c_Charge_ID || l.C_Charge_ID);
+                    // Pick icon: Charge → credit card, Expense → receipt, Resource → person, Service → wrench, Item → box
+                    var lineIcon = chargeId > 0        ? SVG_CHARGE
+                                 : productType === 'E' ? SVG_RECEIPT
+                                 : productType === 'R' ? SVG_PERSON
+                                 : productType === 'S' ? SVG_WRENCH
+                                 :                      SVG_BOX;
                     var qty       = toNum(l.qtyEntered   || l.QtyEntered);
                     var uom       = l.uOMName             || l.UOMName    || '';
                     var price     = toNum(l.priceEntered  || l.PriceEntered  || l.priceActual || l.PriceActual);
                     var disc      = toNum(l.discount      || l.Discount);
                     var amt       = toNum(l.lineNetAmt    || l.LineNetAmt);
-                    var sku       = l.productValue        || l.ProductValue || '';
-                    var product   = l.productName         || l.ProductName  || l.description || l.Description || '';
+                    var sku       = l.productValue  || l.ProductValue  || '';
+                    var product   = l.productName   || l.ProductName   || '';
+                    var attrDesc  = $.trim(l.attributeDesc || l.AttributeDesc || '');
+                    // VIS stores '--' as the default ASI description when no attribute is set — treat as empty
+                    if (attrDesc === '--') attrDesc = '';
+                    var lineDesc  = l.description   || l.Description   || '';
+                    // For charge lines (no product), fall back to line description as the display name
+                    if (!product) product = lineDesc;
 
                     var metaStr = (sku ? esc(sku) + ' · ' : '') + qty + ' ' + esc(uom) + ' × ' + esc(fmtCurrency(price, sym, prec));
                     if (disc > 0) { metaStr += ' · −' + disc + '%'; }
@@ -1171,12 +1225,7 @@
                                     '<span class="vas_123_qrp-lh-when">' + esc(fmtEngTs(hr.changedOn || hr.ChangedOn)) + '</span>' +
                                     '<span>' + esc(fmtCurrency(toNum(hr.priceActual || hr.PriceActual), sym, hCPrec)) + '</span>' +
                                     '<span>' + esc(hQty.toFixed(hPrec) + (hUom ? ' ' + hUom : '')) + '</span>' +
-                                    '<span>' + esc(fmtDate(hr.datePromised || hr.DatePromised) || '—') + '</span>' +
                                     '<span>' + esc(fmtCurrency(toNum(hr.lineNetAmt || hr.LineNetAmt), sym, hCPrec)) + '</span>' +
-                                    '<span class="vas_123_qrp-lh-recv">' +
-                                        '<span class="vas_123_qrp-lh-bar"><i style="width:' + hBarW + '%"></i></span>' +
-                                        '<span>' + esc(hDel.toFixed(hPrec) + '/' + hOrd.toFixed(hPrec)) + '</span>' +
-                                    '</span>' +
                                 '</div>';
                         }
                         drawerHtml =
@@ -1187,9 +1236,7 @@
                                         '<span>' + esc(msg('VAS_123_HistChangedOn'))    + '</span>' +
                                         '<span>' + esc(msg('VAS_123_HistUnitPrice'))    + '</span>' +
                                         '<span>' + esc(msg('VAS_123_HistQty'))          + '</span>' +
-                                        '<span>' + esc(msg('VAS_123_HistExpDelivery'))  + '</span>' +
                                         '<span>' + esc(msg('VAS_123_HistLineAmt'))      + '</span>' +
-                                        '<span>' + esc(msg('VAS_123_HistReceived'))     + '</span>' +
                                     '</div>' +
                                     hRows +
                                 '</div>' +
@@ -1199,11 +1246,17 @@
                     rowsHtml +=
                         '<div class="vas_123_qrp-lh-wrap">' +
                             '<div class="vas_123_qrp-erow" data-action="openLine" data-line-id="' + esc(lId) + '">' +
-                                '<div class="vas_123_qrp-etile vas_123_qrp-etile--info vas_123_qrp-etile--rect">' + (isService ? SVG_WRENCH : SVG_BOX) + '</div>' +
+                                '<div class="vas_123_qrp-etile vas_123_qrp-etile--info vas_123_qrp-etile--rect">' + lineIcon + '</div>' +
                                 '<div class="vas_123_qrp-emain">' +
                                     '<div class="vas_123_qrp-e-titlerow">' +
                                         '<span class="vas_123_qrp-e-primary" title="' + esc(product) + '">' + esc(product) + '</span>' +
                                     '</div>' +
+                                    (function () {
+                                        var sp = [];
+                                        if (attrDesc) sp.push(esc(attrDesc));
+                                        if (lineDesc && lineDesc !== product) sp.push(esc(lineDesc));
+                                        return sp.length ? '<p class="vas_123_qrp-e-sub">' + sp.join(' · ') + '</p>' : '';
+                                    }()) +
                                     '<p class="vas_123_qrp-e-meta" title="' + metaStr + '">' + metaStr + '</p>' +
                                 '</div>' +
                                 '<div class="vas_123_qrp-etrail">' +
@@ -1215,21 +1268,40 @@
                         '</div>';
                 }
 
-                // Totals: net and grand from state.header; tax derived (no freight per spec)
-                var netTotal = toNum(h.totalLines);
-                var grand    = toNum(h.grandTotal);
-                var taxAmt   = grand - netTotal;
+                // Totals: TaxBaseAmt (taxable base) and per-tax-type rows from h.taxLines.
+                // Falls back to a single consolidated Tax row when taxLines is unavailable.
+                var grand      = toNum(h.grandTotal);
+                var taxAmt     = toNum(h.taxAmt);
+                var taxBaseAmt = toNum(h.taxBaseAmt);
+
+                // Build individual tax rows (one per C_Tax entry on this order)
+                var taxRowsHtml = '';
+                var taxLines    = (h.taxLines && h.taxLines.length) ? h.taxLines : null;
+                if (taxLines) {
+                    for (var ti = 0; ti < taxLines.length; ti++) {
+                        var tl = taxLines[ti];
+                        taxRowsHtml +=
+                            '<div class="vas_123_qrp-totrow">' +
+                                '<span class="vas_123_qrp-t-label">' + esc(tl.taxName || tl.TaxName || msg('VAS_123_Tax')) + '</span>' +
+                                '<span class="vas_123_qrp-t-value">' + esc(fmtCurrency(toNum(tl.taxAmt != null ? tl.taxAmt : tl.TaxAmt), sym, prec)) + '</span>' +
+                            '</div>';
+                    }
+                } else {
+                    // Fallback: single consolidated row when taxLines not yet in response
+                    taxRowsHtml =
+                        '<div class="vas_123_qrp-totrow">' +
+                            '<span class="vas_123_qrp-t-label">' + esc(msg('VAS_123_Tax')) + '</span>' +
+                            '<span class="vas_123_qrp-t-value">' + esc(fmtCurrency(taxAmt, sym, prec)) + '</span>' +
+                        '</div>';
+                }
 
                 var totHtml =
                     '<div class="vas_123_qrp-totals-block">' +
                         '<div class="vas_123_qrp-totrow">' +
-                            '<span class="vas_123_qrp-t-label">' + esc(msg('VAS_123_Subtotal')) + '</span>' +
-                            '<span class="vas_123_qrp-t-value">' + esc(fmtCurrency(netTotal, sym, prec)) + '</span>' +
+                            '<span class="vas_123_qrp-t-label">' + esc(msg('VAS_123_TaxableAmt')) + '</span>' +
+                            '<span class="vas_123_qrp-t-value">' + esc(fmtCurrency(taxBaseAmt, sym, prec)) + '</span>' +
                         '</div>' +
-                        '<div class="vas_123_qrp-totrow">' +
-                            '<span class="vas_123_qrp-t-label">' + esc(msg('VAS_123_Tax')) + '</span>' +
-                            '<span class="vas_123_qrp-t-value">' + esc(fmtCurrency(taxAmt, sym, prec)) + '</span>' +
-                        '</div>' +
+                        taxRowsHtml +
                         '<div class="vas_123_qrp-esummary">' +
                             '<span class="vas_123_qrp-es-label">' +
                                 esc(msg('VAS_123_GrandTotal')) + ' · ' + lines.length + ' ' + esc(lines.length === 1 ? msg('VAS_123_Line') : msg('VAS_123_Lines')) +
@@ -1238,7 +1310,27 @@
                         '</div>' +
                     '</div>';
 
-                bodyHtml = '<div class="vas_123_qrp-elist">' + rowsHtml + '</div>' + totHtml;
+                // Pagination bar — matches VAS_105 secpager style
+                var pagingHtml = '';
+                if (totalPages > 1) {
+                    var prevDisabled = state.linesPage === 0;
+                    var nextDisabled = state.linesPage >= totalPages - 1;
+                    var chevL = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+                    var chevR = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+                    pagingHtml =
+                        '<div class="vas_123_qrp-secpager">' +
+                          '<span class="vas_123_qrp-secpager__info">' +
+                            esc(msg('VAS_040_Showing')) + ' <b>' + (pageStart + 1) + ' &ndash; ' + pageEnd + '</b> ' + esc(msg('of')) + ' <b>' + totalLines + '</b>' +
+                          '</span>' +
+                          '<nav class="vas_123_qrp-secpager__nav" role="navigation">' +
+                            '<button type="button" class="vas_123_qrp-secpager__btn" data-action="linesPagePrev"' + (prevDisabled ? ' disabled' : '') + '>' + chevL + '</button>' +
+                            '<span class="vas_123_qrp-secpager__page"><b>' + (state.linesPage + 1) + '</b>&nbsp;' + esc(msg('of')) + '&nbsp;' + totalPages + '</span>' +
+                            '<button type="button" class="vas_123_qrp-secpager__btn" data-action="linesPageNext"' + (nextDisabled ? ' disabled' : '') + '>' + chevR + '</button>' +
+                          '</nav>' +
+                        '</div>';
+                }
+
+                bodyHtml = '<div class="vas_123_qrp-elist">' + rowsHtml + '</div>' + pagingHtml + totHtml;
             }
 
             var countHtml = lines.length
@@ -1271,18 +1363,30 @@
             var prec = (h.currencyPrecision != null) ? parseInt(h.currencyPrecision, 10) : 2;
             var bpId = h.c_BPartner_ID  || h.C_BPartner_ID || 0;
 
-            // ── Credit chip ─────────────────────────────────────────────────
+            // ── Credit chip — SO_CreditStatus: X/O/'' = OK, W = Watch, H = Hold, C = Stop ──
             var creditStatus = h.creditStatus || h.CustomerCreditStatus || '';
-            var creditChip   = (creditStatus === 'H')
-                ? '<span class="vas_123_qrp-chip vas_123_qrp-chip--risk">'    + esc(msg('VAS_123_CreditHold')) + '</span>'
-                : '<span class="vas_123_qrp-chip vas_123_qrp-chip--success">' + esc(msg('VAS_123_CreditOK'))   + '</span>';
+            var creditChip;
+            if (creditStatus === 'W') {
+                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--warn">'    + esc(msg('VAS_123_CreditWatch')) + '</span>';
+            } else if (creditStatus === 'H') {
+                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--risk">'    + esc(msg('VAS_123_CreditHold'))  + '</span>';
+            } else if (creditStatus === 'C') {
+                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--risk">'    + esc(msg('VAS_123_CreditStop'))  + '</span>';
+            } else {
+                creditChip = '<span class="vas_123_qrp-chip vas_123_qrp-chip--success">' + esc(msg('VAS_123_CreditOK'))    + '</span>';
+            }
 
             // ── Open balance — comes from state.addresses (fetched separately) ──
+            // TotalOpenBalance is always stored in the accounting (base) currency, so
+            // use the base currency symbol/precision returned by GetAddresses, not the
+            // document currency sym/prec.
             var addr        = state.addresses;
             var openBalance = (addr && addr.totalOpenBalance != null) ? addr.totalOpenBalance
                             : (h.totalOpenBalance    != null) ? h.totalOpenBalance
                             : (h.customerOpenBalance != null) ? h.customerOpenBalance : null;
-            var balHtml     = (openBalance != null) ? esc(fmtCurrency(openBalance, sym, prec)) : '—';
+            var balSym  = (addr && addr.baseCurrSymbol) ? addr.baseCurrSymbol : sym;
+            var balPrec = (addr && addr.baseCurrPrec  != null) ? parseInt(addr.baseCurrPrec, 10) : prec;
+            var balHtml = (openBalance != null) ? esc(fmtCurrency(openBalance, balSym, balPrec)) : '—';
 
             // ── Bill-to / Ship-to from the separately loaded address record ──
             var billTo = addr ? (addr.billingLocationName  || addr.BillingLocationName  || '') : '';
@@ -1387,6 +1491,9 @@
             var currCode    = t.currencyCode || t.currencyISO || h.currencyCode || h.currencyISO || '';
             var currDisplay = currCode ? (currCode + ' · ' + msg('VAS_123_DocumentCurrency')) : '';
 
+            // Currency Rate Type — name of the conversion type (e.g. "Spot", "Corporate")
+            var rateDisplay = t.currencyRateType || '';
+
             // PaymentRule and PriorityRule: server decodes list-reference labels; fall back to raw codes
             var paymentRule  = t.paymentRuleLabel  || t.paymentRule  || '';
             var priorityRule = t.priorityRuleLabel || t.priorityRule || '';
@@ -1401,13 +1508,14 @@
                 '</div>' +
                 '<div class="vas_123_qrp-dcard">' +
                     '<div class="vas_123_qrp-mgrid">' +
-                        termCell(msg('VAS_123_PriceList'),   t.priceListName  || '') +
-                        termCell(msg('VAS_123_Currency'),    currDisplay) +
-                        termCell(msg('VAS_123_PaymentTerm'), t.paymentTermName || '') +
-                        termCell(msg('VAS_123_PaymentRule'), paymentRule) +
-                        termCell(msg('VAS_123_ValidFrom'),   dateOrdered  ? fmtDate(dateOrdered)  : '') +
-                        termCell(msg('VAS_123_ValidUntil'),  orderValidTo ? fmtDate(orderValidTo) : '') +
-                        termCell(msg('Priority'),    priorityRule) +
+                        termCell(msg('VAS_123_PriceList'),      t.priceListName   || '') +
+                        termCell(msg('VAS_123_Currency'),       currDisplay) +
+                        termCell(msg('VAS_123_CurrencyRateType'), rateDisplay) +
+                        termCell(msg('VAS_123_PaymentTerm'),    t.paymentTermName || '') +
+                        termCell(msg('VAS_123_PaymentRule'),    paymentRule) +
+                        termCell(msg('VAS_123_ValidFrom'),      dateOrdered  ? fmtDate(dateOrdered)  : '') +
+                        termCell(msg('VAS_123_ValidUntil'),     orderValidTo ? fmtDate(orderValidTo) : '') +
+                        termCell(msg('Priority'),               priorityRule) +
                     '</div>' +
                 '</div>';
         }
@@ -1429,15 +1537,7 @@
             var h = state.header;
             if (!h) { container.innerHTML = ''; return; }
 
-            var allTasks     = state.tasks || [];
-            var taskDocSt    = h.docStatus || '';
-            var taskEditable = (taskDocSt === 'DR' || taskDocSt === 'IP');
-
-            // §3.2: hide section when no tasks and record is not editable (CO/CL/VO)
-            if (!allTasks.length && !taskEditable) {
-                container.innerHTML = '';
-                return;
-            }
+            var allTasks = state.tasks || [];
 
             var upcoming = [];
             var previous = [];
@@ -1450,6 +1550,15 @@
 
             var listToShow = (state.taskTab === 'prev') ? previous : upcoming;
 
+            // Clamp page to valid range whenever the list changes
+            var TASK_PAGE_SIZE = 5;
+            var taskTotalPages = Math.ceil(listToShow.length / TASK_PAGE_SIZE) || 1;
+            if (state.tasksPage >= taskTotalPages) state.tasksPage = taskTotalPages - 1;
+            if (state.tasksPage < 0)               state.tasksPage = 0;
+            var taskPageStart = state.tasksPage * TASK_PAGE_SIZE;
+            var taskPageEnd   = Math.min(taskPageStart + TASK_PAGE_SIZE, listToShow.length);
+            var pageTaskList  = listToShow.slice(taskPageStart, taskPageEnd);
+
             var segHtml =
                 '<span class="vas_123_qrp-seg">' +
                     '<button class="vas_123_qrp-seg-btn' + (state.taskTab === 'up'   ? ' vas_123_qrp-seg-btn--on' : '') + '" data-action="switchTaskTab" data-tab="up">' +
@@ -1460,12 +1569,11 @@
                     '</button>' +
                 '</span>';
 
+            // New Task button is always available — tasks can be created regardless of doc status
             var newTaskBtnHtml =
                 '<button class="vas_123_qrp-sh-action" data-action="newTask">' +
                     SVG_PLUS + esc(msg('VAS_123_NewTask')) +
                 '</button>';
-            // Suppress entry point on non-editable records (CO/CL/VO)
-            if (!taskEditable) { newTaskBtnHtml = ''; }
 
             var bodyHtml;
             if (!listToShow.length) {
@@ -1474,25 +1582,49 @@
                     : '<p class="vas_123_qrp-emptyline">' + esc(msg('VAS_123_TasksEmptyPrev')) + '</p>';
             } else {
                 var today = new Date(); today.setHours(0, 0, 0, 0);
-                var rowsHtml = '';
-                var PRIORITY_TONE = { U: '--risk', '3': '--warn', '5': '--info', '7': '--neutral' };
-                var PRIORITY_LABEL = { U: msg('VAS_123_PriorityUrgent'), '3': msg('VAS_123_PriorityHigh'), '5': msg('VAS_123_PriorityMedium'), '7': msg('VAS_123_PriorityLow') };
 
-                for (var ti = 0; ti < listToShow.length; ti++) {
-                    var tk      = listToShow[ti];
+                // Priority badge — colored dot + label, keyword-matched like VAS_105
+                function priorityBadge(label, code) {
+                    var text = label || code;
+                    if (!text) return '';
+                    var u = String(text).toUpperCase();
+                    var bg, color, dot;
+                    if (u.indexOf('URGENT') >= 0 || u.indexOf('CRITICAL') >= 0) {
+                        bg = '#FEE2E2'; color = '#B91C1C'; dot = '#EF4444';
+                    } else if (u.indexOf('HIGH') >= 0) {
+                        bg = '#FEF3C7'; color = '#B45309'; dot = '#F59E0B';
+                    } else if (u.indexOf('MED') >= 0) {
+                        bg = '#EDE9FE'; color = '#6D28D9'; dot = '#7C3AED';
+                    } else if (u.indexOf('MINOR') >= 0) {
+                        bg = '#DCFCE7'; color = '#15803D'; dot = '#16A34A';
+                    } else if (u.indexOf('LOW') >= 0) {
+                        bg = '#CFFAFE'; color = '#0E7490'; dot = '#06B6D4';
+                    } else {
+                        bg = '#F1F5F9'; color = '#475569'; dot = '#94A3B8';
+                    }
+                    return '<span style="display:inline-flex;align-items:center;gap:0.3em;padding:0.2em 0.55em;border-radius:999px;font-size:0.75em;font-weight:600;background:' + bg + ';color:' + color + ';white-space:nowrap;">' +
+                           '<span style="width:0.45em;height:0.45em;border-radius:50%;background:' + dot + ';flex-shrink:0;display:inline-block;"></span>' +
+                           esc(text) + '</span>';
+                }
+
+                var rowsHtml = '';
+                for (var ti = 0; ti < pageTaskList.length; ti++) {
+                    var tk      = pageTaskList[ti];
                     var tkId    = tk.r_Request_ID || tk.R_Request_ID || 0;
                     var tkTitle = tk.title || tk.Title || '';
                     var tkDue   = tk.due   || tk.Due   || '';
                     var tkAssg  = tk.assigneeName || tk.AssigneeName || '';
-                    var tkPri   = tk.priority     || tk.Priority     || '5';
-                    var tkPct   = toNum(tk.pct    || tk.Pct);
                     var tkCl    = tk._closed;
+                    // Closed tasks always show 100%; open tasks capped at 100 to guard against
+                    // stale TaskStatus=100 rows where IsClosed was later reset to 'N'
+                    var tkPct   = tkCl ? 100 : Math.min(toNum(tk.pct || tk.Pct), 100);
+                    // Use server-resolved label; fall back to raw code only when label absent
+                    var tkPriLabel = tk.priorityLabel || tk.PriorityLabel || '';
+                    var tkPriCode  = tk.priorityCode  || tk.priority || tk.Priority || '';
 
                     var dueDate  = tkDue ? new Date(tkDue) : null;
                     dueDate && dueDate.setHours(0, 0, 0, 0);
                     var overdue  = !tkCl && dueDate && (dueDate < today);
-                    var priTone  = PRIORITY_TONE[tkPri]  || '--neutral';
-                    var priLabel = PRIORITY_LABEL[tkPri] || tkPri;
 
                     rowsHtml +=
                         '<div class="vas_123_qrp-taskrow" data-action="openTask" data-task-id="' + esc(tkId) + '">' +
@@ -1507,10 +1639,31 @@
                                     '<span>' + tkPct + '%</span>' +
                                 '</p>' +
                             '</div>' +
-                            '<span class="vas_123_qrp-chip vas_123_qrp-chip' + esc(priTone) + '">' + esc(priLabel) + '</span>' +
+                            priorityBadge(tkPriLabel, tkPriCode) +
                         '</div>';
                 }
-                bodyHtml = rowsHtml;
+
+                // Task section pager (shown only when there is more than one page)
+                var tasksPagerHtml = '';
+                if (taskTotalPages > 1) {
+                    var tPrevDisabled = state.tasksPage <= 0;
+                    var tNextDisabled = state.tasksPage >= taskTotalPages - 1;
+                    var chevL = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+                    var chevR = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+                    tasksPagerHtml =
+                        '<div class="vas_123_qrp-secpager">' +
+                            '<span class="vas_123_qrp-secpager__info">' +
+                                esc(msg('VAS_040_Showing')) + ' <b>' + (taskPageStart + 1) + ' &ndash; ' + taskPageEnd + '</b> ' + esc(msg('of')) + ' <b>' + listToShow.length + '</b>' +
+                            '</span>' +
+                            '<nav class="vas_123_qrp-secpager__nav" role="navigation">' +
+                                '<button type="button" class="vas_123_qrp-secpager__btn" data-action="tasksPagePrev"' + (tPrevDisabled ? ' disabled' : '') + '>' + chevL + '</button>' +
+                                '<span class="vas_123_qrp-secpager__page"><b>' + (state.tasksPage + 1) + '</b>&nbsp;' + esc(msg('of')) + '&nbsp;' + taskTotalPages + '</span>' +
+                                '<button type="button" class="vas_123_qrp-secpager__btn" data-action="tasksPageNext"' + (tNextDisabled ? ' disabled' : '') + '>' + chevR + '</button>' +
+                            '</nav>' +
+                        '</div>';
+                }
+
+                bodyHtml = rowsHtml + tasksPagerHtml;
             }
 
             container.innerHTML =
@@ -1541,14 +1694,17 @@
             var engData     = state.engagement || { counts: { total: 0 }, items: [] };
             var counts      = engData.counts || {};
             var items       = Array.isArray(engData.items) ? engData.items : [];
+
+            // Pagination — 10 items per page
+            var ENG_PAGE_SIZE   = 10;
+            var engTotalPages   = Math.ceil(items.length / ENG_PAGE_SIZE) || 1;
+            if (state.engagementPage >= engTotalPages) state.engagementPage = engTotalPages - 1;
+            if (state.engagementPage < 0)              state.engagementPage = 0;
+            var engPageStart    = state.engagementPage * ENG_PAGE_SIZE;
+            var engPageEnd      = Math.min(engPageStart + ENG_PAGE_SIZE, items.length);
+            var pageItems       = items.slice(engPageStart, engPageEnd);
             var engDocSt    = h.docStatus || '';
             var engEditable = (engDocSt === 'DR' || engDocSt === 'IP');
-
-            // §3.3: hide engagement section when no items and record is not editable (CO/CL/VO)
-            if (!items.length && !engEditable) {
-                container.innerHTML = '';
-                return;
-            }
 
             // ── SVG icons (inline, no external dependency) ───────────────────
             var SVG_LIST      = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>';
@@ -1623,17 +1779,19 @@
                 tlHtml = '<p class="vas_123_qrp-emptyline">' + esc(msg('VAS_123_EngagementEmpty')) + '</p>';
             } else {
                 tlHtml = '<div class="vas_123_qrp-tl">';
-                for (var ii = 0; ii < items.length; ii++) {
-                    var item     = items[ii];
+                for (var ii = 0; ii < pageItems.length; ii++) {
+                    var item     = pageItems[ii];
                     var bCfg     = BADGE[item.touchType]    || BADGE['NOTE'];
                     var dotClr   = DOT_COLOR[item.touchType] || '#94A3B8';
                     var typeIcon = TYPE_SVG[item.touchType]  || SVG_NOTE2;
-                    var isLast   = (ii === items.length - 1);
+                    var isLast   = (ii === pageItems.length - 1);
 
                     var titleText = item.title || '';
                     if (item.touchType === 'NOTE') {
                         titleText = (item.title || msg('Notes')) + (item.who ? ' · ' + item.who : '');
                     } else if (item.touchType === 'EMAIL') {
+                        // Outgoing: mail was sent TO the contact; Incoming: mail came FROM the contact.
+                        // item.who is now the contact-facing address (MailAddress or MailAddressFrom).
                         var emailPrefix = item.direction === 'in' ? msg('From') : msg('To');
                         titleText = (item.title || '') + (item.who ? ' · ' + emailPrefix + ' ' + item.who : '');
                     } else if (item.touchType === 'CHAT') {
@@ -1655,10 +1813,7 @@
 
                     var metaHtml2 = '';
                     if (item.touchType === 'MEETING') {
-                        var mtParts2 = [];
-                        if (item.who) mtParts2.push(esc(item.who));
-                        if (item.hasTranscript) mtParts2.push('<span class="vas_123_qrp-eng-meta-badge">' + SVG_TRS + ' ' + esc(msg('Transcript')) + '</span>');
-                        metaHtml2 = mtParts2.join('&nbsp;&nbsp;');
+                        if (item.hasTranscript) metaHtml2 = '<span class="vas_123_qrp-eng-meta-badge">' + SVG_TRS + ' ' + esc(msg('Transcript')) + '</span>';
                     } else if (item.touchType === 'EMAIL') {
                         var emParts2 = [];
                         if (item.who) emParts2.push(esc(item.who));
@@ -1702,6 +1857,25 @@
                         '</div>';
                 }
                 tlHtml += '</div>';
+
+                // Engagement pager — shown only when there are more than 10 items
+                if (engTotalPages > 1) {
+                    var ePrevDisabled = state.engagementPage <= 0;
+                    var eNextDisabled = state.engagementPage >= engTotalPages - 1;
+                    var eChevL = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+                    var eChevR = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+                    tlHtml +=
+                        '<div class="vas_123_qrp-secpager">' +
+                            '<span class="vas_123_qrp-secpager__info">' +
+                                esc(msg('VAS_040_Showing')) + ' <b>' + (engPageStart + 1) + ' &ndash; ' + engPageEnd + '</b> ' + esc(msg('of')) + ' <b>' + items.length + '</b>' +
+                            '</span>' +
+                            '<nav class="vas_123_qrp-secpager__nav" role="navigation">' +
+                                '<button type="button" class="vas_123_qrp-secpager__btn" data-action="engPagePrev"' + (ePrevDisabled ? ' disabled' : '') + '>' + eChevL + '</button>' +
+                                '<span class="vas_123_qrp-secpager__page"><b>' + (state.engagementPage + 1) + '</b>&nbsp;' + esc(msg('of')) + '&nbsp;' + engTotalPages + '</span>' +
+                                '<button type="button" class="vas_123_qrp-secpager__btn" data-action="engPageNext"' + (eNextDisabled ? ' disabled' : '') + '>' + eChevR + '</button>' +
+                            '</nav>' +
+                        '</div>';
+                }
             }
 
             // Note composer — always visible at the bottom of the engagement section
@@ -1750,35 +1924,69 @@
             var price     = toNum(line.priceEntered  || line.PriceEntered || line.priceActual || line.PriceActual);
             var disc      = toNum(line.discount      || line.Discount);
             var amt       = toNum(line.lineNetAmt    || line.LineNetAmt);
-            var product   = line.productName         || line.ProductName  || line.description || line.Description || '';
+            var product   = line.productName   || line.ProductName   || '';
+            var attrDesc  = $.trim(line.attributeDesc || line.AttributeDesc || '');
+            if (attrDesc === '--') attrDesc = '';
+            var lineDesc  = line.description   || line.Description   || '';
+            if (!product) product = lineDesc;
             var sku       = line.productValue        || line.ProductValue || '';
             var isService       = !!(line.isService        || line.IsService);
             var productTypeName = line.productTypeName      || line.ProductTypeName || '';
             var lId             = line.c_OrderLine_ID      || line.C_OrderLine_ID || 0;
+            var chargeId        = parseInt(line.c_Charge_ID  || line.C_Charge_ID  || 0, 10);
+            var productId       = parseInt(line.m_Product_ID || line.M_Product_ID || 0, 10);
+
+            // For charge lines productTypeName is empty — show "Charge" label instead
+            var typeDisplay = (chargeId > 0) ? msg('VAS_123_TypeCharge') : productTypeName;
 
             var priceDisplay = fmtCurrency(price, sym, prec) + (disc > 0 ? ' · −' + disc + '%' : '');
 
             var bodyHtml =
                 '<div class="vas_123_qrp-mgrid">' +
+                    // Attribute — full-width row, shown only when the line has an ASI
+                    (attrDesc
+                        ? '<div class="vas_123_qrp-mcell" style="grid-column:1/-1">' +
+                              '<p class="vas_123_qrp-m-label">' + esc(msg('VAS_123_Attribute')) + '</p>' +
+                              '<p class="vas_123_qrp-m-value">' + esc(attrDesc)                 + '</p>' +
+                          '</div>'
+                        : '') +
+                    // Line description — full-width row, shown only when it differs from the product name
+                    (lineDesc && lineDesc !== product
+                        ? '<div class="vas_123_qrp-mcell" style="grid-column:1/-1">' +
+                              '<p class="vas_123_qrp-m-label">' + esc(msg('VAS_123_LineDesc'))  + '</p>' +
+                              '<p class="vas_123_qrp-m-value" style="white-space:normal;word-break:break-word">' + esc(lineDesc) + '</p>' +
+                          '</div>'
+                        : '') +
                     '<div class="vas_123_qrp-mcell">' +
-                        '<p class="vas_123_qrp-m-label">' + esc(msg('VAS_123_Quantity'))  + '</p>' +
+                        '<p class="vas_123_qrp-m-label">' + esc(msg('VAS_123_Quantity'))   + '</p>' +
                         '<p class="vas_123_qrp-m-value">' + esc(qty + (uom ? ' ' + uom : '')) + '</p>' +
                     '</div>' +
                     '<div class="vas_123_qrp-mcell">' +
-                        '<p class="vas_123_qrp-m-label">' + esc(msg('VAS_123_UnitPrice')) + '</p>' +
-                        '<p class="vas_123_qrp-m-value">' + esc(priceDisplay)              + '</p>' +
+                        '<p class="vas_123_qrp-m-label">' + esc(msg('VAS_123_UnitPrice'))  + '</p>' +
+                        '<p class="vas_123_qrp-m-value">' + esc(priceDisplay)               + '</p>' +
                     '</div>' +
                     '<div class="vas_123_qrp-mcell">' +
-                        '<p class="vas_123_qrp-m-label">' + esc(msg('VAS_123_LineAmount')) + '</p>' +
+                        '<p class="vas_123_qrp-m-label">' + esc(msg('VAS_123_LineAmount'))  + '</p>' +
                         '<p class="vas_123_qrp-m-value">' + esc(fmtCurrency(amt, sym, prec)) + '</p>' +
                     '</div>' +
                     '<div class="vas_123_qrp-mcell">' +
-                        '<p class="vas_123_qrp-m-label">' + esc(msg('Type')) + '</p>' +
-                        '<p class="vas_123_qrp-m-value">' + esc(productTypeName) + '</p>' +
+                        '<p class="vas_123_qrp-m-label">' + esc(msg('Type'))               + '</p>' +
+                        '<p class="vas_123_qrp-m-value">' + esc(typeDisplay)               + '</p>' +
                     '</div>' +
                 '</div>';
 
+            // Show "Open Record" button only when there is a product or charge to zoom to
+            var openRecordBtn = (productId > 0 || chargeId > 0)
+                ? '<button class="vas_123_qrp-btn vas_123_qrp-btn--primary"' +
+                      ' data-action="openRecordFromLine"' +
+                      ' data-product-id="' + productId + '"' +
+                      ' data-charge-id="'  + chargeId  + '">' +
+                      SVG_LINK + ' ' + esc(msg('VAS_123_OpenRecord')) +
+                  '</button>'
+                : '';
+
             var footHtml =
+                openRecordBtn +
                 '<button class="vas_123_qrp-btn vas_123_qrp-btn--ghost" data-action="closeModal">' +
                     esc(msg('VIS_Close')) +
                 '</button>';
@@ -1912,21 +2120,31 @@
             });
         }
 
-        // ── Action: Send Quotation — standard VIS.Email compose window ───────────
+        // ── Action: Send Quotation — record-linked VIS.Email compose window ─────
         function openSendQuotation() {
             if (!window.VIS || typeof VIS.Email !== 'function' || typeof VIS.CFrame !== 'function') return;
-            var h       = state.header;
-            var tableId = $self.table_ID || 0;
-            var toAddr  = (h && h.contactEmail) ? h.contactEmail : '';
-            var bpId    = (h && h.c_BPartner_ID) ? h.c_BPartner_ID : 0;
-            var email   = new VIS.Email(toAddr, null, null, bpId, true, true, tableId, null, '', null);
-            var c       = new VIS.CFrame();
+            var h        = state.header;
+            var tableId  = $self.table_ID || 0;
+            var recordId = currentOrderId || 0;
+            var toAddr   = (h && h.contactEmail) ? h.contactEmail : '';
+            var bpId     = (h && h.c_BPartner_ID) ? h.c_BPartner_ID : 0;
+            var docNo    = (h && h.documentNo) ? h.documentNo : '';
+            var subject  = docNo ? (msg('VAS_123_SalesQuotation') + ': ' + docNo) : '';
+            // Pass currentOrderId (not bpId) as the record ID so the email is scoped to
+            // this Sales Quotation — using bpId here caused the composer to open in
+            // Contacts context because the bpId/C_Order table pair mismatched.
+            var email    = new VIS.Email(toAddr, null, null, currentOrderId, true, true, tableId, null, subject, null);
+            var c        = new VIS.CFrame();
             c.setName(msg('EMail'));
             c.setTitle(msg('EMail'));
             c.hideHeader(true);
             c.setContent(email);
             c.show();
             email.initializeComponent();
+            // VIS.Email hard-codes "Contacts" in the window title — patch it to show
+            // the Sales Quotation context so users know which record the email links to.
+            email.getRoot().find('.vis-awindow-header p').first()
+                .text(VIS.Msg.getMsg('EMail') + ' (' + msg('VAS_123_SalesQuotation') + ')');
         }
 
         // ── Part 3 modal actions ──────────────────────────────────────────────
@@ -2157,13 +2375,48 @@
 
                 document.getElementById('vas_123_mmeta_' + widgetID).textContent = data.whenTs ? fmtEngTs(data.whenTs) : '';
 
-                var dirLabel   = data.direction === 'in' ? msg('VAS_123_Incoming') : msg('VAS_123_Outgoing');
-                var detailAddr = data.direction === 'in' ? (data.fromEmail || '') : (data.toEmail || '');
+                var dirLabel = data.direction === 'in' ? msg('VAS_123_Incoming') : msg('VAS_123_Outgoing');
 
-                var tmpDiv = document.createElement('div');
-                tmpDiv.innerHTML = data.body || '';
-                var plainBody = (tmpDiv.textContent || tmpDiv.innerText || '').replace(/\s+/g, ' ').trim();
-                var quoteText = plainBody ? plainBody.substring(0, 200) + (plainBody.length > 200 ? '…' : '') : '';
+                // Split a semicolon/comma-delimited address string into a clean array.
+                function splitAddrs(s) {
+                    if (!s) return [];
+                    return s.split(/[;,]/).map(function(v){ return v.trim(); }).filter(function(v){ return v.length > 0; });
+                }
+                // Render up to `limit` addresses with a "+N more" chip for the overflow.
+                function renderAddrList(addrs, limit) {
+                    if (!addrs || addrs.length === 0) return '';
+                    var shown = addrs.slice(0, limit);
+                    var rest  = addrs.length - limit;
+                    var h     = esc(shown.join(', '));
+                    if (rest > 0)
+                        h += ' <span style="display:inline-block;font-size:0.75em;font-weight:700;' +
+                             'background:#EFF6FF;color:#1D4ED8;border-radius:0.375em;padding:0.1em 0.5em;' +
+                             'margin-left:0.25em;vertical-align:middle;">+' + rest + '</span>';
+                    return h;
+                }
+
+                // Details: direction-based primary address + CC addresses, deduplicated, up to 5.
+                var primaryAddr = data.direction === 'in' ? (data.fromEmail || '') : (data.toEmail || '');
+                var detailAddrs = splitAddrs(primaryAddr).concat(splitAddrs(data.ccEmail || ''));
+                var seenD = {};
+                detailAddrs = detailAddrs.filter(function(a) {
+                    var k = a.toLowerCase();
+                    if (seenD[k]) return false; seenD[k] = true; return true;
+                });
+                var detailHtml = renderAddrList(detailAddrs, 5);
+
+                // People: direction-aware.
+                // Outgoing → show To+CC recipient names (peopleNames).
+                // Incoming → show who sent it (fromName resolved from MailAddressFrom, else raw email).
+                var peopleItems;
+                if (data.direction === 'in') {
+                    var fromDisplay = data.fromName || data.fromEmail || '';
+                    peopleItems = fromDisplay ? [fromDisplay] : [];
+                } else {
+                    peopleItems = splitAddrs(data.peopleNames || '');
+                    if (peopleItems.length === 0 && data.who) peopleItems = [data.who];
+                }
+                var peopleHtml  = renderAddrList(peopleItems, 5);
 
                 var bodyHtml = [
                     '<div class="vas_123_qrp-emd-top">',
@@ -2172,7 +2425,6 @@
                     '  </span>',
                     '  <span class="vas_123_qrp-emd-heading">', esc(data.subject || msg('EMail')), '</span>',
                     '</div>',
-                    quoteText ? '<div class="vas_123_qrp-emd-quote">' + esc(quoteText) + '</div>' : '',
                     '<table class="vas_123_qrp-emd-meta">',
                     '  <tr>',
                     '    <td class="vas_123_qrp-emd-meta-label">', esc(msg('Type')), '</td>',
@@ -2184,12 +2436,12 @@
                     '    <td class="vas_123_qrp-emd-meta-label">', esc(msg('VAS_123_When')), '</td>',
                     '    <td class="vas_123_qrp-emd-meta-value">', esc(fmtEngTs(data.whenTs || '')), '</td>',
                     '    <td class="vas_123_qrp-emd-meta-label">', esc(msg('Details')), '</td>',
-                    '    <td class="vas_123_qrp-emd-meta-value">', esc(detailAddr), '</td>',
+                    '    <td class="vas_123_qrp-emd-meta-value">', detailHtml || '&mdash;', '</td>',
                     '  </tr>',
-                    data.who ? [
+                    peopleItems.length > 0 ? [
                         '  <tr>',
                         '    <td class="vas_123_qrp-emd-meta-label">', esc(msg('VAS_123_People')), '</td>',
-                        '    <td class="vas_123_qrp-emd-meta-value" colspan="3">', esc(data.who), '</td>',
+                        '    <td class="vas_123_qrp-emd-meta-value" colspan="3">', peopleHtml, '</td>',
                         '  </tr>'
                     ].join('') : '',
                     '</table>',
@@ -2212,12 +2464,13 @@
                     e.stopPropagation(); e.stopImmediatePropagation();
                     if (!window.VIS || typeof VIS.Email !== 'function' || typeof VIS.CFrame !== 'function') return;
                     closeModal();
+                    // Pass currentOrderId (C_Order_ID) as the record ID so the email
+                    // is linked to the Sales Quotation, not to the BPartner (Contacts).
                     var tableId   = $self.table_ID || 0;
-                    var bpId      = (state.header && state.header.c_BPartner_ID) ? state.header.c_BPartner_ID : 0;
                     var replyTo   = data.direction === 'in' ? (data.fromEmail || '') : (data.toEmail || '');
                     var subject   = 'RE: ' + (data.subject || '');
                     var replyBody = '<br><br><hr>' + (data.body || '');
-                    var email     = new VIS.Email(replyTo, null, null, bpId, true, true, tableId, replyBody, subject, null);
+                    var email     = new VIS.Email(replyTo, null, null, currentOrderId, true, true, tableId, replyBody, subject, null);
                     var c         = new VIS.CFrame();
                     c.setName(msg('EMail'));
                     c.setTitle(msg('EMail'));
@@ -2225,6 +2478,10 @@
                     c.setContent(email);
                     c.show();
                     email.initializeComponent();
+                    // email.js hard-codes "Contacts" in the window title when called outside a
+                    // window frame — patch it to show the Sales Quotation context.
+                    email.getRoot().find('.vis-awindow-header p').first()
+                        .text(VIS.Msg.getMsg('EMail') + ' (' + msg('VAS_123_SalesQuotation') + ')');
                 });
             });
         }
@@ -2247,17 +2504,30 @@
                     return;
                 }
 
-                var subText = (data.subject || '') + (data.startDate ? ' · ' + fmtEngTs(data.startDate) : '');
-                document.getElementById('vas_123_mmeta_' + widgetID).textContent = subText;
+                // Header meta: "Doc# · Apr 14, 10:00am"
+                var docNo   = state.header ? (state.header.documentNo || '') : '';
+                var metaStr = [docNo, data.startDate ? fmtEngTs(data.startDate) : ''].filter(Boolean).join(' · ');
+                document.getElementById('vas_123_mmeta_' + widgetID).textContent = metaStr;
 
-                var metaParts = [];
-                if (data.startDate) metaParts.push(esc(fmtEngTs(data.startDate)));
-                if (data.attendees) metaParts.push(esc(data.attendees));
-                if (data.location)  metaParts.push(esc(data.location));
+                // Duration string: "48m" or "1h 30m"
+                var durStr = '';
                 if (data.durationMins > 0) {
-                    var h = Math.floor(data.durationMins / 60), m = data.durationMins % 60;
-                    metaParts.push(h > 0 ? (h + 'h' + (m > 0 ? ' ' + m + 'm' : '')) : (m + 'm'));
+                    var dh = Math.floor(data.durationMins / 60), dm = data.durationMins % 60;
+                    durStr = dh > 0 ? (dh + 'h' + (dm > 0 ? ' ' + dm + 'm' : '')) : (dm + 'm');
                 }
+
+                // Attendee list and count
+                var attendeeList  = data.attendees ? data.attendees.split(',').filter(function (s) { return $.trim(s); }) : [];
+                var attendeeCount = attendeeList.length;
+                // Show full names (consistent with the timeline card)
+                var displayNames  = attendeeList.map(function (n) { return $.trim(n); }).join(', ');
+
+                // Details: "Google Meet · 48m · 4 Attended"
+                var detailParts = [];
+                if (data.location)  detailParts.push(esc(data.location));
+                if (durStr)         detailParts.push(esc(durStr));
+                if (attendeeCount)  detailParts.push(attendeeCount + ' ' + esc(msg('VAS_123_Attended')));
+                var detailsHtml = detailParts.join(' &middot; ') || '&mdash;';
 
                 var transcriptHtml = '';
                 if (data.transcript) {
@@ -2284,17 +2554,56 @@
                 }
 
                 var bodyHtml = [
-                    '<div class="vas_123_qrp-mtg-subject">', esc(data.subject || '—'), '</div>',
-                    '<div class="vas_123_qrp-mtg-meta">', metaParts.join(' &middot; '), '</div>',
+                    // ── Hero: badge chip + subject title ──
+                    '<div class="vas_123_qrp-mtg-hero">',
+                    '  <span class="vas_123_qrp-mtg-badge">', esc(msg('VAS_123_Meeting')), '</span>',
+                    '  <span class="vas_123_qrp-mtg-title">', data.subject ? esc(data.subject) : '&mdash;', '</span>',
+                    '</div>',
+
+                    // ── Info grid: Type/When row + Details/People row ──
+                    '<div class="vas_123_qrp-mtg-infogrid">',
+                    '  <div class="vas_123_qrp-mtg-infogrid__row">',
+                    '    <div class="vas_123_qrp-mtg-infogrid__cell">',
+                    '      <span class="vas_123_qrp-mtg-info-lbl">', esc(msg('Type')), '</span>',
+                    '      <span class="vas_123_qrp-mtg-info-val">', esc(msg('VAS_123_Meeting')), '</span>',
+                    '    </div>',
+                    '    <div class="vas_123_qrp-mtg-infogrid__cell">',
+                    '      <span class="vas_123_qrp-mtg-info-lbl">', esc(msg('When')), '</span>',
+                    '      <span class="vas_123_qrp-mtg-info-val">', data.startDate ? esc(fmtEngTs(data.startDate)) : '&mdash;', '</span>',
+                    '    </div>',
+                    '  </div>',
+                    '  <div class="vas_123_qrp-mtg-infogrid__row">',
+                    '    <div class="vas_123_qrp-mtg-infogrid__cell">',
+                    '      <span class="vas_123_qrp-mtg-info-lbl">', esc(msg('Details')), '</span>',
+                    '      <span class="vas_123_qrp-mtg-info-val">', detailsHtml, '</span>',
+                    '    </div>',
+                    '    <div class="vas_123_qrp-mtg-infogrid__cell">',
+                    '      <span class="vas_123_qrp-mtg-info-lbl">', esc(msg('VAS_123_People')), '</span>',
+                    '      <span class="vas_123_qrp-mtg-info-val">', displayNames ? esc(displayNames) : '&mdash;', '</span>',
+                    '    </div>',
+                    '  </div>',
+                    '</div>',
+
+                    // ── Description (meeting agenda / purpose) ──
+                    data.description
+                        ? '<div class="vas_123_qrp-mtg-notes">' + esc(data.description) + '</div>'
+                        : '',
+
+                    // ── Meeting URL (editable) ──
                     '<div class="vas_123_qrp-mtg-field">',
                     '  <label class="vas_123_qrp-mtg-field-label">', esc(msg('VAS_123_MeetingUrl')), '</label>',
                     '  <input type="text" class="vas_123_qrp-mtg-input" id="', widgetID, '_mtgUrl" value="', esc(data.meetingUrl || ''), '">',
                     '</div>',
-                    transcriptHtml,
-                    '<div class="vas_123_qrp-mtg-field">',
-                    '  <label class="vas_123_qrp-mtg-field-label">', esc(msg('Comments')), '</label>',
-                    '  <textarea class="vas_123_qrp-mtg-textarea" id="', widgetID, '_mtgComments" rows="3">', esc(data.comments || ''), '</textarea>',
-                    '</div>'
+
+                    // ── Comments: plain-text display block ──
+                    data.comments
+                        ? '<div class="vas_123_qrp-mtg-notes">' + esc(data.comments) + '</div>'
+                        : '',
+
+                    // ── Hidden textarea carries comments for Save ──
+                    '<textarea id="', widgetID, '_mtgComments" style="display:none;">', esc(data.comments || ''), '</textarea>',
+
+                    transcriptHtml
                 ].join('');
 
                 var footHtml = [
@@ -2427,15 +2736,18 @@
                     var userId = (window.VIS && VIS.context && typeof VIS.context.getAD_User_ID === 'function')
                         ? VIS.context.getAD_User_ID() : 0;
                     postJSON('GetWhatsAppTopicMeta', { topicId: resolvedTopicId }, function (err1, meta) {
+                        // chatId may be 0 when WSP_SMChat_ID is not set on the topic — still allow send
                         var chatId = (!err1 && meta) ? (meta.chatId || 0) : 0;
                         var mobile = (!err1 && meta) ? (meta.mobile || '') : '';
+                        // WSP/Inbox endpoints require POST (matches VIS.dataContext.getJSONData behaviour)
                         $.ajax({
                             url:      VIS.Application.contextUrl + 'WSP/Inbox/GetUserSocialAcct',
+                            type:     'POST',
                             dataType: 'json',
                             data:     { User_ID: userId, Provider: 'WHATSAPP' },
                             success:  function (raw) {
                                 var accts = (typeof raw === 'string') ? JSON.parse(raw) : raw;
-                                if (!accts || !accts.length || !chatId) {
+                                if (!accts || !accts.length) {
                                     $btn.prop('disabled', false);
                                     return;
                                 }
@@ -2448,7 +2760,7 @@
                                     account_type:  'WHATSAPP',
                                     account_id:    cfg.AccountValue || '',
                                     user_id:       userId,
-                                    chat_id:       chatId,
+                                    chat_id:       chatId || '',
                                     chatdate:      new Date(),
                                     attendee:      mobile,
                                     chatname:      topic.contactName || '',
@@ -2716,17 +3028,63 @@
                 e.stopPropagation();
             });
 
-            // Open customer record in the platform viewer
+            // Open underlying product or charge record from line detail modal
+            $root.on('click', '[data-action="openRecordFromLine"]', function (e) {
+                var $btn      = $(this);
+                var productId = parseInt($btn.data('productId') || 0, 10);
+                var chargeId  = parseInt($btn.data('chargeId')  || 0, 10);
+                if (!window.VIS) return;
+                closeModal();
+                try {
+                    var tableName, pkColumn, recordId;
+                    if (chargeId > 0) {
+                        tableName = 'C_Charge';
+                        pkColumn  = 'C_Charge_ID';
+                        recordId  = chargeId;
+                    } else {
+                        tableName = 'M_Product';
+                        pkColumn  = 'M_Product_ID';
+                        recordId  = productId;
+                    }
+                    var windowId = 0;
+                    if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === 'function') {
+                        windowId = VIS.ZoomTarget.getZoomAD_Window_ID(tableName, 0, null, false) || 0;
+                    }
+                    if (windowId > 0 && VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
+                        var zoomQuery = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
+                            ? VIS.Query.prototype.getEqualQuery(pkColumn, recordId)
+                            : null;
+                        VIS.viewManager.startWindow(windowId, zoomQuery);
+                    }
+                } catch (ex) { }
+                e.stopPropagation();
+            });
+
+            // Open customer record in VAS_CustomerMaster window
             $root.on('click', '[data-action="openCustomer"]', function (e) {
-                var bpId = $(this).data('bpId');
-                if (!bpId || !window.VIS) return;
-                if (VIS.viewManager && typeof VIS.viewManager.startWindow === 'function') {
+                e.stopPropagation();
+                var bpId = parseInt($(this).data('bpId'), 10);
+                if (!bpId || bpId <= 0) return;
+
+                // Primary: use ZoomUtil (same as all CRM widgets) to resolve the
+                // VAS_CustomerMaster window ID and navigate to the specific record.
+                if (window.VAS && VAS.ZoomUtil && typeof VAS.ZoomUtil.zoomToRecord === 'function') {
+                    VAS.ZoomUtil.zoomToRecord('C_BPartner_ID', bpId, 0, 'VAS_CustomerMaster', 'C_BPartner');
+                    return;
+                }
+
+                // Fallback: resolve window ID via ZoomTarget then open with viewManager
+                if (!window.VIS || !VIS.viewManager || typeof VIS.viewManager.startWindow !== 'function') return;
+                var wid = 0;
+                if (VIS.ZoomTarget && typeof VIS.ZoomTarget.getZoomAD_Window_ID === 'function') {
+                    try { wid = VIS.ZoomTarget.getZoomAD_Window_ID('C_BPartner', 0, null, false) || 0; } catch (ex) {}
+                }
+                if (wid > 0) {
                     var q = (VIS.Query && VIS.Query.prototype && typeof VIS.Query.prototype.getEqualQuery === 'function')
                         ? VIS.Query.prototype.getEqualQuery('C_BPartner_ID', bpId)
                         : null;
-                    VIS.viewManager.startWindow('VAS_BPartner', q);
+                    VIS.viewManager.startWindow(wid, q);
                 }
-                e.stopPropagation();
             });
 
             // Click on linked opportunity row — show all quotations sharing that opportunity
@@ -2750,6 +3108,20 @@
             });
 
             // §9b  Line history toggle — show/hide per-line history drawer
+            // Lines pagination — previous page
+            $root.on('click', '[data-action="linesPagePrev"]', function (e) {
+                e.stopPropagation();
+                if (state.linesPage > 0) { state.linesPage--; renderLines(); }
+            });
+
+            // Lines pagination — next page
+            $root.on('click', '[data-action="linesPageNext"]', function (e) {
+                e.stopPropagation();
+                var total   = (state.lines || []).length;
+                var maxPage = Math.ceil(total / 5) - 1;
+                if (state.linesPage < maxPage) { state.linesPage++; renderLines(); }
+            });
+
             $root.on('click', '[data-action="toggleLineHistory"]', function (e) {
                 e.stopPropagation(); // prevent openLine from firing on the row
                 var lineId   = $(this).data('line-id');
@@ -2770,8 +3142,30 @@
 
             // Tasks — segmented tab toggle (Upcoming / Previous)
             $root.on('click', '[data-action="switchTaskTab"]', function () {
-                state.taskTab = $(this).data('tab') || 'up';
+                state.taskTab   = $(this).data('tab') || 'up';
+                state.tasksPage = 0;   // reset to first page when switching tabs
                 renderTasks();
+            });
+
+            // Tasks pagination — previous page
+            $root.on('click', '[data-action="tasksPagePrev"]', function (e) {
+                e.stopPropagation();
+                if (state.tasksPage > 0) { state.tasksPage--; renderTasks(); }
+            });
+
+            // Tasks pagination — next page
+            $root.on('click', '[data-action="tasksPageNext"]', function (e) {
+                e.stopPropagation();
+                var allTasks  = state.tasks || [];
+                var upcoming  = []; var previous = [];
+                for (var i = 0; i < allTasks.length; i++) {
+                    var t = allTasks[i];
+                    var closed = !!(t.closed || t.Closed || (t.pct != null && toNum(t.pct) >= 100 && (t.closed || t.Closed)));
+                    if (closed) { previous.push(t); } else { upcoming.push(t); }
+                }
+                var listLen  = (state.taskTab === 'prev' ? previous : upcoming).length;
+                var maxPage  = Math.ceil(listLen / 5) - 1;
+                if (state.tasksPage < maxPage) { state.tasksPage++; renderTasks(); }
             });
 
             // Tasks — new task button → standard platform Appointments form (task mode)
@@ -2867,6 +3261,9 @@
                         _onPopupClosed();
                     }
                 }, 400);
+
+                // Safety: clean up listeners after 5 minutes even if form never closed
+                setTimeout(function () { _cleanup(); }, 300000);
             });
 
             // Tasks — click task row to edit via standard platform form
@@ -2914,21 +3311,28 @@
             // Tasks — checkbox toggle (mark done / reopen)
             $root.on('click', '[data-action="toggleTask"]', function (e) {
                 e.stopPropagation();
-                var taskId = $(this).data('taskId');
-                var tasks  = state.tasks || [];
+                var $chk   = $(this);
+                var taskId = parseInt($chk.data('taskId'), 10);
+                if (!taskId || taskId <= 0) return;
+
+                var tasks = state.tasks || [];
+                var wasClosed = false;
                 for (var i = 0; i < tasks.length; i++) {
                     var tid = tasks[i].r_Request_ID || tasks[i].R_Request_ID || 0;
-                    if (String(tid) === String(taskId)) {
-                        var wasClosed = tasks[i]._closed;
-                        tasks[i]._closed = !wasClosed;
-                        // Completion % follows the spec: mark done sets 100, reopen preserves existing %
-                        if (!wasClosed) { tasks[i].pct = 100; tasks[i].closed = true; }
-                        else            { tasks[i].closed = false; }
-                        showToast(wasClosed ? msg('VAS_123_TaskReopened') : msg('VAS_123_TaskCompleted'));
-                        break;
-                    }
+                    if (String(tid) === String(taskId)) { wasClosed = !!tasks[i]._closed; break; }
                 }
-                renderTasks();
+
+                $chk.prop('disabled', true);
+                var endpoint = wasClosed ? 'ReopenTask' : 'CompleteTask';
+                postJSON(endpoint, { taskId: taskId }, function (err, res) {
+                    $chk.prop('disabled', false);
+                    if (!err && res && res.success) {
+                        showToast(wasClosed ? msg('VAS_123_TaskReopened') : msg('VAS_123_TaskCompleted'));
+                        loadTasks(currentOrderId);
+                    } else {
+                        showToast(msg('Error'));
+                    }
+                });
             });
 
             // Tasks — priority chip picker inside task modal
@@ -2961,45 +3365,54 @@
             });
 
             // Tasks — save task (PostNote-style; a full task save would go to a dedicated endpoint)
+            // saveTask is called from the internal task form (openTaskForm) — reserved for future
+            // server-side create/update. New tasks are created via VIS.AppointmentsForm (newTask handler).
             $root.on('click', '[data-action="saveTask"]', function () {
-                // Read modal form fields
-                var titleEl = document.getElementById('vas_123_taskTitle_' + widgetID);
-                var dueEl   = document.getElementById('vas_123_taskDue_'   + widgetID);
-                var pctEl   = document.getElementById('vas_123_taskPct_'   + widgetID);
-                var priEl   = document.querySelector('#vas_123_mbody_' + widgetID + ' .vas_123_qrp-pick--on');
+                var titleEl  = document.getElementById('vas_123_taskTitle_' + widgetID);
                 var titleVal = titleEl ? titleEl.value.trim() : '';
                 if (!titleVal) { showToast(msg('VAS_123_TaskTitleRequired')); return; }
-                // For now save is client-only; a future server endpoint can be wired here
-                // (R_Request INSERT/UPDATE was intentionally deferred until the table mapping is confirmed)
                 closeModal();
-                showToast(msg('VAS_123_TaskSaved'));
-                // Reload tasks from server to pick up any server-side changes
                 loadTasks(currentOrderId);
             });
 
             // Tasks — close or reopen task from within the task modal
             $root.on('click', '[data-action="closeReopenTask"]', function () {
-                var taskId  = $(this).data('taskId');
-                var reopen  = ($(this).data('reopen') === 'Y');
-                var tasks   = state.tasks || [];
-                for (var i = 0; i < tasks.length; i++) {
-                    var tid = tasks[i].r_Request_ID || tasks[i].R_Request_ID || 0;
-                    if (String(tid) === String(taskId)) {
-                        tasks[i]._closed = !reopen;
-                        tasks[i].closed  = !reopen;
-                        if (!reopen) { tasks[i].pct = 100; }
+                var $btn   = $(this).prop('disabled', true);
+                var taskId = parseInt($btn.data('taskId'), 10);
+                var reopen = ($btn.data('reopen') === 'Y');
+                if (!taskId || taskId <= 0) { $btn.prop('disabled', false); return; }
+
+                var endpoint = reopen ? 'ReopenTask' : 'CompleteTask';
+                postJSON(endpoint, { taskId: taskId }, function (err, res) {
+                    $btn.prop('disabled', false);
+                    closeModal();
+                    if (!err && res && res.success) {
                         showToast(reopen ? msg('VAS_123_TaskReopened') : msg('VAS_123_TaskCompleted'));
-                        break;
+                        loadTasks(currentOrderId);
+                    } else {
+                        showToast(msg('Error'));
                     }
-                }
-                closeModal();
-                renderTasks();
+                });
             });
 
             // Engagement — WhatsApp stat card opens latest chat
             $root.on('click', '[data-action="openChat"]', function (e) {
                 e.stopPropagation(); e.stopImmediatePropagation();
                 openWhatsAppModal();
+            });
+
+            // Engagement pagination — previous page
+            $root.on('click', '[data-action="engPagePrev"]', function (e) {
+                e.stopPropagation();
+                if (state.engagementPage > 0) { state.engagementPage--; renderEngagement(); }
+            });
+
+            // Engagement pagination — next page
+            $root.on('click', '[data-action="engPageNext"]', function (e) {
+                e.stopPropagation();
+                var total   = (state.engagement && Array.isArray(state.engagement.items)) ? state.engagement.items.length : 0;
+                var maxPage = Math.ceil(total / 10) - 1;
+                if (state.engagementPage < maxPage) { state.engagementPage++; renderEngagement(); }
             });
 
             // Engagement — WhatsApp timeline card opens specific topic
@@ -3114,9 +3527,20 @@
                 pendingXhr[action] = null;
             }
 
-            // Show "no data available" placeholder instead of a blank body
+            // Show "no record selected" placeholder — icon + context message from AD_Message
             var bodyEl = document.getElementById('vas_123_body_' + widgetID);
-            if (bodyEl) bodyEl.innerHTML = '<div class="vas_123_qrp-norecord">' + esc(msg('VIS_NoData')) + '</div>';
+            if (bodyEl) bodyEl.innerHTML =
+                '<div class="vas_123_qrp-nosel">' +
+                    '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
+                        ' stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.3">' +
+                        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
+                        '<polyline points="14 2 14 8 20 8"/>' +
+                        '<line x1="16" y1="13" x2="8" y2="13"/>' +
+                        '<line x1="16" y1="17" x2="8" y2="17"/>' +
+                        '<polyline points="10 9 9 9 8 9"/>' +
+                    '</svg>' +
+                    '<span>' + esc(msg('VAS_123_SelectQuotation')) + '</span>' +
+                '</div>';
         };
 
     }; // end VAS.VAS_123_QuotationRightPanel constructor
