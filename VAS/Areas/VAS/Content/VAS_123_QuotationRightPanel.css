@@ -919,6 +919,22 @@
 }
 
 /* ============================================================
+   NO-SELECTION PLACEHOLDER (clear state — no record open)
+   ============================================================ */
+.vas_123_qrp-nosel {
+    display:        flex;
+    flex-direction: column;
+    align-items:    center;
+    justify-content: center;
+    height:         100%;
+    gap:            0.75em;
+    color:          var(--qrp-muted);
+    font-size:      0.875em;
+    text-align:     center;
+    padding:        2em;
+}
+
+/* ============================================================
    EMPTY STATE
    ============================================================ */
 .vas_123_qrp-emptyline {
@@ -1623,13 +1639,8 @@
     font-size:     .875em;
     font-weight:   700;
     color:         var(--qrp-ink);
-    overflow:      hidden;
-    text-overflow: ellipsis;
-    white-space:   nowrap;
-    min-width:     0;
-    display:       flex;
-    align-items:   center;
-    gap:           .375em;
+    word-break:    break-word;
+    margin-bottom: 0.1875em;
 }
 
 .vas_123_qrp-tl-title svg {
@@ -2036,6 +2047,88 @@
     margin-bottom: 1em;
 }
 
+/* Hero: badge chip + subject title */
+.vas_123_qrp-mtg-hero {
+    display:       flex;
+    align-items:   center;
+    gap:           0.625em;
+    margin-bottom: 0.875em;
+}
+
+.vas_123_qrp-mtg-badge {
+    font-size:      0.6875em;
+    font-weight:    700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding:        0.25em 0.625em;
+    border-radius:  0.375em;
+    background:     #EDE9FF;
+    color:          #5F4AA6;
+    flex-shrink:    0;
+    white-space:    nowrap;
+}
+
+.vas_123_qrp-mtg-title {
+    font-size:   1.0625em;
+    font-weight: 700;
+    color:       var(--qrp-ink);
+}
+
+/* Info grid: 2 rows × 2 cols */
+.vas_123_qrp-mtg-infogrid {
+    border:        0.0625em solid var(--qrp-border);
+    border-radius: 0.5em;
+    overflow:      hidden;
+    margin-bottom: 0.875em;
+}
+
+.vas_123_qrp-mtg-infogrid__row {
+    display:               grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom:         0.0625em solid var(--qrp-divider);
+}
+
+.vas_123_qrp-mtg-infogrid__row:last-child {
+    border-bottom: none;
+}
+
+.vas_123_qrp-mtg-infogrid__cell {
+    display:      flex;
+    align-items:  baseline;
+    gap:          0.75em;
+    padding:      0.5em 0.875em;
+    border-right: 0.0625em solid var(--qrp-divider);
+}
+
+.vas_123_qrp-mtg-infogrid__cell:last-child {
+    border-right: none;
+}
+
+.vas_123_qrp-mtg-info-lbl {
+    font-size:   0.8125em;
+    color:       var(--qrp-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas_123_qrp-mtg-info-val {
+    font-size:   0.875em;
+    font-weight: 600;
+    color:       var(--qrp-ink);
+}
+
+/* Plain-text comments block */
+.vas_123_qrp-mtg-notes {
+    font-size:     0.875em;
+    color:         var(--qrp-ink);
+    line-height:   1.65;
+    margin-bottom: 0.875em;
+    padding:       0.75em 0.875em;
+    background:    #F8FAFC;
+    border:        0.0625em solid var(--qrp-border);
+    border-radius: 0.5em;
+}
+
 .vas_123_qrp-mtg-field {
     display:        flex;
     flex-direction: column;
@@ -2184,10 +2277,46 @@
 }
 
 .vas_123_qrp-emd-body {
-    font-size:   0.875em;
+    font-size:     0.875em;
+    color:         var(--qrp-ink);
+    line-height:   1.6;
+    word-break:    break-word;
+    padding:       0.75em 0.875em;
+    background:    #F6FAFE;
+    border-radius: 0.5em;
+    border:        0.0625em solid var(--qrp-border);
+    margin-bottom: 0.75em;
+    max-height:    18em;
+    overflow-y:    auto;
+}
+
+/* Normalise browser-default heading sizes inside raw email HTML so they match
+   the surrounding panel text and do not appear oversized. */
+.vas_123_qrp-emd-body h1,
+.vas_123_qrp-emd-body h2,
+.vas_123_qrp-emd-body h3,
+.vas_123_qrp-emd-body h4,
+.vas_123_qrp-emd-body h5,
+.vas_123_qrp-emd-body h6 {
+    font-size:   1em;
+    font-weight: 600;
+    margin:      0.5em 0 0.25em;
+    line-height: 1.4;
     color:       var(--qrp-ink);
-    line-height: 1.6;
-    word-break:  break-word;
+}
+
+.vas_123_qrp-emd-body p {
+    margin: 0.35em 0;
+}
+
+.vas_123_qrp-emd-body ul,
+.vas_123_qrp-emd-body ol {
+    margin:      0.35em 0;
+    padding-left: 1.5em;
+}
+
+.vas_123_qrp-emd-body li {
+    margin-bottom: 0.2em;
 }
 
 /* ============================================================
@@ -2431,7 +2560,7 @@
 .vas_123_qrp-lh-thead,
 .vas_123_qrp-lh-row {
     display:               grid;
-    grid-template-columns: 1.6fr 1fr 0.8fr 1fr 1fr 1.1fr;
+    grid-template-columns: 2fr 1.5fr 0.8fr 1.5fr;
     align-items:           center;
     gap:                   .5em;
     padding:               .375em .5em;
@@ -2487,4 +2616,67 @@
     border-radius: 2px;
     background:    var(--qrp-action);
     font-style:    normal;
+}
+
+/* ===== Section pagination bar — matches VAS_105 secpager style ===== */
+.vas_123_qrp-secpager {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    margin-top:      0.75em;
+    padding:         0.4375em 0.875em;
+    border-radius:   0.5em;
+}
+
+.vas_123_qrp-secpager__info {
+    font-size: 0.8125em;
+    color:     var(--qrp-muted);
+}
+
+.vas_123_qrp-secpager__info b {
+    color: var(--qrp-ink);
+}
+
+.vas_123_qrp-secpager__nav {
+    display:     flex;
+    align-items: center;
+    gap:         0.25em;
+}
+
+.vas_123_qrp-secpager__page {
+    font-size:  0.8125em;
+    color:      var(--qrp-muted);
+    min-width:  3.5em;
+    text-align: center;
+}
+
+.vas_123_qrp-secpager__page b {
+    color: var(--qrp-ink);
+}
+
+.vas_123_qrp-secpager__btn {
+    display:         inline-flex;
+    align-items:     center;
+    justify-content: center;
+    width:           1.75em;
+    height:          1.75em;
+    padding:         0;
+    border:          0.0625em solid var(--qrp-border);
+    border-radius:   0.375em;
+    background:      #fff;
+    cursor:          pointer;
+    color:           var(--qrp-muted);
+    transition:      background 0.15s, color 0.15s, border-color 0.15s;
+    line-height:     1;
+}
+
+.vas_123_qrp-secpager__btn:hover:not(:disabled) {
+    background:   #fff;
+    color:        var(--qrp-primary);
+    border-color: var(--qrp-primary);
+}
+
+.vas_123_qrp-secpager__btn:disabled {
+    opacity: 0.4;
+    cursor:  not-allowed;
 }

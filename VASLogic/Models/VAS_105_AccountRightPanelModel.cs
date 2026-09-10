@@ -156,7 +156,7 @@ namespace VAS.Models
                 sb.Append("       bp.URL AS website,");
                 sb.Append("       bp.NumberEmployees AS employees,");
                 sb.Append("       g.Name AS segment,");
-                sb.Append("       rep.Name AS owner,");
+                sb.Append("       TRIM(COALESCE(rep.Name,N'') || ' ' || COALESCE(rep.LastName,N'')) AS owner,");
                 sb.Append("       CASE bp.Rating");
                 sb.Append("           WHEN 'A' THEN 'Platinum'");
                 sb.Append("           WHEN 'B' THEN 'Gold'");
@@ -239,14 +239,15 @@ namespace VAS.Models
                 _log.SaveError("VAS_105_AccountRightPanelModel.GetOverview.Industry", ex.Message);
             }
 
-            // ── KPI: annual revenue (3-yr avg from invoices, base-currency converted) ────
+            // ── KPI: annual revenue (sum of AR invoice GrandTotals for the current calendar year) ────
             response.annualRevenue = 0m;
             try
             {
-                DateTime arr3Yr = DateTime.Today.AddYears(-3);
+                // Current year: Jan 1 of this year to today
+                DateTime yearStart = new DateTime(DateTime.Today.Year, 1, 1);
                 var sbArr = new StringBuilder();
-                // Fetch each invoice's converted amount individually (same pattern as GetInvoices)
-                // so CURRENCYCONVERT runs per-row under DataSet type mapping, avoiding SUM cast issues.
+                // Fetch each invoice's converted amount individually so CURRENCYCONVERT runs
+                // per-row under DataSet type mapping, avoiding SUM cast issues.
                 sbArr.Append("SELECT CURRENCYCONVERT(inv.GrandTotal, inv.C_Currency_ID, cs.C_Currency_ID,");
                 sbArr.Append("           COALESCE(inv.DateAcct, inv.DateInvoiced), inv.C_ConversionType_ID,");
                 sbArr.Append("           inv.AD_Client_ID, inv.AD_Org_ID) AS conv_amount");
@@ -258,15 +259,15 @@ namespace VAS.Models
                 sbArr.Append("   AND inv.DocStatus IN ('CO','CL')");
                 sbArr.Append("   AND dt.DocBaseType IN ('ARI','ARC')");
                 sbArr.Append("   AND inv.C_BPartner_ID = @bpArr");
-                sbArr.Append("   AND COALESCE(inv.DateAcct, inv.DateInvoiced) >= @arr3Yr");
+                sbArr.Append("   AND COALESCE(inv.DateAcct, inv.DateInvoiced) >= @yearStart");
 
                 string arrAccess = MRole.GetDefault(ctx).AddAccessSQL(
                     sbArr.ToString(), "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
                 var arrParams = new SqlParameter[]
                 {
-                    new SqlParameter("@bpArr",  bPartnerId),
-                    new SqlParameter("@arr3Yr", arr3Yr)
+                    new SqlParameter("@bpArr",     bPartnerId),
+                    new SqlParameter("@yearStart", yearStart)
                 };
 
                 decimal totalRevenue = 0m;
@@ -279,7 +280,7 @@ namespace VAS.Models
                             totalRevenue += Convert.ToDecimal(r["conv_amount"]);
                     }
                 }
-                response.annualRevenue = totalRevenue / 3m;
+                response.annualRevenue = totalRevenue;
             }
             catch (Exception ex)
             {
@@ -600,7 +601,7 @@ namespace VAS.Models
                 sb.Append("                                         AND col.IsActive = 'Y')) AS stage_name,");
                 sb.Append("       vo.Probability AS probability,");
                 sb.Append("       TO_CHAR(vo.VAS_DecisionDate,'YYYY-MM-DD') AS close_date,");
-                sb.Append("       rep.Name AS owner,");
+                sb.Append("       TRIM(COALESCE(rep.Name,N'') || ' ' || COALESCE(rep.LastName,N'')) AS owner,");
                 sb.Append("       CURRENCYCONVERT(vo.PlannedAmt, vo.C_Currency_ID, cs.C_Currency_ID,");
                 sb.Append("           COALESCE(vo.VAS_DecisionDate, CURRENT_DATE), NULL,");
                 sb.Append("           vo.AD_Client_ID, vo.AD_Org_ID) AS value,");
@@ -753,11 +754,11 @@ namespace VAS.Models
                     sbCC.Append("                                            AND tbl.IsActive = 'Y')");
                     sbCC.Append("                                       WHERE col.ColumnName = 'RenewalType'");
                     sbCC.Append("                                         AND col.IsActive = 'Y')) AS renewal_name,");
-                    // COALESCE ensures the raw amount is shown when no conversion rate exists
-                    sbCC.Append("       COALESCE(CURRENCYCONVERT(ct.GrandTotal, ct.C_Currency_ID, cs.C_Currency_ID,");
+                    // TotalLines = net amount excluding tax (GrandTotal includes tax — show exclusive)
+                    sbCC.Append("       COALESCE(CURRENCYCONVERT(ct.TotalLines, ct.C_Currency_ID, cs.C_Currency_ID,");
                     sbCC.Append("           COALESCE(ct.StartDate, CURRENT_DATE), NULL,");
-                    sbCC.Append("           ct.AD_Client_ID, ct.AD_Org_ID), ct.GrandTotal) AS value,");
-                    sbCC.Append("       salesrep.Name AS owner_name,");
+                    sbCC.Append("           ct.AD_Client_ID, ct.AD_Org_ID), ct.TotalLines) AS value,");
+                    sbCC.Append("       TRIM(COALESCE(salesrep.Name,N'') || ' ' || COALESCE(salesrep.LastName,N'')) AS owner_name,");
                     sbCC.Append("       p.Name AS product_name,");
                     sbCC.Append("       COALESCE(asi.Description, N'') AS attribute_desc");
                     sbCC.Append("  FROM C_Contract ct");
@@ -2606,12 +2607,14 @@ namespace VAS.Models
                                 }
                             }
 
-                            // Build people list: use name if found in AD_User, otherwise fall back to the email address.
+                            // Build people list: only include addresses resolved to an AD_User name.
+                            // External email addresses with no matching AD_User are excluded so the
+                            // People field shows names only, never raw email addresses.
                             var peopleList = new List<string>();
                             foreach (var addr in uniqueAddrs)
                             {
-                                string nm = nameMap.ContainsKey(addr) ? nameMap[addr] : addr;
-                                if (!string.IsNullOrEmpty(nm)) peopleList.Add(nm);
+                                if (nameMap.ContainsKey(addr))
+                                    peopleList.Add(nameMap[addr]);
                             }
                             response.peopleNames = string.Join(";", peopleList);
                         }

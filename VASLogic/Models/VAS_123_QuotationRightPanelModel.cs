@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Dynamic;
+using System.Linq;
 using System.Text;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -48,26 +49,10 @@ namespace VAS.Models
         /// <returns>AD_Table_ID for C_Order, or 0 on failure/not found.</returns>
         public int GetCOrderTableId(Ctx ctx)
         {
-            string baseSql = @"SELECT MIN(t.AD_Table_ID)
-                FROM AD_Table t
-                WHERE t.TableName = 'C_Order'
-                AND t.IsActive = 'Y'";
-
-            string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                baseSql, "t", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            try
-            {
-                object result = DB.ExecuteScalar(accessSql, null, null);
-                if (result != null && result != DBNull.Value)
-                    return Util.GetValueOfInt(result);
-            }
-            catch (Exception ex)
-            {
-                _log.SaveError("VAS_123_QuotationRightPanelModel.GetCOrderTableId", ex.Message);
-            }
-
-            return 0;
+            // Use the framework cache — same lookup VAS_105 uses for C_BPartner.
+            // A direct SQL query through AddAccessSQL can return 0 when the role
+            // restricts access to AD_Table, causing the task query to find nothing.
+            return MTable.Get_Table_ID("C_Order");
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -109,15 +94,17 @@ namespace VAS.Models
                 o.DocAction AS DocAction,
                 COALESCE(o.GrandTotal, 0) AS GrandTotal,
                 COALESCE(o.TotalLines, 0) AS TotalLines,
+                COALESCE((SELECT SUM(ot.TaxAmt) FROM C_OrderTax ot WHERE ot.C_Order_ID = o.C_Order_ID AND ot.IsActive = 'Y'), 0) AS TaxAmt,
+                COALESCE((SELECT SUM(ot.TaxBaseAmt) FROM C_OrderTax ot WHERE ot.C_Order_ID = o.C_Order_ID AND ot.IsActive = 'Y'), 0) AS TaxBaseAmt,
                 o.C_BPartner_ID AS C_BPartner_ID,
                 bp.Name AS BPartnerName,
                 o.AD_User_ID AS AD_User_ID,
                 COALESCE(ct.Name, N'') AS ContactName,
-                COALESCE(ct.Title, N'') AS ContactTitle,
+                COALESCE(j.Name, ct.Title, N'') AS ContactTitle,
                 COALESCE(ct.EMail, N'') AS ContactEmail,
                 COALESCE(ct.Mobile, ct.Phone, N'') AS ContactPhone,
                 o.SalesRep_ID AS SalesRep_ID,
-                COALESCE(sr.Name, N'') AS SalesRepName,
+                TRIM(COALESCE(sr.Name, N'') || ' ' || COALESCE(sr.LastName, N'')) AS SalesRepName,
                 o.C_Currency_ID AS C_Currency_ID,
                 COALESCE(cur.ISO_Code, N'') AS CurrencyISO,
                 COALESCE(cur.CurSymbol, N'') AS CurrencySymbol,
@@ -130,6 +117,7 @@ namespace VAS.Models
                 FROM C_Order o
                 INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = o.C_BPartner_ID)
                 LEFT OUTER JOIN AD_User ct ON (ct.AD_User_ID = o.AD_User_ID)
+                LEFT OUTER JOIN C_Job j ON (j.C_Job_ID = ct.C_Job_ID AND j.IsActive = 'Y')
                 LEFT OUTER JOIN AD_User sr ON (sr.AD_User_ID = o.SalesRep_ID)
                 LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID = o.C_Currency_ID)
                 WHERE o.C_Order_ID = @orderId
@@ -174,6 +162,13 @@ namespace VAS.Models
                     ? Convert.ToDecimal(row["GrandTotal"]) : 0m;
                 response.totalLines  = row["TotalLines"] != DBNull.Value
                     ? Convert.ToDecimal(row["TotalLines"]) : 0m;
+                // TaxAmt: actual tax charged; TaxBaseAmt: the taxable base amount — both from C_OrderTax.
+                // Using C_OrderTax values avoids the IsTaxIncluded = 'Y' edge case where
+                // GrandTotal - TotalLines gives 0 (tax is already embedded in line amounts).
+                response.taxAmt      = row["TaxAmt"] != DBNull.Value
+                    ? Convert.ToDecimal(row["TaxAmt"]) : 0m;
+                response.taxBaseAmt  = row["TaxBaseAmt"] != DBNull.Value
+                    ? Convert.ToDecimal(row["TaxBaseAmt"]) : 0m;
                 response.c_BPartner_ID  = Util.GetValueOfInt(row["C_BPartner_ID"]);
                 response.bPartnerName   = Util.GetValueOfString(row["BPartnerName"]);
                 response.ad_User_ID     = Util.GetValueOfInt(row["AD_User_ID"]);
@@ -265,6 +260,44 @@ namespace VAS.Models
                 }
             }
 
+            // ── Tax lines — individual rows from C_OrderTax for per-tax-type breakdown ──
+            try
+            {
+                string taxLineSql = @"SELECT t.Name AS TaxName,
+                    COALESCE(ot.TaxAmt, 0) AS TaxAmt,
+                    COALESCE(ot.TaxBaseAmt, 0) AS TaxBaseAmt
+                    FROM C_OrderTax ot
+                    INNER JOIN C_Tax t ON (t.C_Tax_ID = ot.C_Tax_ID AND t.IsActive = 'Y')
+                    WHERE ot.C_Order_ID = @orderId
+                    AND ot.IsActive = 'Y'
+                    ORDER BY t.Name";
+
+                string taxLineAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    taxLineSql, "ot", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+                DataSet taxDs = DB.ExecuteDataset(taxLineAccessSql,
+                    new SqlParameter[] { new SqlParameter("@orderId", orderId) }, null);
+
+                var taxLines = new List<dynamic>();
+                if (taxDs != null && taxDs.Tables.Count > 0)
+                {
+                    foreach (DataRow tr in taxDs.Tables[0].Rows)
+                    {
+                        dynamic tl    = new ExpandoObject();
+                        tl.taxName    = Util.GetValueOfString(tr["TaxName"]);
+                        tl.taxAmt     = tr["TaxAmt"]     != DBNull.Value ? Convert.ToDecimal(tr["TaxAmt"])     : 0m;
+                        tl.taxBaseAmt = tr["TaxBaseAmt"] != DBNull.Value ? Convert.ToDecimal(tr["TaxBaseAmt"]) : 0m;
+                        taxLines.Add(tl);
+                    }
+                }
+                response.taxLines = taxLines;
+            }
+            catch (Exception ex)
+            {
+                _log.SaveError("VAS_123_QuotationRightPanelModel.GetTaxLines", ex.Message);
+                response.taxLines = new List<dynamic>();
+            }
+
             return response;
         }
 
@@ -303,6 +336,7 @@ namespace VAS.Models
                 AND ai.IsActive = 'Y'
                 AND COALESCE(ai.IsDeleted, 'N') = 'N'
                 AND COALESCE(ai.IsCancelled, 'N') = 'N'
+                AND COALESCE(ai.IsTask, 'N') = 'N'
                 AND ai.StartDate >= @todayStart
                 ORDER BY ai.StartDate ASC";
 
@@ -333,18 +367,20 @@ namespace VAS.Models
 
                 DataRow row = ds.Tables[0].Rows[0];
 
+                // Subject, Location and Description are stored HTML-encoded by the VIS platform.
+                // HtmlDecode restores plain text so JS esc() does not double-encode.
                 dynamic meeting = new ExpandoObject();
                 meeting.appointmentsInfo_ID = Util.GetValueOfInt(row["AppointmentsInfo_ID"]);
-                meeting.subject     = Util.GetValueOfString(row["Subject"]);
+                meeting.subject     = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Subject"]));
                 meeting.startDate   = row["StartDate"] != DBNull.Value
                     ? Convert.ToDateTime(row["StartDate"]) : (DateTime?)null;
                 meeting.endDate     = row["EndDate"] != DBNull.Value
                     ? Convert.ToDateTime(row["EndDate"]) : (DateTime?)null;
                 meeting.meetingUrl  = Util.GetValueOfString(row["MeetingUrl"]);
-                meeting.location    = Util.GetValueOfString(row["Location"]);
+                meeting.location    = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Location"]));
                 meeting.attendeeInfo  = Util.GetValueOfString(row["AttendeeInfo"]);
                 meeting.emailToInfo   = Util.GetValueOfString(row["EmailToInfo"]);
-                meeting.description   = Util.GetValueOfString(row["Description"]);
+                meeting.description   = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Description"]));
 
                 return meeting;
             }
@@ -746,7 +782,7 @@ namespace VAS.Models
             sb.Append("       op.Name AS OpportunityName,");
             sb.Append("       op.VAS_OppStage AS Stage,");
             sb.Append("       TO_CHAR(op.VAS_DecisionDate, 'YYYY-MM-DD') AS ExpectedCloseDate,");
-            sb.Append("       rep.Name AS SalesRepName,");
+            sb.Append("       TRIM(COALESCE(rep.Name, N'') || ' ' || COALESCE(rep.LastName, N'')) AS SalesRepName,");
             sb.Append("       op.PlannedAmt AS Amount");
             sb.Append("  FROM C_Order o");
             sb.Append("  LEFT OUTER JOIN VAS_Opportunity op ON (op.VAS_Opportunity_ID = o.VAS_Opportunity_ID AND op.IsActive = 'Y')");
@@ -833,11 +869,13 @@ namespace VAS.Models
                 COALESCE(p.Name, ch.Name, N'') AS ProductName,
                 p.ProductType AS ProductType,
                 (SELECT arl.Name FROM AD_Ref_List arl WHERE arl.Value = p.ProductType AND arl.AD_Reference_ID = (SELECT c.AD_Reference_Value_ID FROM AD_Column c INNER JOIN AD_Table t ON (t.AD_Table_ID = c.AD_Table_ID) WHERE UPPER(t.TableName) = 'M_PRODUCT' AND UPPER(c.ColumnName) = 'PRODUCTTYPE')) AS ProductTypeName,
-                COALESCE(u.Name, N'') AS UOMName
+                COALESCE(u.Name, N'') AS UOMName,
+                COALESCE(NULLIF(TRIM(asi.Description), '--'), N'') AS AttributeDesc
                 FROM C_OrderLine ol
                 LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID AND p.IsActive = 'Y')
                 LEFT OUTER JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID AND ch.IsActive = 'Y')
                 LEFT OUTER JOIN C_UOM u ON (u.C_UOM_ID = ol.C_UOM_ID AND u.IsActive = 'Y')
+                LEFT OUTER JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
                 WHERE ol.C_Order_ID = @orderId
                 AND ol.IsActive = 'Y'
                 ORDER BY ol.Line";
@@ -879,8 +917,13 @@ namespace VAS.Models
                     l.productValue   = Util.GetValueOfString(row["ProductValue"]);
                     l.productName    = Util.GetValueOfString(row["ProductName"]);
                     l.uOMName        = Util.GetValueOfString(row["UOMName"]);
+                    // VIS stores '--' as the default ASI description when no attribute is set — suppress it
+                    var rawAttr = Util.GetValueOfString(row["AttributeDesc"]).Trim();
+                    l.attributeDesc  = rawAttr == "--" ? "" : rawAttr;
                     // Derive service flag from product type — 'S' = Service in Compiere/VIS product model
+                    // productType codes: 'I' = Item, 'S' = Service, 'E' = Expense, 'R' = Resource
                     var rawProductType = Util.GetValueOfString(row["ProductType"]);
+                    l.productType      = rawProductType;
                     l.isService        = "S".Equals(rawProductType);
                     // Display name resolved from AD_Ref_List; empty for charge lines (no M_Product)
                     l.productTypeName  = Util.GetValueOfString(row["ProductTypeName"]);
@@ -1004,6 +1047,57 @@ namespace VAS.Models
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
+        /// Fetches base-currency metadata for the client from the
+        /// AD_ClientInfo → C_AcctSchema → C_Currency chain.
+        /// Returns a dynamic with baseCurrSymbol, baseCurrIso, and baseCurrPrec.
+        /// </summary>
+        /// <param name="ctx">Current session context.</param>
+        /// <param name="adClientId">AD_Client_ID for the active session.</param>
+        /// <returns>Dynamic with base currency fields.</returns>
+        private dynamic GetCurrencyMeta(Ctx ctx, int adClientId)
+        {
+            dynamic meta = new ExpandoObject();
+            meta.baseCurrSymbol = string.Empty;
+            meta.baseCurrIso    = string.Empty;
+            meta.baseCurrPrec   = 2;
+
+            var sb = new StringBuilder();
+            sb.Append("SELECT cs.C_Currency_ID AS CurrencyId,");
+            sb.Append("       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS CurrencySymbol,");
+            sb.Append("       cur.ISO_Code AS CurrencyIso,");
+            sb.Append("       cur.StdPrecision AS StdPrecision");
+            sb.Append("  FROM AD_ClientInfo ci");
+            sb.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
+            sb.Append("  INNER JOIN C_Currency cur ON (cur.C_Currency_ID = cs.C_Currency_ID)");
+            sb.Append(" WHERE ci.AD_Client_ID = @adClientId");
+
+            string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                sb.ToString(), "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            try
+            {
+                DataSet ds = DB.ExecuteDataset(accessSql,
+                    new SqlParameter[] { new SqlParameter("@adClientId", adClientId) }, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow row = ds.Tables[0].Rows[0];
+                    string sym = Util.GetValueOfString(row["CurrencySymbol"]);
+                    if (!string.IsNullOrWhiteSpace(sym)) meta.baseCurrSymbol = sym;
+                    string iso = Util.GetValueOfString(row["CurrencyIso"]);
+                    if (!string.IsNullOrWhiteSpace(iso)) meta.baseCurrIso = iso;
+                    if (row["StdPrecision"] != DBNull.Value)
+                        meta.baseCurrPrec = Util.GetValueOfInt(row["StdPrecision"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.SaveError("VAS_123_QuotationRightPanelModel.GetCurrencyMeta", ex.Message);
+            }
+
+            return meta;
+        }
+
+        /// <summary>
         /// Returns the exact billing and shipping locations selected on the quotation
         /// (C_Order.Bill_Location_ID for billing, C_Order.C_BPartner_Location_ID for shipping).
         /// </summary>
@@ -1057,9 +1151,16 @@ namespace VAS.Models
 
                 addr.shippingLocation_ID   = Util.GetValueOfInt(row["ShippingLocation_ID"]);
                 addr.billingLocation_ID    = Util.GetValueOfInt(row["BillingLocation_ID"]);
-                // totalOpenBalance read here so GetHeader SQL stays lean and schema-safe
+                // totalOpenBalance read here so GetHeader SQL stays lean and schema-safe.
+                // The balance is always stored in the accounting (base) currency, so we
+                // attach base currency metadata so the client renders it correctly.
                 addr.totalOpenBalance      = row["TotalOpenBalance"] != DBNull.Value
                     ? Convert.ToDecimal(row["TotalOpenBalance"]) : 0m;
+
+                dynamic currMeta       = GetCurrencyMeta(ctx, ctx.GetAD_Client_ID());
+                addr.baseCurrSymbol    = currMeta.baseCurrSymbol;
+                addr.baseCurrIso       = currMeta.baseCurrIso;
+                addr.baseCurrPrec      = currMeta.baseCurrPrec;
                 addr.shippingLocationName  = Util.GetValueOfString(row["ShippingLocationName"]);
                 addr.shippingAddress1      = Util.GetValueOfString(row["ShippingAddress1"]);
                 addr.shippingAddress2      = Util.GetValueOfString(row["ShippingAddress2"]);
@@ -1146,6 +1247,28 @@ namespace VAS.Models
                     ? Convert.ToDateTime(row["OrderValidTo"]) : (DateTime?)null;
                 result.currencyISO       = Util.GetValueOfString(row["CurrencyISO"]);
                 result.currencyCode      = result.currencyISO;
+                result.c_Currency_ID     = Util.GetValueOfInt(row["C_Currency_ID"]);
+
+                // Currency Rate Type — name of the conversion type (e.g. "Spot", "Corporate")
+                // stored in C_ConversionType, linked via C_Order.C_ConversionType_ID.
+                // Wrapped in try-catch because C_ConversionType_ID may be absent in older schemas.
+                result.currencyRateType = string.Empty;
+                try
+                {
+                    string rateTypeSql = @"SELECT ct.Name AS ConversionTypeName
+                        FROM C_Order o
+                        LEFT OUTER JOIN C_ConversionType ct ON (ct.C_ConversionType_ID = o.C_ConversionType_ID AND ct.IsActive = 'Y')
+                        WHERE o.C_Order_ID = @orderId";
+                    DataSet dsRt = DB.ExecuteDataset(rateTypeSql,
+                        new SqlParameter[] { new SqlParameter("@orderId", orderId) }, null);
+                    if (dsRt != null && dsRt.Tables.Count > 0 && dsRt.Tables[0].Rows.Count > 0)
+                        result.currencyRateType = Util.GetValueOfString(dsRt.Tables[0].Rows[0]["ConversionTypeName"]);
+                }
+                catch (Exception ex)
+                {
+                    _log.SaveError("VAS_123_QuotationRightPanelModel.GetPricingTerms.CurrencyRateType", ex.Message);
+                    result.currencyRateType = string.Empty;
+                }
 
                 // PriorityRule — column may not exist in older schema deployments.
                 // Failure here must not null-out the already-populated result.
@@ -1408,12 +1531,46 @@ namespace VAS.Models
         {
             var list = new List<dynamic>();
 
+            // Build a code → label map from AD_Ref_List for AppointmentsInfo.PriorityKey
+            // so the client receives the resolved name rather than a raw numeric code.
+            var priorityMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                string lang   = ctx.GetAD_Language();
+                var sbPri     = new StringBuilder();
+                sbPri.Append("SELECT r.Value AS val,");
+                sbPri.Append("       COALESCE(trl.Name, r.Name) AS name");
+                sbPri.Append("  FROM AD_Ref_List r");
+                sbPri.Append("  INNER JOIN AD_Column col ON (col.AD_Reference_Value_ID = r.AD_Reference_ID");
+                sbPri.Append("       AND col.ColumnName = 'PriorityKey' AND col.IsActive = 'Y')");
+                sbPri.Append("  INNER JOIN AD_Table tbl ON (tbl.AD_Table_ID = col.AD_Table_ID");
+                sbPri.Append("       AND tbl.TableName = 'AppointmentsInfo' AND tbl.IsActive = 'Y')");
+                sbPri.Append("  LEFT OUTER JOIN AD_Ref_List_Trl trl ON (trl.AD_Ref_List_ID = r.AD_Ref_List_ID");
+                sbPri.Append("       AND trl.IsActive = 'Y' AND trl.AD_Language = @lang)");
+                sbPri.Append(" WHERE r.IsActive = 'Y'");
+                string priAccess = MRole.GetDefault(ctx).AddAccessSQL(sbPri.ToString(), "r", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                DataSet dsPri = DB.ExecuteDataset(priAccess, new SqlParameter[] { new SqlParameter("@lang", lang) }, null);
+                if (dsPri != null && dsPri.Tables.Count > 0)
+                {
+                    foreach (DataRow pr in dsPri.Tables[0].Rows)
+                    {
+                        string pval = Util.GetValueOfString(pr["val"]);
+                        if (!string.IsNullOrEmpty(pval) && !priorityMap.ContainsKey(pval))
+                            priorityMap[pval] = Util.GetValueOfString(pr["name"]);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.SaveError("VAS_123_QuotationRightPanelModel.GetTasks.PriorityMap", ex.Message);
+            }
+
             var sb = new StringBuilder();
             sb.Append("SELECT a.AppointmentsInfo_ID AS AppointmentsInfo_ID,");
             sb.Append("       a.Subject AS Subject,");
             sb.Append("       TO_CHAR(a.EndDate, 'YYYY-MM-DD') AS DueDate,");
             sb.Append("       a.PriorityKey AS PriorityKey,");
-            sb.Append("       a.TaskStatus AS TaskStatus,");
+            sb.Append("       a.TaskStatus * 10 AS CompletionPct,"); // TaskStatus is 0–10 scale; multiply to get 0–100 percent
             sb.Append("       COALESCE(SUBSTR(a.IsClosed, 1, 1), 'N') AS IsClosed,");
             sb.Append("       u.Name AS AssigneeName");
             sb.Append("  FROM AppointmentsInfo a");
@@ -1426,7 +1583,7 @@ namespace VAS.Models
 
             string accessSql = MRole.GetDefault(ctx).AddAccessSQL(
                 sb.ToString(), "a", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            accessSql += " ORDER BY IsClosed ASC, PriorityKey ASC, DueDate ASC";
+            accessSql += " ORDER BY IsClosed ASC, a.Created DESC";
 
             var sqlParams = new SqlParameter[]
             {
@@ -1443,18 +1600,20 @@ namespace VAS.Models
                 {
                     dynamic t = new ExpandoObject();
 
-                    // r_Request_ID is the field name the JS client reads for data-task-id;
-                    // it now holds AppointmentsInfo_ID (the correct PK for this entity).
-                    t.r_Request_ID = Util.GetValueOfInt(row["AppointmentsInfo_ID"]);
-                    t.title        = Util.GetValueOfString(row["Subject"]);
-                    t.due          = Util.GetValueOfString(row["DueDate"]);   // "YYYY-MM-DD" string
-                    t.assigneeName = Util.GetValueOfString(row["AssigneeName"]);
+                    // r_Request_ID is the field name the JS client reads for data-task-id.
+                    t.r_Request_ID  = Util.GetValueOfInt(row["AppointmentsInfo_ID"]);
+                    // HtmlDecode prevents stored HTML entities (e.g. &amp;) from showing literally.
+                    t.title         = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Subject"]));
+                    t.due           = Util.GetValueOfString(row["DueDate"]);   // "YYYY-MM-DD" string
+                    t.assigneeName  = Util.GetValueOfString(row["AssigneeName"]);
 
-                    // Raw platform priority code (U/3/5/7); client translates via AD_Message
-                    t.priority = Util.GetValueOfString(row["PriorityKey"]);
+                    string rawPri   = Util.GetValueOfString(row["PriorityKey"]);
+                    t.priority      = rawPri;   // kept for backwards compat
+                    t.priorityCode  = rawPri;
+                    t.priorityLabel = priorityMap.ContainsKey(rawPri) ? priorityMap[rawPri] : rawPri;
 
-                    // TaskStatus is the numeric completion percentage (0-100)
-                    t.pct    = Util.GetValueOfString(row["TaskStatus"]);
+                    // CompletionPct = TaskStatus * 10 (TaskStatus is 0–10 scale, e.g. 2 = 20%)
+                    t.pct    = Util.GetValueOfInt(row["CompletionPct"]);
                     t.closed = "Y".Equals(Util.GetValueOfString(row["IsClosed"]));
 
                     list.Add(t);
@@ -1466,6 +1625,77 @@ namespace VAS.Models
             }
 
             return list;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // §14b  CompleteTask / ReopenTask
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Marks an AppointmentsInfo task as closed (IsClosed = Y, TaskStatus = 100).
+        /// </summary>
+        /// <param name="ctx">Current session context.</param>
+        /// <param name="taskId">AppointmentsInfo_ID of the task to complete.</param>
+        /// <returns>Dynamic object with success flag.</returns>
+        public dynamic CompleteTask(Ctx ctx, int taskId)
+        {
+            dynamic response = new ExpandoObject();
+            response.success = false;
+            try
+            {
+                if (taskId <= 0) return response;
+                var sb = new StringBuilder();
+                sb.Append("UPDATE AppointmentsInfo");
+                sb.Append("   SET IsClosed   = 'Y',");
+                sb.Append("       TaskStatus = 100,");
+                sb.Append("       UpdatedBy  = @userId,");
+                sb.Append("       Updated    = CURRENT_TIMESTAMP");
+                sb.Append(" WHERE AppointmentsInfo_ID = @taskId");
+                sb.Append("   AND IsActive   = 'Y'");
+                var sqlParams = new SqlParameter[]
+                {
+                    new SqlParameter("@userId", ctx.GetAD_User_ID()),
+                    new SqlParameter("@taskId", taskId)
+                };
+                int rows = DB.ExecuteQuery(sb.ToString(), sqlParams, null);
+                response.success = (rows >= 0);
+                if (rows < 0) _log.SaveError("VAS_123.CompleteTask", "DB error taskId=" + taskId);
+            }
+            catch (Exception ex) { _log.SaveError("VAS_123.CompleteTask", ex.Message); }
+            return response;
+        }
+
+        /// <summary>
+        /// Reopens a previously closed AppointmentsInfo task (IsClosed = N).
+        /// </summary>
+        /// <param name="ctx">Current session context.</param>
+        /// <param name="taskId">AppointmentsInfo_ID of the task to reopen.</param>
+        /// <returns>Dynamic object with success flag.</returns>
+        public dynamic ReopenTask(Ctx ctx, int taskId)
+        {
+            dynamic response = new ExpandoObject();
+            response.success = false;
+            try
+            {
+                if (taskId <= 0) return response;
+                var sb = new StringBuilder();
+                sb.Append("UPDATE AppointmentsInfo");
+                sb.Append("   SET IsClosed  = 'N',");
+                sb.Append("       UpdatedBy = @userId,");
+                sb.Append("       Updated   = CURRENT_TIMESTAMP");
+                sb.Append(" WHERE AppointmentsInfo_ID = @taskId");
+                sb.Append("   AND IsActive  = 'Y'");
+                var sqlParams = new SqlParameter[]
+                {
+                    new SqlParameter("@userId", ctx.GetAD_User_ID()),
+                    new SqlParameter("@taskId", taskId)
+                };
+                int rows = DB.ExecuteQuery(sb.ToString(), sqlParams, null);
+                response.success = (rows >= 0);
+                if (rows < 0) _log.SaveError("VAS_123.ReopenTask", "DB error taskId=" + taskId);
+            }
+            catch (Exception ex) { _log.SaveError("VAS_123.ReopenTask", ex.Message); }
+            return response;
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -1501,14 +1731,29 @@ namespace VAS.Models
             {
                 try
                 {
+                    // AppointmentsInfo.Created is stored as UTC by the appointments module.
+                    // Offset by the difference between DB server local time and UTC so the
+                    // engagement card shows the user's local creation time.
+                    // The offset expression evaluates to zero when the DB server is already in local time.
+                    string mtCreatedLocalExpr = DB.IsOracle()
+                        ? "TO_CHAR(MIN(a.Created) + (SYSDATE - CAST(SYS_EXTRACT_UTC(SYSTIMESTAMP) AS DATE)),'YYYY-MM-DD HH24:MI')"
+                        : "TO_CHAR(MIN(a.Created) + (LOCALTIMESTAMP - (NOW() AT TIME ZONE 'UTC')),'YYYY-MM-DD HH24:MI')";
+
                     var sbMt = new StringBuilder();
                     sbMt.Append("SELECT MIN(a.AppointmentsInfo_ID) AS MeetingId,");
-                    sbMt.Append("       TO_CHAR(MIN(a.StartDate),'YYYY-MM-DD HH24:MI') AS when_ts,");
+                    // when_ts drives the timestamp shown on the engagement timeline card — use Created
+                    // (UTC-adjusted to local) so users see when the meeting was logged.
+                    sbMt.Append("       " + mtCreatedLocalExpr + " AS when_ts,");
+                    sbMt.Append("       TO_CHAR(MIN(a.StartDate),'YYYY-MM-DD HH24:MI') AS start_date,");
                     sbMt.Append("       TO_CHAR(MIN(a.EndDate),'YYYY-MM-DD HH24:MI') AS end_date,");
                     sbMt.Append("       COALESCE(MIN(a.Subject), N'') AS title,");
                     sbMt.Append("       COALESCE(MIN(a.Location), N'') AS location,");
                     sbMt.Append("       COALESCE(MIN(SUBSTR(a.Comments, 1, 200)), N'') AS preview,");
+                    sbMt.Append("       COALESCE(MIN(a.Description), N'') AS description,");
                     sbMt.Append("       CASE WHEN MIN(atr.AppointmentsInfo_ID) IS NOT NULL THEN 'Y' ELSE 'N' END AS has_transcript,");
+                    // Fetch attendee IDs in the same query to avoid a separate round-trip.
+                    // MIN() picks the value from one row in the group — fine since (StartDate, Subject) normally identifies one appointment.
+                    sbMt.Append("       COALESCE(MIN(a.AttendeeInfo), N'') AS attendee_info,");
                     sbMt.Append("       MIN(u.Name) AS who");
                     sbMt.Append("  FROM AppointmentsInfo a");
                     sbMt.Append("  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = a.CreatedBy AND u.IsActive = 'Y')");
@@ -1525,6 +1770,10 @@ namespace VAS.Models
 
                     DataSet mtDs = DB.ExecuteDataset(mtAccessSql,
                         new SqlParameter[] { new SqlParameter("@orderId", orderId) }, null);
+
+                    // Keep refs to meeting items so attendee names can be back-filled below.
+                    var meetingItemRefs = new List<dynamic>();
+
                     if (mtDs != null && mtDs.Tables.Count > 0)
                     {
                         foreach (DataRow row in mtDs.Tables[0].Rows)
@@ -1533,16 +1782,21 @@ namespace VAS.Models
                             item.touchType    = "MEETING";
                             item.meetingId    = Util.GetValueOfInt(row["MeetingId"]);
                             item.whenTs       = Util.GetValueOfString(row["when_ts"]);
-                            item.title        = Util.GetValueOfString(row["title"]);
-                            item.location     = Util.GetValueOfString(row["location"]);
-                            item.preview      = Util.GetValueOfString(row["preview"]);
+                            // Subject, Location, Comments and Description are stored HTML-encoded by
+                            // the VIS platform (& → &amp;). HtmlDecode restores plain text so the JS
+                            // esc() call does not double-encode the value.
+                            item.title        = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["title"]));
+                            item.location     = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["location"]));
+                            item.preview      = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["preview"]));
+                            item.description  = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["description"]));
                             item.hasTranscript = Util.GetValueOfString(row["has_transcript"]) == "Y";
+                            item.attendeeInfo = Util.GetValueOfString(row["attendee_info"]);
                             item.who          = Util.GetValueOfString(row["who"]);
                             item.direction    = "";
                             item.durationMins = 0;
                             try
                             {
-                                var startStr = Util.GetValueOfString(row["when_ts"]);
+                                var startStr = Util.GetValueOfString(row["start_date"]);
                                 var endStr   = Util.GetValueOfString(row["end_date"]);
                                 if (!string.IsNullOrEmpty(startStr) && !string.IsNullOrEmpty(endStr))
                                 {
@@ -1554,48 +1808,92 @@ namespace VAS.Models
                             }
                             catch { /* duration calc failed — leave 0 */ }
                             allItems.Add(item);
+                            meetingItemRefs.Add(item);
                             countMeetings++;
+                        }
+                    }
+
+                    // Resolve attendee IDs → names and back-fill item.who.
+                    // Also populate allAttendeeIds for the stat card unique-people count.
+                    // AttendeeInfo is a comma/semicolon-delimited list of numeric AD_User_IDs,
+                    // email addresses, or plain display names.
+                    if (meetingItemRefs.Count > 0)
+                    {
+                        var uniqueUids = new HashSet<int>();
+                        foreach (dynamic mi in meetingItemRefs)
+                        {
+                            var raw = (string)(mi.attendeeInfo ?? "");
+                            if (string.IsNullOrEmpty(raw)) continue;
+                            foreach (var part in raw.Split(new char[] { ',', ';' }))
+                            {
+                                var tkn = part.Trim();
+                                if (string.IsNullOrEmpty(tkn)) continue;
+                                allAttendeeIds.Add(tkn); // for stat card count
+                                int uid;
+                                if (int.TryParse(tkn, out uid) && uid > 0) uniqueUids.Add(uid);
+                            }
+                        }
+
+                        // Batch-query AD_User names for all unique numeric IDs.
+                        var uidNameMap = new Dictionary<int, string>();
+                        if (uniqueUids.Count > 0)
+                        {
+                            var pNames  = new List<string>();
+                            var pList   = new List<SqlParameter>();
+                            int pIdx    = 0;
+                            foreach (int uid in uniqueUids)
+                            {
+                                pNames.Add("@uid" + pIdx);
+                                pList.Add(new SqlParameter("@uid" + pIdx, uid));
+                                pIdx++;
+                            }
+                            string uidSql = "SELECT AD_User_ID," +
+                                " TRIM(COALESCE(Name, N'') || ' ' || COALESCE(LastName, N'')) AS FullName" +
+                                " FROM AD_User WHERE IsActive = 'Y' AND AD_User_ID IN (" +
+                                string.Join(",", pNames) + ")";
+                            DataSet uidDs = DB.ExecuteDataset(uidSql, pList.ToArray(), null);
+                            if (uidDs != null && uidDs.Tables.Count > 0)
+                            {
+                                foreach (DataRow nr in uidDs.Tables[0].Rows)
+                                {
+                                    int    uid = Util.GetValueOfInt(nr["AD_User_ID"]);
+                                    string nm  = Util.GetValueOfString(nr["FullName"]).Trim();
+                                    if (uid > 0 && !string.IsNullOrEmpty(nm)) uidNameMap[uid] = nm;
+                                }
+                            }
+                        }
+
+                        // Update each meeting item's who with resolved attendee names.
+                        // Falls back to the organizer name (already set) when no attendees are resolved.
+                        foreach (dynamic mi in meetingItemRefs)
+                        {
+                            var raw = (string)(mi.attendeeInfo ?? "");
+                            if (string.IsNullOrEmpty(raw)) continue;
+                            var resolvedNames = new List<string>();
+                            foreach (var part in raw.Split(new char[] { ',', ';' }))
+                            {
+                                var tkn = part.Trim();
+                                if (string.IsNullOrEmpty(tkn)) continue;
+                                int uid;
+                                if (int.TryParse(tkn, out uid) && uid > 0)
+                                {
+                                    string nm;
+                                    if (uidNameMap.TryGetValue(uid, out nm)) resolvedNames.Add(nm);
+                                }
+                                else if (!tkn.Contains('@'))
+                                {
+                                    // Plain name token — use as-is
+                                    resolvedNames.Add(tkn);
+                                }
+                            }
+                            if (resolvedNames.Count > 0)
+                                mi.who = string.Join(", ", resolvedNames);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
                     _log.SaveError("VAS_123_QuotationRightPanelModel.GetEngagement.Meetings", ex.Message);
-                }
-
-                // Collect unique attendee IDs for the stat card subtitle
-                if (countMeetings > 0)
-                {
-                    try
-                    {
-                        var sbAtt = new StringBuilder();
-                        sbAtt.Append("SELECT COALESCE(SUBSTR(a.AttendeeInfo, 1, 4000), N'') AS attendee_info");
-                        sbAtt.Append("  FROM AppointmentsInfo a");
-                        sbAtt.Append(" WHERE a.IsActive = 'Y'");
-                        sbAtt.Append("   AND COALESCE(a.IsTask, 'N') = 'N'");
-                        sbAtt.Append("   AND a.AD_Table_ID = " + tableId);
-                        sbAtt.Append("   AND a.Record_ID = @orderId");
-                        string attAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                            sbAtt.ToString(), "a", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                        DataSet attDs = DB.ExecuteDataset(attAccessSql,
-                            new SqlParameter[] { new SqlParameter("@orderId", orderId) }, null);
-                        if (attDs != null && attDs.Tables.Count > 0)
-                        {
-                            foreach (DataRow ar in attDs.Tables[0].Rows)
-                            {
-                                var raw = Util.GetValueOfString(ar["attendee_info"]);
-                                if (!string.IsNullOrEmpty(raw))
-                                {
-                                    foreach (var part in raw.Split(','))
-                                    {
-                                        var t = part.Trim();
-                                        if (!string.IsNullOrEmpty(t)) allAttendeeIds.Add(t);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    catch { /* AttendeeInfo read failed — attendee count stays 0 */ }
                 }
             }
 
@@ -1655,14 +1953,18 @@ namespace VAS.Models
                     sbEm.Append("            ELSE TO_CHAR(ma.Created,'YYYY-MM-DD HH24:MI') END AS when_ts,");
                     sbEm.Append("       COALESCE(ma.Title, N'') AS title,");
                     sbEm.Append("       N'' AS preview,");
-                    sbEm.Append("       u.Name AS who,");
+                    // For outgoing mails show the recipient address (MailAddress); for incoming show the sender (MailAddressFrom).
+                    // This is the contact-facing party, not the CRM user who created the record.
+                    sbEm.Append("       CASE WHEN ma.AttachmentType = 'I' THEN COALESCE(ma.MailAddressFrom, N'')");
+                    sbEm.Append("            ELSE COALESCE(ma.MailAddress, N'') END AS who,");
                     sbEm.Append("       CASE WHEN ma.AttachmentType = 'I' THEN 'in' ELSE 'out' END AS direction");
                     sbEm.Append("  FROM MailAttachment1 ma");
-                    sbEm.Append("  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy)");
                     sbEm.Append(" WHERE ma.IsActive = 'Y'");
                     sbEm.Append("   AND ma.AD_Table_ID = " + tableId);
                     sbEm.Append("   AND ma.Record_ID = @orderId");
-                    sbEm.Append("   AND ma.AttachmentType IN ('M', 'I')");
+                    // Use COALESCE so rows where AttachmentType IS NULL (valid mail rows in some
+                    // installations) are not silently excluded — same convention as VAS_ActivitySourcesModel.
+                    sbEm.Append("   AND COALESCE(ma.AttachmentType, 'M') IN ('M', 'I')");
 
                     string emAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
                         sbEm.ToString(), "ma", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -1689,6 +1991,69 @@ namespace VAS.Models
                 catch (Exception ex)
                 {
                     _log.SaveError("VAS_123_QuotationRightPanelModel.GetEngagement.Emails", ex.Message);
+                }
+            }
+
+            // ── Step 3b: APPOINTMENT-LINKED EMAILS ───────────────────────────
+            // Mails can be anchored to AppointmentsInfo rows that are in turn linked to this
+            // C_Order (AD_Table_ID = cOrderTableId, Record_ID = orderId). These never appear
+            // in the direct ma.Record_ID = orderId query above, so they must be fetched
+            // separately — same pattern as VAS_ActivitySourcesModel.LoadAppointmentMails.
+            if (tableId > 0)
+            {
+                try
+                {
+                    int apptTableId = MTable.Get_Table_ID("AppointmentsInfo");
+                    if (apptTableId > 0)
+                    {
+                        var sbAppt = new StringBuilder();
+                        sbAppt.Append("SELECT ma.MailAttachment1_ID AS email_id,");
+                        sbAppt.Append("       CASE WHEN ma.AttachmentType = 'I'");
+                        sbAppt.Append("            THEN TO_CHAR(ma.DateMailReceived,'YYYY-MM-DD HH24:MI')");
+                        sbAppt.Append("            ELSE TO_CHAR(ma.Created,'YYYY-MM-DD HH24:MI') END AS when_ts,");
+                        sbAppt.Append("       COALESCE(ma.Title, N'') AS title,");
+                        sbAppt.Append("       N'' AS preview,");
+                        sbAppt.Append("       CASE WHEN ma.AttachmentType = 'I' THEN COALESCE(ma.MailAddressFrom, N'')");
+                        sbAppt.Append("            ELSE COALESCE(ma.MailAddress, N'') END AS who,");
+                        sbAppt.Append("       CASE WHEN ma.AttachmentType = 'I' THEN 'in' ELSE 'out' END AS direction");
+                        sbAppt.Append("  FROM MailAttachment1 ma");
+                        sbAppt.Append("  INNER JOIN AppointmentsInfo ai ON (ai.AppointmentsInfo_ID = ma.Record_ID");
+                        sbAppt.Append("       AND ai.AD_Table_ID = " + tableId);
+                        sbAppt.Append("       AND ai.Record_ID = @orderId");
+                        sbAppt.Append("       AND COALESCE(ai.IsActive,'Y') = 'Y'");
+                        sbAppt.Append("       AND COALESCE(ai.IsDeleted,'N') = 'N')");
+                        sbAppt.Append(" WHERE ma.IsActive = 'Y'");
+                        sbAppt.Append("   AND ma.AD_Table_ID = " + apptTableId);
+                        // Exclude image attachments; NULL AttachmentType = standard mail (same
+                        // convention as Step 3 above and VAS_ActivitySourcesModel).
+                        sbAppt.Append("   AND COALESCE(ma.AttachmentType, 'M') IN ('M', 'I')");
+
+                        string apptAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                            sbAppt.ToString(), "ma", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+                        DataSet apptDs = DB.ExecuteDataset(apptAccessSql,
+                            new SqlParameter[] { new SqlParameter("@orderId", orderId) }, null);
+                        if (apptDs != null && apptDs.Tables.Count > 0)
+                        {
+                            foreach (DataRow row in apptDs.Tables[0].Rows)
+                            {
+                                dynamic item   = new ExpandoObject();
+                                item.touchType = "EMAIL";
+                                item.emailId   = Util.GetValueOfInt(row["email_id"]);
+                                item.whenTs    = Util.GetValueOfString(row["when_ts"]);
+                                item.title     = Util.GetValueOfString(row["title"]);
+                                item.preview   = "";
+                                item.who       = Util.GetValueOfString(row["who"]);
+                                item.direction = Util.GetValueOfString(row["direction"]);
+                                allItems.Add(item);
+                                countEmails++;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.SaveError("VAS_123_QuotationRightPanelModel.GetEngagement.ApptEmails", ex.Message);
                 }
             }
 
@@ -2146,14 +2511,17 @@ namespace VAS.Models
         public dynamic GetEmailDetail(Ctx ctx, int emailId)
         {
             dynamic response = new ExpandoObject();
-            response.id        = emailId;
-            response.subject   = "";
-            response.body      = "";
-            response.whenTs    = "";
-            response.direction = "";
-            response.fromEmail = "";
-            response.toEmail   = "";
-            response.who       = "";
+            response.id          = emailId;
+            response.subject     = "";
+            response.body        = "";
+            response.whenTs      = "";
+            response.direction   = "";
+            response.fromEmail   = "";
+            response.toEmail     = "";
+            response.ccEmail     = "";
+            response.who         = "";
+            response.peopleNames = "";
+            response.fromName    = "";  // resolved display name for the From address (incoming People)
             try
             {
                 if (emailId <= 0) { response.id = 0; return response; }
@@ -2168,6 +2536,7 @@ namespace VAS.Models
                 sb.Append("       CASE WHEN ma.AttachmentType = 'I' THEN 'in' ELSE 'out' END AS Direction,");
                 sb.Append("       ma.MailAddressFrom AS FromEmail,");
                 sb.Append("       ma.MailAddress AS ToEmail,");
+                sb.Append("       COALESCE(ma.MailAddressCc, N'') AS CcEmail,");
                 sb.Append("       u.Name AS Who");
                 sb.Append("  FROM MailAttachment1 ma");
                 sb.Append("  LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy AND u.IsActive = 'Y')");
@@ -2187,8 +2556,96 @@ namespace VAS.Models
                     response.whenTs    = Util.GetValueOfString(row["WhenTs"]);
                     response.direction = Util.GetValueOfString(row["Direction"]);
                     response.fromEmail = Util.GetValueOfString(row["FromEmail"]);
-                    response.toEmail   = Util.GetValueOfString(row["ToEmail"]);
                     response.who       = Util.GetValueOfString(row["Who"]);
+
+                    string toAddr = Util.GetValueOfString(row["ToEmail"]);
+                    string ccAddr = Util.GetValueOfString(row["CcEmail"]);
+                    response.toEmail = toAddr;
+                    response.ccEmail = ccAddr;
+
+                    // Collect To + CC + From addresses and resolve all to AD_User names in one query.
+                    // peopleNames (outgoing): resolved To+CC names shown in the People field.
+                    // fromName  (incoming):   resolved From name shown in the People field.
+                    string fromEmailRaw = (response.fromEmail ?? "").Trim();
+                    var allAddrs = new List<string>();
+                    foreach (var part in new[] { toAddr, ccAddr })
+                    {
+                        if (!string.IsNullOrWhiteSpace(part))
+                            allAddrs.AddRange(part.Split(new char[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries));
+                    }
+                    // Include fromEmail so its name is resolved in the same query
+                    if (!string.IsNullOrWhiteSpace(fromEmailRaw)) allAddrs.Add(fromEmailRaw);
+
+                    var uniqueAddrs = allAddrs
+                        .Select(e => e.Trim().ToLowerInvariant())
+                        .Where(e => !string.IsNullOrEmpty(e))
+                        .Distinct()
+                        .Take(20)
+                        .ToList();
+
+                    if (uniqueAddrs.Count > 0)
+                    {
+                        try
+                        {
+                            var snb        = new StringBuilder();
+                            var nameParams = new List<SqlParameter>();
+                            var holders    = new List<string>();
+                            for (int i = 0; i < uniqueAddrs.Count; i++)
+                            {
+                                holders.Add("@em" + i);
+                                nameParams.Add(new SqlParameter("@em" + i, uniqueAddrs[i]));
+                            }
+                            snb.Append("SELECT LOWER(TRIM(u.EMail)) AS Email, u.Name AS UName");
+                            snb.Append("  FROM AD_User u");
+                            snb.Append(" WHERE u.IsActive = 'Y'");
+                            snb.Append("   AND LOWER(TRIM(u.EMail)) IN (");
+                            snb.Append(string.Join(", ", holders));
+                            snb.Append(")");
+
+                            DataSet nameDs = DB.ExecuteDataset(snb.ToString(), nameParams.ToArray(), null);
+                            var nameMap    = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                            if (nameDs != null && nameDs.Tables.Count > 0)
+                            {
+                                foreach (DataRow nr in nameDs.Tables[0].Rows)
+                                {
+                                    string eml  = Util.GetValueOfString(nr["Email"]);
+                                    string unam = Util.GetValueOfString(nr["UName"]);
+                                    if (!string.IsNullOrEmpty(eml) && !nameMap.ContainsKey(eml))
+                                        nameMap[eml] = unam;
+                                }
+                            }
+
+                            // peopleNames: To+CC resolved names (for outgoing People field)
+                            var toCcAddrs = allAddrs
+                                .Where(a => !string.Equals(a.Trim(), fromEmailRaw, StringComparison.OrdinalIgnoreCase))
+                                .Select(e => e.Trim().ToLowerInvariant())
+                                .Where(e => !string.IsNullOrEmpty(e))
+                                .Distinct().ToList();
+                            var peopleList = new List<string>();
+                            foreach (var addr in toCcAddrs)
+                            {
+                                if (nameMap.ContainsKey(addr))
+                                    peopleList.Add(nameMap[addr]);
+                            }
+                            response.peopleNames = string.Join(";", peopleList);
+
+                            // fromName: resolved name for From address (for incoming People field).
+                            // Falls back to the raw email so JS always has something to display.
+                            string fromKey = fromEmailRaw.ToLowerInvariant();
+                            response.fromName = !string.IsNullOrEmpty(fromKey) && nameMap.ContainsKey(fromKey)
+                                ? nameMap[fromKey] : fromEmailRaw;
+                        }
+                        catch (Exception exNames)
+                        {
+                            _log.SaveError("VAS_123.GetEmailDetail.PeopleNames", exNames.Message);
+                            // peopleNames stays empty; JS falls back to data.who
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(fromEmailRaw))
+                    {
+                        // No To/CC but we have a fromEmail — use it directly as fromName fallback
+                        response.fromName = fromEmailRaw;
+                    }
                 }
             }
             catch (Exception ex)
@@ -2219,6 +2676,7 @@ namespace VAS.Models
             response.location     = "";
             response.meetingUrl   = "";
             response.comments     = "";
+            response.description  = "";
             response.transcript   = "";
             response.attendees    = "";
             response.durationMins = 0;
@@ -2234,6 +2692,7 @@ namespace VAS.Models
                 sb.Append("       a.Location AS Location,");
                 sb.Append("       a.MeetingUrl AS MeetingUrl,");
                 sb.Append("       SUBSTR(a.Comments, 1, 4000) AS Comments,");
+                sb.Append("       COALESCE(SUBSTR(a.Description, 1, 4000), N'') AS Description,");
                 sb.Append("       COALESCE(SUBSTR(a.AttendeeInfo, 1, 4000), CAST(a.AD_User_ID AS VARCHAR)) AS AttendeeInfo,");
                 sb.Append("       SUBSTR(atr.Transcript, 1, 4000) AS Transcript");
                 sb.Append("  FROM AppointmentsInfo a");
@@ -2249,13 +2708,16 @@ namespace VAS.Models
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
                     DataRow row = ds.Tables[0].Rows[0];
-                    response.subject    = Util.GetValueOfString(row["Subject"]);
-                    response.startDate  = Util.GetValueOfString(row["StartDate"]);
-                    response.endDate    = Util.GetValueOfString(row["EndDate"]);
-                    response.location   = Util.GetValueOfString(row["Location"]);
-                    response.meetingUrl = Util.GetValueOfString(row["MeetingUrl"]);
-                    response.comments   = Util.GetValueOfString(row["Comments"]);
-                    response.transcript = Util.GetValueOfString(row["Transcript"]);
+                    // Subject, Location, Comments and Description are stored HTML-encoded by the
+                    // VIS platform. HtmlDecode restores plain text so JS esc() does not double-encode.
+                    response.subject      = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Subject"]));
+                    response.startDate    = Util.GetValueOfString(row["StartDate"]);
+                    response.endDate      = Util.GetValueOfString(row["EndDate"]);
+                    response.location     = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Location"]));
+                    response.meetingUrl   = Util.GetValueOfString(row["MeetingUrl"]);
+                    response.comments     = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Comments"]));
+                    response.description  = System.Net.WebUtility.HtmlDecode(Util.GetValueOfString(row["Description"]));
+                    response.transcript   = Util.GetValueOfString(row["Transcript"]);
 
                     try
                     {
@@ -2270,42 +2732,98 @@ namespace VAS.Models
                     }
                     catch { }
 
-                    // Resolve attendee IDs to names
+                    // Resolve attendee identifiers to full names.
+                    // AttendeeInfo may hold comma- or semicolon-separated AD_User_IDs, email addresses, or plain names.
                     var attendeeRaw = Util.GetValueOfString(row["AttendeeInfo"]);
                     if (!string.IsNullOrEmpty(attendeeRaw))
                     {
-                        var ids = new List<string>();
-                        foreach (var s in attendeeRaw.Split(','))
+                        var idTokens    = new List<string>();
+                        var emailTokens = new List<string>();
+                        var nameTokens  = new List<string>(); // already a display name — use as-is
+
+                        foreach (var s in attendeeRaw.Split(new char[] { ',', ';' }))
                         {
                             var tkn = s.Trim();
-                            bool isNum = true;
+                            if (string.IsNullOrEmpty(tkn)) continue;
+
+                            bool isNum = tkn.Length > 0;
                             foreach (char c in tkn) { if (!char.IsDigit(c)) { isNum = false; break; } }
-                            if (!string.IsNullOrEmpty(tkn) && isNum && !ids.Contains(tkn)) ids.Add(tkn);
+
+                            if (isNum)
+                            {
+                                if (!idTokens.Contains(tkn)) idTokens.Add(tkn);
+                            }
+                            else if (tkn.Contains('@'))
+                            {
+                                if (!emailTokens.Contains(tkn)) emailTokens.Add(tkn);
+                            }
+                            else
+                            {
+                                if (!nameTokens.Contains(tkn)) nameTokens.Add(tkn);
+                            }
                         }
-                        if (ids.Count > 0)
+
+                        // Start with raw name tokens; resolved entries are appended below.
+                        var resolvedNames = new List<string>(nameTokens);
+
+                        // Resolve numeric AD_User_IDs → full name
+                        if (idTokens.Count > 0)
                         {
-                            var paramNames     = new List<string>();
-                            var nameParamList  = new List<SqlParameter>();
-                            for (int idx = 0; idx < ids.Count; idx++)
+                            var paramNames    = new List<string>();
+                            var idParamList   = new List<SqlParameter>();
+                            for (int idx = 0; idx < idTokens.Count; idx++)
                             {
                                 paramNames.Add("@uid" + idx);
-                                int uid; int.TryParse(ids[idx], out uid);
-                                nameParamList.Add(new SqlParameter("@uid" + idx, uid));
+                                int uid; int.TryParse(idTokens[idx], out uid);
+                                idParamList.Add(new SqlParameter("@uid" + idx, uid));
                             }
-                            string namesSql = "SELECT Name FROM AD_User WHERE IsActive = 'Y' AND AD_User_ID IN (" +
+                            string idSql = "SELECT TRIM(COALESCE(Name, N'') || ' ' || COALESCE(LastName, N'')) AS FullName" +
+                                " FROM AD_User WHERE IsActive = 'Y' AND AD_User_ID IN (" +
                                 string.Join(",", paramNames) + ") ORDER BY Name";
-                            DataSet nameDs = DB.ExecuteDataset(namesSql, nameParamList.ToArray(), null);
-                            if (nameDs != null && nameDs.Tables.Count > 0)
+                            DataSet idDs = DB.ExecuteDataset(idSql, idParamList.ToArray(), null);
+                            if (idDs != null && idDs.Tables.Count > 0)
                             {
-                                var names = new List<string>();
-                                foreach (DataRow nr in nameDs.Tables[0].Rows)
+                                foreach (DataRow nr in idDs.Tables[0].Rows)
                                 {
-                                    var n = Util.GetValueOfString(nr["Name"]);
-                                    if (!string.IsNullOrEmpty(n)) names.Add(n);
+                                    var n = Util.GetValueOfString(nr["FullName"]).Trim();
+                                    if (!string.IsNullOrEmpty(n)) resolvedNames.Add(n);
                                 }
-                                response.attendees = string.Join(", ", names);
                             }
                         }
+
+                        // Resolve email addresses → full name; fall back to email when no AD_User match
+                        if (emailTokens.Count > 0)
+                        {
+                            var paramNames     = new List<string>();
+                            var emailParamList = new List<SqlParameter>();
+                            for (int idx = 0; idx < emailTokens.Count; idx++)
+                            {
+                                paramNames.Add("@em" + idx);
+                                emailParamList.Add(new SqlParameter("@em" + idx, emailTokens[idx]));
+                            }
+                            string emailSql = "SELECT TRIM(COALESCE(Name, N'') || ' ' || COALESCE(LastName, N'')) AS FullName," +
+                                " EMail FROM AD_User WHERE IsActive = 'Y' AND EMail IN (" +
+                                string.Join(",", paramNames) + ") ORDER BY Name";
+                            DataSet emailDs = DB.ExecuteDataset(emailSql, emailParamList.ToArray(), null);
+                            var matchedEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            if (emailDs != null && emailDs.Tables.Count > 0)
+                            {
+                                foreach (DataRow nr in emailDs.Tables[0].Rows)
+                                {
+                                    var n  = Util.GetValueOfString(nr["FullName"]).Trim();
+                                    var em = Util.GetValueOfString(nr["EMail"]);
+                                    matchedEmails.Add(em);
+                                    if (!string.IsNullOrEmpty(n)) resolvedNames.Add(n);
+                                }
+                            }
+                            // Emails with no AD_User match are shown as the email address itself
+                            foreach (var em in emailTokens)
+                            {
+                                if (!matchedEmails.Contains(em)) resolvedNames.Add(em);
+                            }
+                        }
+
+                        response.attendees = string.Join(", ", resolvedNames);
                     }
                 }
             }

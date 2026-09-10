@@ -384,6 +384,54 @@ namespace VAS.Controllers
         }
 
         // ─────────────────────────────────────────────────────────────────────
+        // §13b  CompleteTask
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Marks a task as complete (IsClosed = Y, TaskStatus = 100).
+        /// </summary>
+        /// <param name="taskId">AppointmentsInfo_ID of the task</param>
+        /// <returns>Double-serialized JSON with success flag</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult CompleteTask(int taskId)
+        {
+            int safeId = Util.GetValueOfInt(taskId);
+            if (Session["ctx"] == null)
+                return Json(JsonConvert.SerializeObject(new { error = "session_expired" }), JsonRequestBehavior.AllowGet);
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            VAS_123_QuotationRightPanelModel model = new VAS_123_QuotationRightPanelModel();
+            object result = model.CompleteTask(ctx, safeId);
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // §13c  ReopenTask
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Reopens a previously closed task (IsClosed = N).
+        /// </summary>
+        /// <param name="taskId">AppointmentsInfo_ID of the task</param>
+        /// <returns>Double-serialized JSON with success flag</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult ReopenTask(int taskId)
+        {
+            int safeId = Util.GetValueOfInt(taskId);
+            if (Session["ctx"] == null)
+                return Json(JsonConvert.SerializeObject(new { error = "session_expired" }), JsonRequestBehavior.AllowGet);
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            VAS_123_QuotationRightPanelModel model = new VAS_123_QuotationRightPanelModel();
+            object result = model.ReopenTask(ctx, safeId);
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
         // §14  GetEngagement
         // ─────────────────────────────────────────────────────────────────────
 
