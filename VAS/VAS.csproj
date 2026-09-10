@@ -1152,6 +1152,15 @@
     <Compile Include="Areas\VAS\Controllers\VAS_253_UtlizationbyDimensionWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_253_UtlizationbyDimensionWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\Budget\VAS_253_UtlizationbyDimensionWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_255_BudgetNearLimitWidgeController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_255_BudgetNearLimitWidge.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Budget\VAS_255_BudgetNearLimitWidge.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_251_BudgetvsActualPeriodWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_251_BudgetvsActualPeriodWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Budget\VAS_251_BudgetvsActualPeriodWidget.js" />
+    <Compile Include="Areas\VAS\Controllers\VAS_250_BudgetSummaryWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_250_BudgetSummaryWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\Budget\VAS_250_BudgetSummaryWidget.js" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>
