@@ -1,0 +1,969 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_251_BudgetvsActualPeriodWidget.css
+ * Budget vs Actual by Period (Budgeting dashboard, 6x2 grouped bar chart with a
+ * period drill-down).
+ *
+ * TWO SOURCES, EACH FOR WHAT IT OWNS.
+ *   design.md -> dashboard-widgets.md owns the SHELL: the glass card, the icon well, the
+ *   title / subtitle clamps, the header pill tier, §No Inner Scrollbars and the
+ *   widget-root em anchor. windows-and-panels.md §Panel Foundation owns the MODAL: the
+ *   container-query root, the chrome at document baseline, the em anchor on the body and
+ *   the control reset.
+ *   The widget specification owns the CHART - the grouped columns, their named series
+ *   colours (budget #BFE4FF, actual #0083DA), the axis and the legend.
+ *
+ * All internal sizing is em-driven off the widget root anchor; borders, radii and shadows
+ * stay in px ("Not Scaled With em"). No native tag selector is styled - every rule is
+ * scoped to a vas-251- class.
+ *
+ * THE PLOT IS FLEX AND EVERY BAR IS A PERCENTAGE, which is what makes the chart resize
+ * without a redraw: the widget reflows in CSS alone and the JS never measures the plot.
+ * A period column is a BUTTON only when its period was posted to - the flat variant is a
+ * div and takes no hover, no cursor and no focus ring, because a control that does
+ * nothing is worse than no control.
+ *
+ * THE MODAL IS BODY-MOUNTED, so its rules are NOT nested under .vas-251-root and it
+ * carries its own tokens - a fixed panel is no longer a descendant of the widget and
+ * would inherit nothing from it.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-251-root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    box-sizing: border-box;
+    /* Named query container so the chart and the base font can both step with the CELL,
+       not the viewport. Also the positioning context for the busy overlay. */
+    container: vas-251 / inline-size;
+}
+
+    .vas-251-root,
+    .vas-251-root * {
+        box-sizing: border-box;
+    }
+
+/* Widget root anchor: clamp(16px, 1.2cqi, 20px) expressed against the widget's own
+   measured width when available, falling back to the shared --dash-inline-size contract
+   and finally to the viewport. Everything inside is em against this. */
+.vas-251-card {
+    font-size: clamp(16px, calc(var(--widget-inline-size, var(--dash-inline-size, 100vw)) * .012), 20px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: .85em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    /* §No Inner Scrollbars - the chart fits its cell by construction, so nothing here
+       ever scrolls. */
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+}
+
+/* The form-control reset. Without it every em inside a button resolves against the
+   user-agent default (~13.33px), not the widget anchor. */
+.vas-251-card button {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+/* ---- Header: icon well + title/subtitle + financial year filter ---- */
+
+/* Header -> body gap is 0.75em per the design contract. */
+.vas-251-header {
+    display: flex;
+    align-items: flex-start;
+    gap: .625em;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: .75em;
+}
+
+/* Icon well: 1.75em on the card's em lever - the sibling widgets' well, so the icons read
+   identically side by side. Flat #EAF8FF tile, 9px radius, no inset ring. */
+.vas-251-icon {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+    .vas-251-icon svg {
+        width: .95em;
+        height: .95em;
+        display: block;
+    }
+
+.vas-251-head-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* §Widget Header title verbatim: the --dash-inline-size clamp, Medium (500), line-height
+   1.2, #102C3F - the sibling cards' title, so the headings match on a shared row. */
+.vas-251-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Subtitle: the §Widget Header pattern verbatim - Roboto Regular, #717182, line-height
+   1.3, FIXED 2px top margin. It carries three clauses, so it WILL truncate in a narrow
+   cell; the full sentence is on the element's title attribute, so nothing is lost. */
+.vas-251-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-251-subtitle:empty {
+    display: none;
+}
+
+/* Financial year filter - the interactive pill tier of the two-tier chip system (never a
+   third tier). IDENTICAL TO .vas-252-year / .vas-254-year / .vas-255-year, deliberately
+   and to the value: these cards sit on the same Budgeting dashboard carrying the same
+   control, and year pills of different widths or heights on one screen read as a mistake.
+   If one of them is retuned, retune the others in the same pass. */
+.vas-251-year {
+    flex: 0 0 auto;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-evenly;
+    gap: .35em;
+    min-width: 6.5em;
+    max-width: 42%;
+    font-family: inherit;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008125), 13px);
+    font-weight: 500;
+    line-height: 1.15;
+    color: #41576A;
+    background: rgba(255, 255, 255, .66);
+    border: 1px solid #D9E2EB;
+    border-radius: 999px;
+    padding: .15em 1em;
+    box-shadow: 0 4px 10px rgba(16, 47, 74, .05);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+    .vas-251-year:hover {
+        background: #FFFFFF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-251-year:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 1px;
+    }
+
+    .vas-251-year svg {
+        flex: 0 0 auto;
+        color: #0083DA;
+    }
+
+/* min-width:0 is what actually makes the ellipsis work. A flex item defaults to
+   min-width:auto and refuses to shrink below its content. */
+.vas-251-year-label {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Body: plot, axis, legend ---- */
+.vas-251-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* The plot takes whatever height is left. Columns are laid out from the FLOOR up, which
+   is what makes a percentage height mean what it says. */
+.vas-251-plot {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: flex-end;
+    gap: .25em;
+}
+
+/* One period. Equal share of the width, full height of the plot, its two bars sitting on
+   the floor side by side. min-width:0 lets a 13-period year compress rather than
+   overflow - §Responsive forbids a horizontal scrollbar. */
+.vas-251-col {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: .125em;
+    border-radius: 6px;
+}
+
+/* A posted period is a button and says so on hover and on focus. */
+button.vas-251-col {
+    cursor: pointer;
+}
+
+    button.vas-251-col:hover {
+        background: rgba(234, 248, 255, .7);
+    }
+
+    /* THE SHELL'S OWN BUTTON FOCUS TREATMENT IS NOT WANTED ON A BAR. A column is a button
+       only so the period can be opened - it is not a form control, and the host stylesheet's
+       focused-button look (a filled, ringed box with a shadow) drawn the full height of the
+       plot reads as a period still selected long after the panel it opened has gone. The
+       treatment is reset here and reinstated below for keyboard focus only. */
+    button.vas-251-col:focus {
+        outline: none;
+        box-shadow: none;
+        border-color: transparent;
+    }
+
+    button.vas-251-col:focus:not(:hover) {
+        background: transparent;
+    }
+
+    /* A keyboard reader still needs to see where they are - the ring the card would draw for
+       itself, quiet enough to live inside the plot. */
+    button.vas-251-col:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: -2px;
+    }
+
+/* An unposted period is NOT interactive: no cursor, no hover, no focus ring. Its bars are
+   still drawn - the budget was still approved. */
+.vas-251-col--flat {
+    cursor: default;
+}
+
+/* WHILE THE DRILL-DOWN IS OPEN THE CHART BEHIND IT IS INERT AND UNLIT. The pointer is still
+   resting on the bar that was clicked, so its hover treatment would otherwise sit burning
+   through the scrim next to the panel, and a browser that keeps a ring on a programmatically
+   blurred control would leave a lit button outside the dialog the reader is now in. The bar
+   is only a bar again when the panel closes. */
+.vas-251-modal-open button.vas-251-col:hover,
+.vas-251-modal-open button.vas-251-col:focus,
+.vas-251-modal-open button.vas-251-col:focus-visible {
+    background: transparent;
+    outline: none;
+    box-shadow: none;
+    border-color: transparent;
+}
+
+.vas-251-modal-open button.vas-251-col:hover .vas-251-bar--actual {
+    background: #0083DA;
+}
+
+/* The bars themselves. Width is a share of the column so two bars always sit together as
+   a pair; the cap keeps them from becoming slabs in a 6-period year. */
+.vas-251-bar {
+    display: block;
+    width: 34%;
+    max-width: 15px;
+    border-radius: 3px 3px 0 0;
+    transition: height .2s ease;
+}
+
+/* The specification's series colours: pale for what was approved, brand for what was
+   actually posted. The legend names both, so the colours are learned once. */
+.vas-251-bar--budget {
+    background: #BFE4FF;
+}
+
+.vas-251-bar--actual {
+    background: #0083DA;
+}
+
+button.vas-251-col:hover .vas-251-bar--actual {
+    background: #0069AE;
+}
+
+/* ---- X axis: one label per column, in the same order and the same tracks ---- */
+.vas-251-xaxis {
+    flex: 0 0 auto;
+    display: flex;
+    gap: .25em;
+    margin-top: .25em;
+}
+
+    .vas-251-xaxis > span {
+        flex: 1 1 0;
+        min-width: 0;
+        text-align: center;
+        font-size: .6875em;
+        color: #5F7283;
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+/* ---- Legend ---- */
+.vas-251-legend {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 2em;
+    margin-top: .75em;
+    min-width: 0;
+    font-weight: 700;
+}
+
+.vas-251-lg {
+    display: flex;
+    align-items: center;
+    gap: .375em;
+    font-size: .6875em;
+    color: #41576A;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.vas-251-sw {
+    width: .75em;
+    height: .5em;
+    border-radius: 2px;
+    display: block;
+    flex: 0 0 auto;
+}
+
+.vas-251-sw--budget {
+    background: #BFE4FF;
+}
+
+.vas-251-sw--actual {
+    background: #0083DA;
+}
+
+/* The hint sits at the trailing edge and is the quietest thing on the card - it explains
+   an affordance rather than stating a finding. */
+.vas-251-hint {
+    margin-left: auto;
+    font-size: .6875em;
+    color: #748494;
+    line-height: 1.3;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A year with nothing budgeted and nothing posted is a real answer, not an error - it is
+   said inside the plot, and the header keeps its title and its year pill so the reader
+   can pick another year. */
+.vas-251-empty {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 0 1em;
+    font-size: .75em;
+    color: #5F7283;
+    text-align: center;
+    line-height: 1.35;
+}
+
+/* ---- State takeover: a load failure or a missing configuration ---- */
+.vas-251-state {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1em;
+    font-size: .8125em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.35;
+    text-align: center;
+}
+
+.vas-251-hidden {
+    display: none !important;
+}
+
+/* ---- Financial year picker (body-mounted, so NOT scoped under .vas-251-root) ----
+   Fixed-position panel anchored to the pill by script. rem-based, not em: it lives on
+   <body> and has no widget root anchor to scale against. */
+.vas-251-pp {
+    position: fixed;
+    /* Same narrow band the sibling popovers use: above the glass cards, below every
+       framework layer (jQuery UI .ui-front = 100, dialogs 101+). */
+    z-index: 95;
+    box-sizing: border-box;
+    min-width: 200px;
+    max-width: calc(100vw - 16px);
+    max-height: 60vh;
+    overflow: auto;
+    padding: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(8, 24, 38, .22);
+    color: #102C3F;
+}
+
+    .vas-251-pp * {
+        box-sizing: border-box;
+    }
+
+.vas-251-pp-h {
+    font-size: .6875rem;
+    font-weight: 700;
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 8px 10px 4px;
+}
+
+.vas-251-pp-empty {
+    padding: 8px 10px 10px;
+    font-size: .8125rem;
+    color: #748494;
+}
+
+.vas-251-pp-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .875rem;
+    color: #102C3F;
+    padding: 9px 10px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+    .vas-251-pp-opt:hover {
+        background: #EAF8FF;
+    }
+
+    .vas-251-pp-opt[aria-selected="true"] {
+        background: #EAF8FF;
+        font-weight: 700;
+        color: #0083DA;
+    }
+
+    .vas-251-pp-opt:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: -2px;
+    }
+
+.vas-251-pp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-251-pp-tick {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    width: 16px;
+    height: 16px;
+    color: #0083DA;
+    opacity: 0;
+}
+
+.vas-251-pp-opt[aria-selected="true"] .vas-251-pp-tick {
+    opacity: 1;
+}
+
+/* ==========================================================
+   Drill-down modal (body-mounted)
+   windows-and-panels.md §Panel Foundation: a container-query root, chrome at the
+   document baseline, and the panel BODY carrying the em anchor everything inside it
+   scales from. rem / px at the chrome level, em inside the body.
+   ========================================================== */
+.vas-251-dlg-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.vas-251-dlg-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 47, 74, .38);
+}
+
+/* A FIXED height, not a max: the rows region is paged rather than scrolled, so the panel
+   must not resize as the pages turn - a modal that grew and shrank under the reader's
+   cursor would move the pager out from under it. */
+.vas-251-dlg {
+    position: relative;
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    width: min(940px, 94vw);
+    height: min(600px, 84vh);
+    overflow: hidden;
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(15, 61, 97, .24);
+    color: #102C3F;
+}
+
+    .vas-251-dlg * {
+        box-sizing: border-box;
+    }
+
+.vas-251-dlg-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* 12px, not 16: the well and the title it heads are one unit, and the titles row flexes
+       so the close button holds the trailing edge whatever this gap is. */
+    gap: 12px;
+    min-height: 56px;
+    padding: 10px 16px;
+    border-bottom: 1px solid #D9E2EB;
+}
+
+/* The card's icon well, re-measured for the panel. windows-and-panels.md §Panel Foundation
+   keeps the chrome at the document baseline, so the well is rem here where the card's is em -
+   the tile, the radius and the colour are the shared .vas-251-icon rule's, and only the size
+   is restated. */
+.vas-251-dlg-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9px;
+}
+
+    .vas-251-dlg-icon svg {
+        width: 1.05rem;
+        height: 1.05rem;
+    }
+
+/* Takes the row, so the close button stays pinned to the trailing edge with the icon and the
+   titles together at the leading one. */
+.vas-251-dlg-titles {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-251-dlg-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-251-dlg-meta {
+    font-size: .75rem;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.3;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-251-x {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #141414;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-251-x svg {
+        width: 18px;
+        height: 18px;
+        display: block;
+    }
+
+    /* THE CLOSE CONTROL IS THE GLYPH, NOTHING ELSE. No ring, no border, no tile - focus is
+       held here (the panel puts it here on open) but is not DRAWN, and the shell's own
+       focused-button chrome, which boxes the glyph in a white bordered tile with a shadow, is
+       cleared with it. The selectors are qualified by the panel to outrank that shell rule
+       without reaching for !important. The one treatment the button keeps is its hover fill,
+       below - that is the whole affordance. */
+    .vas-251-x:focus,
+    .vas-251-x:focus-visible,
+    .vas-251-x:active,
+    .vas-251-dlg .vas-251-x:focus,
+    .vas-251-dlg .vas-251-x:focus-visible,
+    .vas-251-dlg .vas-251-x:active {
+        outline: none;
+        border: 0;
+        box-shadow: none;
+        background: transparent;
+    }
+
+    /* Hover answers whatever the focus state - a focused close button under the pointer still
+       lights, and it is the only thing that does. */
+    .vas-251-x:hover,
+    .vas-251-dlg .vas-251-x:hover,
+    .vas-251-dlg .vas-251-x:focus:hover {
+        background: #F1F4F8;
+    }
+
+/* NOTHING IN THIS PANEL SCROLLS. The body is a flex column: the metrics and the column
+   header are chrome and keep their natural height, and the rows region takes what is
+   left and pages. The body carries the em anchor everything inside it scales from. */
+.vas-251-dlg-bodywrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+}
+
+.vas-251-dlg-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 1.125em .875em .5em;
+    font-size: clamp(16px, 1vw, 18px);
+}
+
+/* The paged region, and the only part of the panel that changes between pages. It never
+   scrolls - overflow:hidden is what makes the height measurement in syncDialogCapacity
+   mean something rather than being a fallback. */
+.vas-251-rows {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-251-dlg-busy {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, .72);
+}
+
+.vas-251-dlg-empty {
+    padding: 1.5em 1em;
+    font-size: .8125em;
+    color: #5F7283;
+    text-align: center;
+    line-height: 1.35;
+}
+
+/* ---- The four metrics ---- */
+.vas-251-metrics {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .75em;
+}
+
+.vas-251-metric {
+    min-width: 0;
+}
+
+.vas-251-metric-l {
+    font-size: .6875em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.3;
+}
+
+.vas-251-metric-v {
+    font-size: .8125em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.3;
+    margin-top: .125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- The account grid: Account | Organization Unit | Postings | Amount ----
+   There is deliberately no section heading over it. The panel's own title already names
+   what this is, the metrics above it are the period's figures and the grid's column
+   labels name its columns - a third caption between them said nothing the reader could
+   not already see, and it cost a row of the fixed height the list is paged into. */
+.vas-251-dg-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, .7fr) minmax(0, 1fr);
+    gap: .75em;
+    align-items: center;
+}
+
+/* PINNED. It is a sibling of the rows region, not a row inside it, so it stays over the
+   columns it names while the pages turn under it. */
+.vas-251-dg-h {
+    flex: 0 0 auto;
+    margin-top: 1.1em;
+    padding: 0 .25em .5em;
+    border-bottom: 1px solid #C5D2DD;
+}
+
+    .vas-251-dg-h > span {
+        font-size: .6875em;
+        font-weight: 500;
+        color: #41576A;
+        line-height: 1.3;
+        text-transform: capitalize;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.vas-251-dg-r {
+    padding: .625em .25em;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+    .vas-251-dg-r:last-child {
+        border-bottom: 0;
+    }
+
+.vas-251-dg-r > span {
+    font-size: .75em;
+    line-height: 1.4;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The account is the row's identity, so it carries the row's weight. */
+.vas-251-dg-p {
+    font-weight: 400;
+    color: #102C3F;
+}
+
+/* The organisation is context for the account above it, not a finding of its own. */
+.vas-251-dg-c {
+    font-weight: 400;
+    color: #5F7283;
+}
+
+.vas-251-dg-n {
+    font-weight: 400;
+    color: #102C3F;
+}
+
+.vas-251-num {
+    text-align: right;
+}
+
+/* A missing value. Quiet enough that a gap never competes with the figures beside it. */
+.vas-251-nil {
+    color: #9AA7B4;
+    font-weight: 400;
+}
+
+/* The total the period adds up to - and the figure the chart's bar has to agree with.
+
+   A BAND OF THE PANEL, NOT A ROW OF THE LIST. It sits between the paged rows and the
+   footer, outside the region that changes, so it stays put while the pages turn instead
+   of appearing only on the last one. rem rather than em: it is chrome, like the head and
+   the footer, and does not scale with the body's anchor. */
+.vas-251-dg-total {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .75em;
+    padding: .625em 1.25rem;
+    border-top: 1px solid #D9E2EB;
+}
+
+.vas-251-dg-total-l {
+    font-size: .8125rem;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-251-dg-total-v {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0083DA;
+}
+
+/* ---- Footer: where in the list this page sits, and the pager ---- */
+.vas-251-dlg-foot {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    min-height: 44px;
+    padding: .5rem 1.25rem;
+    border-top: 1px solid #D9E2EB;
+}
+
+.vas-251-dlg-foot:empty {
+    display: none;
+}
+
+.vas-251-foot-info {
+    font-size: .75rem;
+    color: #748494;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vas-251-pager {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    flex-shrink: 0;
+}
+
+.vas-251-pager-label {
+    font-size: .8125rem;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas-251-pgbtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    border-radius: 6px;
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+
+    .vas-251-pgbtn:hover:not(:disabled) {
+        background: #EAF4FC;
+        border-color: #C6D6E4;
+    }
+
+    /* A disabled control is visibly inert as well as programmatically disabled - it keeps
+       its box and reports its state, it is never hidden. */
+    .vas-251-pgbtn:disabled {
+        color: #B8C6D2;
+        border-color: #E2EAF1;
+        cursor: default;
+    }
+
+    .vas-251-pgbtn:focus-visible {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 2px;
+    }
+
+/* ==========================================================
+   RTL
+   The chart is NOT force-flipped: a time axis runs the way the document does, and the
+   plot is a flex row, so the periods reverse with it and the axis labels follow their
+   own columns. Only the text alignment of the body-mounted panels needs stating.
+   ========================================================== */
+[dir="rtl"] .vas-251-pp-opt {
+    text-align: right;
+}
+
+/* ==========================================================
+   Narrow cells
+   The legend's hint folds first - it explains an affordance, and the affordance survives
+   without it. Then the axis thins. Nothing introduces a horizontal scrollbar, and the
+   bars stay visible at every width.
+   ========================================================== */
+@container vas-251 (max-width: 420px) {
+    .vas-251-hint {
+        display: none;
+    }
+}
+
+@container vas-251 (max-width: 320px) {
+    .vas-251-xaxis > span {
+        font-size: .625em;
+    }
+
+    .vas-251-bar {
+        width: 40%;
+    }
+}
+
+/* ---- Narrow cells: step the card base font down so the em scale follows ----
+ *
+ * The sibling widgets' breakpoints and values. The overrides are ABSOLUTE px, never a
+ * relative `em` - an em override here would resolve against the inherited page font rather
+ * than the clamp and collapse the anchor unpredictably. */
+@container vas-251 (max-width: 300px) {
+    .vas-251-card {
+        font-size: 13px;
+    }
+}
+
+@container vas-251 (max-width: 220px) {
+    .vas-251-card {
+        font-size: 11px;
+    }
+}
+
+/* The modal's four metrics stack to two columns on a narrow panel rather than truncating
+   four figures at once. */
+@container (max-width: 560px) {
+    .vas-251-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
