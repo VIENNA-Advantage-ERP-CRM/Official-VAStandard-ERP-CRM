@@ -361,9 +361,13 @@
                sibling amount cards print theirs, rather than the symbol in its own smaller
                span. A card whose headline is one number should read as one number; two
                type tiers inside it read as two marks. */
+            /* THE SIGN IS PART OF THE FIGURE. compact() returns a MAGNITUDE by contract, so
+               a period whose charges net negative - a reversed or refunded fee - would
+               otherwise print as though the bank had taken that money. The minus goes
+               before the symbol, where a reader expects it. */
             $value
                 .attr('title', valueTooltip(amount))
-                .text(symbol() + compact(amount));
+                .text((amount < 0 ? '-' : '') + symbol() + compact(amount));
 
             $foot.html(deltaHtml() + countHtml(count));
         }
@@ -429,8 +433,9 @@
             return (isNaN(p) || p < 0 || p > 6) ? 2 : p;
         }
 
-        /* Compact magnitude (K / L / Cr, or K / M / B) from the shared util. It returns
-           the magnitude only - the symbol is this widget's own composition. */
+        /* Compact magnitude (K / L / Cr, or K / M / B) from the shared util. It returns the
+           magnitude ONLY - both the symbol and the sign are this widget's own composition,
+           so every caller has to put the minus back itself. */
         function compact(value) {
             try {
                 if (VIS.Util && typeof VIS.Util.formatCompactAmount === 'function') {

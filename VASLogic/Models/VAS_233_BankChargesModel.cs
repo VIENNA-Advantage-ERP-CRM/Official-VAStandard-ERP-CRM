@@ -44,12 +44,14 @@ namespace VASLogic.Models
     ///               configured home, add a third Read* method here on the same shape as
     ///               the two below - nothing else has to change.
     ///
-    ///               Signs: PayAmt on a payment is always a positive magnitude.
-    ///               ChargeAmt on a statement line is stored as the STATEMENT-side
-    ///               difference and is therefore normally negative for a fee, so it is
-    ///               read through ABS(...): this widget reports the SIZE of the cost, and
-    ///               a fee must add to the total rather than cancel one recorded the
-    ///               other way round.
+    ///               Signs: NOTHING IS ABSED. PayAmt on a payment is a positive magnitude
+    ///               as the ledger stores it, and ChargeAmt on a statement line is read
+    ///               with the sign the ledger gave it. A charge recorded NEGATIVE - a
+    ///               reversal, a refund, a fee booked the other way round - therefore
+    ///               reduces the total, which is what it did to the tenant's money. The
+    ///               card reports the COST, not the size of the paperwork, and a total the
+    ///               reader cannot reconcile against the statement is worse than one that
+    ///               prints a minus sign.
     ///
     ///               Period list: EVERY active period of the CURRENT fiscal year on the
     ///               tenant's primary calendar (AD_ClientInfo.C_Calendar_ID), newest
@@ -524,10 +526,12 @@ namespace VASLogic.Models
         /// Source 2 - the fee the bank deducted on the statement itself:
         /// C_BankStatementLine.ChargeAmt on a completed or closed statement.
         ///
-        /// ChargeAmt is stored as the statement-side difference and is normally NEGATIVE
-        /// for a fee, so it is read through ABS(...): the card reports the size of the
-        /// cost, and a fee must add to the total rather than cancel one recorded with the
-        /// opposite sign.
+        /// THE STORED SIGN IS KEPT. ChargeAmt is read exactly as the ledger holds it - no
+        /// ABS is applied - so a charge recorded negative reaches the card negative and
+        /// REDUCES the total instead of adding to it. That is the whole point of a signed
+        /// figure: a fee that was reversed, refunded or booked the other way round did not
+        /// cost the tenant anything, and a card that turned it positive would report money
+        /// as spent twice over and print a total nobody could reconcile to the statement.
         ///
         /// The line's own C_Currency_ID and DateAcct drive the conversion. A statement
         /// line carries no C_ConversionType_ID, so NULL is passed and currencyConvert falls
@@ -543,7 +547,9 @@ namespace VASLogic.Models
         /// <returns>Current and prior totals for this source (never null).</returns>
         private SourceTotals ReadStatementCharges(Ctx ctx, ChargeWindow window, int acctCurrencyId)
         {
-            string convert = "currencyConvert(ABS(bsl.ChargeAmt),bsl.C_Currency_ID," + acctCurrencyId
+            /* bsl.ChargeAmt goes into the conversion SIGNED, exactly as stored - see the
+               method summary. currencyConvert carries the sign through unchanged. */
+            string convert = "currencyConvert(bsl.ChargeAmt,bsl.C_Currency_ID," + acctCurrencyId
                 + ",bsl.DateAcct,NULL,bsl.AD_Client_ID,bsl.AD_Org_ID)";
 
             StringBuilder sql = new StringBuilder();

@@ -159,6 +159,7 @@
     <Compile Include="Models\VAS_255_BudgetNearLimitModel.cs" />
     <Compile Include="Models\VAS_251_BudgetvsActualPeriodModel.cs" />
     <Compile Include="Models\VAS_256_UnBudgetedActualModel.cs" />
+    <Compile Include="Models\VAS_250_BudgetSummaryModel.cs" />
     <Compile Include="Models\VAS_ActivitySourcesModel.cs" />
     <Compile Include="Models\VAS_ChangeLogValueModel.cs" />
     <Compile Include="Models\VAS_092_OverviewPurchaseOrderModel.cs" />
