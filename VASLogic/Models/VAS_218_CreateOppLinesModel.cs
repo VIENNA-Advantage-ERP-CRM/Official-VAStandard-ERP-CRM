@@ -755,7 +755,7 @@ namespace VASLogic.Models
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             if (page < 0) page = 0;
-            sql += " ORDER BY ol.VAS_LineNo" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
+            sql += " ORDER BY ol.VAS_LineNo DESC" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
 
             DataSet ds;
             try
@@ -786,7 +786,7 @@ namespace VASLogic.Models
                    WHERE ol.VAS_Opportunity_ID = @VAS_Opportunity_ID
                      AND ol.IsActive = 'Y'";
                 fallbackSql = MRole.GetDefault(ctx).AddAccessSQL(fallbackSql, "ol", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                fallbackSql += " ORDER BY ol.VAS_LineNo" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
+                fallbackSql += " ORDER BY ol.VAS_LineNo DESC" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
                 ds = DB.ExecuteDataset(fallbackSql,
                     new SqlParameter[] { new SqlParameter("@VAS_Opportunity_ID", VAS_Opportunity_ID) }, null);
             }

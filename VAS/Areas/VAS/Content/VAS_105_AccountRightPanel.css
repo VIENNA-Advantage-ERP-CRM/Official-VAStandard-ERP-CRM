@@ -2100,10 +2100,12 @@ html[dir="rtl"] .vas_105_acct-tip[data-tip]:hover::after {
     flex-shrink:   0;
 }
 
-.vas_105_t-warn    { background: #FAEEDA; color: #B45309; }
-.vas_105_t-danger  { background: #FAD7D7; color: #B23B3B; }
-.vas_105_t-info    { background: #DFF1FF; color: #0083DA; }
-.vas_105_t-neutral { background: #F1F5F9; color: #475569; }
+.vas_105_t-warn    { background: #FEF3C7; color: #B45309; } /* High    — amber  */
+.vas_105_t-danger  { background: #FEE2E2; color: #B91C1C; } /* Urgent  — red    */
+.vas_105_t-info    { background: #F5F3FF; color: #6D28D9; } /* Medium  — purple */
+.vas_105_t-success { background: #F0FDF4; color: #15803D; } /* Minor   — green  */
+.vas_105_t-cyan    { background: #ECFEFF; color: #0E7490; } /* Low     — cyan   */
+.vas_105_t-neutral { background: #F1F5F9; color: #475569; } /* Default — slate  */
 
 /* Task row */
 .vas_105_taskrow {

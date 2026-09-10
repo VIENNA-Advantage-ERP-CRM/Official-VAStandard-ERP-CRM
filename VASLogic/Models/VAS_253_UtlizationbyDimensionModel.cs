@@ -580,6 +580,13 @@ namespace VASLogic.Models
         /// _ID names its table. Both routes are then CONFIRMED against AD_Table / AD_Column
         /// before either is named in generated SQL.
         ///
+        /// A MASTER WITHOUT Value / Name IS NAMED BY ITS IDENTIFIERS. Not every table follows
+        /// that shape - a user element can point at any table the tenant built - so when
+        /// neither column is there the label falls back to the columns AD_Column marks as
+        /// IsIdentifier, in SeqNo order, which is what the platform itself shows for a record
+        /// of that table in a lookup or a zoom. The dimension is therefore usable wherever
+        /// the application can display its values at all.
+        ///
         /// An element whose Fact_Acct column or label table cannot be confirmed is dropped and
         /// logged as unsupported configuration - a dimension that would fail the aggregate
         /// must not cost the tenant the dimensions that do work.
@@ -648,8 +655,8 @@ namespace VASLogic.Models
 
             if (drafts.Count == 0) { return specs; }
 
-            Dictionary<string, List<string>> dictionary = ReadTableColumns(tables);
-            List<string> factColumns = ColumnsOf(dictionary, TABLE_FACT_ACCT);
+            Dictionary<string, TableColumns> dictionary = ReadTableColumns(tables);
+            List<string> factColumns = ColumnsOf(dictionary, TABLE_FACT_ACCT).Columns;
 
             for (int i = 0; i < drafts.Count; i++)
             {
@@ -901,30 +908,59 @@ namespace VASLogic.Models
         /// <summary>
         /// Confirms a draft's master table actually carries the key and label columns the spec
         /// wants to name, and trims the ones it does not.
+        ///
+        /// WHEN THE TABLE HAS NEITHER Value NOR Name, THE IDENTIFIER COLUMNS STAND IN. Not
+        /// every master follows the Value / Name shape - a user element can point at any
+        /// table the tenant built - but every table the platform can display marks the
+        /// columns that identify a record with AD_Column.IsIdentifier, in SeqNo order, and
+        /// that is exactly what the framework itself shows for that record in a lookup, a
+        /// zoom or a report. Taking them here means the card names such a value the same way
+        /// the rest of the application does, instead of dropping the dimension for want of a
+        /// column called Name.
+        ///
+        /// At most the first TWO are taken: they are printed as "first - second" in the same
+        /// shape a Value / Name pair is, and a third would be more identity than a dashboard
+        /// row can carry.
         /// </summary>
         /// <param name="spec">Draft being confirmed, adjusted in place.</param>
-        /// <param name="columns">The master table's active columns, from AD_Column.</param>
+        /// <param name="columns">The master table's active columns and identifiers, from
+        /// AD_Column.</param>
         /// <returns>True when the table can name its values.</returns>
-        private bool ConfirmSource(DimensionSpec spec, List<string> columns)
+        private bool ConfirmSource(DimensionSpec spec, TableColumns columns)
         {
-            if (columns.Count == 0) { return false; }
-            if (!HasColumn(columns, spec.SourceKey)) { return false; }
+            if (columns.Columns.Count == 0) { return false; }
+            if (!HasColumn(columns.Columns, spec.SourceKey)) { return false; }
 
-            if (spec.ValueColumn.Length > 0 && !HasColumn(columns, spec.ValueColumn))
+            if (spec.ValueColumn.Length > 0 && !HasColumn(columns.Columns, spec.ValueColumn))
             {
                 spec.ValueColumn = "";
             }
-            if (spec.NameColumn.Length > 0 && !HasColumn(columns, spec.NameColumn))
+            if (spec.NameColumn.Length > 0 && !HasColumn(columns.Columns, spec.NameColumn))
             {
                 spec.NameColumn = "";
             }
-            if (spec.AltNameColumn.Length > 0 && !HasColumn(columns, spec.AltNameColumn))
+            if (spec.AltNameColumn.Length > 0 && !HasColumn(columns.Columns, spec.AltNameColumn))
             {
                 spec.AltNameColumn = "";
             }
 
-            /* Something has to be printable. A table with neither a name nor a value would
-               leave every row of the card labelled by nothing at all. */
+            /* Nothing conventional to print: fall back to what the dictionary says identifies
+               a record of this table. The first identifier takes the leading position - the
+               one Value holds in the conventional shape - and the second, if there is one,
+               follows it. */
+            if (spec.ValueColumn.Length == 0 && spec.NameColumn.Length == 0
+                && spec.AltNameColumn.Length == 0)
+            {
+                if (columns.Identifiers.Count > 0) { spec.ValueColumn = columns.Identifiers[0]; }
+                if (columns.Identifiers.Count > 1) { spec.NameColumn = columns.Identifiers[1]; }
+
+                /* An identifier can be a date, a number or a foreign key, not only text - the
+                   label read must not wrap it in a string-typed COALESCE. */
+                spec.LabelsFromIdentifier = spec.ValueColumn.Length > 0;
+            }
+
+            /* Something has to be printable. A table with no name, no value and no identifier
+               would leave every row of the card labelled by nothing at all. */
             return spec.ValueColumn.Length > 0 || spec.NameColumn.Length > 0
                 || spec.AltNameColumn.Length > 0;
         }
@@ -1257,13 +1293,22 @@ namespace VASLogic.Models
             StringBuilder sql = new StringBuilder();
             sql.Append("SELECT src.").Append(spec.SourceKey).Append(" AS Dimension_ID");
 
+            /* An identifier column is not necessarily text - it can be a date, a number or a
+               foreign key - so those are selected RAW and coerced in C#. Wrapping one in
+               COALESCE(...,N'') would ask the database to reconcile a number with an empty
+               string, which PostgreSQL refuses outright. The conventional Value / Name / City
+               columns are known text and keep their COALESCE. */
+            string valueExpr = spec.LabelsFromIdentifier ? "src.{0}" : "COALESCE(src.{0},N'')";
+
             if (spec.ValueColumn.Length > 0)
             {
-                sql.Append(",COALESCE(src.").Append(spec.ValueColumn).Append(",N'') AS Dimension_Value");
+                sql.Append(",").Append(String.Format(valueExpr, spec.ValueColumn))
+                   .Append(" AS Dimension_Value");
             }
             if (spec.NameColumn.Length > 0)
             {
-                sql.Append(",COALESCE(src.").Append(spec.NameColumn).Append(",N'') AS Dimension_Name");
+                sql.Append(",").Append(String.Format(valueExpr, spec.NameColumn))
+                   .Append(" AS Dimension_Name");
             }
             if (spec.AltNameColumn.Length > 0)
             {
@@ -1289,18 +1334,33 @@ namespace VASLogic.Models
                 int id = Util.GetValueOfInt(row["Dimension_ID"]);
                 if (!byId.ContainsKey(id)) { continue; }
 
-                string value = hasValue ? Util.GetValueOfString(row["Dimension_Value"]) : "";
-                string name = hasName ? Util.GetValueOfString(row["Dimension_Name"]) : "";
+                /* Read through CellText, not GetValueOfString: an identifier column can come
+                   back as a date or a number, and this has to print whatever it is. */
+                string value = hasValue ? CellText(row["Dimension_Value"]) : "";
+                string name = hasName ? CellText(row["Dimension_Name"]) : "";
 
                 /* The street line only stands in when the primary name is blank - it is a
                    fallback, never a second half of the label. */
-                if (name.Length == 0 && hasAlt) { name = Util.GetValueOfString(row["Dimension_Alt"]); }
+                if (name.Length == 0 && hasAlt) { name = CellText(row["Dimension_Alt"]); }
 
                 string label = ComposeLabel(value, name);
 
                 List<UtilizationRow> targets = byId[id];
                 for (int r = 0; r < targets.Count; r++) { targets[r].Label = label; }
             }
+        }
+
+        /// <summary>
+        /// One label cell as text, whatever its column's type. An identifier column need not
+        /// be a string - a date or a document number identifies plenty of tables - so this
+        /// coerces rather than casts, and a NULL reads as nothing at all.
+        /// </summary>
+        /// <param name="value">The raw cell.</param>
+        /// <returns>Its text, or an empty string.</returns>
+        private string CellText(object value)
+        {
+            if (value == null || value == DBNull.Value) { return ""; }
+            return Convert.ToString(value);
         }
 
         /// <summary>
@@ -1352,7 +1412,7 @@ namespace VASLogic.Models
             List<string> tables = new List<string>();
             tables.Add(TABLE_ACCTSCHEMA_GL);
 
-            List<string> present = ColumnsOf(ReadTableColumns(tables), TABLE_ACCTSCHEMA_GL);
+            List<string> present = ColumnsOf(ReadTableColumns(tables), TABLE_ACCTSCHEMA_GL).Columns;
 
             List<string> columns = new List<string>();
             for (int i = 0; i < OFFSET_COLUMNS.Length; i++)
@@ -1451,13 +1511,18 @@ namespace VASLogic.Models
         ///
         /// Columns backed by a virtual expression (AD_Column.ColumnSQL) are excluded: they are
         /// not physical columns and cannot be grouped by or filtered on.
+        ///
+        /// The read also collects each table's IDENTIFIER columns (AD_Column.IsIdentifier),
+        /// in the dictionary's own SeqNo order. Those are what the platform shows for a
+        /// record everywhere else, and they are this model's fallback for a master table that
+        /// carries neither Value nor Name.
         /// </summary>
         /// <param name="tableNames">Physical table names - resolved from the dictionary or
         /// constants of this class, never free client text.</param>
-        /// <returns>Upper-cased table name -&gt; its column names (never null).</returns>
-        private Dictionary<string, List<string>> ReadTableColumns(List<string> tableNames)
+        /// <returns>Upper-cased table name -&gt; its columns (never null).</returns>
+        private Dictionary<string, TableColumns> ReadTableColumns(List<string> tableNames)
         {
-            Dictionary<string, List<string>> map = new Dictionary<string, List<string>>();
+            Dictionary<string, TableColumns> map = new Dictionary<string, TableColumns>();
             if (tableNames == null || tableNames.Count == 0) { return map; }
 
             List<SqlParameter> parameters = new List<SqlParameter>();
@@ -1476,15 +1541,21 @@ namespace VASLogic.Models
 
             if (inList.Length == 0) { return map; }
 
+            /* ORDER BY inside the statement, not appended: no access clause is applied to a
+               dictionary read, so there is no parser to keep a trailing clause away from.
+               The identifier order is AD_Column.SeqNo - the platform's own, which is what
+               makes a two-column identifier read the way it does everywhere else. */
             string sql = @"
                 SELECT UPPER(t.TableName) AS Table_Name,
-                       c.ColumnName AS Column_Name
+                       c.ColumnName AS Column_Name,
+                       COALESCE(c.IsIdentifier,'N') AS Is_Identifier
                 FROM AD_Column c
                 INNER JOIN AD_Table t ON (t.AD_Table_ID=c.AD_Table_ID)
                 WHERE t.IsActive='Y'
                   AND c.IsActive='Y'
                   AND c.ColumnSQL IS NULL
-                  AND UPPER(t.TableName) IN (" + inList.ToString() + ")";
+                  AND UPPER(t.TableName) IN (" + inList.ToString() + @")
+                ORDER BY UPPER(t.TableName),COALESCE(c.SeqNo,0),c.ColumnName";
 
             DataSet ds = DB.ExecuteDataset(sql, parameters.ToArray(), null);
             if (ds == null || ds.Tables.Count == 0) { return map; }
@@ -1496,8 +1567,15 @@ namespace VASLogic.Models
                 string column = Util.GetValueOfString(dt.Rows[i]["Column_Name"]);
                 if (table.Length == 0 || column.Length == 0) { continue; }
 
-                if (!map.ContainsKey(table)) { map.Add(table, new List<string>()); }
-                map[table].Add(column);
+                if (!map.ContainsKey(table)) { map.Add(table, new TableColumns()); }
+
+                map[table].Columns.Add(column);
+
+                if (String.Equals(Util.GetValueOfString(dt.Rows[i]["Is_Identifier"]), "Y",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    map[table].Identifiers.Add(column);
+                }
             }
 
             return map;
@@ -1506,11 +1584,11 @@ namespace VASLogic.Models
         /// <summary>One table's columns out of a dictionary read.</summary>
         /// <param name="map">Result of <see cref="ReadTableColumns"/>.</param>
         /// <param name="tableName">Table to look up.</param>
-        /// <returns>Its columns, or an empty list when the table is not installed.</returns>
-        private List<string> ColumnsOf(Dictionary<string, List<string>> map, string tableName)
+        /// <returns>Its columns, or an empty set when the table is not installed.</returns>
+        private TableColumns ColumnsOf(Dictionary<string, TableColumns> map, string tableName)
         {
             string key = tableName == null ? "" : tableName.ToUpper();
-            return map.ContainsKey(key) ? map[key] : new List<string>();
+            return map.ContainsKey(key) ? map[key] : new TableColumns();
         }
 
         /// <summary>Case-insensitive membership test over a dictionary column list.</summary>
@@ -1628,9 +1706,35 @@ namespace VASLogic.Models
             /// line of a location, for instance.</summary>
             public string AltNameColumn { get; set; }
 
+            /// <summary>True when the label columns came from AD_Column.IsIdentifier rather
+            /// than from the conventional Value / Name pair - which means they may not be
+            /// text, so the label read must not wrap them in a string-typed COALESCE.</summary>
+            public bool LabelsFromIdentifier { get; set; }
+
             /// <summary>True when id 0 is a real value of this dimension rather than "not
             /// assigned" - which is the case for Organization, where 0 is the '*' org.</summary>
             public bool ZeroIsValue { get; set; }
+        }
+
+        /// <summary>
+        /// One dictionary table's physical columns, and the subset of them the dictionary
+        /// marks as identifying a record (AD_Column.IsIdentifier), in SeqNo order. Internal -
+        /// it exists so a table can be confirmed and named in one read.
+        /// </summary>
+        private class TableColumns
+        {
+            public TableColumns()
+            {
+                Columns = new List<string>();
+                Identifiers = new List<string>();
+            }
+
+            /// <summary>Every active, non-virtual column of the table.</summary>
+            public List<string> Columns { get; set; }
+
+            /// <summary>Those marked IsIdentifier, in AD_Column.SeqNo order - what the
+            /// platform shows for a record of this table everywhere else.</summary>
+            public List<string> Identifiers { get; set; }
         }
 
         /// <summary>One page of the widget, plus what the page cannot know by itself.</summary>
