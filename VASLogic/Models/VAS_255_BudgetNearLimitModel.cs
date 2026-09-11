@@ -70,7 +70,7 @@ namespace VASLogic.Models
     ///
     ///               THE THRESHOLD IS CONFIGURATION, NOT A LITERAL. It arrives as a value
     ///               this model holds and returns to the client, which prints it in the
-    ///               subtitle - the card says "above the configured 85% threshold" because
+    ///               subtitle - the card says "between 85% and 100% of approved budget" because
     ///               the server told it 85, not because either of them spells it out.
     ///
     ///               ONE SCAN, TWO POSTING TYPES, as a FLAT SUM(CASE WHEN ...) per side.

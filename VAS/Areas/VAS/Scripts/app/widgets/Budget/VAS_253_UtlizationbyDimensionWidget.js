@@ -7,7 +7,7 @@
  *                  dimension has actually consumed:
  *
  *                    [~] Utilization by dimension   [ FY 2026 v ] [ Organization v ]
- *                        Actual expense against approved budget
+ *                        Actual expense vs budget · 6 Organization values
  *
  *                    Head office                    $3.1M of $4.86M · 63.8%
  *                    ▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░
@@ -72,8 +72,7 @@
  *                   # | Current Text                       | Message Key
  *                  ---+------------------------------------+--------------------------
  *                   1 | Utilization by dimension           | VAS_253_UtilizationByDim
- *                   2 | Actual expense against approved    | VAS_253_UtilizationHint
- *                     |   budget                           |
+ *                   2 | Actual expense vs budget           | VAS_253_UtilizationHint
  *                   3 | values                             | VAS_253_Values
  *                   4 | Dimension                          | VAS_253_Dimension
  *                   5 | No accounting dimensions are       | VAS_253_NoDimensions
@@ -498,13 +497,17 @@
             return '';
         }
 
-        /* "Actual expense against approved budget · 6 Organization values" - the count is the WHOLE
+        /* "Actual expense vs budget · 6 Organization values" - the count is the WHOLE
            ranking, not the page, and the word for the values is the accounting schema
            element's own Name. Before the first read lands there is no count and no
            dimension to name, so the bare hint stands on its own rather than printing a
-           zero the card does not yet know. */
+           zero the card does not yet know.
+
+           The hint is kept SHORT on purpose: the subtitle is one non-wrapping line sharing
+           its row with TWO pills, and a longer hint pushes the count - the figure the reader
+           actually came for - past the ellipsis. */
         function paintSubtitle() {
-            var text = label('VAS_253_UtilizationHint', 'Actual expense against approved budget');
+            var text = label('VAS_253_UtilizationHint', 'Actual expense vs budget');
 
             if (_dimensionLabel) {
                 text += ' · ' + _totalRows + ' ' + _dimensionLabel + ' ' +

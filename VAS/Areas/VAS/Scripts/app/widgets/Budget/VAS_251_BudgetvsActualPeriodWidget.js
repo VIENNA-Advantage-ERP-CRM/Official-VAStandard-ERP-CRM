@@ -7,7 +7,7 @@
  *                  accounting period of the selected financial year:
  *
  *                    [▮] Budget vs actual by period            [ FY 2026 v ]
- *                        12 periods · 64.1% utilized · posted through Aug-26
+ *                        Expense budget against actual · 64.1% utilized · posted through Aug-26
  *
  *                        ▁▁ ▄▄ ▆▆ ██ ██ ▆▆ ▄▄ ▂▂ ▁  ▁  ▁  ▁
  *                        Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
@@ -75,10 +75,10 @@
  *                   # | Current Text                       | Message Key
  *                  ---+------------------------------------+--------------------------
  *                   1 | Budget vs actual by period         | VAS_251_BudgetVsActual
- *                   2 | periods                            | VAS_251_Periods
+ *                   2 | Expense budget against actual      | VAS_251_BudgetVsActualHint
  *                   3 | utilized                           | VAS_251_UtilizedLower
  *                   4 | posted through                     | VAS_251_PostedThrough
- *                   5 | no actual postings yet             | VAS_251_NoActualYet
+ *                   5 | no expense postings yet            | VAS_251_NoActualYet
  *                   6 | No budget or actual postings for   | VAS_251_NoPostings
  *                     |   the selected fiscal year         |
  *                   7 | Approved budget                    | VAS_251_ApprovedBudget
@@ -501,21 +501,25 @@
             return '';
         }
 
-        /* "12 periods · 64.1% utilized · posted through Aug-26".
+        /* "Expense budget against actual · 64.1% utilized · posted through Aug-26".
 
-           The middle and last clauses are earned, not assumed: a year with no actual postings
-           yet says so instead of printing "0.0% utilized · posted through" and a dangling
-           blank, and a year with actuals but no budget prints a dash for a ratio nobody can
-           compute. */
+           The first clause says what the chart IS - expense accounts only, budget against
+           actual - and stands alone until the year is read. It is kept SHORT on purpose:
+           the subtitle is one non-wrapping line sharing its row with the year pill, and a
+           longer hint pushes the utilization and posted-through clauses - the figures the
+           reader actually came for - past the ellipsis. The middle and last clauses are
+           earned, not assumed: a year with no actual postings yet says so instead of
+           printing "0.0% utilized · posted through" and a dangling blank, and a year with
+           actuals but no budget prints a dash for a ratio nobody can compute. */
         function paintSubtitle() {
             var $sub = $card.find('.vas-251-subtitle');
 
-            if (_periodCount === 0) { $sub.text('').attr('title', ''); return; }
+            var text = label('VAS_251_BudgetVsActualHint', 'Expense budget against actual');
 
-            var text = _periodCount + ' ' + label('VAS_251_Periods', 'periods');
+            if (_periodCount === 0) { $sub.text(text).attr('title', text); return; }
 
             if (_postedCount === 0) {
-                text += ' · ' + label('VAS_251_NoActualYet', 'no actual postings yet');
+                text += ' · ' + label('VAS_251_NoActualYet', 'no expense postings yet');
             }
             else {
                 text += ' · ' + (_hasUtilization ? percentText(_utilized, 1) : NIL) + ' ' +
