@@ -539,10 +539,14 @@
             var editCell = (canEdit && o.M_AttributeSetInstance_ID > 0) ?
                 '<span class="vas-cil-attr-edit"><button type="button" class="vas-cil-attr-editbtn" data-act="attr-edit" data-key="' + E(key) +
                 '" title="' + E(L("VAS_074_Edit", "Edit")) + '">' + IC("pencil", "✎") + "</button></span>" : (canEdit ? "<span></span>" : "");
+            // Every text cell carries its full value on a title attribute: the grid cells
+            // clip with an ellipsis, and a long lot number or description would otherwise be
+            // unreadable without selecting the row. Empty cells get no tooltip.
+            var T = function (v) { return v ? ' title="' + E(v) + '"' : ""; };
             $row.html('<span class="vas-cil-attr-radio">' + (key === st.selected ? '<span class="vas-cil-attr-radio__dot"></span>' : "") + "</span>" +
-                '<span class="vas-cil-attr-code">' + E(o.code) + '</span><span class="vas-cil-attr-label">' + E(o.label) + "</span>" +
-                '<span class="vas-cil-attr-spec">' + E(o.spec) + '</span><span class="vas-cil-attr-delta">' + E(o.locator || "—") + "</span>" +
-                '<span class="vas-cil-attr-avail">' + E(o.availability) + "</span>" + editCell);
+                '<span class="vas-cil-attr-code"' + T(o.code) + '>' + E(o.code) + '</span><span class="vas-cil-attr-label"' + T(o.label) + '>' + E(o.label) + "</span>" +
+                '<span class="vas-cil-attr-spec"' + T(o.spec) + '>' + E(o.spec) + '</span><span class="vas-cil-attr-delta"' + T(o.locator) + '>' + E(o.locator || "—") + "</span>" +
+                '<span class="vas-cil-attr-avail"' + T(o.availability) + '>' + E(o.availability) + "</span>" + editCell);
             $row.on("click", function (e) { if ($(e.target).closest("[data-act=attr-edit]").length) return; st.selected = key; renderAttrRows(); });
             $row.on("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); st.selected = key; renderAttrRows(); } });
             body.append($row);

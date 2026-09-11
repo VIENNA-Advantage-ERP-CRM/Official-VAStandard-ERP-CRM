@@ -29,9 +29,12 @@
  * the JS always prints the percentage beside the bar, so the reading survives print, a
  * distance, and a colour-blind reader.
  *
- * TWO PILLS, ONE TIER. The financial year and the accounting dimension are the same
- * kind of control and are drawn identically - the year pill is VAS_254's / VAS_256's to
- * the value, so three Budgeting cards on one dashboard carry one pill, not three.
+ * TWO PILLS, ONE TIER, ONE LINE. The financial year and the accounting dimension are
+ * the same kind of control and are drawn identically - the year pill is VAS_254's /
+ * VAS_256's to the value, so three Budgeting cards on one dashboard carry one pill, not
+ * three. They never wrap: when the header is short of room the dimension pill shrinks
+ * and ellipses (its full name stays on the title attribute), the year pill holds its
+ * width, and the title column gives down to a floor.
  * ───────────────────────────────────────────────────────────────────────── */
 
 .vas-253-root {
@@ -117,7 +120,11 @@
 .vas-253-head-text {
     display: flex;
     flex-direction: column;
-    min-width: 0;
+    /* A floor, not zero: the filters no longer wrap, so this column is what shares the
+       header with them. It shrinks (and the title / subtitle ellipse) but never
+       disappears - a few characters of title remain at the narrowest cell, where the
+       two pills at their 5em floors plus this floor still fit inside the padding. */
+    min-width: 4em;
     flex: 1 1 auto;
 }
 
@@ -157,16 +164,20 @@
     display: none;
 }
 
-/* The two filters. They wrap onto a second line rather than squeezing each other or
-   pushing the title - a 4-column cell at the narrow end cannot always carry a title and
-   two pills on one row, and a squeezed pill is less readable than a wrapped one. */
+/* The two filters, ALWAYS ON ONE LINE. They never wrap onto a second row: a wrapped
+   pill drops under the year pill and pushes the header taller, and the taller header
+   is measured out of the list, so the widget loses a row for the length of a dimension
+   name. When there is not enough room the DIMENSION pill gives - it shrinks and ellipses
+   its label (the full name stays on the button's title attribute) - while the year pill,
+   whose label is always short, keeps its width. The title column shrinks alongside,
+   down to its own floor. */
 .vas-253-filters {
     flex: 0 1 auto;
     align-self: center;
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: .375em;
     min-width: 0;
 }
@@ -218,6 +229,20 @@
         flex: 0 0 auto;
         color: #0083DA;
     }
+
+/* Which pill gives when the header runs out of room. The year pill never shrinks - its
+   label is four digits and a squeezed "20…" would say nothing. The dimension pill is
+   the flexible one: it may shrink to its floor and ellipse, and it is capped so a long
+   C_AcctSchema_Element.Name takes at most a fair share of the header rather than
+   crushing the title to nothing before it starts to clip. */
+.vas-253-year {
+    flex: 0 0 auto;
+}
+
+.vas-253-dim {
+    flex: 0 1 auto;
+    max-width: 14em;
+}
 
 /* min-width:0 is what actually makes the ellipsis work. A flex item defaults to
    min-width:auto and refuses to shrink below its content, so without this the label
