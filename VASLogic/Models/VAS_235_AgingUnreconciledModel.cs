@@ -74,12 +74,21 @@ namespace VASLogic.Models
     ///               its job is to show the original transaction.
     ///
     ///               MRole row-level security is applied to C_Payment p, the main physical
-    ///               table, in both queries. GROUP BY and ORDER BY are appended AFTER
-    ///               AddAccessSQL so its FROM-clause parser never meets a trailing clause,
-    ///               and every join ON is a plain equality so it never meets a function
-    ///               call either. Compatible with PostgreSQL and Oracle.
+    ///               table, in both queries. The summary applies it to a flat inner select
+    ///               and aggregates in a wrapper around the secured text; the detail
+    ///               appends ORDER BY AFTER AddAccessSQL. Either way its FROM-clause parser
+    ///               never meets a nested select or a trailing clause, and every join ON
+    ///               is a plain equality so it never meets a function call either.
+    ///
+    ///               EVERY BIND PLACEHOLDER IS BOUND EXACTLY ONCE. The provider binds by
+    ///               position; Npgsql quietly ignores a surplus SqlParameter, Oracle raises
+    ///               ORA-01006 "bind variable does not exist". Compatible with PostgreSQL
+    ///               and Oracle.
     /// Chronological development:
-    ///   VAI154      2026-09-03 Created
+    ///   VAI145      2026-09-03 Created
+    ///   VAI145      2026-09-11 ORA-01006 on Oracle: summary bound four GROUP BY cut-offs
+    ///                          that never appeared in the SQL (GROUP BY 1). Bucket now
+    ///                          computed once in an inner select, grouped by alias.
     /// </summary>
     public class VAS_235_AgingUnreconciledModel
     {
@@ -267,29 +276,27 @@ namespace VASLogic.Models
             string convert = "currencyConvert(p.PayAmt,p.C_Currency_ID," + acctCurrencyId
                 + ",p.DateAcct,p.C_ConversionType_ID,p.AD_Client_ID,p.AD_Org_ID)";
 
-            /* The bucket expression appears TWICE - once in the SELECT and once in the
-               GROUP BY, because Oracle supports neither positional GROUP BY nor grouping by
-               a SELECT alias. Each occurrence carries its own parameter names, since the
-               provider binds positionally. */
-            string bucketSelect = @"CASE WHEN p.DateAcct>=@Cut_7_S THEN 1
-                            WHEN p.DateAcct>=@Cut_15_S THEN 2
-                            WHEN p.DateAcct>=@Cut_30_S THEN 3
-                            WHEN p.DateAcct>=@Cut_60_S THEN 4
+            /* The bucket expression is written ONCE, in an inner select, and the outer
+               query groups on its alias. Grouping directly on the CASE would need it
+               written a second time in the GROUP BY - Oracle accepts neither a positional
+               GROUP BY nor a SELECT alias there - and because the provider binds
+               positionally, that second copy would need its own four bind names, which
+               PostgreSQL then no longer recognises as the SAME expression as the one in
+               the SELECT list ("p.DateAcct must appear in the GROUP BY clause"). Binding
+               each cut-off exactly once is the only shape both backends accept. */
+            string bucketExpr = @"CASE WHEN p.DateAcct>=@Cut_7 THEN 1
+                            WHEN p.DateAcct>=@Cut_15 THEN 2
+                            WHEN p.DateAcct>=@Cut_30 THEN 3
+                            WHEN p.DateAcct>=@Cut_60 THEN 4
                             ELSE 5 END";
 
-            string bucketGroup = @"CASE WHEN p.DateAcct>=@Cut_7_G THEN 1
-                            WHEN p.DateAcct>=@Cut_15_G THEN 2
-                            WHEN p.DateAcct>=@Cut_30_G THEN 3
-                            WHEN p.DateAcct>=@Cut_60_G THEN 4
-                            ELSE 5 END";
-
-            StringBuilder sql = new StringBuilder();
-            sql.Append(@"
-                SELECT ").Append(bucketSelect).Append(@" AS Age_Bucket,
-                       COALESCE(SUM(CASE WHEN p.IsReceipt='").Append(ISRECEIPT_Yes).Append(@"' THEN 1 ELSE 0 END),0) AS Receipt_Cnt,
-                       COALESCE(SUM(CASE WHEN p.IsReceipt='").Append(ISRECEIPT_No).Append(@"' THEN 1 ELSE 0 END),0) AS Payment_Cnt,
-                       COALESCE(SUM(CASE WHEN p.IsReceipt='").Append(ISRECEIPT_Yes).Append("' THEN ").Append(convert).Append(@" ELSE 0 END),0) AS Receipt_Amt,
-                       COALESCE(SUM(CASE WHEN p.IsReceipt='").Append(ISRECEIPT_No).Append("' THEN ").Append(convert).Append(@" ELSE 0 END),0) AS Payment_Amt
+            /* One row per unreconciled payment: its bucket, its direction and its
+               converted amount. Nothing is aggregated here. */
+            StringBuilder inner = new StringBuilder();
+            inner.Append(@"
+                SELECT ").Append(bucketExpr).Append(@" AS Age_Bucket,
+                       p.IsReceipt AS Is_Receipt,
+                       ").Append(convert).Append(@" AS Base_Amt
                 FROM C_Payment p
                 ").Append(UnreconciledPredicate(filterAccount)).Append(@"
                   AND p.DateAcct<@AsOf_Exclusive");
@@ -297,36 +304,43 @@ namespace VASLogic.Models
             /* C_Payment p is the main physical table and the only one in the FROM clause.
                MRole supplies the organisation access, so no AD_Org_ID predicate is written
                by hand - the explicit tenant filter is a second, independent guard rather
-               than the only one. Flat SUM(CASE ...) aggregation, never nested selects, so
-               the access parser has one simple FROM clause to read. */
-            string finalSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "p",
+               than the only one. The access SQL is applied to the FLAT inner select, so
+               its FROM-clause parser reads one simple FROM and never meets the wrapper
+               below, a nested select or a trailing clause. */
+            string innerSql = MRole.GetDefault(ctx).AddAccessSQL(inner.ToString(), "p",
                 MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            /* GROUP BY and ORDER BY go on AFTER the access SQL - its FROM-clause parser
-               must not meet a trailing clause. The CASE is repeated in full rather than
-               referenced by position or alias, neither of which Oracle accepts. */
-            finalSql += " GROUP BY 1 ORDER BY 1";
+            /* The aggregation wraps the already-secured inner select. No "AS" on the inline
+               view's alias - Oracle does not accept one on a table alias. */
+            StringBuilder sql = new StringBuilder();
+            sql.Append(@"
+                SELECT x.Age_Bucket AS Age_Bucket,
+                       COALESCE(SUM(CASE WHEN x.Is_Receipt='").Append(ISRECEIPT_Yes).Append(@"' THEN 1 ELSE 0 END),0) AS Receipt_Cnt,
+                       COALESCE(SUM(CASE WHEN x.Is_Receipt='").Append(ISRECEIPT_No).Append(@"' THEN 1 ELSE 0 END),0) AS Payment_Cnt,
+                       COALESCE(SUM(CASE WHEN x.Is_Receipt='").Append(ISRECEIPT_Yes).Append(@"' THEN x.Base_Amt ELSE 0 END),0) AS Receipt_Amt,
+                       COALESCE(SUM(CASE WHEN x.Is_Receipt='").Append(ISRECEIPT_No).Append(@"' THEN x.Base_Amt ELSE 0 END),0) AS Payment_Amt
+                FROM (").Append(innerSql).Append(@") x
+                GROUP BY x.Age_Bucket
+                ORDER BY x.Age_Bucket");
 
             /* The provider binds POSITIONALLY, so the list is built in the order the
-               placeholders appear in the finished text: the four SELECT cut-offs, the WHERE
-               tenant filter, the optional account filter, the as-of bound, then the four
-               GROUP BY cut-offs. */
+               placeholders appear in the finished text: the four cut-offs in the inner
+               SELECT, the WHERE tenant filter, the optional account filter, then the
+               as-of bound. Every placeholder is bound exactly once - a bind with no
+               placeholder behind it is ORA-01006 on Oracle. */
             List<SqlParameter> parameters = new List<SqlParameter>();
-            parameters.Add(new SqlParameter("@Cut_7_S", window.Cutoff7));
-            parameters.Add(new SqlParameter("@Cut_15_S", window.Cutoff15));
-            parameters.Add(new SqlParameter("@Cut_30_S", window.Cutoff30));
-            parameters.Add(new SqlParameter("@Cut_60_S", window.Cutoff60));
+            parameters.Add(new SqlParameter("@Cut_7", window.Cutoff7));
+            parameters.Add(new SqlParameter("@Cut_15", window.Cutoff15));
+            parameters.Add(new SqlParameter("@Cut_30", window.Cutoff30));
+            parameters.Add(new SqlParameter("@Cut_60", window.Cutoff60));
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
-            if (filterAccount) { 
-                parameters.Add(new SqlParameter("@C_BankAccount_ID", bankAccountId)); 
+            if (filterAccount)
+            {
+                parameters.Add(new SqlParameter("@C_BankAccount_ID", bankAccountId));
             }
             parameters.Add(new SqlParameter("@AsOf_Exclusive", window.AsOfDateExclusive));
-            parameters.Add(new SqlParameter("@Cut_7_G", window.Cutoff7));
-            parameters.Add(new SqlParameter("@Cut_15_G", window.Cutoff15));
-            parameters.Add(new SqlParameter("@Cut_30_G", window.Cutoff30));
-            parameters.Add(new SqlParameter("@Cut_60_G", window.Cutoff60));
 
-            DataSet ds = DB.ExecuteDataset(finalSql, parameters.ToArray(), null);
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), parameters.ToArray(), null);
             if (ds == null || ds.Tables.Count == 0) { return; }
 
             DataTable dt = ds.Tables[0];
