@@ -37,10 +37,22 @@
  *                  tooltip. Both series share one scale, which is the whole point of
  *                  a grouped chart.
  *
+ *                  BUDGETED LEDGER ACCOUNTS ONLY, ON BOTH SERIES. An account reaches
+ *                  this chart - budget bar or actual bar - only when it carries a
+ *                  budget posting somewhere in the selected financial year. An actual
+ *                  on an account nobody budgeted has no approved figure behind it, and
+ *                  left in it would raise a period's actual bar against a budget bar
+ *                  that never moved; that spending belongs to the unbudgeted card
+ *                  (VAS_256). The test's window is the YEAR, so an annual budget booked
+ *                  in one period still admits that account's actuals in every other.
+ *                  The server decides the set; this file never re-tests it.
+ *
  *                  THE MODAL RECONCILES BY CONSTRUCTION. Its four metrics and its
  *                  account list are read from the SERVER for that period, not passed
  *                  in from the bar, so "Total posted" cannot drift from the bar that
- *                  opened it however the chart was rendered.
+ *                  opened it however the chart was rendered - and it is scoped to the
+ *                  same budgeted accounts, so it can never list one the bar did not
+ *                  count.
  *
  *                  ONE CURRENCY, THE SCHEMA'S OWN, AND ITS SYMBOL. Every figure is an
  *                  accounting amount in the primary accounting schema's currency,

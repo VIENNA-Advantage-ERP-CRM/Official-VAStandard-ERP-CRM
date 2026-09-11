@@ -54,6 +54,21 @@ namespace VASLogic.Models
     ///               leave the drill-down unable to reconcile. The sibling budget cards
     ///               (VAS_253, VAS_256) draw the same line at the same place.
     ///
+    ///               BUDGETED LEDGER ACCOUNTS ONLY, ON THE ACTUAL SIDE TOO. An account only
+    ///               reaches either series when it carries a BUDGET posting somewhere in the
+    ///               selected financial year. The card compares spending against what was
+    ///               approved for it, and an actual on an account nobody budgeted has no
+    ///               approved figure behind it: left in, it would raise a period's actual bar
+    ///               against a budget bar that never moved, and take the subtitle's
+    ///               utilization with it. That spending is not lost - it is the unbudgeted
+    ///               card's subject (VAS_256).
+    ///
+    ///               THE BUDGET TEST'S WINDOW IS THE YEAR, NOT THE PERIOD, so a tenant that
+    ///               books one annual budget line in the opening period still sees its
+    ///               actuals in the other eleven. The same set is applied to the chart and to
+    ///               the drill-down, so the modal can never list an account the bar did not
+    ///               count.
+    ///
     ///               NO ABS. The specification is explicit: the accounting sign convention is
     ///               preserved, so a period whose postings net negative reports a negative
     ///               figure rather than being quietly turned positive. The BAR HEIGHTS are
@@ -124,6 +139,12 @@ namespace VASLogic.Models
            with adjusting periods cannot walk off the end. */
         private const int MAX_PeriodIds = 500;
 
+        /* The same Oracle limit, for the budgeted-account filter - which is NOT bounded by
+           anything the calendar controls. A chart of accounts can run past a thousand budgeted
+           expense accounts, so the list is emitted in chunks of this size joined by OR rather
+           than truncated: a trimmed filter would silently drop real actuals. */
+        private const int MAX_IdsPerChunk = 900;
+
         // ─────────────────────────────────────────────────────────────────────
         // §1  Entry point - the chart
         // ─────────────────────────────────────────────────────────────────────
@@ -192,9 +213,16 @@ namespace VASLogic.Models
             result.Periods = GetPeriods(ctx, year.C_Year_ID);
             result.PeriodCount = result.Periods.Count;
 
-            if (result.Periods.Count > 0)
+            /* THE BUDGETED LEDGER ACCOUNTS OF THE YEAR, read once and applied to BOTH series -
+               see ReadBudgetedAccountIds. An empty set means nothing was budgeted anywhere in
+               the year, so there is nothing to compare an actual against and every period
+               keeps its zeros; the card then says so in its own empty state rather than
+               drawing a row of actual-only bars against no budget at all. */
+            List<int> budgetedAccounts = ReadBudgetedAccountIds(ctx, acct, year.StartDate, year.EndDate);
+
+            if (result.Periods.Count > 0 && budgetedAccounts.Count > 0)
             {
-                ApplyAmounts(ctx, acct, result.Periods);
+                ApplyAmounts(ctx, acct, result.Periods, budgetedAccounts);
                 ApplyTotals(result);
                 ApplyBarPercents(result.Periods);
             }
@@ -460,6 +488,81 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// THE LEDGER ACCOUNTS THIS CHART IS ALLOWED TO REPORT ON: every expense account
+        /// carrying a BUDGET posting anywhere in the selected financial year.
+        ///
+        /// Both series are then restricted to this set, actual included. The card compares
+        /// spending against what was approved for it, and an account nobody budgeted has no
+        /// approved figure to be compared with - its actual would raise the bar of a period
+        /// against a budget bar that never moved, and the utilization in the subtitle with it.
+        /// Such spending is not lost: it is the unbudgeted card's subject (VAS_256).
+        ///
+        /// THE WINDOW IS THE YEAR, NOT THE PERIOD. An account budgeted anywhere in the year is
+        /// in scope for every period of it. This is deliberate: a tenant that books one annual
+        /// budget line in the opening period would otherwise have its actuals blanked in the
+        /// other eleven, which reports far less spending than really happened. It also matches
+        /// how the sibling budget cards scope themselves.
+        ///
+        /// Decided by the EXISTENCE of a budget fact, never by its amount - a budget line that
+        /// nets to zero has still been approved, and reading the amount would silently drop it.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="acct">Resolved accounting context (schema and currency).</param>
+        /// <param name="from">First day of the financial year's date window.</param>
+        /// <param name="to">Last day of that window.</param>
+        /// <returns>C_ElementValue ids of the budgeted expense accounts (never null; empty when
+        /// the year carries no budget at all).</returns>
+        private List<int> ReadBudgetedAccountIds(Ctx ctx, AcctContext acct, DateTime from, DateTime to)
+        {
+            List<int> items = new List<int>();
+            if (ctx == null || acct == null || acct.C_AcctSchema_ID <= 0 || from > to) { return items; }
+
+            string sql = @"
+                SELECT fa.Account_ID AS Account_ID
+                FROM Fact_Acct fa
+                INNER JOIN C_ElementValue ev ON (ev.C_ElementValue_ID=fa.Account_ID)
+                WHERE fa.AD_Client_ID=@AD_Client_ID
+                  AND fa.C_AcctSchema_ID=@C_AcctSchema_ID
+                  AND fa.IsActive='Y'
+                  AND fa.PostingType=@PostingType_Budget
+                  AND fa.DateAcct>=@DateFrom
+                  AND fa.DateAcct<=@DateTo
+                  AND ev.IsActive='Y'
+                  AND ev.AccountType=@AccountType_Expense";
+
+            /* Fact_Acct fa is the main physical table this read fetches from. */
+            string finalSql = MRole.GetDefault(ctx).AddAccessSQL(sql, "fa",
+                MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            /* GROUP BY rather than SELECT DISTINCT, and appended AFTER the access SQL - the
+               parser must not meet a trailing clause, and a DISTINCT sitting in the SELECT list
+               is one more thing for it to read. */
+            finalSql += " GROUP BY fa.Account_ID";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@C_AcctSchema_ID", acct.C_AcctSchema_ID),
+                new SqlParameter("@PostingType_Budget", POSTINGTYPE_Budget),
+                new SqlParameter("@DateFrom", from),
+                new SqlParameter("@DateTo", to),
+                new SqlParameter("@AccountType_Expense", ACCOUNTTYPE_Expense)
+            };
+
+            DataSet ds = DB.ExecuteDataset(finalSql, parameters, null);
+            if (ds == null || ds.Tables.Count == 0) { return items; }
+
+            DataTable dt = ds.Tables[0];
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                int accountId = Util.GetValueOfInt(dt.Rows[i]["Account_ID"]);
+                if (accountId > 0) { items.Add(accountId); }
+            }
+
+            return items;
+        }
+
+        /// <summary>
         /// Fills each period's budget, actual and actual-posting count from ONE grouped scan
         /// of Fact_Acct.
         ///
@@ -479,8 +582,14 @@ namespace VASLogic.Models
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="acct">Resolved accounting context (schema and currency).</param>
         /// <param name="periods">The year's periods, completed in place.</param>
-        private void ApplyAmounts(Ctx ctx, AcctContext acct, List<PeriodPoint> periods)
+        /// <param name="budgetedAccounts">The budgeted expense accounts of the year - both
+        /// series are restricted to these, see ReadBudgetedAccountIds. Never empty when this is
+        /// called.</param>
+        private void ApplyAmounts(Ctx ctx, AcctContext acct, List<PeriodPoint> periods,
+            List<int> budgetedAccounts)
         {
+            if (budgetedAccounts == null || budgetedAccounts.Count == 0) { return; }
+
             List<int> periodIds = new List<int>();
             Dictionary<int, PeriodPoint> byPeriod = new Dictionary<int, PeriodPoint>();
 
@@ -548,6 +657,14 @@ namespace VASLogic.Models
                the clause is last: the adapters bind positionally. */
             sql.Append(" AND ev.IsActive='Y' AND ev.AccountType=@AccountType_Expense");
             parameters.Add(new SqlParameter("@AccountType_Expense", ACCOUNTTYPE_Expense));
+
+            /* BUDGETED LEDGER ACCOUNTS ONLY, ON BOTH SERIES. Filtering the ACCOUNT is what
+               restricts the actual side: every budget fact already sits on a budgeted account
+               by construction, so one predicate covers both without a second pass over the
+               posting type. The binds are appended here because the clause is appended here -
+               the adapters bind positionally. */
+            sql.Append(" AND ").Append(BuildAccountFilter(budgetedAccounts, "fa.Account_ID",
+                "@Budgeted_Acct", parameters));
 
             /* Fact_Acct fa is the main physical table the user is reading from: the role's
                access clause goes HERE, on the base query, and never on a derived alias. */
@@ -722,11 +839,20 @@ namespace VASLogic.Models
             result.EndDate = period.EndDate;
             result.FiscalYear = period.FiscalYear;
 
+            /* THE SAME BUDGETED-ACCOUNT SET THE BAR WAS DRAWN FROM, resolved over the period's
+               own financial YEAR rather than over the period - anything narrower would leave
+               the modal reporting a different population from the bar that opened it, and its
+               "Total posted" would stop reconciling. */
+            YearOption window = ReadYearWindow(ctx, period.C_Year_ID);
+            List<int> budgetedAccounts = window == null
+                ? new List<int>()
+                : ReadBudgetedAccountIds(ctx, acct, window.StartDate, window.EndDate);
+
             /* The period's own figures, from the same definition the chart uses - one period
                instead of the year. */
             List<PeriodPoint> one = new List<PeriodPoint>();
             one.Add(period);
-            ApplyAmounts(ctx, acct, one);
+            ApplyAmounts(ctx, acct, one, budgetedAccounts);
 
             result.Budget = period.Budget;
             result.Actual = period.Actual;
@@ -738,7 +864,7 @@ namespace VASLogic.Models
                 result.UtilizedPct = period.Actual * 100m / period.Budget;
             }
 
-            ReadDetailRows(ctx, acct, period, result);
+            ReadDetailRows(ctx, acct, period, budgetedAccounts, result);
 
             result.Loaded = true;
             return result;
@@ -764,6 +890,7 @@ namespace VASLogic.Models
                        p.Name AS Period_Name,
                        p.StartDate AS Start_Date,
                        p.EndDate AS End_Date,
+                       p.C_Year_ID AS C_Year_ID,
                        y.FiscalYear AS Fiscal_Year
                 FROM C_Period p
                 INNER JOIN C_Year y ON (y.C_Year_ID=p.C_Year_ID)
@@ -794,7 +921,51 @@ namespace VASLogic.Models
             item.Name = Util.GetValueOfString(row["Period_Name"]);
             item.StartDate = ToIsoDate(from.Value);
             item.EndDate = ToIsoDate(to.Value);
+            item.C_Year_ID = Util.GetValueOfInt(row["C_Year_ID"]);
             item.FiscalYear = Util.GetValueOfString(row["Fiscal_Year"]);
+
+            return item;
+        }
+
+        /// <summary>
+        /// One financial year's date window: MIN(StartDate) / MAX(EndDate) over its ACTIVE
+        /// periods - the same definition the year list uses, read for a single year when the
+        /// drill-down needs the window the year list is not in hand for.
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="yearId">C_Year_ID to measure.</param>
+        /// <returns>The year and its window, or null when it has no active period.</returns>
+        private YearOption ReadYearWindow(Ctx ctx, int yearId)
+        {
+            if (ctx == null || yearId <= 0) { return null; }
+
+            string sql = @"
+                SELECT MIN(p.StartDate) AS Start_Date,
+                       MAX(p.EndDate) AS End_Date
+                FROM C_Period p
+                WHERE p.C_Year_ID=@C_Year_ID
+                  AND p.AD_Client_ID=@AD_Client_ID
+                  AND p.IsActive='Y'";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@C_Year_ID", yearId),
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { return null; }
+
+            DataRow row = ds.Tables[0].Rows[0];
+
+            DateTime? from = Util.GetValueOfDateTime(row["Start_Date"]);
+            DateTime? to = Util.GetValueOfDateTime(row["End_Date"]);
+            if (!from.HasValue || !to.HasValue) { return null; }
+
+            YearOption item = new YearOption();
+            item.C_Year_ID = yearId;
+            item.StartDate = from.Value.Date;
+            item.EndDate = to.Value.Date;
 
             return item;
         }
@@ -812,10 +983,14 @@ namespace VASLogic.Models
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="acct">Resolved accounting context (schema and currency).</param>
         /// <param name="period">The period being opened.</param>
+        /// <param name="budgetedAccounts">The budgeted expense accounts of the period's year -
+        /// the list is restricted to these, exactly as the bar was.</param>
         /// <param name="result">Result being filled.</param>
         private void ReadDetailRows(Ctx ctx, AcctContext acct, PeriodPoint period,
-            PeriodDetailResult result)
+            List<int> budgetedAccounts, PeriodDetailResult result)
         {
+            if (budgetedAccounts == null || budgetedAccounts.Count == 0) { return; }
+
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
             parameters.Add(new SqlParameter("@C_AcctSchema_ID", acct.C_AcctSchema_ID));
@@ -833,13 +1008,13 @@ namespace VASLogic.Models
                 SELECT fa.Account_ID AS Account_ID,
                        COALESCE(ev.Value,N'') AS Account_Value,
                        COALESCE(ev.Name,N'') AS Account_Name,
-                       fa.AD_Org_ID AS AD_Org_ID,
+                       fa.AD_OrgTrx_ID AS AD_Org_ID,
                        COALESCE(org.Name,N'') AS Org_Name,
                        COUNT(1) AS Posting_Cnt,
                        COALESCE(SUM(COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0)),0) AS Actual_Amt
                 FROM Fact_Acct fa
                 INNER JOIN C_ElementValue ev ON (ev.C_ElementValue_ID=fa.Account_ID)
-                LEFT OUTER JOIN AD_Org org ON (org.AD_Org_ID=fa.AD_Org_ID)
+                LEFT OUTER JOIN AD_Org org ON (org.AD_Org_ID=fa.AD_OrgTrx_ID)
                 WHERE fa.AD_Client_ID=@AD_Client_ID
                   AND fa.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND fa.IsActive='Y'
@@ -850,6 +1025,13 @@ namespace VASLogic.Models
                   AND ev.IsActive='Y'
                   AND ev.AccountType=@AccountType_Expense";
 
+            /* THE SAME BUDGETED-ACCOUNT FILTER THE BAR CARRIES. Without it the modal would list
+               accounts the bar above it never counted, and its total would exceed the figure
+               that opened it. The binds are appended here because the clause is - the adapters
+               bind positionally. */
+            sql += " AND " + BuildAccountFilter(budgetedAccounts, "fa.Account_ID",
+                "@Budgeted_Acct", parameters);
+
             /* Fact_Acct fa is the main physical table this read fetches from. */
             string finalSql = MRole.GetDefault(ctx).AddAccessSQL(sql, "fa",
                 MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -857,7 +1039,7 @@ namespace VASLogic.Models
             /* GROUP BY and ORDER BY after the access SQL. The ordering expression repeats the
                aggregate rather than referencing its alias - Oracle will not order by a SELECT
                alias inside an aggregate expression. */
-            finalSql += " GROUP BY fa.Account_ID,ev.Value,ev.Name,fa.AD_Org_ID,org.Name"
+            finalSql += " GROUP BY fa.Account_ID,ev.Value,ev.Name,fa.AD_OrgTrx_ID,org.Name"
                 + " ORDER BY ABS(COALESCE(SUM(COALESCE(fa.AmtAcctDr,0)-COALESCE(fa.AmtAcctCr,0)),0)) DESC,ev.Value";
 
             DataSet ds = DB.ExecuteDataset(finalSql, parameters.ToArray(), null);
@@ -910,6 +1092,39 @@ namespace VASLogic.Models
             }
 
             return list.ToString();
+        }
+
+        /// <summary>
+        /// Builds a parameterized membership test over a column - "(col IN (...) OR col IN
+        /// (...))" - splitting the ids into chunks so an Oracle IN list can never exceed its
+        /// 1000-expression limit however many accounts the tenant budgets.
+        ///
+        /// The list is never truncated: a trimmed filter would quietly drop real actuals and
+        /// report less spending than happened, which is exactly the failure this filter exists
+        /// to prevent in the other direction.
+        /// </summary>
+        /// <param name="ids">Ids to bind (server-sourced, never client text).</param>
+        /// <param name="column">Fully qualified column the test is applied to.</param>
+        /// <param name="prefix">Bind name prefix.</param>
+        /// <param name="parameters">Bind list being built, in appearance order.</param>
+        /// <returns>A bracketed predicate, safe to append to a WHERE clause.</returns>
+        private string BuildAccountFilter(List<int> ids, string column, string prefix,
+            List<SqlParameter> parameters)
+        {
+            StringBuilder predicate = new StringBuilder("(");
+
+            for (int i = 0; i < ids.Count; i++)
+            {
+                if (i == 0) { predicate.Append(column).Append(" IN ("); }
+                else if (i % MAX_IdsPerChunk == 0) { predicate.Append(") OR ").Append(column).Append(" IN ("); }
+                else { predicate.Append(","); }
+
+                string name = prefix + i;
+                predicate.Append(name);
+                parameters.Add(new SqlParameter(name, ids[i]));
+            }
+
+            return predicate.Append("))").ToString();
         }
 
         /// <summary>
@@ -1009,6 +1224,11 @@ namespace VASLogic.Models
 
             /// <summary>C_Period.EndDate, as yyyy-MM-dd.</summary>
             public string EndDate { get; set; }
+
+            /// <summary>C_Period.C_Year_ID - carried on a single period read, so the drill-down
+            /// can resolve the financial year window the budgeted-account set is scoped
+            /// to.</summary>
+            public int C_Year_ID { get; set; }
 
             /// <summary>C_Year.FiscalYear - carried on a single period read, for the modal's
             /// title and meta line.</summary>

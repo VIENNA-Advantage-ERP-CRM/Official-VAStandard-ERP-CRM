@@ -7,7 +7,7 @@
  *                  dimension has actually consumed:
  *
  *                    [~] Utilization by dimension   [ FY 2026 v ] [ Organization v ]
- *                        Actual against approved budget
+ *                        Actual expense against approved budget
  *
  *                    Head office                    $3.1M of $4.86M · 63.8%
  *                    ▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░
@@ -72,7 +72,8 @@
  *                   # | Current Text                       | Message Key
  *                  ---+------------------------------------+--------------------------
  *                   1 | Utilization by dimension           | VAS_253_UtilizationByDim
- *                   2 | Actual against approved            | VAS_253_UtilizationHint
+ *                   2 | Actual expense against approved    | VAS_253_UtilizationHint
+ *                     |   budget                           |
  *                   3 | values                             | VAS_253_Values
  *                   4 | Dimension                          | VAS_253_Dimension
  *                   5 | No accounting dimensions are       | VAS_253_NoDimensions
@@ -497,13 +498,13 @@
             return '';
         }
 
-        /* "Actual against approved · 6 Organization values" - the count is the WHOLE
+        /* "Actual expense against approved budget · 6 Organization values" - the count is the WHOLE
            ranking, not the page, and the word for the values is the accounting schema
            element's own Name. Before the first read lands there is no count and no
            dimension to name, so the bare hint stands on its own rather than printing a
            zero the card does not yet know. */
         function paintSubtitle() {
-            var text = label('VAS_253_UtilizationHint', 'Actual against approved');
+            var text = label('VAS_253_UtilizationHint', 'Actual expense against approved budget');
 
             if (_dimensionLabel) {
                 text += ' · ' + _totalRows + ' ' + _dimensionLabel + ' ' +
