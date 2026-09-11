@@ -102,6 +102,10 @@ namespace VASLogic.Models
     ///                          through a two-body CTE with MRole applied inside each body,
     ///                          and dimension masters resolved through the Application
     ///                          Dictionary.
+    ///   VAI145      2026-09-11 Oracle: utilization percentage moved from the SELECT list
+    ///                          to C#. An unbounded NUMBER division (non-terminating
+    ///                          ratio) overflowed the .NET decimal in the DataSet fill,
+    ///                          so the read intermittently came back empty.
     /// </summary>
     public class VAS_253_UtlizationbyDimensionModel
     {
@@ -1015,6 +1019,12 @@ namespace VASLogic.Models
         /// the bodies are composed into the WITH statement. It is never applied to a CTE alias
         /// or to the finished statement: those are derived result sets, not dictionary tables,
         /// and the access parser cannot resolve them.
+        ///
+        /// The query returns the two SUMS only; the utilization percentage is divided in C#.
+        /// A division in the SELECT list is unbounded NUMBER on Oracle, and a non-terminating
+        /// ratio overflows the .NET decimal ODP.NET reads it into, which fails the whole
+        /// DataSet fill. The ranking is likewise done in C# (see CompareRows), so the SQL
+        /// ORDER BY is only there to make the read deterministic.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="acct">Resolved accounting context (schema and currency).</param>
@@ -1066,10 +1076,9 @@ namespace VASLogic.Models
                .Append("GROUP BY b.DimensionValue_ID) ")
                .Append("SELECT d.DimensionValue_ID AS DimensionValue_ID,")
                .Append("d.BudgetAmount AS BudgetAmount,")
-               .Append("d.ActualAmount AS ActualAmount,")
-               .Append("CASE WHEN d.BudgetAmount=0 THEN 0 ELSE (d.ActualAmount/d.BudgetAmount)*100 END AS UtilizationPct ")
+               .Append("d.ActualAmount AS ActualAmount ")
                .Append("FROM DimensionTotals d ")
-               .Append("ORDER BY UtilizationPct DESC,d.DimensionValue_ID");
+               .Append("ORDER BY d.DimensionValue_ID");
 
             DataSet ds = DB.ExecuteDataset(sql.ToString(), parameters.ToArray(), null);
             if (ds == null || ds.Tables.Count == 0) { result.Page = 1; return; }
@@ -1085,7 +1094,17 @@ namespace VASLogic.Models
                 item.Dimension_ID = Util.GetValueOfInt(row["DimensionValue_ID"]);
                 item.Budget = Util.GetValueOfDecimal(row["BudgetAmount"]);
                 item.Actual = Util.GetValueOfDecimal(row["ActualAmount"]);
-                item.UtilizedPct = Util.GetValueOfDecimal(row["UtilizationPct"]);
+
+                /* THE PERCENTAGE IS DIVIDED HERE, NOT IN SQL. On Oracle a division on an
+                   unconstrained NUMBER carries up to 40 significant digits - 1000/3000*100
+                   is 33.3333... to the full width - and ODP.NET cannot fit that into a .NET
+                   decimal: the DataAdapter throws an overflow, the helper swallows it and
+                   the whole result comes back null. It only happens when some row's ratio
+                   is non-terminating, which is why it showed as "sometimes". PostgreSQL
+                   rounds its numeric division and never did. A C# decimal division rounds
+                   to 28 digits and is the same on both backends; the sibling VAS_252 does
+                   it the same way. */
+                item.UtilizedPct = item.Budget == 0 ? 0m : (item.Actual / item.Budget) * 100m;
 
                 all.Add(item);
             }
