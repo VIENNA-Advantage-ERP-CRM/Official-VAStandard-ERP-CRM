@@ -1,0 +1,795 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_262 Value By Contract Type — c3 x r2 read-only breakdown widget + per-
+ * type drill list modal + contract detail modal (Service Contracts
+ * dashboard). Design: value-by-type.html (single-widget preview of the
+ * parent dashboard's own valueByTypeWidget()) is the pixel-level source of
+ * truth - .svc-widget-bg glass surface, value-ranked seg/bar rows (swatch +
+ * label left, value + " · N" right, proportional fill below), header icon
+ * well + title/sub with NO "All ->" link (the whole widget is the
+ * breakdown, bars are the drill). The list-modal/detail-modal chrome mirrors
+ * VAS_241/244/245/246/258/259/260/261's own (same glass/modal tokens incl.
+ * the 900px "wide" panel, vas262-* prefixed) - the detail modal's footer
+ * carries Generate invoice / Renew / Open record, same as VAS_244/245/246/
+ * 258/259/261. Internal type / spacing in em against the widget-root
+ * font-size; borders / radii / shadows in px (physical edges).
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas262-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    display: flex;
+    flex-direction: column;
+    padding: 0.875em 1em 1em 1em;
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 1));
+    border: 2px solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102C3F;
+    overflow: hidden;
+}
+
+    .vas262-root,
+    .vas262-root * {
+        box-sizing: border-box;
+    }
+
+/* ── Header: icon well + title/sub (no "All" link - bars are the drill) ── */
+
+.vas262-head {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    margin-bottom: 0.625em;
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+.vas262-iconwell {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
+    border: 1px solid #E8F2FB;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+}
+
+    .vas262-iconwell svg { width: 1.05em; height: 1.05em; }
+
+.vas262-head-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas262-title {
+    font-weight: 500;
+    font-size: 1.0625rem;
+    color: #000000;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas262-sub {
+    font-weight: 400;
+    font-size: 0.7rem;
+    color: #717182;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas262-skel-sub {
+    display: inline-block;
+    width: 12em;
+    height: 0.7em;
+    border-radius: 6px;
+    background: #E6EBF1;
+    color: transparent !important;
+    animation: vas262-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes vas262-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vas262-skel-sub { animation: none; }
+}
+
+/* ── Body: value-ranked bars, vertically centred, never scrolls ─────────── */
+
+.vas262-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.vas262-segs {
+    display: flex;
+    flex-direction: column;
+}
+
+.vas262-state {
+    padding: 1em;
+    font-size: 0.8125em;
+    color: #748494;
+    text-align: center;
+}
+
+.vas262-seg {
+    margin-bottom: 0.55em;
+}
+
+    .vas262-seg:last-child { margin-bottom: 0; }
+
+.vas262-seg-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 5px;
+    gap: 0.5em;
+}
+
+.vas262-seg-l {
+    font-size: 0.8em;
+    color: #102C3F;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 0;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+    .vas262-seg-l:hover { color: #0083DA; }
+
+.vas262-sw {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.vas262-seg-r {
+    font-size: 0.78em;
+    color: #5F7283;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.vas262-seg-v {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas262-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(15, 61, 97, 0.07);
+    overflow: hidden;
+}
+
+    .vas262-bar > div {
+        height: 100%;
+        border-radius: 999px;
+    }
+
+/* ── Shared modal / dialog chrome (drill list + contract detail) ────────
+ * Fixed scrim + white panel on <body>, own font anchor, px chrome.
+ * ───────────────────────────────────────────────────────────────────── */
+
+.vas262-modal,
+.vas262-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: Roboto, sans-serif;
+    font-size: 14px;
+    color: #102C3F;
+}
+
+    .vas262-modal.is-open,
+    .vas262-dialog.is-open {
+        display: flex;
+    }
+
+    .vas262-modal *,
+    .vas262-modal,
+    .vas262-dialog *,
+    .vas262-dialog {
+        box-sizing: border-box;
+    }
+
+.vas262-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.45);
+}
+
+.vas262-panel {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(15, 61, 97, 0.28);
+    overflow: hidden;
+}
+
+.vas262-mhead,
+.vas262-phead {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 1em 1.25em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas262-mtitle,
+.vas262-ptitle {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 1.05em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas262-mhead-meta,
+.vas262-pcount {
+    flex-shrink: 0;
+    font-size: 0.8em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+.vas262-mclose,
+.vas262-close {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: #748494;
+    cursor: pointer;
+}
+
+    .vas262-mclose:hover,
+    .vas262-close:hover {
+        color: #102C3F;
+        background: rgba(16, 44, 63, 0.08);
+    }
+
+    .vas262-mclose svg,
+    .vas262-close svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.vas262-mbody,
+.vas262-pbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1.25em;
+}
+
+.vas262-mfoot,
+.vas262-pfoot {
+    padding: 0.85em 1.25em;
+    border-top: 1px solid #EDF2F6;
+    background: #FBFDFF;
+}
+
+.vas262-mfoot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6em;
+}
+
+.vas262-pfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+}
+
+.vas262-pfoot-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+}
+
+.vas262-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.6em 1.1em;
+    border-radius: 10px;
+    font-size: 0.875em;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+
+    .vas262-btn svg { width: 0.9em; height: 0.9em; }
+    .vas262-btn:disabled { opacity: 0.55; cursor: default; }
+
+.vas262-btn-ghost {
+    background: #FFFFFF;
+    color: #0083DA;
+    border: 1px solid #B6DEFB;
+}
+
+    .vas262-btn-ghost:hover:not(:disabled) { background: #EEF6FF; }
+
+.vas262-btn-primary {
+    background: #0083DA;
+    color: #FFFFFF;
+}
+
+    .vas262-btn-primary:hover:not(:disabled) { background: #1F83FF; }
+
+body.vas262-modal-open { overflow: hidden; }
+
+.vas262-band {
+    display: inline-flex;
+    align-items: center;
+    font-weight: 500;
+    font-size: 0.6875em;
+    padding: 0.16em 0.66em;
+    border-radius: 999px;
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas262-band-ok     { background: #E4F6EC; color: #0B6B45; }
+.vas262-band-warn   { background: #FCEBD3; color: #9A6500; }
+.vas262-band-danger { background: #FCE4E4; color: #B3241C; }
+.vas262-band-info   { background: #DFF1FF; color: #0E5DA8; }
+
+/* ── Confirm dialog (app-styled - replaces the native window.confirm(), which
+ * renders as an unstyled "<host> says" browser chrome popup). Small centered
+ * box on <body>, above the detail modal (z-index 10070 > 10060). ───────── */
+
+.vas262-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10070;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: Roboto, sans-serif;
+}
+
+    .vas262-confirm-overlay.is-open { display: flex; }
+
+    .vas262-confirm-overlay *,
+    .vas262-confirm-overlay {
+        box-sizing: border-box;
+    }
+
+.vas262-confirm-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.45);
+}
+
+.vas262-confirm-box {
+    position: relative;
+    width: 100%;
+    max-width: 380px;
+    background: #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(15, 61, 97, 0.28);
+    padding: 20px;
+}
+
+.vas262-confirm-msg {
+    margin: 0 0 16px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #102C3F;
+}
+
+.vas262-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6em;
+}
+
+.vas262-status {
+    display: inline-flex;
+    align-items: center;
+    font-weight: 700;
+    font-size: 0.7em;
+    padding: 0.28em 0.75em;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+/* ── Renewal-type chip: neutral surface, colour-carrying dot only ───────── */
+
+.vas262-renewal {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.1875em 0.5em;
+    border-radius: 6px;
+    width: fit-content;
+    white-space: nowrap;
+    flex-shrink: 0;
+    background: #F1F5F9;
+    color: #445363;
+}
+
+.vas262-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+.vas262-renewal-auto .vas262-dot    { background: #20A464; }
+.vas262-renewal-manual .vas262-dot  { background: #D78B10; }
+.vas262-renewal-neutral .vas262-dot { background: #94A4B4; }
+
+/* ── Per-type drill list modal: column header + rows ─────────────────────── */
+
+.vas262-colhead {
+    display: grid;
+    grid-template-columns: 1.9fr 1fr 1fr .9fr .9fr;
+    gap: 1em;
+    align-items: center;
+    padding: 0.6em 1.25em;
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #94A4B4;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas262-col-r { text-align: right; }
+
+.vas262-mtrow {
+    display: grid;
+    grid-template-columns: 1.9fr 1fr 1fr .9fr .9fr;
+    gap: 1em;
+    align-items: center;
+    padding: 0.7em 0;
+    border-top: 1px solid #F1F5F8;
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+
+    .vas262-mtrow:first-child { border-top: none; }
+    .vas262-mtrow:hover { background: #F8FBFD; }
+
+.vas262-mtc-main {
+    display: flex;
+    align-items: center;
+    gap: 0.65em;
+    min-width: 0;
+}
+
+.vas262-mtc-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas262-avatar {
+    width: 2.2em;
+    height: 2.2em;
+    flex-shrink: 0;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+.vas262-row-name {
+    font-weight: 700;
+    font-size: 0.9em;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas262-row-meta {
+    font-size: 0.76em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@container (max-width: 40em) {
+    .vas262-colhead, .vas262-mtrow { grid-template-columns: 1fr 5em 6.5em; }
+    .vas262-colhead span:nth-child(3), .vas262-mtrow span:nth-child(3) { display: none; }
+}
+
+/* ── Pager (drill list modal) ─────────────────────────────────────────── */
+
+.vas262-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    font-size: 0.8em;
+    color: #748494;
+}
+
+.vas262-pgctl {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.vas262-pgbtn {
+    width: 1.9em;
+    height: 1.9em;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    border: 1px solid #E4EDF4;
+    background: #FFFFFF;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .vas262-pgbtn:hover:not(:disabled) { background: #EEF6FF; }
+    .vas262-pgbtn:disabled { opacity: 0.4; cursor: default; }
+    .vas262-pgbtn svg { width: 0.8em; height: 0.8em; }
+
+/* ── Contract detail modal (mirrors VAS_241/244/245/246/258/259/261's own detail layout) ── */
+
+.vas262-dtop2 {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85em;
+    padding-bottom: 1em;
+    margin-bottom: 1em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas262-davatar {
+    width: 2.75em;
+    height: 2.75em;
+    flex-shrink: 0;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+.vas262-dhead-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+.vas262-dname {
+    font-size: 1.15em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas262-dsub {
+    font-size: 0.8em;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas262-dhead-right {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35em;
+}
+
+.vas262-dcycles {
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+.vas262-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1em 1.25em;
+    padding-bottom: 1.1em;
+    margin-bottom: 1.1em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas262-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    min-width: 0;
+}
+
+.vas262-slabel {
+    font-size: 0.68em;
+    font-weight: 600;
+    color: #94A4B4;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.vas262-sval {
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container (max-width: 40em) {
+    .vas262-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+.vas262-attn { margin-bottom: 1.1em; }
+
+.vas262-attn-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 0.6em;
+}
+
+.vas262-attn-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7em;
+    padding: 0.7em 0;
+    border-top: 1px solid #F1F5F8;
+}
+
+    .vas262-attn-card:first-of-type { border-top: none; }
+
+.vas262-attn-ic {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+    .vas262-attn-ic svg { width: 1em; height: 1em; }
+
+.vas262-attn-ic-danger {
+    background: rgba(216, 67, 74, 0.12);
+    color: #D8434A;
+}
+
+.vas262-attn-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+.vas262-attn-title2 {
+    font-size: 0.875em;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas262-attn-desc {
+    font-size: 0.78em;
+    color: #748494;
+}
+
+.vas262-attn-empty {
+    font-size: 0.8em;
+    color: #94A4B4;
+}
+
+.vas262-sched-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 0.6em;
+}
+
+.vas262-sched-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.vas262-sched-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.65em 0;
+    border-top: 1px solid #F1F5F8;
+    font-size: 0.85em;
+}
+
+    .vas262-sched-row:first-child { border-top: none; }
+
+.vas262-sched-left {
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas262-sched-right {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+}
+
+.vas262-sched-amt {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas262-mmsg {
+    display: none;
+    padding: 0.6em 1.25em;
+    font-size: 0.8em;
+    color: #0B6B45;
+    background: #E4F6EC;
+    border-top: 1px solid #EDF2F6;
+}
+
+    .vas262-mmsg.is-open { display: block; }
+    .vas262-mmsg.is-error { color: #B3241C; background: #FCE4E4; }
