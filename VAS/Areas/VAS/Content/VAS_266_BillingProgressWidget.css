@@ -1,0 +1,845 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_266 Billing Progress — c3 x r2 read-only summary widget + shared drill
+ * list modal + contract detail modal (Service Contracts dashboard). Design:
+ * billing-progress.html (single-widget preview of the parent dashboard's own
+ * billingProgressWidget()) is the pixel-level source of truth - .svc-widget-bg
+ * glass surface, no "All ->" header link (a summary, not a list), a
+ * vertically-centred prog-wrap (% figure, split bar, legend, two-tile stat
+ * row). The drill list modal is shared across all three drills (unbilled /
+ * billing overdue / billed) - ONE 5-column shape (Contract / Value / Ends /
+ * Renewal / Status) for all of them, matching the combined dashboard mock's
+ * own universal drill-list row (2026-09-09 fix - the mock's actual rendered
+ * "Unbilled contracts" / "Billing overdue" dialogs both carry all five
+ * columns; the original build's narrower per-kind money/date-only shape
+ * omitted Ends/Renewal/Status). The list-modal/detail-modal chrome otherwise
+ * mirrors VAS_241/244/245/246/258/259/260/261/262/263/264/265's own (same
+ * glass/modal tokens incl. the 900px "wide" panel, vas266-* prefixed). This
+ * is a read-only drill (no row action button), so there is no "-sm" button
+ * size modifier here and no equal-specificity cascade risk to guard against.
+ * Structural sizing below is fixed px or rem (document-root-relative)
+ * matching the mock's own .prog-big/.split/.stat3 literally, not em relative
+ * to .vas266-root's own dashboard-scaled font-size (the em-vs-fixed-px/rem
+ * mismatch VAS_263 needed a follow-up fix for, 2026-09-08 - applied
+ * correctly here from the start).
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas266-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    display: flex;
+    flex-direction: column;
+    padding: 0.875em 1em 1em 1em;
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 1));
+    border: 2px solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102C3F;
+    overflow: hidden;
+}
+
+    .vas266-root,
+    .vas266-root * {
+        box-sizing: border-box;
+    }
+
+/* ── Header: icon well + title/sub (no "All" link - summary, not a list) ── */
+
+.vas266-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.625em;
+    flex-shrink: 0;
+}
+
+.vas266-head-l {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas266-iconwell {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
+    border: 1px solid #E8F2FB;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+}
+
+    .vas266-iconwell svg { width: 1.05em; height: 1.05em; }
+
+.vas266-head-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas266-title {
+    font-weight: 500;
+    font-size: 1.0625rem;
+    color: #000000;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas266-sub {
+    font-weight: 400;
+    font-size: 0.7rem;
+    color: #717182;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas266-skel-sub {
+    display: inline-block;
+    width: 16em;
+    height: 0.7em;
+    border-radius: 6px;
+    background: #E6EBF1;
+    color: transparent !important;
+    animation: vas266-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes vas266-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vas266-skel-sub { animation: none; }
+}
+
+/* ── Body: vertically-centred summary content (never resizes / never a list) ── */
+
+.vas266-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas266-state {
+    padding: 1em;
+    font-size: 0.8125em;
+    color: #748494;
+    text-align: center;
+}
+
+.vas266-progwrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+    justify-content: center;
+}
+
+.vas266-progbig {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+    .vas266-progbig b {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #102C3F;
+        line-height: 1;
+    }
+
+    .vas266-progbig span {
+        font-size: 0.75rem;
+        color: #5F7283;
+    }
+
+.vas266-split {
+    height: 14px;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    background: rgba(15, 61, 97, 0.07);
+}
+
+.vas266-split-billed {
+    height: 100%;
+    background: linear-gradient(90deg, #0083DA, #1F83FF);
+}
+
+.vas266-split-unbilled {
+    height: 100%;
+    background: #E6EDF3;
+}
+
+.vas266-legend {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+}
+
+.vas266-lg {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #5F7283;
+    cursor: pointer;
+}
+
+.vas266-sw {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.vas266-sw-billed { background: #1F83FF; }
+.vas266-sw-unbilled { background: #B9C6D2; }
+
+.vas266-stat3 {
+    display: flex;
+    gap: 10px;
+    flex: none;
+    align-items: stretch;
+    margin-top: 2px;
+}
+
+.vas266-st {
+    flex: 1;
+    border: 1px solid #E4EDF4;
+    border-radius: 11px;
+    background: linear-gradient(180deg, #FFFFFF, #FAFDFF);
+    padding: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    cursor: pointer;
+}
+
+    .vas266-st:hover { border-color: #BFE4FF; }
+
+.vas266-sv {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1;
+}
+
+.vas266-sv-danger { color: #D8434A; }
+.vas266-sv-ok { color: #0B6B45; }
+
+.vas266-sl {
+    font-size: 0.66rem;
+    color: #5F7283;
+    margin-top: 3px;
+}
+
+/* ── Shared modal / dialog chrome (drill list modal + contract detail) ──
+ * Fixed scrim + white panel on <body>, own font anchor, px chrome.
+ * ───────────────────────────────────────────────────────────────────── */
+
+.vas266-modal,
+.vas266-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: Roboto, sans-serif;
+    font-size: 14px;
+    color: #102C3F;
+}
+
+    .vas266-modal.is-open,
+    .vas266-dialog.is-open {
+        display: flex;
+    }
+
+    .vas266-modal *,
+    .vas266-modal,
+    .vas266-dialog *,
+    .vas266-dialog {
+        box-sizing: border-box;
+    }
+
+.vas266-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.45);
+}
+
+.vas266-panel {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(15, 61, 97, 0.28);
+    overflow: hidden;
+}
+
+.vas266-mhead,
+.vas266-phead {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 1em 1.25em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas266-mtitle,
+.vas266-ptitle {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 1.05em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas266-mhead-meta,
+.vas266-pcount {
+    flex-shrink: 0;
+    font-size: 0.8em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+.vas266-mclose,
+.vas266-close {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: #748494;
+    cursor: pointer;
+}
+
+    .vas266-mclose:hover,
+    .vas266-close:hover {
+        color: #102C3F;
+        background: rgba(16, 44, 63, 0.08);
+    }
+
+    .vas266-mclose svg,
+    .vas266-close svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.vas266-mbody,
+.vas266-pbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1.25em;
+}
+
+.vas266-mfoot,
+.vas266-pfoot {
+    padding: 0.85em 1.25em;
+    border-top: 1px solid #EDF2F6;
+    background: #FBFDFF;
+}
+
+.vas266-mfoot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6em;
+}
+
+.vas266-pfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+}
+
+.vas266-pfoot-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+}
+
+.vas266-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.6em 1.1em;
+    border-radius: 10px;
+    font-size: 0.875em;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+
+    .vas266-btn svg { width: 0.9em; height: 0.9em; }
+    .vas266-btn:disabled { opacity: 0.55; cursor: default; }
+
+.vas266-btn-ghost {
+    background: #FFFFFF;
+    color: #0083DA;
+    border: 1px solid #B6DEFB;
+}
+
+    .vas266-btn-ghost:hover:not(:disabled) { background: #EEF6FF; }
+
+.vas266-btn-primary {
+    background: #0083DA;
+    color: #FFFFFF;
+}
+
+    .vas266-btn-primary:hover:not(:disabled) { background: #1F83FF; }
+
+body.vas266-modal-open { overflow: hidden; }
+
+.vas266-band {
+    display: inline-flex;
+    align-items: center;
+    font-weight: 500;
+    font-size: 0.6875em;
+    padding: 0.16em 0.66em;
+    border-radius: 999px;
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas266-band-ok     { background: #E4F6EC; color: #0B6B45; }
+.vas266-band-warn   { background: #FCEBD3; color: #9A6500; }
+.vas266-band-danger { background: #FCE4E4; color: #B3241C; }
+.vas266-band-info   { background: #DFF1FF; color: #0E5DA8; }
+
+/* ── Confirm dialog (app-styled - replaces the native window.confirm(), which
+ * renders as an unstyled "<host> says" browser chrome popup). Small centered
+ * box on <body>, above the detail modal (z-index 10070 > 10060). ───────── */
+
+.vas266-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10070;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: Roboto, sans-serif;
+}
+
+    .vas266-confirm-overlay.is-open { display: flex; }
+
+    .vas266-confirm-overlay *,
+    .vas266-confirm-overlay {
+        box-sizing: border-box;
+    }
+
+.vas266-confirm-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.45);
+}
+
+.vas266-confirm-box {
+    position: relative;
+    width: 100%;
+    max-width: 380px;
+    background: #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(15, 61, 97, 0.28);
+    padding: 20px;
+}
+
+.vas266-confirm-msg {
+    margin: 0 0 16px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #102C3F;
+}
+
+.vas266-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6em;
+}
+
+/* ── Drill list modal: column header + rows - ONE 5-column shape shared by
+ * all three drills (Contract / Value / Ends / Renewal / Status), matching
+ * the combined dashboard mock's own universal drill-list row exactly
+ * (its shared cols='1.9fr 1fr 1fr .9fr .9fr'). ───────────────────────────── */
+
+.vas266-colhead {
+    display: grid;
+    grid-template-columns: 1.9fr 1fr 1fr 0.9fr 0.9fr;
+    gap: 1em;
+    align-items: center;
+    padding: 0.6em 1.25em;
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #94A4B4;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas266-col-r { text-align: right; }
+
+.vas266-mtrow {
+    display: grid;
+    grid-template-columns: 1.9fr 1fr 1fr 0.9fr 0.9fr;
+    gap: 1em;
+    align-items: center;
+    padding: 0.7em 0;
+    border-top: 1px solid #F1F5F8;
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+
+    .vas266-mtrow:first-child { border-top: none; }
+    .vas266-mtrow:hover { background: #F8FBFD; }
+
+/* ── Renewal chip: neutral surface, colour-coded dot (green Auto / amber Manual) ── */
+
+.vas266-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 600;
+    font-size: 0.6875rem;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 6px;
+    line-height: 1.2;
+    white-space: nowrap;
+    background: #F1F5F9;
+    color: #445363;
+}
+
+.vas266-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+.vas266-chip-auto .vas266-dot { background: #20A464; }
+.vas266-chip-manual .vas266-dot { background: #D78B10; }
+
+.vas266-mtc-main {
+    display: flex;
+    align-items: center;
+    gap: 0.65em;
+    min-width: 0;
+}
+
+.vas266-mtc-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas266-row-name {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas266-row-meta {
+    font-size: 0.72rem;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas266-avatar {
+    width: 2.2em;
+    height: 2.2em;
+    flex-shrink: 0;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+@container (max-width: 40em) {
+    .vas266-colhead, .vas266-mtrow { grid-template-columns: 1fr 5em 6.5em; }
+    .vas266-colhead span:nth-child(3), .vas266-mtrow span:nth-child(3),
+    .vas266-colhead span:nth-child(4), .vas266-mtrow span:nth-child(4) { display: none; }
+}
+
+/* ── Pager (list modal) ───────────────────────────────────────────────── */
+
+.vas266-pglabel {
+    font-size: 0.73rem;
+    color: #5F7283;
+}
+
+.vas266-pager2 {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    font-size: 0.8em;
+    color: #748494;
+}
+
+.vas266-pgctl {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.vas266-pgbtn {
+    width: 1.9em;
+    height: 1.9em;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    border: 1px solid #E4EDF4;
+    background: #FFFFFF;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .vas266-pgbtn:hover:not(:disabled) { background: #EEF6FF; }
+    .vas266-pgbtn:disabled { opacity: 0.4; cursor: default; }
+    .vas266-pgbtn svg { width: 0.8em; height: 0.8em; }
+
+/* ── Contract detail modal (mirrors VAS_241/244/245/246/258/259/260/261/262/263/264/265's own detail layout) ── */
+
+.vas266-dtop2 {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85em;
+    padding-bottom: 1em;
+    margin-bottom: 1em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas266-davatar {
+    width: 2.75em;
+    height: 2.75em;
+    flex-shrink: 0;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+.vas266-dhead-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+.vas266-dname {
+    font-size: 1.15em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas266-dsub {
+    font-size: 0.8em;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas266-dhead-right {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35em;
+}
+
+.vas266-dcycles {
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+.vas266-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1em 1.25em;
+    padding-bottom: 1.1em;
+    margin-bottom: 1.1em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas266-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    min-width: 0;
+}
+
+.vas266-slabel {
+    font-size: 0.68em;
+    font-weight: 600;
+    color: #94A4B4;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.vas266-sval {
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container (max-width: 40em) {
+    .vas266-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+.vas266-attn { margin-bottom: 1.1em; }
+
+.vas266-attn-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 0.6em;
+}
+
+.vas266-attn-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7em;
+    padding: 0.7em 0;
+    border-top: 1px solid #F1F5F8;
+}
+
+    .vas266-attn-card:first-of-type { border-top: none; }
+
+.vas266-attn-ic {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+    .vas266-attn-ic svg { width: 1em; height: 1em; }
+
+.vas266-attn-ic-danger {
+    background: rgba(216, 67, 74, 0.12);
+    color: #D8434A;
+}
+
+.vas266-attn-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+.vas266-attn-title2 {
+    font-size: 0.875em;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas266-attn-desc {
+    font-size: 0.78em;
+    color: #748494;
+}
+
+.vas266-attn-empty {
+    font-size: 0.8em;
+    color: #94A4B4;
+}
+
+.vas266-sched-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 0.6em;
+}
+
+.vas266-sched-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.vas266-sched-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.65em 0;
+    border-top: 1px solid #F1F5F8;
+    font-size: 0.85em;
+}
+
+    .vas266-sched-row:first-child { border-top: none; }
+
+.vas266-sched-left {
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.vas266-sched-right {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+}
+
+.vas266-sched-amt {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas266-mmsg {
+    display: none;
+    padding: 0.6em 1.25em;
+    font-size: 0.8em;
+    color: #0B6B45;
+    background: #E4F6EC;
+    border-top: 1px solid #EDF2F6;
+}
+
+    .vas266-mmsg.is-open { display: block; }
+    .vas266-mmsg.is-error { color: #B3241C; background: #FCE4E4; }
