@@ -7,7 +7,7 @@
  *                  budget but have NOT yet passed it:
  *
  *                    [◎] Budgets near limit                   [ FY 2026 v ]
- *                        23 accounts above the configured 80% threshold
+ *                        23 accounts between 80% and 100% of approved budget
  *
  *                    Account                       Budget   Actual   Used
  *                    11800 — Cash in Registers      $180K    $169K    94%
@@ -24,10 +24,11 @@
  *                  and never show the same account twice.
  *
  *                  THE SUBTITLE COUNTS EVERY MATCHING ACCOUNT, not the page. "23
- *                  accounts above the configured 80% threshold" is a property of the
- *                  whole result, and both the count and the threshold come from the
- *                  server - the card never spells the number out itself, so a tenant
- *                  that warns at 80% sees 80.
+ *                  accounts between 80% and 100% of approved budget" is a property of
+ *                  the whole result, and both the count and the threshold come from
+ *                  the server - the card never spells the number out itself, so a
+ *                  tenant that warns at 80% sees 80. The 100% is the card's own
+ *                  ceiling, stated so the reader knows overruns are NOT in the count.
  *
  *                  USED IS TIERED, THE FIGURES ARE NOT. Below 90% the ratio is
  *                  stated plainly; from 90% it takes the risk tone, because that is
@@ -60,8 +61,8 @@
  *                   # | Current Text                       | Message Key
  *                  ---+------------------------------------+--------------------------
  *                   1 | Budgets near limit                 | VAS_255_BudgetsNearLimit
- *                   2 | accounts above the configured      | VAS_255_AccountsAbove
- *                   3 | threshold                          | VAS_255_Threshold
+ *                   2 | accounts between                   | VAS_255_AccountsBetween
+ *                   3 | and 100% of approved budget        | VAS_255_AndFullBudget
  *                   4 | Used                               | VAS_255_Used
  *                   5 | No budgets are near the configured | VAS_255_NoNearLimit
  *                     |   limit.                           |
@@ -437,19 +438,22 @@
             return label('VAS_192_CouldntLoad', "Couldn't load");
         }
 
-        /* "23 accounts above the configured 80% threshold" - the count is the WHOLE result,
-           never the page, and the threshold is the server's. Before the first read lands
-           there is neither, so the subtitle stays empty rather than printing a zero the card
-           does not yet know. */
+        /* "23 accounts between 80% and 100% of approved budget" - the count is the WHOLE
+           result, never the page, and the threshold is the server's. The sentence states
+           BOTH bounds of the band: the lower one is configuration, the upper one is what
+           makes this the near-limit card rather than the overrun card (VAS_252), and a
+           subtitle that named only the threshold read as if overruns were counted too.
+           Before the first read lands there is neither, so the subtitle stays empty rather
+           than printing a zero the card does not yet know. */
         function paintSubtitle() {
             var $sub = $card.find('.vas-255-subtitle');
 
             if (_threshold <= 0) { $sub.text('').attr('title', ''); return; }
 
             var text = _totalRows + ' ' +
-                label('VAS_255_AccountsAbove', 'accounts above the configured') + ' ' +
+                label('VAS_255_AccountsBetween', 'accounts between') + ' ' +
                 percentText(_threshold, 0) + ' ' +
-                label('VAS_255_Threshold', 'threshold');
+                label('VAS_255_AndFullBudget', 'and 100% of approved budget');
 
             /* The subtitle truncates in a 3-column cell that is already sharing its header row
                with the year pill, so the full sentence also goes on the title attribute - it

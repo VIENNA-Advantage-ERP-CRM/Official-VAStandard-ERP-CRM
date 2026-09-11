@@ -693,8 +693,16 @@ button.vas-251-col:hover .vas-251-bar--actual {
     background: rgba(255, 255, 255, .72);
 }
 
+/* An empty list or a failed read takes the whole ROWS REGION, centred in it - the panel
+   is a fixed height, so a message pinned to the top would leave a tall blank below it
+   and read as a list that had failed to finish drawing rather than as an answer. The
+   metrics above it stay put and stay true. */
 .vas-251-dlg-empty {
-    padding: 1.5em 1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 1em;
     font-size: .8125em;
     color: #5F7283;
     text-align: center;
