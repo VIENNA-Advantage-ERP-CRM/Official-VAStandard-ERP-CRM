@@ -1344,13 +1344,15 @@ namespace VASLogic.Models
                                FROM M_Product p
                                WHERE p.IsActive = 'Y'
                                  AND p.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
-                                 AND (UPPER(p.UPC) = UPPER(@code) OR UPPER(p.Value) = UPPER(@code))";
+                                 AND (UPPER(p.UPC) = UPPER(@codeUpc) OR UPPER(p.Value) = UPPER(@codeValue))";
             string scanProdPred = GetValRulePredicate(ctx, "M_Product_ID", "M_Product", "p", C_Invoice_ID);
             if (scanProdPred.Length > 0) prodSql += " AND (" + scanProdPred + ")";
             prodSql = MRole.GetDefault(ctx).AddAccessSQL(prodSql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
+            // Oracle binds by POSITION: the UPC and Value placeholders each need their own
+            // SqlParameter (one "@code" used twice left the second slot unbound -> ORA-01008).
             DataSet ds = DB.ExecuteDataset(prodSql,
-                new SqlParameter[] { new SqlParameter("@code", key) }, null);
+                new SqlParameter[] { new SqlParameter("@codeUpc", key), new SqlParameter("@codeValue", key) }, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 DataRow r = ds.Tables[0].Rows[0];
