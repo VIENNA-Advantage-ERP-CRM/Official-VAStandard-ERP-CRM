@@ -101,7 +101,7 @@ namespace VAS.Areas.VAS.Controllers
             // Beyond the free-text match, the term can also find journals by document STATUS
             // (keyword -> DocStatus code), POSTED flag (posted / unposted), or exact AMOUNT
             // (numeric term matches TotalDr or TotalCr). Status codes and the posted flag are
-            // fixed literals (safe to inline); the amount is bound (@Amt).
+            // fixed literals (safe to inline); the amount is bound (@AmtDr / @AmtCr).
             var extraOrs = new List<string>();
             var codes = new List<string>();
             if (ql.Contains("draft"))    { codes.Add("'DR'"); }
@@ -119,7 +119,9 @@ namespace VAS.Areas.VAS.Controllers
             else if (ql.Contains("posted"))                           { extraOrs.Add("b.Posted = 'Y'"); }
             decimal amt;
             bool hasAmt = decimal.TryParse(ql.Replace(",", "").Replace("$", "").Trim(), out amt);
-            if (hasAmt) { extraOrs.Add("(ABS(b.TotalDr) = @Amt OR ABS(b.TotalCr) = @Amt)"); }
+            // Two placeholders, two binds: Oracle binds by POSITION, so a single "@Amt" used
+            // twice leaves the second slot unbound (ORA-01008 on any numeric term).
+            if (hasAmt) { extraOrs.Add("(ABS(b.TotalDr) = @AmtDr OR ABS(b.TotalCr) = @AmtCr)"); }
 
             // Lookup tables (C_DocType / GL_Category / GL_JournalBatch / C_AcctSchema /
             // AD_Ref_List posting type) join outside MRole scope and feed the searchable text
@@ -151,7 +153,7 @@ namespace VAS.Areas.VAS.Controllers
                                   " || COALESCE(ev.Name, " + empty + ")) LIKE LOWER(@Q2))";
 
             // Order in SQL text (matters for Oracle positional binding): @Q1 (header text),
-            // then the optional @Amt inside extraOrs, then @Q2 (journal-line EXISTS).
+            // then the optional @AmtDr / @AmtCr inside extraOrs, then @Q2 (journal-line EXISTS).
             var ors = new List<string>();
             ors.Add(textMatch);
             ors.AddRange(extraOrs);
@@ -189,7 +191,7 @@ namespace VAS.Areas.VAS.Controllers
             }
 
             // Relevance params (doc-no exact / prefix / contains) come first textually
-            // (in the SELECT CASE), then @Q1 (header WHERE), then the optional @Amt, then
+            // (in the SELECT CASE), then @Q1 (header WHERE), then the optional @AmtDr / @AmtCr, then
             // @Q2 (journal-line EXISTS). Oracle binds by POSITION - keep this order.
             string like = "%" + term + "%";
             var p = new List<SqlParameter>
@@ -199,7 +201,11 @@ namespace VAS.Areas.VAS.Controllers
                 new SqlParameter("@QDoc", like),
                 new SqlParameter("@Q1", like)
             };
-            if (hasAmt) { p.Add(new SqlParameter("@Amt", Math.Abs(amt))); }
+            if (hasAmt)
+            {
+                p.Add(new SqlParameter("@AmtDr", Math.Abs(amt)));
+                p.Add(new SqlParameter("@AmtCr", Math.Abs(amt)));
+            }
             p.Add(new SqlParameter("@Q2", like));
 
             DataSet ds = DB.ExecuteDataset(strQuery, p.ToArray(), null);

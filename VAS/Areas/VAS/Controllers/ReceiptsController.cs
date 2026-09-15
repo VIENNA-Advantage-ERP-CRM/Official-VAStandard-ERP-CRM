@@ -248,12 +248,17 @@ namespace VIS.Controllers
 
             /* Amount match when the term parses as a number (commas/symbols stripped).
                Sign-agnostic: compare on absolute values so a receipt of +500 or -500
-               both match whether the user types "500" or "-500". */
+               both match whether the user types "500" or "-500".
+               A numeric DOCUMENT NUMBER lands here too, so this predicate runs on most
+               document-no searches. Oracle binds by POSITION, not by name: the two
+               placeholders below each need their own SqlParameter (one shared "@Amt"
+               used twice left the second slot unbound -> ORA-01008). */
             decimal amt;
             if (decimal.TryParse(q.Replace(",", "").Replace("$", "").Trim(), out amt))
             {
-                parameters.Add(new SqlParameter("@Amt", Math.Abs(amt)));
-                ors.Add("(ABS(Payment.PayAmt) = @Amt OR ABS(Payment.PaymentAmount) = @Amt)");
+                parameters.Add(new SqlParameter("@AmtPay", Math.Abs(amt)));
+                parameters.Add(new SqlParameter("@AmtPaymentAmount", Math.Abs(amt)));
+                ors.Add("(ABS(Payment.PayAmt) = @AmtPay OR ABS(Payment.PaymentAmount) = @AmtPaymentAmount)");
             }
         }
 
