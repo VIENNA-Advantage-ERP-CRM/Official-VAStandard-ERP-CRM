@@ -92,9 +92,9 @@
 }
 
 .vas-220-icon {
-    width: 1.75em;
-    height: 1.75em;
-    border-radius: 9px;
+    width: 2em;
+    height: 2em;
+    border-radius: 10px;
     flex: 0 0 auto;
     display: flex;
     align-items: center;
@@ -104,8 +104,8 @@
 }
 
 .vas-220-icon svg {
-    width: .95em;
-    height: .95em;
+    width: 1em;
+    height: 1em;
     display: block;
 }
 
@@ -113,7 +113,7 @@
    so it never depends on a container-query ancestor. */
 .vas-220-label {
     font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
     min-width: 0;
@@ -458,7 +458,7 @@
 }
 
 .vas-220-c-val {
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -518,11 +518,15 @@
     white-space: nowrap;
 }
 
+/* margin-left:auto as well as the footer's space-between: the note is the only thing
+   holding the pager to the right, and space-between with a single remaining child
+   would swing it to the left edge if the note ever renders empty. */
 .vas-220-foot-actions {
     display: flex;
     align-items: center;
     gap: 8px;
     flex: none;
+    margin-left: auto;
 }
 
 /* Canonical widget pager: 24px buttons, 14px chevrons. */
@@ -575,29 +579,5 @@
     text-align: center;
 }
 
-.vas-220-btn {
-    border-radius: 999px;
-    padding: .5em .875em;
-    font-family: inherit;
-    font-size: .8125rem;
-    font-weight: 500;
-    border: 1px solid #0083DA;
-    background: #FFFFFF;
-    color: #0083DA;
-    cursor: pointer;
-    outline: none;
-    transition: background .15s ease, color .15s ease;
-}
-
-.vas-220-btn:hover {
-    background: #EEF8FF;
-}
-
-.vas-220-btn-primary {
-    background: #0083DA;
-    color: #FFFFFF;
-}
-
-.vas-220-btn-primary:hover {
-    background: #0069AE;
-}
+/* The footer's Close button is gone - the X in the dialog header and Escape are the
+   close controls - so the pill button rules that dressed it went with it. */

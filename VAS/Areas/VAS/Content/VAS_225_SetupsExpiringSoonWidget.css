@@ -82,7 +82,7 @@
    container-query ancestor. */
 .vas-225-title {
     font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
     min-width: 0;

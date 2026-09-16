@@ -14,7 +14,8 @@
  * preference save. Plain DOM internals (no jQuery in the widget logic);
  * jQuery is used only at the framework boundary.
  * Backend - VAS_128_IncompleteRecordsWidget/GetIncompleteRecords
- *           VAS_128_IncompleteRecordsWidget/SaveFieldPreference
+ *           VAS_128_IncompleteRecordsWidget/SaveFieldPreferences (batch; one
+ *           request for a whole Select all / Clear)
  * Summary Message Table
  *  # | Current Text                                     | Message Key
  * ---+--------------------------------------------------+------------------------
@@ -108,6 +109,24 @@
         var resizeObserver = null;
         var resizeTimer = null;
         var lastFocusedRow = null;
+        var disposed = false;
+
+        // Serial queue for preference writes. Two things depend on it:
+        // (1) writes land in the order the user made them, so the last click on a
+        //     checkbox is the value that survives; and
+        // (2) loadData() waits for it to drain, so pressing Done (or the gear)
+        //     while a save is still in flight can no longer re-read a half-written
+        //     selection - which is why "Clear" then Done used to come back with
+        //     only some of the fields actually cleared.
+        // Every link in the chain swallows its own rejection so one failed save
+        // can never stall the queue.
+        var saveQueue = Promise.resolve();
+
+        function queueSave(task) {
+            var next = saveQueue.then(task, task);
+            saveQueue = next['catch'](function () { });
+            return saveQueue;
+        }
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -196,6 +215,9 @@
             next.type = 'button';
             next.setAttribute('aria-label', lbl('VAS_NextPage', 'Next page'));
             next.appendChild(svg('<path d="m9 18 6-6-6-6"/>'));
+            // Nothing to page through until the first load lands.
+            prev.disabled = true;
+            next.disabled = true;
             prev.addEventListener('click', function () { if (state.page > 1) { state.page--; renderPage(); } });
             next.addEventListener('click', function () {
                 var pages = pageCount();
@@ -246,10 +268,22 @@
             els.setErr = setErr;
             els.settingsState = settingsState;
 
+            // Framework busy indicator - the same core spinner classes the rest
+            // of the widget family uses (see VAS_113). The outer wrap is
+            // absolutely positioned over the card by the core stylesheet, so the
+            // spinner never changes the widget's layout height; it is toggled
+            // with visibility, not display, for the same reason.
+            var busy = el('div', 'vis-busyindicatorouterwrap MPC-ir-busy MPC-ir-busy-hidden');
+            var busyInner = el('div', 'vis-busyindicatorinnerwrap');
+            busyInner.appendChild(el('i', 'vis_widgetloader'));
+            busy.appendChild(busyInner);
+            els.busy = busy;
+
             var card = el('div', 'MPC-ir-card');
             card.appendChild(head);
             card.appendChild(listState);
             card.appendChild(settingsState);
+            card.appendChild(busy);
             root.appendChild(card);
 
             buildModal();
@@ -336,16 +370,36 @@
             }
             loadController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
 
-            showRowsMessage(lbl('Loading', 'Loading...'));
+            setBusy(true);
 
+            // Drain outstanding preference writes first: the server derives the
+            // whole list from the stored selection, so reading before the last
+            // write lands would show a stale/partial one.
+            var controller = loadController;
+            saveQueue.then(function () {
+                if (disposed || controller !== loadController) { return; }
+                fetchList(controller);
+            });
+        }
+
+        function fetchList(controller) {
             var url = VIS.Application.contextUrl + 'VAS_128_IncompleteRecordsWidget/GetIncompleteRecords';
             fetch(url, {
                 method: 'GET',
                 credentials: 'same-origin',
-                signal: loadController ? loadController.signal : undefined
+                signal: controller ? controller.signal : undefined
             }).then(function (res) { return res.text(); }).then(function (text) {
+                if (disposed || controller !== loadController) { return; }
+                setBusy(false);
                 var data = parseResponse(text);
-                if (!data || data.error) { showRowsError(); return; }
+                if (!data || data.error) {
+                    // The banner is deliberately generic, but the server's
+                    // reason (an ORA-/PG- message, say) is the only thing that
+                    // makes a "Couldn't load" diagnosable - keep it reachable.
+                    console.warn('VAS_128_IncompleteRecordsWidget: load failed -', (data && data.error) || text);
+                    showRowsError();
+                    return;
+                }
                 state.selected = data.trackedFields || [];
                 state.available = data.available || data.availableFields || [];
                 state.items = data.items || [];
@@ -355,8 +409,16 @@
                 renderList(0);
             }).catch(function (err) {
                 if (err && err.name === 'AbortError') { return; }
+                if (disposed || controller !== loadController) { return; }
+                setBusy(false);
                 showRowsError();
             });
+        }
+
+        function setBusy(visible) {
+            if (!els.busy) { return; }
+            if (visible) { els.busy.classList.remove('MPC-ir-busy-hidden'); }
+            else { els.busy.classList.add('MPC-ir-busy-hidden'); }
         }
 
         function parseResponse(text) {
@@ -455,15 +517,6 @@
             return row;
         }
 
-        function showRowsMessage(message) {
-            els.rows.innerHTML = '';
-            els.rows.appendChild(el('div', 'MPC-ir-state', message));
-            els.helper.textContent = '';
-            els.pageText.textContent = '1 ' + lbl('VAS_Of', 'of') + ' 1';
-            els.prev.disabled = true;
-            els.next.disabled = true;
-        }
-
         function showEmptyState() {
             els.rows.innerHTML = '';
             els.rows.appendChild(el('div', 'MPC-ir-state', lbl('VAS_128_EmptyState', 'No items are missing the selected data. Adjust tracked fields from the gear icon.')));
@@ -519,7 +572,7 @@
         function onToggleField(key, checked, cb) {
             // Optimistic local update; persist immediately.
             setLocalSelected(key, checked);
-            saveField(key, checked, cb);
+            saveFields([key], checked);
         }
 
         function setLocalSelected(key, checked) {
@@ -533,32 +586,44 @@
             var previous = state.selected.slice();
             state.selected = selectAll ? available.slice() : [];
             renderSettings();
-            // Persist only the fields whose value actually changed.
-            available.forEach(function (key) {
-                var was = previous.indexOf(key) >= 0;
-                var now = selectAll;
-                if (was !== now) { saveField(key, now, null); }
+
+            // Persist only the fields whose value actually changed - and all of
+            // them in ONE request. One POST per checkbox meant up to fifteen
+            // round trips that ASP.NET ran one at a time (per-session request
+            // serialization), which is what made Select all / Clear crawl.
+            var changed = available.filter(function (key) {
+                return (previous.indexOf(key) >= 0) !== selectAll;
+            });
+            if (!changed.length) { return; }
+            saveFields(changed, selectAll);
+        }
+
+        /// Persists one value for one or more field keys, queued behind any
+        /// earlier write so the stored selection always ends up matching what the
+        /// panel shows.
+        function saveFields(keys, checked) {
+            els.setErr.textContent = '';
+            var url = VIS.Application.contextUrl + 'VAS_128_IncompleteRecordsWidget/SaveFieldPreferences';
+            var body = 'fieldKeys=' + encodeURIComponent(keys.join(',')) + '&value=' + (checked ? 'Y' : 'N');
+            return queueSave(function () {
+                return fetch(url, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                    body: body
+                }).then(function (res) { return res.text(); }).then(function (text) {
+                    var data = parseResponse(text);
+                    if (!data || data.error || data.success === false) { onSaveFailed(data); }
+                })['catch'](function () { onSaveFailed(null); });
             });
         }
 
-        function saveField(key, checked, cb) {
-            els.setErr.textContent = '';
-            var url = VIS.Application.contextUrl + 'VAS_128_IncompleteRecordsWidget/SaveFieldPreference';
-            var body = 'fieldKey=' + encodeURIComponent(key) + '&value=' + (checked ? 'Y' : 'N');
-            fetch(url, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-                body: body
-            }).then(function (res) { return res.text(); }).then(function (text) {
-                var data = parseResponse(text);
-                if (!data || data.error || data.success === false) { onSaveFailed(key, checked, cb); }
-            }).catch(function () { onSaveFailed(key, checked, cb); });
-        }
-
-        function onSaveFailed(key, checked, cb) {
+        function onSaveFailed(data) {
             // Keep the working selection for the session; show a small,
             // non-blocking message. Do not crash or revert.
+            if (data && data.error) {
+                console.warn('VAS_128_IncompleteRecordsWidget: preference save failed -', data.error);
+            }
             if (els.setErr) { els.setErr.textContent = lbl('VAS_128_PrefNotSaved', 'Preference not saved.'); }
         }
 
@@ -674,6 +739,7 @@
         this.getRoot = function () { return root; };
 
         this.disposeComponent = function () {
+            disposed = true;
             if (loadController && typeof loadController.abort === 'function') {
                 try { loadController.abort(); } catch (ignored) { }
             }

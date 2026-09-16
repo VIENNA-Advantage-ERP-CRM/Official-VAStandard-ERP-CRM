@@ -730,7 +730,15 @@
             loadList();
         }
 
+        /* Called by the platform Refresh button and whenever the host dashboard
+           re-broadcasts a record change on the Recurring window.
+
+           A refresh re-reads the list from the top. The page index is deliberately
+           NOT carried over: schedules may have been generated away or added since
+           the last read, so page 3 no longer holds the rows the user left there -
+           and on a list that has since shrunk it can point past the end. */
         this.refreshWidget = function () {
+            currentPage = 0;
             loadList();
         };
 

@@ -512,8 +512,15 @@
         }
 
         /* Called by the platform Refresh button and whenever the host dashboard
-           re-broadcasts a record change on the Recurring window. */
+           re-broadcasts a record change on the Recurring window.
+
+           A refresh re-reads the list from the top. The page index is deliberately
+           NOT carried over: this list is ordered newest-first, so anything generated
+           since the last read shifts every row along and the old page number no
+           longer names the same records - and on a shorter list it can point past
+           the end. */
         this.refreshWidget = function () {
+            currentPage = 0;
             loadList();
         };
 

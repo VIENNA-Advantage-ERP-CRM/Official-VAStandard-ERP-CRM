@@ -525,7 +525,7 @@ namespace VAS.Controllers
             string rankedContactsSql = @"
                 SELECT Contact.C_BPartner_ID,
                        Contact.AD_User_ID,
-                       Contact.Name AS Contact_Name,
+                       TRIM(COALESCE(Contact.Name, N'') || ' ' || COALESCE(Contact.LastName, N'')) AS Contact_Name,
                        Contact.EMail AS Contact_EMail,
                        ROW_NUMBER() OVER (
                            PARTITION BY Contact.C_BPartner_ID
@@ -549,7 +549,7 @@ namespace VAS.Controllers
                        grp.C_BP_Group_ID AS Segment_Id,
                        COALESCE(grp.Name, N'') AS Segment,
                        owner.AD_User_ID AS Owner_Id,
-                       COALESCE(owner.Name, N'') AS Rep,
+                       TRIM(COALESCE(owner.Name, N'') || ' ' || COALESCE(owner.LastName, N'')) AS Rep,
                        bp.Rating AS Tier_Code,
                        COALESCE(RatingTrl.Name, RatingList.Name, N'') AS Tier_Name,
                        CASE
@@ -576,7 +576,7 @@ namespace VAS.Controllers
                       OR UPPER(COALESCE(c.Contact_Name, bp.Name, N'')) LIKE @Search_Like_Contact
                       OR UPPER(COALESCE(c.Contact_EMail, bp.EMail, N'')) LIKE @Search_Like_Email
                       OR UPPER(COALESCE(grp.Name, N'')) LIKE @Search_Like_Segment
-                      OR UPPER(COALESCE(owner.Name, N'')) LIKE @Search_Like_Rep
+                      OR UPPER(TRIM(COALESCE(owner.Name, N'') || ' ' || COALESCE(owner.LastName, N''))) LIKE @Search_Like_Rep
                   )";
 
             // MRole tenant + record access on the main physical table alias only.

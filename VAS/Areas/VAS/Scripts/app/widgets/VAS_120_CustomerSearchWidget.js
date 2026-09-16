@@ -424,7 +424,11 @@
             var scheduleLabel = label('VAS_120_Schedule', 'Schedule');
 
             var html = suggestions.map(function (customer, index) {
-                var displayName = customer.Name || customer.Value || '';
+                var nameOnly    = customer.Name || customer.Value || '';
+                // Display as "Code_Name" when both fields are present, otherwise fall back to whichever exists
+                var displayName = (customer.Value && customer.Name)
+                    ? customer.Value + '_' + customer.Name
+                    : nameOnly;
                 var contact = customer.Contact || '';
                 var segment = customer.Segment || unsegmented;
                 var owner = customer.Rep || noOwner;
@@ -441,7 +445,8 @@
                 }
 
                 return '<div class="vas120-option' + (index === suggestionIndex ? ' is-active' : '') + '" role="option" aria-selected="' + (index === suggestionIndex ? 'true' : 'false') + '" data-index="' + index + '">' +
-                    '<span class="vas120-avatar" style="background:' + avatarColor(displayName) + '">' + escapeHtml(initials(displayName)) + '</span>' +
+                    // Avatar initials derived from the name only (not the code) to keep them meaningful
+                    '<span class="vas120-avatar" style="background:' + avatarColor(nameOnly) + '">' + escapeHtml(initials(nameOnly)) + '</span>' +
                     '<span class="vas120-option-main">' +
                         '<span class="vas120-option-name" title="' + escapeHtml(displayName) + '">' + highlight(displayName, searchText) + '</span>' +
                         '<span class="vas120-option-meta" title="' + escapeHtml(metaPlain) + '">' + meta + '</span>' +
@@ -509,9 +514,10 @@
         function selectSuggestion(index) {
             var customer = suggestions[index];
             if (!customer) { return; }
-            $input.val(customer.Name || customer.Value || '');
             closeSuggestions();
             zoomToCustomer(customer.Id);
+            // Reset the widget so returning to the dashboard shows a clean search state
+            $self.refreshWidget();
         }
 
         // Resolve the name of the window currently hosting this widget so the

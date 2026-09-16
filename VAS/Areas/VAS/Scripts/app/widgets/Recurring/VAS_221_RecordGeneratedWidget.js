@@ -62,7 +62,8 @@
  * 22 | Internal                              | VAS_221_Internal
  * 23 | Showing                               | VAS_221_Showing
  * 24 | of                                    | VAS_221_Of
- * 25 | generated this period                 | VAS_221_GeneratedThisPeriod
+ * 25 | generated this period                 | VAS_221_GeneratedThisPeriod (not used -
+ *    |                                       | the footer note counts and stops there)
  * 26 | No records found                      | VAS_221_NoRecordsFound
  * 27 | Loading  (accessible name of the busy indicator) | VAS_221_Loading
  * 28 | Close                                 | VAS_221_Close
@@ -501,11 +502,14 @@
                 '<div class="vas-221-banner"></div>' +
                 '<div class="vas-221-tbl-wrap"></div>' +
                 '</div>' +
+                /* The footer carries the pager and nothing else. Closing is the X in
+                   the header or Escape - a second Close button down here repeated a
+                   control the dialog already has, in the corner where the eye goes
+                   looking for the next page. */
                 '<div class="vas-221-modal-foot">' +
                 '<span class="vas-221-foot-note"></span>' +
                 '<span class="vas-221-foot-actions">' +
                 '<span class="vas-221-pager"></span>' +
-                '<button type="button" class="vas-221-btn vas-221-btn-primary" data-close="1">' + escapeHtml(closeText) + '</button>' +
                 '</span>' +
                 '</div>' +
                 '</div>' +
@@ -710,14 +714,22 @@
                 '<div class="vas-221-tbl">' + headHtml + '<div class="vas-221-tbody">' + bodyHtml + '</div></div>'
             );
 
-            /* Footer helper carries the dataset size, not the page size, so the user
-               can see how much sits behind the pager. */
-            var footNote = formatCount(totalRows) + ' ' +
-                label("VAS_221_GeneratedThisPeriod", "generated this period");
-            if (totalRows > 0 && totalPages > 1) {
+            /* Footer note: which slice of the set is on screen, and how big the set is.
+               It names the slice at every page count - "Showing 1-1 of 1" on a list with
+               nothing to turn - so the footer never goes quiet just because there is a
+               single page, and it reads beside the pager rather than being swapped out
+               for it (the sibling VAS_225 footer works the same way).
+
+               The period is named twice in the dialog head already - in the title and
+               again in the subtitle - so the note counts and stops there. An empty
+               result has no slice to name and says nothing: the body already carries
+               its own empty row. */
+            var footNote = '';
+            if (totalRows > 0) {
                 footNote = label("VAS_221_Showing", "Showing") + ' ' + (start + 1) + '–' + (start + rows.length)
-                    + ' ' + label("VAS_221_Of", "of") + ' ' + footNote;
+                    + ' ' + label("VAS_221_Of", "of") + ' ' + formatCount(totalRows);
             }
+
             $modal.find('.vas-221-foot-note').text(footNote).attr('title', footNote);
 
             var pagerHtml = '';

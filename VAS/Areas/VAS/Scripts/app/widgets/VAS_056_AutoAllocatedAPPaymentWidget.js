@@ -26,7 +26,13 @@
  * 20  | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
  * 21  | Un Allocated                               | VAS_UnAllocatedAmount
  * 22  | Could not load data                               | VAS_ErrorLoading
+ * 23  | day                                               | VAS_Day
+ * 24  | days                                              | VAS_Days
  * ──────────────────────────────────────────────────────────────────────────────
+ *
+ * The card header subtitle names the period the percentage covers (periodName,
+ * e.g. "Sep-26"), with its date range and day count in the tooltip - all four
+ * fields come from the KPI response as periodName / fromDate / toDate / period.
  */
 
 /*
@@ -76,6 +82,7 @@
         var $body = null;
         var $footer = null;
         var $metricEl = null;
+        var $subtitleEl = null;
         var $busy = null;
         var $state = null;
 
@@ -569,6 +576,8 @@
         }
 
         function renderMetric(data) {
+            renderPeriodSubtitle(data);
+
             var percent = Number(
                 data.autoAllocatedPercent || 0
             );
@@ -1178,14 +1187,41 @@
             return stdPrecision;
         }
 
+        /*
+         * Dates arrive as plain "yyyy-MM-dd" strings. Date.parse reads those as
+         * UTC midnight, which renders as the previous day west of Greenwich, so
+         * the parts are handed to the local-time constructor instead. Anything
+         * that is not a bare ISO date falls back to the browser's own parse.
+         */
+        function parseServerDate(value) {
+            if (!value) {
+                return null;
+            }
+
+            var text = String(value);
+            var parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+
+            var date = parts
+                ? new Date(
+                    Number(parts[1]),
+                    Number(parts[2]) - 1,
+                    Number(parts[3])
+                )
+                : new Date(text);
+
+            return isNaN(date.getTime())
+                ? null
+                : date;
+        }
+
         function formatDate(value) {
             if (!value) {
                 return "";
             }
 
-            var date = new Date(value);
+            var date = parseServerDate(value);
 
-            if (isNaN(date.getTime())) {
+            if (!date) {
                 return value;
             }
 
@@ -1197,6 +1233,124 @@
                     year: "numeric"
                 }
             );
+        }
+
+        function countDays(from, to) {
+            if (!from || !to) {
+                return 0;
+            }
+
+            var msPerDay = 24 * 60 * 60 * 1000;
+
+            /*
+             * Both ends are local midnight, so the difference is whole days
+             * apart from a DST shift; rounding absorbs that. The range is
+             * inclusive of its last day, hence the +1.
+             */
+            var days = Math.round(
+                (to.getTime() - from.getTime()) / msPerDay
+            ) + 1;
+
+            return days > 0
+                ? days
+                : 0;
+        }
+
+        /*
+         * The percentage only counts payments dated inside the current
+         * financial period, so the header names that period ("Sep-26") - a
+         * label the user recognises at a glance, where a date range has to be
+         * read. The days it stands for, and how many there are, follow in the
+         * tooltip. A client whose periods carry no name falls back to the
+         * range itself.
+         */
+        function renderPeriodSubtitle(data) {
+            if (!$subtitleEl || !$subtitleEl.length) {
+                return;
+            }
+
+            var from = parseServerDate(
+                data ? data.fromDate : ""
+            );
+
+            var to = parseServerDate(
+                data ? data.toDate : ""
+            );
+
+            var rangeText = "";
+
+            if (from && to) {
+                rangeText =
+                    formatDate(data.fromDate) +
+                    " – " +
+                    formatDate(data.toDate);
+            }
+            else if (from || to) {
+                rangeText = formatDate(
+                    from
+                        ? data.fromDate
+                        : data.toDate
+                );
+            }
+
+            var periodLabel =
+                data && data.period
+                    ? String(data.period)
+                    : "";
+
+            var periodName =
+                data && data.periodName
+                    ? String(data.periodName)
+                    : "";
+
+            var label =
+                periodName ||
+                rangeText ||
+                periodLabel;
+
+            if (!label) {
+                $subtitleEl
+                    .text("")
+                    .removeAttr("title");
+
+                return;
+            }
+
+            var dayCount = countDays(from, to);
+
+            var tooltipParts = [];
+
+            if (periodLabel) {
+                tooltipParts.push(periodLabel);
+            }
+
+            if (rangeText && rangeText !== label) {
+                tooltipParts.push(rangeText);
+            }
+
+            if (dayCount > 0) {
+                tooltipParts.push(
+                    dayCount +
+                    " " +
+                    lbl(
+                        dayCount === 1
+                            ? "VAS_Day"
+                            : "VAS_Days",
+                        dayCount === 1
+                            ? "day"
+                            : "days"
+                    )
+                );
+            }
+
+            $subtitleEl
+                .text(label)
+                .attr(
+                    "title",
+                    tooltipParts.length
+                        ? tooltipParts.join(" | ")
+                        : label
+                );
         }
 
         function formatBankAccount(row) {
@@ -1734,6 +1888,10 @@
 
                 "</div>" +
 
+                '<div class="' +
+                classPrefix +
+                'head-text">' +
+
                 '<span class="' +
                 classPrefix +
                 'title">' +
@@ -1744,6 +1902,15 @@
                     )
                 ) +
                 "</span>" +
+
+                /* The percentage only counts payments dated inside the current
+                   financial period, so the header carries those days as a
+                   subtitle -- without them the share reads as all-time. */
+                '<span class="' +
+                classPrefix +
+                'subtitle"></span>' +
+
+                "</div>" +
 
                 "</div>" +
 
@@ -1793,6 +1960,10 @@
 
             $metricEl = $card.find(
                 "." + classPrefix + "value"
+            );
+
+            $subtitleEl = $card.find(
+                "." + classPrefix + "subtitle"
             );
 
             $state = $card.find(
@@ -1874,6 +2045,7 @@
             }
 
             $metricEl = null;
+            $subtitleEl = null;
             $body = null;
             $footer = null;
             $busy = null;

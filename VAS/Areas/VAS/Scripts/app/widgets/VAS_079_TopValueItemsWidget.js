@@ -109,16 +109,53 @@
             return !isNaN(precision) && precision >= 0 ? precision : 0;
         }
 
-        function formatAmount(value) {
-            var number = Number(value || 0);
-            var precision = getPrecision(stdPrecision);
-            var currency = currencySymbol || currencyIso;
-            var formatted = number.toLocaleString(currencyLocale(currencyIso), {
-                minimumFractionDigits: precision,
-                maximumFractionDigits: precision
-            });
-            return currency ? currency + ' ' + formatted : formatted;
+        // ===== NEW CODE START — currency format (2026-09-08) =====
+        // Money is rendered in the organization's ISO 4217 currency: Indian-numbering
+        // currencies get Indian grouping with Lakh/Crore, every other code gets
+        // international grouping with K/M/B. No unnecessary decimals, the symbol always
+        // comes from the endpoint payload (never hardcoded), null/empty renders as 0.
+        function currencyPrefix() {
+            var symbol = currencySymbol || currencyIso;
+            if (!symbol) { return ''; }
+            // Multi-character symbols ("ID", "Rp") need a separator; "₹0" / "$0" do not.
+            return symbol.length > 1 ? symbol + ' ' : symbol;
         }
+
+        function toAmountNumber(value) {
+            var number = Number(value);
+            return isFinite(number) ? number : 0;
+        }
+
+        function formatAmount(value) {
+            var number = toAmountNumber(value);
+            var sign = number < 0 ? '-' : '';
+            return sign + currencyPrefix() + formatCompactNumber(Math.abs(number), currencyIso);
+        }
+
+        // Exact, unabbreviated amount for the hover title, so the compact display never
+        // hides the precise figure. Honours the currency's StdPrecision (IQD needs 3).
+        function formatAmountExact(value) {
+            var number = toAmountNumber(value);
+            var sign = number < 0 ? '-' : '';
+            return sign + currencyPrefix() + Math.abs(number).toLocaleString(currencyLocale(currencyIso), {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: getPrecision(stdPrecision)
+            });
+        }
+        // ===== NEW CODE END — currency format =====
+
+        // ----- OLD CODE (kept for rollback, do not delete) -----
+        // function formatAmount(value) {
+        //     var number = Number(value || 0);
+        //     var precision = getPrecision(stdPrecision);
+        //     var currency = currencySymbol || currencyIso;
+        //     var formatted = number.toLocaleString(currencyLocale(currencyIso), {
+        //         minimumFractionDigits: precision,
+        //         maximumFractionDigits: precision
+        //     });
+        //     return currency ? currency + ' ' + formatted : formatted;
+        // }
+        // ----- END OLD CODE -----
 
         function gemIcon() {
             return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 21 9-10-4-6H7l-4 6 9 10Z"></path><path d="m3 11 9 10 9-10M7 5l5 16 5-16"></path></svg>';
@@ -149,6 +186,7 @@
             var html = '';
             items.forEach(function (item) {
                 var amount = formatAmount(item.carrying_value);
+                var exactAmount = formatAmountExact(item.carrying_value);
                 var warehouseName = item.warehouse_name || label('VAS_AllWarehouses', 'All Warehouses');
                 html +=
                     '<button type="button" class="MPC-tv-row" data-product-id="' + Number(item.product_id) + '" data-product-name="' + escapeHtml(item.product_name) + '">' +
@@ -156,7 +194,7 @@
                             '<strong>' + escapeHtml(item.product_name) + '</strong>' +
                             '<small>' + escapeHtml(formatQty(item.qty_on_hand)) + ' ' + escapeHtml(label('VAS_Units', 'units')) + ' \u00b7 ' + escapeHtml(warehouseName) + '</small>' +
                         '</span>' +
-                        '<span class="MPC-tv-value" title="' + escapeHtml(amount) + '">' + escapeHtml(amount) + '</span>' +
+                        '<span class="MPC-tv-value" title="' + escapeHtml(exactAmount) + '">' + escapeHtml(amount) + '</span>' +
                     '</button>';
             });
             $list.html(html);
