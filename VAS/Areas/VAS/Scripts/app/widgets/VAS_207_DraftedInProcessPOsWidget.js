@@ -611,6 +611,9 @@
             var totalOrderedQty = 0;
             var totalPendingQty = 0;
             for (var i = 0; i < lines.length; i++) {
+                // Per specification the summary cards count ITEM type products
+                // only; charges and other non-item lines are excluded.
+                if (lines[i].ProductType && lines[i].ProductType !== 'I') { continue; }
                 totalOrderedQty += Number(lines[i].QtyOrdered || 0);
                 totalPendingQty += Number(lines[i].QtyPending || 0);
             }

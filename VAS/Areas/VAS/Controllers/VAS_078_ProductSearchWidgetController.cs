@@ -284,8 +284,9 @@ namespace VAS.Controllers
                 Requisitions = GetRequisitions(ctx, productId, pageSize),
                 ReorderPoint = GetReorderPoint(ctx, productId),
                 PreferredSupplier = GetPreferredSupplier(ctx, productId),
-                // Review #6: every product reads Active unless it is flagged Discontinued.
-                Status = overview.Discontinued ? "D" : "Y",
+                // Status tile: D = Discontinued (Discontinued flag), I = Inactive
+                // (IsActive='N' and not discontinued), Y = Active.
+                Status = overview.Discontinued ? "D" : (overview.IsActive ? "Y" : "I"),
                 CurrencySymbol = currency.Symbol,
                 CurrencyIso = currency.IsoCode,
                 StdPrecision = currency.StdPrecision
@@ -780,9 +781,16 @@ namespace VAS.Controllers
 
         private List<ProductMovementRow> GetMovements(Ctx ctx, int productId, int pageSize)
         {
+            // The Type column must show the movement type as the dictionary defines it
+            // (AD_Reference 189 "M_Transaction Movement Type": C+ = Customer Shipment,
+            // M+ = Movement To, VI = Vendor Invoice, ...). Resolving the name here - against the
+            // same list the MovementType field itself is based on - keeps the tab in step with
+            // the dictionary instead of a hand-copied JS map that had drifted (and had no entry
+            // at all for VI / IR / W+ / W-, which printed as raw codes).
             string sql = @"
                 SELECT Movement.MovementDate,
                        Movement.MovementType,
+                       MovementTypeList.Name AS MovementType_Name,
                        Movement.MovementQty,
                        Warehouse.Name AS Warehouse_Name,
                        Locator.Value AS Locator_Value,
@@ -791,6 +799,7 @@ namespace VAS.Controllers
                 INNER JOIN M_Locator Locator ON (Locator.M_Locator_ID=Movement.M_Locator_ID AND Locator.IsActive=N'Y')
                 INNER JOIN M_Warehouse Warehouse ON (Warehouse.M_Warehouse_ID=Locator.M_Warehouse_ID AND Warehouse.IsActive=N'Y')
                 LEFT OUTER JOIN M_AttributeSetInstance AttributeInstance ON (AttributeInstance.M_AttributeSetInstance_ID=Movement.M_AttributeSetInstance_ID)
+                LEFT OUTER JOIN AD_Ref_List MovementTypeList ON (MovementTypeList.AD_Reference_ID=189 AND MovementTypeList.Value=Movement.MovementType AND MovementTypeList.IsActive=N'Y')
                 WHERE Movement.M_Product_ID=@M_Product_ID
                   AND Movement.IsActive=N'Y'
                   AND Movement.AD_Client_ID=@AD_Client_ID
@@ -828,6 +837,7 @@ namespace VAS.Controllers
                     {
                         MovementDate = FormatDateTime(Util.GetValueOfDateTime(dr["MovementDate"])),
                         MovementType = Util.GetValueOfString(dr["MovementType"]),
+                        MovementTypeName = Util.GetValueOfString(dr["MovementType_Name"]),
                         MovementQuantity = Util.GetValueOfDecimal(dr["MovementQty"]),
                         WarehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                         LocatorValue = Util.GetValueOfString(dr["Locator_Value"]),
@@ -1091,6 +1101,7 @@ namespace VAS.Controllers
         {
             public string MovementDate { get; set; }
             public string MovementType { get; set; }
+            public string MovementTypeName { get; set; }
             public decimal MovementQuantity { get; set; }
             public string WarehouseName { get; set; }
             public string LocatorValue { get; set; }

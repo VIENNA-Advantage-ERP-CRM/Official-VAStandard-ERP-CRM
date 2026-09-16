@@ -39,6 +39,20 @@ namespace VIS.Controllers
         }
 
         /// <summary>
+        /// Hours between a timestamp column and the database clock. Created is stamped by the
+        /// database, so both ends share one clock and the result does not depend on the browser's
+        /// or the web server's time zone.
+        /// </summary>
+        /// <param name="column">Qualified timestamp column.</param>
+        /// <returns>A dialect-appropriate numeric hours expression.</returns>
+        private static string AgeHoursSql(string column)
+        {
+            return DB.IsPostgreSQL()
+                ? "(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - " + column + ")) / 3600)"
+                : "((SYSDATE - " + column + ") * 24)";
+        }
+
+        /// <summary>
         /// One page of not-yet-stored vendor receipts, oldest first.
         /// </summary>
         /// <param name="pageNo">1-based page number.</param>
@@ -71,7 +85,8 @@ namespace VIS.Controllers
                        COALESCE(PurchaseOrder.DocumentNo, " + NLiteral("-") + @") AS Linked_PO_No,
                        InOut.MovementDate AS Received_On,
                        InOut.DocStatus AS Doc_Status,
-                       Warehouse.Name AS Warehouse_Name
+                       Warehouse.Name AS Warehouse_Name,
+                       " + AgeHoursSql("InOut.Created") + @" AS Age_Hours
                 FROM M_InOut InOut
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
                 LEFT OUTER JOIN M_Warehouse Warehouse ON (Warehouse.M_Warehouse_ID=InOut.M_Warehouse_ID AND Warehouse.IsActive='Y')
@@ -89,6 +104,12 @@ namespace VIS.Controllers
                 MRole.SQL_RO
             );
 
+            /* QA sheet GRN #14/#15 (2026-09-15):
+               - quantity is the received quantity in the unit the lines were entered in (QtyEntered, e.g.
+                 2,000 ml); MovementQty is the product UOM. A total is only meaningful when every line shares
+                 one UOM, so Uom is NULL for a mixed receipt and the row then shows no total;
+               - time on dock is Age_Hours (database clock minus Created). MovementDate is date-only, so
+                 hours measured from it were wrong; rows are ordered oldest first by that age. */
             string sql = @"
                 SELECT AgingData.Receipt_Id,
                        AgingData.GRN_No,
@@ -99,10 +120,12 @@ namespace VIS.Controllers
                        AgingData.Total_Qty,
                        AgingData.Uom,
                        AgingData.Received_On,
+                       AgingData.Age_Hours,
                        AgingData.Doc_Status,
                        AgingData.Warehouse_Name,
                        AgingData.TotalRecords,
-                       AgingData.Oldest_Received_On
+                       AgingData.Oldest_Received_On,
+                       AgingData.Oldest_Age_Hours
                 FROM (
                     SELECT HeaderData.Receipt_Id,
                            HeaderData.GRN_No,
@@ -110,13 +133,15 @@ namespace VIS.Controllers
                            HeaderData.Linked_PO_No,
                            MIN(Product.Name) AS First_Item_Name,
                            COUNT(InOutLine.M_InOutLine_ID) AS Line_Count,
-                           SUM(COALESCE(InOutLine.MovementQty, 0)) AS Total_Qty,
-                           MIN(COALESCE(UOM.UOMSymbol, UOM.Name)) AS Uom,
+                           SUM(COALESCE(InOutLine.QtyEntered, InOutLine.MovementQty, 0)) AS Total_Qty,
+                           CASE WHEN COUNT(DISTINCT InOutLine.C_UOM_ID) = 1 THEN MIN(COALESCE(UOM.UOMSymbol, UOM.Name)) ELSE NULL END AS Uom,
                            HeaderData.Received_On,
+                           MAX(HeaderData.Age_Hours) AS Age_Hours,
                            HeaderData.Doc_Status,
                            HeaderData.Warehouse_Name,
                            COUNT(1) OVER () AS TotalRecords,
-                           MIN(HeaderData.Received_On) OVER () AS Oldest_Received_On
+                           MIN(HeaderData.Received_On) OVER () AS Oldest_Received_On,
+                           MAX(MAX(HeaderData.Age_Hours)) OVER () AS Oldest_Age_Hours
                     FROM (
                         " + headerSql + @"
                     ) HeaderData
@@ -131,7 +156,7 @@ namespace VIS.Controllers
                              HeaderData.Doc_Status,
                              HeaderData.Warehouse_Name
                 ) AgingData
-                ORDER BY AgingData.Received_On ASC, AgingData.GRN_No ASC
+                ORDER BY AgingData.Age_Hours DESC, AgingData.GRN_No ASC
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
             List<SqlParameter> parameters = new List<SqlParameter>();
@@ -143,6 +168,7 @@ namespace VIS.Controllers
             List<object> rows = new List<object>();
             int totalRecords = 0;
             string oldestReceivedOnValue = "";
+            decimal? oldestAgeHoursValue = null;
             IDataReader dr = null;
 
             try
@@ -159,6 +185,7 @@ namespace VIS.Controllers
                     {
                         oldestReceivedOnValue = oldestReceivedOn.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
                     }
+                    oldestAgeHoursValue = Math.Round(Math.Max(0, Util.GetValueOfDecimal(dr["Oldest_Age_Hours"])), 2);
 
                     string docStatus = Util.GetValueOfString(dr["Doc_Status"]);
 
@@ -173,6 +200,7 @@ namespace VIS.Controllers
                         totalQty = Util.GetValueOfDecimal(dr["Total_Qty"]),
                         uom = Util.GetValueOfString(dr["Uom"]),
                         receivedOn = receivedOn.HasValue ? receivedOn.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture) : "",
+                        ageHours = Math.Round(Math.Max(0, Util.GetValueOfDecimal(dr["Age_Hours"])), 2),
                         warehouse = Util.GetValueOfString(dr["Warehouse_Name"]),
                         statusCode = docStatus,
                         statusText = GetDocStatusName(ctx, docStatus)
@@ -186,7 +214,8 @@ namespace VIS.Controllers
                     pageSize = pageSize,
                     totalRecords = totalRecords,
                     totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalRecords / pageSize)),
-                    oldestReceivedOn = oldestReceivedOnValue
+                    oldestReceivedOn = oldestReceivedOnValue,
+                    oldestAgeHours = oldestAgeHoursValue
                 }), JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -243,9 +272,13 @@ namespace VIS.Controllers
                 ? "COALESCE(Locator.Value, LocatorConfirm.Value)"
                 : "Locator.Value";
 
+            // QA sheet GRN #7/#14 (2026-09-15): the line's attribute instance is returned for the popup's
+            // Attribute column, and the received quantity is QtyEntered - the unit the line was received in
+            // (2,000 ml), matching the UOM shown next to it; MovementQty is the product UOM.
             string linesSql = @"
                 SELECT Product.Name AS Item_Name,
-                       COALESCE(InOutLine.MovementQty, 0) AS Received_Qty,
+                       AttrInstance.Description AS Attribute_Name,
+                       COALESCE(InOutLine.QtyEntered, InOutLine.MovementQty, 0) AS Received_Qty,
                        COALESCE(UOM.UOMSymbol, UOM.Name) AS Uom,
                        " + locatorSql + @" AS Locator_Code,
                        InOut.DocStatus AS Doc_Status
@@ -253,6 +286,7 @@ namespace VIS.Controllers
                 INNER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOut_ID=InOut.M_InOut_ID AND InOutLine.IsActive='Y')
                 INNER JOIN M_Product Product ON (Product.M_Product_ID=InOutLine.M_Product_ID AND Product.IsActive='Y')
                 LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=InOutLine.C_UOM_ID AND UOM.IsActive='Y')
+                LEFT OUTER JOIN M_AttributeSetInstance AttrInstance ON (AttrInstance.M_AttributeSetInstance_ID=InOutLine.M_AttributeSetInstance_ID)
                 " + lineConfirmJoin + @"
                 " + locatorJoin + @"
                 WHERE InOut.IsActive='Y'
@@ -287,6 +321,7 @@ namespace VIS.Controllers
                     rows.Add(new
                     {
                         itemName = Util.GetValueOfString(dr["Item_Name"]),
+                        attributeName = Util.GetValueOfString(dr["Attribute_Name"]),
                         receivedQty = Util.GetValueOfDecimal(dr["Received_Qty"]),
                         uom = Util.GetValueOfString(dr["Uom"]),
                         locatorCode = Util.GetValueOfString(dr["Locator_Code"]),

@@ -109,18 +109,17 @@
         return status;
     }
 
+    // Totals are Item-type lines only. A completed PO with nothing received is Pending (it used to read
+    // "Fully delivered"), which matters now that completed advance-payment POs are listed before receipt.
     function getDeliveryStatusDisplay(status, totalOrdered, totalDelivered) {
-        if (status === 'CL' || status === 'Closed' || status === 'VO' || status === 'Voided') {
+        if (status === 'CL' || status === 'Closed' || status === 'VO' || status === 'Voided' || !(totalOrdered > 0)) {
             return lbl('VAS_NotApplicable', 'Not applicable');
         }
-        if (totalOrdered > 0 && totalDelivered >= totalOrdered) {
+        if (totalDelivered >= totalOrdered) {
             return lbl('VAS_FullyDelivered', 'Fully delivered');
         }
-        if (totalDelivered > 0 && totalDelivered < totalOrdered) {
+        if (totalDelivered > 0) {
             return lbl('VAS_Partial', 'Partial');
-        }
-        if (status === 'CO' || status === 'Completed') {
-            return lbl('VAS_FullyDelivered', 'Fully delivered');
         }
         return lbl('VAS_Pending', 'Pending');
     }
@@ -832,6 +831,8 @@
                             var totalDeliveredQty = 0;
                             var totalPendingQty = 0;
                             lines.forEach(function (l) {
+                                // Delivery status counts Item-type products only; charges and other product types are excluded
+                                if (l.ProductType !== 'I') { return; }
                                 totalOrderedQty += Number(l.OrderedQty || 0);
                                 totalDeliveredQty += Number(l.DeliveredQty || 0);
                                 totalPendingQty += Number(l.PendingQty || 0);

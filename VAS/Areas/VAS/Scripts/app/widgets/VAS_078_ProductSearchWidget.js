@@ -272,24 +272,39 @@
 
         // Review #6: the status reads Active for every product unless the product
         // is flagged Discontinued (controller sends Status 'D').
+        /* Status tile: Discontinued wins over Inactive; an inactive product
+           (IsActive = 'N') must NOT read as Active. */
         function productStatusLabel() {
-            return productDetail.Status === 'D'
-                ? label('VAS_StatusDiscontinued', 'Discontinued')
-                : label('Active', 'Active');
+            if (productDetail.Status === 'D') {
+                return label('VAS_StatusDiscontinued', 'Discontinued');
+            }
+            if (productDetail.Status === 'I') {
+                return label('VAS_StatusInactive', 'Inactive');
+            }
+            return label('Active', 'Active');
         }
 
-        function movementTypeLabel(code) {
+        /* Fallback only: the controller resolves the Type name from AD_Ref_List (reference 189,
+           the same list M_Transaction.MovementType is based on). This map mirrors that list for
+           the rare response that carries no resolved name, and corrects the labels that had
+           drifted (M+/M-, and the unmapped VI / IR / W+ / W- which printed as raw codes). */
+        function movementTypeLabel(code, resolvedName) {
+            if (resolvedName) { return resolvedName; }
             var movementTypes = {
-                'V+': label('VAS_MovementReceipt', 'Receipt'),
-                'V-': label('VAS_MovementVendorReturn', 'Vendor Return'),
-                'C+': label('VAS_MovementCustomerReturn', 'Customer Return'),
-                'C-': label('VAS_MovementShipment', 'Shipment / Issue'),
-                'M+': label('VAS_MovementIn', 'Movement In'),
-                'M-': label('VAS_MovementOut', 'Movement Out'),
-                'I+': label('VAS_InventoryIncrease', 'Inventory Increase'),
-                'I-': label('VAS_InventoryDecrease', 'Inventory Decrease'),
-                'P+': label('VAS_ProductionIn', 'Production In'),
-                'P-': label('VAS_ProductionOut', 'Production Out')
+                'V+': label('VAS_MovementReceipt', 'Vendor Receipts'),
+                'V-': label('VAS_MovementVendorReturn', 'Vendor Returns'),
+                'C+': label('VAS_MovementCustomerReturn', 'Customer Returns'),
+                'C-': label('VAS_MovementShipment', 'Customer Shipment'),
+                'M+': label('VAS_MovementIn', 'Movement To'),
+                'M-': label('VAS_MovementOut', 'Movement From'),
+                'I+': label('VAS_InventoryIncrease', 'Inventory In'),
+                'I-': label('VAS_InventoryDecrease', 'Inventory Out'),
+                'IR': label('VAS_InventoryRevaluation', 'Inventory Revaluation'),
+                'P+': label('VAS_ProductionIn', 'Production +'),
+                'P-': label('VAS_ProductionOut', 'Production -'),
+                'W+': label('VAS_WorkOrderIn', 'Production Order +'),
+                'W-': label('VAS_WorkOrderOut', 'Production Order -'),
+                'VI': label('VAS_VendorInvoice', 'Vendor Invoice')
             };
             return movementTypes[code] || code || '-';
         }
@@ -656,7 +671,7 @@
                 statsContent += statTile(label('VAS_StockValue', 'Stock Value'), formatCompactAmount(productDetail.StockValue, productDetail.CurrencySymbol, productDetail.CurrencyIso), '');
                 statsContent += statTile(label('VAS_ReorderPoint', 'Reorder Pt'), formatQty(productDetail.ReorderPoint), 'is-warning');
             }
-            statsContent += statTile(label('Status', 'Status'), status, productDetail.Status === 'D' ? 'is-warning' : 'is-success');
+            statsContent += statTile(label('Status', 'Status'), status, productDetail.Status === 'Y' ? 'is-success' : 'is-warning');
             statsContent += openRecordTile;
 
             var hero = '<section class="MPC-product-search-hero">' +
@@ -816,7 +831,7 @@
             var rows = (productDetail.Movements || []).map(function (movement) {
                 return [
                     formatDate(movement.MovementDate),
-                    movementTypeLabel(movement.MovementType),
+                    movementTypeLabel(movement.MovementType, movement.MovementTypeName),
                     movement.Attribute,
                     (Number(movement.MovementQuantity) > 0 ? '+' : '') + formatQty(movement.MovementQuantity),
                     movement.WarehouseName,

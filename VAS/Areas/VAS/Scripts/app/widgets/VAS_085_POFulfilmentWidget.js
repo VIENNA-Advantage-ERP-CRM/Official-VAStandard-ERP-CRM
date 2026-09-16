@@ -63,14 +63,20 @@
             $busy.toggleClass('vas-pof-hidden', !show);
         }
 
+        /* One decimal (e.g. 72.1%): a whole-number figure could not move when a single PO was
+           created or a GRN was completed (QA sheet GRN #4). */
+        function formatPercent(value) {
+            return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 1 }) + "%";
+        }
+
         /* "▲ 7% vs last month" / "▼ 4% vs last month" / "0% vs last month".
            change is a percentage-point difference (current − last month). */
         function metaText(change) {
             var c = Number(change || 0);
             var suffix = lbl("VAS_085_VsLastMonthShort", "vs last month");
-            if (c > 0) { return "▲ " + c + "% " + suffix; }
-            if (c < 0) { return "▼ " + Math.abs(c) + "% " + suffix; }
-            return "0% " + suffix;
+            if (c > 0) { return "▲ " + formatPercent(c) + " " + suffix; }
+            if (c < 0) { return "▼ " + formatPercent(Math.abs(c)) + " " + suffix; }
+            return formatPercent(0) + " " + suffix;
         }
 
         function escapeHtml(value) {
@@ -84,6 +90,8 @@
 
         this.Initalize = function () {
             createWidget();
+            /* A GRN completed from any receiving widget on the dashboard moves the percentage at once (QA sheet GRN #4). */
+            $(document).on('VAS_GRNCreated.vas-pof', loadKpi);
             loadKpi();
         };
 
@@ -112,8 +120,8 @@
             var change = Number(data.changePercent || 0);
 
             if ($valueEl) {
-                $valueEl.text(current + "%");
-                $valueEl.attr('title', current + "%");
+                $valueEl.text(formatPercent(current));
+                $valueEl.attr('title', formatPercent(current));
             }
             if ($metaEl) { $metaEl.text(metaText(change)); }
         }
@@ -153,6 +161,7 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
+            $(document).off('VAS_GRNCreated.vas-pof');
             $root.remove();
         };
     };

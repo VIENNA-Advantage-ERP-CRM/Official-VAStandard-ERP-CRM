@@ -92,6 +92,12 @@ namespace VIS.Controllers
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                       AND o.DocStatus IN ('DR', 'IP')
+                      -- Per specification this widget covers the Purchase Order screen only;
+                      -- Blanket Purchase Order documents are excluded (C_DocType.IsBlanketTrx).
+                      AND NOT EXISTS (
+                          SELECT 1 FROM C_DocType dt
+                          WHERE dt.C_DocType_ID = o.C_DocTypeTarget_ID
+                            AND COALESCE(dt.IsBlanketTrx, 'N') = 'Y')
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
                     GROUP BY
                         o.C_Order_ID,
@@ -262,6 +268,7 @@ namespace VIS.Controllers
                              THEN COALESCE(asi.Description, N'')
                              ELSE N'' END AS attribute_desc,
                         COALESCE(u.UOMSymbol, u.Name, N'') AS uom_symbol,
+                        COALESCE(p.ProductType, N'')   AS product_type,
                         COALESCE(ol.QtyOrdered, 0)    AS qty_ordered,
                         -- QtyEntered is expressed in the line's own C_UOM_ID (the UOM the buyer
                         -- picked); QtyOrdered / QtyDelivered are in the product's base UOM. The
@@ -335,6 +342,7 @@ namespace VIS.Controllers
                             ProductCode = Util.GetValueOfString(dr["product_code"]),
                             AttributeDesc = Util.GetValueOfString(dr["attribute_desc"]),
                             UOM = Util.GetValueOfString(dr["uom_symbol"]),
+                            ProductType = Util.GetValueOfString(dr["product_type"]),
                             QtyOrdered = qtyOrdered,
                             QtyDelivered = qtyDelivered,
                             QtyPending = qtyPending,

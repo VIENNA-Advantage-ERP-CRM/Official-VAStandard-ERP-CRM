@@ -14,13 +14,15 @@ namespace VIS.Controllers
     /// <summary>
     /// Module Name : Receipts MTD (Material Receipt / GRN dashboard KPI)
     /// Purpose     : KPI = COUNT of vendor material receipts (M_InOut, IsSOTrx 'N',
-    ///               MovementType 'V+') for the current month-to-date, with the
-    ///               prior-month count for comparison. Reversed/Voided (RE, VO)
+    ///               MovementType 'V+') for the current calendar month-to-date, with the
+    ///               previous calendar month's count for comparison. Reversed/Voided (RE, VO)
     ///               documents are excluded. Read-only, header-level count (never
     ///               joins M_InOutLine). Tenant/organization scope comes from
     ///               MRole, applied to the single physical table M_InOut.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-06-18 Created
+    ///   2026-09-15 QA sheet GRN #3: calendar months instead of the financial calendar (C_Period);
+    ///              one bind per placeholder occurrence, in order of appearance
     /// </summary>
     public class VAS_089_ReceiptsMTDWidgetController : Controller
     {
@@ -42,31 +44,32 @@ namespace VIS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
-            PeriodBounds bounds = GetPeriodBounds(ctx);
-            if (bounds == null)
-            {
-                return Json(new
-                {
-                    error = Msg.GetMsg(ctx, "VAS_PeriodNotFound") ?? "No active financial period found"
-                }, JsonRequestBehavior.AllowGet);
-            }
+            /* Month-to-date and the whole previous month come straight from the calendar. The
+               financial calendar (C_Period) was used before: a tenant without periods got no figure
+               at all ("No active financial period found"), and a period that is not a plain
+               calendar month shifted the previous-month count away from the real monthly total. */
+            DateTime today = DateTime.Today;
+            DateTime currentStart = new DateTime(today.Year, today.Month, 1);
+            DateTime currentEndNext = today.AddDays(1);
+            DateTime previousStart = currentStart.AddMonths(-1);
+            DateTime previousEndNext = currentStart;
 
             string sql = @"
                 SELECT SUM(CASE
-                           WHEN MInOut.MovementDate >= @CurrentPeriodStart
-                            AND MInOut.MovementDate < @CurrentPeriodEndNext
+                           WHEN MInOut.MovementDate >= @CurrentStart
+                            AND MInOut.MovementDate < @CurrentEndNext
                            THEN 1 ELSE 0 END) AS Receipts_MTD,
                        SUM(CASE
-                           WHEN MInOut.MovementDate >= @PreviousPeriodStart
-                            AND MInOut.MovementDate < @PreviousPeriodEndNext
+                           WHEN MInOut.MovementDate >= @PreviousStart
+                            AND MInOut.MovementDate < @PreviousEndNext
                            THEN 1 ELSE 0 END) AS Receipts_Prev_Month
                 FROM M_InOut MInOut
                 WHERE MInOut.IsActive = 'Y'
                   AND MInOut.IsSOTrx = 'N'
                   AND MInOut.MovementType = 'V+'
                   AND MInOut.DocStatus NOT IN ('RE', 'VO')
-                  AND MInOut.MovementDate >= @PreviousPeriodStart
-                  AND MInOut.MovementDate < @CurrentPeriodEndNext";
+                  AND MInOut.MovementDate >= @RangeStart
+                  AND MInOut.MovementDate < @RangeEndNext";
 
             /* MRole supplies tenant + organization access on the only physical
                table; applied to the main table alias (shared notation/CTE rules). */
@@ -77,12 +80,16 @@ namespace VIS.Controllers
                 MRole.SQL_RO
             );
 
+            /* The database layer binds positionally: one parameter per placeholder occurrence,
+               in the order the placeholders appear (the old statement bound 4 values to 6 markers). */
             SqlParameter[] parameters =
             {
-                new SqlParameter("@CurrentPeriodStart", bounds.CurrentStart),
-                new SqlParameter("@CurrentPeriodEndNext", bounds.CurrentEndNext),
-                new SqlParameter("@PreviousPeriodStart", bounds.PreviousStart),
-                new SqlParameter("@PreviousPeriodEndNext", bounds.PreviousEndNext)
+                new SqlParameter("@CurrentStart", currentStart),
+                new SqlParameter("@CurrentEndNext", currentEndNext),
+                new SqlParameter("@PreviousStart", previousStart),
+                new SqlParameter("@PreviousEndNext", previousEndNext),
+                new SqlParameter("@RangeStart", previousStart),
+                new SqlParameter("@RangeEndNext", currentEndNext)
             };
 
             IDataReader dr = null;
@@ -119,99 +126,6 @@ namespace VIS.Controllers
                     dr.Dispose();
                 }
             }
-        }
-
-        private static PeriodBounds GetPeriodBounds(Ctx ctx)
-        {
-            string sql = @"
-                WITH CurrentPeriod AS (
-                    SELECT CalPeriod.StartDate,
-                           CalPeriod.EndDate,
-                           CalYear.C_Calendar_ID,
-                           ROW_NUMBER() OVER (
-                               ORDER BY CalPeriod.StartDate DESC,
-                                        CalPeriod.C_Period_ID DESC
-                           ) AS SeqNo
-                    FROM AD_ClientInfo ClientInfo
-                    INNER JOIN C_Year CalYear ON (CalYear.C_Calendar_ID = ClientInfo.C_Calendar_ID)
-                    INNER JOIN C_Period CalPeriod ON (CalPeriod.C_Year_ID = CalYear.C_Year_ID)
-                    WHERE ClientInfo.IsActive = 'Y'
-                      AND CalYear.IsActive = 'Y'
-                      AND CalPeriod.IsActive = 'Y'
-                      AND ClientInfo.AD_Client_ID = @AD_Client_ID
-                      AND CURRENT_DATE BETWEEN CalPeriod.StartDate AND CalPeriod.EndDate
-                ),
-                PreviousPeriod AS (
-                    SELECT CalPeriod.StartDate,
-                           CalPeriod.EndDate,
-                           ROW_NUMBER() OVER (
-                               ORDER BY CalPeriod.EndDate DESC,
-                                        CalPeriod.StartDate DESC,
-                                        CalPeriod.C_Period_ID DESC
-                           ) AS SeqNo
-                    FROM CurrentPeriod CurPeriod
-                    INNER JOIN C_Year CalYear ON (CalYear.C_Calendar_ID = CurPeriod.C_Calendar_ID)
-                    INNER JOIN C_Period CalPeriod ON (CalPeriod.C_Year_ID = CalYear.C_Year_ID)
-                    WHERE CurPeriod.SeqNo = 1
-                      AND CalYear.IsActive = 'Y'
-                      AND CalPeriod.IsActive = 'Y'
-                      AND CalPeriod.EndDate < CurPeriod.StartDate
-                )
-                SELECT CurrentPeriod.StartDate AS Current_StartDate,
-                       CurrentPeriod.EndDate AS Current_EndDate,
-                       PreviousPeriod.StartDate AS Previous_StartDate,
-                       PreviousPeriod.EndDate AS Previous_EndDate
-                FROM CurrentPeriod
-                LEFT OUTER JOIN PreviousPeriod ON (PreviousPeriod.SeqNo = 1)
-                WHERE CurrentPeriod.SeqNo = 1";
-
-            SqlParameter[] parameters = { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) };
-            IDataReader dr = null;
-
-            try
-            {
-                dr = DB.ExecuteReader(sql, parameters);
-                if (dr == null || !dr.Read())
-                {
-                    return null;
-                }
-
-                DateTime? currentStart = Util.GetValueOfDateTime(dr["Current_StartDate"]);
-                DateTime? currentEnd = Util.GetValueOfDateTime(dr["Current_EndDate"]);
-                DateTime? previousStart = Util.GetValueOfDateTime(dr["Previous_StartDate"]);
-                DateTime? previousEnd = Util.GetValueOfDateTime(dr["Previous_EndDate"]);
-
-                if (!currentStart.HasValue || !currentEnd.HasValue)
-                {
-                    return null;
-                }
-
-                DateTime currentStartDate = currentStart.Value.Date;
-
-                return new PeriodBounds
-                {
-                    CurrentStart = currentStartDate,
-                    CurrentEndNext = currentEnd.Value.Date.AddDays(1),
-                    PreviousStart = previousStart.HasValue ? previousStart.Value.Date : currentStartDate,
-                    PreviousEndNext = previousEnd.HasValue ? previousEnd.Value.Date.AddDays(1) : currentStartDate
-                };
-            }
-            finally
-            {
-                if (dr != null)
-                {
-                    dr.Close();
-                    dr.Dispose();
-                }
-            }
-        }
-
-        private class PeriodBounds
-        {
-            public DateTime CurrentStart { get; set; }
-            public DateTime CurrentEndNext { get; set; }
-            public DateTime PreviousStart { get; set; }
-            public DateTime PreviousEndNext { get; set; }
         }
     }
 }

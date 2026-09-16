@@ -530,6 +530,12 @@
     width: 5em;
 }
 
+/* Attribute column (QA sheet GRN #7) - present only when a line of the receipt carries an attribute. */
+.vas-rag-l-attr {
+    width: 9em;
+    max-width: 9em;
+}
+
 .vas-rag-l-location {
     width: 9em;
 }
