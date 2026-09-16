@@ -466,6 +466,29 @@
  *                        moves stock on. Only raisedDate changes, so this is the
  *                        In Process date under IsShipConfirm; Delivered still dates
  *                        itself by the completion moment.
+ *   VAI163   2026-09-10  SHIPPED without ship confirmation dates itself by the
+ *                        EARLIEST completed delivery order (deliveryState's new
+ *                        firstCompletedDate) rather than the latest. The latest is
+ *                        what DELIVERED reports, so an order shipped in parts
+ *                        printed the same day against both stages and the stepper
+ *                        said nothing about how long the order had been going out.
+ *                        The IsShipConfirm path is unchanged — it still reads the
+ *                        delivery order's own MovementDate from the first DO to
+ *                        leave draft, which is the moment it reaches In Process —
+ *                        and a stage that has not been reached still carries no
+ *                        date. Model side: IsShipConfirm is now read from the
+ *                        TARGET document type alone wherever the order has one.
+ *   VAI163   2026-09-15  Order Progress:
+ *                        - Under ship confirmation the DELIVERED stage's In Process
+ *                          caption carries the delivery order's own date ("In
+ *                          Process · 10 Sep 2026" — deliveryState's new
+ *                          inProcessDate, the latest DO still waiting), so the
+ *                          reader sees which day's shipment is awaiting its
+ *                          confirmation. Shipped already dated itself the same way.
+ *                        - A closed or voided order (DocStatus CL / VO) reads
+ *                          "Closed" / "Voided" under the Completed stage: Closed
+ *                          keeps the tick and replaces the date, Voided replaces
+ *                          "In Process" on a stage that stays unreached.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1260,24 +1283,39 @@
         //                   below reports the latest movement.
         //   completedDate — the LATEST completed delivery order's completion moment
         //                   (its workflow DocComplete stamp, model side), falling
-        //                   back to when it was raised.
+        //                   back to when it was raised. This is DELIVERED's date:
+        //                   the point the order reached its current delivered
+        //                   position.
+        //   firstCompletedDate — the same moment on the EARLIEST completed delivery
+        //                   order, which is SHIPPED's date where no confirmation is
+        //                   asked for. Shipped is when the goods first went out, and
+        //                   dating it by the latest completion instead made the two
+        //                   stages report the same day on every order — a shipment
+        //                   raised in March and one in June both read June.
         //   inProcess     — a delivery order exists that is neither drafted nor
         //                   completed. Under ship confirmation that is where a
         //                   delivery order SITS, waiting to be confirmed, so it is a
         //                   state the stages have to report as progress rather than
         //                   as nothing having happened.
+        //   inProcessDate — the LATEST such delivery order's own MovementDate, which
+        //                   Delivered captions its In Process state with under ship
+        //                   confirmation: the reader sees WHICH day's shipment is
+        //                   waiting, not only that one is.
         //   onlyDrafted   — every delivery order raised is still in draft, which the
         //                   stages read exactly as "none raised": Pending.
         function deliveryState() {
             var dv = data.Deliveries || [];
-            var raised = null, completed = null, inProcess = false, open = 0;
+            var raised = null, completed = null, firstCompleted = null, inProcessDate = null;
+            var inProcess = false, open = 0;
             for (var i = 0; i < dv.length; i++) {
                 var st = dv[i].DocStatus;
-                if (st === "CO" || st === "CL") {
+                var isDone = st === "CO" || st === "CL";
+                if (isDone) {
                     var c = parseDbDate(dv[i].CompletedDate, true) ||
                             parseDbDate(dv[i].Created, true) ||
                             parseDbDate(dv[i].MovementDate, false);
                     if (c && (!completed || c > completed)) completed = c;
+                    if (c && (!firstCompleted || c < firstCompleted)) firstCompleted = c;
                 } else if (st !== "DR") {
                     inProcess = true;
                 }
@@ -1293,12 +1331,19 @@
                     var r = parseDbDate(dv[i].MovementDate, false) ||
                             parseDbDate(dv[i].Created, true);
                     if (r && (!raised || r < raised)) raised = r;
+                    // The LATEST delivery order still In Process, by the same date:
+                    // Delivered reports the latest movement, so while a shipment
+                    // waits on its confirmation the stage names the day of the most
+                    // recent one to be waiting.
+                    if (!isDone && r && (!inProcessDate || r > inProcessDate)) inProcessDate = r;
                 }
             }
             return {
                 exists: dv.length > 0,
                 raisedDate: raised,
                 completedDate: completed,
+                firstCompletedDate: firstCompleted,
+                inProcessDate: inProcessDate,
                 completed: !!completed,
                 inProcess: inProcess,
                 onlyDrafted: dv.length > 0 && open === 0
@@ -1359,22 +1404,44 @@
             var dl = deliveryState();
             var inProcess = getMsg("VAS_106_InProcess", "In Process");
 
-            // Shipped. With ship confirmation ON the delivery order sits In Process
-            // awaiting confirmation and may never complete on its own, so reaching
-            // that state IS the shipment and the stage dates itself by when the
-            // delivery order was raised. With it OFF, completion is the milestone
-            // and the stage dates itself by that. Either way a delivery order that
-            // is still drafted, or none at all, leaves the stage Pending — including
-            // on a completed sales order, which says nothing about whether anything
-            // has shipped.
+            // Shipped, and which question it asks turns on IsShipConfirm of the
+            // order's TARGET document type (data.IsShipConfirmTarget, model side).
+            //
+            // With confirmation ON the delivery order sits In Process awaiting its
+            // confirmation and may never complete on its own, so REACHING THAT STATE
+            // is the shipment: the stage goes done as soon as a delivery order has
+            // left draft, and it shows that delivery order's own date — MovementDate,
+            // the date the DO screen shows — taken from the first one to leave draft
+            // (raisedDate). A delivery order that has since been confirmed and
+            // completed still counts, and still dates the stage by the day it moved
+            // the stock rather than by the day it was confirmed.
+            //
+            // With it OFF, completion is the milestone and the stage dates itself by
+            // the EARLIEST completed delivery order. It read the latest before, which
+            // is the moment Delivered reports — so both stages printed the same day
+            // however long the order had been shipping in parts.
+            //
+            // Either way a delivery order that is still drafted, or none at all,
+            // leaves the stage Pending — including on a completed sales order, which
+            // says nothing about whether anything has shipped.
             var shipDone = shipConfirm ? (dl.inProcess || dl.completed) : dl.completed;
-            var shipDate = shipConfirm ? (dl.raisedDate || dl.completedDate) : dl.completedDate;
+            // No fallback on the OFF path: the stage is done only where a delivery
+            // order has completed, so firstCompletedDate is set exactly when there is
+            // a date to show, and reaching for raisedDate here would hand a date to a
+            // stage that has not been reached.
+            var shipDate = shipConfirm
+                         ? (dl.raisedDate || dl.firstCompletedDate)
+                         : dl.firstCompletedDate;
 
             // Delivered. Nothing raised, or nothing out of draft, is Pending. Once a
             // delivery order has COMPLETED the question is how much of the order it
             // took: all of it dates the stage, part of it captions it Partial
             // Delivered — a state, not a date. A delivery order under way but not
-            // completed is In Process.
+            // completed is In Process — and under ship confirmation, where that is
+            // where a delivery order sits until it is confirmed, the caption also
+            // names the delivery order's own date ("In Process · 10 Sep 2026"), so
+            // the reader sees which day's shipment is waiting rather than only
+            // that one is.
             var deliveredFull = f.total > 0 ? (f.full >= f.total) : dl.completed;
             var delDone = dl.completed && deliveredFull;
             var delPending = null, delActive = false;
@@ -1386,9 +1453,20 @@
                     delActive = true;
                 } else {
                     delPending = inProcess;
+                    var ipDate = shipConfirm ? formatDate(dl.inProcessDate) : "";
+                    if (ipDate) delPending += " · " + ipDate;
                     delActive = true;
                 }
             }
+
+            // A closed or voided order says so under Completed. Closed is a
+            // completed order that was then shut, so the stage keeps its tick and
+            // the word replaces the date; voided never completed, so the stage stays
+            // unreached and the word replaces "In Process" — either way the reader
+            // sees where the document ended rather than a stage that reads as
+            // though the order were still moving.
+            var closed = data.DocStatus === "CL";
+            var voided = data.DocStatus === "VO";
 
             var invDate = invoiceCompletedDate();
             var payDate = receiptCompletedDate();
@@ -1404,9 +1482,12 @@
                 // document is: nothing has been done to a drafted order, and one past
                 // draft is In Process.
                 { key: "VAS_106_Completed", label: "Completed", done: completed,
-                  date: completed ? (parseDbDate(data.CompletedDate, true) ||
-                                     parseDbDate(data.DateOrdered, false)) : null,
-                  pending: drafted ? null : inProcess, active: !drafted },
+                  date: (completed && !closed) ? (parseDbDate(data.CompletedDate, true) ||
+                                                  parseDbDate(data.DateOrdered, false)) : null,
+                  meta: closed ? getMsg("VAS_106_Closed", "Closed") : null,
+                  pending: voided ? getMsg("VAS_106_Voided", "Voided")
+                                  : (drafted ? null : inProcess),
+                  active: !drafted && !voided },
                 { key: "VAS_106_Shipped", label: "Shipped", done: shipDone, date: shipDate },
                 { key: "VAS_106_Delivered", label: "Delivered", done: delDone,
                   date: dl.completedDate, pending: delPending, active: delActive,

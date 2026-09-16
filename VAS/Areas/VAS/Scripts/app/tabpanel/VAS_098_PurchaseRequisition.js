@@ -418,6 +418,13 @@
  *                          IsConverted, and captions with the completion date; a
  *                          converted requisition still lights it through the
  *                          existing reach rule.
+ *   VAI163   2026-09-15  Notes is drawn when the header OR any line carries a
+ *                        description (renderNotesPanel). The header was the whole
+ *                        gate, so a requisition with line notes and no header
+ *                        description showed no Notes section at all.
+ *   VAI163   2026-09-15  Progress: a closed or voided requisition (StatusCode CL /
+ *                        VO) reads "Closed" / "Voided" under the Completed stage in
+ *                        place of the date or "Pending".
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1667,6 +1674,14 @@
                 } else {
                     stateCls = "vas_098-pending"; showCheck = false; sub = msg("Pending");
                 }
+                // A closed or voided requisition says so under Completed. Closed
+                // is a completed document that was then shut, so the tick stays
+                // and the word replaces the date; voided never completed, so the
+                // stage stays unreached and the word replaces "Pending".
+                if (stg.key === "vas_098-c2") {
+                    if (data.StatusCode === "CL") sub = msg("Closed");
+                    else if (data.StatusCode === "VO") sub = msg("Voided");
+                }
                 $stepper.append(stepEntry(s + 1, stg, stateCls, showCheck, sub));
             }
             $body.append($stepper);
@@ -1728,8 +1743,8 @@
             var $docs = renderDocuments();
             if ($docs) $body.append($docs);
 
-            // Notes only exists when the requisition carries a description of its
-            // own. Without one, no section: the heading goes with the card it heads.
+            // Notes exists when the header OR any line carries a description.
+            // With none anywhere, no section: the heading goes with the card.
             var $notes = renderNotesPanel();
             if ($notes) {
                 sectionHead(msg("Notes"), "");
@@ -2370,20 +2385,17 @@
         // written against, so a reader knows which row it annotates without
         // counting back to the table.
         //
-        // The section exists only when the REQUISITION ITSELF carries a
-        // description. With none, it is not drawn at all — heading included —
+        // The section exists when ANY description was entered — on the header or
+        // on a line. With none anywhere it is not drawn at all, heading included,
         // rather than standing as an empty card saying so.
         //
-        // The header's description is the whole gate, deliberately: a requisition
-        // with line notes but no description of its own shows no Notes section,
-        // and those line notes are not reachable from the panel. The alternative —
-        // opening the section for line notes alone — was considered and rejected;
-        // the header description is what decides whether this requisition has
-        // anything to say. Line notes remain a detail OF that section, not a
-        // reason to raise it.
+        // The header used to be the whole gate: a requisition with line notes but
+        // no description of its own showed no Notes section, and those line notes
+        // were reachable from nowhere on the panel. A note typed against a line
+        // is a note about the requisition whether or not the header has one, so
+        // each is shown on its own account — the same rule as every other
+        // overview panel.
         function renderNotesPanel() {
-            if (!data.Description || !String(data.Description).trim()) return null;
-
             var $notes = $('<div class="vas_098-notesbody"></div>');
             appendNoteText($notes, data.Description, null);
 
@@ -2391,6 +2403,7 @@
             for (var i = 0; i < lines.length; i++) {
                 appendNoteText($notes, lines[i].Description, lineNoteLabel(lines[i]));
             }
+            if (!$notes.children().length) return null;
 
             var $panel = $('<div class="vas_098-lowersec"></div>');
             var $card = $('<div class="vas_098-panelcard vas_098-notescard"></div>');

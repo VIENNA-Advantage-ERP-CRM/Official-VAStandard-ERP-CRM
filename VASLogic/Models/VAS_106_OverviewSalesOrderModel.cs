@@ -275,7 +275,8 @@
 ///                          the letters (it is called with includeMail: false).
 ///                        - IsShipConfirmTarget (LoadShipConfirmTarget):
 ///                          IsShipConfirm on C_DocTypeTarget_ID, falling back to
-///                          the completed type. The progress line's Shipped and
+///                          the completed type (narrowed 2026-09-10 to the target
+///                          alone wherever it is set). The progress line's Shipped and
 ///                          Delivered stages read the delivery order differently
 ///                          with confirmation on — where it SITS In Process
 ///                          awaiting confirmation — than with it off, where
@@ -328,6 +329,16 @@
 ///                        TO_CHAR — the form VAS_105 has always used on both
 ///                        engines. Same meaning on Oracle, and the letters are
 ///                        still read only once.
+///   VAI163   2026-09-10  IsShipConfirmTarget is decided by the TARGET document
+///                        type ALONE wherever the order has one
+///                        (LoadShipConfirmTarget). It was a flat COALESCE over the
+///                        target and the completed type, which fell through on a
+///                        NULL — so an order targeted at a type that asks for no
+///                        confirmation was read as asking for one wherever the type
+///                        it completed on did, and the progress line's Shipped stage
+///                        went green on a delivery order that was merely In Process.
+///                        A target type whose flag is unset means 'N'; the completed
+///                        type answers only where C_DocTypeTarget_ID is unset.
 /// </summary>
 
 using System;
@@ -2991,9 +3002,15 @@ namespace VASLogic.Models
         ///
         /// The target type, not the completed one: it is the type the order is being
         /// processed AS — the one the user picks on the record — and C_DocType_ID
-        /// only catches up with it when the document completes. The completed type
-        /// is kept as the fallback, so a schema that leaves the target unset still
-        /// answers from the type the order ended on.
+        /// only catches up with it when the document completes. Where the target
+        /// RESOLVES to a document type its flag is the answer, null included: an
+        /// unset IsShipConfirm on that type is "no confirmation", not "ask the other
+        /// type". A flat COALESCE over both could not say that — it fell through to
+        /// the completed type on a null, so an order targeted at a type that asks
+        /// for no confirmation was read as asking for one wherever the type it
+        /// completed on did. The completed type answers only where the target is
+        /// unset, so a schema that leaves it empty still reports the type the order
+        /// ended on.
         ///
         /// This is what splits the progress line's Shipped and Delivered stages in
         /// two. With confirmation ON, the delivery order sits In Process awaiting its
@@ -3012,7 +3029,11 @@ namespace VASLogic.Models
 
             try
             {
-                string sql = @"SELECT COALESCE(dtt.IsShipConfirm, dt.IsShipConfirm, 'N') AS IsShipConfirm
+                string sql = @"SELECT CASE
+                                        WHEN dtt.C_DocType_ID IS NOT NULL
+                                             THEN COALESCE(dtt.IsShipConfirm, 'N')
+                                        ELSE COALESCE(dt.IsShipConfirm, 'N')
+                                      END AS IsShipConfirm
                                  FROM C_Order o
                                  LEFT OUTER JOIN C_DocType dtt ON (dtt.C_DocType_ID = o.C_DocTypeTarget_ID)
                                  LEFT OUTER JOIN C_DocType dt  ON (dt.C_DocType_ID  = o.C_DocType_ID)

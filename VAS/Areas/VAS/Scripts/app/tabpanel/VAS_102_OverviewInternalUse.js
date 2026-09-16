@@ -206,6 +206,11 @@
  *                        each one - who it went to, its subject, when it went
  *                        and who sent it, then the message itself. The body is
  *                        shown ONLY once the row is opened.
+ *   VAI163   2026-09-15  Issue Timeline: a closed, voided or reversed issue
+ *                        (StatusCode CL / VO / RE) reads "Closed" / "Voided" /
+ *                        "Reversed" under the Issued stage in place of the date or
+ *                        "Pending"; one that never completed is not drawn as the
+ *                        active stage.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -901,6 +906,21 @@
                 } else {
                     stateCls = "is-pending";
                     metaText = VIS.Msg.getMsg("VAS_102_Pending");
+                }
+                // A closed, voided or reversed issue says so under Issued — the
+                // stage that reports the document's completion. The word replaces
+                // the date or "Pending"; the tick stays only where the issue did
+                // complete (Processed — closed, or reversed after completion), and
+                // a document voided or reversed before that stays unreached rather
+                // than being drawn as the stage under way.
+                if (s.key === "VAS_102_Issued") {
+                    var endKey = data.StatusCode === "CL" ? "VAS_102_Closed"
+                               : data.StatusCode === "VO" ? "VAS_102_Voided"
+                               : data.StatusCode === "RE" ? "VAS_102_Reversed" : null;
+                    if (endKey) {
+                        metaText = VIS.Msg.getMsg(endKey);
+                        if (!s.done) stateCls = "is-pending";
+                    }
                 }
                 $tl.append(stepEntry(i + 1, VIS.Msg.getMsg(s.key), metaText, s.done, stateCls));
             }
