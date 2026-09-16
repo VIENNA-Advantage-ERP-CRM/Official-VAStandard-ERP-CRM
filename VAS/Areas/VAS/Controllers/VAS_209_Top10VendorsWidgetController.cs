@@ -69,7 +69,7 @@ namespace VIS.Controllers
                             o.C_ConversionType_ID,
                             o.AD_Client_ID,
                             o.AD_Org_ID,
-                            SUM(COALESCE(ol.LineNetAmt, 0)) AS po_value_document_currency,
+                            SUM(" + NetOfTaxLineAmount() + @") AS po_value_document_currency,
                             SUM(COALESCE(ol.QtyOrdered, 0)) AS ordered_qty,
                             SUM(COALESCE(ol.QtyDelivered, 0)) AS delivered_qty
                         FROM C_Order o
@@ -296,7 +296,7 @@ namespace VIS.Controllers
                         bp.Name AS VendorName,
                         wh.Name AS WarehouseName,
                         usr.Name AS SalesRepName,
-                        SUM(COALESCE(ol.LineNetAmt, 0)) AS PoValueDoc,
+                        SUM(" + NetOfTaxLineAmount() + @") AS PoValueDoc,
                         SUM(COALESCE(ol.QtyOrdered, 0)) AS OrderedQty,
                         SUM(COALESCE(ol.QtyDelivered, 0)) AS DeliveredQty,
                         COUNT(ol.C_OrderLine_ID) AS LineCount,
@@ -313,8 +313,7 @@ namespace VIS.Controllers
                     INNER JOIN C_BPartner bp ON bp.C_BPartner_ID = o.C_BPartner_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = o.M_Warehouse_ID
                     LEFT JOIN AD_User usr ON usr.AD_User_ID = o.SalesRep_ID
-                    LEFT JOIN C_OrderLine ol ON ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y'
-                    WHERE o.AD_Client_ID = @ClientID
+                    LEFT JOIN C_OrderLine ol ON ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y'                    WHERE o.AD_Client_ID = @ClientID
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
@@ -564,8 +563,9 @@ namespace VIS.Controllers
                         COALESCE(ol.QtyEntered, ol.QtyOrdered, 0) AS QtyEntered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0) AS PriceActual,
-                        COALESCE(ol.LineNetAmt, 0) AS LineNetAmt
+                        " + NetOfTaxLineAmount() + @" AS LineNetAmt
                     FROM C_OrderLine ol
+                    INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
                     -- Charge lines have no M_Product, so this must not be an INNER JOIN.
                     LEFT JOIN M_Product p ON p.M_Product_ID = ol.M_Product_ID
                     LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
@@ -686,6 +686,45 @@ namespace VIS.Controllers
         }
 
         #region Helpers
+
+        /// <summary>
+        /// PO line amount without taxes. When the order is tax-inclusive (C_Order.IsTaxIncluded - the order's own
+        /// flag decides, not the price list's) LineNetAmt already contains the line tax and surcharge tax, so those
+        /// are taken off; otherwise LineNetAmt is already net of tax. Expects the line as "ol" and the order as "o".
+        /// </summary>
+        private static string NetOfTaxLineAmount()
+        {
+            string surcharge = HasColumn("C_OrderLine", "SurchargeAmt") ? " - COALESCE(ol.SurchargeAmt, 0)" : "";
+            return "CASE WHEN o.IsTaxIncluded = 'Y' THEN COALESCE(ol.LineNetAmt, 0) - COALESCE(ol.TaxAmt, 0)" + surcharge
+                + " ELSE COALESCE(ol.LineNetAmt, 0) END";
+        }
+
+        private static bool HasColumn(string tableName, string columnName)
+        {
+            string sql;
+            if (DB.IsPostgreSQL())
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM information_schema.columns
+                    WHERE UPPER(table_name)=UPPER(@TableName)
+                      AND UPPER(column_name)=UPPER(@ColumnName)";
+            }
+            else
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM USER_TAB_COLUMNS
+                    WHERE TABLE_NAME=UPPER(@TableName)
+                      AND COLUMN_NAME=UPPER(@ColumnName)";
+            }
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@TableName", tableName),
+                new SqlParameter("@ColumnName", columnName)
+            }, null)) > 0;
+        }
 
         private class CurrencyInfo
         {

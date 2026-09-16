@@ -331,7 +331,7 @@
                     '</div>' +
                     '<div class="vas-riu-row-right">' +
                     '<div class="vas-riu-lines-qty">' + item.lineCount + ' ' + escapeHtml(label("VAS_187_Lines", "lines")) + ' · ' + formatQty(item.totalQty) + '</div>' +
-                    '<div class="vas-riu-val">' + formatINR(item.totalValue) + '</div>' +
+                    '<div class="vas-riu-val">' + escapeHtml(formatCurrencyAmount(item.totalValue, currencyIso, currencySymbol)) + '</div>' +
                     '</div>' +
                     '</button>';
             }

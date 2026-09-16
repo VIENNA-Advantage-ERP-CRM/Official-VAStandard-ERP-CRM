@@ -62,7 +62,7 @@
         var selectedWarehouseId = null;
         var selectedWarehouseName = "All Warehouses";
         var warehousesList = [];
-        var summaryData = { b0_30: 0, b31_90: 0, b91_180: 0, b180_plus: 0, totalProducts: 0 };
+        var summaryData = { b0_30: 0, b31_90: 0, b91_180: 0, b180_plus: 0, totalQty: 0 };
 
         var $bucketBtns = {};
         var widgetObserver = null;
@@ -226,7 +226,9 @@
         }
 
         function updateWidgetUI() {
-            var total = summaryData.totalProducts || 0;
+            // Bucket values are aging QUANTITIES from M_Transaction.MovementQty
+            // (not product counts), so the share bars compare quantity share.
+            var total = summaryData.totalQty || 0;
 
             for (var i = 0; i < bucketsConfig.length; i++) {
                 var b = bucketsConfig[i];
@@ -239,7 +241,7 @@
 
                 var btnObj = $bucketBtns[b.id];
                 if (btnObj) {
-                    btnObj.$countText.text(count.toLocaleString() + (count === 1 ? " product" : " products"));
+                    btnObj.$countText.text(count.toLocaleString() + " qty");
 
                     var pct = total > 0 ? Math.round((count / total) * 100) : 0;
                     btnObj.$barFill.css("width", pct + "%");

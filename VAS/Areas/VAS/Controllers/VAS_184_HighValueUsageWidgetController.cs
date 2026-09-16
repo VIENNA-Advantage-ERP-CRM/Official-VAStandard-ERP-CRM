@@ -144,7 +144,6 @@ namespace VIS.Controllers
                       LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = p.M_Product_ID
                       WHERE line.IsActive = 'Y'
                         AND COALESCE(line.QtyInternalUse, 0) > 0
-                        AND line.CurrentCostPrice > 0
                       GROUP BY p.M_Product_ID, p.Name, asi.Description, uom.Name
                       ORDER BY MAX(COALESCE(pc.CurrentCostPrice, NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), 0)) DESC,
                                SUM(line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pc.CurrentCostPrice, 0)) DESC
@@ -217,7 +216,6 @@ namespace VIS.Controllers
                     LEFT JOIN (" + ProductCurrentCostSql + @") pc ON pc.M_Product_ID = line.M_Product_ID
                     WHERE line.IsActive = 'Y'
                       AND COALESCE(line.QtyInternalUse, 0) > 0
-                      AND line.CurrentCostPrice > 0
                       AND line.M_Product_ID = " + productId + @"
                     ORDER BY ai.MovementDate DESC, ai.DocumentNo DESC";
 

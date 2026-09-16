@@ -152,6 +152,16 @@
             return Math.max(0, (new Date().getTime() - d.getTime()) / 3600000);
         }
 
+        /* Time on dock comes from the server: hours between the receipt's creation and the database
+           clock. The browser used to measure from MovementDate, which is date-only (midnight) and in
+           server time, so the hours were off by up to a day plus the time-zone gap (QA sheet GRN #15). */
+        function rowAgeHours(row) {
+            if (row && row.ageHours != null && isFinite(Number(row.ageHours))) {
+                return Math.max(0, Number(row.ageHours));
+            }
+            return ageHours(row ? row.receivedOn : null);
+        }
+
         function ageLabel(hours) {
             if (hours < 24) {
                 return Math.floor(hours) + "h";
@@ -296,6 +306,7 @@
                     totalPages = Number(data.totalPages || 0);
                     totalRecords = Number(data.totalRecords || 0);
                     oldestReceivedOn = data.oldestReceivedOn || "";
+                    oldestAgeHours = (data.oldestAgeHours != null && isFinite(Number(data.oldestAgeHours))) ? Number(data.oldestAgeHours) : null;
                     renderRows();
                     updatePager();
                     window.setTimeout(syncPageSize, 0);
@@ -314,10 +325,14 @@
             totalRecords = 0;
             totalPages = 0;
             oldestReceivedOn = "";
+            oldestAgeHours = null;
             renderRows();
             updatePager();
             window.setTimeout(syncPageSize, 0);
         }
+
+        /* Oldest time on dock across all pages, in hours, as calculated by the server. */
+        var oldestAgeHours = null;
 
         function renderRows() {
             $listBody.empty();
@@ -326,10 +341,10 @@
                 (totalRecords === 1 ? lbl("VAS_087_ReceiptAwaiting", "receipt awaiting") : lbl("VAS_087_ReceiptsAwaiting", "receipts awaiting"));
 
             if (totalRecords > 0) {
-                var oldestHours = ageHours(oldestReceivedOn);
+                var oldestHours = oldestAgeHours != null ? oldestAgeHours : ageHours(oldestReceivedOn);
                 if (!oldestHours) {
                     for (var s = 0; s < rows.length; s++) {
-                        oldestHours = Math.max(oldestHours, ageHours(rows[s].receivedOn));
+                        oldestHours = Math.max(oldestHours, rowAgeHours(rows[s]));
                     }
                 }
                 summaryText += " - " + lbl("VAS_087_Oldest", "oldest") + " " + ageLongLabel(oldestHours);
@@ -344,16 +359,17 @@
 
             var maxAgeHours = 1;
             for (var i = 0; i < rows.length; i++) {
-                maxAgeHours = Math.max(maxAgeHours, ageHours(rows[i].receivedOn));
+                maxAgeHours = Math.max(maxAgeHours, rowAgeHours(rows[i]));
             }
 
             for (var r = 0; r < rows.length; r++) {
                 var record = rows[r];
-                var hours = ageHours(record.receivedOn);
+                var hours = rowAgeHours(record);
                 var severity = ageSeverity(hours);
                 var pct = Math.max(7, Math.round(hours / maxAgeHours * 100));
                 var label = (record.grnNo || "-") + " - " + (record.supplier || "-");
-                var sub = itemSummary(record) + " - " + formatQtyWithUom(record.totalQty, record.uom);
+                // No total for a receipt whose lines use different UOMs (the server sends no UOM then)
+                var sub = itemSummary(record) + (record.uom ? " - " + formatQtyWithUom(record.totalQty, record.uom) : "");
 
                 $listBody.append(
                     '<button type="button" class="vas-rag-row" data-receiptid="' + escapeHtml(record.receiptId) + '">' +
@@ -432,7 +448,7 @@
             var header = rowsById[receiptId];
             if (!header || !$dialog) { return; }
 
-            var hours = ageHours(header.receivedOn);
+            var hours = rowAgeHours(header);
             var severity = ageSeverity(hours);
 
             $dialogTitle.text((header.grnNo || "") + " - " + (header.supplier || ""));
@@ -485,12 +501,22 @@
                 return;
             }
 
+            /* QA sheet GRN #7: an Attribute column beside the item, only when at least one line of the
+               receipt carries a real attribute (empty and dash-only instance descriptions do not count);
+               lines without one show an empty cell. */
+            var showAttr = false;
+            for (var a = 0; a < lines.length; a++) {
+                if (hasAttributeText(lines[a].attributeName)) { showAttr = true; break; }
+            }
+
             var body = "";
             for (var i = 0; i < lines.length; i++) {
                 var ln = lines[i];
+                var attrText = hasAttributeText(ln.attributeName) ? String(ln.attributeName) : "";
                 body +=
                     '<tr>' +
                     '<td class="vas-rag-l-item" title="' + escapeHtml(ln.itemName) + '"><span class="vas-rag-trunc">' + escapeHtml(ln.itemName) + '</span></td>' +
+                    (showAttr ? '<td class="vas-rag-l-attr" title="' + escapeHtml(attrText) + '"><span class="vas-rag-trunc">' + escapeHtml(attrText) + '</span></td>' : '') +
                     // Qty and UOM are separate columns now - the cell used to read "2 Ea".
                     '<td class="vas-rag-l-num" title="' + escapeHtml(formatQty(ln.receivedQty)) + '">' + escapeHtml(formatQty(ln.receivedQty)) + '</td>' +
                     '<td class="vas-rag-l-uom" title="' + escapeHtml(ln.uom || "-") + '">' + escapeHtml(ln.uom || "-") + '</td>' +
@@ -503,6 +529,7 @@
                 '<table class="vas-rag-lines-table">' +
                 '<thead><tr>' +
                 '<th class="vas-rag-l-item">' + escapeHtml(lbl("VAS_087_Item", "Item")) + '</th>' +
+                (showAttr ? '<th class="vas-rag-l-attr">' + escapeHtml(lbl("VAS_087_Attribute", "Attribute")) + '</th>' : '') +
                 '<th class="vas-rag-l-num">' + escapeHtml(lbl("VAS_087_Received", "Received")) + '</th>' +
                 '<th class="vas-rag-l-uom">' + escapeHtml(lbl("VAS_087_UOM", "UOM")) + '</th>' +
                 '<th class="vas-rag-l-location">' + escapeHtml(lbl("VAS_087_Locator", "Locator")) + '</th>' +
@@ -510,6 +537,13 @@
                 '</tr></thead><tbody>' + body + '</tbody></table></div>';
 
             $dialogBody.html(html);
+        }
+
+        /* A line has an attribute only when its instance description is real text - empty,
+           whitespace and dash-only descriptions ("---") do not count. */
+        function hasAttributeText(attributeName) {
+            var text = String(attributeName == null ? '' : attributeName).trim();
+            return text !== '' && !/^-+$/.test(text);
         }
 
         function closeDetail() {

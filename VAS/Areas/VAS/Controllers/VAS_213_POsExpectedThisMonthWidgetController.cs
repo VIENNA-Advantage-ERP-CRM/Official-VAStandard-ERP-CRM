@@ -144,13 +144,13 @@ namespace VIS.Controllers
                         GROUP BY C_Order_ID
                     ) q
                         ON q.C_Order_ID = o.C_Order_ID
-                    WHERE o.AD_Client_ID = @P_AD_Client_ID@
+                    WHERE o.AD_Client_ID = @P_AD_Client_ID
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                       AND o.DocStatus NOT IN ('CO', 'CL', 'VO', 'RE')
-                      AND o.DatePromised >= @P_MONTH_START@
-                      AND o.DatePromised < @P_MONTH_END_EXCLUSIVE@
+                      AND o.DatePromised >= @P_MONTH_START
+                      AND o.DatePromised < @P_MONTH_END_EXCLUSIVE
                       AND q.ordered_qty > q.delivered_qty
                       AND o.C_Order_ID IN (@P_ORDER_ACCESS@)
                     ORDER BY o.DatePromised ASC, o.DocumentNo ASC";
