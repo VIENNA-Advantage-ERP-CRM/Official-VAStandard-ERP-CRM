@@ -253,6 +253,28 @@
  *                          new formatStampDate, so the day lands in the viewer's
  *                          zone rather than on the stored UTC clock. Drafted was
  *                          already showing the raw stamp's day.
+ *   VAI163   2026-09-15  - Activity row sub-lines (recipients, the line an edit
+ *                          landed on, the delta) render in a .vas_100-actSubs
+ *                          container of their own, appended after the stamp and
+ *                          caret, which the stylesheet places on the row's second
+ *                          line at full width. They sat inside the headline's
+ *                          cell and wrapped into a narrow column beside it.
+ *                        - Line table headings and the UOM / Ordered / Delivered
+ *                          / Line Value cells carry their text as a tooltip
+ *                          (cell()), so a figure a narrow panel clips is still
+ *                          readable.
+ *                        - Notes lists the LINE descriptions too (collectNotes:
+ *                          "#10 Product — text"), each on its own account — a
+ *                          line note shows whether or not the header has one. It
+ *                          showed the header description alone.
+ *                        - Timeline: a closed, reversed or voided delivery
+ *                          (StatusCode CL / RE / VO) reads "Closed" / "Reversed" /
+ *                          "Voided" under the Completed stage in place of the date
+ *                          or "In Process"; a reversed or voided one is no longer
+ *                          drawn as the active stage.
+ *                        - Timeline: the Confirmed stage reads Pending until a
+ *                          confirmation (M_InOutConfirm, data.HasConfirmation) has
+ *                          actually been raised; it read In Process from the start.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1004,9 +1026,10 @@
         //               stage with last month.
         //   Confirmed — drawn ONLY for a delivery whose TARGET document type asks for
         //               a shipment confirmation (IsShipConfirm on C_DocTypeTarget_ID).
-        //               Until the confirmation (M_InOutConfirm) completes — including
-        //               when none has been raised yet — it reads In Process; once it
-        //               completes it captions with the moment it did.
+        //               Pending while no confirmation (M_InOutConfirm) has been raised
+        //               (data.HasConfirmation), In Process from the moment one is
+        //               raised until it completes, and captioned with the moment it
+        //               did once it has.
         //   Invoiced  — Pending until an AR invoice against this delivery's lines
         //               COMPLETES; a drafted invoice is not an invoiced delivery. With
         //               several invoices it captions with the latest completed one.
@@ -1037,20 +1060,25 @@
                   done: completed,
                   date: completed ? (formatStampDate(data.CompletedDate) ||
                                      formatDate(data.MovementDate)) : "",
-                  pending: drafted ? null : inProcess, active: !drafted }
+                  // A voided or reversed delivery is not under way; the stage stays
+                  // unreached and renderLifecycle captions it "Voided" / "Reversed".
+                  pending: drafted ? null : inProcess,
+                  active: !drafted && s !== "VO" && s !== "RE" }
             ];
 
             // Only a delivery that is going to be confirmed carries the stage. On any
             // other document type there is no confirmation to wait for, and a
             // permanently In Process stage would read as an omission.
             if (data.IsShipConfirmTarget) {
+                // Pending until a confirmation (M_InOutConfirm) EXISTS — nothing
+                // is being worked through while none has been raised — and In
+                // Process from the moment one is raised until it completes.
+                var confirmRaised = !!data.HasConfirmation;
                 stages.push({
                     key: "VAS_100_StageConfirmed", fallback: "Confirmed",
                     done: !!data.ConfirmCompletedDate,
                     date: formatStampDate(data.ConfirmCompletedDate),
-                    // Not raised yet, still drafted, or raised and not completed —
-                    // all of them are the confirmation being worked through.
-                    pending: inProcess, active: true
+                    pending: confirmRaised ? inProcess : null, active: confirmRaised
                 });
             }
 
@@ -1079,6 +1107,16 @@
                     // falls back to Pending.
                     stateCls = stg.active ? "vas_100-is-active" : "is-pending";
                     metaText = stg.pending || msg("VAS_100_Pending", "Pending");
+                }
+                // A closed, reversed or voided delivery says so under Completed.
+                // Closed is a completed document that was then shut, so the tick
+                // stays and the word replaces the date; reversed and voided never
+                // stand as completed, so the stage stays unreached and the word
+                // replaces "In Process" / "Pending".
+                if (stg.key === "VAS_100_StageCompleted") {
+                    if (data.StatusCode === "CL") metaText = VIS.Msg.getMsg("VAS_100_Closed");
+                    else if (data.StatusCode === "RE") metaText = VIS.Msg.getMsg("VAS_100_Reversed");
+                    else if (data.StatusCode === "VO") metaText = VIS.Msg.getMsg("VAS_100_Voided");
                 }
                 $tl.append(stepEntry(k + 1, msg(stg.key, stg.fallback), metaText, stg.done, stateCls));
             }
@@ -1134,16 +1172,17 @@
             if (showQuality) $tbl.addClass("vas_100-has-q");
 
             // Header row
+            // Every heading carries itself as a tooltip: a narrow panel can still
+            // clip one, and a clipped heading names nothing.
             var $head = $('<div class="vas_100-tRow vas_100-tHead"></div>');
-            $head.append($('<span></span>').text(msg("VAS_100_Line", "Line")));
-            $head.append($('<span></span>').text(VIS.Msg.getMsg("VAS_100_UOM")));
-            $head.append($('<span class="vas_100-ta-r"></span>').text(VIS.Msg.getMsg("VAS_100_Ordered")));
-            $head.append($('<span class="vas_100-ta-r"></span>').text(VIS.Msg.getMsg("VAS_100_Delivered")));
-            $head.append($('<span class="vas_100-ta-r"></span>').text(VIS.Msg.getMsg("VAS_100_LineValue")));
-            $head.append($('<span class="vas_100-ta-c"></span>').text(VIS.Msg.getMsg("VAS_100_Status")));
+            $head.append(cell("", msg("VAS_100_Line", "Line")));
+            $head.append(cell("", VIS.Msg.getMsg("VAS_100_UOM")));
+            $head.append(cell("vas_100-ta-r", VIS.Msg.getMsg("VAS_100_Ordered")));
+            $head.append(cell("vas_100-ta-r", VIS.Msg.getMsg("VAS_100_Delivered")));
+            $head.append(cell("vas_100-ta-r", VIS.Msg.getMsg("VAS_100_LineValue")));
+            $head.append(cell("vas_100-ta-c", VIS.Msg.getMsg("VAS_100_Status")));
             if (showQuality) {
-                $head.append($('<span class="vas_100-ta-c"></span>')
-                    .text(msg("VAS_100_Quality", "Quality")));
+                $head.append(cell("vas_100-ta-c", msg("VAS_100_Quality", "Quality")));
             }
             $tbl.append($head);
 
@@ -1407,14 +1446,42 @@
             return $tr;
         }
 
-        // ---------- Notes (the description entered on the delivery order) ---------- //
+        // ---------- Notes (header + line descriptions) ---------- //
 
+        // Every description entered against the delivery order: the one typed on
+        // the header (M_InOut.Description) first, then the one typed on each line
+        // (M_InOutLine.Description), labelled "#10 Product — text" so a note is
+        // attributable to the row it was written on. Each stands on its own: a
+        // line note shows whether or not the header has one. Skipped entirely
+        // when nothing was written anywhere.
         function renderNotes() {
-            var text = (data && data.Description) || "";
-            if (!String(text).trim()) return;
+            var notes = collectNotes();
+            if (!notes.length) return;
 
             var $sec = section(msg("VAS_100_Notes", "Notes"), null);
-            $sec.append($('<div class="vas_100-noteCard"></div>').text(text));
+            var $card = $('<div class="vas_100-noteCard"></div>');
+            for (var i = 0; i < notes.length; i++) {
+                $card.append($('<p></p>').text(notes[i]));
+            }
+            $sec.append($card);
+        }
+
+        function collectNotes() {
+            var out = [];
+            var header = ((data && data.Description) || "").trim();
+            if (header) out.push(header);
+
+            var lines = (data && data.Lines) || [];
+            for (var i = 0; i < lines.length; i++) {
+                var ln = lines[i];
+                var text = (ln.Description || "").trim();
+                if (!text) continue;
+                var label = (+ln.Line > 0) ? "#" + ln.Line : "";
+                var prod = (ln.ProductName || "").trim();
+                if (prod) label = label ? label + " " + prod : prod;
+                out.push(label ? label + " — " + text : text);
+            }
+            return out;
         }
 
         // ---------- Activity (audit trail) ---------- //
@@ -1532,6 +1599,16 @@
             // after one line — that text is what the reader came for.
             if (a.Type === "note") $lead.addClass("vas_100-multiline");
             $title.append($lead);
+            $row.append($title);
+
+            // The sub-lines go in a container of their own, placed by the
+            // stylesheet on the row's SECOND line spanning to its right edge.
+            // They used to sit inside the headline's cell, which is only as wide
+            // as the stamp and the caret leave it — so an e-mail's recipient list
+            // wrapped into a tall, narrow column beside an empty right half of
+            // the row. Appended to the row last, and only when it holds
+            // something, so a plain row stays a single line.
+            var $subs = $('<span class="vas_100-actSubs"></span>');
 
             // An e-mail names its recipients under the subject — every address on
             // the To, Cc and Bcc lists, in full. The line wraps, so a long list is
@@ -1539,7 +1616,7 @@
             // A LETTER names its addresses here too — it is the same record in the
             // same table, filed under a different attachment type.
             if (a.Type === "call" && a.MailTo) {
-                $title.append($('<small class="vas_100-actSub"></small>')
+                $subs.append($('<small class="vas_100-actSub"></small>')
                     .text(a.MailTo).attr("title", a.MailTo));
             }
             if (a.Type === "appointment" || a.Type === "task") {
@@ -1555,25 +1632,24 @@
                 if (apptMails.length) apptBits.push(mailCountLabel(apptMails.length));
                 if (apptBits.length) {
                     var apptSub = apptBits.join(" · ");
-                    $title.append($('<small class="vas_100-actSub"></small>')
+                    $subs.append($('<small class="vas_100-actSub"></small>')
                         .text(apptSub).attr("title", apptSub));
                 }
             }
             if (a.Type === "email" || a.Type === "letter") {
                 var to = recipientSummary(a);
-                if (to) $title.append($('<small class="vas_100-actSub"></small>').text(to));
+                if (to) $subs.append($('<small class="vas_100-actSub"></small>').text(to));
             }
 
             // A field edit names the line it landed on. Dropped entirely for a
             // header edit, which has no line to name.
             if (a.Type === "updated" && a.ChangeScope) {
-                $title.append($('<small class="vas_100-actSub"></small>')
+                $subs.append($('<small class="vas_100-actSub"></small>')
                     .text(a.ChangeScope).attr("title", a.ChangeScope));
             }
             // ...and the move itself: what the field held before the edit and
             // what it holds after, on a sub-line of its own.
-            if (a.OldValue || a.NewValue) $title.append(changeDelta(a));
-            $row.append($title);
+            if (a.OldValue || a.NewValue) $subs.append(changeDelta(a));
 
             // "when · by whom" — the audit trail's whole point, in the same place
             // on every row. For an e-mail that is when it went out and who sent it.
@@ -1608,6 +1684,8 @@
                     $panel.toggle(nowOpen);
                 });
             }
+
+            if ($subs.children().length) $row.append($subs);
 
             return $row;
         }
@@ -1742,6 +1820,16 @@
             bits.push(msg(key, fallback) + " " + text);
         }
 
+        // A plain text cell of the line table, carrying its own text as a
+        // tooltip. Every track is minmax(0, Nfr) and the cells clip, so any one
+        // of them can be cut short on a narrow panel — the tooltip is where the
+        // whole of it stays readable.
+        function cell(cls, text) {
+            var $c = $('<span></span>').text(text).attr("title", text);
+            if (cls) $c.addClass(cls);
+            return $c;
+        }
+
         function buildLineRow(ln, cur, showQuality) {
             var $tr = $('<div class="vas_100-tRow vas_100-tBody"></div>');
 
@@ -1832,10 +1920,10 @@
             var prec = +ln.UOMPrecision || 0;
 
             // UOM
-            $tr.append($('<span></span>').text(dash(ln.UOMName)));
+            $tr.append(cell("", dash(ln.UOMName)));
 
             // Ordered
-            $tr.append($('<span class="vas_100-ta-r"></span>').text(formatNumber(+ln.OrderedQty || 0, prec)));
+            $tr.append(cell("vas_100-ta-r", formatNumber(+ln.OrderedQty || 0, prec)));
 
             // Delivered (mini bar + delivered qty)
             var ordered = +ln.OrderedQty || 0;
@@ -1846,12 +1934,13 @@
             var $bar = $('<span class="vas_100-recvBar"><i></i></span>');
             $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
             $recv.append($bar);
-            $recv.append(document.createTextNode(formatNumber(delivered, prec)));
+            var deliveredTxt = formatNumber(delivered, prec);
+            $recv.append(document.createTextNode(deliveredTxt));
+            $recv.attr("title", deliveredTxt);
             $tr.append($recv);
 
             // Line value
-            $tr.append($('<span class="vas_100-ta-r"></span>').text(
-                formatAmount(+ln.LineValue || 0, cur, data.StdPrecision)));
+            $tr.append(cell("vas_100-ta-r", formatAmount(+ln.LineValue || 0, cur, data.StdPrecision)));
 
             // Status tag: Full / Partial / Short
             var $q = $('<span class="vas_100-ta-c"></span>');
