@@ -1,0 +1,413 @@
+/* VAS_270_SalesOrdersCompletedMTDWidget.css
+ * Onfinity KPI tile (2x1) with a drill-down modal, per 03-kpi-completed-mtd.html / .md.
+ * The tile itself stacks title / headline / meta and uses the "ok" (healthy) tone -
+ * completed sales orders are the healthy counterweight to the dashboard's open-work
+ * tiles. CSS namespaced vas270-* (module-prefixed, matching every other dashboard
+ * widget in this codebase - see VAS_268/VAS_120/VAS_241 etc.).
+ */
+
+.vas270-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas270-root,
+    .vas270-root * {
+        box-sizing: border-box;
+    }
+
+/* ---------- tile ---------- */
+.vas270-tile {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, .6));
+    border: 2px solid #CBEEDD;
+    border-radius: 14px;
+    padding: .85em;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    text-align: left;
+    cursor: pointer;
+    transition: box-shadow .15s, transform .15s;
+}
+
+    .vas270-tile:hover {
+        box-shadow: 0 14px 30px rgba(15, 61, 97, .12);
+        transform: translateY(-1px);
+    }
+
+    .vas270-tile:focus-visible {
+        outline: 2px solid #1F83FF;
+        outline-offset: 2px;
+    }
+
+    .vas270-tile[aria-disabled="true"] {
+        cursor: default;
+        transform: none;
+    }
+
+    .vas270-tile[aria-disabled="true"]:hover {
+        box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+        transform: none;
+    }
+
+.vas270-title {
+    font-weight: 400;
+    color: #748494;
+    line-height: 1.2;
+    margin: 0;
+    font-size: .8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas270-group { min-width: 0; }
+
+.vas270-val {
+    font-size: 2.05rem;
+    font-weight: 700;
+    line-height: 1.02;
+    color: #0B6B45;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas270-val.error { color: #A33F3F; }
+
+.vas270-meta {
+    font-size: .72rem;
+    color: #5F7283;
+    line-height: 1.3;
+    margin: .5em 0 0 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas270-skel {
+    display: block;
+    width: 5.5em;
+    height: 1.75em;
+    margin-top: .25em;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #EEF3F8 25%, #F7FAFC 37%, #EEF3F8 63%);
+    background-size: 200% 100%;
+    animation: vas270-shimmer 1.4s ease infinite;
+}
+
+@keyframes vas270-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ---------- modal ---------- */
+.vas270-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0, 38, 64, .34);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: min(4vh, 28px) min(3vw, 28px);
+    font-family: Roboto, Arial, sans-serif;
+}
+
+.vas270-mask.is-open { display: flex; }
+
+.vas270-modal {
+    width: min(1240px, 94vw);
+    max-height: min(880px, 90dvh);
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 16px;
+    box-shadow: 0 28px 64px rgba(15, 61, 97, .26);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas270-modal.sm { width: min(760px, 94vw); }
+.vas270-modal.md { width: min(1000px, 94vw); }
+
+.vas270-mhead {
+    height: 56px;
+    flex: none;
+    padding: 0 16px;
+    border-bottom: 1px solid #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vas270-mhead .vas270-htxt { min-width: 0; display: flex; align-items: center; gap: 8px; }
+
+.vas270-mhead h2 {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 400;
+    color: #141414;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas270-msub {
+    font-size: .8125em;
+    color: #717182;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas270-xbtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    color: #141414;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex: none;
+}
+
+.vas270-xbtn:hover { background: #F1F4F8; }
+.vas270-xbtn svg { width: 20px; height: 20px; }
+
+.vas270-mbody {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 1.125em .875em;
+    display: flex;
+    flex-direction: column;
+    gap: .75em;
+    container-type: inline-size;
+    font-size: clamp(18px, 1vw, 20px);
+}
+
+.vas270-mfoot {
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #FBFDFF;
+}
+
+.vas270-foot-note { font-size: 13px; color: #5F7283; }
+
+.vas270-btn {
+    border-radius: 999px;
+    padding: .5em .875em;
+    font-size: .8125em;
+    font-family: inherit;
+    border: 1px solid #0083DA;
+    background: #fff;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+.vas270-btn:hover { background: #EEF8FF; }
+.vas270-btn-primary { background: #0083DA; color: #fff; }
+.vas270-btn-primary:hover { background: #0069AE; }
+
+.vas270-mstats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .5em;
+    flex: none;
+}
+
+@container (max-width: 700px) {
+    .vas270-mstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.vas270-mstat {
+    border: 1px solid #D9E2EB;
+    border-radius: 10px;
+    padding: .4em .6em;
+    background: #FBFDFF;
+    min-width: 0;
+}
+
+.vas270-mstat .l { font-size: .6875em; color: #5F7283; line-height: 1.3; }
+.vas270-mstat .v {
+    font-size: .875em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+    margin-top: .1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas270-msec {
+    font-size: .9375em;
+    font-weight: 500;
+    color: #102C3F;
+    margin: .25em 0 .35em;
+    padding-bottom: .3em;
+    border-bottom: 1px solid #E2EAF1;
+    flex: none;
+}
+
+.vas270-polink {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    font-size: .75em;
+    color: #5F7283;
+    flex: none;
+}
+
+.vas270-mtwrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.vas270-mtbl { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+
+.vas270-mrow {
+    display: grid;
+    gap: .75em;
+    padding: 0 .5em;
+    align-items: center;
+}
+
+.vas270-mhead-row {
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    padding: .5em .5em;
+    border-bottom: 1px solid #C5D2DD;
+    flex: none;
+}
+
+.vas270-mbody-rows { overflow: hidden; flex: 1; min-height: 0; }
+.vas270-mbody-rows .vas270-mrow {
+    font-size: .75em;
+    padding: .55em .5em;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.vas270-mbody-rows .vas270-mrow:last-child { border-bottom: 0; }
+
+.vas270-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas270-cell.right { text-align: right; }
+.vas270-cell.center { display: flex; justify-content: center; }
+.vas270-c-prim { font-weight: 700; color: #102C3F; }
+.vas270-c-std { color: #5F7283; }
+.vas270-c-emph { font-weight: 700; color: #0083DA; }
+.vas270-c-short { font-weight: 700; color: #A33F3F; }
+.vas270-c-ok { font-weight: 700; color: #0B6B45; }
+
+.vas270-lnk {
+    border: 0;
+    background: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    color: #0083DA;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    text-align: left;
+}
+
+.vas270-lnk:hover { color: #0069AE; }
+
+.vas270-iconbtn {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #fff;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    flex: none;
+}
+
+.vas270-iconbtn:hover { background: #EEF8FF; border-color: #BFE4FF; }
+.vas270-iconbtn svg { width: .8em; height: .8em; }
+
+.vas270-mtfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    border-top: 1px solid #D9E2EB;
+    padding-top: .5em;
+    margin-top: .5em;
+    flex: none;
+}
+
+.vas270-helper { font-size: .75em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas270-pager { display: flex; align-items: center; gap: 6px; flex: none; }
+
+.vas270-pbtn {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #fff;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+}
+
+.vas270-pbtn:hover:not(:disabled) { background: #EEF8FF; }
+.vas270-pbtn:disabled { color: #B8C6D2; cursor: default; }
+.vas270-pbtn svg { width: .75em; height: .75em; }
+.vas270-ptxt { font-size: .8125em; font-weight: 500; color: #102C3F; min-width: 3.4em; text-align: center; }
+
+.vas270-chip {
+    display: inline-block;
+    border-radius: 999px;
+    padding: .3125em .625em;
+    font-size: .6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas270-chip-info { background: #EAF8FF; color: #0083DA; }
+.vas270-chip-ok { background: #E7F7EF; color: #0B6B45; }
+.vas270-chip-warn { background: #FFF6E2; color: #9A6500; }
+.vas270-chip-risk { background: #FCEFEF; color: #A33F3F; }
+.vas270-chip-neutral { background: #F1F4F8; color: #41576A; font-weight: 500; }
+.vas270-chip-prop { background: #EFEEFF; color: #5F4AA6; }
+
+.vas270-mstate { padding: 1em; font-size: .8125em; color: #5F7283; text-align: center; }

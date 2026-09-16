@@ -1,0 +1,474 @@
+/* VAS_288_SOQueueWidget.css
+ * Onfinity 6x3 primary operational work-queue table widget with a Month/Year filter
+ * and a direct-record-modal row click (no intermediate list), per
+ * 21-so-queue.html / .md. CSS namespaced vas288-* (module-prefixed, matching every
+ * other dashboard widget in this codebase). The modal shell / stat tiles / table /
+ * chip rules mirror VAS_270-287's own shared Sales Order record-preview modal
+ * styling - duplicated here as this widget's own self-contained copy.
+ */
+
+.vas288-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas288-root,
+    .vas288-root * {
+        box-sizing: border-box;
+    }
+
+/* ---------- widget shell ---------- */
+.vas288-shell {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, 1.2cqi, 20px);
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, .6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    padding: .85em;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.vas288-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .5em;
+    flex: none;
+    margin-bottom: .75em;
+}
+
+.vas288-head-txt { min-width: 0; }
+
+.vas288-title {
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+    margin: 0;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas288-sub {
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin: 2px 0 0 0;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------- Month / Year filter ---------- */
+.vas288-mfilter {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+}
+
+.vas288-msel {
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: inherit;
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    background-color: #fff;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2341576A' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right .45em center;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    padding: .3em 1.35em .3em .55em;
+    line-height: 1.1;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(16, 47, 74, .04);
+    max-width: 7.2em;
+    /* Without a min-width, the flex row (.vas288-mfilter) can shrink this select
+       below its own content width on a real (narrower-than-the-mockup) dashboard,
+       clipping the last digit of a 4-digit year. flex-shrink:0 belt-and-suspenders
+       the same guarantee regardless of the parent's flex context. */
+    min-width: 4.6em;
+    flex-shrink: 0;
+}
+
+.vas288-msel:hover { background-color: #F7FBFF; border-color: #BFE4FF; }
+
+/* ---------- grid data table ---------- */
+.vas288-tbl {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas288-trow {
+    display: grid;
+    gap: .75em;
+    padding: 0 .5em;
+    align-items: center;
+}
+
+.vas288-thead {
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    padding-top: .5em;
+    padding-bottom: .5em;
+    border-bottom: 1px solid #C5D2DD;
+    flex: none;
+}
+
+.vas288-thead .vas288-cell.right { text-align: right; }
+
+.vas288-tbody {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas288-tbody .vas288-trow {
+    font-size: .75em;
+    padding-top: .5em;
+    padding-bottom: .5em;
+    border-bottom: 1px solid #E2EAF1;
+    background: none;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.vas288-tbody .vas288-trow:last-child { border-bottom: 0; }
+.vas288-tbody .vas288-trow:hover { background: #F4FAFF; border-radius: 6px; }
+
+.vas288-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas288-cell.right { text-align: right; }
+.vas288-c-prim { font-weight: 700; color: #102C3F; }
+.vas288-c-std { color: #5F7283; }
+.vas288-c-dark { color: #102C3F; }
+.vas288-c-emph { font-weight: 700; color: #0083DA; }
+.vas288-c-link { font-weight: 700; color: #0083DA; }
+.vas288-c-short { font-weight: 700; color: #A33F3F; }
+.vas288-c-ok { font-weight: 700; color: #0B6B45; }
+
+/* loading skeleton */
+.vas288-skel-cell {
+    display: block;
+    height: .85em;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #EEF3F8 25%, #F7FAFC 37%, #EEF3F8 63%);
+    background-size: 200% 100%;
+    animation: vas288-shimmer 1.4s ease infinite;
+}
+
+@keyframes vas288-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.vas288-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .75em;
+    color: #5F7283;
+    text-align: center;
+}
+
+/* ---------- footer pager ---------- */
+.vas288-wfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding-top: .5em;
+    margin-top: .625em;
+}
+
+.vas288-helper { font-size: .75em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas288-pager { display: flex; align-items: center; gap: 6px; flex: none; }
+
+.vas288-pbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #fff;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+}
+
+.vas288-pbtn:hover:not(:disabled) { background: #EEF8FF; }
+.vas288-pbtn:disabled { color: #B8C6D2; cursor: default; }
+.vas288-pbtn svg { width: 14px; height: 14px; }
+.vas288-ptxt { font-size: .8125em; font-weight: 500; color: #102C3F; min-width: 3.4em; text-align: center; }
+
+/* ---------- status chips (main table only shows drafted/in-process/completed) ---------- */
+.vas288-chip {
+    display: inline-block;
+    border-radius: 999px;
+    padding: .3125em .625em;
+    font-size: .6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas288-chip-ok { background: #E7F7EF; color: #0B6B45; }
+.vas288-chip-info { background: #EAF8FF; color: #0083DA; }
+.vas288-chip-warn { background: #FFF6E2; color: #9A6500; }
+.vas288-chip-neutral { background: #F1F4F8; color: #41576A; font-weight: 500; }
+.vas288-chip-prop { background: #EFEEFF; color: #5F4AA6; }
+
+/* ---------- modal ---------- */
+.vas288-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0, 38, 64, .34);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: min(4vh, 28px) min(3vw, 28px);
+    font-family: Roboto, Arial, sans-serif;
+}
+
+.vas288-mask.is-open { display: flex; }
+
+.vas288-modal {
+    width: min(1240px, 94vw);
+    max-height: min(880px, 90dvh);
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 16px;
+    box-shadow: 0 28px 64px rgba(15, 61, 97, .26);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas288-modal.sm { width: min(760px, 94vw); }
+.vas288-modal.md { width: min(1000px, 94vw); }
+
+.vas288-mhead {
+    height: 56px;
+    flex: none;
+    padding: 0 16px;
+    border-bottom: 1px solid #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vas288-mhead .vas288-htxt { min-width: 0; display: flex; align-items: center; gap: 8px; }
+
+.vas288-mhead h2 {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 400;
+    color: #141414;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas288-msub {
+    font-size: .8125em;
+    color: #717182;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas288-xbtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    color: #141414;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex: none;
+}
+
+.vas288-xbtn:hover { background: #F1F4F8; }
+.vas288-xbtn svg { width: 20px; height: 20px; }
+
+.vas288-mbody {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 1.125em .875em;
+    display: flex;
+    flex-direction: column;
+    gap: .75em;
+    container-type: inline-size;
+    font-size: clamp(18px, 1vw, 20px);
+}
+
+.vas288-mfoot {
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #FBFDFF;
+}
+
+.vas288-foot-note { font-size: 13px; color: #5F7283; }
+
+.vas288-btn {
+    border-radius: 999px;
+    padding: .5em .875em;
+    font-size: .8125em;
+    font-family: inherit;
+    border: 1px solid #0083DA;
+    background: #fff;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+.vas288-btn:hover { background: #EEF8FF; }
+
+.vas288-mstats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .5em;
+    flex: none;
+}
+
+@container (max-width: 700px) {
+    .vas288-mstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.vas288-mstat {
+    border: 1px solid #D9E2EB;
+    border-radius: 10px;
+    padding: .4em .6em;
+    background: #FBFDFF;
+    min-width: 0;
+}
+
+.vas288-mstat .l { font-size: .6875em; color: #5F7283; line-height: 1.3; }
+.vas288-mstat .v {
+    font-size: .875em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+    margin-top: .1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas288-msec {
+    font-size: .9375em;
+    font-weight: 500;
+    color: #102C3F;
+    margin: .25em 0 .35em;
+    padding-bottom: .3em;
+    border-bottom: 1px solid #E2EAF1;
+    flex: none;
+}
+
+.vas288-mtwrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.vas288-mtbl { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+
+.vas288-mrow {
+    display: grid;
+    gap: .75em;
+    padding: 0 .5em;
+    align-items: center;
+}
+
+.vas288-mhead-row {
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    padding: .5em .5em;
+    border-bottom: 1px solid #C5D2DD;
+    flex: none;
+}
+
+.vas288-mbody-rows { overflow: hidden; flex: 1; min-height: 0; }
+.vas288-mbody-rows .vas288-mrow {
+    font-size: .75em;
+    padding: .55em .5em;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.vas288-mbody-rows .vas288-mrow:last-child { border-bottom: 0; }
+
+.vas288-mtfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    border-top: 1px solid #D9E2EB;
+    padding-top: .5em;
+    margin-top: .5em;
+    flex: none;
+}
+
+.vas288-mtfoot .vas288-helper { font-size: .75em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas288-mtfoot .vas288-pager { display: flex; align-items: center; gap: 6px; flex: none; }
+
+.vas288-mtfoot .vas288-pbtn {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 7px;
+    border: 1px solid #D9E2EB;
+    background: #fff;
+    display: grid;
+    place-items: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+}
+
+.vas288-mtfoot .vas288-pbtn:hover:not(:disabled) { background: #EEF8FF; }
+.vas288-mtfoot .vas288-pbtn:disabled { color: #B8C6D2; cursor: default; }
+.vas288-mtfoot .vas288-pbtn svg { width: .75em; height: .75em; }
+.vas288-mtfoot .vas288-ptxt { font-size: .8125em; font-weight: 500; color: #102C3F; min-width: 3.4em; text-align: center; }
+
+.vas288-mstate { padding: 1em; font-size: .8125em; color: #5F7283; text-align: center; }

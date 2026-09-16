@@ -1,0 +1,96 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_269 New Sales Order — 1x1 quick-action tile (Sales Order dashboard).
+ * Design: follows VAS_242 New Contract's pattern exactly - borderless
+ * white-glass tile chrome (no dashed border/pale fill), centred blue "+"
+ * well, bold title, muted subtitle below. Internal type / spacing in em
+ * against the widget-root font-size (--dash-inline-size lever, matching the
+ * other dashboard quick-action tiles); borders / radii / shadows in px.
+ * All classes carry the module prefix vas269-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas269-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas269-root,
+    .vas269-root * {
+        box-sizing: border-box;
+    }
+
+/* Quick-action surface - the blue "+" well alone marks it as an "add" tile. */
+.vas269-card {
+    font-family: Roboto, Arial, sans-serif;
+    /* Widget root anchor — one lever; internal em values scale from this. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    text-align: center;
+    padding: 0.85em;
+    border: none;
+    border-radius: 14px;                        /* px */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.05);
+    cursor: pointer;
+    transition: background 180ms ease, box-shadow 180ms ease;
+}
+
+    .vas269-card:hover {
+        background: linear-gradient(180deg, #DEEEFC 0%, #F0F7FD 100%);
+        box-shadow: 0 8px 18px rgba(16, 47, 74, 0.08);
+    }
+
+    .vas269-card:focus-visible {
+        outline: 2px solid #1F83FF;
+        outline-offset: 2px;
+    }
+
+/* Centred blue "+" well. */
+.vas269-well {
+    width: 2.25em;
+    height: 2.25em;
+    flex: 0 0 auto;
+    border-radius: 11px;                        /* px */
+    background: #1F83FF;
+    color: #FFFFFF;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 10px 24px rgba(31, 131, 255, 0.22);
+}
+
+    .vas269-well svg {
+        display: block;
+        width: 1.1em;
+        height: 1.1em;
+    }
+
+.vas269-text {
+    display: block;
+    min-width: 0;
+}
+
+.vas269-title {
+    display: block;
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.1;
+}
+
+.vas269-sub {
+    display: -webkit-box;
+    font-size: 0.66em;
+    color: #748494;
+    line-height: 1.25;
+    margin-top: 0.125em;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}

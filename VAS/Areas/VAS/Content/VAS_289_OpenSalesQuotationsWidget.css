@@ -1,0 +1,372 @@
+/* VAS_289_OpenSalesQuotationsWidget.css
+ * Onfinity 3x3 conversion-worklist widget (ready chip + two-line-cell table + pager)
+ * and its Quotation -> Sales Order conversion wizard (shared modal, 3 screens: line
+ * selection, order details, lines review/create), per
+ * 22-open-sales-quotations.html / .md. CSS namespaced vas289-* (module-prefixed,
+ * matching every other dashboard widget in this codebase).
+ */
+
+.vas289-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas289-root,
+    .vas289-root * {
+        box-sizing: border-box;
+    }
+
+/* ---------- widget shell ---------- */
+.vas289-shell {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, 1.2cqi, 20px);
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, .6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    padding: .85em;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.vas289-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .5em;
+    flex: none;
+    margin-bottom: .75em;
+}
+
+.vas289-head-txt { min-width: 0; }
+
+.vas289-title {
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+    margin: 0;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 17px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas289-sub {
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin: 2px 0 0 0;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------- header chip ---------- */
+.vas289-chip {
+    display: inline-block;
+    border-radius: 999px;
+    padding: .3125em .625em;
+    font-size: .6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    flex: none;
+}
+
+.vas289-chip-ok { background: #E7F7EF; color: #0B6B45; }
+.vas289-chip-warn { background: #FFF6E2; color: #9A6500; }
+.vas289-chip-neutral { background: #F1F4F8; color: #41576A; font-weight: 500; }
+
+/* ---------- grid data table ---------- */
+.vas289-tbl { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+
+.vas289-trow { display: grid; gap: .75em; padding: 0 .5em; align-items: center; }
+
+.vas289-thead {
+    font-size: .6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
+    padding-top: .5em;
+    padding-bottom: .5em;
+    border-bottom: 1px solid #C5D2DD;
+    flex: none;
+}
+
+.vas289-thead .vas289-cell.right { text-align: right; }
+
+.vas289-tbody { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+
+.vas289-tbody .vas289-trow {
+    font-size: .75em;
+    padding-top: .5em;
+    padding-bottom: .5em;
+    border-bottom: 1px solid #E2EAF1;
+    background: none;
+    border-left: 0; border-right: 0; border-top: 0;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.vas289-tbody .vas289-trow:last-child { border-bottom: 0; }
+.vas289-tbody .vas289-trow:hover { background: #F4FAFF; border-radius: 6px; }
+
+.vas289-cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vas289-cell.right { text-align: right; }
+.vas289-cell.center { display: flex; justify-content: center; }
+.vas289-sub { font-size: .6875em; color: #5F7283; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.vas289-c-prim { font-weight: 700; color: #102C3F; }
+.vas289-c-std { color: #5F7283; }
+.vas289-c-dark { color: #102C3F; }
+.vas289-c-emph { font-weight: 700; color: #0083DA; }
+.vas289-c-short { font-weight: 700; color: #A33F3F; }
+.vas289-c-ok { font-weight: 700; color: #0B6B45; }
+
+/* loading skeleton */
+.vas289-skel-cell {
+    display: block;
+    height: .85em;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #EEF3F8 25%, #F7FAFC 37%, #EEF3F8 63%);
+    background-size: 200% 100%;
+    animation: vas289-shimmer 1.4s ease infinite;
+}
+
+@keyframes vas289-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.vas289-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .75em;
+    color: #5F7283;
+    text-align: center;
+    padding: 0 .5em;
+}
+
+/* ---------- footer pager ---------- */
+.vas289-wfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    flex: none;
+    border-top: 1px solid #D9E2EB;
+    padding-top: .5em;
+    margin-top: .625em;
+}
+
+.vas289-helper { font-size: .75em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas289-pager { display: flex; align-items: center; gap: 6px; flex: none; }
+
+.vas289-pbtn {
+    width: 24px; height: 24px; border-radius: 7px; border: 1px solid #D9E2EB; background: #fff;
+    display: grid; place-items: center; color: #0083DA; cursor: pointer; padding: 0;
+}
+.vas289-pbtn:hover:not(:disabled) { background: #EEF8FF; }
+.vas289-pbtn:disabled { color: #B8C6D2; cursor: default; }
+.vas289-pbtn svg { width: 14px; height: 14px; }
+.vas289-ptxt { font-size: .8125em; font-weight: 500; color: #102C3F; min-width: 3.4em; text-align: center; }
+
+/* ---------- modal ---------- */
+.vas289-mask {
+    position: fixed; inset: 0; z-index: 60; background: rgba(0, 38, 64, .34);
+    display: none; align-items: center; justify-content: center;
+    padding: min(4vh, 28px) min(3vw, 28px);
+    font-family: Roboto, Arial, sans-serif;
+}
+.vas289-mask.is-open { display: flex; }
+
+.vas289-modal {
+    width: min(1240px, 94vw);
+    max-height: min(880px, 90dvh);
+    background: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 16px;
+    box-shadow: 0 28px 64px rgba(15, 61, 97, .26);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.vas289-modal.sm { width: min(760px, 94vw); }
+.vas289-modal.md { width: min(1000px, 94vw); }
+
+.vas289-mhead {
+    height: 56px; flex: none; padding: 0 16px; border-bottom: 1px solid #1F83FF;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.vas289-mhead .vas289-htxt { min-width: 0; display: flex; align-items: center; gap: 8px; }
+.vas289-mhead h2 {
+    margin: 0; font-size: 1em; font-weight: 400; color: #141414; line-height: 1.2;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vas289-msub {
+    font-size: .8125em; color: #717182; margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vas289-xbtn {
+    width: 32px; height: 32px; border-radius: 8px; border: 0; background: transparent; color: #141414;
+    display: grid; place-items: center; cursor: pointer; flex: none;
+}
+.vas289-xbtn:hover { background: #F1F4F8; }
+.vas289-xbtn svg { width: 20px; height: 20px; }
+
+.vas289-mbody {
+    flex: 1; min-height: 0; overflow: hidden;
+    padding: 1.125em .875em; display: flex; flex-direction: column; gap: .75em;
+    container-type: inline-size;
+    font-size: clamp(18px, 1vw, 20px);
+}
+/* Step 3 (order-details form) has more fields than fit any fixed modal height on a
+   laptop viewport, and unlike a table it has no "reduce rows per page" fit strategy -
+   so it is the one screen allowed to scroll vertically instead of silently clipping
+   fields beneath the footer. */
+.vas289-mbody.vas289-scrollable { overflow-y: auto; overflow-x: hidden; }
+.vas289-mbody button, .vas289-mbody input, .vas289-mbody select, .vas289-mbody textarea {
+    font-family: inherit; font-size: inherit; line-height: inherit; color: inherit;
+}
+
+.vas289-mfoot {
+    flex: none; border-top: 1px solid #D9E2EB; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #FBFDFF;
+}
+
+.vas289-foot-note { font-size: 13px; color: #5F7283; }
+.vas289-warnnote { font-size: 13px; color: #A33F3F; }
+.vas289-oknote { font-size: 13px; color: #0B6B45; }
+
+.vas289-btn {
+    border-radius: 999px; padding: .5em .875em; font-size: .8125em; font-family: inherit;
+    border: 1px solid #0083DA; background: #fff; color: #0083DA; cursor: pointer;
+}
+.vas289-btn:hover { background: #EEF8FF; }
+.vas289-btn-primary { background: #0083DA; color: #fff; }
+.vas289-btn-primary:hover { background: #0069AE; }
+.vas289-btn:disabled { border-color: #9AB0C0; color: #9AB0C0; background: #fff; cursor: not-allowed; }
+.vas289-btn-primary:disabled { background: #CBD8E2; border-color: #CBD8E2; color: #fff; }
+
+.vas289-mstats {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5em; flex: none;
+}
+@container (max-width: 700px) {
+    .vas289-mstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.vas289-mstat { border: 1px solid #D9E2EB; border-radius: 10px; padding: .4em .6em; background: #FBFDFF; min-width: 0; }
+.vas289-mstat .l { font-size: .6875em; color: #5F7283; line-height: 1.3; }
+.vas289-mstat .v {
+    font-size: .875em; font-weight: 600; color: #102C3F; line-height: 1.2; margin-top: .1em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.vas289-msec {
+    font-size: .9375em; font-weight: 500; color: #102C3F; margin: .25em 0 .35em; padding-bottom: .3em;
+    border-bottom: 1px solid #E2EAF1; flex: none;
+}
+
+.vas289-mtwrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.vas289-mtbl { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+
+.vas289-mrow { display: grid; gap: .6em; padding: 0 .5em; align-items: center; }
+.vas289-mhead-row {
+    font-size: .6875em; font-weight: 500; color: #41576A; text-transform: capitalize;
+    padding: .5em .5em; border-bottom: 1px solid #C5D2DD; flex: none;
+}
+.vas289-mbody-rows { overflow: hidden; flex: 1; min-height: 0; }
+.vas289-mbody-rows .vas289-mrow { font-size: .75em; padding: .4em .5em; border-bottom: 1px solid #E2EAF1; }
+.vas289-mbody-rows .vas289-mrow:last-child { border-bottom: 0; }
+.vas289-mrow-pick { cursor: pointer; width: 100%; background: none; border: 0; text-align: left; font-family: inherit; }
+.vas289-mrow-pick:hover { background: #F4FAFF; }
+
+.vas289-mtfoot {
+    display: flex; align-items: center; justify-content: space-between; gap: .75em;
+    border-top: 1px solid #D9E2EB; padding-top: .5em; margin-top: .5em; flex: none;
+}
+.vas289-mtfoot .vas289-helper { font-size: .75em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas289-mtfoot .vas289-pager { display: flex; align-items: center; gap: 6px; flex: none; }
+.vas289-mtfoot .vas289-pbtn { width: 1.5em; height: 1.5em; border-radius: 7px; }
+.vas289-mtfoot .vas289-pbtn svg { width: .75em; height: .75em; }
+.vas289-mtfoot .vas289-ptxt { font-size: .8125em; }
+
+.vas289-mstate { padding: 1em; font-size: .8125em; color: #5F7283; text-align: center; }
+
+/* ---------- form (Step 3 order details) ---------- */
+.vas289-formsec {
+    font-size: .8125em; font-weight: 500; color: #41576A; text-transform: capitalize;
+    margin: .35em 0 .3em; padding-bottom: .25em; border-bottom: 1px solid #E2EAF1; flex: none;
+}
+.vas289-form-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .55em .7em; flex: none; }
+@container (max-width: 760px) {
+    .vas289-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.vas289-field { display: flex; flex-direction: column; gap: .2em; min-width: 0; }
+.vas289-field-span-all { grid-column: 1 / -1; }
+.vas289-field label { font-size: .6875em; color: #5F7283; line-height: 1.2; }
+.vas289-req { color: #D14545; }
+
+.vas289-fctl {
+    border: 1px solid #D9E2EB; border-radius: 8px; background: #fff; color: #102C3F;
+    font-family: inherit; font-size: .8125em; padding: .42em .55em; min-width: 0; width: 100%;
+}
+.vas289-readonly { background: #F5F7F9; color: #5F7283; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+select.vas289-fctl {
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2341576A' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat; background-position: right .5em center; padding-right: 1.4em;
+}
+
+/* ---------- Step 2 / 4 line tables: checkbox, qty input, select ---------- */
+.vas289-chk { width: 1.05em; height: 1.05em; accent-color: #0083DA; cursor: pointer; }
+.vas289-qty-input {
+    border: 1px solid #D9E2EB; border-radius: 6px; background: #fff; color: #102C3F;
+    font-family: inherit; font-size: 1em; padding: .2em .35em; width: 100%; min-width: 0; text-align: right;
+}
+select.vas289-wh-select, select.vas289-line-tax {
+    border: 1px solid #D9E2EB; border-radius: 6px; background: #fff; color: #102C3F;
+    font-family: inherit; font-size: 1em; padding: .2em 1.1em .2em .35em; width: 100%; min-width: 0;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2341576A' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat; background-position: right .3em center;
+}
+input.vas289-line-promised { border: 1px solid #D9E2EB; border-radius: 6px; background: #fff; color: #102C3F; font-family: inherit; font-size: 1em; padding: .2em .35em; width: 100%; min-width: 0; }
+
+.vas289-iconbtn {
+    width: 1.5em; height: 1.5em; border-radius: 7px; border: 1px solid #D9E2EB; background: #fff;
+    display: grid; place-items: center; color: #0083DA; cursor: pointer; padding: 0; flex: none;
+}
+.vas289-iconbtn:hover { background: #EEF8FF; border-color: #BFE4FF; }
+.vas289-iconbtn svg { width: .8em; height: .8em; }
+
+.vas289-linedesc {
+    border: 1px solid #D9E2EB; border-radius: 10px; background: #FBFDFF; padding: .5em .65em;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5em .7em;
+    margin: 0 .5em .4em .5em;
+}
+
+.vas289-totline {
+    display: flex; justify-content: flex-end; gap: 1.5em; padding: .4em .5em 0; border-top: 1px solid #D9E2EB; flex: none;
+}
+.vas289-totline span { font-size: .75em; color: #5F7283; }
+.vas289-totline b { font-size: .8125em; color: #102C3F; }
+
+/* toast */
+.vas289-toast {
+    position: fixed; left: 50%; bottom: 56px; transform: translateX(-50%) translateY(10px);
+    background: #002640; color: #fff; font-size: 13px; padding: 10px 16px; border-radius: 999px;
+    box-shadow: 0 12px 28px rgba(0, 38, 64, .3); opacity: 0; pointer-events: none; transition: .22s; z-index: 70;
+}
+.vas289-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
