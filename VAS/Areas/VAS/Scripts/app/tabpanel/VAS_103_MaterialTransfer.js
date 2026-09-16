@@ -123,6 +123,10 @@
  *                        each one - who it went to, its subject, when it went
  *                        and who sent it, then the message itself. The body is
  *                        shown ONLY once the row is opened.
+ *   VAI163   2026-09-15  Lifecycle: a closed or voided transfer (StatusCode CL /
+ *                        VO) reads "Closed" / "Voided" under the Completed stage
+ *                        (Initiated on a confirmed route) in place of the date or
+ *                        "Pending"; a voided one is not drawn as the active stage.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -720,6 +724,18 @@
                 } else {
                     stateCls = "is-pending";
                     metaText = VIS.Msg.getMsg("VAS_103_Pending");
+                }
+                // A closed or voided transfer says so under the stage that reports
+                // the document's completion (Completed, or Initiated on a confirmed
+                // route). Closed keeps the tick and the word replaces the date;
+                // voided never completed, so the stage stays unreached and the
+                // word replaces "Pending".
+                if (s.key === "VAS_103_Completed" || s.key === "VAS_103_Initiated") {
+                    if (data.StatusCode === "CL") metaText = VIS.Msg.getMsg("VAS_103_Closed");
+                    else if (data.StatusCode === "VO") {
+                        stateCls = "is-pending";
+                        metaText = VIS.Msg.getMsg("VAS_103_Voided");
+                    }
                 }
                 $tl.append(stepEntry(i + 1, getMsg(s.key, s.label), metaText, s.done, stateCls));
             }

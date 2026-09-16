@@ -358,6 +358,13 @@
  *                          order was finished, never that it had reached the
  *                          vendor. A stage may now carry its own sub-line (meta),
  *                          which holds in every state.
+ *   VAI163   2026-09-15  Order Progress: a closed or voided order (data.DocStatus
+ *                        CL / VO) reads "Closed" / "Voided" under the Completed
+ *                        stage in place of the date or "Pending". New message key
+ *                        VAS_092_StVoided (default "Voided"). The header status
+ *                        pill (statusTone) reports Voided / Closed first too — it
+ *                        was read off the delivery / payment flags alone, so a
+ *                        voided order wore a "Drafted" pill.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -572,6 +579,7 @@
             VAS_092_StInProgress: "In Progress",
             VAS_092_StCompleted: "Completed",
             VAS_092_StClosed: "Closed",
+            VAS_092_StVoided: "Voided",
             VAS_092_StApproved: "Approved",
             VAS_092_StNotApproved: "Not Approved",
             VAS_092_StInvalid: "Invalid",
@@ -902,6 +910,14 @@
         // Fully received is checked before partial so a completed order never
         // reports "Partially Received".
         function statusTone(d) {
+            // A voided or closed order says so before anything else. The tone
+            // used to be read off the delivery / payment flags alone, so a voided
+            // order — none of whose flags are set — wore a "Drafted" pill beside
+            // a document the window itself marks Voided.
+            if (d.DocStatus === "VO")
+                return { tone: "risk", label: getMsg("VAS_092_StVoided") };
+            if (d.DocStatus === "CL")
+                return { tone: "neutral", label: getMsg("VAS_092_StClosed") };
             if (d.IsPaymentDone)
                 return { tone: "success", label: getMsg("VAS_092_PaymentDone") };
             if (d.IsFullyDelivered)
@@ -1419,6 +1435,16 @@
                 // A stage that states its own sub-line (With Vendor) keeps it in
                 // every state — the sentence is the point, not the date.
                 if (s.meta) metaText = s.meta;
+                // A closed or voided order says so under Completed. Closed is a
+                // completed order that was then shut, so the tick stays and the
+                // word replaces the date; voided never completed, so the stage
+                // stays unreached and the word replaces "Pending" / "In Progress"
+                // — either way the reader sees where the document ended rather
+                // than a stage that reads as though the order were still moving.
+                if (s.key === "VAS_092_Completed") {
+                    if (data.DocStatus === "CL") metaText = getMsg("VAS_092_StClosed");
+                    else if (data.DocStatus === "VO") metaText = getMsg("VAS_092_StVoided");
+                }
 
                 $tl.append(stepEntry(i + 1, s.label || getMsg(s.key), metaText, s.done, stateCls));
             }

@@ -351,6 +351,17 @@
  *                          stage previously went green on an invoice merely
  *                          existing. With several invoices it captions with the
  *                          latest completed one (model side).
+ *   VAI163   2026-09-15  Notes lists the LINE descriptions too (collectNotes:
+ *                        "#10 Product — text"), each on its own account — a line
+ *                        note shows whether or not the header has one. It showed
+ *                        the header description alone.
+ *   VAI163   2026-09-15  Receipt Timeline: a closed, reversed or voided receipt
+ *                        (StatusCode CL / RE / VO) reads "Closed" / "Reversed" /
+ *                        "Voided" under the Completed stage in place of the date
+ *                        or "In Process" / "Pending". The Confirmed stage reads
+ *                        Pending until a confirmation (M_InOutConfirm,
+ *                        data.HasConfirmation) has actually been raised; it read
+ *                        In Process from the start.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -1238,9 +1249,11 @@
                     key: "VAS_099_Confirmed", fallback: "Confirmed",
                     date: data.ConfirmCompletedDate,
                     done: !!data.ConfirmCompletedDate, stamp: true,
-                    // Not raised yet, still drafted, or raised and not completed —
-                    // all of them are the confirmation being worked through.
-                    pending: inProcessText()
+                    // Pending until a confirmation (M_InOutConfirm) EXISTS —
+                    // nothing is being worked through while none has been raised
+                    // — and In Process from the moment one is raised until it
+                    // completes.
+                    pending: data.HasConfirmation ? inProcessText() : null
                 });
             }
 
@@ -1285,6 +1298,16 @@
                     // A stage that is under way says so; one that has not started
                     // falls back to Pending.
                     metaText = s.pending || msg("VAS_099_Pending", "Pending");
+                }
+                // A closed, reversed or voided receipt says so under Completed.
+                // Closed is a completed document that was then shut, so the tick
+                // stays and the word replaces the date; reversed and voided never
+                // stand as completed, so the stage stays unreached and the word
+                // replaces "In Process" / "Pending".
+                if (s.key === "VAS_099_Completed") {
+                    if (data.StatusCode === "CL") metaText = msg("VAS_099_Closed", "Closed");
+                    else if (data.StatusCode === "RE") metaText = msg("VAS_099_Reversed", "Reversed");
+                    else if (data.StatusCode === "VO") metaText = msg("VAS_099_Voided", "Voided");
                 }
 
                 $tl.append(stepEntry(i + 1, msg(s.key, s.fallback), metaText, s.done, stateCls));
@@ -1834,18 +1857,43 @@
             return $tr;
         }
 
-        // ---------- Notes (GRN header description) ---------- //
+        // ---------- Notes (GRN header + line descriptions) ---------- //
 
-        // The description typed on the goods receipt header. Skipped when blank so
-        // an empty card never trails the panel.
+        // Every description entered against the receipt: the one typed on the
+        // header (M_InOut.Description) first, then the one typed on each line
+        // (M_InOutLine.Description), labelled "#10 Product — text" so a note is
+        // attributable to the row it was written on. Each stands on its own: a
+        // line note shows whether or not the header has one. Skipped entirely
+        // when nothing was written anywhere, so an empty card never trails the
+        // panel.
         function renderNotes() {
-            var text = (data.Description || "").trim();
-            if (!text) return;
+            var notes = collectNotes();
+            if (!notes.length) return;
 
             var $sec = section(msg("VAS_099_Notes", "Notes"), null);
             var $card = $('<div class="vas_099-textCard"></div>');
-            $card.append($('<p></p>').text(text));
+            for (var i = 0; i < notes.length; i++) {
+                $card.append($('<p></p>').text(notes[i]));
+            }
             $sec.append($card);
+        }
+
+        function collectNotes() {
+            var out = [];
+            var header = (data.Description || "").trim();
+            if (header) out.push(header);
+
+            var lines = (data && data.Lines) || [];
+            for (var i = 0; i < lines.length; i++) {
+                var ln = lines[i];
+                var text = (ln.Description || "").trim();
+                if (!text) continue;
+                var label = (+ln.Line > 0) ? "#" + ln.Line : "";
+                var prod = (ln.ProductName || "").trim();
+                if (prod) label = label ? label + " " + prod : prod;
+                out.push(label ? label + " — " + text : text);
+            }
+            return out;
         }
 
         // ---------- Activity (audit trail) ---------- //
