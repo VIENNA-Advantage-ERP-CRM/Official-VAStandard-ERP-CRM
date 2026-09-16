@@ -268,6 +268,28 @@ namespace VAS.Areas.VAS.Controllers
                 string fromLabel = monthShortNames[fromDate.Month - 1] + " " + fromDate.Year;
                 string toLabel = monthShortNames[toDt.Month - 1] + " " + toDt.Year;
 
+                // Month filter options: only months that actually hold PO data,
+                // so the From/To pickers do not offer empty months.
+                var availableMonths = new List<object>();
+                string monthsSql = @"
+                    SELECT DISTINCT EXTRACT(YEAR FROM o.DateOrdered) AS Yr, EXTRACT(MONTH FROM o.DateOrdered) AS Mo
+                    FROM C_Order o
+                    WHERE o.AD_Client_ID = " + clientId + @"
+                      AND o.IsActive = 'Y'
+                      AND o.IsSOTrx = 'N'
+                      AND COALESCE(o.IsReturnTrx, 'N') = 'N'
+                      AND o.DocStatus <> 'VO'
+                      AND o.DateOrdered IS NOT NULL";
+                monthsSql = MRole.GetDefault(ctx).AddAccessSQL(monthsSql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                monthsSql += " ORDER BY Yr, Mo";
+                using (IDataReader mdr = CoreLibrary.DataBase.DB.ExecuteReader(monthsSql, null, null))
+                {
+                    while (mdr != null && mdr.Read())
+                    {
+                        availableMonths.Add(new { y = Util.GetValueOfInt(mdr["Yr"]), m = Util.GetValueOfInt(mdr["Mo"]) });
+                    }
+                }
+
                 return Json(JsonConvert.SerializeObject(new
                 {
                     success = true,
@@ -283,7 +305,8 @@ namespace VAS.Areas.VAS.Controllers
                     totalPOCount = overallPOCount,
                     fromLabel = fromLabel,
                     toLabel = toLabel,
-                    monthCount = totalMonthsSpan
+                    monthCount = totalMonthsSpan,
+                    availableMonths = availableMonths
                 }), JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -324,7 +347,7 @@ namespace VAS.Areas.VAS.Controllers
                 string orderAccessSql = @"
                     SELECT o.C_Order_ID, o.DocumentNo, o.DateOrdered, o.DocStatus,
                            o.C_BPartner_ID, o.M_Warehouse_ID, o.SalesRep_ID,
-                           o.C_Currency_ID, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID
+                           o.C_Currency_ID, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID, o.TotalLines
                     FROM C_Order o
                     WHERE o.AD_Client_ID = " + clientId + @"
                       AND o.IsActive = 'Y'
@@ -349,14 +372,18 @@ namespace VAS.Areas.VAS.Controllers
                         base_o.C_ConversionType_ID,
                         base_o.AD_Client_ID,
                         base_o.AD_Org_ID,
-                        SUM(COALESCE(ol.LineNetAmt, 0)) AS LineNetTotal,
-                        SUM(COALESCE(ol.QtyOrdered, 0)) AS TotalQtyOrdered,
-                        SUM(COALESCE(ol.QtyDelivered, 0)) AS TotalQtyDelivered,
+                        MAX(base_o.TotalLines) AS LineNetTotal, -- Sub total (excl. taxes) per specification
+                        -- Qty pending (ordered/delivered) counts ITEM type products only;
+                        -- charges and other non-item lines are excluded per specification.
+                        SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyOrdered, 0) ELSE 0 END) AS TotalQtyOrdered,
+                        SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyDelivered, 0) ELSE 0 END) AS TotalQtyDelivered,
                         COUNT(ol.C_OrderLine_ID) AS LineCount
                     FROM (" + orderAccessSql + @") base_o
                     INNER JOIN C_OrderLine ol
                         ON ol.C_Order_ID = base_o.C_Order_ID
                        AND ol.IsActive = 'Y'
+                    LEFT JOIN M_Product prod
+                        ON prod.M_Product_ID = ol.M_Product_ID
                     LEFT JOIN C_BPartner bp ON bp.C_BPartner_ID = base_o.C_BPartner_ID
                     LEFT JOIN M_Warehouse wh ON wh.M_Warehouse_ID = base_o.M_Warehouse_ID
                     LEFT JOIN AD_User usr ON usr.AD_User_ID = base_o.SalesRep_ID

@@ -68,6 +68,7 @@
         var $self = this;
         var $root = $('<div class="vas-203-posrch-root"></div>');
         var $shell, $box, $input, $spin, $kbd, $results;
+        var $detailModal = null;
         var searchTimer = null;
         var requestSeq = 0;
         var currentItems = [];
@@ -353,11 +354,16 @@
             }
         }
 
+        /* Clicking a result opens the PO Search DETAIL modal for that document,
+           per specification - not a navigation to the Purchase Order screen.
+           The screen itself stays reachable via the modal's "Open record". */
         function goToRecord(orderId, orderLineId) {
             if (!orderId) { return; }
             closeResults();
+            openPurchaseOrderDetail(orderId);
+        }
 
-            var navigated = false;
+        function openRecordInWindow(orderId) {
             try {
                 if ($self.listener && typeof $self.widgetFirevalueChanged === 'function') {
                     $self.widgetFirevalueChanged({
@@ -368,21 +374,161 @@
                         "ActionName": WINDOW_NAME,
                         "ActionType": "W"
                     });
-                    navigated = true;
+                    return;
                 }
             } catch (ex) {
                 console.warn("VAS_203_POGlobalSearchWidget: widgetFirevalueChanged failed", ex);
             }
 
-            if (!navigated) {
-                try {
-                    if (VIS && VIS.AEnv && typeof VIS.AEnv.zoom === 'function') {
-                        VIS.AEnv.zoom(259, orderId); // 259 is C_Order Table ID
-                    }
-                } catch (ex2) {
-                    console.warn("VAS_203_POGlobalSearchWidget: VIS.AEnv.zoom fallback failed", ex2);
+            try {
+                if (VIS && VIS.AEnv && typeof VIS.AEnv.zoom === 'function') {
+                    VIS.AEnv.zoom(259, orderId); // 259 is C_Order Table ID
                 }
+            } catch (ex2) {
+                console.warn("VAS_203_POGlobalSearchWidget: VIS.AEnv.zoom fallback failed", ex2);
             }
+        }
+
+        function closePurchaseOrderDetail() {
+            $(document).off('keydown.vas-203-dtl');
+            if ($detailModal) { $detailModal.remove(); $detailModal = null; }
+        }
+
+        function fmtMoney(value, symbol, iso, precision) {
+            var num = Number(value || 0);
+            var sym = symbol || '';
+            if (!sym && iso) { sym = iso; }
+            var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
+            return sym + ' ' + num.toLocaleString(window.navigator.language, { minimumFractionDigits: 0, maximumFractionDigits: prec });
+        }
+
+        function fmtQty(value) {
+            return Number(value || 0).toLocaleString(window.navigator.language);
+        }
+
+        function openPurchaseOrderDetail(orderId) {
+            if ($detailModal) { $detailModal.remove(); }
+
+            $detailModal = $(
+                '<div class="vas-203-dtl-overlay" role="dialog" aria-modal="true">' +
+                    '<div class="vas-203-dtl-card">' +
+                        '<div class="vas-203-dtl-head">' +
+                            '<div class="vas-203-dtl-headtxt">' +
+                                '<h3 class="vas-203-dtl-title">' + escapeHtml(lbl('VAS_Loading', 'Loading...')) + '</h3>' +
+                                '<div class="vas-203-dtl-sub"></div>' +
+                            '</div>' +
+                            '<button type="button" class="vas-203-dtl-close" aria-label="' + escapeHtml(lbl('VAS_Close', 'Close')) + '">&times;</button>' +
+                        '</div>' +
+                        '<div class="vas-203-dtl-body">' +
+                            '<div class="vas-203-dtl-msg">' + escapeHtml(lbl('VAS_Loading', 'Loading...')) + '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>'
+            );
+
+            $detailModal.find('.vas-203-dtl-close').on('click', closePurchaseOrderDetail);
+            $detailModal.on('click', function (e) {
+                if (e.target === this) { closePurchaseOrderDetail(); }
+            });
+            $(document).on('keydown.vas-203-dtl', function (e) {
+                if (e.key === 'Escape' || e.keyCode === 27) { closePurchaseOrderDetail(); }
+            });
+
+            $('body').append($detailModal);
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_203_POGlobalSearchWidget/GetPurchaseOrderDetail',
+                type: 'GET',
+                data: { orderId: orderId },
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    var payload = data && data.data ? data.data : data;
+                    if (!payload || payload.error || !payload.header) {
+                        $detailModal.find('.vas-203-dtl-body').html(
+                            '<div class="vas-203-dtl-msg">' + escapeHtml(lbl('VAS_CouldntLoad', "Couldn't load")) + '</div>');
+                        return;
+                    }
+                    renderPurchaseOrderDetail(payload.header, payload.lines || []);
+                },
+                error: function () {
+                    if ($detailModal) {
+                        $detailModal.find('.vas-203-dtl-body').html(
+                            '<div class="vas-203-dtl-msg">' + escapeHtml(lbl('VAS_CouldntLoad', "Couldn't load")) + '</div>');
+                    }
+                }
+            });
+        }
+
+        function renderPurchaseOrderDetail(header, lines) {
+            var title = header.documentNo || (lbl('VAS_PONo', 'PO No') + ' #' + header.orderId);
+            $detailModal.find('.vas-203-dtl-title').text(title);
+            $detailModal.find('.vas-203-dtl-title').attr('title', title);
+            $detailModal.find('.vas-203-dtl-sub').text(
+                (header.vendorName || '—') + ' · ' + (header.orderDateDisplay || '—') + ' · ' + (header.docStatusLabel || ''));
+
+            var totalOrdered = 0, totalPending = 0, totalAmount = 0;
+            var k, ln;
+            for (k = 0; k < lines.length; k++) {
+                ln = lines[k];
+                totalOrdered += Number(ln.qtyOrdered || 0);
+                totalPending += Number(ln.qtyPending || 0);
+                totalAmount += Number(ln.lineNetAmt || 0);
+            }
+
+            var amtFmt = fmtMoney(totalAmount, header.currencySymbol, header.currencyIso, header.stdPrecision);
+
+            var html = '<div class="vas-203-dtl-summary">' +
+                '<div class="vas-203-dtl-cell"><span class="vas-203-dtl-lbl">' + escapeHtml(lbl('VAS_Vendor', 'Vendor')) + '</span><span class="vas-203-dtl-val">' + escapeHtml(header.vendorName || '—') + '</span></div>' +
+                '<div class="vas-203-dtl-cell"><span class="vas-203-dtl-lbl">' + escapeHtml(lbl('VAS_Warehouse', 'Warehouse')) + '</span><span class="vas-203-dtl-val">' + escapeHtml(header.warehouseName || '—') + '</span></div>' +
+                '<div class="vas-203-dtl-cell"><span class="vas-203-dtl-lbl">' + escapeHtml(lbl('VAS_Status', 'Status')) + '</span><span class="vas-203-dtl-val">' + escapeHtml(header.docStatusLabel || '—') + '</span></div>' +
+                '<div class="vas-203-dtl-cell"><span class="vas-203-dtl-lbl">' + escapeHtml(lbl('VAS_TotalAmount', 'Amount')) + '</span><span class="vas-203-dtl-val">' + escapeHtml(amtFmt) + '</span></div>' +
+                '<div class="vas-203-dtl-cell"><span class="vas-203-dtl-lbl">' + escapeHtml(lbl('VAS_QtyOrdered', 'Qty ordered')) + '</span><span class="vas-203-dtl-val">' + escapeHtml(fmtQty(totalOrdered)) + '</span></div>' +
+                '<div class="vas-203-dtl-cell"><span class="vas-203-dtl-lbl">' + escapeHtml(lbl('VAS_QtyPending', 'Qty pending')) + '</span><span class="vas-203-dtl-val">' + escapeHtml(fmtQty(totalPending)) + '</span></div>' +
+                '</div>';
+
+            html += '<div class="vas-203-dtl-sect">' + escapeHtml(lbl('VAS_PurchaseOrderLines', 'Purchase order lines')) + ' (' + lines.length + ')</div>';
+
+            if (lines.length === 0) {
+                html += '<div class="vas-203-dtl-msg">' + escapeHtml(lbl('VAS_203_NoLines', 'No order lines.')) + '</div>';
+            } else {
+                html += '<div class="vas-203-dtl-tblwrap"><table class="vas-203-dtl-table"><thead><tr>' +
+                    '<th>#</th>' +
+                    '<th>' + escapeHtml(lbl('VAS_Product', 'Product')) + '</th>' +
+                    '<th>' + escapeHtml(lbl('VAS_Attribute', 'Attribute')) + '</th>' +
+                    '<th>' + escapeHtml(lbl('VAS_UoM', 'UoM')) + '</th>' +
+                    '<th class="r">' + escapeHtml(lbl('VAS_Ordered', 'Ordered')) + '</th>' +
+                    '<th class="r">' + escapeHtml(lbl('VAS_Received', 'Received')) + '</th>' +
+                    '<th class="r">' + escapeHtml(lbl('VAS_Pending', 'Pending')) + '</th>' +
+                    '<th class="r">' + escapeHtml(lbl('VAS_Amount', 'Amount')) + '</th>' +
+                    '</tr></thead><tbody>';
+                for (k = 0; k < lines.length; k++) {
+                    ln = lines[k];
+                    html += '<tr>' +
+                        '<td>' + escapeHtml(String(ln.lineNo || (k + 1))) + '</td>' +
+                        '<td title="' + escapeHtml(ln.productName || '') + '">' + escapeHtml(ln.productName || '—') + '</td>' +
+                        '<td>' + escapeHtml(ln.attribute || '—') + '</td>' +
+                        '<td>' + escapeHtml(ln.uom || '—') + '</td>' +
+                        '<td class="r">' + escapeHtml(fmtQty(ln.qtyOrdered)) + '</td>' +
+                        '<td class="r">' + escapeHtml(fmtQty(ln.qtyDelivered)) + '</td>' +
+                        '<td class="r">' + escapeHtml(fmtQty(ln.qtyPending)) + '</td>' +
+                        '<td class="r" title="' + escapeHtml(fmtMoney(ln.lineNetAmt, header.currencySymbol, header.currencyIso, header.stdPrecision)) + '">' + escapeHtml(fmtMoney(ln.lineNetAmt, header.currencySymbol, header.currencyIso, header.stdPrecision)) + '</td>' +
+                        '</tr>';
+                }
+                html += '</tbody></table></div>';
+            }
+
+            html += '<div class="vas-203-dtl-foot">' +
+                '<button type="button" class="vas-203-dtl-openbtn">' + escapeHtml(lbl('VAS_OpenRecord', 'Open record')) + '</button>' +
+                '<button type="button" class="vas-203-dtl-closebtn">' + escapeHtml(lbl('VAS_Close', 'Close')) + '</button>' +
+                '</div>';
+
+            $detailModal.find('.vas-203-dtl-body').html(html);
+            $detailModal.find('.vas-203-dtl-openbtn').on('click', function () {
+                closePurchaseOrderDetail();
+                openRecordInWindow(header.orderId || orderId);
+            });
+            $detailModal.find('.vas-203-dtl-closebtn').on('click', closePurchaseOrderDetail);
         }
 
         this.refreshWidget = function () {

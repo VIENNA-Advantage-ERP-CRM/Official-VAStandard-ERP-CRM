@@ -877,16 +877,20 @@
                     var docStatusInfo = getDocStatusInfo(hdr.DocStatus);
                     var delivStatusInfo = getDeliveryStatusInfo(deliveryStatus);
 
-                    var headerStats = mstatsHtml([
-                        { l: lbl('VAS_Vendor', 'Vendor'), v: vendor },
-                        { l: lbl('VAS_PODate', 'PO date'), v: dateDisplay },
+                    /* Summary cards: Vendor, PO date and Document status were removed per
+                       specification - all three already sit in the modal title bar. A
+                       Requisition card appears ONLY when the PO was created from one. */
+                    var statItems = [
                         { l: lbl('VAS_ExpectedOn', 'Expected on'), v: expDateDisplay },
                         { l: lbl('VAS_POValue', 'PO value'), v: formattedVal },
                         { l: lbl('VAS_Warehouse', 'Warehouse'), v: whName },
                         { l: lbl('VAS_CreatedBy', 'Created by'), v: createdBy || '—' },
-                        { l: lbl('VAS_DocumentStatus', 'Document status'), v: docStatusInfo.text },
                         { l: lbl('VAS_DeliveryStatus', 'Delivery status'), v: delivStatusInfo.text }
-                    ]);
+                    ];
+                    if (hdr.FirstRequisition) {
+                        statItems.push({ l: lbl('VAS_Requisition', 'Requisition'), v: hdr.FirstRequisition });
+                    }
+                    var headerStats = mstatsHtml(statItems);
 
                     // Load PO lines for the record modal table
                     $.ajax({

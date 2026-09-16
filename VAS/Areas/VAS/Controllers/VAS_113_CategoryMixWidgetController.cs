@@ -84,8 +84,12 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Counts active, non-discontinued items per active category, ordered by
-        /// count descending. The total is summed in C# for the share %.
+        /// Counts items per active category, ordered by count descending. A
+        /// category counts EVERY product that belongs to it (IsActive='Y'),
+        /// including discontinued ones - the previous "not discontinued"
+        /// filter made the bar count disagree with the product grid for the
+        /// category (a 4-product category read as 2). The total is summed in
+        /// C# for the share %.
         /// </summary>
         private CategoryMixResult GetCategoryMixData(Ctx ctx)
         {
@@ -94,8 +98,8 @@ namespace VAS.Controllers
 
             // MRole on the main table (Category); GROUP BY / ORDER BY appended
             // after the access predicate (ORA-00907 lesson). The item join
-            // predicate lives in the ON clause so categories with zero active
-            // items still appear.
+            // predicate lives in the ON clause so categories with zero
+            // products still appear.
             string sql = @"
                 SELECT Category.M_Product_Category_ID,
                        Category.Name AS Category_Name,
@@ -103,7 +107,6 @@ namespace VAS.Controllers
                 FROM M_Product_Category Category
                 LEFT OUTER JOIN M_Product Prod ON (Prod.M_Product_Category_ID=Category.M_Product_Category_ID
                     AND Prod.IsActive='Y'
-                    AND (Prod.Discontinued IS NULL OR Prod.Discontinued='N')
                     AND Prod.AD_Client_ID=@Prod_Client_ID
                     AND Prod.AD_Org_ID IN (0,COALESCE(NULLIF(@Prod_Org_ID,0),Prod.AD_Org_ID)))
                 WHERE Category.IsActive='Y'
@@ -151,12 +154,15 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Loads the active, non-discontinued items of one category with their
-        /// summed on-hand quantity and schema-currency stock value. Stock value
-        /// values each storage row with the best available cost (org/warehouse/
-        /// ASI/product fallback, same as VAS_079). MRole on each physical block;
-        /// the final SELECT reads only CTE aliases. Plain ASCII literals for
-        /// Oracle + PostgreSQL.
+        /// Loads the items of one category with their summed on-hand quantity
+        /// and schema-currency stock value. Per the Category Mix spec the
+        /// drill-in lists EVERY product belonging to the selected category
+        /// (IsActive='Y'), including discontinued ones - the previous filter
+        /// silently hid products and the modal disagreed with the category
+        /// count. Stock value values each storage row with the best available
+        /// cost (org/warehouse/ASI/product fallback, same as VAS_079). MRole
+        /// on each physical block; the final SELECT reads only CTE aliases.
+        /// Plain ASCII literals for Oracle + PostgreSQL.
         /// </summary>
         private CategoryItemsResult GetCategoryItemsData(Ctx ctx, int categoryId)
         {
@@ -194,7 +200,6 @@ namespace VAS.Controllers
                        Product.ProductType AS Product_Type
                 FROM M_Product Product
                 WHERE Product.IsActive='Y'
-                  AND (Product.Discontinued IS NULL OR Product.Discontinued='N')
                   AND Product.M_Product_Category_ID=@Category_ID
                   AND Product.AD_Client_ID=@Product_Client_ID
                   AND Product.AD_Org_ID IN (0,COALESCE(NULLIF(@Product_Org_ID,0),Product.AD_Org_ID))";

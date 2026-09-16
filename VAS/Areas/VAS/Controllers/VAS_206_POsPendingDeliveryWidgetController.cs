@@ -94,6 +94,28 @@ namespace VIS.Controllers
                 // Step 2: Query Operational Completed POs with Pending Delivery Lines
                 DateTime today = DateTime.Today;
 
+                // Factor converting a line quantity from the line's entered UOM to the product's
+                // own (selected) UOM, so ordered/pending quantities read in the UOM the product is
+                // defined with (e.g. millilitres). Same rate convention as VAS_186/VAS_188:
+                // C_UOM_Conversion stores C_UOM_ID = product UOM, C_UOM_To_ID = entered UOM, and
+                // qty(product UOM) = qty(entered) * DivideRate. Aliases here: line = "ol", product = "prod".
+
+                string uomFactor = @"
+                          COALESCE(
+                            CASE WHEN COALESCE(ol.C_UOM_ID, 0) = COALESCE(prod.C_UOM_ID, 0) THEN 1 END,
+                            (SELECT conv.DivideRate
+                             FROM (SELECT conv0.DivideRate
+                                   FROM C_UOM_Conversion conv0
+                                   WHERE conv0.IsActive = 'Y'
+                                     AND conv0.M_Product_ID = prod.M_Product_ID
+                                     AND conv0.C_UOM_ID = prod.C_UOM_ID
+                                     AND conv0.C_UOM_To_ID = ol.C_UOM_ID
+                                     AND COALESCE(conv0.DivideRate, 0) <> 0
+                                   ORDER BY conv0.AD_Client_ID DESC, conv0.AD_Org_ID DESC
+                                  ) conv
+                             WHERE ROWNUM = 1),
+                            1)
+                ";
                 string sql = @"
                     SELECT
                         o.C_Order_ID AS purchase_order_id,
@@ -107,18 +129,18 @@ namespace VIS.Controllers
                         w.Name AS warehouse_name,
                         c.CurSymbol AS doc_cur_symbol,
                         c.ISO_Code AS doc_cur_iso,
-                        SUM(COALESCE(ol.QtyOrdered, 0)) AS ordered_qty,
-                        SUM(COALESCE(ol.QtyDelivered, 0)) AS delivered_qty,
+                        SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyOrdered, 0) * " + uomFactor + @" ELSE 0 END) AS ordered_qty,
+                        SUM(CASE WHEN prod.ProductType = 'I' THEN COALESCE(ol.QtyDelivered, 0) * " + uomFactor + @" ELSE 0 END) AS delivered_qty,
                         SUM(
                             CASE
-                                WHEN COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
-                                THEN COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)
+                                WHEN prod.ProductType = 'I' AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
+                                THEN (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) * " + uomFactor + @"
                                 ELSE 0
                             END
                         ) AS pending_qty,
                         SUM(
                             CASE
-                                WHEN COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
+                                WHEN prod.ProductType = 'I' AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
                                 THEN (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) * COALESCE(ol.PriceActual, 0)
                                 ELSE 0
                             END
@@ -129,6 +151,8 @@ namespace VIS.Controllers
                     INNER JOIN C_OrderLine ol
                         ON ol.C_Order_ID = o.C_Order_ID
                        AND ol.IsActive = 'Y'
+                    LEFT JOIN M_Product prod
+                        ON prod.M_Product_ID = ol.M_Product_ID
                     INNER JOIN C_BPartner bp
                         ON bp.C_BPartner_ID = o.C_BPartner_ID
                     LEFT JOIN M_Warehouse w

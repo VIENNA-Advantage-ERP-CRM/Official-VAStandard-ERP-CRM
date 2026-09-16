@@ -287,7 +287,7 @@
                         invoiceTag(item.MatchedInvoiceNo) +
                     '</div>' +
                     '<div class="vas-dssrch-meta">' +
-                        '<div class="vas-dssrch-amount">' + formatAmount(item.Amount) + '</div>' +
+                        '<div class="vas-dssrch-amount">' + formatQuantities(item) + '</div>' +
                         '<div class="vas-dssrch-date">' + dsEsc(formatDate(item.DocDate)) + '</div>' +
                     '</div>' +
                 '</div>'
@@ -346,6 +346,16 @@
             var prec = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
             var formatted = n.toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
             return (curSymbol ? curSymbol + ' ' : '') + formatted;
+        }
+        // Received quantity per UOM as entered on the receipt, e.g. "2,000 ml" or "3,000 ml · 21 Ea"
+        function formatQuantities(item) {
+            var list = item.Quantities || [];
+            if (!list.length) { return formatAmount(item.Amount); }
+            return list.map(function (q) {
+                var prec = (typeof q.Precision === 'number') ? q.Precision : 0;
+                var n = Number(q.Qty || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: 0, maximumFractionDigits: prec });
+                return dsEsc(n + (q.Uom ? ' ' + q.Uom : ''));
+            }).join(' · ');
         }
         function formatDate(iso) {
             if (!iso) { return ''; }

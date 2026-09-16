@@ -76,7 +76,7 @@ namespace VAS.Areas.VAS.Controllers
                         o.AD_Client_ID,
                         o.AD_Org_ID,
                         COALESCE(pc.M_Product_Category_ID, 0) AS M_Product_Category_ID,
-                        COALESCE(pc.Name, 'Uncategorised') AS CategoryName,
+                        pc.Name AS CategoryName,
                         SUM(COALESCE(ol.LineNetAmt, 0)) AS CategoryLineNetAmt
                     FROM C_Order o
                     INNER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID AND ol.IsActive = 'Y')
@@ -109,7 +109,10 @@ namespace VAS.Areas.VAS.Controllers
                     while (dr != null && dr.Read())
                     {
                         int catId = Util.GetValueOfInt(dr["M_Product_Category_ID"]);
+                        // The Uncategorised fallback lives here in C#: a SQL COALESCE against a plain
+                        // literal mixes the NVARCHAR2 Name column and dies with ORA-12704 on Oracle.
                         string catName = Util.GetValueOfString(dr["CategoryName"]);
+                        if (string.IsNullOrEmpty(catName)) { catName = "Uncategorised"; }
                         int orderId = Util.GetValueOfInt(dr["C_Order_ID"]);
                         int vendorId = Util.GetValueOfInt(dr["C_BPartner_ID"]);
                         DateTime orderDate = Convert.ToDateTime(dr["DateOrdered"]);

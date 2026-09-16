@@ -106,7 +106,7 @@ namespace VAS.Areas.VAS.Controllers
             // outside MRole scope and their text added to the searchable string, so
             // the user can search by supplier name, PO no., doc type or warehouse.
             string core = @"SELECT b.M_InOut_ID AS RecordId, b.DocumentNo AS DocumentNo, bp.Name AS Title,
-                       COALESCE((SELECT SUM(iol.MovementQty) FROM M_InOutLine iol WHERE iol.M_InOut_ID = b.M_InOut_ID AND iol.IsActive = 'Y'), 0) AS Amount,
+                       COALESCE((SELECT SUM(COALESCE(iol.QtyEntered, iol.MovementQty)) FROM M_InOutLine iol WHERE iol.M_InOut_ID = b.M_InOut_ID AND iol.IsActive = 'Y'), 0) AS Amount,
                        b.MovementDate AS DocDate, b.DocStatus AS DocStatus,
                        CASE WHEN LOWER(b.DocumentNo) = @QExact THEN 4
                             WHEN LOWER(b.DocumentNo) LIKE @QStart THEN 3
@@ -158,6 +158,44 @@ namespace VAS.Areas.VAS.Controllers
                     });
                 }
             }
+
+            // Received quantity per unit of measure as entered on the receipt lines (e.g. 2,000 ml) instead of
+            // one sum of product-base quantities; a receipt holding several UOMs lists each of them.
+            if (result.Items.Count > 0)
+            {
+                Dictionary<int, SearchHit> hitsById = new Dictionary<int, SearchHit>();
+                foreach (SearchHit hit in result.Items)
+                {
+                    hit.Quantities = new List<QtyByUom>();
+                    hitsById[hit.RecordId] = hit;
+                }
+
+                // Record ids are integers read from the database - safe to inline.
+                string qtySql = @"SELECT iol.M_InOut_ID AS InOutId, COALESCE(u.UOMSymbol, u.Name) AS Uom, u.StdPrecision AS StdPrecision,
+                           SUM(COALESCE(iol.QtyEntered, iol.MovementQty)) AS Qty
+                      FROM M_InOutLine iol
+                      LEFT OUTER JOIN C_UOM u ON (u.C_UOM_ID = iol.C_UOM_ID)
+                     WHERE iol.IsActive = 'Y' AND iol.M_InOut_ID IN (" + string.Join(",", hitsById.Keys) + @")
+                     GROUP BY iol.M_InOut_ID, iol.C_UOM_ID, u.UOMSymbol, u.Name, u.StdPrecision
+                     ORDER BY iol.M_InOut_ID, Uom";
+                DataSet qtyDs = DB.ExecuteDataset(qtySql, null, null);
+                if (qtyDs != null && qtyDs.Tables.Count > 0)
+                {
+                    foreach (DataRow row in qtyDs.Tables[0].Rows)
+                    {
+                        SearchHit hit;
+                        if (hitsById.TryGetValue(Util.GetValueOfInt(row["InOutId"]), out hit))
+                        {
+                            hit.Quantities.Add(new QtyByUom
+                            {
+                                Qty       = Util.GetValueOfDecimal(row["Qty"]),
+                                Uom       = Util.GetValueOfString(row["Uom"]),
+                                Precision = Util.GetValueOfInt(row["StdPrecision"])
+                            });
+                        }
+                    }
+                }
+            }
             return result;
         }
 
@@ -198,6 +236,14 @@ namespace VAS.Areas.VAS.Controllers
             public decimal Amount     { get; set; }
             public string  DocDate    { get; set; }
             public string  DocStatus  { get; set; }
+            public List<QtyByUom> Quantities { get; set; }
+        }
+
+        public class QtyByUom
+        {
+            public decimal Qty       { get; set; }
+            public string  Uom       { get; set; }
+            public int     Precision { get; set; }
         }
     }
 }

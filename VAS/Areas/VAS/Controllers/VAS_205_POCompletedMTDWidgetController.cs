@@ -123,13 +123,13 @@ namespace VIS.Controllers
                         ON w.M_Warehouse_ID = o.M_Warehouse_ID
                     LEFT JOIN AD_User rep
                         ON rep.AD_User_ID = o.SalesRep_ID
-                    WHERE o.AD_Client_ID = @P_AD_Client_ID@
+                    WHERE o.AD_Client_ID = @P_AD_Client_ID
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
                       AND o.DocStatus IN ('CO', 'CL')
-                      AND o.OrderCompletionDatetime >= @P_MTD_START@
-                      AND o.OrderCompletionDatetime < @P_MTD_END_EXCLUSIVE@
+                      AND o.OrderCompletionDatetime >= @P_MTD_START
+                      AND o.OrderCompletionDatetime < @P_MTD_END_EXCLUSIVE
                     GROUP BY
                         o.C_Order_ID,
                         o.DocumentNo,

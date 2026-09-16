@@ -254,7 +254,7 @@ namespace VAS.Controllers
                         COALESCE(bp.Name, N'—') AS VendorName,
                         w.Name          AS WarehouseName,
                         COALESCE(usr.Name, N'—') AS SalesRepName,
-                        o.GrandTotal    AS OrderTotal,
+                        COALESCE(o.TotalLines, 0) AS OrderTotal, -- Sub total (excl. taxes) per specification
                         o.DocStatus     AS DocStatus,
                         COALESCE(c.CurSymbol, c.ISO_Code, N'') AS CurrencySymbol,
                         COALESCE(lines.QtyOrdered, 0)   AS QtyOrdered,
@@ -268,10 +268,14 @@ namespace VAS.Controllers
                     LEFT JOIN (
                         SELECT
                             ol.C_Order_ID,
-                            SUM(COALESCE(ol.QtyOrdered, 0))   AS QtyOrdered,
-                            SUM(COALESCE(ol.QtyDelivered, 0)) AS QtyDelivered,
+                            -- Quantity pending (ordered/delivered) counts ITEM type
+                            -- products only; charges and other non-item lines are
+                            -- excluded from the per-source specification.
+                            SUM(CASE WHEN Prod.ProductType = 'I' THEN COALESCE(ol.QtyOrdered, 0) ELSE 0 END)   AS QtyOrdered,
+                            SUM(CASE WHEN Prod.ProductType = 'I' THEN COALESCE(ol.QtyDelivered, 0) ELSE 0 END) AS QtyDelivered,
                             COUNT(ol.C_OrderLine_ID)          AS LineCount
                         FROM C_OrderLine ol
+                        LEFT JOIN M_Product Prod ON (Prod.M_Product_ID = ol.M_Product_ID)
                         WHERE ol.IsActive = 'Y'
                         GROUP BY ol.C_Order_ID
                     ) lines ON (lines.C_Order_ID = o.C_Order_ID)
@@ -419,7 +423,7 @@ namespace VAS.Controllers
                         o.DateOrdered   AS DateOrdered,
                         o.DatePromised  AS DatePromised,
                         o.Created       AS CreatedOn,
-                        o.GrandTotal    AS GrandTotal,
+                        COALESCE(o.TotalLines, 0) AS SubTotal, -- Sub total (excl. taxes) per specification
                         o.DocStatus     AS DocStatus,
                         COALESCE(bp.Name, N'—') AS VendorName,
                         w.Name          AS WarehouseName,
@@ -469,7 +473,7 @@ namespace VAS.Controllers
                         dateOrdered    = Util.GetValueOfDateTime(dr["DateOrdered"]),
                         datePromised   = Util.GetValueOfDateTime(dr["DatePromised"]),
                         createdOn      = Util.GetValueOfDateTime(dr["CreatedOn"]),
-                        grandTotal     = Util.GetValueOfDecimal(dr["GrandTotal"]),
+                        subTotal       = Util.GetValueOfDecimal(dr["SubTotal"]),
                         vendorName     = Util.GetValueOfString(dr["VendorName"]),
                         warehouseName  = Util.GetValueOfString(dr["WarehouseName"]),
                         createdByName  = Util.GetValueOfString(dr["CreatedByName"]),
@@ -489,6 +493,7 @@ namespace VAS.Controllers
                         COALESCE(p.Name, N'Standard Product')  AS ProductName,
                         COALESCE(asi.Description, N'Standard') AS AttributeDesc,
                         COALESCE(uom.UOMSymbol, uom.Name, N'') AS UomName,
+                        p.ProductType AS Product_Type,
                         COALESCE(ol.QtyOrdered, 0)   AS QtyOrdered,
                         COALESCE(ol.QtyDelivered, 0) AS QtyDelivered,
                         COALESCE(ol.PriceActual, 0)  AS PriceActual,
@@ -507,8 +512,14 @@ namespace VAS.Controllers
                 {
                     decimal ord = Util.GetValueOfDecimal(dr["QtyOrdered"]);
                     decimal del = Util.GetValueOfDecimal(dr["QtyDelivered"]);
-                    totalQtyOrdered += ord;
-                    totalQtyDelivered += del;
+                    // The order totals / quantity pending follow the same rule as
+                    // the drill-down: ITEM type products only, charges excluded.
+                    bool isItem = Util.GetValueOfString(dr["Product_Type"]) == "I";
+                    if (isItem)
+                    {
+                        totalQtyOrdered += ord;
+                        totalQtyDelivered += del;
+                    }
 
                     string lineStatus = "Pending";
                     string lineChip   = "chip-neutral";

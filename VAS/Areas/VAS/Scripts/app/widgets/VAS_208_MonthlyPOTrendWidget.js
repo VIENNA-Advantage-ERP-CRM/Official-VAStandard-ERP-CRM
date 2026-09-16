@@ -130,6 +130,9 @@
 
         var trendSeries = [];
         var currencyInfo = { symbol: '₹', iso: 'INR', precision: 2 };
+        // Months that actually hold PO data, as [{ y, m }] from the server.
+        // Null until the first load: the pickers then fall back to the calendar range.
+        var availableMonths = null;
 
         // Modal engine state
         var $mask = null;
@@ -187,10 +190,53 @@
 
         function populateSelectOptions($sel, selectedVal) {
             var html = '';
-            for (var i = minIdx; i <= maxIdx; i++) {
-                html += '<option value="' + i + '"' + (i === selectedVal ? ' selected' : '') + '>' + escapeHtml(idxToLabel(i)) + '</option>';
+            var values = [];
+            if (availableMonths && availableMonths.length > 0) {
+                for (var a = 0; a < availableMonths.length; a++) {
+                    values.push(availableMonths[a].y * 12 + (availableMonths[a].m - 1));
+                }
+                values.sort(function (x, y2) { return x - y2; });
+            } else {
+                for (var i = minIdx; i <= maxIdx; i++) {
+                    values.push(i);
+                }
+            }
+            for (var v = 0; v < values.length; v++) {
+                html += '<option value="' + values[v] + '"' + (values[v] === selectedVal ? ' selected' : '') + '>' + escapeHtml(idxToLabel(values[v])) + '</option>';
             }
             $sel.html(html);
+            return values;
+        }
+
+        /* Re-fill both pickers from the months that hold PO data and keep the
+           current window sensible: a selection that fell on an empty month moves
+           to the nearest month that has one. */
+        function refreshFilterOptions() {
+            var fromValues = populateSelectOptions($fromSel, fromIdx);
+            var toValues = populateSelectOptions($toSel, toIdx);
+
+            if (fromValues.length > 0 && fromValues.indexOf(fromIdx) < 0) {
+                fromIdx = nearestValue(fromValues, fromIdx);
+                $fromSel.val(String(fromIdx));
+            }
+            if (toValues.length > 0 && toValues.indexOf(toIdx) < 0) {
+                toIdx = nearestValue(toValues, toIdx);
+                $toSel.val(String(toIdx));
+            }
+            if (fromIdx > toIdx) {
+                fromIdx = toIdx;
+                $fromSel.val(String(fromIdx));
+            }
+        }
+
+        function nearestValue(values, target) {
+            var best = values[0];
+            for (var i = 1; i < values.length; i++) {
+                if (Math.abs(values[i] - target) < Math.abs(best - target)) {
+                    best = values[i];
+                }
+            }
+            return best;
         }
 
         function buildWidget() {
@@ -301,6 +347,13 @@
                         trendSeries = data.series;
                         if (data.currency) {
                             currencyInfo = data.currency;
+                        }
+                        // Restrict the From/To pickers to months that actually
+                        // hold PO data (server reports them; falls back to the
+                        // calendar range when absent).
+                        if (data.availableMonths && data.availableMonths.length > 0) {
+                            availableMonths = data.availableMonths;
+                            refreshFilterOptions();
                         }
                     } else {
                         trendSeries = [];

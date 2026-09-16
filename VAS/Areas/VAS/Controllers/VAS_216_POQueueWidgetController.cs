@@ -125,7 +125,7 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
-                      AND o.DocStatus NOT IN ('CO', 'CL', 'VO', 'RE')
+                      AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL') -- queue includes Completed and Closed per specification; only Voided/Reversed stay out
                       AND o.DatePromised >= @MonthStart
                       AND o.DatePromised < @MonthEndExclusive";
 
@@ -195,7 +195,7 @@ namespace VIS.Controllers
                       AND o.IsActive = 'Y'
                       AND o.IsSOTrx = 'N'
                       AND COALESCE(o.IsReturnTrx, 'N') = 'N'
-                      AND o.DocStatus NOT IN ('CO', 'CL', 'VO', 'RE')
+                      AND o.DocStatus IN ('DR', 'IP', 'CO', 'CL') -- queue includes Completed and Closed per specification; only Voided/Reversed stay out
                       AND o.DatePromised >= @MonthStart
                       AND o.DatePromised < @MonthEndExclusive
                     ORDER BY o.DatePromised ASC, o.DocumentNo ASC
@@ -378,7 +378,7 @@ namespace VIS.Controllers
                         o.DateOrdered AS order_date,
                         o.DatePromised AS promised_date,
                         o.DocStatus AS document_status,
-                        COALESCE(o.GrandTotal, 0) AS po_value,
+                        COALESCE(o.TotalLines, 0) AS po_value, -- Sub total (excl. taxes) per specification
                         o.C_Currency_ID AS currency_id,
                         c.CurSymbol AS doc_cur_symbol,
                         c.ISO_Code AS doc_cur_iso,
@@ -386,6 +386,7 @@ namespace VIS.Controllers
                         bp.Name AS vendor_name,
                         w.Name AS warehouse_name,
                         rep.Name AS representative_name,
+                        rq.first_requisition_number,
                         o.Created AS created_date,
                         created_by.Name AS created_by_name,
                         o.POReference AS order_reference,
@@ -399,6 +400,21 @@ namespace VIS.Controllers
                     LEFT JOIN AD_User rep ON rep.AD_User_ID = o.SalesRep_ID
                     LEFT JOIN AD_User created_by ON created_by.AD_User_ID = o.CreatedBy
                     LEFT JOIN C_PaymentTerm pt ON pt.C_PaymentTerm_ID = o.C_PaymentTerm_ID
+                    LEFT JOIN (
+                        SELECT
+                            ol.C_Order_ID,
+                            MIN(r.DocumentNo) AS first_requisition_number
+                        FROM C_OrderLine ol
+                        INNER JOIN M_RequisitionLine rl
+                            ON rl.M_RequisitionLine_ID = ol.M_RequisitionLine_ID
+                        INNER JOIN M_Requisition r
+                            ON r.M_Requisition_ID = rl.M_Requisition_ID
+                        WHERE ol.IsActive = 'Y'
+                          AND rl.IsActive = 'Y'
+                          AND r.IsActive = 'Y'
+                        GROUP BY ol.C_Order_ID
+                    ) rq
+                        ON rq.C_Order_ID = o.C_Order_ID
                     WHERE o.C_Order_ID = @C_Order_ID
                       AND o.IsActive = 'Y'
                       AND o.AD_Client_ID = " + ctx.GetAD_Client_ID();
@@ -429,6 +445,7 @@ namespace VIS.Controllers
                             VendorName = Util.GetValueOfString(dr["vendor_name"]),
                             WarehouseName = Util.GetValueOfString(dr["warehouse_name"]),
                             RepresentativeName = Util.GetValueOfString(dr["representative_name"]),
+                            FirstRequisition = Util.GetValueOfString(dr["first_requisition_number"]),
                             CreatedDate = Util.GetValueOfDateTime(dr["created_date"]),
                             CreatedByName = Util.GetValueOfString(dr["created_by_name"]),
                             OrderReference = Util.GetValueOfString(dr["order_reference"]),
@@ -451,11 +468,13 @@ namespace VIS.Controllers
                 // Query summary lines delivery status for header
                 string delivSql = @"
                     SELECT
-                        SUM(COALESCE(QtyOrdered, 0)) AS total_ordered,
-                        SUM(COALESCE(QtyDelivered, 0)) AS total_delivered
-                    FROM C_OrderLine
-                    WHERE C_Order_ID = @C_Order_ID
-                      AND IsActive = 'Y'";
+                        SUM(COALESCE(ol.QtyOrdered, 0)) AS total_ordered,
+                        SUM(COALESCE(ol.QtyDelivered, 0)) AS total_delivered
+                    FROM C_OrderLine ol
+                    LEFT JOIN M_Product prod ON prod.M_Product_ID = ol.M_Product_ID
+                    WHERE ol.C_Order_ID = @C_Order_ID
+                      AND ol.IsActive = 'Y'
+                      AND prod.ProductType = 'I'";
 
                 decimal totalOrdered = 0;
                 decimal totalDelivered = 0;

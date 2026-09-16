@@ -484,6 +484,17 @@
     color: #5F7283;
 }
 
+/* Received-lines popup (QA sheet GRN #38/#42): Attribute (only when a line has one) and the
+   line's UOM beside the quantities. */
+.vas-rq-l-attr {
+    width: 9em;
+    max-width: 9em;
+}
+
+.vas-rq-l-uom {
+    width: 5.5em;
+}
+
 .vas-rq-l-item {
     min-width: 0;
 }
