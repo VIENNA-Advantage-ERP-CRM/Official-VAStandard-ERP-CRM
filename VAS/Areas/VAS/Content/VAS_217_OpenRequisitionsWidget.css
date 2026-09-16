@@ -686,6 +686,20 @@
 .vas-217-orw-fctl:disabled {
     background: #F5F7F9;
     color: #5F7283;
+    cursor: not-allowed;
+}
+
+.vas-217-orw-fctl.vas-217-orw-invalid,
+.vas-217-orw-rowin.vas-217-orw-invalid {
+    border-color: #A33F3F;
+}
+
+/* PO stage (Drafted / Completed) selector beside the Create PO button */
+.vas-217-orw-fctl.vas-217-orw-stage {
+    width: auto;
+    min-width: 7.5em;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 select.vas-217-orw-fctl {

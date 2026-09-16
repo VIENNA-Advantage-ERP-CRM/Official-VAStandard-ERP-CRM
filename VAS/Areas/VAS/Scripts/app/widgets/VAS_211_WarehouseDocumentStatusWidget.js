@@ -345,7 +345,8 @@
                 type: 'GET',
                 cache: false,
                 success: function (res) {
-                    var data = typeof res === 'string' ? JSON.parse(res) : res;
+                    var data = null;
+                    try { data = typeof res === 'string' ? JSON.parse(res) : res; } catch (e) { data = null; }
                     if (data && data.years && data.years.length > 0) {
                         $yearSelect.empty();
                         for (var y = 0; y < data.years.length; y++) {
@@ -627,7 +628,8 @@
                 cache: false,
                 data: { warehouseId: activeWarehouseId, month: selectedMonth, year: selectedYear },
                 success: function (res) {
-                    var data = typeof res === 'string' ? JSON.parse(res) : res;
+                    var data = null;
+                    try { data = typeof res === 'string' ? JSON.parse(res) : res; } catch (e) { data = null; }
                     if (data && !data.error) {
                         activeWarehouseOrders = data.orders || [];
                         $('#vas211_st_tot').text(formatNumber(data.totalDocuments));
@@ -823,13 +825,15 @@
                 cache: false,
                 data: { orderId: orderId },
                 success: function (res) {
-                    var data = typeof res === 'string' ? JSON.parse(res) : res;
+                    var data = null;
+                    try { data = typeof res === 'string' ? JSON.parse(res) : res; } catch (e) { data = null; }
                     if (data && !data.error) {
                         activeOrderHeader = data.header || fallbackPo;
                         activeOrderLines = data.lines || [];
                         $('#vas211_ln_cnt').text(formatNumber(data.totalLines));
                         if (activeOrderHeader) {
-                            $('#vas211_ln_val').text(formatAmount(activeOrderHeader.grandTotal, activeOrderHeader.currencySymbol));
+                            var hdrVal = (activeOrderHeader.subTotal != null) ? activeOrderHeader.subTotal : activeOrderHeader.grandTotal;
+                            $('#vas211_ln_val').text(formatAmount(hdrVal, activeOrderHeader.currencySymbol));
                         }
                         $('#vas211_ln_ord').text(formatNumber(data.totalQtyOrdered));
                         $('#vas211_ln_pnd').text(formatNumber(data.totalQtyPending));

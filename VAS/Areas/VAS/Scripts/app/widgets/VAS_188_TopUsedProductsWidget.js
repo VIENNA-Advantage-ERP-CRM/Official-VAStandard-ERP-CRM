@@ -295,6 +295,10 @@
 
             $body.html(rowsHtml);
 
+            // A single record keeps its natural height at the top of the body instead of
+            // stretching (flex: 1 1 0) into a vertically-centred full-height row.
+            $body.toggleClass('single-row', (endIndex - startIndex) === 1);
+
             if ($footHelper) {
                 $footHelper.text((startIndex + 1) + '–' + endIndex + ' of ' + productsData.length);
             }
@@ -309,6 +313,15 @@
             $(document).off("keydown.vas-tup-modal"); if ($modal) { $modal.remove(); }
 
             var monthFull = formatMonthName(selectedMonth) + ' ' + selectedYear;
+
+            // Unit price of the product's selected UOM (e.g. price per millilitre): the consumed
+            // value divided by the converted consumed quantity. The controller already reports
+            // quantities in the selected UOM, so this stays in step with the qty/value fields.
+            var totalQtyNum = Number(totalQty || 0);
+            var totalValNum = Number(totalValue || 0);
+            var unitPriceStr = totalQtyNum > 0
+                ? formatCurrencyCompact(totalValNum / totalQtyNum) + ' / ' + uomName
+                : '—';
 
             $modal = $(
                 '<div class="vas-tup-modal-overlay" role="dialog" aria-modal="true">' +
@@ -327,6 +340,7 @@
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_Month", "Month")) + '</div><div class="vas-tup-field-val">' + escapeHtml(monthFull) + '</div></div>' +
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedQty", "Consumed Qty")) + '</div><div class="vas-tup-field-val">' + escapeHtml(formatQty(totalQty) + ' ' + uomName) + '</div></div>' +
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_ConsumedValue", "Consumed Value")) + '</div><div class="vas-tup-field-val" title="' + escapeHtml(formatCurrencyFull(totalValue)) + '">' + escapeHtml(formatCurrencyCompact(totalValue)) + '</div></div>' +
+                '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_UnitPrice", "Unit Price")) + '</div><div class="vas-tup-field-val" title="' + escapeHtml(unitPriceStr) + '">' + escapeHtml(unitPriceStr) + '</div></div>' +
                 '<div class="vas-tup-summary-field"><div class="vas-tup-field-lbl">' + escapeHtml(label("VAS_188_IssueLines", "Issue Lines")) + '</div><div class="vas-tup-field-val vas-tup-m-lines-cnt">—</div></div>' +
                 '</div>' +
                 '<table class="vas-tup-lines-table">' +

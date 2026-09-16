@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Web.Mvc;
 using System.Data.SqlClient;
 using VAdvantage.DataBase;
@@ -99,6 +100,7 @@ namespace VIS.Controllers
                 string json = JsonConvert.SerializeObject(new
                 {
                     percentage = percentage,
+                    workOrderColumns = ResolveProductionOrderColumns(),
                     success = true
                 });
                 return Json(json, JsonRequestBehavior.AllowGet);
@@ -121,32 +123,59 @@ namespace VIS.Controllers
         private const string ProductionOrderColumn = "VAMFG_M_WorkOrder_ID";
 
         /// <summary>
-        /// Returns the line-level production-order column if this installation actually has it,
-        /// otherwise null.
+        /// Returns the line-level production-order columns that this installation actually has
+        /// (never null; empty when the manufacturing module is not installed).
         ///
-        /// The column ships with the manufacturing module, so it is absent on an installation that
-        /// does not have that module - it does not exist on DB 1, for example. Naming it
+        /// The columns ship with the manufacturing module, so they are absent on an installation
+        /// that does not have that module - they do not exist on DB 1, for example. Naming them
         /// unconditionally makes the whole query die with ORA-00904 instead of the widget simply
         /// reporting no production issues, so the spec's column is verified against the dictionary
         /// first and any other work-order column is accepted as a fallback.
         /// </summary>
-        private static string ResolveProductionOrderColumn()
+        private static List<string> ResolveProductionOrderColumns()
         {
             string sql = @"
-                SELECT MAX(c.ColumnName) KEEP (DENSE_RANK FIRST ORDER BY CASE WHEN UPPER(c.ColumnName) = UPPER('" + ProductionOrderColumn + @"') THEN 0 ELSE 1 END, c.ColumnName)
+                SELECT c.ColumnName
                 FROM AD_Column c
                 INNER JOIN AD_Table t ON t.AD_Table_ID = c.AD_Table_ID
                 WHERE t.TableName = 'M_InventoryLine'
                   AND c.IsActive = 'Y'
-                  AND UPPER(c.ColumnName) LIKE '%WORKORDER%'";
+                  AND UPPER(c.ColumnName) LIKE '%WORKORDER%'
+                ORDER BY CASE WHEN UPPER(c.ColumnName) = UPPER('" + ProductionOrderColumn + @"') THEN 0 ELSE 1 END, c.ColumnName";
 
-            string column = Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
-            return string.IsNullOrEmpty(column) ? null : column;
+            var columns = new List<string>();
+            using (System.Data.IDataReader dr = DB.ExecuteReader(sql, null, null))
+            {
+                while (dr != null && dr.Read())
+                {
+                    columns.Add(Util.GetValueOfString(dr["ColumnName"]));
+                }
+            }
+            return columns;
+        }
+
+        /// <summary>
+        /// SQL predicate that is true when the line is raised against a work order, using only the
+        /// columns this installation actually has. When none exist the installation cannot
+        /// identify production issues at all, so the predicate is never true.
+        /// </summary>
+        private static string WorkOrderLinePredicate(List<string> workOrderColumns)
+        {
+            if (workOrderColumns.Count == 0) { return "1 = 0"; }
+
+            var tests = new List<string>();
+            foreach (string column in workOrderColumns)
+            {
+                tests.Add("COALESCE(line." + column + ", 0) > 0");
+            }
+            return "(" + string.Join(" OR ", tests) + ")";
         }
 
         private int GetProductionIssuesPercentageData(Ctx ctx)
         {
             if (ctx == null) { return 0; }
+
+            List<string> workOrderColumns = ResolveProductionOrderColumns();
 
             DateTime now = DateTime.Now;
             DateTime monthStart = new DateTime(now.Year, now.Month, 1);
@@ -162,12 +191,15 @@ namespace VIS.Controllers
             // 100% (and its complement VAS_182 returned 0%). The work order link is the only
             // field in the schema that actually distinguishes a production issue.
             //
+            // The work-order columns are manufacturing-module only, so they are named only after
+            // the dictionary confirms them - referencing a missing column kills the whole query
+            // with ORA-00904 (which is exactly what happened on installations without the module).
+            //
             // Cost fallback must end in 0: NVL(CurrentCostPrice, PriceCost) yields NULL when both
             // are null, and SUM() silently drops those lines from the total.
             string sql = @"
                 SELECT
-                  COALESCE(SUM(CASE WHEN COALESCE(line.VA075_WorkOrder_ID, 0) > 0
-                                      OR COALESCE(line.VAMFG_M_WorkOrder_ID, 0) > 0
+                  COALESCE(SUM(CASE WHEN " + WorkOrderLinePredicate(workOrderColumns) + @"
                                     THEN (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0))
                                     ELSE 0 END), 0) AS ProductionValue,
                   COALESCE(SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)), 0) AS TotalValue
@@ -177,8 +209,6 @@ namespace VIS.Controllers
                   AND line.IsActive = 'Y'
                   AND inv.IsInternalUse = 'Y'
                   AND inv.DocStatus IN ('CO', 'CL')
-                  AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
-                  AND line.IsActive = 'Y'
                   AND COALESCE(line.QtyInternalUse, 0) > 0
                   AND inv.MovementDate >= " + msl + @"
                   AND inv.MovementDate < " + nmsl;

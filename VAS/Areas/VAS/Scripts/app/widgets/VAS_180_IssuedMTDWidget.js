@@ -152,6 +152,49 @@
             if ($card) { $card.prop('disabled', true); }
         }
 
+        function showBusy(show) {
+            if (!$busy || !$busy[0]) { return; }
+            $busy.toggleClass('vas-imtd-hidden', !show);
+        }
+
+        function loadKpi() {
+            showBusy(true);
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_180_IssuedMTDWidget/GetIssuedMTDCount',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data.error) { setError(); return; }
+                    renderMetric(data);
+                },
+                error: function () { setError(); },
+                complete: function () { showBusy(false); }
+            });
+        }
+
+        function setupResizeObserver() {
+            if (typeof ResizeObserver === 'undefined') { return; }
+            try {
+                var ro = new ResizeObserver(function (entries) {
+                    for (var i = 0; i < entries.length; i++) {
+                        var width = entries[i].contentRect.width;
+                        if (width > 0 && $root[0]) {
+                            $root[0].style.setProperty('--widget-inline-size', width + 'px');
+                        }
+                    }
+                });
+                ro.observe($root[0]);
+            } catch (e) { }
+        }
+
+        this.Initalize = function () {
+            createWidget();
+            setupResizeObserver();
+            loadKpi();
+        };
+
         function openIssuedMTDList() {
             // Keep in lock-step with GetIssuedMTDCountData in the controller. This drills through
             // at DOCUMENT level, so it can carry the IsInternalUse filter but not the line-level

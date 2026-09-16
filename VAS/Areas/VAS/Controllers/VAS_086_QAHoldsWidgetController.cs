@@ -89,6 +89,13 @@ namespace VIS.Controllers
                 ? "LEFT OUTER JOIN " + acceptableTable + " AcceptableVal ON (AcceptableVal.VA010_TestPrmtrList_ID=QAParam.VA010_TestPrmtrList_ID AND AcceptableVal.IsActive='Y')"
                 : "";
 
+            /* QA sheet GRN #33 (2026-09-15): the hold age is measured on the database clock -
+               Created is stamped by the database, so the browser/server time-zone gap no longer
+               shifts the "held Xh" figure. */
+            string holdAgeExpr = DB.IsPostgreSQL()
+                ? "(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - LineConfirm.Created)) / 3600)"
+                : "((SYSDATE - LineConfirm.Created) * 24)";
+
             string holdSql = @"
                 SELECT LineConfirm.M_InOutLineConfirm_ID AS GRN_Confirmation_Line_ID,
                        QAParam.VA010_ShipConfParameters_ID AS QA_Record_ID,
@@ -97,6 +104,7 @@ namespace VIS.Controllers
                        Product.Name AS Item_Name,
                        COALESCE(QAParam.VA010_QuantityToVerify, LineConfirm.TargetQty, LineConfirm.ConfirmedQty, 0) AS Held_Qty,
                        LineConfirm.Created AS Hold_Started_On,
+                       " + holdAgeExpr + @" AS Hold_Age_Hours,
                        QAParam.M_Product_ID AS QA_Product_ID,
                        QAParam.VA010_QuantityToVerify AS Quantity_To_Verify,
                        QAParam.VA010_TestParameter_ID AS Test_Parameter_ID,
@@ -115,7 +123,7 @@ namespace VIS.Controllers
                 INNER JOIN " + inOutTable + @" InOut ON (InOut.M_InOut_ID=InOutLine.M_InOut_ID AND InOut.IsActive='Y')
                 INNER JOIN " + bPartnerTable + @" BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
                 INNER JOIN " + productTable + @" Product ON (Product.M_Product_ID=InOutLine.M_Product_ID AND Product.IsActive='Y')
-                LEFT OUTER JOIN " + qaTable + @" QAParam ON (QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID AND QAParam.IsActive='Y' AND QAParam.AD_Client_ID=@QA_AD_Client_ID)
+                INNER JOIN " + qaTable + @" QAParam ON (QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID AND QAParam.IsActive='Y' AND QAParam.AD_Client_ID=@QA_AD_Client_ID)
                 LEFT OUTER JOIN " + productTable + @" QAProduct ON (QAProduct.M_Product_ID=QAParam.M_Product_ID AND QAProduct.IsActive='Y')
                 " + testParamJoin + @"
                 " + acceptableJoin + @"
@@ -124,11 +132,15 @@ namespace VIS.Controllers
                   AND InOut.IsSOTrx='N'
                   AND InOut.MovementType='V+'
                   AND LineConfirm.VA010_QualCheckMArk='Y'
+                  AND QAParam.VA010_ShipConfParameters_ID IS NOT NULL
                   AND (QAParam.VA010_ActualValue IS NULL OR QAParam.VA010_ActualValue='')
                   AND COALESCE(Confirm.Processed,'N')<>'Y'
                   AND COALESCE(Confirm.IsApproved,'N')='N'
                   AND COALESCE(Confirm.DocStatus,'DR') IN ('DR','IP')";
 
+            /* QA sheet GRN #32 (2026-09-15): QAParam is an INNER JOIN - a confirmation line without any
+               VA010_ShipConfParameters record has nothing to inspect and is no longer listed (the LEFT JOIN
+               listed every such line as an empty hold; DB 2: 58 rows on 50 lines -> 11 rows on 3 lines). */
             holdSql = MRole.GetDefault(ctx).AddAccessSQL(
                 holdSql,
                 "LineConfirm",
@@ -144,6 +156,7 @@ namespace VIS.Controllers
                        HoldData.Item_Name,
                        HoldData.Held_Qty,
                        HoldData.Hold_Started_On,
+                       HoldData.Hold_Age_Hours,
                        HoldData.QA_Product_ID,
                        HoldData.Quantity_To_Verify,
                        HoldData.Test_Parameter_ID,
@@ -197,6 +210,7 @@ namespace VIS.Controllers
                         itemName = Util.GetValueOfString(dr["Item_Name"]),
                         heldQty = Util.GetValueOfDecimal(dr["Held_Qty"]),
                         holdStartedOn = holdStartedOn.HasValue ? holdStartedOn.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture) : "",
+                        holdAgeHours = Math.Round(Math.Max(0, Util.GetValueOfDecimal(dr["Hold_Age_Hours"])), 2),
                         qaProductId = Util.GetValueOfInt(dr["QA_Product_ID"]),
                         quantityToVerify = Util.GetValueOfDecimal(dr["Quantity_To_Verify"]),
                         testParameterId = testParameterId,
@@ -299,6 +313,111 @@ namespace VIS.Controllers
             catch (Exception ex)
             {
                 return Json(JsonConvert.SerializeObject(new { error = ex.Message }), JsonRequestBehavior.AllowGet);
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+        }
+
+        /// <summary>
+        /// Quality parameters for one GRN confirmation. Receiving Actions uses this
+        /// before completion so every applicable actual value can be reviewed in one popup.
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetConfirmationQualityParameters(int confirmId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Json(new { error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired" }, JsonRequestBehavior.AllowGet);
+            }
+
+            List<object> rows = new List<object>();
+            if (confirmId <= 0) { return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet); }
+
+            string schemaMessage;
+            if (!HasRequiredQASchema(out schemaMessage))
+            {
+                return Json(JsonConvert.SerializeObject(new { rows = rows, missingSchema = true }), JsonRequestBehavior.AllowGet);
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            string lineConfirmTable = GetQATableName("M_InOutLineConfirm");
+            string confirmTable = GetQATableName("M_InOutConfirm");
+            string inOutLineTable = GetQATableName("M_InOutLine");
+            string productTable = GetQATableName("M_Product");
+            string qaTable = GetQATableName("VA010_ShipConfParameters");
+            string testParamTable = GetQATableName("VA010_TestParameter");
+            string testParamDisplayColumn = FindDisplayColumn(testParamTable, new[] { "VA010_TestPrmtrName", "Name", "Description", "Value" });
+            string testParamNameExpr = !string.IsNullOrEmpty(testParamDisplayColumn)
+                ? "TestParam." + testParamDisplayColumn
+                : "CAST(NULL AS VARCHAR(255))";
+            string testParamJoin = !string.IsNullOrEmpty(testParamDisplayColumn)
+                ? "LEFT OUTER JOIN " + testParamTable + " TestParam ON (TestParam.VA010_TestParameter_ID=QAParam.VA010_TestParameter_ID AND TestParam.IsActive='Y')"
+                : "";
+
+            string sql = @"
+                SELECT QAParam.VA010_ShipConfParameters_ID AS QA_Record_ID,
+                       LineConfirm.M_InOutLineConfirm_ID AS Line_Confirm_ID,
+                       COALESCE(QAProduct.Name, Product.Name) AS Product_Name,
+                       QAParam.VA010_TestParameter_ID AS Test_Parameter_ID,
+                       " + testParamNameExpr + @" AS Test_Parameter_Name,
+                       QAParam.VA010_ActualValue AS Actual_Value,
+                       QAParam.VA010_QAQCDate AS QA_QC_Date,
+                       QAParam.Remark AS Description
+                FROM " + lineConfirmTable + @" LineConfirm
+                INNER JOIN " + confirmTable + @" Confirm ON (Confirm.M_InOutConfirm_ID=LineConfirm.M_InOutConfirm_ID AND Confirm.IsActive='Y')
+                INNER JOIN " + inOutLineTable + @" InOutLine ON (InOutLine.M_InOutLine_ID=LineConfirm.M_InOutLine_ID AND InOutLine.IsActive='Y')
+                LEFT OUTER JOIN " + productTable + @" Product ON (Product.M_Product_ID=InOutLine.M_Product_ID AND Product.IsActive='Y')
+                INNER JOIN " + qaTable + @" QAParam ON (QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID AND QAParam.IsActive='Y')
+                LEFT OUTER JOIN " + productTable + @" QAProduct ON (QAProduct.M_Product_ID=QAParam.M_Product_ID AND QAProduct.IsActive='Y')
+                " + testParamJoin + @"
+                WHERE LineConfirm.IsActive='Y'
+                  AND LineConfirm.M_InOutConfirm_ID=@Confirm_ID
+                  AND LineConfirm.AD_Client_ID=@AD_Client_ID
+                  AND QAParam.AD_Client_ID=@QA_AD_Client_ID";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(
+                sql,
+                "LineConfirm",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+            sql += " ORDER BY Product_Name, QA_Record_ID";
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@Confirm_ID", confirmId),
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@QA_AD_Client_ID", ctx.GetAD_Client_ID())
+                });
+                while (dr != null && dr.Read())
+                {
+                    DateTime? qaQcDate = Util.GetValueOfDateTime(dr["QA_QC_Date"]);
+                    int testParameterId = Util.GetValueOfInt(dr["Test_Parameter_ID"]);
+                    string testParameterName = Util.GetValueOfString(dr["Test_Parameter_Name"]);
+                    rows.Add(new
+                    {
+                        qaRecordId = Util.GetValueOfInt(dr["QA_Record_ID"]),
+                        lineConfirmId = Util.GetValueOfInt(dr["Line_Confirm_ID"]),
+                        productName = Util.GetValueOfString(dr["Product_Name"]),
+                        testParameterId = testParameterId,
+                        testParameter = !string.IsNullOrEmpty(testParameterName) ? testParameterName : FormatReferenceFallback(testParameterId),
+                        actualValue = Util.GetValueOfString(dr["Actual_Value"]),
+                        qaQcDate = qaQcDate.HasValue ? qaQcDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                        description = Util.GetValueOfString(dr["Description"])
+                    });
+                }
+
+                return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new { error = ex.Message }, JsonRequestBehavior.AllowGet);
             }
             finally
             {

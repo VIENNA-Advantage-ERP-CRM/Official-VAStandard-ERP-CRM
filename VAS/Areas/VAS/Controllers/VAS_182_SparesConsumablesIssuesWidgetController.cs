@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Web.Mvc;
 using System.Data.SqlClient;
@@ -104,6 +105,7 @@ namespace VIS.Controllers
                 string json = JsonConvert.SerializeObject(new
                 {
                     percentage = percentage,
+                    workOrderColumns = ResolveProductionOrderColumns(),
                     success = true
                 });
                 return Json(json, JsonRequestBehavior.AllowGet);
@@ -116,9 +118,39 @@ namespace VIS.Controllers
             }
         }
 
+        /// <summary>
+        /// The line-level work-order columns this installation actually has (manufacturing-module
+        /// only - absent on DB 1, for example). Referencing a missing column makes the whole query
+        /// die with ORA-00904 instead of the widget simply reporting its share, so the columns are
+        /// verified against the dictionary first.
+        /// </summary>
+        private static List<string> ResolveProductionOrderColumns()
+        {
+            string sql = @"
+                SELECT c.ColumnName
+                FROM AD_Column c
+                INNER JOIN AD_Table t ON t.AD_Table_ID = c.AD_Table_ID
+                WHERE t.TableName = 'M_InventoryLine'
+                  AND c.IsActive = 'Y'
+                  AND UPPER(c.ColumnName) LIKE '%WORKORDER%'
+                ORDER BY c.ColumnName";
+
+            var columns = new List<string>();
+            using (IDataReader dr = DB.ExecuteReader(sql, null, null))
+            {
+                while (dr != null && dr.Read())
+                {
+                    columns.Add(Util.GetValueOfString(dr["ColumnName"]));
+                }
+            }
+            return columns;
+        }
+
         private int GetSparesConsumablesPercentageData(Ctx ctx)
         {
             if (ctx == null) { return 0; }
+
+            List<string> workOrderColumns = ResolveProductionOrderColumns();
 
             DateTime now = DateTime.Now;
             DateTime monthStart = new DateTime(now.Year, now.Month, 1);
@@ -136,10 +168,21 @@ namespace VIS.Controllers
             //
             // Cost fallback must end in 0: NVL(CurrentCostPrice, PriceCost) yields NULL when both
             // are null, and SUM() silently drops those lines from the total.
+            //
+            // Without any work-order column the installation cannot classify a production issue,
+            // so every issue line counts as spares / consumables (production KPI reads 0%).
+            var woTests = new List<string>();
+            foreach (string column in workOrderColumns)
+            {
+                woTests.Add("COALESCE(line." + column + ", 0) > 0");
+            }
+            string isNotWorkOrderLine = woTests.Count > 0
+                ? "NOT (" + string.Join(" OR ", woTests) + ")"
+                : "1 = 1";
+
             string sql = @"
                 SELECT
-                  COALESCE(SUM(CASE WHEN COALESCE(line.VA075_WorkOrder_ID, 0) = 0
-                                     AND COALESCE(line.VAMFG_M_WorkOrder_ID, 0) = 0
+                  COALESCE(SUM(CASE WHEN " + isNotWorkOrderLine + @"
                                     THEN (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0))
                                     ELSE 0 END), 0) AS SparesValue,
                   COALESCE(SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)), 0) AS TotalValue

@@ -52,8 +52,12 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Counts active items (active and not discontinued) and, for the meta
-        /// caption, the discontinued items within the same active catalogue.
+        /// Counts active items (IsActive='Y') and, for the meta caption, ALL
+        /// discontinued items (whether the product is active or inactive).
+        /// Scope: every organization the role has access to - the explicit
+        /// "logged-in org + star" predicate was removed because it hid products
+        /// from the user's other accessible organizations; MRole.AddAccessSQL
+        /// already appends the client + AD_Role_OrgAccess org list.
         /// </summary>
         /// <param name="ctx">Current application context.</param>
         /// <returns>Active and discontinued counts.</returns>
@@ -65,9 +69,7 @@ namespace VAS.Controllers
             string sql = @"
                 SELECT SUM(CASE WHEN Product.IsActive=N'Y' THEN 1 ELSE 0 END) AS Active_Count,
                        SUM(CASE WHEN Product.Discontinued=N'Y' THEN 1 ELSE 0 END) AS Discontinued_Count
-                FROM M_Product Product
-                WHERE Product.AD_Client_ID=@AD_Client_ID
-                  AND Product.AD_Org_ID IN (0,COALESCE(NULLIF(@AD_Org_ID,0),Product.AD_Org_ID))";
+                FROM M_Product Product";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql,
@@ -76,16 +78,10 @@ namespace VAS.Controllers
                 MRole.SQL_RO
             );
 
-            SqlParameter[] parameters = new SqlParameter[]
-            {
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID())
-            };
-
             IDataReader reader = null;
             try
             {
-                reader = DB.ExecuteReader(sql, parameters);
+                reader = DB.ExecuteReader(sql, null, null);
                 if (reader != null && reader.Read())
                 {
                     result.active_count = Util.GetValueOfInt(reader["Active_Count"]);

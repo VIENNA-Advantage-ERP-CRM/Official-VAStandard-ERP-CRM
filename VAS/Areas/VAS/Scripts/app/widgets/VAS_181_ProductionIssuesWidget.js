@@ -70,6 +70,9 @@
 
 // ===== NEW CODE START — currency format (agent A03, 2026-08-19) =====
         var currencyInfo = { iso: '', symbol: '' };
+        // Work-order columns this installation actually has, reported by the KPI endpoint
+        // (they are manufacturing-module only and are absent on some databases).
+        var workOrderColumns = [];
 
         function loadCurrencyInfo() {
             $.ajax({
@@ -145,11 +148,11 @@
         };
 // ===== NEW CODE END — currency format =====
 // ----- OLD CODE (kept for rollback, do not delete) -----
-        this.Initalize = function () {
-            createWidget();
-            setupResizeObserver();
-            loadKpi();
-        };
+//        this.Initalize = function () {
+//            createWidget();
+//            setupResizeObserver();
+//            loadKpi();
+//        };
 // ----- END OLD CODE -----
 
         function setupResizeObserver() {
@@ -177,6 +180,7 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     if (data.error) { setError(); return; }
+                    if (data.workOrderColumns) { workOrderColumns = data.workOrderColumns; }
                     renderMetric(data);
                 },
                 error: function () { setError(); },
@@ -226,11 +230,20 @@
             // Keep in lock-step with GetProductionIssuesPercentageData in the controller. The
             // drill-through is DOCUMENT level, so the work-order classification (a line-level
             // column) is expressed as an EXISTS over the production issue lines.
+            // The work-order columns exist only with the manufacturing module, so the controller
+            // reports which ones this installation actually has; without any of them the KPI is a
+            // hard 0% and the drill has nothing that can be classified as a production issue.
+            var woTests = [];
+            for (var w = 0; w < (workOrderColumns || []).length; w++) {
+                woTests.push("COALESCE(il." + workOrderColumns[w] + ", 0) > 0");
+            }
+            var woClause = woTests.length > 0
+                ? " AND EXISTS (SELECT 1 FROM M_InventoryLine il WHERE il.M_Inventory_ID = M_Inventory.M_Inventory_ID"
+                  + " AND il.IsActive = 'Y' AND COALESCE(il.QtyInternalUse, 0) > 0 AND (" + woTests.join(" OR ") + "))"
+                : " AND 1 = 0";
             var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL')"
                 + " AND COALESCE(M_Inventory.IsInternalUse, 'N') = 'Y'"
-                + " AND EXISTS (SELECT 1 FROM M_InventoryLine il WHERE il.M_Inventory_ID = M_Inventory.M_Inventory_ID"
-                + " AND il.IsActive = 'Y' AND COALESCE(il.QtyInternalUse, 0) > 0"
-                + " AND (COALESCE(il.VA075_WorkOrder_ID, 0) > 0 OR COALESCE(il.VAMFG_M_WorkOrder_ID, 0) > 0))"
+                + woClause
                 + " AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
             var windowParam = {
                 "TabWhereClause": where,
