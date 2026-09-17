@@ -67,6 +67,7 @@
         var $card;
         var $body;
         var $footnote;
+        var $pager;
         var $pagerText;
         var $prevBtn;
         var $nextBtn;
@@ -292,6 +293,7 @@
             if (categoriesData.length === 0) {
                 $body.html('<div class="vas-pcu-empty">No usage recorded for ' + escapeHtml(formatMonthName(selectedMonth) + ' ' + selectedYear) + '.</div>');
                 if ($footnote) { $footnote.addClass('vas-pcu-hidden'); }
+                if ($pager) { $pager.addClass('vas-pcu-hidden'); }
                 return;
             }
 
@@ -353,12 +355,8 @@
             // Footnote counts the bars actually on screen, so it can no longer overstate the page.
             var shownCount = endIndex - startIndex;
             if (categoriesData.length > shownCount) {
-                var restMeasure = activePeriodTotal - shownTotalMeasure;
-                var restPct = activePeriodTotal > 0 ? Math.round((restMeasure / activePeriodTotal) * 100) : 0;
-                var restStr = activeMeasure === "val" ? formatCurrency(restMeasure) : (formatQty(restMeasure) + ' units');
                 $footnote.text(shownCount + ' ' + label("VAS_186_Of", "of") + ' ' + categoriesData.length +
-                    ' ' + label("VAS_186_Categories", "categories") + ' · ' +
-                    label("VAS_186_Others", "Others") + ': ' + restStr + ' (' + restPct + '%)');
+                    ' ' + label("VAS_186_Categories", "categories"));
             } else {
                 $footnote.text(label("VAS_186_All", "All") + ' ' + categoriesData.length + ' ' +
                     label("VAS_186_CategoriesShown", "categories shown"));
@@ -398,6 +396,9 @@
             }
             if ($prevBtn) { $prevBtn.prop('disabled', pageNo <= 1); }
             if ($nextBtn) { $nextBtn.prop('disabled', pageNo >= totalPages); }
+            // Never show pagination controls for a single page of results - there is nothing to
+            // navigate to, and disabled-but-visible buttons only invite a pointless click.
+            if ($pager) { $pager.toggleClass('vas-pcu-hidden', totalPages <= 1); }
 
             /* Bars are on screen now, so their real height is measurable. If the body can hold a
                different number than we just drew, adopt it and redraw once. recalcPageSize only
@@ -435,6 +436,59 @@
 
             pageSize = fits;
             return true;
+        }
+
+        /* Doc No -> real Inventory Use record navigation. Mirrors VAS_244's own zoom-to-record
+           pattern exactly: when hosted on a window, relay through widgetFirevalueChanged /
+           ActionName so the host resolves the window BY NAME (a hardcoded AD_Window_ID has
+           previously resolved to the wrong window on a real install - see VAS_244); otherwise
+           (Home-page placement) fall back to VAS.ZoomUtil.zoomToRecord with a window id resolved
+           once via VAS_178's existing GetMaterialIssueWindowId endpoint (same Inventory Use /
+           Internal Use window every widget on this dashboard already targets - reused rather
+           than re-deriving the same multi-name AD_Window lookup here). */
+        var INVENTORY_USE_WINDOW_NAME = 'Inventory Use';
+        var inventoryUseWindowId = 0;
+
+        function hostWindowName() {
+            try {
+                var listener = $self.listener;
+                for (var i = 0; i < 6 && listener; i++) {
+                    if (listener.apanel && listener.apanel.gridWindow && listener.apanel.gridWindow.getName) { return listener.apanel.gridWindow.getName(); }
+                    if (listener.gridWindow && listener.gridWindow.getName) { return listener.gridWindow.getName(); }
+                    listener = listener.listener;
+                }
+            } catch (e) { /* best-effort */ }
+            return '';
+        }
+
+        function zoomToInventoryRecord(inventoryId) {
+            if (!inventoryId) { return; }
+            try {
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                        "TabLayout": "Y", "TabIndex": "0",
+                        "ActionName": hostWindowName() || INVENTORY_USE_WINDOW_NAME,
+                        "ActionType": "W"
+                    });
+                    return;
+                }
+                if (inventoryUseWindowId > 0) {
+                    if (window.VAS && VAS.ZoomUtil) { VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null); }
+                    return;
+                }
+                $.ajax({
+                    url: VIS.Application.contextUrl + 'VAS_178_NewMaterialIssueQuickAction/GetMaterialIssueWindowId',
+                    type: 'GET', dataType: 'json', cache: false,
+                    success: function (res) {
+                        var data = parseResponse(res);
+                        inventoryUseWindowId = Number((data && data.windowId) || 0);
+                        if (inventoryUseWindowId > 0 && window.VAS && VAS.ZoomUtil) {
+                            VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null);
+                        }
+                    }
+                });
+            } catch (e) { /* best-effort */ }
         }
 
         function openCategoryDrilldownModal(categoryId, categoryName) {
@@ -531,7 +585,11 @@
                     var rec = issueLines[j];
                     tbodyHtml +=
                         '<tr>' +
-                        '<td title="' + escapeHtml(rec.documentNo) + '">' + escapeHtml(rec.documentNo) + '</td>' +
+                        '<td title="' + escapeHtml(rec.documentNo) + '">' +
+                        (rec.inventoryId
+                            ? '<button type="button" class="vas-pcu-m-doclink" data-invid="' + rec.inventoryId + '">' + escapeHtml(rec.documentNo) + '</button>'
+                            : escapeHtml(rec.documentNo)) +
+                        '</td>' +
                         '<td title="' + escapeHtml(rec.productName) + '">' +
                         '<span class="vas-pcu-m-product">' + escapeHtml(rec.productName) + '</span>' +
                         (rec.attribute ? ('<span class="vas-pcu-m-attr">' + escapeHtml(rec.attribute) + '</span>') : '') +
@@ -566,12 +624,11 @@
                 closeModal();
             });
 
-            $modal.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas-pcu-modal', function (e) {
-                if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
+            $modal.on('click', '.vas-pcu-m-doclink', function (e) {
+                e.stopPropagation();
+                var invId = Number($(this).data('invid') || 0);
+                closeModal();
+                zoomToInventoryRecord(invId);
             });
 
             $modal.find('.vas-pcu-m-prev').on('click', function () {
@@ -642,6 +699,7 @@
 
             $body = $card.find('.vas-pcu-body');
             $footnote = $card.find('.vas-pcu-footnote');
+            $pager = $card.find('.vas-pcu-pager');
             $pagerText = $card.find('.vas-pcu-pager-txt');
             $prevBtn = $card.find('.vas-pcu-prev');
             $nextBtn = $card.find('.vas-pcu-next');

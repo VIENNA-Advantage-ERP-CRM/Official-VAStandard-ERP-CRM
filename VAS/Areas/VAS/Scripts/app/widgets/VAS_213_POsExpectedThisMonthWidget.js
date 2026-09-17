@@ -481,12 +481,7 @@
             $modalHost.find('.vas-213-back-btn').on('click', popModal);
 
             $modalHost.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
                 if ($(e.target).closest('[data-vas-close]').length) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas201', function (e) {
-                if (e.key === 'Escape') { closeModal(); }
             });
 
             $(window).on('resize.vas201', function () {
@@ -1033,7 +1028,6 @@
                 widgetObserver.disconnect();
                 widgetObserver = null;
             }
-            $(document).off('keydown.vas201');
             $(window).off('resize.vas201');
             if ($modalHost) {
                 $modalHost.remove();

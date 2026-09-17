@@ -285,10 +285,7 @@
             $modal.find('.MPC-hsp-modal-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
-            $modal.on('click' + modalEventNamespace, '.MPC-hsp-modal-close, .MPC-hsp-modal-scrim', closeModal);
-            $(document).on('keydown' + modalEventNamespace, function (event) {
-                if (event.key === 'Escape') { closeModal(); }
-            });
+            $modal.on('click' + modalEventNamespace, '.MPC-hsp-modal-close', closeModal);
         }
 
         function closeModal() {

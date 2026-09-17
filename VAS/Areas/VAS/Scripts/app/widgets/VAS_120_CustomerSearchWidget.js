@@ -342,13 +342,11 @@
                     closeSuggestions();
                 }
             });
-            // Escape dismisses the topmost surface: an open dialog first, then the
-            // suggestion popover.
+            // Escape dismisses the suggestion popover. The quick-action dialogs
+            // close only via their own Close/Cancel buttons.
             $(document).on('keydown' + ns, function (event) {
                 if (event.key !== 'Escape') { return; }
-                var $open = openModal();
-                if ($open) { closeDialog($open); }
-                else { closeSuggestions(); }
+                closeSuggestions();
             });
 
             // A dashboard scroll must not tear a modal down, so only the popover
@@ -675,7 +673,7 @@
         function buildDialog(modifier, titleText, bodyHtml, confirmText) {
             var $dialog = $(
                 '<div class="vas120-modal ' + modifier + '" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(titleText) + '">' +
-                    '<div class="vas120-scrim" data-vas120-close></div>' +
+                    '<div class="vas120-scrim"></div>' +
                     '<section class="vas120-panel">' +
                         '<header class="vas120-mhead">' +
                             '<h2 class="vas120-mtitle">' + escapeHtml(titleText) + '</h2>' +

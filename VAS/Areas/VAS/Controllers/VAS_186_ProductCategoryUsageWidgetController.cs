@@ -261,14 +261,23 @@ namespace VIS.Controllers
 
                 string invAccessSql = BuildAccessibleInventorySql(ctx, msl, nmsl);
 
+                // LocatorCombination is the full "Warehouse.Aisle.Bin.Level"-style locator name;
+                // Value alone is often just an auto-generated numeric code (e.g. "1000007"), which
+                // read like a raw ID to the user. Not present on every database release, so check
+                // first and fall back to Value - same pattern as VAS_146/VAS_164/VAS_165 etc.
+                string locatorSql = HasColumn("M_Locator", "LocatorCombination")
+                    ? "COALESCE(loc.LocatorCombination, loc.Value)"
+                    : "loc.Value";
+
                 string sql = @"
                     SELECT
+                      ai.M_Inventory_ID AS InventoryId,
                       ai.DocumentNo,
                       p.Name AS ProductName,
                       asi.Description AS Attribute,
                       uom.Name AS UomName,
                       wh.Name AS WarehouseName,
-                      loc.Value AS LocatorCode,
+                      " + locatorSql + @" AS LocatorCode,
                       line.QtyInternalUse,
                       ai.MovementDate
                     FROM M_InventoryLine line
@@ -289,6 +298,7 @@ namespace VIS.Controllers
                     {
                         lines.Add(new
                         {
+                            inventoryId = Util.GetValueOfInt(dr["InventoryId"]),
                             documentNo = Util.GetValueOfString(dr["DocumentNo"]),
                             productName = Util.GetValueOfString(dr["ProductName"]),
                             attribute = NormalizeAttributes(Util.GetValueOfString(dr["Attribute"])),
@@ -362,6 +372,41 @@ namespace VIS.Controllers
             if (hasWarehouse) { return warehouseName; }
             if (hasLocator) { return locatorCode; }
             return "";
+        }
+
+        /// <summary>Same dynamic column-existence check VAS_146/VAS_161-165 already use to guard LocatorCombination.</summary>
+        private bool HasColumn(string tableName, string columnName)
+        {
+            string sql;
+            if (DB.IsPostgreSQL())
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM information_schema.columns
+                    WHERE UPPER(table_name)=UPPER(@TableName)
+                      AND UPPER(column_name)=UPPER(@ColumnName)";
+            }
+            else
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM USER_TAB_COLUMNS
+                    WHERE TABLE_NAME=UPPER(@TableName)
+                      AND COLUMN_NAME=UPPER(@ColumnName)";
+            }
+
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@TableName", tableName),
+                    new SqlParameter("@ColumnName", columnName)
+                }, null)) > 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static string ToSqlDate(DateTime date)

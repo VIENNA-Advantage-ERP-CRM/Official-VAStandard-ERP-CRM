@@ -1041,7 +1041,6 @@
             $dlgFoot.empty();
 
             $dlg.removeClass('vas-250-hidden');
-            $(document).on('keydown' + _ns + '_dlg', onDialogKeyDown);
 
             /* NOTHING BEHIND THE SCRIM STAYS LIT. The class suppresses the row's hover and focus
                treatment for as long as the panel is up - the pointer is still sitting on the row
@@ -1113,7 +1112,6 @@
             if (!$dlg) { return; }
 
             $dlg.addClass('vas-250-hidden');
-            $(document).off('keydown' + _ns + '_dlg');
 
             /* The rows are activatable again the moment the scrim is gone. */
             if ($root) { $root.removeClass('vas-250-modal-open'); }
@@ -1146,10 +1144,6 @@
             if (inDialog || inCard) {
                 try { active.blur(); } catch (e) { /* ignore */ }
             }
-        }
-
-        function onDialogKeyDown(e) {
-            if (e.key === 'Escape' || e.keyCode === 27) { closeDialog(); }
         }
 
         function showDialogBusy(on) {

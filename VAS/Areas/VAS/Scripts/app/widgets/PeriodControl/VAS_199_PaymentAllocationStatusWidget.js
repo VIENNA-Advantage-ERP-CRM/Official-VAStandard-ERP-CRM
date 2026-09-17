@@ -805,8 +805,6 @@
             _modalOpen = true;
             closePicker();
 
-            $(document).on('keydown' + _ns + 'm', onModalKeyDown);
-
             loadModalPage();
         }
 
@@ -816,11 +814,6 @@
             _detailSeq++;                       // drop any page still in flight
             showModalBusy(false);
             if ($overlay) { $overlay.addClass('vas-199-hidden'); }
-            $(document).off('keydown' + _ns + 'm');
-        }
-
-        function onModalKeyDown(e) {
-            if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
         }
 
         function findCategory(code) {

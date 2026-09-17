@@ -221,10 +221,7 @@
             $modal.find('.MPC-mv-modal-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
-            $modal.on('click' + modalEventNamespace, '.MPC-mv-modal-close, .MPC-mv-modal-scrim', closeModal);
-            $(document).on('keydown' + modalEventNamespace, function (event) {
-                if (event.key === 'Escape') { closeModal(); }
-            });
+            $modal.on('click' + modalEventNamespace, '.MPC-mv-modal-close', closeModal);
         }
 
         function closeModal() {

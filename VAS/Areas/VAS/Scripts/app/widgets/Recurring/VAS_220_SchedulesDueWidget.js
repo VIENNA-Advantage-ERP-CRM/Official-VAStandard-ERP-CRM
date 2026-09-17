@@ -491,10 +491,6 @@
                 }
             });
 
-            $(document).on('keydown.vas220modal', function (e) {
-                if (e.key === 'Escape') { closeModal(); }
-            });
-
             renderTable();
         }
 
@@ -504,7 +500,6 @@
                 $modal.remove();
                 $modal = null;
             }
-            $(document).off('keydown.vas220modal');
         }
 
         function renderTable() {

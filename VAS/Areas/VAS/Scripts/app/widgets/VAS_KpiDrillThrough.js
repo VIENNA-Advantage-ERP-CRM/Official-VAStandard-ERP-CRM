@@ -105,7 +105,7 @@
         function build() {
             $modal = $(
                 '<div class="MPC-kpidrill" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(opts.title || '') + '">' +
-                    '<div class="MPC-kpidrill-scrim" data-drill-close></div>' +
+                    '<div class="MPC-kpidrill-scrim"></div>' +
                     '<section class="MPC-kpidrill-panel">' +
                         '<header class="MPC-kpidrill-head">' +
                             '<h2 class="MPC-kpidrill-title">' + escapeHtml(opts.title || '') + '</h2>' +

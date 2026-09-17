@@ -726,10 +726,6 @@
                 closeDialog();
             });
 
-            $dialog.find('.vas-scheduled-ap-payment-dialog-scrim').on('click', function () {
-                closeDialog();
-            });
-
             $pagerPrev.on('click', function () {
                 if (rowsLoading || pageNo <= 1) {
                     return;
@@ -746,12 +742,6 @@
 
                 pageNo++;
                 loadRows();
-            });
-
-            $(document).on('keydown.vas-scheduled-ap-payment-dialog-' + self.AD_UserHomeWidgetID, function (e) {
-                if (e.key === 'Escape' && $dialog && $dialog.is(':visible')) {
-                    closeDialog();
-                }
             });
 
             $('body').append($dialog);

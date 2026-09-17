@@ -433,14 +433,9 @@
                 dialogResizeObserver.observe($dialog.find('.VAS-047-cash-in-dialog-body')[0]);
             }
 
-            $dialog.find('.VAS-047-cash-in-dialog-close, .VAS-047-cash-in-dialog-scrim').on('click', closeDialog);
+            $dialog.find('.VAS-047-cash-in-dialog-close').on('click', closeDialog);
             $pagerPrev.on('click', function () { if (!rowsLoading && pageNo > 1) { pageNo--; loadDialogRows(); } });
             $pagerNext.on('click', function () { if (!rowsLoading && pageNo < totalPages) { pageNo++; loadDialogRows(); } });
-
-            eventNamespace = '.VAS048CashOut' + String(widgetId).replace(/[^A-Za-z0-9]/g, '');
-            $(document).on('keydown' + eventNamespace, function (event) {
-                if (event.key === 'Escape' && $dialog.is(':visible')) { closeDialog(); }
-            });
 
             $('body').append($dialog);
         }

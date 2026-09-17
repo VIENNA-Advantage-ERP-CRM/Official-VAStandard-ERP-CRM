@@ -239,9 +239,7 @@
             panel.appendChild(foot);
             overlay.appendChild(panel);
 
-            overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) { closeModal(key); } });
             overlay.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape') { closeModal(key); return; }
                 if (e.key === 'Tab') {
                     var focusables = panel.querySelectorAll('button');
                     if (!focusables.length) { return; }

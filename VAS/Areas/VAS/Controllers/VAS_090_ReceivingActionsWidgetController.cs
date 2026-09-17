@@ -1365,13 +1365,17 @@ namespace VIS.Controllers
                 MRole.SQL_RO
             );
 
+            string lineLocatorSql = HasColumn("M_Locator", "LocatorCombination")
+                ? "COALESCE(Locator.LocatorCombination, Locator.Value)"
+                : "Locator.Value";
+
             string linesSql = @"
                 SELECT LineConfirm.M_InOutLineConfirm_ID AS Line_Confirm_ID,
                        InOutLine.Line AS Line_No,
                        Product.Name AS Product_Name,
                        UomInfo.Name AS UOM_Name,
                        AttributeInstance.Description AS Attribute_Description,
-                       Locator.Value AS Locator_Value,
+                       " + lineLocatorSql + @" AS Locator_Value,
                        LineConfirm.TargetQty AS Target_Qty,
                        LineConfirm.ConfirmedQty AS Confirmed_Qty,
                        LineConfirm.ScrappedQty AS Scrapped_Qty,

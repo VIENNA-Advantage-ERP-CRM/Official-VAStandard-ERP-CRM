@@ -329,15 +329,12 @@
             $modal.find('.MPC-abc-modal-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
-            $modal.on('click' + modalEventNamespace, '.MPC-abc-modal-close, .MPC-abc-modal-scrim', closeModal);
+            $modal.on('click' + modalEventNamespace, '.MPC-abc-modal-close', closeModal);
             $modal.on('click' + modalEventNamespace, '.MPC-abc-mp-prev', function () {
                 if (modalState.page > 0) { modalState.page--; renderModalPage(); }
             });
             $modal.on('click' + modalEventNamespace, '.MPC-abc-mp-next', function () {
                 modalState.page++; renderModalPage();
-            });
-            $(document).on('keydown' + modalEventNamespace, function (event) {
-                if (event.key === 'Escape') { closeModal(); }
             });
         }
 

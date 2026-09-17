@@ -283,7 +283,6 @@
 
             $modal.find('#vas172-m-close').on('click', closeModal);
             $modal.find('#vas172-b1').on('click', closeModal);
-            $modal.find('.vas-172-modal-scrim').on('click', function (e) { if (e.target === this) { closeModal(); } });
 
             $modal.find('.vas-172-line-row').on('click', function () {
                 var lidx = parseInt($(this).attr('data-lidx'), 10);
@@ -365,7 +364,6 @@
 
             $modal.find('#vas172-m-close2').on('click', closeModal);
             $modal.find('#vas172-b2').on('click', function () { renderModalView1(); });
-            $modal.find('.vas-172-modal-scrim').on('click', function (e) { if (e.target === this) { closeModal(); } });
 
             var calcDiff = function () {
                 var target = Number(l.TargetQty || 0);

@@ -516,10 +516,6 @@
                 closeDialog();
             });
 
-            $dialog.find('.vas-tarm-dialog-scrim').on('click', function () {
-                closeDialog();
-            });
-
             $pagerPrev.on('click', function () {
                 if (rowsLoading || pageNo <= 1) { return; }
                 pageNo--;
@@ -530,12 +526,6 @@
                 if (rowsLoading || pageNo >= totalPages) { return; }
                 pageNo++;
                 loadRows();
-            });
-
-            $(document).on('keydown.vas-tarm', function (e) {
-                if (e.key === 'Escape' && $dialog.is(':visible')) {
-                    closeDialog();
-                }
             });
 
             /* Attach the dialog to <body> so its fixed positioning escapes any

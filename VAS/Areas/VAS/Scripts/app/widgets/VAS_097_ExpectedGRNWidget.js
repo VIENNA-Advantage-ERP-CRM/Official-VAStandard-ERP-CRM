@@ -395,7 +395,6 @@
             $dialogBusy = $dialog.find('.vas-egrn-modal-busy');
 
             $dialog.find('.vas-egrn-modal-close').on('click', closeDialog);
-            $dialog.find('.vas-egrn-scrim').on('click', closeDialog);
             $dialog.find('.vas-egrn-back').on('click', closeDialog);
 
             $dialogBody.on('input', '.vas-egrn-rcv-in', function () {
@@ -417,10 +416,6 @@
                 });
                 modalResizeObserver.observe($dialogBody[0]);
             }
-
-            $(document).on('keydown.vas-egrn', function (e) {
-                if (e.key === 'Escape' && !$dialog.hasClass('vas-egrn-hidden')) { closeDialog(); }
-            });
 
             $('body').append($dialog);
         }
@@ -721,7 +716,6 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-egrn');
             $('body').removeClass('vas-egrn-body-lock');
             if (rowResizeObserver) { rowResizeObserver.disconnect(); rowResizeObserver = null; }
             if (modalResizeObserver) { modalResizeObserver.disconnect(); modalResizeObserver = null; }

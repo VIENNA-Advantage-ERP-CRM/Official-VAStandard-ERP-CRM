@@ -1417,8 +1417,7 @@
             );
 
             $dialog.find(
-                '.vas-cpa-dialog-close, ' +
-                '.vas-cpa-dialog-scrim'
+                '.vas-cpa-dialog-close'
             ).on(
                 'click',
                 closeDialog
@@ -1494,19 +1493,6 @@
                                 'Payment reconciliation window is not configured'
                             )
                         );
-                    }
-                }
-            );
-
-            $(document).on(
-                'keydown.VAS_027_ClearedAPPaymentWidget',
-                function (event) {
-                    if (
-                        event.key === 'Escape' &&
-                        $dialog &&
-                        $dialog.is(':visible')
-                    ) {
-                        closeDialog();
                     }
                 }
             );

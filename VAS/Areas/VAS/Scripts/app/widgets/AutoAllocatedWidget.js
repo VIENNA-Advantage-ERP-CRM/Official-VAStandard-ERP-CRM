@@ -583,10 +583,6 @@
                 closeDialog();
             });
 
-            $dialog.find('.vas-aa-dialog-scrim').on('click', function () {
-                closeDialog();
-            });
-
             $tabAllocated.on('click', function () { switchTab("allocated"); });
             $tabUnallocated.on('click', function () { switchTab("unallocated"); });
 
@@ -604,11 +600,6 @@
                 loadRows();
             });
 
-            $(document).on('keydown.vas-aa', function (e) {
-                if (e.key === 'Escape' && $dialog.is(':visible')) {
-                    closeDialog();
-                }
-            });
 
             /* Attach to <body> so fixed positioning escapes any transformed
                dashboard ancestor. */

@@ -292,7 +292,7 @@
         }
 
         function openProductIssuesModal(pid, pname, cost, attr, uom, issuedQty, issuedValue) {
-            $(document).off("keydown.vas-hvu-modal"); if ($modal) { $modal.remove(); }
+            if ($modal) { $modal.remove(); }
 
             var monthFull = formatMonthName(selectedMonth) + ' ' + selectedYear;
 
@@ -453,21 +453,12 @@
                the overlay with .find(), which only searches descendants -- $modal IS the overlay,
                so the scrim click never bound at all. */
             function closeModal() {
-                $(document).off('keydown.vas-hvu-modal');
                 if ($modal) { $modal.remove(); }
             }
 
             $modal.find('.vas-hvu-modal-close').on('click', function (e) {
                 e.stopPropagation();
                 closeModal();
-            });
-
-            $modal.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas-hvu-modal', function (e) {
-                if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
             });
 
             $modal.find('.vas-hvu-m-prev').on('click', function () {
@@ -590,7 +581,7 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            $(document).off("keydown.vas-hvu-modal"); if ($modal) { $modal.remove(); }
+            if ($modal) { $modal.remove(); }
             $root.remove();
         };
     };

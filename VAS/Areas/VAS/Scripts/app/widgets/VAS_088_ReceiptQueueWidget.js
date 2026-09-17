@@ -409,10 +409,6 @@
             $dialogBusy = $dialog.find('.vas-rq-modal-busy');
 
             $dialog.find('.vas-rq-modal-close').on('click', function () { closeDetail(); });
-            $dialog.find('.vas-rq-scrim').on('click', function () { closeDetail(); });
-            $(document).on('keydown.vas-rq', function (e) {
-                if (e.key === 'Escape' && !$dialog.hasClass('vas-rq-hidden')) { closeDetail(); }
-            });
 
             $('body').append($dialog);
         }

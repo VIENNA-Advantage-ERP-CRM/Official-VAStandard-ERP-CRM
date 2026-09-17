@@ -233,10 +233,6 @@
             $modal.data('overlay', $overlay);
 
             $modalClose.on('click', closeModal);
-            $overlay.on('mousedown', function (e) { if (e.target === $overlay[0]) { closeModal(); } });
-            $(document).on('keydown' + modalEventNamespace, function (e) {
-                if (e.key === 'Escape' && $overlay.hasClass('MPC-wc-open')) { closeModal(); }
-            });
         }
 
         /* ---- Widget list ---- */
@@ -819,7 +815,6 @@
             if (locatorsRequest && typeof locatorsRequest.abort === 'function') { try { locatorsRequest.abort(); } catch (ignored) { } }
             $root.off('.' + eventNamespace);
             $body.off('.' + eventNamespace);
-            $(document).off('keydown' + modalEventNamespace);
             if ($modal) {
                 var $overlay = $modal.data('overlay');
                 if ($overlay) { $overlay.remove(); }

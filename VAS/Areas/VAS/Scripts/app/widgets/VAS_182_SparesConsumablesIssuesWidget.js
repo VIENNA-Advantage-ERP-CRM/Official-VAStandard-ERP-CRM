@@ -276,22 +276,35 @@
         // columns (VA075_WorkOrder_ID / VAMFG_M_WorkOrder_ID) are module-specific and absent on
         // DB 1, and an unresolved column makes the grid query throw instead of opening.
         function openSparesConsumablesList() {
-            // Keep in lock-step with GetSparesConsumablesPercentageData in the controller, and the
-            // exact complement of the VAS_181 drill-through. The classification is line-level but
-            // this drills through at DOCUMENT level, so it is expressed as an EXISTS over the
-            // non-work-order issue lines.
-            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL')"
-                + " AND COALESCE(M_Inventory.IsInternalUse, 'N') = 'Y'"
-                + " AND EXISTS (SELECT 1 FROM M_InventoryLine il WHERE il.M_Inventory_ID = M_Inventory.M_Inventory_ID"
-                + " AND il.IsActive = 'Y' AND COALESCE(il.QtyInternalUse, 0) > 0"
-                + " AND COALESCE(il.VA075_WorkOrder_ID, 0) = 0 AND COALESCE(il.VAMFG_M_WorkOrder_ID, 0) = 0)"
-                + " AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": where,
-                "TabLayout": "Y",
-                "TabIndex": "0",
-                "ActionName": hostWindowName() || "VAS_InternalUseInventory",
-                "ActionType": "W"
+            // Keep in lock-step with GetSparesConsumablesIdsData in the controller.
+            // The TabWhereClause is a flat M_Inventory_ID IN (...) list, NOT a
+            // correlated EXISTS(SELECT 1 FROM M_InventoryLine ...) subquery - the
+            // host window's own "duplicate DocumentNo" grid diagnostic does naive,
+            // parenthesis-unaware text surgery on the TabWhereClause looking for a
+            // FROM to lift out, and it mishandled the nested EXISTS(...) (confirmed
+            // via the app log: it produced malformed SQL and Oracle rejected it with
+            // ORA-00933, which is what was actually hanging this drill-through, the
+            // same bug VAS_181 hit and fixed the same way). A flat ID list has no
+            // FROM/subquery in it at all, so there is nothing for that diagnostic
+            // query to mishandle.
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_182_SparesConsumablesIssuesWidget/GetSparesConsumablesIds',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data.error) { return; }
+                    var ids = data.ids || [];
+                    var idList = ids.length ? ids.join(',') : '-1';
+                    var where = "M_Inventory.M_Inventory_ID IN (" + idList + ")";
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": where,
+                        "TabLayout": "N",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || "VAS_InternalUseInventory",
+                        "ActionType": "W"
+                    }); 
+                }
             });
         }
 

@@ -566,17 +566,26 @@ namespace VAS.Controllers
             }
         }
 
+        /// <summary>
+        /// Resolves a purchase order's document-status code (C_Order.DocStatus) to its
+        /// human-readable name from the system's own DocStatus reference list
+        /// (AD_Reference_ID 131) - the same source MOrder.GetDocStatusName uses - instead
+        /// of an AD_Message lookup keyed by the raw code, which has no matching message
+        /// for several codes (e.g. "Drafted", "InProgress") and rendered as "[Drafted]" /
+        /// "[InProgress]" in the search results. Falls back to the raw code if the list
+        /// name cannot be resolved.
+        /// </summary>
         private string GetDocStatusLabel(Ctx ctx, string docStatus)
         {
             if (string.IsNullOrEmpty(docStatus)) return "";
-            switch (docStatus.ToUpperInvariant())
+            try
             {
-                case "DR": return Msg.GetMsg(ctx, "Drafted") ?? "Drafted";
-                case "IP": return Msg.GetMsg(ctx, "InProgress") ?? "In Progress";
-                case "CO": return Msg.GetMsg(ctx, "Completed") ?? "Completed";
-                case "CL": return Msg.GetMsg(ctx, "Closed") ?? "Closed";
-                case "VO": return Msg.GetMsg(ctx, "Voided") ?? "Voided";
-                default: return docStatus;
+                string name = MRefList.GetListName(ctx, 131, docStatus);
+                return string.IsNullOrEmpty(name) ? docStatus : name;
+            }
+            catch
+            {
+                return docStatus;
             }
         }
 

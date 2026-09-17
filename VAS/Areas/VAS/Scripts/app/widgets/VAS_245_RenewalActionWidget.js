@@ -357,7 +357,7 @@
         function createListDialog() {
             $list = $(
                 '<div class="vas245-dialog" role="dialog" aria-modal="true" aria-hidden="true">' +
-                    '<div class="vas245-scrim" data-list-close></div>' +
+                    '<div class="vas245-scrim"></div>' +
                     '<section class="vas245-panel">' +
                         '<header class="vas245-phead">' +
                             '<h2 class="vas245-ptitle">' + escapeHtml(label('VAS_245_ListTitle', 'Renewal Action Needed')) + '</h2>' +
@@ -392,9 +392,7 @@
             $list.on('click', '.vas245-pgbtn', function () { turnPage($(this).attr('data-dir')); });
             $(document).on('keydown.MPCvas245', function (event) {
                 if (event.key !== 'Escape') { return; }
-                if ($confirm && $confirm.hasClass('is-open')) { closeConfirm(); return; }
-                if ($detail && $detail.hasClass('is-open')) { closeDetail(); return; }
-                if ($list.hasClass('is-open')) { closeList(); }
+                if ($confirm && $confirm.hasClass('is-open')) { closeConfirm(); }
             });
         }
 
@@ -525,7 +523,7 @@
         function createDetailDialog() {
             $detail = $(
                 '<div class="vas245-modal" role="dialog" aria-modal="true" aria-hidden="true">' +
-                    '<div class="vas245-scrim" data-detail-close></div>' +
+                    '<div class="vas245-scrim"></div>' +
                     '<section class="vas245-panel">' +
                         '<header class="vas245-mhead">' +
                             '<h2 class="vas245-mtitle">' + escapeHtml(label('VAS_245_ContractTitle', 'Service Contract')) + '</h2>' +

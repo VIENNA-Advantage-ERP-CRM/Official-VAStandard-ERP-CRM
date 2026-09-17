@@ -454,7 +454,7 @@
         function createListDialog() {
             $list = $(
                 '<div class="vas263-dialog" role="dialog" aria-modal="true" aria-hidden="true">' +
-                    '<div class="vas263-scrim" data-list-close></div>' +
+                    '<div class="vas263-scrim"></div>' +
                     '<section class="vas263-panel">' +
                         '<header class="vas263-phead">' +
                             '<h2 class="vas263-ptitle">' + escapeHtml(label('VAS_263_ListTitle', 'Upcoming Billing')) + '</h2>' +
@@ -487,9 +487,7 @@
             $list.on('click', '.vas263-pgbtn', function () { turnListPage($(this).attr('data-dir')); });
             $(document).on('keydown.MPCvas263', function (event) {
                 if (event.key !== 'Escape') { return; }
-                if ($confirm && $confirm.hasClass('is-open')) { closeConfirm(); return; }
-                if ($detail && $detail.hasClass('is-open')) { closeDetail(); return; }
-                if ($list.hasClass('is-open')) { closeList(); }
+                if ($confirm && $confirm.hasClass('is-open')) { closeConfirm(); }
             });
         }
 
@@ -617,7 +615,7 @@
         function createDetailDialog() {
             $detail = $(
                 '<div class="vas263-modal" role="dialog" aria-modal="true" aria-hidden="true">' +
-                    '<div class="vas263-scrim" data-detail-close></div>' +
+                    '<div class="vas263-scrim"></div>' +
                     '<section class="vas263-panel">' +
                         '<header class="vas263-mhead">' +
                             '<h2 class="vas263-mtitle">' + escapeHtml(label('VAS_263_ContractTitle', 'Service Contract')) + '</h2>' +

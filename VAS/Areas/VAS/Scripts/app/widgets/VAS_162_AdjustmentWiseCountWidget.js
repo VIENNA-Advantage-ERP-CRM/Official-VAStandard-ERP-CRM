@@ -32,6 +32,9 @@
        Hardcoding an id is what made VAS_160 answer "With your current role and settings, you
        cannot view this information." */
     var COUNT_WINDOW_NAME = "VAS_PhysicalInventory";
+    /* Resolved AD_Window_ID for the Home Page zoom path, cached after the first successful
+       lookup so a second click does not repeat the round trip. */
+    var countWindowId = 0;
 
     /* Product and attribute text comes from the database and was previously concatenated straight
        into innerHTML. The source prompt requires the opposite: "Render database text through
@@ -299,17 +302,31 @@
            lean on a DocumentNo uniqueness the schema does not enforce.
 
            The navigation happens on the screen behind the popup, so the popup is closed straight
-           after - otherwise it sits on top of the record it just opened. */
+           after - otherwise it sits on top of the record it just opened.
+
+           windowNo >= 0 means this widget is hosted on a screen (e.g. a Landing Page tab), so the
+           record opens in place via the host's own widgetFirevalueChanged channel. windowNo < 0
+           means it is placed on the Home Page, which has no such host to relay through - there
+           the Inventory Count window has to be opened directly (as its own new tab) via
+           VAS.ZoomUtil.zoomToRecord, positioned on the record. Previously this always took the
+           widgetFirevalueChanged path, so a Home Page instance's click did nothing. */
         function openInventoryWindow(inventoryId) {
             if (!inventoryId) { return; }
 
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
-                "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
-                "TabIndex": "0",
-                "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
-                "ActionType": "W"
-            });
+            if ($self.windowNo >= 0) {
+                /* Screen Landing Page */
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                    "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                    "TabIndex": "0",
+                    "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
+                    "ActionType": "W"
+                });
+            } else {
+                /* From Home Page */
+                VAS.ZoomUtil.zoomToRecord("M_Inventory_ID", Number(inventoryId), countWindowId, "VAS_PhysicalInventory", "Physical Inventory")
+                    .done(function (id) { if (id > 0) { countWindowId = id; } });
+            }
 
             closeDetailModal();
         }
@@ -353,17 +370,6 @@
             };
 
             $closeBtn.on('click', closeModal);
-            $overlay.on('click', function (e) {
-                if ($(e.target).hasClass('vas-adjwisecount-modal-overlay')) {
-                    closeModal();
-                }
-            });
-
-            $(document).off('keydown.vas-adjwisecount').on('keydown.vas-adjwisecount', function (e) {
-                if (e.key === 'Escape' && $modalOverlay) {
-                    closeModal();
-                }
-            });
 
             // Fetch Detail Lines
             $.ajax({

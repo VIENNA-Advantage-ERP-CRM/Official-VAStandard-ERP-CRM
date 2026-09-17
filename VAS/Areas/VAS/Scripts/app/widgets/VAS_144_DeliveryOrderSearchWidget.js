@@ -402,9 +402,6 @@
             $('body').append($modal);
 
             $modal.on('click' + eventNamespace, '.MPC-dos-m-close', closeModal);
-            $modal.on('click' + eventNamespace, function (event) {
-                if (event.target === $modal[0]) { closeModal(); }
-            });
             $modal.on('click' + eventNamespace, '.MPC-dos-tab', function () {
                 activeTab = $(this).attr('data-tab');
                 renderPanel();
@@ -647,7 +644,6 @@
             $(document).on('keydown' + eventNamespace, function (event) {
                 if (event.key !== 'Escape') { return; }
                 if (dropdownIsOpen()) { closeDropdown(); }
-                else if ($modal && $modal.hasClass('MPC-dos-open')) { closeModal(); }
             });
             $(window).on('scroll' + eventNamespace, closeDropdown);
             $(window).on('resize' + eventNamespace, function () {

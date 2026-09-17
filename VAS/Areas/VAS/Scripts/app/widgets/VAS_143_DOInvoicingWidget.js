@@ -287,10 +287,6 @@
             $modal.data('overlay', $overlay);
 
             $modalClose.on('click', closeModal);
-            $overlay.on('mousedown', function (e) { if (e.target === $overlay[0]) { closeModal(); } });
-            $(document).on('keydown' + modalEventNamespace, function (e) {
-                if (e.key === 'Escape' && $overlay.hasClass('MPC-dis-open')) { closeModal(); }
-            });
             $modalPrev.on('click', function () { if (modalState.page > 0) { modalState.page--; loadDrillDown(); } });
             $modalNext.on('click', function () {
                 var pageCount = Math.max(1, Math.ceil(modalState.total / modalState.pageSize));

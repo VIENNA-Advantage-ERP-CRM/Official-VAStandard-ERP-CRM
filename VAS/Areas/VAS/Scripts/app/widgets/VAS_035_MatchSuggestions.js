@@ -655,13 +655,8 @@
                 e.stopPropagation();
                 closeDialog();
             });
-            $dialog.find('.vas-msug-dialog-scrim').on('click', function () { closeDialog(); });
             $dialog.find('.vas-msug-btn-skip').on('click', function () { closeDialog(); });
             $dialogFooterApply.on('click', function () { applyCurrentSuggestion(); });
-
-            $(document).on('keydown.vas-msug', function (e) {
-                if (e.key === 'Escape' && $dialog.is(':visible')) { closeDialog(); }
-            });
 
             $('body').append($dialog);
         }

@@ -845,16 +845,6 @@
                 closeDialog();
             });
 
-            $dialog.find('.vas-recent-ap-payments-dialog-scrim').on('click', function () {
-                closeDialog();
-            });
-
-            $(document).on('keydown.vas-recent-ap-payments', function (e) {
-                if (e.key === 'Escape' && $dialog && $dialog.is(':visible')) {
-                    closeDialog();
-                }
-            });
-
             $('body').append($dialog);
         }
 
@@ -1595,7 +1585,6 @@
 
             $root.remove();
             closeDialog();
-            $(document).off('keydown.vas-recent-ap-payments');
 
             if ($dialog) {
                 $dialog.remove();

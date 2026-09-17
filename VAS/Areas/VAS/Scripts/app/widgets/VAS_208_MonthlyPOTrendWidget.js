@@ -413,15 +413,6 @@
 
             $mask.find('.vas-mpt-close-btn').on('click', closeModal);
             $mask.find('.vas-mpt-back-btn').on('click', backModal);
-            $mask.on('click', function (e) {
-                if (e.target === $mask[0]) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas-mpt', function (e) {
-                if (e.key === 'Escape' && $mask.hasClass('vas-mpt-mask-open')) {
-                    closeModal();
-                }
-            });
 
             $('body').append($mask);
         }
@@ -812,7 +803,6 @@
             closeModal();
             if ($toast) { $toast.remove(); $toast = null; }
             if ($mask) { $mask.remove(); $mask = null; }
-            $(document).off('keydown.vas-mpt');
             $root.remove();
         };
     };

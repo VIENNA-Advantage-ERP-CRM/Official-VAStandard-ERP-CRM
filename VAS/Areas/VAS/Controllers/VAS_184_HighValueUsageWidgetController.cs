@@ -202,12 +202,20 @@ namespace VIS.Controllers
 
                 // Same cost rule and same zero exclusion as GetHighValueProducts - if the two drifted,
                 // the modal's line values would no longer add up to the total shown on the row.
+                // LocatorCombination is the full "Warehouse.Aisle.Bin.Level"-style locator name;
+                // Value alone is often just an auto-generated numeric code, which read like a raw
+                // ID to the user. Not present on every database release, so check first and fall
+                // back to Value - same pattern as VAS_146/VAS_164/VAS_165/VAS_186/VAS_188.
+                string locatorSql = HasColumn("M_Locator", "LocatorCombination")
+                    ? "COALESCE(loc.LocatorCombination, loc.Value)"
+                    : "loc.Value";
+
                 string sql = @"
                     SELECT
                       ai.DocumentNo,
                       ai.MovementDate,
                       wh.Name AS WarehouseName,
-                      loc.Value AS LocatorCode,
+                      " + locatorSql + @" AS LocatorCode,
                       line.QtyInternalUse,
                       (line.QtyInternalUse * COALESCE(NULLIF(line.CurrentCostPrice, 0), NULLIF(line.PriceCost, 0), NULLIF(line.VA024_CostPrice, 0), pc.CurrentCostPrice, 0)) AS LineValue
                     FROM M_InventoryLine line
@@ -297,6 +305,41 @@ namespace VIS.Controllers
                 return "TO_DATE('" + date.ToString("yyyy-MM-dd") + "', 'YYYY-MM-DD')";
             }
             return "CAST('" + date.ToString("yyyy-MM-dd") + "' AS DATE)";
+        }
+
+        /// <summary>Same dynamic column-existence check VAS_146/VAS_161-165/VAS_186/VAS_188 already use to guard LocatorCombination.</summary>
+        private bool HasColumn(string tableName, string columnName)
+        {
+            string sql;
+            if (DB.IsPostgreSQL())
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM information_schema.columns
+                    WHERE UPPER(table_name)=UPPER(@TableName)
+                      AND UPPER(column_name)=UPPER(@ColumnName)";
+            }
+            else
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM USER_TAB_COLUMNS
+                    WHERE TABLE_NAME=UPPER(@TableName)
+                      AND COLUMN_NAME=UPPER(@ColumnName)";
+            }
+
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@TableName", tableName),
+                    new SqlParameter("@ColumnName", columnName)
+                }, null)) > 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

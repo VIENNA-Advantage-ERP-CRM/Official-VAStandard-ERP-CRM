@@ -90,8 +90,13 @@
 
 /* Select Filter Dropdowns, per Global VA Design Standards. The native arrow reserves space on the
    right of the control, and without a min-width the box is sized to content -- together those
-   clipped the last digit of a 4-digit year ("2026" losing its 6). Arrow removed, value centred,
-   min-width guarantees room for four digits. */
+   clipped the last digit of a 4-digit year ("2026" losing its 6). Arrow removed, min-width
+   guarantees room for four digits.
+   text-align-last: center (plus centring the <option> rows) is NOT reliably honoured by the
+   browser's native open dropdown list - Chromium pads the popup to simulate it and can leave a
+   visible blank strip down one side of the open list instead of true centring. Left-aligned text
+   is what every native select renders consistently, so that is what both the closed control and
+   the open list use here. */
 .vas-tup-select {
     font-family: inherit;
     font-size: .6875em;
@@ -104,18 +109,12 @@
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     background-image: none !important;
-    text-align: center;
-    text-align-last: center;
+    text-align: left;
     padding: 0.35em 0.75em;
     min-width: 4.5em;
     outline: none;
     cursor: pointer;
 }
-
-    /* Centre each option row too, so the open list matches the closed control. */
-    .vas-tup-select option {
-        text-align: center;
-    }
 
 .vas-tup-divider {
     width: 1px;
@@ -527,6 +526,24 @@
             .vas-tup-lines-table tbody tr:hover td {
                 background: #F5FBFF;
             }
+
+    .vas-tup-m-doclink {
+        border: 0;
+        background: none;
+        padding: 0;
+        margin: 0;
+        font: inherit;
+        font-weight: 700;
+        color: #0083DA;
+        cursor: pointer;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-align: left;
+    }
+
+        .vas-tup-m-doclink:hover { color: #0069AE; text-decoration: underline; }
 
     /* Spacer rows that keep a short page the same height as a full one. Not interactive. */
     .vas-tup-lines-table tbody tr.vas-tup-m-filler:hover {

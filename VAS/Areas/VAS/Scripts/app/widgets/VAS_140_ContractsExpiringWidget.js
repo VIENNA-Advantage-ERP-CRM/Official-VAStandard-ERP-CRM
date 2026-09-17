@@ -347,7 +347,7 @@
         function createListDialog() {
             $list = $(
                 '<div class="vas140-dialog" role="dialog" aria-modal="true" aria-hidden="true">' +
-                    '<div class="vas140-scrim" data-list-close></div>' +
+                    '<div class="vas140-scrim"></div>' +
                     '<section class="vas140-panel">' +
                         '<header class="vas140-phead"><h2 class="vas140-ptitle"></h2>' +
                             '<button type="button" class="vas140-close" data-list-close aria-label="' + escapeHtml(label('VAS_140_Close', 'Close')) + '">' + icon('close') + '</button></header>' +
@@ -397,16 +397,12 @@
         this.Initalize = function () {
             createWidget();
             createListDialog();
-            $(document).on('keydown.MPCvas140', function (event) {
-                if (event.key === 'Escape' && $list && $list.hasClass('is-open')) { closeList(); }
-            });
             loadBuckets();
         };
 
         this.refreshWidget = function () { loadBuckets(); };
         this.getRoot = function () { return $root; };
         this.disposeComponent = function () {
-            $(document).off('keydown.MPCvas140');
             if ($list) { $list.remove(); $list = null; }
             $('body').removeClass('vas140-modal-open');
             $root.remove();

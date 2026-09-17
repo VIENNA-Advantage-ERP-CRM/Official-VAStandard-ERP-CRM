@@ -292,10 +292,6 @@
                 '</div>'
             );
             $dialog.find('.vas-exf-mclose').on('click', closeDialog);
-            $dialog.find('.vas-exf-scrim').on('click', closeDialog);
-            $(document).on('keydown.vas-exf', function (e) {
-                if (e.key === 'Escape' && $dialog && !$dialog.hasClass('vas-exf-hidden')) { closeDialog(); }
-            });
 
             var $c = $dialog.find('.vas-exf-mcontent');
             $c.on('change', '.vas-exf-f-wh', onWarehouseChange);
@@ -636,7 +632,6 @@
         this.refreshWidget = function () { loadFulfilments(1); };
         this.getRoot = function () { return $root; };
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-exf');
             $('body').removeClass('vas-exf-body-lock');
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();

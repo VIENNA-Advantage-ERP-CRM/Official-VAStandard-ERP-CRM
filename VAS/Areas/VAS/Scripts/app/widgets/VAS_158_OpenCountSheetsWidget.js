@@ -47,6 +47,9 @@
     // "Inventory Count navigation" section. Used as the fallback when the widget is not hosted
     // inside that window itself.
     var COUNT_WINDOW_NAME = "VAS_PhysicalInventory";
+    /* Resolved AD_Window_ID for the Home Page zoom path, cached after the first successful
+       lookup so a second click does not repeat the round trip. */
+    var countWindowId = 0;
 
     VAS.VAS_158_OpenCountSheetsWidget = function () {
 
@@ -159,17 +162,6 @@
             };
 
             $closeBtn.on('click', closeModal);
-            $overlay.on('click', function (e) {
-                if ($(e.target).hasClass('vas-opencountsheets-modal-overlay')) {
-                    closeModal();
-                }
-            });
-
-            $(document).off('keydown.vas-opencountsheets').on('keydown.vas-opencountsheets', function (e) {
-                if (e.key === 'Escape' && $modalOverlay) {
-                    closeModal();
-                }
-            });
 
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_158_OpenCountSheetsWidget/GetDraftSheetsList",
@@ -381,13 +373,20 @@
         function openInventoryWindow(inventoryId) {
             if (!inventoryId) { return; }
 
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
-                "TabLayout": "Y",
-                "TabIndex": "0",
-                "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
-                "ActionType": "W"
-            });
+            if ($self.windowNo >= 0) {
+                /* Screen Landing Page */
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                    "TabLayout": "Y",
+                    "TabIndex": "0",
+                    "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
+                    "ActionType": "W"
+                });
+            } else {
+                /* From Home Page */
+                VAS.ZoomUtil.zoomToRecord("M_Inventory_ID", Number(inventoryId), countWindowId, "VAS_PhysicalInventory", "Physical Inventory")
+                    .done(function (id) { if (id > 0) { countWindowId = id; } });
+            }
 
             /* The navigation happens on the screen behind the popup, so the popup has to get out
                of the way - previously it stayed open on top of the record it had just opened. */

@@ -543,7 +543,6 @@
             }
 
             $dialog.find('.VAS-047-cash-in-dialog-close').on('click', closeDialog);
-            $dialog.find('.VAS-047-cash-in-dialog-scrim').on('click', closeDialog);
 
             $pagerPrev.on('click', function () {
                 if (rowsLoading || pageNo <= 1) {
@@ -561,13 +560,6 @@
 
                 pageNo++;
                 loadDialogRows();
-            });
-
-            eventNamespace = '.VAS047CashIn' + String(uid).replace(/[^A-Za-z0-9]/g, '');
-            $(document).on('keydown' + eventNamespace, function (event) {
-                if (event.key === 'Escape' && $dialog && $dialog.is(':visible')) {
-                    closeDialog();
-                }
             });
 
             $('body').append($dialog);

@@ -480,15 +480,6 @@
 
             $modalMask.find('.vas-211-mclose').on('click', closeModal);
             $modalMask.find('.vas-211-mback').on('click', backModal);
-            $modalMask.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas211', function (e) {
-                if (e.key === 'Escape' && $modalMask && $modalMask.hasClass('vas-211-open')) {
-                    closeModal();
-                }
-            });
         }
 
         function openModalShell(config, isBack) {
@@ -960,7 +951,6 @@
 
         this.disposeComponent = function () {
             closeModal();
-            $(document).off('keydown.vas211');
             if ($modalMask) {
                 $modalMask.remove();
                 $modalMask = null;

@@ -520,10 +520,7 @@
                 if (row) { openAgeModal(row); }
             });
 
-            $modal.on('click', '.MPC-ws-modal-close, .MPC-ws-modal-scrim', closeAgeModal);
-            $(document).on('keydown.MPCWarehouseStock-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget'), function (event) {
-                if (event.key === 'Escape') { closeAgeModal(); }
-            });
+            $modal.on('click', '.MPC-ws-modal-close', closeAgeModal);
         }
 
         this.Initalize = function () {

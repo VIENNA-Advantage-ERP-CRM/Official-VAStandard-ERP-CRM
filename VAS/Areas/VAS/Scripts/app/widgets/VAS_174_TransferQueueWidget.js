@@ -531,7 +531,6 @@
             $('body').append($modal);
 
             $modal.find('#vas174-m-close').on('click', closeModal);
-            $modal.find('.vas-174-modal-scrim').on('click', function (e) { if (e.target === this) { closeModal(); } });
             $modal.find('#vas174-m-prev').on('click', function () { if (modalPage > 1) { modalPage--; renderModal(); } });
             $modal.find('#vas174-m-next').on('click', function () { if (modalPage < totalPages) { modalPage++; renderModal(); } });
         }

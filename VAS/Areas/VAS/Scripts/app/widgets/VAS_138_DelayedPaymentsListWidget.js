@@ -389,7 +389,7 @@
         function createAllDialog() {
             $all = $(
                 '<div class="vas138-dialog" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(label('VAS_138_AllTitle', 'Overdue receivables')) + '">' +
-                    '<div class="vas138-scrim" data-all-close></div>' +
+                    '<div class="vas138-scrim"></div>' +
                     '<section class="vas138-panel">' +
                         '<header class="vas138-phead">' +
                             '<h2 class="vas138-ptitle">' + escapeHtml(label('VAS_138_AllTitle', 'Overdue receivables')) + '</h2>' +
@@ -520,7 +520,7 @@
         function createDetailDialog() {
             $detail = $(
                 '<div class="vas138-detail" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(label('VAS_138_CustomerDetails', 'Customer details')) + '">' +
-                    '<div class="vas138-scrim" data-detail-close></div>' +
+                    '<div class="vas138-scrim"></div>' +
                     '<section class="vas138-dpanel">' +
                         '<header class="vas138-phead"><h2 class="vas138-ptitle">' + escapeHtml(label('VAS_138_CustomerDetails', 'Customer details')) + '</h2>' +
                             '<div class="vas138-phead-right"><span class="vas138-dsummary"></span>' +
@@ -662,7 +662,7 @@
         function createProjectsDialog() {
             $proj = $(
                 '<div class="vas138-proj-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(label('VAS_138_ActiveProjects', 'Active projects')) + '">' +
-                    '<div class="vas138-scrim" data-proj-close></div>' +
+                    '<div class="vas138-scrim"></div>' +
                     '<section class="vas138-ppanel">' +
                         '<header class="vas138-phead"><h2 class="vas138-ptitle">' + escapeHtml(label('VAS_138_ActiveProjects', 'Active projects')) + '</h2>' +
                             '<div class="vas138-phead-right"><span class="vas138-psummary"></span>' +
@@ -717,13 +717,6 @@
             createDetailDialog();
             createProjectsDialog();
 
-            $(document).on('keydown.MPCvas138', function (event) {
-                if (event.key !== 'Escape') { return; }
-                else if ($proj && $proj.hasClass('is-open')) { closeProjects(); }
-                else if ($detail && $detail.hasClass('is-open')) { closeDetail(); }
-                else if ($all && $all.hasClass('is-open')) { closeAll(); }
-            });
-
             loadSummary();
             loadRows();
         };
@@ -737,7 +730,6 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            $(document).off('keydown.MPCvas138');
             if ($all) { $all.remove(); $all = null; }
             if ($detail) { $detail.remove(); $detail = null; }
             if ($proj) { $proj.remove(); $proj = null; }

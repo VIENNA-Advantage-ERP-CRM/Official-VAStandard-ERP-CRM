@@ -425,9 +425,6 @@
 
             $('body').append($elcMask);
             $elcMask.find('.vas-elc-mclose, .vas-elc-mbtn').on('click', closeCostModal);
-            $elcMask.on('mousedown', function (e) {
-                if (e.target === $elcMask[0]) { closeCostModal(); }
-            });
         }
 
         function closeCostModal() {

@@ -1,16 +1,17 @@
 /**
  * Categories Widget (KPI Card)
  * Widget number 110 - reassign on hand-off.
- * Shows the distinct count of active product categories; meta shows the
- * distinct parent-category count ("product families", per the dev =
- * M_Product_Category_Parent_ID).
+ * Shows the distinct count of active product categories. The meta line used
+ * to show the distinct parent-category count ("product families", per
+ * M_Product_Category_Parent_ID) but was removed on explicit request: this
+ * data has no category hierarchy configured, so the count was always 0 and
+ * never conveyed anything to the user.
  * Backend - VAS_110_CategoriesWidget/GetCategories
  * Summary Message Table
  *  # | Current Text       | Message Key
  * ---+--------------------+------------------------------
  *  1 | Categories         | VAS_110_Categories
- *  2 | product families   | VAS_110_ProductFamilies
- *  3 | Couldn't load      | VAS_CouldntLoad
+ *  2 | Couldn't load      | VAS_CouldntLoad
  */
 ; VAS = window.VAS || {};
 
@@ -23,7 +24,6 @@
 
         var $root = $('<div class="MPC-categories-root">');
         var $value;
-        var $meta;
         var request;
 
         function label(key, fallback) {
@@ -49,8 +49,7 @@
                     if (typeof result === 'string' && result) { result = JSON.parse(result); }
 
                     if (result && !result.error) {
-                        $value.text(formatCount(result.category_count));
-                        $meta.text(formatCount(result.family_count) + ' ' + label('VAS_110_ProductFamilies', 'product families'));
+                        $value.removeAttr('title').text(formatCount(result.category_count));
                         return;
                     }
 
@@ -63,8 +62,7 @@
         }
 
         function showError() {
-            $value.text('—');
-            $meta.text(label('VAS_CouldntLoad', "Couldn't load"));
+            $value.text('—').attr('title', label('VAS_CouldntLoad', "Couldn't load"));
         }
 
         this.Initalize = function () {
@@ -72,13 +70,11 @@
                 '<div class="MPC-categories-card" aria-live="polite">' +
                     '<div class="MPC-categories-label"></div>' +
                     '<div class="MPC-categories-value">—</div>' +
-                    '<div class="MPC-categories-meta"></div>' +
                 '</div>'
             );
 
             $card.find('.MPC-categories-label').text(label('VAS_110_Categories', 'Categories'));
             $value = $card.find('.MPC-categories-value');
-            $meta = $card.find('.MPC-categories-meta');
             $root.append($card);
             loadCategories();
         };

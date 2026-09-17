@@ -396,8 +396,6 @@
             $(document).on('keydown' + namespace, function (event) {
                 if (event.key !== 'Escape') { return; }
                 if ($confirm && $confirm.hasClass('is-open')) { closeConfirm(); return; }
-                if ($detail && $detail.hasClass('is-open')) { closeDetail(); return; }
-                if ($list && $list.hasClass('is-open')) { closeList(); return; }
                 closeSuggestions();
             });
 
@@ -553,7 +551,7 @@
         function createDetailDialog() {
             $detail = $(
                 '<div class="vas241-modal" role="dialog" aria-modal="true" aria-hidden="true">' +
-                    '<div class="vas241-scrim" data-detail-close></div>' +
+                    '<div class="vas241-scrim"></div>' +
                     '<section class="vas241-panel">' +
                         '<header class="vas241-mhead">' +
                             '<h2 class="vas241-mtitle">' + escapeHtml(label('VAS_241_ContractTitle', 'Service Contract')) + '</h2>' +
@@ -825,7 +823,7 @@
         function createListDialog() {
             $list = $(
                 '<div class="vas241-dialog" role="dialog" aria-modal="true" aria-hidden="true">' +
-                    '<div class="vas241-scrim" data-list-close></div>' +
+                    '<div class="vas241-scrim"></div>' +
                     '<section class="vas241-panel">' +
                         '<header class="vas241-phead"><h2 class="vas241-ptitle"></h2>' +
                             '<button type="button" class="vas241-close" data-list-close aria-label="' + escapeHtml(label('VAS_241_Close', 'Close')) + '">' + icon('close') + '</button></header>' +

@@ -349,18 +349,6 @@
             $header.find('.vas-207-mclose').on('click', closeModal);
             $foot.find('.vas-207-close-btn').on('click', closeModal);
 
-            $overlay.on('click', function (e) {
-                if ($(e.target).hasClass('vas-207-mask')) {
-                    closeModal();
-                }
-            });
-
-            $(document).off('keydown.vas207modal').on('keydown.vas207modal', function (e) {
-                if (e.key === 'Escape' && $activeModalOverlay) {
-                    closeModal();
-                }
-            });
-
             $header.find('.vas-207-mback').on('click', function () {
                 if (modalStack.length > 0) {
                     var prevView = modalStack.pop();

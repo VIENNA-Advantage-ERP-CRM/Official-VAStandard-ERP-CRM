@@ -412,10 +412,6 @@
             $dialogBusy = $dialog.find('.vas-rag-modal-busy');
 
             $dialog.find('.vas-rag-modal-close').on('click', closeDetail);
-            $dialog.find('.vas-rag-scrim').on('click', closeDetail);
-            $(document).on('keydown.vas-rag', function (e) {
-                if (e.key === 'Escape' && !$dialog.hasClass('vas-rag-hidden')) { closeDetail(); }
-            });
 
             $('body').append($dialog);
         }
@@ -526,7 +522,6 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-rag');
             $('body').removeClass('vas-rag-body-lock');
             if (rowResizeObserver) { rowResizeObserver.disconnect(); rowResizeObserver = null; }
             if ($dialog) { $dialog.remove(); $dialog = null; }

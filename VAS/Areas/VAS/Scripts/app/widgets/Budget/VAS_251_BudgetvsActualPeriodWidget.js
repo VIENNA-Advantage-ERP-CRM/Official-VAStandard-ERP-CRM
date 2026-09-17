@@ -870,7 +870,6 @@
             $dlgFoot.empty();
 
             $dlg.removeClass('vas-251-hidden');
-            $(document).on('keydown' + _ns + '_dlg', onDialogKeyDown);
 
             /* NOTHING BEHIND THE SCRIM STAYS LIT. The class suppresses the column's hover and
                focus treatment for as long as the panel is up - a belt to the focus move's
@@ -949,7 +948,6 @@
             if (!$dlg) { return; }
 
             $dlg.addClass('vas-251-hidden');
-            $(document).off('keydown' + _ns + '_dlg');
 
             /* The chart is interactive again the moment the scrim is gone. */
             if ($root) { $root.removeClass('vas-251-modal-open'); }
@@ -982,10 +980,6 @@
             if (inDialog || inCard) {
                 try { active.blur(); } catch (e) { /* ignore */ }
             }
-        }
-
-        function onDialogKeyDown(e) {
-            if (e.key === 'Escape' || e.keyCode === 27) { closeDialog(); }
         }
 
         function showDialogBusy(on) {

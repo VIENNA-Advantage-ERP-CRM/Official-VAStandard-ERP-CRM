@@ -30,6 +30,9 @@
 
     // Window name/search key for the Inventory Count screen - the counts tab navigates here.
     var COUNT_WINDOW_NAME = "VAS_PhysicalInventory";
+    /* Resolved AD_Window_ID for the Home Page zoom path, cached after the first successful
+       lookup so a second click does not repeat the round trip. */
+    var countWindowId = 0;
 
     /* Database text was being concatenated straight into innerHTML throughout this widget. The
        source prompt requires the opposite: "Use textContent when rendering database text. If a
@@ -359,17 +362,6 @@
             };
 
             $closeBtn.on('click', closeModal);
-            $overlay.on('click', function (e) {
-                if ($(e.target).hasClass('vas-stocksearch-modal-overlay')) {
-                    closeModal();
-                }
-            });
-
-            $(document).off('keydown.vas-stocksearch').on('keydown.vas-stocksearch', function (e) {
-                if (e.key === 'Escape' && $modalOverlay) {
-                    closeModal();
-                }
-            });
 
             // Fetch Locators
             $.ajax({
@@ -411,13 +403,20 @@
         function openCountRecord(inventoryId) {
             if (!inventoryId) { return; }
             if ($modalOverlay) { $modalOverlay.remove(); $modalOverlay = null; }
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
-                "TabLayout": "Y",
-                "TabIndex": "0",
-                "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
-                "ActionType": "W"
-            });
+            if ($self.windowNo >= 0) {
+                /* Screen Landing Page */
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                    "TabLayout": "Y",
+                    "TabIndex": "0",
+                    "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
+                    "ActionType": "W"
+                });
+            } else {
+                /* From Home Page */
+                VAS.ZoomUtil.zoomToRecord("M_Inventory_ID", Number(inventoryId), countWindowId, "VAS_PhysicalInventory", "Physical Inventory")
+                    .done(function (id) { if (id > 0) { countWindowId = id; } });
+            }
         }
 
         function fetchCountHistory(prodItem, $container) {

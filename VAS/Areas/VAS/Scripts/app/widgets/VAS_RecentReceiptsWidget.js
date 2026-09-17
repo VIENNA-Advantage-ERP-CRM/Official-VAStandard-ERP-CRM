@@ -923,16 +923,6 @@
                 closeDialog();
             });
 
-            $dialog.find('.vas-rr-dialog-scrim').on('click', function () {
-                closeDialog();
-            });
-
-            $(document).on('keydown.vas-rr', function (e) {
-                if (e.key === 'Escape' && $dialog.is(':visible')) {
-                    closeDialog();
-                }
-            });
-
             /* Attached to <body> so fixed positioning escapes any
                transformed dashboard ancestor. */
             $('body').append($dialog);
@@ -1070,7 +1060,6 @@
         };
 
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-rr');
             $('body').removeClass('vas-rr-body-lock');
 
             if ($dialog) {

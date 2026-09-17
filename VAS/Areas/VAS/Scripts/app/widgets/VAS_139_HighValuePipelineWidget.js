@@ -424,7 +424,7 @@
         function createPipelineDialog() {
             $pipe = $(
                 '<div class="vas139-pipe" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(label('VAS_139_Pipeline', 'Pipeline')) + '">' +
-                    '<div class="vas139-scrim" data-pipe-close></div>' +
+                    '<div class="vas139-scrim"></div>' +
                     '<section class="vas139-dpanel">' +
                         '<header class="vas139-phead"><h2 class="vas139-ptitle">' + escapeHtml(label('VAS_139_Pipeline', 'Pipeline')) + '</h2>' +
                             '<div class="vas139-phead-right"><span class="vas139-pcust"></span>' +
@@ -539,7 +539,7 @@
         function createDetailDialog() {
             $detail = $(
                 '<div class="vas139-detail" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(label('VAS_139_CustomerDetails', 'Customer details')) + '">' +
-                    '<div class="vas139-scrim" data-detail-close></div>' +
+                    '<div class="vas139-scrim"></div>' +
                     '<section class="vas139-dpanel">' +
                         '<header class="vas139-phead"><h2 class="vas139-ptitle">' + escapeHtml(label('VAS_139_CustomerDetails', 'Customer details')) + '</h2>' +
                             '<div class="vas139-phead-right"><span class="vas139-dsummary"></span>' +
@@ -590,12 +590,6 @@
             createPipelineDialog();
             createDetailDialog();
 
-            $(document).on('keydown.MPCvas139', function (event) {
-                if (event.key !== 'Escape') { return; }
-                if ($detail && $detail.hasClass('is-open')) { closeDetail(); }
-                else if ($pipe && $pipe.hasClass('is-open')) { closePipeline(); }
-            });
-
             loadRows();
         };
 
@@ -607,7 +601,6 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            $(document).off('keydown.MPCvas139');
             if ($pipe) { $pipe.remove(); $pipe = null; }
             if ($detail) { $detail.remove(); $detail = null; }
             $('body').removeClass('vas139-modal-open');

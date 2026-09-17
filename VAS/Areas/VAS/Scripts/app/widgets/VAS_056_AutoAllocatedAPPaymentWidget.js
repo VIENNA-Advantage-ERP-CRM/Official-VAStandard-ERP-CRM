@@ -1788,9 +1788,7 @@
             $dialog.find(
                 "." +
                 classPrefix +
-                "dialog-close, ." +
-                classPrefix +
-                "dialog-scrim"
+                "dialog-close"
             ).on(
                 "click",
                 closeDialog
@@ -1845,20 +1843,6 @@
                     state.loaded = false;
 
                     loadRows();
-                }
-            );
-
-            $(document).on(
-                "keydown.VAS-056-AutoAllocatedAPPayment-" +
-                self.AD_UserHomeWidgetID,
-
-                function (event) {
-                    if (
-                        event.key === "Escape" &&
-                        $dialog.is(":visible")
-                    ) {
-                        closeDialog();
-                    }
                 }
             );
 

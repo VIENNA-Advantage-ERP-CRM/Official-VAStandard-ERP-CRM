@@ -1539,12 +1539,6 @@
                     closeDialog();
                 });
 
-            $dialog
-                .find('.vas-ptm-dialog-scrim')
-                .on('click', function () {
-                    closeDialog();
-                });
-
             $pagerPrev.on('click', function () {
                 if (
                     rowsLoading ||
@@ -1568,20 +1562,6 @@
                 pageNo++;
                 loadRows();
             });
-
-            $(document).on(
-                'keydown.vas-ptm-dialog-' +
-                self.AD_UserHomeWidgetID,
-                function (e) {
-                    if (
-                        e.key === 'Escape' &&
-                        $dialog &&
-                        $dialog.is(':visible')
-                    ) {
-                        closeDialog();
-                    }
-                }
-            );
 
             $('body').append($dialog);
 

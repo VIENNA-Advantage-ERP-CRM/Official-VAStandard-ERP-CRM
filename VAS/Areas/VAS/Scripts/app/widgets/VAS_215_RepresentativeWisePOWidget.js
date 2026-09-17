@@ -527,17 +527,6 @@
                     popModal();
                 });
 
-                $modalHost.on('click', function (e) {
-                    if (e.target === $modalHost[0]) {
-                        closeModal();
-                    }
-                });
-
-                $(document).off('keydown.vas_rwpo_esc').on('keydown.vas_rwpo_esc', function (e) {
-                    if (e.key === 'Escape' && $modalHost.hasClass('vas-rwpo-open')) {
-                        closeModal();
-                    }
-                });
             }
             return $modalHost;
         }

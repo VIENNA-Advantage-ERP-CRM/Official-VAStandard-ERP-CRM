@@ -552,8 +552,6 @@
                 e.stopPropagation();
                 closeDialog();
             });
-            $dialog.find('.vas-ce-dialog-scrim').on('click', function () { closeDialog(); });
-
             $pagerPrev.on('click', function () {
                 if (rowsLoading || pageNo <= 1) { return; }
                 pageNo--;
@@ -565,9 +563,6 @@
                 loadAging();
             });
 
-            $(document).on('keydown.vas-ce', function (e) {
-                if (e.key === 'Escape' && $dialog.is(':visible')) { closeDialog(); }
-            });
 
             $('body').append($dialog);
         }

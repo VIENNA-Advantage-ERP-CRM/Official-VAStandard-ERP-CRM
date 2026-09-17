@@ -1114,8 +1114,7 @@
                 );
 
                 $dialog.find(
-                    ".VAS-glje-dialog-close, " +
-                    ".VAS-glje-dialog-scrim"
+                    ".VAS-glje-dialog-close"
                 ).on(
                     "click",
                     closeDialog
@@ -1257,22 +1256,6 @@
                             loadDialogRows();
                         }
                     );
-
-                $(document).on(
-                    "keydown.VAS-glje-" +
-                    id,
-                    function (event) {
-                        if (
-                            event.key === "Escape" &&
-                            !VAS.GLJournalDetailDialog.isBusy() &&
-                            !VAS.GLJournalDetailDialog.isOpen() &&
-                            $dialog &&
-                            $dialog.is(":visible")
-                        ) {
-                            closeDialog();
-                        }
-                    }
-                );
 
                 $("body").append(
                     $dialog

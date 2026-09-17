@@ -4533,8 +4533,7 @@
             $payDialog
                 .find(
                     '.vas-upcoming-ap-runs-pay-close,' +
-                    '.vas-upcoming-ap-runs-pay-cancel,' +
-                    '.vas-upcoming-ap-runs-pay-scrim'
+                    '.vas-upcoming-ap-runs-pay-cancel'
                 )
                 .on(
                     'click',
@@ -4547,21 +4546,6 @@
                 'click',
                 function () {
                     savePayDialog();
-                }
-            );
-
-            $(document).on(
-                'keydown.vas-upcoming-ap-runs-' +
-                $self.AD_UserHomeWidgetID,
-
-                function (event) {
-                    if (
-                        event.key === 'Escape' &&
-                        $payDialog &&
-                        $payDialog.is(':visible')
-                    ) {
-                        closePayDialog();
-                    }
                 }
             );
 
@@ -4863,11 +4847,6 @@
             isDisposed = true;
 
             stopAdaptiveRowObserver();
-
-            $(document).off(
-                'keydown.vas-upcoming-ap-runs-' +
-                $self.AD_UserHomeWidgetID
-            );
 
             selectedRun = null;
             selectedInvoiceRow = null;

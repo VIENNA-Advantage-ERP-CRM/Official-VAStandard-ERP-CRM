@@ -469,17 +469,6 @@
                     popModal();
                 });
 
-                $modalHost.on('click', function (e) {
-                    if (e.target === $modalHost[0]) {
-                        closeModal();
-                    }
-                });
-
-                $(document).off('keydown.vas_t10v_esc').on('keydown.vas_t10v_esc', function (e) {
-                    if (e.key === 'Escape' && $modalHost.hasClass('vas-t10v-open')) {
-                        closeModal();
-                    }
-                });
             }
             return $modalHost;
         }
@@ -942,7 +931,6 @@
                 widgetObserver.disconnect();
                 widgetObserver = null;
             }
-            $(document).off('keydown.vas_t10v_esc');
             if ($modalHost) {
                 $modalHost.remove();
                 $modalHost = null;

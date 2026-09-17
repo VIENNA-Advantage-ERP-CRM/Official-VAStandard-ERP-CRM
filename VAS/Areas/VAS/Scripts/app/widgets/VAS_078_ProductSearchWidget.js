@@ -58,6 +58,7 @@
         var $self = this;
         var $root = $('<div class="MPC-product-search-root">');
         var $input;
+        var $clearBtn;
         var $suggest;
         var $dialog;
         var $dialogTitle;
@@ -316,10 +317,12 @@
                         '<input class="MPC-product-search-input" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="MPC-product-search-suggestions-' + escapeHtml($self.windowNo || '') + '" placeholder="' + escapeHtml(placeholder) + '">' +
                     '</span>' +
                     '<span class="MPC-product-search-helper">' + escapeHtml(helper) + '</span>' +
+                    '<button type="button" class="MPC-product-search-clear" aria-label="' + escapeHtml(label('Clear', 'Clear')) + '" hidden>' + icon('close') + '</button>' +
                 '</div>'
             );
 
             $input = $root.find('.MPC-product-search-input');
+            $clearBtn = $root.find('.MPC-product-search-clear');
         }
 
         function createSuggestionList() {
@@ -330,16 +333,34 @@
             $('body').append($suggest);
         }
 
+        // Flips the popover above the search pill when there is not enough room below it (e.g. the
+        // widget sits near the bottom of the dashboard/viewport) but more room above - otherwise
+        // the list was clipped/hidden behind whatever sits below the viewport (taskbar, page edge).
+        // scrollHeight is read before repositioning since it reflects the content's natural height
+        // regardless of the popover's current on-screen position.
         function positionSuggest() {
             if (!$suggest) { return; }
             var pill = $root.find('.MPC-product-search-pill')[0];
             if (!pill) { return; }
             var rect = pill.getBoundingClientRect();
+            var gap = 6;
+            var suggestHeight = $suggest[0].scrollHeight;
+            var spaceBelow = window.innerHeight - rect.bottom - gap;
+            var spaceAbove = rect.top - gap;
+            var openAbove = suggestHeight > spaceBelow && spaceAbove > spaceBelow;
+
             $suggest.css({
                 left: Math.round(rect.left) + 'px',
-                top: Math.round(rect.bottom + 6) + 'px',
-                width: Math.round(rect.width) + 'px'
+                width: Math.round(rect.width) + 'px',
+                maxHeight: Math.round(Math.max(spaceBelow, spaceAbove, 0)) + 'px',
+                overflowY: 'auto'
             });
+
+            if (openAbove) {
+                $suggest.css({ top: 'auto', bottom: Math.round(window.innerHeight - rect.top + gap) + 'px' });
+            } else {
+                $suggest.css({ bottom: 'auto', top: Math.round(rect.bottom + gap) + 'px' });
+            }
         }
 
         function createDialog() {
@@ -374,12 +395,21 @@
             });
             $input.on('keydown', handleInputKeydown);
 
+            $clearBtn.on('click', function () {
+                if (searchTimer) { clearTimeout(searchTimer); }
+                requestSequence += 1;
+                $input.val('');
+                $clearBtn.prop('hidden', true);
+                closeSuggestions();
+                $input.trigger('focus');
+            });
+
             $suggest.on('mousedown', '.MPC-product-search-option', function (event) {
                 event.preventDefault();
                 selectSuggestion(Number($(this).attr('data-index')));
             });
 
-            $dialog.on('click', '.MPC-product-search-dialog-close, .MPC-product-search-dialog-scrim', closeDialog);
+            $dialog.on('click', '.MPC-product-search-dialog-close', closeDialog);
             $dialog.on('click', '.MPC-product-search-open-record', function () {
                 zoomProductRecord(currentProductId);
             });
@@ -401,8 +431,7 @@
             });
             $(document).on('keydown' + eventNamespace, function (event) {
                 if (event.key !== 'Escape') { return; }
-                if ($dialog.hasClass('is-open')) { closeDialog(); }
-                else { closeSuggestions(); }
+                closeSuggestions();
             });
 
             $(window).on('scroll' + eventNamespace, closeSuggestions);
@@ -420,6 +449,7 @@
             if (searchTimer) { clearTimeout(searchTimer); }
 
             var searchText = $input.val().trim();
+            if ($clearBtn) { $clearBtn.prop('hidden', !searchText); }
             if (!searchText) {
                 requestSequence += 1;
                 closeSuggestions();

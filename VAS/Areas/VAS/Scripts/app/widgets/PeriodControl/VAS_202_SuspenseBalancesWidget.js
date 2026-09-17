@@ -867,7 +867,6 @@
             _modalOpen = true;
             closePicker();
 
-            $(document).on('keydown' + _ns + 'm', onModalKeyDown);
             $overlay.find('.vas-202-modal-close').focus();
 
             loadModalPage();
@@ -906,7 +905,6 @@
             _detailSeq++;                       // drop any page still in flight
             showModalBusy(false);
             if ($overlay) { $overlay.addClass('vas-202-hidden'); }
-            $(document).off('keydown' + _ns + 'm');
 
             /* Focus goes back to the row that opened the dialog - a keyboard user must
                not be dropped at the top of the document. */
@@ -914,10 +912,6 @@
                 try { _returnFocusTo.focus(); } catch (e) { }
                 _returnFocusTo = null;
             }
-        }
-
-        function onModalKeyDown(e) {
-            if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
         }
 
         function showModalBusy(show) {

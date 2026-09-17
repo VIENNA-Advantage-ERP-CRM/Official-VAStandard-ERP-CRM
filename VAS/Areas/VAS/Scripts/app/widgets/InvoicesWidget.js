@@ -1163,9 +1163,8 @@
                 else if (act === 'void') { doReverseNewer(set); }
             });
 
-            /* X and backdrop dismiss the dialog. */
+            /* Only the explicit Close (X) button dismisses the dialog. */
             overlay.on('click', '.vas-dup-close', function () { closeReview(); });
-            overlay.on('click', function (e) { if (e.target === overlay[0]) closeReview(); });
 
             return overlay;
         }
@@ -1178,13 +1177,9 @@
             /* Force a reflow so the open transition runs, then reveal. */
             if ($review[0]) { void $review[0].offsetHeight; }
             $review.addClass('is-open');
-            $(document).on('keydown.vasInvDup', function (e) {
-                if (e.key === 'Escape' || e.keyCode === 27) closeReview();
-            });
         }
 
         function closeReview() {
-            $(document).off('keydown.vasInvDup');
             if ($review) {
                 $review.remove();
                 $review = null;

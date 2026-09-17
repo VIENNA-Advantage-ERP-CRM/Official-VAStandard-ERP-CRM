@@ -43,6 +43,14 @@
         var $metaEl;
         var $busy;
         var lastCount = 0;
+        // DB-ready date literals for the current month window (Oracle TO_DATE(...) or
+        // CAST(...AS DATE) elsewhere, per the controller's ToSqlDate) - populated from
+        // the KPI response and reused verbatim by openIssuedMTDList's TabWhereClause,
+        // instead of that click handler reconstructing the same month window with
+        // Oracle-only SYSDATE/TRUNC/ADD_MONTHS syntax (broke the drill-through on
+        // this install's actual Postgres backend).
+        var monthStartSql = null;
+        var nextMonthStartSql = null;
 
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
@@ -156,7 +164,9 @@
             // Keep in lock-step with GetIssuedMTDCountData in the controller. This drills through
             // at DOCUMENT level, so it can carry the IsInternalUse filter but not the line-level
             // QtyInternalUse one - it lands on the issue documents behind the counted lines.
-            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL') AND COALESCE(M_Inventory.IsInternalUse, 'N') = 'Y' AND M_Inventory.MovementDate >= TRUNC(SYSDATE, 'MM') AND M_Inventory.MovementDate < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
+            if (!monthStartSql || !nextMonthStartSql) { return; }
+
+            var where = "M_Inventory.IsActive = 'Y' AND M_Inventory.DocStatus IN ('CO', 'CL') AND COALESCE(M_Inventory.IsInternalUse, 'N') = 'Y' AND M_Inventory.MovementDate >= " + monthStartSql + " AND M_Inventory.MovementDate < " + nextMonthStartSql;
             var windowParam = {
                 "TabWhereClause": where,
                 "TabLayout": "N",
@@ -199,6 +209,30 @@
 //        }
 // ----- END OLD CODE -----
 
+        function showBusy(show) {
+            if (!$busy || !$busy[0]) { return; }
+            $busy.toggleClass('vas-imtd-hidden', !show);
+        }
+
+        function loadKpi() {
+            showBusy(true);
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_180_IssuedMTDWidget/GetIssuedMTDCount',
+                type: 'GET',
+                cache: false,
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data.error) { setError(); return; }
+                    monthStartSql = data.monthStartSql || null;
+                    nextMonthStartSql = data.nextMonthStartSql || null;
+                    renderMetric(data);
+                },
+                error: function () { setError(); },
+                complete: function () { showBusy(false); }
+            });
+        }
+
         function createWidget() {
             var title = label("VAS_180_IssuedMTD", "Issued MTD");
             $card = $(
@@ -218,6 +252,11 @@
             $busy = $('<div class="vas-imtd-busy vas-imtd-hidden"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $root.append($busy);
         }
+
+        this.Initalize = function () {
+            createWidget();
+            loadKpi();
+        };
 
         this.refreshWidget = function () {
             loadKpi();

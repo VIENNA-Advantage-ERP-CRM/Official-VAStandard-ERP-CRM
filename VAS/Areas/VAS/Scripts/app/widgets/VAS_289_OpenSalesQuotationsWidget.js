@@ -475,15 +475,10 @@
 
             $closeBtn.on('click', closeModal);
             $mBack.on('click', backModal);
-            $mask.on('mousedown', function (event) { if (event.target === $mask[0]) { closeModal(); } });
         }
 
         function bindDocumentLevelEvents() {
             var ns = '.vas289-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget');
-            $(document).on('keydown' + ns, function (event) {
-                if (event.key !== 'Escape') { return; }
-                if ($mask.hasClass('is-open')) { closeModal(); }
-            });
             $(window).on('resize' + ns, function () {
                 if ($mask.hasClass('is-open')) { fitAllTables(); }
             });

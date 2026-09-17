@@ -936,7 +936,6 @@
             $dlg.find('.vas-235-dlg-sub').text('');
 
             $dlg.removeClass('vas-235-hidden');
-            $(document).on('keydown' + _ns + '_dlg', onDialogKeyDown);
 
             fetchDetail(1);
             $dlg.find('.vas-235-x').focus();
@@ -950,7 +949,6 @@
             if (!$dlg) { return; }
 
             $dlg.addClass('vas-235-hidden');
-            $(document).off('keydown' + _ns + '_dlg');
 
             _dlgBucket = '';
             _dlgLoading = false;
@@ -963,10 +961,6 @@
                 try { _dlgTrigger.focus(); } catch (e) { /* ignore */ }
                 _dlgTrigger = null;
             }
-        }
-
-        function onDialogKeyDown(e) {
-            if (e.key === 'Escape' || e.keyCode === 27) { closeDialog(); }
         }
 
         function bucketLabelOf(bucketKey) {
@@ -1323,7 +1317,6 @@
             _disposed = true;
 
             closePicker();
-            $(document).off('keydown' + _ns + '_dlg');
 
             if (_rootObserver) {
                 try { _rootObserver.disconnect(); } catch (e) { /* ignore */ }

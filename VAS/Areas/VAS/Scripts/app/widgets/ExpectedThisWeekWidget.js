@@ -518,10 +518,6 @@
                 closeDialog();
             });
 
-            $dialog.find('.vas-etw-dialog-scrim').on('click', function () {
-                closeDialog();
-            });
-
             $pagerPrev.on('click', function () {
                 if (rowsLoading || pageNo <= 1) { return; }
                 pageNo--;
@@ -532,12 +528,6 @@
                 if (rowsLoading || pageNo >= totalPages) { return; }
                 pageNo++;
                 loadRows();
-            });
-
-            $(document).on('keydown.vas-etw', function (e) {
-                if (e.key === 'Escape' && $dialog.is(':visible')) {
-                    closeDialog();
-                }
             });
 
             $('body').append($dialog);

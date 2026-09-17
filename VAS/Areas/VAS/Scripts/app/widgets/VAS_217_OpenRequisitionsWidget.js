@@ -605,17 +605,6 @@
                     popModal();
                 });
 
-                $modalHost.on('click', function (e) {
-                    if (e.target === $modalHost[0]) {
-                        closeModal();
-                    }
-                });
-
-                $(document).off('keydown.vas_217_esc').on('keydown.vas_217_esc', function (e) {
-                    if (e.key === 'Escape' && $modalHost.hasClass('open')) {
-                        closeModal();
-                    }
-                });
             }
             return $modalHost;
         }

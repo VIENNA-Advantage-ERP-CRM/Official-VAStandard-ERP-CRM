@@ -297,17 +297,6 @@
             };
 
             $closeBtn.on('click', closeModal);
-            $overlay.on('click', function (e) {
-                if ($(e.target).hasClass('vas-invaging-modal-overlay')) {
-                    closeModal();
-                }
-            });
-
-            $(document).off('keydown.vas-invaging').on('keydown.vas-invaging', function (e) {
-                if (e.key === 'Escape' && $modalOverlay) {
-                    closeModal();
-                }
-            });
 
             // Fetch Bucket Details
             var url = VIS.Application.contextUrl + "VAS_163_InventoryAgingReportWidget/GetBucketDetail?bucketId=" + encodeURIComponent(bConfig.id);
@@ -426,13 +415,20 @@
                     var item = pageItems[i];
                     var formattedQty = Number(item.qty || 0).toLocaleString();
 
+                    /* Blank when the product has no attribute - no hyphen, no "Standard". Some
+                       attribute set instances carry a lone dash ("-"/"–"/"—") as their
+                       stored Description instead of being genuinely empty; treat that the same
+                       as no attribute rather than displaying it as if it were real data. */
+                    var rawAttribute = item.attribute || '';
+                    var attributeIsBlank = !rawAttribute.trim() || /^[-‐-―]+$/.test(rawAttribute.trim());
+                    var attributeText = attributeIsBlank ? '' : rawAttribute;
+
                     var $mRow = $(
                         '<div class="vas-invaging-modal-grid-template vas-invaging-modal-data-row">' +
                         '<div class="vas-invaging-cell">' +
                         '<div class="vas-invaging-prod-name" title="' + item.product + '">' + item.product + '</div>' +
-                        /* Blank when the product has no attribute - no hyphen, no "Standard".
-                           The element is still rendered so the row keeps its height. */
-                        '<div class="vas-invaging-prod-attr" title="' + (item.attribute || '') + '">' + (item.attribute || '&nbsp;') + '</div>' +
+                        /* The element is still rendered (with &nbsp;) so the row keeps its height. */
+                        '<div class="vas-invaging-prod-attr" title="' + attributeText + '">' + (attributeText || '&nbsp;') + '</div>' +
                         '</div>' +
                         '<div class="vas-invaging-cell vas-invaging-cell-text" title="' + item.warehouse + '">' + item.warehouse + '</div>' +
                         '<div class="vas-invaging-cell vas-invaging-cell-text" title="' + item.locator + '">' + item.locator + '</div>' +

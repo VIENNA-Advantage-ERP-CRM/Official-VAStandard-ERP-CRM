@@ -31,6 +31,9 @@
     // Window name / search key for the Inventory Count (Physical Inventory) screen. Window IDs
     // differ per installation, so the screen is resolved by NAME - never by a hardcoded id.
     var COUNT_WINDOW_NAME = "VAS_PhysicalInventory";
+    /* Resolved AD_Window_ID for the Home Page zoom path, cached after the first successful
+       lookup so a second click does not repeat the round trip. */
+    var countWindowId = 0;
 
     function ensureDashInlineSizeVar($el) {
         var container = $el.closest('.vis-widget-container, [data-dashboard-container], .vis-widget-body, body')[0] || document.documentElement;
@@ -289,7 +292,7 @@
         }
 
         function bindModalEvents() {
-            $modalOverlay.find('.vas-neg-var-modal-close, .vas-neg-var-modal-scrim').on('click', function (e) {
+            $modalOverlay.find('.vas-neg-var-modal-close').on('click', function (e) {
                 e.preventDefault();
                 closeModal();
             });
@@ -306,12 +309,6 @@
                 if (currentPage < maxPages) {
                     currentPage++;
                     fetchModalPage(currentPage);
-                }
-            });
-
-            $(window).on('keydown.vasNegVarModal', function (e) {
-                if (isModalOpen && e.key === 'Escape') {
-                    closeModal();
                 }
             });
 
@@ -472,13 +469,20 @@
 
             closeModal();
 
-            $self.widgetFirevalueChanged({
-                "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(mInventoryId),
-                "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
-                "TabIndex": "0",
-                "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
-                "ActionType": "W"
-            });
+            if ($self.windowNo >= 0) {
+                /* Screen Landing Page */
+                $self.widgetFirevalueChanged({
+                    "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(mInventoryId),
+                    "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                    "TabIndex": "0",
+                    "ActionName": hostWindowName() || COUNT_WINDOW_NAME,
+                    "ActionType": "W"
+                });
+            } else {
+                /* From Home Page */
+                VAS.ZoomUtil.zoomToRecord("M_Inventory_ID", Number(mInventoryId), countWindowId, "VAS_PhysicalInventory", "Physical Inventory")
+                    .done(function (id) { if (id > 0) { countWindowId = id; } });
+            }
         }
 
         this.refreshData = function () {

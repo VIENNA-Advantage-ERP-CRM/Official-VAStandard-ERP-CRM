@@ -249,15 +249,12 @@
             $modal.find('.MPC-cm-modal-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
-            $modal.on('click' + modalEventNamespace, '.MPC-cm-modal-close, .MPC-cm-modal-scrim', closeModal);
+            $modal.on('click' + modalEventNamespace, '.MPC-cm-modal-close', closeModal);
             $modal.on('click' + modalEventNamespace, '.MPC-cm-mp-prev', function () {
                 if (modalState.page > 0) { modalState.page--; renderModalPage(); }
             });
             $modal.on('click' + modalEventNamespace, '.MPC-cm-mp-next', function () {
                 modalState.page++; renderModalPage();
-            });
-            $(document).on('keydown' + modalEventNamespace, function (event) {
-                if (event.key === 'Escape') { closeModal(); }
             });
         }
 
@@ -497,7 +494,6 @@
             $root.off('.' + eventNamespace);
             if ($prevButton) { $prevButton.off('.' + eventNamespace); }
             if ($nextButton) { $nextButton.off('.' + eventNamespace); }
-            $(document).off('keydown' + modalEventNamespace);
             if ($modal) { $modal.remove(); $modal = null; }
             $root.remove();
             state.categories = [];

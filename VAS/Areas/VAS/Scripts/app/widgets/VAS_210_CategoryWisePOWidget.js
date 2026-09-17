@@ -403,20 +403,10 @@
             $modal.find('.vas-cpow-m-close, .vas-cpow-m-close-btn').on('click', closeModal);
             $modal.find('.vas-cpow-m-back').on('click', backModal);
 
-            $modal.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
-            });
-
-            $(document).off('keydown.vas-cpow');
-            $(document).on('keydown.vas-cpow', function (e) {
-                if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
-            });
-
             if (cfg.afterRender) { cfg.afterRender($modal); }
         }
 
         function closeModal() {
-            $(document).off('keydown.vas-cpow');
             if ($modal) { $modal.remove(); $modal = null; }
             modalStack = [];
             currentModalConfig = null;
@@ -761,7 +751,6 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-cpow');
             if ($modal) { $modal.remove(); $modal = null; }
             $root.remove();
         };

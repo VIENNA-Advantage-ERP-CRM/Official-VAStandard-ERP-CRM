@@ -381,12 +381,6 @@
             $('body').append($modal);
 
             $modal.on('click' + modalEventNamespace, '.MPC-dow-m-close', closeModal);
-            $modal.on('click' + modalEventNamespace, function (event) {
-                if (event.target === $modal[0]) { closeModal(); }
-            });
-            $(document).on('keydown' + modalEventNamespace, function (event) {
-                if (event.key === 'Escape') { closeModal(); }
-            });
         }
 
         function openModal(index) {
@@ -572,7 +566,6 @@
             if ($yearSelect) { $yearSelect.off('.' + eventNamespace); }
             if ($prevButton) { $prevButton.off('.' + eventNamespace); }
             if ($nextButton) { $nextButton.off('.' + eventNamespace); }
-            $(document).off('keydown' + modalEventNamespace);
             if ($modal) { $modal.remove(); $modal = null; }
             $root.remove();
             state.rows = [];

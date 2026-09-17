@@ -393,12 +393,7 @@
             $modalHost.find('.vas-206-back-btn').on('click', popModal);
 
             $modalHost.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
                 if ($(e.target).closest('[data-vas-close]').length) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas206', function (e) {
-                if (e.key === 'Escape') { closeModal(); }
             });
 
             $(window).on('resize.vas206', function () {
@@ -937,7 +932,6 @@
 
         this.disposeComponent = function () {
             if ($card) { $card.off('click'); }
-            $(document).off('keydown.vas206');
             $(window).off('resize.vas206');
             if ($modalHost) {
                 $modalHost.remove();

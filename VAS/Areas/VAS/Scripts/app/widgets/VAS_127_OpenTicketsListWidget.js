@@ -360,7 +360,7 @@
         function createAllDialog() {
             $all = $(
                 '<div class="vas127-dialog" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(label('VAS_127_AllTitle', 'Customers with open tickets')) + '">' +
-                    '<div class="vas127-scrim" data-all-close></div>' +
+                    '<div class="vas127-scrim"></div>' +
                     '<section class="vas127-panel">' +
                         '<header class="vas127-phead">' +
                             '<h2 class="vas127-ptitle">' + escapeHtml(label('VAS_127_AllTitle', 'Customers with open tickets')) + '</h2>' +
@@ -518,7 +518,7 @@
         function createDetailDialog() {
             $detail = $(
                 '<div class="vas127-detail" role="dialog" aria-modal="true" aria-hidden="true" aria-label="' + escapeHtml(label('VAS_127_CustomerDetails', 'Customer details')) + '">' +
-                    '<div class="vas127-scrim" data-detail-close></div>' +
+                    '<div class="vas127-scrim"></div>' +
                     '<section class="vas127-dpanel">' +
                         '<header class="vas127-phead"><h2 class="vas127-ptitle">' + escapeHtml(label('VAS_127_CustomerDetails', 'Customer details')) + '</h2>' +
                             '<div class="vas127-phead-right"><span class="vas127-dsummary"></span>' +
@@ -570,12 +570,6 @@
             createAllDialog();
             createDetailDialog();
 
-            $(document).on('keydown.MPCvas127', function (event) {
-                if (event.key !== 'Escape') { return; }
-                else if ($detail && $detail.hasClass('is-open')) { closeDetail(); }
-                else if ($all && $all.hasClass('is-open')) { closeAll(); }
-            });
-
             loadSummary();
             loadRows();
         };
@@ -589,7 +583,6 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            $(document).off('keydown.MPCvas127');
             if (allSearchTimer) { clearTimeout(allSearchTimer); }
             if ($all) { $all.remove(); $all = null; }
             if ($detail) { $detail.remove(); $detail = null; }

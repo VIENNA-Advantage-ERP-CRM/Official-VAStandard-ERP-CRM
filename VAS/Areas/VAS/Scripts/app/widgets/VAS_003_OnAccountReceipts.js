@@ -432,8 +432,6 @@
                 e.stopPropagation();
                 closeDialog();
             });
-            $dialog.find('.vas-oar-dialog-scrim').on('click', function () { closeDialog(); });
-
             $pagerPrev.on('click', function () {
                 if (rowsLoading || pageNo <= 1) { return; }
                 pageNo--;
@@ -445,9 +443,6 @@
                 loadRows();
             });
 
-            $(document).on('keydown.vas-oar', function (e) {
-                if (e.key === 'Escape' && $dialog.is(':visible')) { closeDialog(); }
-            });
 
             $('body').append($dialog);
         }

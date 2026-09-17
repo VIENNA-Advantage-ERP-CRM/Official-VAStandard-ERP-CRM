@@ -553,7 +553,8 @@
 
                         /* Footer carries the pager only (design.md widget footer pager).
                            No totals strip and no action buttons: Export moved to the
-                           header and the dialog closes from the header X / Escape. */
+                           header and the dialog closes only from the header X (Close
+                           button); it no longer closes on Escape or outside click. */
                         '<div class="VAS-glju-dialog-footer">' +
 
                         '<div class="VAS-glju-dialog-actions" ' +
@@ -586,8 +587,7 @@
                 showDialogBusy(false);
 
                 $dialog.find(
-                    ".VAS-glju-dialog-close, " +
-                    ".VAS-glju-dialog-scrim"
+                    ".VAS-glju-dialog-close"
                 ).on(
                     "click",
                     closeDialog
@@ -689,27 +689,6 @@
                         loadDialogRows();
                     }
                     );
-
-                $(document).on(
-                    "keydown.VAS-glju-" +
-                    id,
-                    function (event) {
-                        if (
-                            event.key !== "Escape" ||
-                            VAS.GLJournalDetailDialog.isBusy()
-                        ) {
-                            return;
-                        }
-
-                        if (
-                            $dialog &&
-                            $dialog.is(":visible") &&
-                            !VAS.GLJournalDetailDialog.isOpen()
-                        ) {
-                            closeDialog();
-                        }
-                    }
-                );
 
                 $("body").append($dialog);
             }
@@ -1562,11 +1541,6 @@
                         dialogResizeObserver.disconnect();
                         dialogResizeObserver = null;
                     }
-
-                    $(document).off(
-                        "keydown.VAS-glju-" +
-                        $self.AD_UserHomeWidgetID
-                    );
 
                     $("body").removeClass(
                         "VAS-glju-body-lock"

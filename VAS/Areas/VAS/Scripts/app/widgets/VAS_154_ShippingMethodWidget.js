@@ -340,10 +340,6 @@
                 '</div>'
             );
             $dialog.find('.vas-shm-mclose').on('click', closeModal);
-            $dialog.on('click', function (e) { if (e.target === $dialog[0]) { closeModal(); } });
-            $(document).on('keydown.vas-shm', function (e) {
-                if (e.key === 'Escape' && $dialog && !$dialog.hasClass('vas-shm-hidden')) { closeModal(); }
-            });
             $('body').append($dialog);
         }
 
@@ -468,7 +464,6 @@
         this.refreshWidget = function () { loadSummary(selMonth, selYear); };
         this.getRoot = function () { return $root; };
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-shm');
             $('body').removeClass('vas-shm-body-lock');
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();

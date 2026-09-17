@@ -559,6 +559,24 @@
     text-overflow: ellipsis;
 }
 
+.vas-pcu-m-doclink {
+    border: 0;
+    background: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    font-weight: 700;
+    color: #0083DA;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+
+    .vas-pcu-m-doclink:hover { color: #0069AE; text-decoration: underline; }
+
 /* Loading / empty state cell */
 .vas-pcu-m-msgcell {
     text-align: center;

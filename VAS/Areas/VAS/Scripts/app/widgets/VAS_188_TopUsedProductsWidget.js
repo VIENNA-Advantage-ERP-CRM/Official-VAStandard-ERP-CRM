@@ -305,6 +305,57 @@
             if ($nextBtn) { $nextBtn.prop('disabled', pageNo >= totalPages); }
         }
 
+        /* Doc No -> real Inventory Use record navigation. Same pattern as VAS_186/VAS_244: when
+           hosted on a window, relay through widgetFirevalueChanged/ActionName so the host resolves
+           the window BY NAME (a hardcoded AD_Window_ID has previously resolved to the wrong window
+           on a real install); otherwise fall back to VAS.ZoomUtil.zoomToRecord with a window id
+           resolved once via VAS_178's existing GetMaterialIssueWindowId endpoint (reused rather
+           than re-deriving the same window lookup here). */
+        var INVENTORY_USE_WINDOW_NAME = 'Inventory Use';
+        var inventoryUseWindowId = 0;
+
+        function hostWindowName() {
+            try {
+                var listener = $self.listener;
+                for (var i = 0; i < 6 && listener; i++) {
+                    if (listener.apanel && listener.apanel.gridWindow && listener.apanel.gridWindow.getName) { return listener.apanel.gridWindow.getName(); }
+                    if (listener.gridWindow && listener.gridWindow.getName) { return listener.gridWindow.getName(); }
+                    listener = listener.listener;
+                }
+            } catch (e) { /* best-effort */ }
+            return '';
+        }
+
+        function zoomToInventoryRecord(inventoryId) {
+            if (!inventoryId) { return; }
+            try {
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "M_Inventory.M_Inventory_ID=" + Number(inventoryId),
+                        "TabLayout": "Y", "TabIndex": "0",
+                        "ActionName": hostWindowName() || INVENTORY_USE_WINDOW_NAME,
+                        "ActionType": "W"
+                    });
+                    return;
+                }
+                if (inventoryUseWindowId > 0) {
+                    if (window.VAS && VAS.ZoomUtil) { VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null); }
+                    return;
+                }
+                $.ajax({
+                    url: VIS.Application.contextUrl + 'VAS_178_NewMaterialIssueQuickAction/GetMaterialIssueWindowId',
+                    type: 'GET', dataType: 'json', cache: false,
+                    success: function (res) {
+                        var data = parseResponse(res);
+                        inventoryUseWindowId = Number((data && data.windowId) || 0);
+                        if (inventoryUseWindowId > 0 && window.VAS && VAS.ZoomUtil) {
+                            VAS.ZoomUtil.zoomToRecord('M_Inventory_ID', Number(inventoryId), inventoryUseWindowId, null, null);
+                        }
+                    }
+                });
+            } catch (e) { /* best-effort */ }
+        }
+
         function openProductUsageDetailModal(pid, pname, categoryName, uomName, totalQty, totalValue) {
             $(document).off("keydown.vas-tup-modal"); if ($modal) { $modal.remove(); }
 
@@ -402,7 +453,11 @@
                     var rec = usageLines[j];
                     tbodyHtml +=
                         '<tr>' +
-                        '<td title="' + escapeHtml(rec.documentNo) + '">' + escapeHtml(rec.documentNo) + '</td>' +
+                        '<td title="' + escapeHtml(rec.documentNo) + '">' +
+                        (rec.inventoryId
+                            ? '<button type="button" class="vas-tup-m-doclink" data-invid="' + rec.inventoryId + '">' + escapeHtml(rec.documentNo) + '</button>'
+                            : escapeHtml(rec.documentNo)) +
+                        '</td>' +
                         '<td>' + escapeHtml(rec.movementDate) + '</td>' +
                         '<td title="' + escapeHtml(rec.whLoc) + '">' + escapeHtml(rec.whLoc) + '</td>' +
                         '<td>' + escapeHtml(formatQty(rec.qty)) + '</td>' +
@@ -438,12 +493,11 @@
                 closeModal();
             });
 
-            $modal.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas-tup-modal', function (e) {
-                if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
+            $modal.on('click', '.vas-tup-m-doclink', function (e) {
+                e.stopPropagation();
+                var invId = Number($(this).data('invid') || 0);
+                closeModal();
+                zoomToInventoryRecord(invId);
             });
 
             $modal.find('.vas-tup-m-prev').on('click', function () {

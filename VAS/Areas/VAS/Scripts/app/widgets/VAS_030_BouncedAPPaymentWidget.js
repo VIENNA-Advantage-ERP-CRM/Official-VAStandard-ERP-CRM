@@ -1898,16 +1898,6 @@
                     closeDialog
                 );
 
-            $dialog
-                .find(
-                    '.vas-bounced-ap-payment-dialog-scrim'
-                )
-                .off('click.vas030')
-                .on(
-                    'click.vas030',
-                    closeDialog
-                );
-
             $pagerPrev
                 .off('click.vas030')
                 .on(
@@ -1946,25 +1936,6 @@
 
                         pageNo++;
                         loadRows();
-                    }
-                );
-
-            $(document)
-                .off(
-                    'keydown.vas-bounced-ap-payment-' +
-                    self.AD_UserHomeWidgetID
-                )
-                .on(
-                    'keydown.vas-bounced-ap-payment-' +
-                    self.AD_UserHomeWidgetID,
-                    function (e) {
-                        if (
-                            e.key === 'Escape' &&
-                            $dialog &&
-                            $dialog.is(':visible')
-                        ) {
-                            closeDialog(e);
-                        }
                     }
                 );
 

@@ -276,10 +276,19 @@
                 loadLocatorSummary();
             });
 
-            // One menu open at a time; clicking anywhere outside closes both.
-            $self._onDocClickMcw = function () {
-                closeMenu($whMenu, $whBtn);
-                closeMenu($monthMenu, $monthBtn);
+            // One menu open at a time; clicking anywhere outside closes both. This listens on
+            // 'mousedown' (capture phase) so it can also swallow the outside click before the
+            // host window's own handlers see it. But because the menu is hidden via display:none,
+            // closing it unconditionally here - including when the mousedown target IS a menu
+            // item - removed the button from the render tree before its own 'click' event could
+            // fire: display:none between mousedown and mouseup silently drops the click, so
+            // selecting an option looked like it did nothing. Skip closing a menu when the
+            // mousedown landed inside that menu (or its own trigger button) and let the menu
+            // item's own click handler close it after acting on the selection.
+            $self._onDocClickMcw = function (e) {
+                var $t = $(e.target);
+                if (!$t.closest('.vas-mcw-wh-menu, .vas-mcw-wh-btn').length) { closeMenu($whMenu, $whBtn); }
+                if (!$t.closest('.vas-mcw-month-menu, .vas-mcw-month-btn').length) { closeMenu($monthMenu, $monthBtn); }
             };
             $self._onReflowMcw = function () {
                 if ($whMenu.hasClass('vas-mcw-menu-open')) { positionMenu($whMenu, $whBtn); }
@@ -347,9 +356,14 @@
         }
 
         function renderWarehouseMenu() {
+            // Value (shortName) is often just an auto-generated numeric code (e.g. "1000002") on
+            // this deployment, which read as a raw ID to the user and gave no way to tell
+            // warehouses apart when picking one - same root cause as the locator names fixed in
+            // VAS_186. Name (fullName) is the real, human-readable warehouse name and must win;
+            // Value is only a fallback for the rare warehouse with no name at all.
             if ($whLbl) {
                 $whLbl.text(selectedWarehouse
-                    ? (selectedWarehouse.shortName || selectedWarehouse.name || '')
+                    ? (selectedWarehouse.fullName || selectedWarehouse.shortName || '')
                     : label("VAS_NoWarehouse", "No warehouse"));
             }
             if (!$whMenu) { return; }
@@ -360,7 +374,7 @@
                 var isOn = selectedWarehouse && Number(wh.warehouseId) === Number(selectedWarehouse.warehouseId);
                 html += '<button type="button" role="menuitem" data-whid="' + Number(wh.warehouseId) + '"' +
                     (isOn ? ' class="vas-mcw-menu-on"' : '') + '>' +
-                    escapeHtml(wh.shortName || wh.name || ('#' + wh.warehouseId)) + '</button>';
+                    escapeHtml(wh.fullName || wh.shortName || ('#' + wh.warehouseId)) + '</button>';
             }
             $whMenu.html(html);
         }
@@ -600,14 +614,6 @@
             $modal.find('.vas-mcw-modal-close').on('click', function (e) {
                 e.stopPropagation();
                 closeModal();
-            });
-
-            $modal.on('click', function (e) {
-                if (e.target === this) { closeModal(); }
-            });
-
-            $(document).on('keydown.vas-mcw-modal', function (e) {
-                if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
             });
 
             $modal.find('.vas-mcw-m-prev').on('click', function () {

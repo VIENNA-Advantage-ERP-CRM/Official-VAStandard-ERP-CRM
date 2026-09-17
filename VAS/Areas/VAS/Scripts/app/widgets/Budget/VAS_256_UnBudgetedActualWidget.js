@@ -904,11 +904,9 @@
             _modalBodyH = (MODAL_ROW_H * MODAL_PAGE_SIZE) + MODAL_HEAD_H + MODAL_BODY_SLACK;
             $modalBody.css('height', _modalBodyH + 'px');
 
-            /* The close button, Escape, and a click on the scrim - all three dismiss. */
+            /* Only the explicit close controls dismiss the dialog - a click on the
+               backdrop is deliberately inert. */
             $overlay.find('.vas-256-modal-close').on('click', closeModal);
-            $overlay.on('mousedown', function (e) {
-                if (e.target === $overlay[0]) { closeModal(); }
-            });
 
             $modalPager.on('click', '.vas-256-pgbtn', function () {
                 var $btn = $(this);
@@ -955,7 +953,6 @@
             _modalOpen = true;
             closePicker();
 
-            $(document).on('keydown' + _ns + 'm', onModalKeyDown);
             $overlay.find('.vas-256-modal-close').focus();
 
             loadModalPage();
@@ -989,7 +986,6 @@
             _detailSeq++;                       // drop any page still in flight
             showModalBusy(false);
             if ($overlay) { $overlay.addClass('vas-256-hidden'); }
-            $(document).off('keydown' + _ns + 'm');
 
             /* Focus goes back to the row that opened the dialog - a keyboard user must not
                be dropped at the top of the document. */
@@ -997,10 +993,6 @@
                 try { _returnFocusTo.focus(); } catch (e) { /* ignore */ }
                 _returnFocusTo = null;
             }
-        }
-
-        function onModalKeyDown(e) {
-            if (e.key === 'Escape' || e.keyCode === 27) { closeModal(); }
         }
 
         function showModalBusy(show) {

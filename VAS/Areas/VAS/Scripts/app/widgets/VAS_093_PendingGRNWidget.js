@@ -329,7 +329,6 @@
             $dialogBusy = $dialog.find('.vas-egrn-modal-busy');
 
             $dialog.find('.vas-egrn-modal-close').on('click', closeDialog);
-            $dialog.find('.vas-egrn-scrim').on('click', closeDialog);
             $dialog.find('.vas-egrn-back').on('click', closeDialog);
 
             $dialogBody.on('change', '.vas-pgrn-check', function () {
@@ -361,10 +360,6 @@
                 });
                 modalResizeObserver.observe($dialogBody[0]);
             }
-
-            $(document).on('keydown.vas-pgrn-' + widgetID, function (e) {
-                if (e.key === 'Escape' && $dialog && !$dialog.hasClass('vas-egrn-hidden')) { closeDialog(); }
-            });
 
             $('body').append($dialog);
         }
@@ -752,7 +747,6 @@
                 window.cancelAnimationFrame(modalFitRaf);
                 modalFitRaf = null;
             }
-            $(document).off('keydown.vas-pgrn-' + widgetID);
             $('body').removeClass('vas-egrn-body-lock');
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.off();

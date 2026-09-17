@@ -293,10 +293,6 @@
             $card.on('keydown', function (e) {
                 if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); drill.open(); }
             });
-            $(document).on('keydown.MPCvas122drill', function (e) {
-                if (e.key === 'Escape' && drill && drill.isOpen()) { drill.close(); }
-            });
-
             loadKpi();
         };
 
@@ -307,7 +303,6 @@
         this.getRoot = function () { return $root; };
 
         this.disposeComponent = function () {
-            $(document).off('keydown.MPCvas122drill');
             if (drill) { drill.dispose(); drill = null; }
             $root.remove();
         };

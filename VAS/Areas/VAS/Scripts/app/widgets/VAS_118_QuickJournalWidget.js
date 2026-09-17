@@ -396,7 +396,6 @@
             resetForm();
             $dialog.removeClass('vas-qj-hidden');
             $('body').addClass('vas-qj-body-lock');
-            $(document).on('keydown.vas-qj', function (e) { if (e.key === 'Escape') { closeDialog(); } });
             loadInitData();
             setTimeout(function () { $dialog.find('.vas-qj-desc').focus(); }, 150);
         }

@@ -293,10 +293,6 @@
                 '</div>'
             );
             $dialog.find('.vas-duf-mclose').on('click', closeDialog);
-            $dialog.find('.vas-duf-scrim').on('click', closeDialog);
-            $(document).on('keydown.vas-duf', function (e) {
-                if (e.key === 'Escape' && $dialog && !$dialog.hasClass('vas-duf-hidden')) { closeDialog(); }
-            });
 
             var $c = $dialog.find('.vas-duf-mcontent');
             $c.on('change', '.vas-duf-f-wh', onWarehouseChange);
@@ -638,7 +634,6 @@
         this.refreshWidget = function () { loadFulfilments(1); };
         this.getRoot = function () { return $root; };
         this.disposeComponent = function () {
-            $(document).off('keydown.vas-duf');
             $('body').removeClass('vas-duf-body-lock');
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();

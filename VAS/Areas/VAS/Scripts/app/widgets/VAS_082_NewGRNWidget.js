@@ -325,7 +325,6 @@
             $dialogBusy = $dialog.find('.vas-ngrn-busy');
 
             $dialog.find('.vas-ngrn-close').on('click', closeDialog);
-            $dialog.find('.vas-ngrn-scrim').on('click', closeDialog);
             $dialog.find('.vas-ngrn-back').on('click', showPOStep);
 
             $dialogBody.on('click', '.vas-ngrn-po-row', function () {
@@ -340,9 +339,6 @@
                 if (pageNo < totalPages) { loadPOs(pageNo + 1); }
             });
 
-            $(document).on('keydown.vas-ngrn', function (e) {
-                if (e.key === 'Escape' && !$dialog.hasClass('vas-ngrn-hidden')) { closeDialog(); }
-            });
             $(window).on('resize.vas-ngrn', syncPOPageSize);
 
             $('body').append($dialog);

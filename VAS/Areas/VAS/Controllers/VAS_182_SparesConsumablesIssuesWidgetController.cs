@@ -90,7 +90,16 @@ namespace VIS.Controllers
             return new { iso = iso, symbol = symbol };
         }
 
-        /// <summary>Returns the percentage share of MTD issued value for spares/consumables purpose.</summary>
+        /// <summary>
+        /// Returns the percentage share of MTD issued value for spares/consumables
+        /// purpose, plus the same month-window boundaries as DB-ready SQL date
+        /// literals (monthStartSql/nextMonthStartSql via <see cref="ToSqlDate"/>) -
+        /// the widget's own click-through reuses these verbatim in its
+        /// TabWhereClause instead of reconstructing the month window with
+        /// Oracle-only SYSDATE/TRUNC/ADD_MONTHS syntax (broke the drill-through on
+        /// this install's actual Postgres backend - stuck on loading, never
+        /// actually filtered - the same class of bug VAS_140/VAS_181 already hit).
+        /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetSparesConsumablesPercentage()
@@ -100,10 +109,16 @@ namespace VIS.Controllers
 
             try
             {
-                int percentage = GetSparesConsumablesPercentageData(ctx);
+                DateTime now = DateTime.Now;
+                DateTime monthStart = new DateTime(now.Year, now.Month, 1);
+                DateTime nextMonthStart = monthStart.AddMonths(1);
+
+                int percentage = GetSparesConsumablesPercentageData(ctx, monthStart, nextMonthStart);
                 string json = JsonConvert.SerializeObject(new
                 {
                     percentage = percentage,
+                    monthStartSql = ToSqlDate(monthStart),
+                    nextMonthStartSql = ToSqlDate(nextMonthStart),
                     success = true
                 });
                 return Json(json, JsonRequestBehavior.AllowGet);
@@ -116,13 +131,87 @@ namespace VIS.Controllers
             }
         }
 
-        private int GetSparesConsumablesPercentageData(Ctx ctx)
+        /// <summary>
+        /// Every M_Inventory_ID matching the MTD spares/consumables predicate
+        /// (capped at <see cref="MaxZoomIds"/>) - the click-through builds its
+        /// TabWhereClause as a flat M_Inventory.M_Inventory_ID IN (...) list from
+        /// this, instead of a correlated EXISTS(SELECT 1 FROM M_InventoryLine ...)
+        /// subquery. The grid's own "duplicate DocumentNo" diagnostic query does
+        /// naive, parenthesis-unaware text surgery on the TabWhereClause looking
+        /// for a FROM it can lift out - it mishandled the nested EXISTS(...) and
+        /// sent Oracle malformed SQL (ORA-00933), the same bug VAS_181 hit and
+        /// fixed the same way (confirmed directly in the app log).
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetSparesConsumablesIds()
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null) { return Json("", JsonRequestBehavior.AllowGet); }
+
+            try
+            {
+                DateTime now = DateTime.Now;
+                DateTime monthStart = new DateTime(now.Year, now.Month, 1);
+                DateTime nextMonthStart = monthStart.AddMonths(1);
+
+                var ids = GetSparesConsumablesIdsData(ctx, monthStart, nextMonthStart);
+                string json = JsonConvert.SerializeObject(new { ids = ids, success = true });
+                return Json(json, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                Log.Log(Level.SEVERE, "VAS_182_SparesConsumablesIssuesWidget.GetSparesConsumablesIds", ex);
+                string json = JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" });
+                return Json(json, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        private const int MaxZoomIds = 1000;
+
+        private System.Collections.Generic.List<int> GetSparesConsumablesIdsData(Ctx ctx, DateTime monthStart, DateTime nextMonthStart)
+        {
+            var ids = new System.Collections.Generic.List<int>();
+            if (ctx == null) { return ids; }
+
+            string msl = ToSqlDate(monthStart);
+            string nmsl = ToSqlDate(nextMonthStart);
+
+            // Same population as GetSparesConsumablesPercentageData's SparesValue
+            // branch (line-level NOT-work-order classification), just DISTINCT
+            // header ids instead of a SUM.
+            string sql = @"
+                SELECT DISTINCT inv.M_Inventory_ID
+                  FROM M_Inventory inv
+                  INNER JOIN M_InventoryLine line ON ( line.M_Inventory_ID = inv.M_Inventory_ID )
+                 WHERE inv.IsActive = 'Y'
+                   AND line.IsActive = 'Y'
+                   AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
+                   AND inv.DocStatus IN ('CO', 'CL')
+                   AND COALESCE(line.QtyInternalUse, 0) > 0
+                   AND COALESCE(line.VA075_WorkOrder_ID, 0) = 0
+                   AND COALESCE(line.VAMFG_M_WorkOrder_ID, 0) = 0
+                   AND inv.MovementDate >= " + msl + @"
+                   AND inv.MovementDate < " + nmsl;
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            using (IDataReader dr = DB.ExecuteReader(sql, null, null))
+            {
+                while (dr != null && dr.Read())
+                {
+                    if (ids.Count >= MaxZoomIds) { break; }
+                    ids.Add(Util.GetValueOfInt(dr["M_Inventory_ID"]));
+                }
+            }
+
+            return ids;
+        }
+
+        private int GetSparesConsumablesPercentageData(Ctx ctx, DateTime monthStart, DateTime nextMonthStart)
         {
             if (ctx == null) { return 0; }
 
-            DateTime now = DateTime.Now;
-            DateTime monthStart = new DateTime(now.Year, now.Month, 1);
-            DateTime nextMonthStart = monthStart.AddMonths(1);
             string msl = ToSqlDate(monthStart);
             string nmsl = ToSqlDate(nextMonthStart);
 
@@ -143,8 +232,8 @@ namespace VIS.Controllers
                                     THEN (line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0))
                                     ELSE 0 END), 0) AS SparesValue,
                   COALESCE(SUM(line.QtyInternalUse * COALESCE(line.CurrentCostPrice, line.PriceCost, line.VA024_CostPrice, 0)), 0) AS TotalValue
-                FROM M_InventoryLine line
-                INNER JOIN M_Inventory inv ON inv.M_Inventory_ID = line.M_Inventory_ID
+                FROM M_Inventory inv
+                INNER JOIN M_InventoryLine line ON ( line.M_Inventory_ID = inv.M_Inventory_ID )
                 WHERE inv.IsActive = 'Y'
                   AND inv.DocStatus IN ('CO', 'CL')
                   AND COALESCE(inv.IsInternalUse, 'N') = 'Y'
