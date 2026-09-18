@@ -278,6 +278,32 @@
     color: #FFFFFF;
 }
 .vas_190-sheetBtn--primary:hover { background: #0071BD; }
+.vas_190-sheetBtn--sm { padding: 0.25em 0.625em; font-size: 0.6875em; }
+
+/* A meeting's transcript, under its fields (18-Sep-2026): the heading and the
+   download side by side, the lines in a bounded box beneath so a long
+   recording never pushes the Close button off the sheet. */
+.vas_190-sheetTranscript { margin-top: 0.5em; }
+.vas_190-sheetTrHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5em;
+}
+.vas_190-sheetTrHead .vas_190-sheetLabel { margin-bottom: 0; }
+.vas_190-sheetTrBox {
+    margin-top: 0.375em;
+    max-height: 18em;
+    overflow: auto;
+    padding: 0.5em 0.625em;
+    border: 1px solid var(--p190-divider);
+    border-radius: 8px;
+    background: #F8FAFC;
+    white-space: normal;
+}
+.vas_190-sheetTrLine { margin: 0 0 0.35em; }
+.vas_190-sheetTrLine:last-child { margin-bottom: 0; }
+.vas_190-sheetTrSpeaker { font-weight: 700; color: var(--p190-text, #0F172A); }
 
 /* ----------------------------------------------------------- */
 /*  Task priority badge                                         */

@@ -370,6 +370,10 @@
 ///                        appointment / task / call / letter sources in
 ///                        VAS_ActivitySourcesModel, where the helper lives. A no-op
 ///                        on Oracle.
+///   VAI163   2026-09-16  ComputeCurrentStage puts a prepared order (DocStatus IP)
+///                        on stage 2, so the panel captions the Completed stage
+///                        "In progress" instead of "Pending" while the window says
+///                        In Progress.
 /// </summary>
 
 using System;
@@ -604,10 +608,24 @@ namespace VASLogic.Models
             //  net subtotal is then GrandTotal - Tax (which equals TotalLines for a
             //  tax-exclusive order, so nothing changes there). SubTotal + TaxAmt
             //  always equals GrandTotal.
-            result.GrandTotal    = Util.GetValueOfDecimal(r["GrandTotal"]);
             result.TotalLines    = Util.GetValueOfDecimal(r["TotalLines"]);
             result.TaxAmt        = GetOrderTaxAmt(C_Order_ID);
-            result.SubTotal      = result.GrandTotal - result.TaxAmt;
+            //  The SUB TOTAL is the taxable base summed off the LINES, judged by the
+            //  PRICE LIST's Prices-Include-Tax flag (18-Sep-2026) - not
+            //  GrandTotal - Tax. The framework's two halves read two different
+            //  flags: MOrderLine.IsTaxIncluded / MOrderTax read M_PriceList
+            //  .IsTaxIncluded when they write LineNetAmt, TaxAmt and C_OrderTax,
+            //  while MOrder.CalculateTaxTotal reads C_Order.IsTaxIncluded - a copy
+            //  taken when the price list was ASSIGNED - to decide whether
+            //  GrandTotal is TotalLines or TotalLines + tax. A price list whose flag
+            //  was switched after the order was raised leaves the copy stale, and
+            //  the header then reads GrandTotal = gross + extracted tax (2,630.33
+            //  on a 2,500.00 tax-inclusive line). Derived from the lines the way
+            //  MOrderLine wrote them, Sub Total + Tax always states the amounts the
+            //  lines actually carry: tax-inclusive net = LineNetAmt - TaxAmt -
+            //  SurchargeAmt, tax-exclusive net = LineNetAmt.
+            result.SubTotal      = GetOrderTaxableBase(C_Order_ID, result.TotalLines);
+            result.GrandTotal    = result.SubTotal + result.TaxAmt;
 
             // ----- Budget control (GL budget breach) -----
             //  The platform's budget check (ModelLibrary BudgetCheck) stamps the
@@ -762,6 +780,10 @@ namespace VASLogic.Models
         private int ComputeCurrentStage(PurchaseOrderOverviewData d)
         {
             int stage = 1;                              // Drafted (always reached)
+            // A prepared order (IP) is on its way to Completed: the stage is
+            // current but not reached, so the panel captions it "In progress"
+            // rather than "Pending" and the badge stops reading "Drafted".
+            if (d.DocStatus == "IP")  stage = 2;        // Completed under way
             if (d.IsCompleted)        stage = 3;        // Completed + With Vendor
             if (d.IsExpectedDelivery) stage = 4;        // Expected Delivery scheduled
             if (d.IsPartialDelivered) stage = 5;        // Partial / received
@@ -816,6 +838,43 @@ namespace VASLogic.Models
             {
                 _log.Severe("GetOrderTaxAmt (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
                 return 0;
+            }
+        }
+
+        /// <summary>
+        /// The order's taxable base = SUM over its lines of the net amount, judged
+        /// by the PRICE LIST's IsTaxIncluded (the flag MOrderLine and MOrderTax
+        /// wrote the line amounts under): tax-inclusive net = LineNetAmt - TaxAmt -
+        /// SurchargeAmt, tax-exclusive net = LineNetAmt. Falls back to
+        /// C_Order.TotalLines when the lines cannot be read. Standalone query,
+        /// child of an already authorized order, for the reason GetOrderTaxAmt
+        /// gives. Two bind names, each once, in order.
+        /// </summary>
+        /// <param name="C_Order_ID">Owning purchase order id.</param>
+        /// <param name="totalLines">C_Order.TotalLines, the fallback.</param>
+        private decimal GetOrderTaxableBase(int C_Order_ID, decimal totalLines)
+        {
+            try
+            {
+                string surchargeExpr = ColumnExists("C_OrderLine", "SurchargeAmt")
+                    ? "COALESCE(ol.SurchargeAmt, 0)" : "0";
+                string sql = @"SELECT COALESCE(SUM(CASE WHEN COALESCE(pl.IsTaxIncluded, 'N') = 'Y'
+                                                        THEN COALESCE(ol.LineNetAmt, 0) - COALESCE(ol.TaxAmt, 0) - " + surchargeExpr + @"
+                                                        ELSE COALESCE(ol.LineNetAmt, 0) END), 0) AS Net
+                                 FROM C_OrderLine ol
+                                INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                                 LEFT OUTER JOIN M_PriceList pl ON (pl.M_PriceList_ID = o.M_PriceList_ID)
+                                WHERE ol.C_Order_ID = @C_Order_ID
+                                  AND ol.IsActive   = 'Y'";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return totalLines;
+                return Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Net"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetOrderTaxableBase (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                return totalLines;
             }
         }
 

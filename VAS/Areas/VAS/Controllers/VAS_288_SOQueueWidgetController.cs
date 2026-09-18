@@ -154,6 +154,14 @@ namespace VAS.Controllers
         /// GROUP BY (Prompt_Instructions.txt "Case 1"). The ONLY thing AddAccessSQL is
         /// ever applied to for this widget. Cohort = live Sales Orders (DR/IP/CO)
         /// promised in the given half-open period.
+        ///
+        /// Quotation_Order_Id is C_Order.C_Order_Quotation - VARCHAR2(22) /
+        /// character varying holding the quotation's C_Order_ID as TEXT - so the
+        /// outer query's join to the quotation casts the NUMBER side
+        /// (18-Sep-2026): compared raw, PostgreSQL rejects the statement
+        /// ("operator does not exist: numeric = character varying") and Oracle
+        /// converts the text implicitly, raising ORA-01722 on any non-numeric
+        /// value. CAST(... AS VARCHAR(22)) reads on both.
         /// </summary>
         private static string BuildBaseOrdersSql()
         {
@@ -207,7 +215,7 @@ namespace VAS.Controllers
                   INNER JOIN C_BPartner bp ON ( bp.C_BPartner_ID = bo.BPartner_Id )
                   LEFT OUTER JOIN M_Warehouse wh ON ( wh.M_Warehouse_ID = bo.Warehouse_Id )
                   LEFT OUTER JOIN AD_User rep ON ( rep.AD_User_ID = bo.Sales_Rep_Id )
-                  LEFT OUTER JOIN C_Order q ON ( q.C_Order_ID = bo.Quotation_Order_Id )
+                  LEFT OUTER JOIN C_Order q ON ( CAST(q.C_Order_ID AS VARCHAR(22)) = TRIM(bo.Quotation_Order_Id) )
                  ORDER BY bo.Date_Promised ASC, bo.Document_No ASC
                  OFFSET @Row_Offset ROWS FETCH NEXT @Page_Size ROWS ONLY";
 

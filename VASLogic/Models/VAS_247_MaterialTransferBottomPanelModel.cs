@@ -27,6 +27,17 @@
  * Chronological  : Development
  *   VAI154         Created  07-Sep-2026
  *   VAI154         Rebuilt on the VAS_240 pattern  09-Sep-2026
+ *   VAI163         17-Sep-2026  Material-transfer round of corrections:
+ *                  - Lines page at 20, newest line first (Line DESC).
+ *                  - SaveLines states MovementQty itself (entered figure, converted
+ *                    where the unit differs): BeforeSave only derives it on a unit
+ *                    change, so a line in the product's own unit failed with
+ *                    "Fill mandatory: Movement Quantity".
+ *                  - A line raised against a requisition line may not move more
+ *                    than it asked for (RequisitionQtyError, own wording); the
+ *                    loaded line carries VASMTLDISP_ReqQty so the panel can say so
+ *                    as the quantity is typed.
+ *                  - UOM labels are the full name, never the symbol.
  ******************************************************/
 
 using System;
@@ -66,7 +77,7 @@ namespace VASLogic.Models
         private const int CATALOG_PAGE_SIZE = 50;
 
         /// <summary>Saved movement lines loaded per page (server-side paging).</summary>
-        private const int LINE_PAGE_SIZE = 10;
+        private const int LINE_PAGE_SIZE = 20;   // 20 since 17-Sep-2026
 
         /// <summary>Physical line table this panel edits.</summary>
         private const string LINE_TABLE = "M_MovementLine";
@@ -887,8 +898,14 @@ namespace VASLogic.Models
         private static readonly string[] _logicTokenColumns =
         {
             "DocumentNo", "MovementDate", "M_Warehouse_ID", "C_DocType_ID",
-            "C_BPartner_ID", "AD_User_ID", "C_Project_ID", "C_Activity_ID", "C_Campaign_ID"
+            "C_BPartner_ID", "AD_User_ID", "C_Project_ID", "C_Activity_ID", "C_Campaign_ID",
+            // The header's Date Required, under either name a schema may carry it
+            // (guarded like the rest): a new line's own Date Required defaults from it.
+            "DateRequired", "DTD001_DateRequired"
         };
+
+        /// <summary>The line's Date Required columns, in the order they are looked for.</summary>
+        private static readonly string[] LINE_DATE_REQUIRED_COLS = { "DTD001_DateRequired", "DateRequired" };
 
         /// <summary>Loads the parent movement header values used as line context.</summary>
         /// <param name="ctx">session context</param>
@@ -931,6 +948,15 @@ namespace VASLogic.Models
             data.M_Warehouse_ID = Util.GetValueOfInt(LogicValue(data, "M_Warehouse_ID"));
             data.C_BPartner_ID = Util.GetValueOfInt(LogicValue(data, "C_BPartner_ID"));
             data.MovementDate = ParseDate(LogicValue(data, "MovementDate"));
+            // The header's Date Required as a real date (ISO on the wire), for the line
+            // seed - the LogicContext copy is a culture-formatted string the panel cannot
+            // parse reliably. Whichever column the schema carries; null where neither does.
+            foreach (string dcol in new string[] { "DateRequired", "DTD001_DateRequired" })
+            {
+                if (r[dcol] == DBNull.Value) continue;
+                DateTime? dr = Util.GetValueOfDateTime(r[dcol]);
+                if (dr.HasValue) { data.DateRequired = DateTime.SpecifyKind(dr.Value.Date, DateTimeKind.Unspecified); break; }
+            }
             data.DocStatus = Util.GetValueOfString(r["DocStatus"]);
             data.Processed = Util.GetValueOfString(r["Processed"]) == "Y";
             data.IsEditable = !data.Processed
@@ -990,19 +1016,25 @@ namespace VASLogic.Models
                   COALESCE(lt.Value, N'') AS VASMTLDISP_LocatorToName,
                   COALESCE(asi.Description, N'') AS VASMTLDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASMTLDISP_HasAttrSet,
-                  COALESCE(p.ProductType, '') AS VASMTLDISP_ProductType
+                  COALESCE(p.ProductType, '') AS VASMTLDISP_ProductType,
+                  -- The requisition line's quantity, where the movement line was raised
+                  -- against one: the ceiling the panel holds the entered quantity to.
+                  COALESCE(rq.Qty, 0) AS VASMTLDISP_ReqQty
                FROM M_MovementLine ml
                LEFT JOIN M_Product p ON (ml.M_Product_ID = p.M_Product_ID)
                LEFT JOIN C_UOM uom ON (ml.C_UOM_ID = uom.C_UOM_ID)
                LEFT JOIN M_Locator lf ON (ml.M_Locator_ID = lf.M_Locator_ID)
                LEFT JOIN M_Locator lt ON (ml.M_LocatorTo_ID = lt.M_Locator_ID)
                LEFT JOIN M_AttributeSetInstance asi ON (ml.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
+               LEFT JOIN M_RequisitionLine rq ON (ml.M_RequisitionLine_ID = rq.M_RequisitionLine_ID)
                WHERE ml.M_Movement_ID = @M_Movement_ID
                  AND ml.IsActive = 'Y'";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "ml", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             if (page < 0) page = 0;
-            sql += " ORDER BY ml.Line, ml.M_MovementLine_ID" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
+            // Newest line first (17-Sep-2026): the line just added is the one the user is
+            // working on, and it belongs at the top of the first page.
+            sql += " ORDER BY ml.Line DESC, ml.M_MovementLine_ID DESC" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
 
             DataSet ds = DB.ExecuteDataset(sql,
                 new SqlParameter[] { new SqlParameter("@M_Movement_ID", M_Movement_ID) }, null);
@@ -1048,6 +1080,9 @@ namespace VASLogic.Models
                 // on both engines. Authoritative, unlike the display flag, which is OR'd with an
                 // existing instance description.
                 row.Values["VASMTLDISP_HasAttrSet"] = hasAttrSetRaw;
+                // The requisition line's quantity (0 where the line has none), same key
+                // convention: the panel caps the entered quantity at it.
+                row.Values["VASMTLDISP_ReqQty"] = Util.GetValueOfDecimal(r["VASMTLDISP_ReqQty"]);
                 row.ProductType = Util.GetValueOfString(r["VASMTLDISP_ProductType"]);
                 rows.Add(row);
             }
@@ -1184,7 +1219,8 @@ namespace VASLogic.Models
         private Dictionary<int, string> LoadUomNames(Ctx ctx, int M_Movement_ID)
         {
             Dictionary<int, string> map = new Dictionary<int, string>();
-            foreach (MovementUomItem u in LoadUomList(ctx, M_Movement_ID, null)) map[u.C_UOM_ID] = u.Symbol;
+            // Full name ("Each"), never the symbol ("Ea") - 17-Sep-2026.
+            foreach (MovementUomItem u in LoadUomList(ctx, M_Movement_ID, null)) map[u.C_UOM_ID] = u.Name;
             return map;
         }
 
@@ -1475,6 +1511,60 @@ namespace VASLogic.Models
             return entered;
         }
 
+        /// <summary>
+        /// Defaults every Date Required column the line carries from the header's own
+        /// (DateRequired or DTD001_DateRequired, whichever the schema has and holds a
+        /// value), where the line does not already hold one.
+        /// </summary>
+        /// <param name="line">line being saved</param>
+        /// <param name="movement">its header</param>
+        private static void ApplyHeaderDateRequired(MMovementLine line, MMovement movement)
+        {
+            if (movement == null) return;
+            object hdr = null;
+            foreach (string hcol in new string[] { "DateRequired", "DTD001_DateRequired" })
+            {
+                if (movement.Get_ColumnIndex(hcol) < 0) continue;
+                object v = movement.Get_Value(hcol);
+                if (v != null && v != DBNull.Value) { hdr = v; break; }
+            }
+            if (hdr == null) return;
+            foreach (string col in LINE_DATE_REQUIRED_COLS)
+            {
+                if (line.Get_ColumnIndex(col) < 0) continue;
+                object cur = line.Get_Value(col);
+                if (cur != null && cur != DBNull.Value) continue;
+                line.Set_ValueNoCheck(col, hdr);
+            }
+        }
+
+        /// <summary>
+        /// "" when the line's MovementQty is within its requisition line's quantity (or
+        /// the line has no requisition line); otherwise the message to show on the row.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="line">line about to be saved</param>
+        /// <param name="trx">save transaction</param>
+        /// <returns>error text, or ""</returns>
+        private string RequisitionQtyError(Ctx ctx, MMovementLine line, Trx trx)
+        {
+            try
+            {
+                if (line.Get_ColumnIndex("M_RequisitionLine_ID") < 0) return "";
+                int reqLineId = Util.GetValueOfInt(line.Get_Value("M_RequisitionLine_ID"));
+                if (reqLineId <= 0) return "";
+                object o = DB.ExecuteScalar("SELECT Qty FROM M_RequisitionLine WHERE M_RequisitionLine_ID = @id",
+                    new SqlParameter[] { new SqlParameter("@id", reqLineId) }, trx);
+                if (o == null || o == DBNull.Value) return "";
+                decimal reqQty = Util.GetValueOfDecimal(o);
+                if (line.GetMovementQty() <= reqQty) return "";
+                string msg = Msg.GetMsg(ctx, MSG + "QtyExceedsRequisition");
+                if (string.IsNullOrEmpty(msg) || msg.StartsWith(MSG)) msg = "Movement quantity should be less than or equal to requisition quantity.";
+                return msg;
+            }
+            catch (Exception ex) { log.Warning("VAS_247 RequisitionQtyError: " + ex.Message); return ""; }
+        }
+
         /// <summary>Reads AD_Column.Callout for one column of a table.</summary>
         /// <param name="ctx">session context</param>
         /// <param name="tableName">table</param>
@@ -1508,7 +1598,8 @@ namespace VASLogic.Models
             }
         }
 
-        /// <summary>Reads a unit's display name.</summary>
+        /// <summary>Reads a unit's display name — the full NAME ("Each"), not the symbol
+        /// ("Ea"), which is what the panel prints everywhere since 17-Sep-2026.</summary>
         /// <param name="ctx">session context</param>
         /// <param name="C_UOM_ID">unit</param>
         /// <returns>name, or ""</returns>
@@ -1516,7 +1607,7 @@ namespace VASLogic.Models
         {
             if (C_UOM_ID <= 0) return "";
             object o = DB.ExecuteScalar(
-                "SELECT COALESCE(UOMSymbol, Name) FROM C_UOM WHERE C_UOM_ID = @id",
+                "SELECT Name FROM C_UOM WHERE C_UOM_ID = @id",
                 new SqlParameter[] { new SqlParameter("@id", C_UOM_ID) }, null);
             return Util.GetValueOfString(o);
         }
@@ -1948,11 +2039,21 @@ namespace VASLogic.Models
                     // through the generic column bag — and BEFORE the quantity, because
                     // MMovementLine.BeforeSave reads it to derive MovementQty from
                     // QtyEntered via MUOMConversion.
+                    // NoCheck, as the framework's own line writers do for this column: Set_Value
+                    // refuses a column the dictionary marks non-updateable and the unit was
+                    // silently never written (17-Sep-2026).
                     int uom = input.C_UOM_ID > 0 ? input.C_UOM_ID : GetProductUomId(ctx, input.M_Product_ID);
-                    if (uom > 0 && line.Get_ColumnIndex("C_UOM_ID") >= 0) line.Set_Value("C_UOM_ID", uom);
+                    if (uom > 0 && line.Get_ColumnIndex("C_UOM_ID") >= 0) line.Set_ValueNoCheck("C_UOM_ID", uom);
 
                     decimal entered = input.QtyEntered > 0 ? input.QtyEntered : (input.MovementQty > 0 ? input.MovementQty : 1);
                     line.SetQtyEntered(entered);
+                    // MovementQty is stated here as well (17-Sep-2026). MMovementLine.BeforeSave
+                    // derives it from QtyEntered ONLY where the line's unit differs from the
+                    // product's; a line in the product's own unit kept the zero it was born
+                    // with and failed with "Fill mandatory: Movement Quantity". The movement
+                    // window's callout sets it client-side, so the panel does the same
+                    // server-side: the entered figure, converted where the unit differs.
+                    line.SetMovementQty(ConvertToBaseQty(ctx, input.M_Product_ID, uom, entered));
 
                     if (input.Line > 0) line.SetLine(input.Line);
                     line.SetDescription(input.Description ?? "");
@@ -1961,6 +2062,30 @@ namespace VASLogic.Models
                         ? new HashSet<string>(input.TouchedCols, StringComparer.OrdinalIgnoreCase)
                         : null;
                     ApplyExtraColumns(line, input.Values, touchedCols);
+
+                    // Date Required defaults from the header (17-Sep-2026), under whichever
+                    // name the line carries (DTD001_DateRequired first), where nothing has
+                    // set it - written NoCheck so a non-updateable dictionary flag cannot
+                    // swallow it. Same rule as VAS_240.
+                    ApplyHeaderDateRequired(line, movement);
+
+                    // A line raised against a requisition line may not move more than that
+                    // line asked for (17-Sep-2026). MMovementLine.BeforeSave enforces the
+                    // same ceiling (net of what is already reserved / delivered) with the
+                    // framework's own message; this states the plain rule first, in the
+                    // wording asked for, so the row says exactly what was wrong.
+                    string reqErr = RequisitionQtyError(ctx, line, trx);
+                    if (reqErr.Length > 0)
+                    {
+                        res.LineErrors.Add(new MovementLineSaveError
+                        {
+                            RowKey = input.RowKey,
+                            M_MovementLine_ID = input.M_MovementLine_ID,
+                            Line = input.Line,
+                            Message = reqErr
+                        });
+                        continue;
+                    }
 
                     if (!line.Save())
                     {
@@ -2122,6 +2247,9 @@ namespace VASLogic.Models
         /// <summary>Header warehouse where the schema has one; a movement often has none.</summary>
         public int M_Warehouse_ID { get; set; }
         public DateTime? MovementDate { get; set; }
+        /// <summary>The header's Date Required (either column name), as a date; null where
+        /// the schema has none. What a new line's own Date Required is seeded from.</summary>
+        public DateTime? DateRequired { get; set; }
         /// <summary>
         /// Header values that M_MovementLine field DisplayLogic / ReadOnlyLogic name as
         /// tokens. A column that is NULL on the movement is ABSENT from this bag, which

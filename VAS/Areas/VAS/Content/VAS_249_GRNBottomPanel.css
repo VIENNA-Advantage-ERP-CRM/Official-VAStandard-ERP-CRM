@@ -18,6 +18,26 @@
  * All sizing in em (no px), classes namespaced vas-grn-* so nothing
  * leaks into the host page. Tokens are shared with the body-level
  * dialogs / toast (which mount outside .vas-grn-root).
+ * Chronological development:
+ *   VAI163   2026-09-17  - The root carries its own white surface, so a cleared
+ *                          panel (New Record) never shows the host's blue.
+ *                        - NO column is dropped at any width / zoom: the container
+ *                          queries tighten the tracks and gaps instead. Cells clip
+ *                          their own overflow so head and body rows stay in step.
+ *                        - The UOM / locator <select> gets side padding, so the
+ *                          chosen option no longer touches the cell's edge.
+ *                        - The "..." button is live on a locked receipt (the modal
+ *                          opens read-only), so its cell no longer reads not-allowed.
+ *   VAI163   2026-09-17  Responsive under zoom. The panel's type anchor follows
+ *                        the panel's own width (cqw clamp on .vas-grn-panel,
+ *                        16px down to 12.5px) instead of a constant 16px, so a
+ *                        zoomed-in panel scales into the room it has rather than
+ *                        crushing its columns and stacking its toolbar; the
+ *                        dialogs take a vw clamp of their own. Header chrome and
+ *                        radii moved from px to em; the title truncates before the
+ *                        toolbar wraps; the pager wraps; the catalog list and the
+ *                        dialogs are capped to the panel / viewport width; the
+ *                        Additional Info grid goes single-column in a narrow window.
  * ============================================================ */
 
 .vas-grn-root,
@@ -79,14 +99,44 @@
     overscroll-behavior: auto;
     font-family: var(--grn-font);
     color: var(--grn-text);
-    /* Query container for the responsive rules at the foot of this file. */
+    /* The panel's own surface. With no background of its own, a cleared panel (New
+       Record hides the grid) let the framework host's blue show through the root. */
+    background: var(--grn-surface);
+    /* Query container for the responsive rules at the foot of this file, and for the
+       fluid type anchor on .vas-grn-panel (cqw resolves against THIS box). */
     container-type: inline-size;
-    /* Canonical panel anchor, deliberately a CONSTANT rather than a vw-derived clamp.
-       Browser zoom shrinks the viewport measured in CSS pixels, so a vw anchor SHRINKS as
-       the user zooms in and the whole panel contracts against framework chrome that is
-       sized in fixed px. A constant makes zoom do only what was asked - magnify. */
+    /* The maximum anchor. The working anchor is set on .vas-grn-panel from the
+       container's own width - see there. */
     --panel-anchor: 16px;
     font-size: var(--panel-anchor);
+}
+
+/* ---------------------------------------------------------------------------
+   Fluid type anchor - what makes the panel keep its proportions under zoom
+   ---------------------------------------------------------------------------
+   Everything inside the panel is sized in em, so ONE font-size decides how big the whole
+   panel is. It used to be a constant 16px: fine at 100%, but browser zoom shrinks the
+   room the panel has (measured in CSS px) while the panel kept its 16px design size, so
+   at 125-175% the six columns, the toolbar and the pager were being crushed into a box
+   that had lost a third of its width - the cells wrapped, the buttons stacked, the
+   figures broke over two lines. Zooming OUT had the opposite look: a small panel lost in
+   a wide host.
+
+   The anchor now follows the panel's own width (cqw = 1% of the root, the query
+   container): 16px on a wide panel, easing down to a 12.5px floor as the panel narrows,
+   whether the narrowing comes from the splitter, the window or a zoom. Between the two
+   clamps the scale is continuous, so there is no jump at a threshold. The container
+   queries at the foot of this file then only have to trim gaps and minimums - they no
+   longer carry the whole burden. Zooming in still magnifies (the floor is in px, so 12.5px
+   at 150% zoom is 18.75 device px), it just stops the panel outgrowing its box. */
+.vas-grn-panel {
+    font-size: clamp(12.5px, calc(9.5px + 0.65cqw), var(--panel-anchor));
+}
+/* The empty state and the pager sit beside .vas-grn-panel under the root, so they take
+   the same anchor. */
+.vas-grn-empty,
+.vas-grn-linepager {
+    font-size: clamp(12.5px, calc(9.5px + 0.65cqw), var(--panel-anchor));
 }
 
 /* Same guard down the wrapper chain in case the host stretches an inner block as the
@@ -139,9 +189,13 @@
 .vas-grn-empty {
     display: flex;
     height: 100%;
+    min-height: 4em;
     align-items: center;
     justify-content: center;
+    padding: 1em;
+    text-align: center;
     color: var(--grn-text-muted);
+    background: var(--grn-surface);
 }
 
 .vas-grn-icon {
@@ -162,20 +216,27 @@
    lines + totals) as one unit. */
 .vas-grn-panel {
     background: #FFFFFF;
-    border-radius: 16px;
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    border-radius: 1em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
 }
 
-/* Panel Foundation Rule 2 — header chrome */
+/* Panel Foundation Rule 2 — header chrome. Sized in em (it was 56px / 16px) so it
+   follows the fluid anchor like everything else; the title yields (min-width:0 +
+   ellipsis) before the toolbar wraps. */
 .vas-grn-panel__header {
-    min-height: 56px;
-    padding: 0 16px;
+    min-height: 3.5em;
+    padding: 0.375em 1em;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75em;
+    gap: 0.5em 0.75em;
 }
+
+    .vas-grn-panel__header > div:first-child {
+        flex: 1 1 12em;
+        min-width: 0;
+    }
 
 .vas-grn-panel__title {
     margin: 0;
@@ -183,6 +244,9 @@
     font-weight: 700;
     letter-spacing: -0.01em;
     color: var(--grn-text-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .vas-grn-panel__subtitle {
@@ -195,8 +259,17 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.625em;
+    justify-content: flex-end;
+    gap: 0.5em 0.625em;
+    /* Never wider than the header: the buttons wrap onto a second row instead of pushing
+       the panel past its box. */
+    max-width: 100%;
+    min-width: 0;
 }
+
+    .vas-grn-panel__actions .vas-grn-btn {
+        white-space: nowrap;
+    }
 
 /* ---------- buttons ---------- */
 .vas-grn-btn {
@@ -491,6 +564,10 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* A cell clips its own overflow. With the keep-every-column tracks (minmax(0, Nfr),
+       see the container queries at the foot) the head and body rows - separate grids -
+       can only stay in step if no cell can grow past its track. */
+    overflow: hidden;
     font-size: 0.875em;
     color: var(--grn-text);
 }
@@ -528,10 +605,11 @@
    button are disabled -> not-allowed. A disabled control IGNORES its own `cursor` in
    Chromium, so put the cursor on the (enabled) parent cell and let the disabled control
    pass pointer events through to it. */
-.vas-grn-locked .vas-grn-cell--check,
-.vas-grn-locked .vas-grn-cell--more {
+.vas-grn-locked .vas-grn-cell--check {
     cursor: not-allowed;
 }
+/* The "..." cell is NOT in that set: on a locked receipt the button stays live and opens
+   the Additional Info modal for reading (17-Sep-2026). */
 
     .vas-grn-locked .vas-grn-cell--check input[type="checkbox"]:disabled,
     .vas-grn-locked .vas-grn-more-btn:disabled {
@@ -641,6 +719,11 @@
 
 .vas-grn-cell-edit select.vas-grn-cell-edit__select {
     color: var(--grn-text-secondary);
+    /* Room between the chosen option's text and the cell's edge on either side - with
+       appearance:none the browser draws no arrow, so a right-aligned UOM sat flush
+       against the border. */
+    padding-left: 0.5em;
+    padding-right: 0.5em;
 }
 
 .vas-grn-cell-edit input.vas-grn-cell-edit__input::placeholder {
@@ -711,7 +794,10 @@
     top: 100%;
     margin-top: 0;
     z-index: 30;
-    min-width: 22.5em;
+    /* Wide enough to read, but never wider than most of the panel: on a narrow (zoomed)
+       panel a fixed 22.5em pushed the list past the root's edge and clipped it. */
+    min-width: min(22.5em, 80cqw);
+    max-width: 92cqw;
     background: #ffffff;
     border: 1px solid var(--grn-divider-strong);
     border-top: none;
@@ -1209,6 +1295,10 @@
     z-index: 99;
     font-family: var(--grn-font);
     color: var(--grn-text);
+    /* The dialogs mount on <body>, outside the root, so they carry their own anchor:
+       the viewport's, eased down under zoom the same way the panel's is, so a modal
+       never opens larger than the window it sits in. */
+    font-size: clamp(12.5px, calc(9.5px + 0.5vw), 16px);
 }
 
     .vas-grn-dialog-backdrop * {
@@ -1230,9 +1320,9 @@
 
 .vas-grn-dialog {
     background: var(--grn-surface);
-    border-radius: 14px;
+    border-radius: 0.875em;
     box-shadow: var(--grn-shadow-dialog);
-    width: 45em;
+    width: min(45em, 96vw);
     max-width: 100%;
     max-height: 90vh;
     overflow: hidden;
@@ -1241,8 +1331,18 @@
 }
 
 .vas-grn-dialog--wide {
-    width: 56em;
-    height: 30em;
+    width: min(56em, 96vw);
+    height: min(30em, 90vh);
+}
+
+/* Additional Info: the 2-up field grid goes single-column once the dialog is narrow
+   (a zoomed or small window), instead of squeezing two framework fields into a width
+   neither can render in. */
+@media (max-width: 52em) {
+    .vas-grn-more-grid {
+        grid-template-columns: 1fr;
+        gap: 0.25em 0;
+    }
 }
 
 .vas-grn-dialog__header {
@@ -1558,6 +1658,7 @@
    "‹ P of Q ›" nav on the right. */
 .vas-grn-linepager {
     display: flex;
+    flex-wrap: wrap;           /* "Showing…" and the nav stack on a narrow panel */
     align-items: center;
     justify-content: space-between;
     gap: 0.5em;
@@ -1687,36 +1788,43 @@
    of crushing them.
 
    `em` inside a container query resolves against the QUERY CONTAINER's font size - the
-   constant 16px anchor - so these thresholds are fixed real widths. */
+   root's constant 16px - so these thresholds are fixed real widths, whatever the fluid
+   anchor on .vas-grn-panel is doing to the type at the time. That anchor does the bulk
+   of the work (the whole panel scales with its width); these steps only trim what
+   scaling cannot: the gaps and the fixed minimums.
+
+   NO column is ever dropped (17-Sep-2026). The earlier steps hid Description below 56em
+   and Locator below 40em, and with the host width the framework leaves behind after a
+   zoom (see "Full-width host" above) the first threshold was being crossed at 100% on
+   an ordinary screen - the user lost the Description column they were about to fill in.
+   Every column stays; what gives instead is the room between and inside them: the gap
+   shrinks, the fixed em minimum on the quantity column comes down so all six tracks can
+   share a narrow row, and the type steps down a little at the narrowest widths. Text in
+   a crushed cell truncates with an ellipsis (the cells carry min-width:0 +
+   overflow:hidden), which is recoverable - a hidden column is not. */
 @container (max-width: 56em) {
-    /* Description (3rd cell) is the first to go: every other cell carries something the
-       row is actually read for - what is being received, into which bin, how much. */
     .vas-grn-row {
-        grid-template-columns: 1.75em minmax(0, 2fr) minmax(0, 1.3fr) minmax(6em, 0.9fr) 3.5em;
+        grid-template-columns: 1.5em minmax(0, 1.8fr) minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(5em, 0.8fr) 3.25em;
+        gap: 0.5em;
     }
 
-    .vas-grn-row--head .vas-grn-cell:nth-child(3),
-    .vas-grn-row--line .vas-grn-cell:nth-child(3) {
-        display: none;
+    .vas-grn-row--head .vas-grn-cell {
+        font-size: 0.85em;
     }
 }
 
 @container (max-width: 40em) {
-    /* Narrower still: what is being received, and how much. The bin goes last because it is
-       the one value the picker can still resolve from the attribute instance. */
     .vas-grn-row {
-        grid-template-columns: 1.75em minmax(0, 2fr) minmax(5.5em, 0.9fr) 3.5em;
-    }
-
-    .vas-grn-row--head .vas-grn-cell:nth-child(4),
-    .vas-grn-row--line .vas-grn-cell:nth-child(4) {
-        display: none;
+        grid-template-columns: 1.4em minmax(0, 1.7fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(4.25em, 0.8fr) 3em;
+        gap: 0.35em;
+        font-size: 0.9em;
     }
 }
 
 @container (max-width: 30em) {
     .vas-grn-row {
-        gap: 0.5em;
+        gap: 0.3em;
+        font-size: 0.85em;
     }
 
     .vas-grn-panel__header {

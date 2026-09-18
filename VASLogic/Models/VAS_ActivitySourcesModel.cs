@@ -57,6 +57,14 @@
 ///                        being viewed. Both now use an IS NULL branch and a
 ///                        TRIMmed comparison: no COALESCE across character sets,
 ///                        no TO_CHAR, same meaning on Oracle.
+///   VAI163   2026-09-16  Appointment times were off by the viewer's zone offset
+///                        (reported on VAS_098; every panel reads this feed).
+///                        StartDate / EndDate are stored as entered, on the
+///                        server's clock, not in UTC as Created is — yet they
+///                        went out through Stamp() and the panels parsed them as
+///                        UTC. WallClock() now moves them onto the UTC clock
+///                        first so the browser's conversion lands back on the
+///                        entered time.
 /// </summary>
 
 using System;
@@ -226,6 +234,28 @@ namespace VASLogic.Models
             return DateTime.SpecifyKind(v, DateTimeKind.Unspecified);
         }
 
+        /// <summary>
+        /// A WALL-CLOCK date-time read out of the database — AppointmentsInfo's
+        /// StartDate / EndDate — moved onto the UTC clock so it lines up with the
+        /// stamps the rest of the feed is dated by.
+        ///
+        /// Created / Updated are stored in UTC, and every panel parses a bare
+        /// timestamp as UTC and renders it in the viewer's zone. An appointment's
+        /// StartDate is not stored that way: the appointments module writes the
+        /// time as entered, on the server's own clock (VAS_105 / VAS_123 read it
+        /// with TO_CHAR and show it verbatim for the same reason). Handing it out
+        /// as though it were UTC shifted every meeting by the viewer's offset —
+        /// a 10:00 meeting read 15:30 in India. Tagging it Local first makes the
+        /// same conversion the browser will undo, so the entered time comes back.
+        /// </summary>
+        public static DateTime? WallClock(object value)
+        {
+            DateTime? dt = Util.GetValueOfDateTime(value);
+            if (!dt.HasValue) return null;
+            DateTime v = DateTime.SpecifyKind(dt.Value, DateTimeKind.Local).ToUniversalTime();
+            return DateTime.SpecifyKind(v, DateTimeKind.Unspecified);
+        }
+
         /// <summary>AD_Table_ID for a table name, or 0. Cached for the app's life
         /// — the dictionary does not change under a running instance.</summary>
         private int TableId(string tableName)
@@ -311,7 +341,8 @@ namespace VASLogic.Models
 
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
-                    DateTime? start = Stamp(r["StartDate"]);
+                    // StartDate / EndDate are wall-clock, not UTC — see WallClock.
+                    DateTime? start = WallClock(r["StartDate"]);
                     string subject  = Util.GetValueOfString(r["Subject"]);
                     int apptId      = Util.GetValueOfInt(r["AppointmentsInfo_ID"]);
                     string key = (start.HasValue ? start.Value.ToString("yyyyMMddHHmm") : "")
@@ -337,7 +368,7 @@ namespace VASLogic.Models
                         Body        = Util.GetValueOfString(r["Description"]),
                         Location    = Util.GetValueOfString(r["Location"]),
                         StartDate   = start,
-                        EndDate     = Stamp(r["EndDate"]),
+                        EndDate     = WallClock(r["EndDate"]),
                         IsClosed    = Util.GetValueOfString(r["IsClosed"]) == "Y",
                         IsCancelled = Util.GetValueOfString(r["IsCancelled"]) == "Y",
                         ActorName   = Util.GetValueOfString(r["ActorName"]),
