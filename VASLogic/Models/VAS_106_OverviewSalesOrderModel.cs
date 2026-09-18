@@ -479,9 +479,27 @@ namespace VASLogic.Models
             result.PriorityRule = Util.GetValueOfString(r["PriorityRule"]);
             result.Created      = Stamp(r["Created"]);
 
-            result.GrandTotal   = Util.GetValueOfDecimal(r["GrandTotal"]);
-            result.TotalLines   = Util.GetValueOfDecimal(r["TotalLines"]);
-            result.TaxAmt       = result.GrandTotal - result.TotalLines;
+            // ----- Header totals (18-Sep-2026) -----
+            //  Derived from the LINES, judged by the PRICE LIST's Prices-Include-Tax
+            //  flag - never GrandTotal - TotalLines. That subtraction gave zero tax
+            //  on every tax-inclusive order (there TotalLines is the gross and
+            //  GrandTotal equals it), and the header itself is not to be trusted:
+            //  the framework's two halves read two different flags. MOrderLine
+            //  .IsTaxIncluded / MOrderTax judge LineNetAmt, TaxAmt and C_OrderTax by
+            //  M_PriceList.IsTaxIncluded, while MOrder.CalculateTaxTotal decides
+            //  whether GrandTotal is TotalLines or TotalLines + tax by
+            //  C_Order.IsTaxIncluded, a copy taken when the price list was
+            //  assigned. A price list whose flag was switched afterwards leaves the
+            //  copy stale and the header holding gross + extracted tax. So:
+            //    TotalLines (the subtotal the panel prints, "exclusive taxes") =
+            //      SUM(tax-inclusive ? LineNetAmt - TaxAmt - SurchargeAmt : LineNetAmt)
+            //    TaxAmt     = SUM(C_OrderTax.TaxAmt) - the extracted tax either way
+            //    GrandTotal = TotalLines + TaxAmt
+            //  Same derivation as VAS_092 and the VAS_107 line panel.
+            decimal storedTotalLines = Util.GetValueOfDecimal(r["TotalLines"]);
+            result.TaxAmt       = GetOrderTaxAmt(C_Order_ID);
+            result.TotalLines   = GetOrderTaxableBase(C_Order_ID, storedTotalLines);
+            result.GrandTotal   = result.TotalLines + result.TaxAmt;
 
             result.C_Currency_ID = Util.GetValueOfInt(r["C_Currency_ID"]);
             result.CurSymbol     = Util.GetValueOfString(r["CurSymbol"]);
@@ -3004,6 +3022,70 @@ namespace VASLogic.Models
         private SqlParameter[] OrderParam(int C_Order_ID)
         {
             return new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) };
+        }
+
+        /// <summary>
+        /// The order's total tax = SUM(C_OrderTax.TaxAmt): the extracted tax on a
+        /// tax-inclusive price list, the added tax on a tax-exclusive one - the
+        /// platform stores it there in both cases (MOrderTax). Standalone query,
+        /// child of an already authorized order, so it never reaches the MRole
+        /// rewriter on the main SELECT. Mirrors VAS_092.
+        /// </summary>
+        /// <param name="C_Order_ID">Owning sales order id.</param>
+        private decimal GetOrderTaxAmt(int C_Order_ID)
+        {
+            try
+            {
+                string sql = @"SELECT COALESCE(SUM(ot.TaxAmt), 0) AS TaxAmt
+                                 FROM C_OrderTax ot
+                                WHERE ot.C_Order_ID = @C_Order_ID
+                                  AND ot.IsActive   = 'Y'";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return 0;
+                return Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["TaxAmt"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetOrderTaxAmt (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// The order's taxable base = SUM over its lines of the net amount, judged
+        /// by the PRICE LIST's IsTaxIncluded (the flag MOrderLine and MOrderTax
+        /// wrote the line amounts under): tax-inclusive net = LineNetAmt - TaxAmt -
+        /// SurchargeAmt, tax-exclusive net = LineNetAmt. Falls back to
+        /// C_Order.TotalLines when the lines cannot be read. Standalone query for
+        /// the reason GetOrderTaxAmt gives; one bind name, once. Mirrors VAS_092.
+        /// </summary>
+        /// <param name="C_Order_ID">Owning sales order id.</param>
+        /// <param name="totalLines">C_Order.TotalLines, the fallback.</param>
+        private decimal GetOrderTaxableBase(int C_Order_ID, decimal totalLines)
+        {
+            try
+            {
+                string surchargeExpr = ColumnExists("C_OrderLine", "SurchargeAmt")
+                    ? "COALESCE(ol.SurchargeAmt, 0)" : "0";
+                string sql = @"SELECT COALESCE(SUM(CASE WHEN COALESCE(pl.IsTaxIncluded, 'N') = 'Y'
+                                                        THEN COALESCE(ol.LineNetAmt, 0) - COALESCE(ol.TaxAmt, 0) - " + surchargeExpr + @"
+                                                        ELSE COALESCE(ol.LineNetAmt, 0) END), 0) AS Net
+                                 FROM C_OrderLine ol
+                                INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                                 LEFT OUTER JOIN M_PriceList pl ON (pl.M_PriceList_ID = o.M_PriceList_ID)
+                                WHERE ol.C_Order_ID = @C_Order_ID
+                                  AND ol.IsActive   = 'Y'";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return totalLines;
+                return Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Net"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetOrderTaxableBase (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                return totalLines;
+            }
         }
 
         /// <summary>

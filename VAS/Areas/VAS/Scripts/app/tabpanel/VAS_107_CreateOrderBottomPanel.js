@@ -851,7 +851,9 @@
                 var prec = (h.StdPrecision != null && h.StdPrecision >= 0) ? h.StdPrecision : precision();
                 function fmtP(n) { return sym + (+n || 0).toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec }); }
                 $totalsRow.append(totalsRow(lbl("VAS_107_Subtotal", "Sub Total") + ":", fmtP(h.TotalLines), false));
+                var taxTotal = 0;
                 for (var i = 0; i < taxSummary.length; i++) {
+                    taxTotal += +taxSummary[i].TaxAmt || 0;
                     if (!taxSummary[i].TaxName) continue;
                     // TaxAmt from C_OrderTax is the base tax only (surcharge is separate).
                     $totalsRow.append(totalsRow(esc(taxSummary[i].TaxName) + ":", fmtP(taxSummary[i].TaxAmt), false));
@@ -859,7 +861,24 @@
                 // Surcharge stored on index-0 (total across all lines; separate from base tax).
                 if (+h.TotalSurcharge) $totalsRow.append(totalsRow(lbl("VAS_107_Surcharge", "Surcharge") + ":", fmtP(h.TotalSurcharge), false));
                 if (+h.TCSAmount) $totalsRow.append(totalsRow(lbl("VA106_TaxCollectedAtSource", "TCS") + ":", fmtP(h.TCSAmount), false));
-                $totalsRow.append(totalsRow(lbl("VAS_107_Total", "Grand Total") + ":", fmtP(h.GrandTotal), true));
+                // Grand Total = the rows above it, NOT C_Order.GrandTotal (18-Sep-2026).
+                // The framework's two halves read two different Prices-Include-Tax
+                // flags: MOrderLine / MOrderTax judge the line amounts, TaxAmt and
+                // C_OrderTax by M_PriceList.IsTaxIncluded, while MOrder.CalculateTaxTotal
+                // decides whether GrandTotal is TotalLines or TotalLines + tax by
+                // C_Order.IsTaxIncluded - a copy taken when the price list was
+                // assigned. A price list whose flag was switched afterwards leaves that
+                // copy stale, and the header then holds gross + extracted tax (2,630.33
+                // on a 2,500.00 tax-inclusive line) under rows that add up to 2,500.00.
+                // The panel's rows follow the price list, as the lines were written, so
+                // the total is their sum: tax-inclusive net + tax = the gross entered,
+                // tax-exclusive net + tax = net plus tax - the same figure the framework
+                // stores whenever its two flags agree. The tax added is EVERY C_OrderTax
+                // row (MOrder sums exactly those; a surcharge tax has its own row there,
+                // so TotalSurcharge - the same money read off the lines - is not added
+                // again).
+                var grand = (+h.TotalLines || 0) + taxTotal + (+h.TCSAmount || 0);
+                $totalsRow.append(totalsRow(lbl("VAS_107_Total", "Grand Total") + ":", fmtP(grand), true));
                 return;
             }
             // Fallback: C_OrderTax server breakdown not yet available (new/unsaved order, or
