@@ -18,6 +18,12 @@
  *                  here rather than stubbed.
  * Chronological  : Development
  *   VAI163         Created  03-Sep-2026
+ *   VAI163         17-Sep-2026  Requisition round of corrections:
+ *                  - Newest line first (Line DESC).
+ *                  - Catalog rows carry the product's own unit (UomId / UomName)
+ *                    so the panel can put it on the line as the product is picked.
+ *                  - SaveLines defaults a line's DateRequired from the header
+ *                    where the line reaches it without one.
  ******************************************************/
 
 using System;
@@ -884,6 +890,13 @@ namespace VASLogic.Models
             data.M_PriceList_ID = Util.GetValueOfInt(r["M_PriceList_ID"]);
             data.C_Currency_ID = Util.GetValueOfInt(r["C_Currency_ID"]);
             data.DateDoc = Util.GetValueOfDateTime(r["DateDoc"]);
+            // The header's Date Required as a real date, for the line seed (see the
+            // property). DBNull where the header carries none.
+            if (r.Table.Columns.Contains("DateRequired") && r["DateRequired"] != DBNull.Value)
+            {
+                DateTime? dr = Util.GetValueOfDateTime(r["DateRequired"]);
+                if (dr.HasValue) data.DateRequired = DateTime.SpecifyKind(dr.Value.Date, DateTimeKind.Unspecified);
+            }
             // Header values named by requisition-line DisplayLogic tokens. A DBNull stays
             // absent from the bag rather than becoming "" or 0, so the client can tell
             // "not set" from a real value and "@token@=null" evaluates the way the
@@ -943,7 +956,10 @@ namespace VASLogic.Models
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "rl", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             if (page < 0) page = 0;
-            sql += " ORDER BY rl.Line" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
+            // Newest line first (17-Sep-2026): the line just added is the one the user is
+            // working on, and it belongs at the top of the first page rather than at the
+            // foot of the last. The panel adds a new row at the top for the same reason.
+            sql += " ORDER BY rl.Line DESC, rl.M_RequisitionLine_ID DESC" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
 
             DataSet ds = DB.ExecuteDataset(sql,
                 new SqlParameter[] { new SqlParameter("@M_Requisition_ID", M_Requisition_ID) }, null);
@@ -1113,12 +1129,17 @@ namespace VASLogic.Models
             string term = (query ?? "").Trim();
             string like = "%" + term.ToLower() + "%";
 
+            // The product's own unit rides on the row (UomId / UomName), so the panel can
+            // put it on the line the moment the product is picked.
             string prodSql = @"SELECT p.M_Product_ID AS RecordId, 'P' AS Kind,
                                       p.Value AS SearchKey, p.Name AS DisplayName,
                                       COALESCE(p.Description, N'') AS Description,
                                       p.M_AttributeSet_ID AS AttributeSetId,
-                                      COALESCE(p.ProductType, '') AS ProductType
+                                      COALESCE(p.ProductType, '') AS ProductType,
+                                      COALESCE(p.C_UOM_ID, 0) AS UomId,
+                                      COALESCE(pu.Name, N'') AS UomName
                                FROM M_Product p
+                               LEFT JOIN C_UOM pu ON (pu.C_UOM_ID = p.C_UOM_ID)
                                WHERE p.IsActive = 'Y'
                                  AND p.IsSummary = 'N'
                                  AND p.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
@@ -1133,7 +1154,9 @@ namespace VASLogic.Models
                                         COALESCE(ch.Name, N'') AS SearchKey, ch.Name AS DisplayName,
                                         COALESCE(ch.Description, N'') AS Description,
                                         0 AS AttributeSetId,
-                                        '' AS ProductType
+                                        '' AS ProductType,
+                                        0 AS UomId,
+                                        N'' AS UomName
                                  FROM C_Charge ch
                                  WHERE ch.IsActive = 'Y'
                                    AND ch.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
@@ -1143,7 +1166,7 @@ namespace VASLogic.Models
             if (chargePred.Length > 0) chargeSql += " AND (" + chargePred + ")";
             chargeSql = MRole.GetDefault(ctx).AddAccessSQL(chargeSql, "ch", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            string combined = "SELECT x.RecordId, x.Kind, x.SearchKey, x.DisplayName, x.Description, x.AttributeSetId, x.ProductType"
+            string combined = "SELECT x.RecordId, x.Kind, x.SearchKey, x.DisplayName, x.Description, x.AttributeSetId, x.ProductType, x.UomId, x.UomName"
                 + " FROM ((" + prodSql + ") UNION ALL (" + chargeSql + ")) x"
                 + " ORDER BY x.Kind, x.DisplayName" + PagingSuffix(pageSize, offset);
 
@@ -1170,6 +1193,8 @@ namespace VASLogic.Models
                 it.Description = Util.GetValueOfString(r["Description"]);
                 it.HasAttributeSet = Util.GetValueOfInt(r["AttributeSetId"]) > 0;
                 it.ProductType = Util.GetValueOfString(r["ProductType"]);
+                it.C_UOM_ID = Util.GetValueOfInt(r["UomId"]);
+                it.UomName = Util.GetValueOfString(r["UomName"]);
                 items.Add(it);
             }
             return items;
@@ -1466,6 +1491,29 @@ namespace VASLogic.Models
             return line;
         }
 
+        /// <summary>The line's Date Required columns, in the order they are looked for.</summary>
+        private static readonly string[] LINE_DATE_REQUIRED_COLS = { "DTD001_DateRequired", "DateRequired" };
+
+        /// <summary>
+        /// Defaults every Date Required column the line carries from the header's
+        /// M_Requisition.DateRequired, where the line does not already hold one.
+        /// </summary>
+        /// <param name="line">line being saved</param>
+        /// <param name="parent">its requisition</param>
+        private static void ApplyHeaderDateRequired(MRequisitionLine line, MRequisition parent)
+        {
+            if (parent == null || parent.Get_ColumnIndex("DateRequired") < 0) return;
+            object hdr = parent.Get_Value("DateRequired");
+            if (hdr == null || hdr == DBNull.Value) return;
+            foreach (string col in LINE_DATE_REQUIRED_COLS)
+            {
+                if (line.Get_ColumnIndex(col) < 0) continue;
+                object cur = line.Get_Value(col);
+                if (cur != null && cur != DBNull.Value) continue;
+                line.Set_ValueNoCheck(col, hdr);
+            }
+        }
+
         /// <summary>
         /// Writes the line's selected unit. C_UOM_ID is an optional column on
         /// M_RequisitionLine (only the requisition window maintains it), so it is set
@@ -1476,7 +1524,10 @@ namespace VASLogic.Models
         {
             if (C_UOM_ID <= 0) return;
             if (line.Get_ColumnIndex("C_UOM_ID") < 0) return;
-            line.Set_Value("C_UOM_ID", C_UOM_ID);
+            // NoCheck, as the framework's own requisition-line writers do (InventoryLinesModel,
+            // CopyFromProjectLine): Set_Value refuses a column the dictionary marks
+            // non-updateable and the unit was silently never written (17-Sep-2026).
+            line.Set_ValueNoCheck("C_UOM_ID", C_UOM_ID);
         }
 
         /// <summary>
@@ -1559,14 +1610,21 @@ namespace VASLogic.Models
             MRequisitionLine line = BuildCalcLine(ctx, req, out parent);
             if (line == null || (req.M_Product_ID <= 0 && req.C_Charge_ID <= 0)) return res;
 
-            res.Values["C_UOM_ID"] = LineUomId(line);
+            // The unit the line is priced in. Where the transient line cannot state one
+            // (a schema whose M_RequisitionLine carries no C_UOM_ID column leaves
+            // LineUomId at 0), answer with the unit the request named, else the product's
+            // own - never 0, which the panel would read as "clear the unit" (17-Sep-2026).
+            int lineUom = LineUomId(line);
+            if (lineUom <= 0) lineUom = req.C_UOM_ID > 0 ? req.C_UOM_ID : GetProductUomId(ctx, req.M_Product_ID);
+            if (lineUom <= 0 && req.C_Charge_ID > 0) lineUom = GetDefaultUomId(ctx);
+            res.Values["C_UOM_ID"] = lineUom;
             res.Values["PriceActual"] = line.GetPriceActual();
             res.Values["Qty"] = line.GetQty();
             res.Values["LineNetAmt"] = line.GetLineNetAmt();
             if (req.M_Product_ID > 0) res.Values["C_Charge_ID"] = 0;
             else if (req.C_Charge_ID > 0) { res.Values["M_Product_ID"] = 0; res.Values["M_AttributeSetInstance_ID"] = 0; }
 
-            res.Display["uomName"] = GetUomLabel(ctx, LineUomId(line));
+            res.Display["uomName"] = GetUomLabel(ctx, lineUom);
             return res;
         }
 
@@ -2071,6 +2129,17 @@ namespace VASLogic.Models
                         : null;
                     ApplyExtraColumns(line, input.Values, touchedCols);
 
+                    // Date Required defaults from the header (17-Sep-2026): the requisition
+                    // says by when it is needed, and a line raised through the panel used to
+                    // reach the table with the column NULL - the Lines tab then showed it
+                    // blank. The line's column is DTD001_DateRequired (the DTD001 module's,
+                    // which the Lines tab shows; the framework's own writers set it the same
+                    // way - see InventoryLinesModel / CopyFromProjectLine); a schema that
+                    // also carries a plain DateRequired gets it too. Only where nothing
+                    // (client seed or Additional Info entry) has set it, and written NoCheck
+                    // so a non-updateable dictionary flag cannot swallow it.
+                    ApplyHeaderDateRequired(line, parent);
+
                     if (!line.Save())
                     {
                         string err = string.Empty;
@@ -2226,6 +2295,13 @@ namespace VASLogic.Models
         /// <summary>Currency of the requisition's PRICE LIST — a requisition has none of its own.</summary>
         public int C_Currency_ID { get; set; }
         public DateTime? DateDoc { get; set; }
+        /// <summary>
+        /// M_Requisition.DateRequired as a DATE (serialised ISO), not the culture-formatted
+        /// string the LogicContext bag carries — which is what a new line's own Date
+        /// Required is seeded from (the panel could not parse "16-09-2026 00:00:00").
+        /// Normalised to Unspecified so the JSON shape is the same on Oracle and PostgreSQL.
+        /// </summary>
+        public DateTime? DateRequired { get; set; }
         /// <summary>
         /// Header values that M_RequisitionLine field DisplayLogic / ReadOnlyLogic name as
         /// tokens (@M_Warehouse_ID@, @DateRequired@, ...). A column that is NULL on the
@@ -2565,6 +2641,10 @@ namespace VASLogic.Models
         public bool HasAttributeSet { get; set; }
         /// <summary>M_Product.ProductType; empty for a charge.</summary>
         public string ProductType { get; set; }
+        /// <summary>The product's own unit (M_Product.C_UOM_ID); 0 for a charge.</summary>
+        public int C_UOM_ID { get; set; }
+        /// <summary>That unit's name, so the panel can label it without a lookup.</summary>
+        public string UomName { get; set; }
     }
 
     /// <summary>

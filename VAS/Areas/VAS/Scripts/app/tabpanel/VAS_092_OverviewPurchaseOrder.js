@@ -365,6 +365,11 @@
  *                        pill (statusTone) reports Voided / Closed first too — it
  *                        was read off the delivery / payment flags alone, so a
  *                        voided order wore a "Drafted" pill.
+ *   VAI163   2026-09-16  A prepared order (DocStatus IP) wore a "Drafted" pill and
+ *                        read "Pending" under the Completed stage. statusTone
+ *                        reports "In Progress" for IP, and the model now puts an
+ *                        IP order on stage 2 so the Completed stage captions
+ *                        itself "In progress".
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -918,6 +923,11 @@
                 return { tone: "risk", label: getMsg("VAS_092_StVoided") };
             if (d.DocStatus === "CL")
                 return { tone: "neutral", label: getMsg("VAS_092_StClosed") };
+            // A prepared order (DocStatus IP) is past draft but not completed:
+            // none of the delivery / payment flags are set yet, so without this
+            // it fell through to "Drafted" while the window said In Progress.
+            if (d.DocStatus === "IP")
+                return { tone: "info", label: getMsg("VAS_092_StInProgress") };
             if (d.IsPaymentDone)
                 return { tone: "success", label: getMsg("VAS_092_PaymentDone") };
             if (d.IsFullyDelivered)

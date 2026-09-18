@@ -17,7 +17,8 @@
 
 .vas-obl-root,
 .vas-obl-dialog-backdrop,
-.vas-obl-toast {
+.vas-obl-toast,
+.vas-obl-catalog-popover--fixed {
     --cil-action-blue: #0083da;
     --cil-action-blue-hover: #0069ae;
     --cil-link-deep: #005fa3;
@@ -91,8 +92,8 @@
        — magnify everything uniformly — so the panel keeps its size on screen.
        16px is the clamp's own floor, i.e. what every viewport under ~1800px already
        resolved to, so ordinary screens are unchanged at 100% zoom.
-       Narrow-width responsiveness is handled where it belongs: the layout media query at
-       the foot of this file, which drops columns instead of scaling type down. */
+       Narrow-width responsiveness is handled where it belongs: the container queries at
+       the foot of this file, which tighten the tracks and gaps (every column stays). */
     container-type: inline-size;
     --panel-anchor: 16px;
     font-size: var(--panel-anchor);
@@ -335,11 +336,11 @@
    Scoped to the root + body-level dialogs (mirrors VAS_074 :where(.vas-cil-root,...))
    so every button/input/select inside the panel inherits the root's font-size anchor
    instead of falling back to the UA default (~13.33px in Chrome). */
-:where(.vas-obl-root, .vas-obl-dialog-backdrop) button,
-:where(.vas-obl-root, .vas-obl-dialog-backdrop) input,
-:where(.vas-obl-root, .vas-obl-dialog-backdrop) select,
-:where(.vas-obl-root, .vas-obl-dialog-backdrop) textarea,
-:where(.vas-obl-root, .vas-obl-dialog-backdrop) optgroup {
+:where(.vas-obl-root, .vas-obl-dialog-backdrop, .vas-obl-catalog-popover--fixed) button,
+:where(.vas-obl-root, .vas-obl-dialog-backdrop, .vas-obl-catalog-popover--fixed) input,
+:where(.vas-obl-root, .vas-obl-dialog-backdrop, .vas-obl-catalog-popover--fixed) select,
+:where(.vas-obl-root, .vas-obl-dialog-backdrop, .vas-obl-catalog-popover--fixed) textarea,
+:where(.vas-obl-root, .vas-obl-dialog-backdrop, .vas-obl-catalog-popover--fixed) optgroup {
     font-family: inherit;
     font-size: inherit;
     line-height: inherit;
@@ -506,6 +507,14 @@
     min-width: 0;
     font-size: 0.875em;
     color: var(--cil-text);
+}
+
+/* A cell clips its own overflow. With the keep-every-column tracks (minmax(0, Nfr),
+   see the container queries at the foot) the head and body rows - separate grids - can
+   only stay in step if no cell can grow past its track. Every document since
+   18-Sep-2026 (was purchase / sales orders only). */
+.vas-obl-cell {
+    overflow: hidden;
 }
 
 .vas-obl-cell--check {
@@ -689,6 +698,15 @@
     color: var(--cil-text-secondary);
 }
 
+/* The Tax dropdown sits in a right-aligned column, and a <select> inherits that
+   alignment - so its list of names read ragged-right. A list of names is read from the
+   left, like every other dropdown on the screen. */
+.vas-obl-cell-edit select.vas-obl-tax-select,
+.vas-obl-cell-edit select.vas-obl-tax-select option {
+    text-align: left;
+    text-align-last: left;
+}
+
 .vas-obl-cell-edit input.vas-obl-cell-edit__input::placeholder {
     color: var(--cil-text-disabled);
 }
@@ -794,6 +812,25 @@
     border-radius: var(--cil-r-md) var(--cil-r-md) 0 0;
 }
 
+/* The Product / Charge list is mounted on <body>, fixed to the viewport (positionCatalog
+   sets left / width / top or bottom inline), so the panel root's scroll box cannot clip it
+   and it keeps its full size whether it opens below or above the input. Outside the root
+   it must carry its own font anchor and sit above the framework chrome; the FK popover
+   inside the Additional Info modal keeps the in-flow rule above. */
+.vas-obl-catalog-popover--fixed {
+    position: fixed;
+    right: auto;
+    z-index: 10001;
+    font-family: var(--cil-font);
+    font-size: 16px;
+    color: var(--cil-text);
+    border-top: 1px solid var(--cil-divider-strong);
+}
+
+.vas-obl-catalog-popover--fixed.vas-obl-catalog-popover--above {
+    border-bottom: 1px solid var(--cil-divider-strong);
+}
+
 .vas-obl-catalog__hint {
     padding: 0.55em 0.75em;
     font-size: 0.75em;
@@ -865,35 +902,45 @@
 }
 
 /* ---------- more popover ---------- */
+/* The "..." (More) button reads its state by colour (17-Sep-2026): WHITE while the
+   line holds nothing in Additional Info, BLUE once it does (.has-values, re-evaluated
+   on every render). */
 .vas-obl-more-btn {
     width: 1.5em;
     height: 1.5em;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: none;
-    background: transparent;
+    border: 1px solid var(--cil-border-default);
+    background: var(--cil-surface);
     border-radius: var(--cil-r-sm);
     color: var(--cil-text-muted);
     cursor: pointer;
-    transition: background .12s, color .12s;
+    transition: background .12s, color .12s, border-color .12s;
 }
 
     .vas-obl-more-btn:hover {
         background: #f1f8ff;
+        border-color: var(--cil-action-blue);
         color: var(--cil-action-blue);
     }
 
     .vas-obl-more-btn.is-open {
         background: var(--cil-blue-soft);
+        border-color: var(--cil-action-blue);
         color: var(--cil-action-blue);
     }
+    /* The line already holds Additional-Info values: blue, so the user can see there is
+       something inside without opening it. */
     .vas-obl-more-btn.has-values {
-        background: var(--cil-blue-soft);
-        color: var(--cil-action-blue);
+        background: var(--cil-action-blue);
+        border-color: var(--cil-action-blue);
+        color: #fff;
     }
     .vas-obl-more-btn.has-values:hover {
-        background: #d9eeff;
+        background: var(--cil-action-blue-hover);
+        border-color: var(--cil-action-blue-hover);
+        color: #fff;
     }
     /* Read-only invoice: the "..." button is disabled -> not-allowed (no hover tint). */
     .vas-obl-more-btn:disabled {
@@ -2023,33 +2070,32 @@
    panel anchor, a constant 16px - so these thresholds are fixed, real widths and do not
    drift with zoom or with the host page's root font size.
 
-   Each step keeps the columns you cannot enter a line without (product, quantity, price)
-   and drops the ones that can be read elsewhere - Description and Tax first, then the
-   computed Taxable Amount. Every step also uses flexible minmax() tracks rather than the
-   fixed em widths this rule used to carry: fixed tracks plus gaps consumed ~28em, so at a
-   narrow width the product column was left with almost nothing and its text collided with
-   the quantity. */
+   NO column is ever dropped, on ANY document (purchase orders since 16-Sep-2026, sales
+   orders since 17-Sep, quotations since 18-Sep). The steps this rule used to carry for a
+   sales document hid Description and Tax below 60em and Taxable Amount below 42em, and
+   with the host width the framework leaves behind after a zoom (see "Full-width host"
+   above) - or simply with the right-hand Overview panel open beside the grid - those
+   thresholds were being crossed on an ordinary screen: the user lost the Tax column
+   they were about to fill in. Every column stays; what gives instead is the room
+   between and inside them: the gap shrinks, the fixed em minimums on the figure columns
+   come down so all eight tracks can share a narrow row, and the type steps down a little
+   at the narrowest widths. Text in a crushed cell truncates with an ellipsis (the cells
+   carry min-width:0 + overflow:hidden), which is recoverable - a hidden column is not. */
 @container (max-width: 60em) {
     .vas-obl-row {
-        grid-template-columns: 1.75em minmax(0, 1.6fr) minmax(5.5em, 0.9fr) minmax(4.5em, 0.7fr) minmax(6em, 0.9fr) 3.5em;
+        grid-template-columns: 1.5em minmax(0, 1.7fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(4.5em, 0.7fr) minmax(4.5em, 0.7fr) minmax(5em, 0.8fr) 3.5em;
+        gap: 0.5em;
     }
-    /* Description (3) and Tax (6). */
-    .vas-obl-row--head .vas-obl-cell:nth-child(3), .vas-obl-row--line .vas-obl-cell:nth-child(3),
-    .vas-obl-row--head .vas-obl-cell:nth-child(6), .vas-obl-row--line .vas-obl-cell:nth-child(6) {
-        display: none;
+    .vas-obl-row--head .vas-obl-cell {
+        font-size: 0.85em;
     }
 }
 
 @container (max-width: 42em) {
     .vas-obl-row {
-        grid-template-columns: 1.75em minmax(0, 1.5fr) minmax(5em, 0.9fr) minmax(4.5em, 0.8fr) 3em;
-        gap: 0.5em;
-    }
-    /* ...and Taxable Amount (7): it is a computed figure, and the Total below the grid
-       still states the money. Product, Quantity/UOM and Price survive to the narrowest
-       step - a line cannot be keyed without them. */
-    .vas-obl-row--head .vas-obl-cell:nth-child(7), .vas-obl-row--line .vas-obl-cell:nth-child(7) {
-        display: none;
+        grid-template-columns: 1.4em minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(3.75em, 0.7fr) minmax(3.75em, 0.7fr) minmax(4.25em, 0.8fr) 3.25em;
+        gap: 0.35em;
+        font-size: 0.875em;
     }
 
     .vas-obl-panel__header {

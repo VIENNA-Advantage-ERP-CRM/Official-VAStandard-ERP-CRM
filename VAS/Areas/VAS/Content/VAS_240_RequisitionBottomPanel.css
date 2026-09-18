@@ -13,11 +13,35 @@
  * All sizing in em (no px), classes namespaced vas-rbl-* so nothing
  * leaks into the host page. Tokens are shared with the body-level
  * dialogs / toast (which mount outside .vas-rbl-root).
+ * Chronological development:
+ *   VAI163   2026-09-17  Responsive under zoom (same fix as VAS_247/248/249). The
+ *                        panel's type anchor follows the panel's own width (cqw
+ *                        clamp on .vas-rbl-panel, 16px down to 12.5px) instead of a
+ *                        viewport clamp, so a zoomed-in panel scales into the room
+ *                        it has rather than crushing its columns and stacking its
+ *                        toolbar; the dialogs take a vw clamp of their own. Header
+ *                        chrome and radii moved from px to em; the title truncates
+ *                        before the toolbar wraps; the pager wraps; the catalog
+ *                        list and the dialogs are capped to the panel / viewport
+ *                        width; the Additional Info grid goes single-column in a
+ *                        narrow window. NO column is dropped at any width / zoom:
+ *                        the viewport media query became container queries that
+ *                        tighten the tracks and gaps instead, and cells clip their
+ *                        own overflow so head and body rows stay in step. The
+ *                        framework host's stale inline width is released with the
+ *                        :has() rule the sibling panels carry.
+ *   VAI163   2026-09-17  Requisition round: the root carries its own white surface
+ *                        (no host blue on New Record / at a zoom-out); the Product /
+ *                        Charge list is body-mounted and viewport-fixed
+ *                        (--fixed) so its first row is never clipped; the
+ *                        "Additional Details" link-style group in the Additional
+ *                        Info modal; read-only fields are white, never grey.
  * ============================================================ */
 
 .vas-rbl-root,
 .vas-rbl-dialog-backdrop,
-.vas-rbl-toast {
+.vas-rbl-toast,
+.vas-rbl-catalog-popover--fixed {
     --cil-action-blue: #0083da;
     --cil-action-blue-hover: #0069ae;
     --cil-link-deep: #005fa3;
@@ -78,16 +102,65 @@
        so it felt stuck. Chaining lets the page scroll smoothly past the panel (mirrors VAS_074). */
     overscroll-behavior: auto;
     /*padding: 0.75em;*/
+    /* The panel's own surface. With no background of its own, a cleared panel (New
+       Record hides the grid) let the framework host's blue show through the root, and
+       at a zoom-out the room the host keeps below a short panel read as a blue band. */
+    background: var(--cil-surface);
     font-family: var(--cil-font);
-    /* Canonical panel anchor — VIEWPORT-stable so the panel renders at the same physical
-       size on every screen resolution (mirrors VAS_074). All internal em tokens resolve
-       against this anchor; container-type lets inner primitives use cqi if needed. */
+    /* Query container for the responsive rules at the foot of this file, and for the
+       fluid type anchor on .vas-rbl-panel (cqw resolves against THIS box). */
     container-type: inline-size;
-    --panel-anchor: clamp(16px, 1vw, 18px);
+    /* The maximum anchor (it was clamp(16px, 1vw, 18px), a viewport clamp). The working
+       anchor is set on .vas-rbl-panel from the container's own width - see there. */
+    --panel-anchor: 16px;
     font-size: var(--panel-anchor);
     color: var(--cil-text);
     /* Bottom panel top-edge divider per windows-and-panels.md (Bottom Panel > Shared Rules) */
     /*border-top: 1px solid #DCE6EE;*/
+}
+
+/* ---------------------------------------------------------------------------
+   Fluid type anchor - what makes the panel keep its proportions under zoom
+   ---------------------------------------------------------------------------
+   Everything inside the panel is sized in em, so ONE font-size decides how big the whole
+   panel is. It used to be a viewport clamp (16-18px): fine at 100%, but browser zoom
+   shrinks the room the panel has (measured in CSS px) while the panel kept its design
+   size, so at 125-175% the seven columns, the toolbar and the pager were being crushed
+   into a box that had lost a third of its width. Zooming OUT had the opposite look: a
+   small panel lost in a wide host.
+
+   The anchor now follows the panel's own width (cqw = 1% of the root, the query
+   container): 16px on a wide panel, easing down to a 12.5px floor as the panel narrows,
+   whether the narrowing comes from the splitter, the window or a zoom. The container
+   queries at the foot of this file then only have to trim gaps and minimums. Zooming in
+   still magnifies (the floor is in px), it just stops the panel outgrowing its box. */
+.vas-rbl-panel,
+.vas-rbl-empty,
+.vas-rbl-linepager {
+    font-size: clamp(12.5px, calc(9.5px + 0.65cqw), var(--panel-anchor));
+}
+
+/* ---------------------------------------------------------------------------
+   Full-width host - survives browser zoom / window resize
+   ---------------------------------------------------------------------------
+   The framework stylesheet sizes the tab-panel host for a RIGHT-docked panel
+   (.vis-ad-w-p-ap-tp-outerwrap { width:250px }) and stretches a BOTTOM-docked one with an
+   INLINE pixel width computed once at layout time. Browser zoom changes the CSS viewport
+   but never recomputes that inline width, so the host keeps its pre-zoom pixels and the
+   panel stops short of the window's right edge. An author !important outranks an inline
+   style, so this keeps winning when the framework re-asserts its width. Scoped with
+   :has() to a host containing THIS panel, so right-docked panels keep their 250px. Same
+   rule as VAS_247/248/249. */
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-rbl-root) {
+    width: auto !important;
+    max-width: 100% !important;
+}
+
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-rbl-root) > .vis-ad-w-p-ap-tp-o-body,
+.vis-ad-w-p-ap-tp-outerwrap:has(.vas-rbl-root) .vis-ad-w-p-ap-tp-o-b-content {
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0;
 }
 /* Same guard down the wrapper chain in case the host stretches an inner block as the
    flex item rather than the root itself. */
@@ -102,9 +175,13 @@
 .vas-rbl-empty {
     display: flex;
     height: 100%;
+    min-height: 4em;
     align-items: center;
     justify-content: center;
+    padding: 1em;
+    text-align: center;
     color: var(--cil-text-muted);
+    background: var(--cil-surface);
 }
 
 .vas-rbl-icon {
@@ -127,21 +204,28 @@
 .vas-rbl-panel {
     background: #FFFFFF;
     /*border: 1px solid #D9E2EB;*/
-    border-radius: 16px;
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    border-radius: 1em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
 }
 
-/* Panel Foundation Rule 2 — header chrome (windows-and-panels.md § Panel Foundation) */
+/* Panel Foundation Rule 2 — header chrome (windows-and-panels.md § Panel Foundation).
+   Sized in em (it was 56px / 16px) so it follows the fluid anchor like everything else;
+   the title yields (min-width:0 + ellipsis) before the toolbar wraps. */
 .vas-rbl-panel__header {
-    min-height: 56px;
-    padding: 0 16px;
+    min-height: 3.5em;
+    padding: 0.375em 1em;
     /*border-bottom: 1px solid #D9E2EB;*/
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75em;
+    gap: 0.5em 0.75em;
 }
+
+    .vas-rbl-panel__header > div:first-child {
+        flex: 1 1 12em;
+        min-width: 0;
+    }
 
 .vas-rbl-panel__title {
     margin: 0;
@@ -149,6 +233,9 @@
     font-weight: 700;
     letter-spacing: -0.01em;
     color: var(--cil-text-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .vas-rbl-panel__subtitle {
@@ -161,8 +248,17 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.625em;
+    justify-content: flex-end;
+    gap: 0.5em 0.625em;
+    /* Never wider than the header: the buttons wrap onto a second row instead of pushing
+       the panel past its box. */
+    max-width: 100%;
+    min-width: 0;
 }
+
+    .vas-rbl-panel__actions .vas-rbl-btn {
+        white-space: nowrap;
+    }
 
 /* ---------- buttons ---------- */
 .vas-rbl-btn {
@@ -283,11 +379,11 @@
    Scoped to the root + body-level dialogs (mirrors VAS_074 :where(.vas-cil-root,...))
    so every button/input/select inside the panel inherits the root's font-size anchor
    instead of falling back to the UA default (~13.33px in Chrome). */
-:where(.vas-rbl-root, .vas-rbl-dialog-backdrop) button,
-:where(.vas-rbl-root, .vas-rbl-dialog-backdrop) input,
-:where(.vas-rbl-root, .vas-rbl-dialog-backdrop) select,
-:where(.vas-rbl-root, .vas-rbl-dialog-backdrop) textarea,
-:where(.vas-rbl-root, .vas-rbl-dialog-backdrop) optgroup {
+:where(.vas-rbl-root, .vas-rbl-dialog-backdrop, .vas-rbl-catalog-popover--fixed) button,
+:where(.vas-rbl-root, .vas-rbl-dialog-backdrop, .vas-rbl-catalog-popover--fixed) input,
+:where(.vas-rbl-root, .vas-rbl-dialog-backdrop, .vas-rbl-catalog-popover--fixed) select,
+:where(.vas-rbl-root, .vas-rbl-dialog-backdrop, .vas-rbl-catalog-popover--fixed) textarea,
+:where(.vas-rbl-root, .vas-rbl-dialog-backdrop, .vas-rbl-catalog-popover--fixed) optgroup {
     font-family: inherit;
     font-size: inherit;
     line-height: inherit;
@@ -450,8 +546,17 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* A cell clips its own overflow. With the keep-every-column tracks (minmax(0, Nfr),
+       see the container queries at the foot) the head and body rows - separate grids -
+       can only stay in step if no cell can grow past its track. */
+    overflow: hidden;
     font-size: 0.875em;
     color: var(--cil-text);
+}
+
+/* The catalog popover is absolutely positioned against this cell, so it must not clip. */
+.vas-rbl-cell--product {
+    overflow: visible;
 }
 
 .vas-rbl-cell--check {
@@ -715,7 +820,10 @@
     top: 100%;
     margin-top: 0;
     z-index: 30;
-    min-width: 22.5em;
+    /* Wide enough to read, but never wider than most of the panel: on a narrow (zoomed)
+       panel a fixed 22.5em pushed the list past the root's edge and clipped it. */
+    min-width: min(22.5em, 80cqw);
+    max-width: 92cqw;
     background: #ffffff;
     border: 1px solid var(--cil-divider-strong);
     border-top: none;
@@ -739,6 +847,33 @@
     border-bottom: none;
     border-radius: var(--cil-r-md) var(--cil-r-md) 0 0;
 }
+
+/* The Product / Charge list is mounted on <body>, fixed to the viewport (positionCatalog
+   sets left / width / top or bottom inline), so the panel root's scroll box cannot clip
+   it and it keeps its full size whether it opens below or above the input - which is
+   what stopped its first row being cut off (17-Sep-2026). Outside the root it must carry
+   its own font anchor and design tokens and sit above the framework chrome; the FK
+   popover inside the Additional Info modal keeps the in-flow rule above. Its width is
+   the input's (inline), so the in-flow min / max widths (cqw) do not apply. */
+.vas-rbl-catalog-popover--fixed {
+    position: fixed;
+    right: auto;
+    min-width: 0;
+    max-width: none;
+    z-index: 10001;
+    font-family: var(--cil-font);
+    font-size: clamp(12.5px, calc(9.5px + 0.5vw), 16px);
+    color: var(--cil-text);
+    border-top: 1px solid var(--cil-divider-strong);
+}
+
+.vas-rbl-catalog-popover--fixed.vas-rbl-catalog-popover--above {
+    border-bottom: 1px solid var(--cil-divider-strong);
+}
+
+    .vas-rbl-catalog-popover--fixed * {
+        box-sizing: border-box;
+    }
 
 .vas-rbl-catalog__hint {
     padding: 0.55em 0.75em;
@@ -1318,6 +1453,10 @@
     z-index: 99;
     font-family: var(--cil-font);
     color: var(--cil-text);
+    /* The dialogs mount on <body>, outside the root, so they carry their own anchor:
+       the viewport's, eased down under zoom the same way the panel's is, so a modal
+       never opens larger than the window it sits in. */
+    font-size: clamp(12.5px, calc(9.5px + 0.5vw), 16px);
 }
 
     .vas-rbl-dialog-backdrop * {
@@ -1338,9 +1477,9 @@
 
 .vas-rbl-dialog {
     background: var(--cil-surface);
-    border-radius: 14px;
+    border-radius: 0.875em;
     box-shadow: var(--cil-shadow-dialog);
-    width: 45em;
+    width: min(45em, 96vw);
     max-width: 100%;
     max-height: 90vh;
     overflow: hidden;
@@ -1349,8 +1488,18 @@
 }
 
 .vas-rbl-dialog--wide {
-    width: 56em;
-    height: 30em;
+    width: min(56em, 96vw);
+    height: min(30em, 90vh);
+}
+
+/* Additional Info: the 2-up field grid goes single-column once the dialog is narrow
+   (a zoomed or small window), instead of squeezing two framework fields into a width
+   neither can render in. */
+@media (max-width: 52em) {
+    .vas-rbl-more-grid {
+        grid-template-columns: 1fr;
+        gap: 0.25em 0;
+    }
 }
 
 .vas-rbl-dialog__header {
@@ -1874,6 +2023,7 @@
    "Showing X-Y of N" on the left, "‹ P of Q ›" nav on the right. */
 .vas-rbl-linepager {
     display: flex;
+    flex-wrap: wrap;           /* "Showing…" and the nav stack on a narrow panel */
     align-items: center;
     justify-content: space-between;
     gap: 0.5em;
@@ -1942,16 +2092,60 @@
     transform: translateX(-50%) translateY(0);
 }
 
-/* ---------- responsive ---------- */
-@media (max-width: 60em) {
-    /* Narrow layout: five tracks + the "..." cell. Description (3rd cell) is the
-       one column dropped — every other cell carries a figure the row is read for. */
+/* ---------- responsive ----------
+   @container, not @media (17-Sep-2026): this is a bottom panel whose width is set by
+   the framework splitter, not by the viewport, so a viewport breakpoint fired at the
+   wrong moment in both directions. `em` inside a container query resolves against the
+   QUERY CONTAINER's font size - the root's constant 16px - so these thresholds are fixed
+   real widths, whatever the fluid anchor on .vas-rbl-panel is doing to the type at the
+   time. That anchor does the bulk of the work (the whole panel scales with its width);
+   these steps only trim what scaling cannot: the gaps and the fixed minimums.
+
+   NO column is ever dropped (ported from VAS_249). The earlier media query hid
+   Description below 60em of VIEWPORT, which a zoom crosses on an ordinary screen - the
+   user lost the column they were about to fill in. Every column stays; what gives
+   instead is the room between and inside them: the gap shrinks, the fixed em minimums on
+   the price and amount columns come down so all seven tracks can share a narrow row, and
+   the type steps down a little at the narrowest widths. Text in a crushed cell truncates
+   with an ellipsis (the cells carry min-width:0 + overflow:hidden), which is
+   recoverable - a hidden column is not. */
+@container (max-width: 60em) {
     .vas-rbl-row {
-        grid-template-columns: 1.75em minmax(0, 1.6fr) 7em 6em 6em 3.5em;
+        grid-template-columns: 1.5em minmax(0, 1.7fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(5em, 0.8fr) minmax(5.5em, 0.9fr) 3.25em;
+        gap: 0.5em;
     }
 
-    .vas-rbl-row--head .vas-rbl-cell:nth-child(3), .vas-rbl-row--line .vas-rbl-cell:nth-child(3) {
+    .vas-rbl-row--head .vas-rbl-cell {
+        font-size: 0.85em;
+    }
+}
+
+@container (max-width: 44em) {
+    .vas-rbl-row {
+        grid-template-columns: 1.4em minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(4.25em, 0.8fr) minmax(4.75em, 0.9fr) 3em;
+        gap: 0.35em;
+        font-size: 0.9em;
+    }
+}
+
+@container (max-width: 30em) {
+    .vas-rbl-row {
+        gap: 0.3em;
+        font-size: 0.85em;
+    }
+
+    .vas-rbl-panel__header {
+        padding: 0.375em 0.5em;
+    }
+
+    /* Icon-only toolbar: at this width the labels wrap the header into three rows and push
+       the grid off screen. */
+    .vas-rbl-btn > span {
         display: none;
+    }
+
+    .vas-rbl-btn {
+        padding: 0.5em 0.625em;
     }
 }
 
@@ -2011,9 +2205,63 @@
     transform: rotate(180deg);
 }
 
+/* "Additional Details" (17-Sep-2026): a link-style group header. No bar, no Show
+   More/Less - the group's name IS the hyperlink, and it reveals the origin references
+   the line carries (each offered only where it has a value). */
+.vas-rbl-more-grid > .vas-rbl-fldgrp.vas-rbl-fldgrp--link {
+    justify-content: flex-start;
+    margin: 0.5em 0 0.75em;
+    padding: 0.25em 0;
+    background: none;
+    border-top: 1px solid var(--cil-divider);
+    border-radius: 0;
+}
+
+.vas-rbl-fldgrp-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    color: var(--cil-action-blue);
+    font-size: 0.875em;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+    .vas-rbl-fldgrp-link:hover,
+    .vas-rbl-fldgrp-link:focus {
+        color: var(--cil-action-blue-hover);
+        text-decoration: underline;
+        outline: none;
+    }
+
 /* Member field hidden while its group is collapsed (independent of DisplayLogic). */
 .vas-rbl-more-grid > .vas-rbl-grp-collapsed {
     display: none !important;
+}
+
+/* Read-only fields (17-Sep-2026): white, never grey. The framework paints a disabled /
+   readonly control with a grey fill; on this panel a locked field reads as plain text
+   on the same white surface as everything else - in the Additional Info modal's
+   framework controls and in the grid's resting cells alike. */
+.vas-rbl-dialog .vis-input-wrap input[readonly],
+.vas-rbl-dialog .vis-input-wrap input:disabled,
+.vas-rbl-dialog .vis-input-wrap select:disabled,
+.vas-rbl-dialog .vis-input-wrap textarea[readonly],
+.vas-rbl-dialog .vis-input-wrap textarea:disabled,
+.vas-rbl-dialog .vis-input-wrap .vis-ev-col-readonly,
+.vas-rbl-dialog .vis-input-wrap .vis-ev-col-readonly input,
+.vas-rbl-dialog .vis-input-wrap .vis-ev-col-readonly select,
+.vas-rbl-dialog .vis-input-wrap .vis-ev-col-readonly textarea,
+.vas-rbl-dialog .vis-input-wrap:has(.vis-ev-col-readonly) .input-group-text,
+.vas-rbl-dialog .vis-control-wrap input[readonly] {
+    background: var(--cil-surface) !important;
+    background-color: var(--cil-surface) !important;
+}
+
+.vas-rbl-cell-edit input.vas-rbl-cell-disp--ro,
+.vas-rbl-cell-edit input.vas-rbl-cell-disp:disabled {
+    background: transparent !important;
 }
 
 /* Section header all of whose fields are DisplayLogic-hidden — must not show. */

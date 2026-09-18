@@ -881,8 +881,42 @@ namespace VASLogic.Models
         {
             "DocumentNo", "MovementDate", "DateAcct", "M_Warehouse_ID", "C_DocType_ID",
             "C_BPartner_ID", "C_Order_ID", "AD_User_ID", "C_Project_ID", "C_Activity_ID",
-            "C_Campaign_ID", "IsInDispute", "MovementType"
+            "C_Campaign_ID", "IsInDispute", "MovementType",
+            // The header's Date Required, under either name a schema may carry it: a new
+            // line's own Date Required defaults from it.
+            "DateRequired", "DTD001_DateRequired"
         };
+
+        /// <summary>The line's Date Required columns, in the order they are looked for.</summary>
+        private static readonly string[] LINE_DATE_REQUIRED_COLS = { "DTD001_DateRequired", "DateRequired" };
+
+        /// <summary>
+        /// Defaults every Date Required column the line carries from the header's own
+        /// (DateRequired or DTD001_DateRequired, whichever the schema has and holds a
+        /// value), where the line does not already hold one. Written NoCheck so a
+        /// non-updateable dictionary flag cannot swallow it. Same rule as VAS_240 / VAS_247.
+        /// </summary>
+        /// <param name="line">line being saved</param>
+        /// <param name="header">its shipment</param>
+        private static void ApplyHeaderDateRequired(MInOutLine line, MInOut header)
+        {
+            if (header == null) return;
+            object hdr = null;
+            foreach (string hcol in new string[] { "DateRequired", "DTD001_DateRequired" })
+            {
+                if (header.Get_ColumnIndex(hcol) < 0) continue;
+                object v = header.Get_Value(hcol);
+                if (v != null && v != DBNull.Value) { hdr = v; break; }
+            }
+            if (hdr == null) return;
+            foreach (string col in LINE_DATE_REQUIRED_COLS)
+            {
+                if (line.Get_ColumnIndex(col) < 0) continue;
+                object cur = line.Get_Value(col);
+                if (cur != null && cur != DBNull.Value) continue;
+                line.Set_ValueNoCheck(col, hdr);
+            }
+        }
 
         /// <summary>
         /// Loads the parent shipment header values used as line context. Leaves M_InOut_ID
@@ -943,6 +977,15 @@ namespace VASLogic.Models
             data.C_BPartner_ID = Util.GetValueOfInt(LogicValue(data, "C_BPartner_ID"));
             data.C_Order_ID = Util.GetValueOfInt(LogicValue(data, "C_Order_ID"));
             data.MovementDate = ParseDate(LogicValue(data, "MovementDate"));
+            // The header's Date Required as a real date (ISO on the wire), for the line
+            // seed - the LogicContext copy is a culture-formatted string the panel cannot
+            // parse reliably. Whichever column the schema carries; null where neither does.
+            foreach (string dcol in new string[] { "DateRequired", "DTD001_DateRequired" })
+            {
+                if (r[dcol] == DBNull.Value) continue;
+                DateTime? dr = Util.GetValueOfDateTime(r[dcol]);
+                if (dr.HasValue) { data.DateRequired = DateTime.SpecifyKind(dr.Value.Date, DateTimeKind.Unspecified); break; }
+            }
             data.DocStatus = Util.GetValueOfString(r["DocStatus"]);
             data.Processed = Util.GetValueOfString(r["Processed"]) == "Y";
             data.IsEditable = !data.Processed
@@ -2004,7 +2047,10 @@ namespace VASLogic.Models
                     // A charge line has no product to take a unit from; the framework does not
                     // set one either, and a line without a unit fails to save.
                     if (uom <= 0 && input.C_Charge_ID > 0) uom = MUOM.GetDefault_UOM_ID(ctx);
-                    if (uom > 0) line.SetC_UOM_ID(uom);
+                    // NoCheck (17-Sep-2026): the typed setter goes through Set_Value, which
+                    // refuses a column the dictionary marks non-updateable, and the unit was
+                    // then silently never written. Same rule as VAS_240 / VAS_247.
+                    if (uom > 0) line.Set_ValueNoCheck("C_UOM_ID", uom);
 
                     decimal entered = input.QtyEntered > 0 ? input.QtyEntered : (input.MovementQty > 0 ? input.MovementQty : 1);
                     line.SetQtyEntered(entered);
@@ -2019,6 +2065,10 @@ namespace VASLogic.Models
                         ? new HashSet<string>(input.TouchedCols, StringComparer.OrdinalIgnoreCase)
                         : null;
                     ApplyExtraColumns(line, input.Values, touchedCols);
+
+                    // Date Required defaults from the header, under whichever name the line
+                    // carries (DTD001_DateRequired first), where nothing has set it.
+                    ApplyHeaderDateRequired(line, inout);
 
                     if (!line.Save())
                     {
@@ -2183,6 +2233,9 @@ namespace VASLogic.Models
         /// <summary>Header warehouse — the locator list is scoped to it.</summary>
         public int M_Warehouse_ID { get; set; }
         public DateTime? MovementDate { get; set; }
+        /// <summary>The header's Date Required (either column name), as a date; null where
+        /// the schema has none. What a new line's own Date Required is seeded from.</summary>
+        public DateTime? DateRequired { get; set; }
         /// <summary>
         /// Header values that M_InOutLine field DisplayLogic / ReadOnlyLogic name as tokens.
         /// A column that is NULL on the shipment is ABSENT from this bag, which the client

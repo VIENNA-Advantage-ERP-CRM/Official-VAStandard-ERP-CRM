@@ -20,10 +20,12 @@
  *                  Data comes from VAS_291_GLJournalRightPanel/GetJournalOverview
  *                  in one read. The Approval routing steps are composed HERE
  *                  from the facts the server reports (creator, human workflow
- *                  activities, document status, posting status + moment, period
- *                  control) so every step title is localised through
- *                  VIS.Msg. Exactly one step is ever "active": the first one
- *                  that is neither done nor blocked.
+ *                  activities, document status, posting status + moment) so
+ *                  every step title is localised through VIS.Msg. Exactly one
+ *                  step is ever "active": the first one that is neither done
+ *                  nor blocked. Drawn as the rail the payment panel (VAS_191)
+ *                  uses - a state-toned marker node, a hairline connector and
+ *                  plain title + meta text, no tinted card per step.
  *
  *                  Print voucher and Download PDF both run the hosting tab's
  *                  print process through JsonData/GeneratePrint (same path as
@@ -60,6 +62,9 @@
  *                        posting type; lines paged on the server at 50 per
  *                        request; "Open Line Details" switches the hosting
  *                        window to the line tab instead of zooming.
+ *   VAI145   2026-09-18  Approval routing redrawn as the VAS_191 rail (same
+ *                        steps and states, no tinted cards); Period close
+ *                        lock step dropped.
  *
  * -- Labels / Message Keys ---------------------------------------------------
  *  Panel
@@ -103,9 +108,6 @@
  *   Posted to ledger                      | VAS_291_PostedToLedger
  *   System                                | VAS_291_System
  *   not posted yet                        | VAS_291_NotPostedYet
- *   Period close lock                     | VAS_291_PeriodCloseLock
- *   Period closed                         | VAS_291_PeriodClosed
- *   {0} ends {1}                          | VAS_291_PeriodEnds
  * ---------------------------------------------------------------------------
  ***********************************************************/
 ; VAS = window.VAS || {};
@@ -196,7 +198,9 @@
             debit: '<svg ' + SVG_ATTR + '><path d="M17 7 7 17"/><path d="M17 17H7V7"/></svg>',
             credit: '<svg ' + SVG_ATTR + '><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>',
             prev: '<svg ' + SVG_ATTR + '><path d="m15 18-6-6 6-6"/></svg>',
-            next: '<svg ' + SVG_ATTR + '><path d="m9 18 6-6-6-6"/></svg>'
+            next: '<svg ' + SVG_ATTR + '><path d="m9 18 6-6-6-6"/></svg>',
+            check: '<svg ' + SVG_ATTR.replace('stroke-width="2"', 'stroke-width="3"') + '><path d="M20 6 9 17l-5-5"/></svg>',
+            cross: '<svg ' + SVG_ATTR.replace('stroke-width="2"', 'stroke-width="3"') + '><path d="M18 6 6 18M6 6l12 12"/></svg>'
         };
 
         function icon(name) {
@@ -324,7 +328,6 @@
            reversed - that is when an empty lines section is worth showing. */
         function isEditable() { return !!(data && !isCompletedOrClosed() && !isReversedOrVoided()); }
         function isBalanced() { return !!(data && Math.abs((+data.TotalDr || 0) - (+data.TotalCr || 0)) < 0.000001); }
-        function isPeriodClosed() { return !!(data && (data.PeriodStatus === "C" || data.PeriodStatus === "P")); }
 
         /* Hero tone follows the headline fact: posted = success, reversed /
            voided = risk, a failed posting = warning, anything still moving = info. */
@@ -576,7 +579,8 @@
             $body.append(renderActions());
             var $lines = renderLines();
             if ($lines) $body.append($lines);
-            $body.append(renderRouting());
+            var $routing = renderRouting();
+            if ($routing) $body.append($routing);
 
             resetScroll();
         }
@@ -912,7 +916,7 @@
             });
         }
 
-        /* 9 · Step flow - approval routing -------------------------------- */
+        /* 9 · Approval routing rail ---------------------------------------- */
 
         /* Composes the routing from the facts the server reports. Titles are
            localised here; the server only tells what happened.
@@ -920,7 +924,6 @@
              2. workflow steps      - one per human workflow activity
              3. Completed           - document status
              4. Posted to ledger    - posting status + moment + batch
-             5. Period close lock   - period control of the journal's period
            Exactly one step is active: the first that is neither done nor
            blocked. Every step after a blocked one is pending. */
         function buildSteps() {
@@ -986,37 +989,24 @@
                 });
             }
 
-            /* The period lock is nobody's task - it happens to the journal when
-               the period closes - so while open it stays pending rather than
-               taking the active slot. */
-            if (isPeriodClosed()) {
-                steps.push({
-                    title: msg("VAS_291_PeriodClosed", "Period closed"),
-                    meta: joinBits([data.PeriodName, data.PeriodStatusName]),
-                    state: "done"
-                });
-            } else {
-                steps.push({
-                    title: msg("VAS_291_PeriodCloseLock", "Period close lock"),
-                    meta: fmt(msg("VAS_291_PeriodEnds", "{0} ends {1}"), data.PeriodName || "", fmtDate(data.PeriodEndDate)),
-                    state: "pending",
-                    passive: true
-                });
-            }
-
             /* One active step at most: the first one that is still open. Once a
                step is blocked nothing after it can be reached, so those read as
-               pending too. A passive step never takes the active slot. */
+               pending too. */
             var activeSeen = false, blockedSeen = false;
             for (var s = 0; s < steps.length; s++) {
                 if (steps[s].state === "blocked") { blockedSeen = true; continue; }
                 if (steps[s].state === "done") continue;
-                if (steps[s].passive || blockedSeen || activeSeen) steps[s].state = "pending";
+                if (blockedSeen || activeSeen) steps[s].state = "pending";
                 else { steps[s].state = "active"; activeSeen = true; }
             }
             return steps;
         }
 
+        /* Drawn as the rail the payment panel (VAS_191) uses - a marker node per
+           step, a hairline connector, title + meta in plain text, no tinted
+           card. The node carries the state: done = filled green check,
+           active = blue ring with a dot, pending = grey ring, blocked = filled
+           red cross. */
         function renderRouting() {
             var steps = buildSteps();
             var done = 0;
@@ -1028,21 +1018,30 @@
                 fmt(msg("VAS_291_StepsComplete", "{0} of {1} complete"), done, steps.length),
                 null));
 
-            var $flow = $('<div class="' + CLS + 'steps"></div>');
+            var $rail = $('<div class="' + CLS + 'vsteps"></div>');
             for (var j = 0; j < steps.length; j++) {
                 var st = steps[j];
-                var $step = $('<div class="' + CLS + 'step ' + CLS + 'is-' + st.state + '"></div>');
-                var $rail = $('<span class="' + CLS + 'stepRail"></span>');
-                $rail.append($('<span class="' + CLS + 'stepDot"></span>'));
-                if (j < steps.length - 1) $rail.append($('<span class="' + CLS + 'stepTrail"></span>'));
-                $step.append($rail);
-                var $card = $('<div class="' + CLS + 'stepCard"></div>');
-                $card.append($('<div class="' + CLS + 'stepTitle"></div>').text(st.title).attr("title", st.title));
-                if (st.meta) $card.append($('<div class="' + CLS + 'stepMeta"></div>').text(st.meta).attr("title", st.meta));
-                $step.append($card);
-                $flow.append($step);
+                var $step = $('<div class="' + CLS + 'vstep ' + CLS + 'is-' + st.state + '"></div>');
+
+                var $r = $('<div class="' + CLS + 'rail"></div>');
+                var $node = $('<div class="' + CLS + 'node"></div>');
+                if (st.state === "done") $node.append(icon("check"));
+                else if (st.state === "blocked") $node.append(icon("cross"));
+                else if (st.state === "active") $node.append($('<span class="' + CLS + 'nodeDot"></span>'));
+                $r.append($node);
+                /* The connector is drawn by every step but the last, which has
+                   nothing below it to connect to. */
+                if (j < steps.length - 1) $r.append($('<div class="' + CLS + 'line"></div>'));
+                $step.append($r);
+
+                var $c = $('<div class="' + CLS + 'vc"></div>');
+                $c.append($('<div class="' + CLS + 'st"></div>').text(st.title).attr("title", st.title));
+                if (st.meta) $c.append($('<div class="' + CLS + 'mt"></div>').text(st.meta).attr("title", st.meta));
+                $step.append($c);
+
+                $rail.append($step);
             }
-            $sec.append($flow);
+            $sec.append($rail);
             return $sec;
         }
 

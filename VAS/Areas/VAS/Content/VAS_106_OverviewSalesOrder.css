@@ -185,6 +185,9 @@
  *                        of more detail. The tooltip is unchanged and the class is
  *                        kept, so the markup and the stylesheet still name the
  *                        same cell.
+ *   VAI163   2026-09-17  Added .vas_106-rdTag.vas_106-closed: the Delivery
+ *                        Readiness state for a closed order's line that was
+ *                        closed short. Grey — settled, not in question.
  ***********************************************************/
 
 .vas_106-root {
@@ -867,6 +870,10 @@ select.vas_106-ffInput { appearance: none; -webkit-appearance: none; cursor: poi
 .vas_106-rdTag.vas_106-partial .vas_106-rdDot { background: var(--vaso-info-tx); }
 .vas_106-rdTag.vas_106-awaited { background: var(--vaso-risk-bg); color: var(--vaso-risk-tx); }
 .vas_106-rdTag.vas_106-awaited .vas_106-rdDot { background: var(--vaso-risk-tx); }
+/* The order was closed with part of the line still to deliver. Grey: the question
+   is settled, not answered — nothing is pending and nothing is wrong with stock. */
+.vas_106-rdTag.vas_106-closed  { background: var(--vaso-neutral-bg); color: var(--vaso-neutral-tx); }
+.vas_106-rdTag.vas_106-closed .vas_106-rdDot { background: var(--vaso-neutral-tx); }
 
 .vas_106-note { display: flex; align-items: flex-start; gap: 0.5em; margin-top: 0.625em; font-size: 0.72em; color: var(--vaso-muted); line-height: 1.5; }
 .vas_106-note .vas_106-ic { color: var(--vaso-primary); margin-top: 0.1em; }

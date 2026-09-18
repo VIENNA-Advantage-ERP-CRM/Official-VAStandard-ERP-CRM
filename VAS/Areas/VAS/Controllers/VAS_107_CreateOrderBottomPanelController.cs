@@ -115,6 +115,27 @@ namespace VAS.Controllers
         }
 
         /// <summary>
+        /// The blanket order line a release line is raised against — product, open
+        /// quantity, UOM, prices, tax and organisation — so the panel can fill the
+        /// release line from it when the user picks it in Additional Info.
+        /// </summary>
+        /// <param name="C_OrderLine_ID">the blanket order line</param>
+        /// <returns>serialized OrderBlanketLineData (C_OrderLine_ID = 0 when not found)</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetBlanketLine(int C_OrderLine_ID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_107_CreateOrderBottomPanelModel model = new VAS_107_CreateOrderBottomPanelModel();
+                retJSON = JsonConvert.SerializeObject(model.GetBlanketLine(ctx, C_OrderLine_ID));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
         /// Server-side line callout: recomputes UOM / price / tax / amounts for
         /// the current product-charge-qty-price-tax selection.
         /// </summary>
